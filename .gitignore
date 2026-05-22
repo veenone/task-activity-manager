@@ -1,0 +1,20 @@
+# Wails / frontend build output
+build/bin
+node_modules
+frontend/dist
+
+# Go
+*.exe
+*.test
+*.out
+
+# Local database (portable-mode DB, if ever placed in-repo)
+*.db
+*.db-journal
+*.db-wal
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
