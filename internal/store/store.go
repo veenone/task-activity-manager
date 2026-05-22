@@ -13,11 +13,14 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// schemaVersion is bumped whenever the schema changes; migrations run on Open.
-const schemaVersion = 1
+// schemaVersion is bumped whenever the schema changes.
+//
+// TODO(xtm): replace additive CREATE IF NOT EXISTS with versioned migrations
+// once the schema starts changing existing columns.
+const schemaVersion = 2
 
-// schema is the initial database layout. The full Xray entity model (FR-13)
-// is added in later phases; Phase 0 only needs metadata and profiles.
+// schema is the database layout. Tables holding Xray data are scoped by
+// profile_id so each profile owns an isolated dataset (FR-5.3).
 const schema = `
 CREATE TABLE IF NOT EXISTS meta (
 	key   TEXT PRIMARY KEY,
@@ -31,6 +34,28 @@ CREATE TABLE IF NOT EXISTS profiles (
 	project_key TEXT NOT NULL,
 	created_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS sync_state (
+	profile_id     TEXT PRIMARY KEY,
+	last_synced_at TEXT,
+	test_count     INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS test_case (
+	profile_id  TEXT NOT NULL,
+	jira_key    TEXT NOT NULL,
+	jira_id     TEXT NOT NULL,
+	summary     TEXT NOT NULL,
+	description TEXT NOT NULL DEFAULT '',
+	status      TEXT NOT NULL DEFAULT '',
+	priority    TEXT NOT NULL DEFAULT '',
+	labels      TEXT NOT NULL DEFAULT '',
+	updated_at  TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, jira_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_test_case_status  ON test_case(profile_id, status);
+CREATE INDEX IF NOT EXISTS idx_test_case_updated ON test_case(profile_id, updated_at);
 `
 
 // Store wraps the SQLite connection for one local database file.

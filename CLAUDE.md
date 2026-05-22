@@ -34,6 +34,8 @@ internal/
   jira/              Jira DC + Xray Server REST client
   store/             SQLite local store and schema
   profile/           Connection profiles + OS credential storage
+  testrepo/          Local Test repository — browse / search / filter queries
+  syncer/            Pull-sync engine — Jira -> local store
 frontend/            React + TypeScript (Vite), rendered in WebView2
 build/               Wails build assets and output
 ```
@@ -59,7 +61,7 @@ go build ./... # compile-check the Go backend only
 
 ## Current status
 
-Phase 0 (Foundations) scaffold. Backend packages are skeletons: `jira.Client`
-performs a real connection test; `store.Store` opens the database and applies
-the initial schema; `profile.Manager` and the credential store are wired stubs
-(`TODO(xtm)`) to be built out per the roadmap.
+Phase 1 backend. Profiles and Windows credential storage are implemented; the
+local store caches Test data; `jira.Client` does paginated Test search;
+`syncer.Engine` runs a full pull sync; `testrepo.Repository` serves the
+browse / search / filter queries. The React browse grid is the next slice.

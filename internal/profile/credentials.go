@@ -1,5 +1,14 @@
 package profile
 
+import (
+	"fmt"
+
+	"github.com/danieljoos/wincred"
+)
+
+// credentialPrefix namespaces this app's entries in Windows Credential Manager.
+const credentialPrefix = "xray-test-manager:"
+
 // CredentialStore persists per-profile secrets (a PAT or password) in the
 // operating system credential manager — never in the database, never in
 // plaintext, never in logs (FR-8.3, NFR-3).
@@ -12,10 +21,8 @@ type CredentialStore interface {
 	Delete(profileID string) error
 }
 
-// windowsCredentialStore backs CredentialStore with Windows Credential Manager
-// (DPAPI-protected entries).
-//
-// TODO(xtm): implement using github.com/danieljoos/wincred (FR-8.3).
+// windowsCredentialStore backs CredentialStore with Windows Credential Manager,
+// whose entries are DPAPI-protected per user account.
 type windowsCredentialStore struct{}
 
 // NewCredentialStore returns the OS-native credential store. Windows is the
@@ -25,13 +32,29 @@ func NewCredentialStore() CredentialStore {
 }
 
 func (w *windowsCredentialStore) Save(profileID, secret string) error {
-	return ErrNotImplemented
+	cred := wincred.NewGenericCredential(credentialPrefix + profileID)
+	cred.CredentialBlob = []byte(secret)
+	if err := cred.Write(); err != nil {
+		return fmt.Errorf("store credential: %w", err)
+	}
+	return nil
 }
 
 func (w *windowsCredentialStore) Load(profileID string) (string, error) {
-	return "", ErrNotImplemented
+	cred, err := wincred.GetGenericCredential(credentialPrefix + profileID)
+	if err != nil {
+		return "", fmt.Errorf("load credential: %w", err)
+	}
+	return string(cred.CredentialBlob), nil
 }
 
 func (w *windowsCredentialStore) Delete(profileID string) error {
-	return ErrNotImplemented
+	cred, err := wincred.GetGenericCredential(credentialPrefix + profileID)
+	if err != nil {
+		return fmt.Errorf("find credential to delete: %w", err)
+	}
+	if err := cred.Delete(); err != nil {
+		return fmt.Errorf("delete credential: %w", err)
+	}
+	return nil
 }
