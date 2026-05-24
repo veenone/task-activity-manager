@@ -105,8 +105,10 @@ func (a *App) TestConnection(jiraURL, token string) (string, error) {
 	return user.DisplayName, nil
 }
 
-// SyncProfile runs a full pull sync for a profile, emitting "sync:progress"
-// events to the frontend as pages complete (FR-1.1).
+// SyncProfile syncs a profile, emitting "sync:progress" events to the
+// frontend as pages complete. The first sync (no watermark) is a full pull;
+// subsequent syncs use the previous sync's timestamp as a watermark for an
+// incremental fetch (FR-1.1 / FR-1.2).
 func (a *App) SyncProfile(profileID string) error {
 	p, err := a.profiles.Get(profileID)
 	if err != nil {
@@ -116,8 +118,12 @@ func (a *App) SyncProfile(profileID string) error {
 	if err != nil {
 		return fmt.Errorf("load credentials: %w", err)
 	}
+	state, err := a.repo.GetSyncState(profileID)
+	if err != nil {
+		return fmt.Errorf("read sync state: %w", err)
+	}
 	engine := syncer.New(jira.NewClient(p.JiraURL, token), a.repo)
-	return engine.FullSync(a.ctx, profileID, p.ProjectKey, func(pr syncer.Progress) {
+	return engine.Sync(a.ctx, profileID, p.ProjectKey, state.LastSyncedAt, func(pr syncer.Progress) {
 		runtime.EventsEmit(a.ctx, "sync:progress", pr)
 	})
 }

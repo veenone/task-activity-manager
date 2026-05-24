@@ -184,6 +184,32 @@ func TestReplaceAllTestPreconditionsClearsStaleLinks(t *testing.T) {
 	}
 }
 
+func TestSetSyncStateReflectsCurrentRowCount(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "a"},
+		{Key: "QA-2", ID: "2", Summary: "b"},
+		{Key: "QA-3", ID: "3", Summary: "c"},
+	}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	if err := repo.SetSyncState("p1"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+
+	state, err := repo.GetSyncState("p1")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if state.TestCount != 3 {
+		t.Errorf("TestCount = %d, want 3 (derived from current rows)", state.TestCount)
+	}
+	if state.LastSyncedAt == "" {
+		t.Errorf("LastSyncedAt should be set, got empty")
+	}
+}
+
 // seedFolders populates a fresh repo with three tests across two folder
 // branches so the FolderID filter tests can exercise leaf and ancestor
 // selections.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 // Test is a Jira issue of type Test, flattened to the fields the app caches.
@@ -44,15 +45,23 @@ type searchResponse struct {
 	} `json:"issues"`
 }
 
-// SearchTestsPage fetches one page of Test issues for a project, beginning at
-// startAt. It returns the page of tests and the total reported by Jira, so the
-// caller can page until every Test is retrieved (FR-1.1).
-func (c *Client) SearchTestsPage(ctx context.Context, projectKey string, startAt, maxResults int) ([]Test, int, error) {
+// SearchTestsPage fetches one page of Test issues for a project, beginning
+// at startAt. If `since` is non-empty (RFC3339), only Tests updated at or
+// after that time are returned — the incremental-sync path (FR-1.2). The
+// caller pages until the total reported by Jira is reached.
+func (c *Client) SearchTestsPage(ctx context.Context, projectKey, since string, startAt, maxResults int) ([]Test, int, error) {
 	if isDemoURL(c.baseURL) {
+		// Demo mode ignores `since` so an incremental sync still fills the
+		// progress bar against the regenerated dataset.
 		tests, total := demoTestsPage(projectKey, startAt, maxResults)
 		return tests, total, nil
 	}
-	jql := fmt.Sprintf("project = %s AND issuetype = Test ORDER BY updated ASC", projectKey)
+	jql := fmt.Sprintf("project = %s AND issuetype = Test", projectKey)
+	if extra := incrementalSinceClause(since); extra != "" {
+		jql += " AND " + extra
+	}
+	jql += " ORDER BY updated ASC"
+
 	q := url.Values{}
 	q.Set("jql", jql)
 	q.Set("startAt", strconv.Itoa(startAt))
@@ -83,6 +92,22 @@ func (c *Client) SearchTestsPage(ctx context.Context, projectKey string, startAt
 		tests = append(tests, t)
 	}
 	return tests, resp.Total, nil
+}
+
+// incrementalSinceClause builds the JQL fragment for an updated-since filter.
+// A 1-hour safety buffer is subtracted from the watermark to absorb clock
+// skew and Jira's server-timezone interpretation of bare date literals — a
+// small overlap is harmless because UpsertTests is idempotent.
+func incrementalSinceClause(rfc3339 string) string {
+	if rfc3339 == "" {
+		return ""
+	}
+	t, err := time.Parse(time.RFC3339, rfc3339)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf(`updated >= "%s"`,
+		t.Add(-time.Hour).Format("2006-01-02 15:04"))
 }
 
 // TODO(xtm): Test Steps (Xray /rest/raven/2.0/api/test/{key}/step) are fetched

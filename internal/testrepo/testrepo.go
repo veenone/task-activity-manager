@@ -345,14 +345,22 @@ func (r *Repository) GetTest(profileID, key string) (TestCase, error) {
 	return t, err
 }
 
-// SetSyncState records that a profile finished syncing with testCount Tests.
-func (r *Repository) SetSyncState(profileID string, testCount int) error {
+// SetSyncState records that a profile finished syncing now. The test count
+// is derived from the current row count so the state stays accurate after
+// both full and incremental syncs.
+func (r *Repository) SetSyncState(profileID string) error {
+	var count int
+	if err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM test_case WHERE profile_id = ?`, profileID,
+	).Scan(&count); err != nil {
+		return fmt.Errorf("count tests for sync state: %w", err)
+	}
 	_, err := r.db.Exec(
 		`INSERT INTO sync_state (profile_id, last_synced_at, test_count) VALUES (?, ?, ?)
 		 ON CONFLICT(profile_id) DO UPDATE SET
 		   last_synced_at = excluded.last_synced_at,
 		   test_count     = excluded.test_count`,
-		profileID, time.Now().UTC().Format(time.RFC3339), testCount)
+		profileID, time.Now().UTC().Format(time.RFC3339), count)
 	if err != nil {
 		return fmt.Errorf("set sync state: %w", err)
 	}

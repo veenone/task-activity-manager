@@ -36,11 +36,12 @@ func New(client *jira.Client, repo *testrepo.Repository) *Engine {
 	return &Engine{client: client, repo: repo}
 }
 
-// FullSync pulls the Test Repository folder tree, every Test for the project,
-// and the project's Preconditions (with their test links) into the local
-// store, calling onProgress after each Test page. Upserts are idempotent, so
-// an interrupted sync is safe to re-run.
-func (e *Engine) FullSync(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
+// Sync pulls the Test Repository folder tree, the project's Tests, and the
+// project's Preconditions into the local store, calling onProgress after each
+// Test page. If `since` is empty, this is a full sync; otherwise it is an
+// incremental sync that only fetches Tests updated since the watermark
+// (FR-1.2). Upserts are idempotent, so an interrupted sync is safe to re-run.
+func (e *Engine) Sync(ctx context.Context, profileID, projectKey, since string, onProgress func(Progress)) error {
 	if err := e.syncFolders(ctx, profileID, projectKey); err != nil {
 		return err
 	}
@@ -53,7 +54,7 @@ func (e *Engine) FullSync(ctx context.Context, profileID, projectKey string, onP
 			return err
 		}
 
-		tests, pageTotal, err := e.client.SearchTestsPage(ctx, projectKey, fetched, pageSize)
+		tests, pageTotal, err := e.client.SearchTestsPage(ctx, projectKey, since, fetched, pageSize)
 		if err != nil {
 			return fmt.Errorf("fetch page at offset %d: %w", fetched, err)
 		}
@@ -80,7 +81,7 @@ func (e *Engine) FullSync(ctx context.Context, profileID, projectKey string, onP
 		return err
 	}
 
-	if err := e.repo.SetSyncState(profileID, fetched); err != nil {
+	if err := e.repo.SetSyncState(profileID); err != nil {
 		return err
 	}
 	if onProgress != nil {

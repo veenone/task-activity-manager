@@ -1,6 +1,9 @@
 package jira
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIsDemoURLRecognisesDemoSchemes(t *testing.T) {
 	cases := map[string]bool{
@@ -52,5 +55,32 @@ func TestMakeDemoTestIsDeterministic(t *testing.T) {
 	b := makeDemoTest("QA", 42)
 	if a.Summary != b.Summary || a.Status != b.Status || a.Key != b.Key {
 		t.Errorf("makeDemoTest not deterministic: %+v vs %+v", a, b)
+	}
+}
+
+func TestIncrementalSinceClauseEmptyReturnsEmpty(t *testing.T) {
+	if got := incrementalSinceClause(""); got != "" {
+		t.Errorf("empty input should yield empty clause, got %q", got)
+	}
+}
+
+func TestIncrementalSinceClauseBuildsJQLWithHourBuffer(t *testing.T) {
+	// 13:00 UTC minus the 1-hour buffer => 12:00 should appear in the clause.
+	clause := incrementalSinceClause("2026-05-20T13:00:00Z")
+
+	if !strings.HasPrefix(clause, `updated >= "`) {
+		t.Errorf("missing JQL prefix in %q", clause)
+	}
+	if !strings.Contains(clause, "2026-05-20") {
+		t.Errorf("date missing from clause %q", clause)
+	}
+	if !strings.Contains(clause, "12:00") {
+		t.Errorf("1-hour buffer not applied: clause = %q", clause)
+	}
+}
+
+func TestIncrementalSinceClauseToleratesBadInput(t *testing.T) {
+	if got := incrementalSinceClause("not-a-time"); got != "" {
+		t.Errorf("bad input should yield empty clause, got %q", got)
 	}
 }
