@@ -247,6 +247,50 @@ tr.row-selected {
   padding: 8px 14px;
 }
 
+/* Folder tree */
+.folder-tree {
+  width: 240px;
+  flex-shrink: 0;
+  background: #fafbfc;
+  border-right: 1px solid #dfe1e6;
+  overflow: auto;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folder-item:hover {
+  background: #eef0f3;
+}
+.folder-selected {
+  background: #e1e8ff !important;
+  color: #2f49b3;
+  font-weight: 500;
+}
+.folder-caret {
+  width: 12px;
+  display: inline-block;
+  color: #6b7280;
+  text-align: center;
+  flex-shrink: 0;
+}
+.folder-caret-toggle {
+  cursor: pointer;
+}
+.folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Detail drawer */
 .detail {
   width: 420px;

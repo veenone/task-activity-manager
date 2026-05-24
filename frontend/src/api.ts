@@ -11,6 +11,7 @@ export {
   TestConnection,
   SyncProfile,
   GetSyncState,
+  ListFolders,
   ListTests,
   GetTest,
 } from "../wailsjs/go/main/App";
@@ -33,6 +34,7 @@ export interface TestCase {
   priority: string;
   labels: string[];
   updated: string;
+  folderId: string;
 }
 
 export interface TestPage {
@@ -43,6 +45,7 @@ export interface TestPage {
 export interface TestQuery {
   search: string;
   status: string;
+  folderId: string;
   sortBy: string;
   desc: boolean;
   limit: number;
@@ -53,6 +56,12 @@ export interface SyncState {
   profileId: string;
   lastSyncedAt: string;
   testCount: number;
+}
+
+export interface Folder {
+  id: string;
+  parentId: string;
+  name: string;
 }
 
 // SyncProgress mirrors the Go syncer.Progress payload emitted on "sync:progress".

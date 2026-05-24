@@ -8,19 +8,19 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
 
 // schemaVersion is bumped whenever the schema changes.
-//
-// TODO(xtm): replace additive CREATE IF NOT EXISTS with versioned migrations
-// once the schema starts changing existing columns.
-const schemaVersion = 2
+const schemaVersion = 3
 
-// schema is the database layout. Tables holding Xray data are scoped by
-// profile_id so each profile owns an isolated dataset (FR-5.3).
+// schema is the canonical database layout for a fresh install. Existing
+// databases are upgraded by applyMigrations.
 const schema = `
 CREATE TABLE IF NOT EXISTS meta (
 	key   TEXT PRIMARY KEY,
@@ -41,6 +41,16 @@ CREATE TABLE IF NOT EXISTS sync_state (
 	test_count     INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS test_folder (
+	profile_id TEXT NOT NULL,
+	id         TEXT NOT NULL,
+	parent_id  TEXT NOT NULL DEFAULT '',
+	name       TEXT NOT NULL,
+	PRIMARY KEY (profile_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_test_folder_parent ON test_folder(profile_id, parent_id);
+
 CREATE TABLE IF NOT EXISTS test_case (
 	profile_id  TEXT NOT NULL,
 	jira_key    TEXT NOT NULL,
@@ -51,11 +61,13 @@ CREATE TABLE IF NOT EXISTS test_case (
 	priority    TEXT NOT NULL DEFAULT '',
 	labels      TEXT NOT NULL DEFAULT '',
 	updated_at  TEXT NOT NULL DEFAULT '',
+	folder_id   TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, jira_key)
 );
 
 CREATE INDEX IF NOT EXISTS idx_test_case_status  ON test_case(profile_id, status);
 CREATE INDEX IF NOT EXISTS idx_test_case_updated ON test_case(profile_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_test_case_folder  ON test_case(profile_id, folder_id);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -63,8 +75,8 @@ type Store struct {
 	db *sql.DB
 }
 
-// Open opens (creating if absent) the SQLite database at path and applies the
-// current schema.
+// Open opens (creating if absent) the SQLite database at path, applies the
+// canonical schema, and runs any upgrade migrations.
 func Open(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -73,6 +85,10 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
+	}
+	if err := applyMigrations(db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("apply migrations: %w", err)
 	}
 	if _, err := db.Exec(
 		"INSERT INTO meta (key, value) VALUES ('schema_version', ?) "+
@@ -83,6 +99,46 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("record schema version: %w", err)
 	}
 	return &Store{db: db}, nil
+}
+
+// applyMigrations upgrades older databases to the current schema. Fresh
+// installs already match the canonical layout via CREATE TABLE IF NOT EXISTS;
+// this function handles the deltas for in-place upgrades from earlier
+// versions.
+func applyMigrations(db *sql.DB) error {
+	current, err := readSchemaVersion(db)
+	if err != nil {
+		return err
+	}
+
+	// v3: add folder_id to test_case. Fresh installs already have it from
+	// the CREATE above; this ALTER catches v1/v2 databases. The
+	// "duplicate column" error is tolerated so the migration is idempotent.
+	if current < 3 {
+		if _, err := db.Exec(
+			`ALTER TABLE test_case ADD COLUMN folder_id TEXT NOT NULL DEFAULT ''`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v3 add folder_id: %w", err)
+		}
+	}
+	return nil
+}
+
+// readSchemaVersion returns the recorded schema version, or 0 for a database
+// that has never had one written.
+func readSchemaVersion(db *sql.DB) (int, error) {
+	var raw string
+	err := db.QueryRow(
+		"SELECT value FROM meta WHERE key = 'schema_version'",
+	).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	v, _ := strconv.Atoi(raw)
+	return v, nil
 }
 
 // DB exposes the underlying connection for the repository layer.

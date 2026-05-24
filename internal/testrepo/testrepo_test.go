@@ -96,3 +96,45 @@ func TestGetTestUnknownKeyReturnsNotFound(t *testing.T) {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
+
+func TestListTestsFilterByLeafFolderReturnsOnlyThatFolder(t *testing.T) {
+	repo := seedFolders(t)
+
+	page, err := repo.ListTests("p1", testrepo.Query{FolderID: "/Authentication/Login"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if page.Total != 1 || page.Tests[0].Key != "QA-1" {
+		t.Errorf("leaf filter returned %+v, want only QA-1", page)
+	}
+}
+
+func TestListTestsFilterByCategoryFolderIncludesDescendants(t *testing.T) {
+	repo := seedFolders(t)
+
+	page, err := repo.ListTests("p1", testrepo.Query{FolderID: "/Authentication"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if page.Total != 2 {
+		t.Errorf("category filter Total = %d, want 2 (QA-1, QA-2 under /Authentication/*)", page.Total)
+	}
+}
+
+// seedFolders populates a fresh repo with three tests across two folder
+// branches so the FolderID filter tests can exercise leaf and ancestor
+// selections.
+func seedFolders(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login test", FolderID: "/Authentication/Login"},
+		{Key: "QA-2", ID: "2", Summary: "Logout test", FolderID: "/Authentication/Logout"},
+		{Key: "QA-3", ID: "3", Summary: "Search test", FolderID: "/Browse/Search"},
+	}); err != nil {
+		t.Fatalf("seed upsert: %v", err)
+	}
+	return repo
+}

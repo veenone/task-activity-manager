@@ -127,6 +127,13 @@ func (a *App) GetSyncState(profileID string) (testrepo.SyncState, error) {
 	return a.repo.GetSyncState(profileID)
 }
 
+// --- Test Repository (FR-13) ---
+
+// ListFolders returns the synced Test Repository folder tree for a profile.
+func (a *App) ListFolders(profileID string) ([]testrepo.Folder, error) {
+	return a.repo.ListFolders(profileID)
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.

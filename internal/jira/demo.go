@@ -9,8 +9,8 @@ import (
 // Demo mode generates fake Test data so the UI can be exercised without a
 // real Jira instance. A profile triggers demo mode when its Jira URL is
 // "demo", "demo://…", or "mock://…" (case-insensitive). Auth tokens are
-// ignored; TestConnection / SearchTestsPage short-circuit to the generators
-// in this file.
+// ignored; TestConnection / SearchTestsPage / ListFolders short-circuit to
+// the generators in this file.
 
 // demoTestCount is the size of the fake dataset — enough to exercise the
 // grid's pagination, search, filter and sort without being absurd.
@@ -25,8 +25,7 @@ func isDemoURL(baseURL string) bool {
 }
 
 // demoTestsPage returns the [startAt, startAt+maxResults) slice of the demo
-// dataset plus the dataset total — matching the signature SearchTestsPage
-// expects.
+// dataset plus the dataset total — matching SearchTestsPage's signature.
 func demoTestsPage(projectKey string, startAt, maxResults int) ([]Test, int) {
 	if projectKey == "" {
 		projectKey = "DEMO"
@@ -97,6 +96,54 @@ var demoLabels = []string{
 	"security", "performance",
 }
 
+// demoFolderCategories defines the demo Test Repository hierarchy. Feature
+// names match those in demoFeatures so each test slots into the matching
+// leaf folder.
+var demoFolderCategories = []struct {
+	Name     string
+	Features []string
+}{
+	{"Authentication", []string{"Login", "Logout", "User registration", "Password reset", "Multi-factor auth", "Session timeout"}},
+	{"Browse", []string{"Search", "Filter results", "Sort results", "Pagination"}},
+	{"Commerce", []string{"Checkout", "Cart", "Add to cart", "Remove from cart", "Payment", "Refund"}},
+	{"User", []string{"Profile update", "Settings", "Notifications"}},
+	{"Reporting", []string{"Dashboard", "Reports", "Export to CSV", "Import data"}},
+	{"Admin", []string{"Admin console", "Permissions", "Audit log"}},
+	{"System", []string{"API rate limit", "File upload", "File download", "Bulk operations"}},
+}
+
+// demoFolders returns the demo folder tree. Folder IDs are full paths so a
+// folder is uniquely identified by its location in the tree
+// ("/Authentication/Login").
+func demoFolders(_ string) []Folder {
+	out := make([]Folder, 0)
+	for _, cat := range demoFolderCategories {
+		catID := "/" + cat.Name
+		out = append(out, Folder{ID: catID, ParentID: "", Name: cat.Name})
+		for _, feat := range cat.Features {
+			out = append(out, Folder{
+				ID:       catID + "/" + feat,
+				ParentID: catID,
+				Name:     feat,
+			})
+		}
+	}
+	return out
+}
+
+// demoFolderForFeature returns the leaf folder ID holding tests for a given
+// feature, or empty if the feature isn't mapped.
+func demoFolderForFeature(feature string) string {
+	for _, cat := range demoFolderCategories {
+		for _, f := range cat.Features {
+			if f == feature {
+				return "/" + cat.Name + "/" + f
+			}
+		}
+	}
+	return ""
+}
+
 // makeDemoTest builds a deterministic Test for index i, so repeated syncs of
 // a demo profile are idempotent.
 func makeDemoTest(projectKey string, i int) Test {
@@ -139,5 +186,6 @@ func makeDemoTest(projectKey string, i int) Test {
 		Priority:    priority,
 		Labels:      labels,
 		Updated:     updated,
+		FolderID:    demoFolderForFeature(feature),
 	}
 }

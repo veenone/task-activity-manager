@@ -27,17 +27,27 @@ type TestCase struct {
 	Priority    string   `json:"priority"`
 	Labels      []string `json:"labels"`
 	Updated     string   `json:"updated"`
+	FolderID    string   `json:"folderId"`
 }
 
-// Query drives a ListTests call: free-text search, an optional status filter,
-// sorting, and paging (FR-11).
+// Folder is one node in the Xray Test Repository tree (FR-13.1). The ID is
+// the folder's full path ("/Authentication/Login"), so ParentID + Name + ID
+// together describe the tree without any extra lookup tables.
+type Folder struct {
+	ID       string `json:"id"`
+	ParentID string `json:"parentId"`
+	Name     string `json:"name"`
+}
+
+// Query drives a ListTests call: free-text search, filters, sorting, paging.
 type Query struct {
-	Search string `json:"search"` // matched against key, summary and description
-	Status string `json:"status"` // exact status filter; empty means any
-	SortBy string `json:"sortBy"` // key | summary | status | updated
-	Desc   bool   `json:"desc"`
-	Limit  int    `json:"limit"` // page size; defaults to 100, capped at 500
-	Offset int    `json:"offset"`
+	Search   string `json:"search"`
+	Status   string `json:"status"`
+	FolderID string `json:"folderId"` // empty = any folder
+	SortBy   string `json:"sortBy"`
+	Desc     bool   `json:"desc"`
+	Limit    int    `json:"limit"`
+	Offset   int    `json:"offset"`
 }
 
 // Page is one page of list results plus the total matching count.
@@ -62,7 +72,7 @@ var sortColumns = map[string]string{
 	"updated": "updated_at",
 }
 
-// Repository reads and writes cached Test data, scoped per profile.
+// Repository reads and writes cached data, scoped per profile.
 type Repository struct {
 	db *sql.DB
 }
@@ -72,8 +82,7 @@ func NewRepository(s *store.Store) *Repository {
 	return &Repository{db: s.DB()}
 }
 
-// UpsertTests inserts or updates a batch of Tests for a profile in one
-// transaction. It is idempotent, so a re-run of sync is safe.
+// UpsertTests inserts or updates a batch of Tests in one transaction.
 func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -83,8 +92,8 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 
 	stmt, err := tx.Prepare(
 		`INSERT INTO test_case
-		   (profile_id, jira_key, jira_id, summary, description, status, priority, labels, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		   (profile_id, jira_key, jira_id, summary, description, status, priority, labels, updated_at, folder_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
 		   jira_id     = excluded.jira_id,
 		   summary     = excluded.summary,
@@ -92,7 +101,8 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 		   status      = excluded.status,
 		   priority    = excluded.priority,
 		   labels      = excluded.labels,
-		   updated_at  = excluded.updated_at`)
+		   updated_at  = excluded.updated_at,
+		   folder_id   = excluded.folder_id`)
 	if err != nil {
 		return fmt.Errorf("prepare upsert: %w", err)
 	}
@@ -101,7 +111,8 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 	for _, t := range tests {
 		if _, err := stmt.Exec(
 			profileID, t.Key, t.ID, t.Summary, t.Description,
-			t.Status, t.Priority, strings.Join(t.Labels, " "), t.Updated,
+			t.Status, t.Priority, strings.Join(t.Labels, " "),
+			t.Updated, t.FolderID,
 		); err != nil {
 			return fmt.Errorf("upsert %s: %w", t.Key, err)
 		}
@@ -109,7 +120,58 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 	return tx.Commit()
 }
 
+// UpsertFolders inserts or updates a batch of Test Repository folders.
+func (r *Repository) UpsertFolders(profileID string, folders []Folder) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(
+		`INSERT INTO test_folder (profile_id, id, parent_id, name)
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT(profile_id, id) DO UPDATE SET
+		   parent_id = excluded.parent_id,
+		   name      = excluded.name`)
+	if err != nil {
+		return fmt.Errorf("prepare upsert folder: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, f := range folders {
+		if _, err := stmt.Exec(profileID, f.ID, f.ParentID, f.Name); err != nil {
+			return fmt.Errorf("upsert folder %s: %w", f.ID, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// ListFolders returns the folder tree for a profile, ordered by id (which is
+// the path, so a stable depth-first ordering falls out naturally).
+func (r *Repository) ListFolders(profileID string) ([]Folder, error) {
+	rows, err := r.db.Query(
+		`SELECT id, parent_id, name FROM test_folder WHERE profile_id = ? ORDER BY id`,
+		profileID)
+	if err != nil {
+		return nil, fmt.Errorf("list folders: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Folder{}
+	for rows.Next() {
+		var f Folder
+		if err := rows.Scan(&f.ID, &f.ParentID, &f.Name); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.
+// A FolderID filter matches the folder itself plus any descendants so
+// selecting a category in the tree shows everything beneath it.
 func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 	where := []string{"profile_id = ?"}
 	args := []any{profileID}
@@ -122,6 +184,10 @@ func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 	if q.Status != "" {
 		where = append(where, "status = ?")
 		args = append(args, q.Status)
+	}
+	if q.FolderID != "" {
+		where = append(where, "(folder_id = ? OR folder_id LIKE ?)")
+		args = append(args, q.FolderID, q.FolderID+"/%")
 	}
 	whereSQL := "WHERE " + strings.Join(where, " AND ")
 
@@ -146,7 +212,7 @@ func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 	}
 
 	listSQL := fmt.Sprintf(
-		`SELECT jira_key, jira_id, summary, description, status, priority, labels, updated_at
+		`SELECT jira_key, jira_id, summary, description, status, priority, labels, updated_at, folder_id
 		 FROM test_case %s ORDER BY %s %s LIMIT ? OFFSET ?`,
 		whereSQL, sortCol, dir)
 
@@ -170,7 +236,7 @@ func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 // GetTest returns one Test by its Jira key, or ErrNotFound.
 func (r *Repository) GetTest(profileID, key string) (TestCase, error) {
 	row := r.db.QueryRow(
-		`SELECT jira_key, jira_id, summary, description, status, priority, labels, updated_at
+		`SELECT jira_key, jira_id, summary, description, status, priority, labels, updated_at, folder_id
 		 FROM test_case WHERE profile_id = ? AND jira_key = ?`, profileID, key)
 	t, err := scanTest(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -193,8 +259,8 @@ func (r *Repository) SetSyncState(profileID string, testCount int) error {
 	return nil
 }
 
-// GetSyncState returns the last sync outcome for a profile. A profile that has
-// never synced yields a zero-valued state (no error).
+// GetSyncState returns the last sync outcome for a profile. A profile that
+// has never synced yields a zero-valued state (no error).
 func (r *Repository) GetSyncState(profileID string) (SyncState, error) {
 	var (
 		s    SyncState
@@ -226,7 +292,7 @@ func scanTest(s scanner) (TestCase, error) {
 	)
 	if err := s.Scan(
 		&t.Key, &t.ID, &t.Summary, &t.Description,
-		&t.Status, &t.Priority, &labels, &t.Updated,
+		&t.Status, &t.Priority, &labels, &t.Updated, &t.FolderID,
 	); err != nil {
 		return TestCase{}, err
 	}

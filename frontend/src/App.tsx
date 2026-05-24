@@ -4,13 +4,15 @@ import {
   ListProfiles,
   SyncProfile,
   GetSyncState,
+  ListFolders,
   EventsOn,
   errMsg,
 } from "./api";
-import type { Profile, SyncState, SyncProgress } from "./api";
+import type { Profile, SyncState, SyncProgress, Folder } from "./api";
 import { ProfileForm } from "./components/ProfileForm";
 import { TestTable } from "./components/TestTable";
 import { TestDetail } from "./components/TestDetail";
+import { FolderTree } from "./components/FolderTree";
 
 function App() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -22,6 +24,9 @@ function App() {
   const [progress, setProgress] = useState<SyncProgress | null>(null);
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
+
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string>("");
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -42,20 +47,30 @@ function App() {
     return EventsOn("sync:progress", (p: SyncProgress) => setProgress(p));
   }, []);
 
-  // Refresh the sync summary when the active profile changes or a sync finishes.
-  const loadSyncState = useCallback(() => {
+  // Refresh the sync summary and folder tree when the active profile changes
+  // or a sync finishes.
+  const loadProfileData = useCallback(() => {
     if (!activeId) {
       setSyncState(null);
+      setFolders([]);
       return;
     }
     GetSyncState(activeId)
       .then(setSyncState)
       .catch((e) => console.error("sync state:", errMsg(e)));
+    ListFolders(activeId)
+      .then(setFolders)
+      .catch((e) => console.error("list folders:", errMsg(e)));
   }, [activeId]);
 
   useEffect(() => {
-    loadSyncState();
-  }, [loadSyncState, refreshKey]);
+    loadProfileData();
+  }, [loadProfileData, refreshKey]);
+
+  // Clear folder selection when the profile changes.
+  useEffect(() => {
+    setSelectedFolder("");
+  }, [activeId]);
 
   async function runSync() {
     if (!activeId || syncing) return;
@@ -151,8 +166,19 @@ function App() {
       </header>
 
       <main className="content">
+        {folders.length > 0 && (
+          <FolderTree
+            folders={folders}
+            selected={selectedFolder}
+            onSelect={(id) => {
+              setSelectedFolder(id);
+              setSelectedKey(null);
+            }}
+          />
+        )}
         <TestTable
           profileId={activeId}
+          folderId={selectedFolder}
           refreshKey={refreshKey}
           selectedKey={selectedKey}
           onSelect={setSelectedKey}

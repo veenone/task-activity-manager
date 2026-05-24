@@ -17,6 +17,7 @@ type Test struct {
 	Priority    string
 	Labels      []string
 	Updated     string
+	FolderID    string
 }
 
 // testFields are the issue fields requested from Jira's search API.

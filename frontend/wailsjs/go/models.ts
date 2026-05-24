@@ -44,6 +44,22 @@ export namespace profile {
 
 export namespace testrepo {
 	
+	export class Folder {
+	    id: string;
+	    parentId: string;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Folder(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.parentId = source["parentId"];
+	        this.name = source["name"];
+	    }
+	}
 	export class TestCase {
 	    key: string;
 	    id: string;
@@ -53,6 +69,7 @@ export namespace testrepo {
 	    priority: string;
 	    labels: string[];
 	    updated: string;
+	    folderId: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TestCase(source);
@@ -68,6 +85,7 @@ export namespace testrepo {
 	        this.priority = source["priority"];
 	        this.labels = source["labels"];
 	        this.updated = source["updated"];
+	        this.folderId = source["folderId"];
 	    }
 	}
 	export class Page {
@@ -105,6 +123,7 @@ export namespace testrepo {
 	export class Query {
 	    search: string;
 	    status: string;
+	    folderId: string;
 	    sortBy: string;
 	    desc: boolean;
 	    limit: number;
@@ -118,6 +137,7 @@ export namespace testrepo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.search = source["search"];
 	        this.status = source["status"];
+	        this.folderId = source["folderId"];
 	        this.sortBy = source["sortBy"];
 	        this.desc = source["desc"];
 	        this.limit = source["limit"];

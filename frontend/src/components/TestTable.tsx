@@ -4,6 +4,7 @@ import type { TestPage, TestQuery } from "../api";
 
 interface Props {
   profileId: string;
+  folderId: string;
   refreshKey: number;
   selectedKey: string | null;
   onSelect: (key: string) => void;
@@ -15,6 +16,7 @@ type SortCol = "key" | "summary" | "status" | "updated";
 
 export function TestTable({
   profileId,
+  folderId,
   refreshKey,
   selectedKey,
   onSelect,
@@ -39,7 +41,7 @@ export function TestTable({
   // Return to the first page whenever the query changes.
   useEffect(() => {
     setOffset(0);
-  }, [debouncedSearch, status, sortBy, desc, profileId]);
+  }, [debouncedSearch, status, folderId, sortBy, desc, profileId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +50,7 @@ export function TestTable({
     const q: TestQuery = {
       search: debouncedSearch,
       status: status.trim(),
+      folderId,
       sortBy,
       desc,
       limit: PAGE_SIZE,
@@ -66,7 +69,16 @@ export function TestTable({
     return () => {
       cancelled = true;
     };
-  }, [profileId, debouncedSearch, status, sortBy, desc, offset, refreshKey]);
+  }, [
+    profileId,
+    debouncedSearch,
+    status,
+    folderId,
+    sortBy,
+    desc,
+    offset,
+    refreshKey,
+  ]);
 
   function toggleSort(col: SortCol) {
     if (sortBy === col) {
@@ -168,7 +180,8 @@ export function TestTable({
                 <td colSpan={6} className="empty-row muted">
                   {page.total === 0 &&
                   debouncedSearch === "" &&
-                  status.trim() === ""
+                  status.trim() === "" &&
+                  folderId === ""
                     ? "No tests yet — run a sync to pull them from Jira."
                     : "No tests match the current filter."}
                 </td>

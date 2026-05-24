@@ -36,10 +36,14 @@ func New(client *jira.Client, repo *testrepo.Repository) *Engine {
 	return &Engine{client: client, repo: repo}
 }
 
-// FullSync pulls every Test for the project and upserts it into the local
-// store, calling onProgress (if non-nil) after each page. Upserts are
-// idempotent, so an interrupted sync is safe to re-run.
+// FullSync pulls the Test Repository folder tree and every Test for the
+// project, upserting them into the local store and calling onProgress after
+// each page. Upserts are idempotent, so an interrupted sync is safe to re-run.
 func (e *Engine) FullSync(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
+	if err := e.syncFolders(ctx, profileID, projectKey); err != nil {
+		return err
+	}
+
 	fetched := 0
 	total := -1
 
@@ -80,6 +84,28 @@ func (e *Engine) FullSync(ctx context.Context, profileID, projectKey string, onP
 	return nil
 }
 
+// syncFolders pulls the Test Repository folder tree and upserts it. Empty
+// results are tolerated — the real-Jira implementation is currently a no-op
+// (FR-13.1), but demo mode populates the tree.
+func (e *Engine) syncFolders(ctx context.Context, profileID, projectKey string) error {
+	folders, err := e.client.ListFolders(ctx, projectKey)
+	if err != nil {
+		return fmt.Errorf("list folders: %w", err)
+	}
+	if len(folders) == 0 {
+		return nil
+	}
+	repoFolders := make([]testrepo.Folder, len(folders))
+	for i, f := range folders {
+		repoFolders[i] = testrepo.Folder{
+			ID:       f.ID,
+			ParentID: f.ParentID,
+			Name:     f.Name,
+		}
+	}
+	return e.repo.UpsertFolders(profileID, repoFolders)
+}
+
 // toRepoTests maps the Jira client's Test type to the repository's TestCase.
 func toRepoTests(in []jira.Test) []testrepo.TestCase {
 	out := make([]testrepo.TestCase, len(in))
@@ -93,6 +119,7 @@ func toRepoTests(in []jira.Test) []testrepo.TestCase {
 			Priority:    t.Priority,
 			Labels:      t.Labels,
 			Updated:     t.Updated,
+			FolderID:    t.FolderID,
 		}
 	}
 	return out
