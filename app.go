@@ -139,14 +139,6 @@ func (a *App) GetTest(profileID, key string) (testrepo.TestCase, error) {
 	return a.repo.GetTest(profileID, key)
 }
 
-// Greet returns a greeting for the given name.
-//
-// TODO(xtm): placeholder from the Wails template — removed once the Phase 1
-// React UI replaces the default frontend.
-func (a *App) Greet(name string) string {
-	return "Hello " + name + ", It's show time!"
-}
-
 // defaultDBPath returns <user-config-dir>/xray-test-manager/xtm.db, creating
 // the directory if needed.
 func defaultDBPath() (string, error) {
