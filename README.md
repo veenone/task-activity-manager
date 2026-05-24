@@ -34,6 +34,14 @@ wails build    # build build/bin/xray-test-manager.exe
 go build ./... # compile-check the Go backend only
 ```
 
+## Demo mode
+
+No Jira instance handy? Create a profile with **Jira base URL `demo`** (any
+project key, any token). The backend short-circuits the sync and serves
+~5,000 deterministically-generated tests so the full UI — sync progress,
+browse, search, filter, sort, detail — can be exercised end to end. The
+header shows a yellow `DEMO` chip while a demo profile is active.
+
 ## Roadmap
 
 | Phase | Theme |

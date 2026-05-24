@@ -39,8 +39,12 @@ func NewClient(baseURL, token string) *Client {
 }
 
 // TestConnection verifies the base URL and token by fetching the current user
-// (FR-8.4). It returns the authenticated user on success.
+// (FR-8.4). It returns the authenticated user on success. Demo URLs
+// short-circuit to a fake user so the UI can be exercised without Jira.
 func (c *Client) TestConnection(ctx context.Context) (*User, error) {
+	if isDemoURL(c.baseURL) {
+		return &User{Name: "demo", DisplayName: "Demo User", Email: "demo@local"}, nil
+	}
 	var u User
 	if err := c.get(ctx, "/rest/api/2/myself", &u); err != nil {
 		return nil, fmt.Errorf("connection test failed: %w", err)

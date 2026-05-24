@@ -80,6 +80,11 @@ function App() {
     setSelectedKey(null);
   }
 
+  const activeProfile = profiles.find((p) => p.id === activeId);
+  const isDemo =
+    !!activeProfile &&
+    /^(demo$|demo:|mock:)/i.test(activeProfile.jiraUrl.trim());
+
   if (loading) {
     return <div className="centered muted">Loading…</div>;
   }
@@ -103,6 +108,7 @@ function App() {
     <div className="app">
       <header className="topbar">
         <span className="brand">Xray Test Manager</span>
+        {isDemo && <span className="demo-chip">DEMO</span>}
         <select
           className="profile-select"
           value={activeId}

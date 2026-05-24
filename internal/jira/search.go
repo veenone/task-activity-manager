@@ -47,6 +47,10 @@ type searchResponse struct {
 // startAt. It returns the page of tests and the total reported by Jira, so the
 // caller can page until every Test is retrieved (FR-1.1).
 func (c *Client) SearchTestsPage(ctx context.Context, projectKey string, startAt, maxResults int) ([]Test, int, error) {
+	if isDemoURL(c.baseURL) {
+		tests, total := demoTestsPage(projectKey, startAt, maxResults)
+		return tests, total, nil
+	}
 	jql := fmt.Sprintf("project = %s AND issuetype = Test ORDER BY updated ASC", projectKey)
 	q := url.Values{}
 	q.Set("jql", jql)
