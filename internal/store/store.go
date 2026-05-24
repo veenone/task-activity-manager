@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 4
+const schemaVersion = 5
 
 // schema is the canonical database layout for a fresh install. Existing
 // databases are upgraded by applyMigrations.
@@ -86,6 +86,38 @@ CREATE TABLE IF NOT EXISTS test_precondition (
 );
 
 CREATE INDEX IF NOT EXISTS idx_test_precondition_test ON test_precondition(profile_id, test_key);
+
+CREATE TABLE IF NOT EXISTS pending_change (
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	profile_id   TEXT NOT NULL,
+	entity_type  TEXT NOT NULL,
+	entity_key   TEXT NOT NULL,
+	field        TEXT NOT NULL,
+	before_val   TEXT NOT NULL DEFAULT '',
+	after_val    TEXT NOT NULL DEFAULT '',
+	base_version TEXT NOT NULL DEFAULT '',
+	created_at   TEXT NOT NULL,
+	UNIQUE (profile_id, entity_type, entity_key, field)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_change_profile ON pending_change(profile_id);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	profile_id  TEXT NOT NULL,
+	occurred_at TEXT NOT NULL,
+	actor       TEXT NOT NULL DEFAULT '',
+	entity_type TEXT NOT NULL,
+	entity_key  TEXT NOT NULL,
+	action      TEXT NOT NULL,
+	field       TEXT NOT NULL DEFAULT '',
+	before_val  TEXT NOT NULL DEFAULT '',
+	after_val   TEXT NOT NULL DEFAULT '',
+	note        TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_profile_time
+	ON audit_log(profile_id, occurred_at DESC);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -139,9 +171,9 @@ func applyMigrations(db *sql.DB) error {
 			return fmt.Errorf("v3 add folder_id: %w", err)
 		}
 	}
-	// v4: precondition / test_precondition tables. Additive only — the
-	// CREATE TABLE IF NOT EXISTS statements above cover both fresh installs
-	// and upgrades, so no explicit migration step is needed.
+	// v4: precondition / test_precondition tables. Additive — covered by
+	// CREATE TABLE IF NOT EXISTS, no explicit step needed.
+	// v5: pending_change / audit_log tables. Also additive.
 	return nil
 }
 

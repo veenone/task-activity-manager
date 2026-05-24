@@ -145,6 +145,33 @@ func (a *App) GetTestPreconditions(profileID, testKey string) ([]testrepo.Precon
 	return a.repo.ListTestPreconditions(profileID, testKey)
 }
 
+// --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---
+
+// EditTestField applies a local edit to a Test field and queues a pending
+// change for commit. Editable fields: summary, description, priority, labels.
+// Repeated edits to the same field are coalesced; reverting to the original
+// value drops the pending change.
+func (a *App) EditTestField(profileID, testKey, field, newValue string) error {
+	return a.repo.EditTestField(profileID, testKey, field, newValue)
+}
+
+// DiscardPendingChange reverts a queued change and removes it from the
+// pending list.
+func (a *App) DiscardPendingChange(profileID string, changeID int64) error {
+	return a.repo.DiscardPendingChange(profileID, changeID)
+}
+
+// ListPendingChanges returns all uncommitted local edits for a profile.
+func (a *App) ListPendingChanges(profileID string) ([]testrepo.PendingChange, error) {
+	return a.repo.ListPendingChanges(profileID)
+}
+
+// ListAuditEntries returns the most recent audit log entries for a profile
+// (newest first). Defaults to 200 entries.
+func (a *App) ListAuditEntries(profileID string, limit int) ([]testrepo.AuditEntry, error) {
+	return a.repo.ListAuditEntries(profileID, limit)
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.

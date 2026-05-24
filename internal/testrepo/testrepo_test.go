@@ -210,6 +210,143 @@ func TestSetSyncStateReflectsCurrentRowCount(t *testing.T) {
 	}
 }
 
+func TestEditTestFieldCreatesPendingChange(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	if err := repo.EditTestField("p1", "QA-1", "summary", "Login works (edited)"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	changes, err := repo.ListPendingChanges("p1")
+	if err != nil {
+		t.Fatalf("list pending: %v", err)
+	}
+	if len(changes) != 1 {
+		t.Fatalf("got %d pending, want 1", len(changes))
+	}
+	c := changes[0]
+	if c.Field != "summary" {
+		t.Errorf("Field = %q, want summary", c.Field)
+	}
+	if c.BeforeVal != "Login works" {
+		t.Errorf("BeforeVal = %q, want %q", c.BeforeVal, "Login works")
+	}
+	if c.AfterVal != "Login works (edited)" {
+		t.Errorf("AfterVal = %q, want %q", c.AfterVal, "Login works (edited)")
+	}
+}
+
+func TestEditTestFieldCoalescesRepeatedEdits(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	if err := repo.EditTestField("p1", "QA-1", "summary", "first edit"); err != nil {
+		t.Fatalf("first edit: %v", err)
+	}
+	if err := repo.EditTestField("p1", "QA-1", "summary", "second edit"); err != nil {
+		t.Fatalf("second edit: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+
+	if len(changes) != 1 {
+		t.Fatalf("got %d pending, want 1 (coalesced)", len(changes))
+	}
+	if changes[0].BeforeVal != "Login works" {
+		t.Errorf("BeforeVal = %q, want original (not first edit)", changes[0].BeforeVal)
+	}
+	if changes[0].AfterVal != "second edit" {
+		t.Errorf("AfterVal = %q, want %q", changes[0].AfterVal, "second edit")
+	}
+}
+
+func TestEditTestFieldRevertingToOriginalRemovesPending(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	if err := repo.EditTestField("p1", "QA-1", "summary", "temporary"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	if err := repo.EditTestField("p1", "QA-1", "summary", "Login works"); err != nil {
+		t.Fatalf("revert: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("got %d pending, want 0 (reverted to original)", len(changes))
+	}
+}
+
+func TestDiscardPendingChangeRevertsTheValue(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	if err := repo.EditTestField("p1", "QA-1", "summary", "edited"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 pending change before discard, got %d", len(changes))
+	}
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	test, err := repo.GetTest("p1", "QA-1")
+	if err != nil {
+		t.Fatalf("get test: %v", err)
+	}
+	if test.Summary != "Login works" {
+		t.Errorf("Summary = %q after discard, want %q", test.Summary, "Login works")
+	}
+
+	after, _ := repo.ListPendingChanges("p1")
+	if len(after) != 0 {
+		t.Errorf("got %d pending after discard, want 0", len(after))
+	}
+}
+
+func TestEditTestFieldRejectsUnknownField(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	err := repo.EditTestField("p1", "QA-1", "bogus", "value")
+
+	if err == nil {
+		t.Error("editing an unknown field should error")
+	}
+}
+
+func TestAuditLogRecordsEditAndDiscard(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	if err := repo.EditTestField("p1", "QA-1", "summary", "edited"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	entries, err := repo.ListAuditEntries("p1", 100)
+	if err != nil {
+		t.Fatalf("list audit: %v", err)
+	}
+
+	var hasEdit, hasDiscard bool
+	for _, e := range entries {
+		if e.Action == "edit-local" {
+			hasEdit = true
+		}
+		if e.Action == "discard-pending" {
+			hasDiscard = true
+		}
+	}
+	if !hasEdit {
+		t.Error("audit log missing edit-local entry")
+	}
+	if !hasDiscard {
+		t.Error("audit log missing discard-pending entry")
+	}
+}
+
 // seedFolders populates a fresh repo with three tests across two folder
 // branches so the FolderID filter tests can exercise leaf and ancestor
 // selections.
@@ -222,6 +359,25 @@ func seedFolders(t *testing.T) *testrepo.Repository {
 		{Key: "QA-3", ID: "3", Summary: "Search test", FolderID: "/Browse/Search"},
 	}); err != nil {
 		t.Fatalf("seed upsert: %v", err)
+	}
+	return repo
+}
+
+// seedTestForEditing creates one Test with known values so editing tests can
+// assert on the BeforeVal / AfterVal transitions.
+func seedTestForEditing(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{
+			Key:         "QA-1",
+			ID:          "1",
+			Summary:     "Login works",
+			Description: "original",
+			Priority:    "Medium",
+		},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
 	}
 	return repo
 }

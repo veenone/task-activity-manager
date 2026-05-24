@@ -44,6 +44,36 @@ export namespace profile {
 
 export namespace testrepo {
 	
+	export class AuditEntry {
+	    id: number;
+	    occurredAt: string;
+	    actor: string;
+	    entityType: string;
+	    entityKey: string;
+	    action: string;
+	    field: string;
+	    beforeVal: string;
+	    afterVal: string;
+	    note: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuditEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.occurredAt = source["occurredAt"];
+	        this.actor = source["actor"];
+	        this.entityType = source["entityType"];
+	        this.entityKey = source["entityKey"];
+	        this.action = source["action"];
+	        this.field = source["field"];
+	        this.beforeVal = source["beforeVal"];
+	        this.afterVal = source["afterVal"];
+	        this.note = source["note"];
+	    }
+	}
 	export class Folder {
 	    id: string;
 	    parentId: string;
@@ -119,6 +149,32 @@ export namespace testrepo {
 		    }
 		    return a;
 		}
+	}
+	export class PendingChange {
+	    id: number;
+	    entityType: string;
+	    entityKey: string;
+	    field: string;
+	    beforeVal: string;
+	    afterVal: string;
+	    baseVersion: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PendingChange(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.entityType = source["entityType"];
+	        this.entityKey = source["entityKey"];
+	        this.field = source["field"];
+	        this.beforeVal = source["beforeVal"];
+	        this.afterVal = source["afterVal"];
+	        this.baseVersion = source["baseVersion"];
+	        this.createdAt = source["createdAt"];
+	    }
 	}
 	export class Precondition {
 	    key: string;

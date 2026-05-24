@@ -10,6 +10,14 @@ export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
+export function DiscardPendingChange(arg1, arg2) {
+  return window['go']['main']['App']['DiscardPendingChange'](arg1, arg2);
+}
+
+export function EditTestField(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['EditTestField'](arg1, arg2, arg3, arg4);
+}
+
 export function GetSyncState(arg1) {
   return window['go']['main']['App']['GetSyncState'](arg1);
 }
@@ -22,8 +30,16 @@ export function GetTestPreconditions(arg1, arg2) {
   return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
 }
 
+export function ListAuditEntries(arg1, arg2) {
+  return window['go']['main']['App']['ListAuditEntries'](arg1, arg2);
+}
+
 export function ListFolders(arg1) {
   return window['go']['main']['App']['ListFolders'](arg1);
+}
+
+export function ListPendingChanges(arg1) {
+  return window['go']['main']['App']['ListPendingChanges'](arg1);
 }
 
 export function ListProfiles() {
