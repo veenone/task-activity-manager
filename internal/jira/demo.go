@@ -9,8 +9,8 @@ import (
 // Demo mode generates fake Test data so the UI can be exercised without a
 // real Jira instance. A profile triggers demo mode when its Jira URL is
 // "demo", "demo://…", or "mock://…" (case-insensitive). Auth tokens are
-// ignored; TestConnection / SearchTestsPage / ListFolders short-circuit to
-// the generators in this file.
+// ignored; TestConnection / SearchTestsPage / ListFolders / ListPreconditions
+// short-circuit to the generators in this file.
 
 // demoTestCount is the size of the fake dataset — enough to exercise the
 // grid's pagination, search, filter and sort without being absurd.
@@ -142,6 +142,102 @@ func demoFolderForFeature(feature string) string {
 		}
 	}
 	return ""
+}
+
+// preconditionDefs is the master list of distinct demo preconditions. Their
+// indexes here are used by featurePreconditions to assign preconditions to
+// tests by feature.
+var preconditionDefs = []struct {
+	Summary string
+	Type    string
+}{
+	{"User account exists", "Manual"},
+	{"User is logged in", "Manual"},
+	{"Email service is available", "Manual"},
+	{"MFA device enrolled", "Manual"},
+	{"Search index is populated", "Manual"},
+	{"Cart has items", "Manual"},
+	{"Payment method on file", "Manual"},
+	{"Product catalog is loaded", "Manual"},
+	{"Completed order exists", "Manual"},
+	{"Admin user is logged in", "Manual"},
+	{"At least one report exists", "Manual"},
+	{"Database has seed data", "Manual"},
+	{"Network is available", "Manual"},
+	{"File system has write access", "Manual"},
+	{"Multiple users are logged in", "Manual"},
+}
+
+// featurePreconditions maps each feature in demoFeatures to indexes into
+// preconditionDefs. Tests inherit these preconditions based on their feature.
+var featurePreconditions = map[string][]int{
+	"Login":             {0},
+	"Logout":            {1},
+	"User registration": {2},
+	"Password reset":    {0, 2},
+	"Multi-factor auth": {0, 3},
+	"Session timeout":   {1},
+	"Search":            {4},
+	"Filter results":    {4},
+	"Sort results":      {4},
+	"Pagination":        {4},
+	"Checkout":          {5, 6},
+	"Cart":              {1},
+	"Add to cart":       {7},
+	"Remove from cart":  {5},
+	"Profile update":    {1},
+	"Settings":          {1},
+	"Dashboard":         {1},
+	"Notifications":     {1},
+	"Payment":           {6},
+	"Refund":            {8},
+	"Reports":           {1, 10},
+	"Export to CSV":     {1, 10},
+	"Import data":       {9, 11},
+	"Admin console":     {9},
+	"Permissions":       {9},
+	"Audit log":         {1, 9},
+	"API rate limit":    {12},
+	"File upload":       {1, 13},
+	"File download":     {1, 13},
+	"Bulk operations":   {9, 14},
+}
+
+// demoPreconditionsAndLinks returns the demo precondition master list plus
+// the test-key → precondition-keys mapping. Keys use a "<project>-P-N"
+// convention so they read like Jira keys without colliding with the test
+// number range.
+func demoPreconditionsAndLinks(projectKey string) ([]Precondition, map[string][]string, error) {
+	if projectKey == "" {
+		projectKey = "DEMO"
+	}
+
+	preconditions := make([]Precondition, 0, len(preconditionDefs))
+	for i, def := range preconditionDefs {
+		preconditions = append(preconditions, Precondition{
+			Key:         fmt.Sprintf("%s-P-%d", projectKey, i+1),
+			Summary:     def.Summary,
+			Type:        def.Type,
+			Description: fmt.Sprintf("(Demo precondition: %s)", def.Summary),
+		})
+	}
+
+	links := make(map[string][]string, demoTestCount)
+	for i := 0; i < demoTestCount; i++ {
+		feature := demoFeatures[i%len(demoFeatures)]
+		indexes, ok := featurePreconditions[feature]
+		if !ok || len(indexes) == 0 {
+			continue
+		}
+		testKey := fmt.Sprintf("%s-%d", projectKey, i+1)
+		keys := make([]string, len(indexes))
+		for j, idx := range indexes {
+			keys[j] = fmt.Sprintf("%s-P-%d", projectKey, idx+1)
+		}
+		links[testKey] = keys
+	}
+
+	return preconditions, links, nil
 }
 
 // makeDemoTest builds a deterministic Test for index i, so repeated syncs of

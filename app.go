@@ -134,6 +134,11 @@ func (a *App) ListFolders(profileID string) ([]testrepo.Folder, error) {
 	return a.repo.ListFolders(profileID)
 }
 
+// GetTestPreconditions returns the Preconditions linked to a Test.
+func (a *App) GetTestPreconditions(profileID, testKey string) ([]testrepo.Precondition, error) {
+	return a.repo.ListTestPreconditions(profileID, testKey)
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.

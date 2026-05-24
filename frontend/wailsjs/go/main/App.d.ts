@@ -11,6 +11,8 @@ export function GetSyncState(arg1:string):Promise<testrepo.SyncState>;
 
 export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;
 
+export function GetTestPreconditions(arg1:string,arg2:string):Promise<Array<testrepo.Precondition>>;
+
 export function ListFolders(arg1:string):Promise<Array<testrepo.Folder>>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;

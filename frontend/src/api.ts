@@ -12,6 +12,7 @@ export {
   SyncProfile,
   GetSyncState,
   ListFolders,
+  GetTestPreconditions,
   ListTests,
   GetTest,
 } from "../wailsjs/go/main/App";
@@ -62,6 +63,13 @@ export interface Folder {
   id: string;
   parentId: string;
   name: string;
+}
+
+export interface Precondition {
+  key: string;
+  summary: string;
+  type: string;
+  description: string;
 }
 
 // SyncProgress mirrors the Go syncer.Progress payload emitted on "sync:progress".

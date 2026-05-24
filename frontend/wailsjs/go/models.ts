@@ -120,6 +120,24 @@ export namespace testrepo {
 		    return a;
 		}
 	}
+	export class Precondition {
+	    key: string;
+	    summary: string;
+	    type: string;
+	    description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Precondition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.type = source["type"];
+	        this.description = source["description"];
+	    }
+	}
 	export class Query {
 	    search: string;
 	    status: string;

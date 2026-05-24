@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 3
+const schemaVersion = 4
 
 // schema is the canonical database layout for a fresh install. Existing
 // databases are upgraded by applyMigrations.
@@ -68,6 +68,24 @@ CREATE TABLE IF NOT EXISTS test_case (
 CREATE INDEX IF NOT EXISTS idx_test_case_status  ON test_case(profile_id, status);
 CREATE INDEX IF NOT EXISTS idx_test_case_updated ON test_case(profile_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_test_case_folder  ON test_case(profile_id, folder_id);
+
+CREATE TABLE IF NOT EXISTS precondition (
+	profile_id  TEXT NOT NULL,
+	jira_key    TEXT NOT NULL,
+	summary     TEXT NOT NULL,
+	type        TEXT NOT NULL DEFAULT '',
+	description TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, jira_key)
+);
+
+CREATE TABLE IF NOT EXISTS test_precondition (
+	profile_id       TEXT NOT NULL,
+	test_key         TEXT NOT NULL,
+	precondition_key TEXT NOT NULL,
+	PRIMARY KEY (profile_id, test_key, precondition_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_test_precondition_test ON test_precondition(profile_id, test_key);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -121,6 +139,9 @@ func applyMigrations(db *sql.DB) error {
 			return fmt.Errorf("v3 add folder_id: %w", err)
 		}
 	}
+	// v4: precondition / test_precondition tables. Additive only — the
+	// CREATE TABLE IF NOT EXISTS statements above cover both fresh installs
+	// and upgrades, so no explicit migration step is needed.
 	return nil
 }
 

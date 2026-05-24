@@ -36,9 +36,10 @@ func New(client *jira.Client, repo *testrepo.Repository) *Engine {
 	return &Engine{client: client, repo: repo}
 }
 
-// FullSync pulls the Test Repository folder tree and every Test for the
-// project, upserting them into the local store and calling onProgress after
-// each page. Upserts are idempotent, so an interrupted sync is safe to re-run.
+// FullSync pulls the Test Repository folder tree, every Test for the project,
+// and the project's Preconditions (with their test links) into the local
+// store, calling onProgress after each Test page. Upserts are idempotent, so
+// an interrupted sync is safe to re-run.
 func (e *Engine) FullSync(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
 	if err := e.syncFolders(ctx, profileID, projectKey); err != nil {
 		return err
@@ -75,6 +76,10 @@ func (e *Engine) FullSync(ctx context.Context, profileID, projectKey string, onP
 		}
 	}
 
+	if err := e.syncPreconditions(ctx, profileID, projectKey); err != nil {
+		return err
+	}
+
 	if err := e.repo.SetSyncState(profileID, fetched); err != nil {
 		return err
 	}
@@ -104,6 +109,33 @@ func (e *Engine) syncFolders(ctx context.Context, profileID, projectKey string) 
 		}
 	}
 	return e.repo.UpsertFolders(profileID, repoFolders)
+}
+
+// syncPreconditions pulls the Preconditions for a project and reconciles the
+// Test-to-Precondition links. An empty result is tolerated — the real-Jira
+// implementation is currently a no-op pending live verification (FR-13.4),
+// but demo mode populates them.
+func (e *Engine) syncPreconditions(ctx context.Context, profileID, projectKey string) error {
+	preconditions, links, err := e.client.ListPreconditions(ctx, projectKey)
+	if err != nil {
+		return fmt.Errorf("list preconditions: %w", err)
+	}
+	if len(preconditions) == 0 && len(links) == 0 {
+		return nil
+	}
+	repoPre := make([]testrepo.Precondition, len(preconditions))
+	for i, p := range preconditions {
+		repoPre[i] = testrepo.Precondition{
+			Key:         p.Key,
+			Summary:     p.Summary,
+			Type:        p.Type,
+			Description: p.Description,
+		}
+	}
+	if err := e.repo.UpsertPreconditions(profileID, repoPre); err != nil {
+		return err
+	}
+	return e.repo.ReplaceAllTestPreconditions(profileID, links)
 }
 
 // toRepoTests maps the Jira client's Test type to the repository's TestCase.

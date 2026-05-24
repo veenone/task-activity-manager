@@ -39,6 +39,14 @@ type Folder struct {
 	Name     string `json:"name"`
 }
 
+// Precondition mirrors a Xray Precondition issue (FR-13.4).
+type Precondition struct {
+	Key         string `json:"key"`
+	Summary     string `json:"summary"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+}
+
 // Query drives a ListTests call: free-text search, filters, sorting, paging.
 type Query struct {
 	Search   string `json:"search"`
@@ -165,6 +173,98 @@ func (r *Repository) ListFolders(profileID string) ([]Folder, error) {
 			return nil, err
 		}
 		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// UpsertPreconditions inserts or updates a batch of Preconditions.
+func (r *Repository) UpsertPreconditions(profileID string, preconditions []Precondition) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(
+		`INSERT INTO precondition (profile_id, jira_key, summary, type, description)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
+		   summary     = excluded.summary,
+		   type        = excluded.type,
+		   description = excluded.description`)
+	if err != nil {
+		return fmt.Errorf("prepare upsert precondition: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, p := range preconditions {
+		if _, err := stmt.Exec(profileID, p.Key, p.Summary, p.Type, p.Description); err != nil {
+			return fmt.Errorf("upsert precondition %s: %w", p.Key, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// ReplaceAllTestPreconditions wipes a profile's Test-to-Precondition link
+// table and rewrites it from the provided map. Used by FullSync so removed
+// links actually disappear locally.
+func (r *Repository) ReplaceAllTestPreconditions(profileID string, links map[string][]string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`DELETE FROM test_precondition WHERE profile_id = ?`, profileID,
+	); err != nil {
+		return fmt.Errorf("clear precondition links: %w", err)
+	}
+
+	if len(links) == 0 {
+		return tx.Commit()
+	}
+
+	stmt, err := tx.Prepare(
+		`INSERT INTO test_precondition (profile_id, test_key, precondition_key)
+		 VALUES (?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("prepare insert link: %w", err)
+	}
+	defer stmt.Close()
+
+	for testKey, preKeys := range links {
+		for _, pk := range preKeys {
+			if _, err := stmt.Exec(profileID, testKey, pk); err != nil {
+				return fmt.Errorf("link %s -> %s: %w", testKey, pk, err)
+			}
+		}
+	}
+	return tx.Commit()
+}
+
+// ListTestPreconditions returns the Preconditions linked to a Test.
+func (r *Repository) ListTestPreconditions(profileID, testKey string) ([]Precondition, error) {
+	rows, err := r.db.Query(
+		`SELECT p.jira_key, p.summary, p.type, p.description
+		 FROM test_precondition tp
+		 JOIN precondition p
+		   ON p.profile_id = tp.profile_id AND p.jira_key = tp.precondition_key
+		 WHERE tp.profile_id = ? AND tp.test_key = ?
+		 ORDER BY p.jira_key`,
+		profileID, testKey)
+	if err != nil {
+		return nil, fmt.Errorf("list test preconditions: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Precondition{}
+	for rows.Next() {
+		var p Precondition
+		if err := rows.Scan(&p.Key, &p.Summary, &p.Type, &p.Description); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
 	}
 	return out, rows.Err()
 }

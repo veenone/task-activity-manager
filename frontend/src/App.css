@@ -346,6 +346,19 @@ tr.row-selected {
   margin-top: 14px;
   font-size: 12px;
 }
+.pre-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.pre-list li {
+  padding: 4px 0;
+  border-bottom: 1px dashed #eceef1;
+  font-size: 12px;
+}
+.pre-list li:last-child {
+  border-bottom: none;
+}
 
 /* Profile form and modal */
 .profile-form {

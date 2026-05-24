@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { GetTest, errMsg } from "../api";
-import type { TestCase } from "../api";
+import { GetTest, GetTestPreconditions, errMsg } from "../api";
+import type { TestCase, Precondition } from "../api";
 
 interface Props {
   profileId: string;
@@ -10,6 +10,7 @@ interface Props {
 
 export function TestDetail({ profileId, testKey, onClose }: Props) {
   const [test, setTest] = useState<TestCase | null>(null);
+  const [preconditions, setPreconditions] = useState<Precondition[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -18,9 +19,16 @@ export function TestDetail({ profileId, testKey, onClose }: Props) {
     setLoading(true);
     setError("");
     setTest(null);
-    GetTest(profileId, testKey)
-      .then((t) => {
-        if (!cancelled) setTest(t);
+    setPreconditions([]);
+
+    Promise.all([
+      GetTest(profileId, testKey),
+      GetTestPreconditions(profileId, testKey),
+    ])
+      .then(([t, pre]) => {
+        if (cancelled) return;
+        setTest(t);
+        setPreconditions(pre);
       })
       .catch((e) => {
         if (!cancelled) setError(errMsg(e));
@@ -28,6 +36,7 @@ export function TestDetail({ profileId, testKey, onClose }: Props) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
@@ -62,6 +71,19 @@ export function TestDetail({ profileId, testKey, onClose }: Props) {
             <dt>Updated</dt>
             <dd>{test.updated || "—"}</dd>
           </dl>
+
+          <h4>Preconditions</h4>
+          {preconditions.length === 0 ? (
+            <p className="muted">None linked</p>
+          ) : (
+            <ul className="pre-list">
+              {preconditions.map((p) => (
+                <li key={p.key}>
+                  <span className="mono">{p.key}</span> — {p.summary}
+                </li>
+              ))}
+            </ul>
+          )}
 
           <h4>Description</h4>
           <pre className="detail-desc">

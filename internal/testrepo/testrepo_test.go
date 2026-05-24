@@ -123,6 +123,67 @@ func TestListTestsFilterByCategoryFolderIncludesDescendants(t *testing.T) {
 	}
 }
 
+func TestListTestPreconditionsReturnsLinkedItems(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login test"},
+	}); err != nil {
+		t.Fatalf("upsert tests: %v", err)
+	}
+	if err := repo.UpsertPreconditions("p1", []testrepo.Precondition{
+		{Key: "QA-P-1", Summary: "User account exists"},
+		{Key: "QA-P-2", Summary: "Email service is available"},
+	}); err != nil {
+		t.Fatalf("upsert preconditions: %v", err)
+	}
+	if err := repo.ReplaceAllTestPreconditions("p1", map[string][]string{
+		"QA-1": {"QA-P-1", "QA-P-2"},
+	}); err != nil {
+		t.Fatalf("replace links: %v", err)
+	}
+
+	got, err := repo.ListTestPreconditions("p1", "QA-1")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	if len(got) != 2 {
+		t.Errorf("got %d preconditions, want 2", len(got))
+	}
+}
+
+func TestReplaceAllTestPreconditionsClearsStaleLinks(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login test"},
+	}); err != nil {
+		t.Fatalf("upsert tests: %v", err)
+	}
+	if err := repo.UpsertPreconditions("p1", []testrepo.Precondition{
+		{Key: "QA-P-1", Summary: "Stale"},
+	}); err != nil {
+		t.Fatalf("upsert preconditions: %v", err)
+	}
+	if err := repo.ReplaceAllTestPreconditions("p1", map[string][]string{
+		"QA-1": {"QA-P-1"},
+	}); err != nil {
+		t.Fatalf("first replace: %v", err)
+	}
+
+	// Re-run with an empty map — links must be cleared.
+	if err := repo.ReplaceAllTestPreconditions("p1", map[string][]string{}); err != nil {
+		t.Fatalf("second replace: %v", err)
+	}
+
+	got, err := repo.ListTestPreconditions("p1", "QA-1")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("got %d preconditions, want 0 after clearing", len(got))
+	}
+}
+
 // seedFolders populates a fresh repo with three tests across two folder
 // branches so the FolderID filter tests can exercise leaf and ancestor
 // selections.

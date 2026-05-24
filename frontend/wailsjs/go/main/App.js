@@ -18,6 +18,10 @@ export function GetTest(arg1, arg2) {
   return window['go']['main']['App']['GetTest'](arg1, arg2);
 }
 
+export function GetTestPreconditions(arg1, arg2) {
+  return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
+}
+
 export function ListFolders(arg1) {
   return window['go']['main']['App']['ListFolders'](arg1);
 }
