@@ -5,6 +5,7 @@
 // classes so plain object literals (initial state, query objects) type-check.
 
 export {
+  Health,
   ListProfiles,
   CreateProfile,
   DeleteProfile,
@@ -15,8 +16,19 @@ export {
   GetTestPreconditions,
   ListTests,
   GetTest,
+  EditTestField,
+  DiscardPendingChange,
+  ListPendingChanges,
+  ListAuditEntries,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
+
+export interface HealthInfo {
+  ok: boolean;
+  error: string;
+  dbPath: string;
+  logPath: string;
+}
 
 export interface Profile {
   id: string;
@@ -70,6 +82,30 @@ export interface Precondition {
   summary: string;
   type: string;
   description: string;
+}
+
+export interface PendingChange {
+  id: number;
+  entityType: string;
+  entityKey: string;
+  field: string;
+  beforeVal: string;
+  afterVal: string;
+  baseVersion: string;
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  id: number;
+  occurredAt: string;
+  actor: string;
+  entityType: string;
+  entityKey: string;
+  action: string;
+  field: string;
+  beforeVal: string;
+  afterVal: string;
+  note: string;
 }
 
 // SyncProgress mirrors the Go syncer.Progress payload emitted on "sync:progress".

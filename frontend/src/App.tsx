@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import {
+  Health,
   ListProfiles,
   SyncProfile,
   GetSyncState,
@@ -8,16 +9,24 @@ import {
   EventsOn,
   errMsg,
 } from "./api";
-import type { Profile, SyncState, SyncProgress, Folder } from "./api";
+import type {
+  HealthInfo,
+  Profile,
+  SyncState,
+  SyncProgress,
+  Folder,
+} from "./api";
 import { ProfileForm } from "./components/ProfileForm";
 import { TestTable } from "./components/TestTable";
 import { TestDetail } from "./components/TestDetail";
 import { FolderTree } from "./components/FolderTree";
 
 function App() {
+  const [health, setHealth] = useState<HealthInfo | null>(null);
+
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeId, setActiveId] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const [syncState, setSyncState] = useState<SyncState | null>(null);
@@ -31,16 +40,34 @@ function App() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Load profiles once on startup.
+  // First: check whether the backend started up cleanly. If not, render a
+  // diagnostic screen so the user sees the actual failure instead of a
+  // blank window or a cryptic nil-pointer panic.
   useEffect(() => {
+    Health()
+      .then(setHealth)
+      .catch((e) =>
+        setHealth({
+          ok: false,
+          error: `Health check itself failed: ${errMsg(e)}`,
+          dbPath: "",
+          logPath: "",
+        }),
+      );
+  }, []);
+
+  // Load profiles once the backend reports healthy.
+  useEffect(() => {
+    if (!health || !health.ok) return;
+    setLoadingProfiles(true);
     ListProfiles()
       .then((ps) => {
         setProfiles(ps);
         if (ps.length > 0) setActiveId(ps[0].id);
       })
       .catch((e) => console.error("load profiles:", errMsg(e)))
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => setLoadingProfiles(false));
+  }, [health]);
 
   // Subscribe to sync progress events for the lifetime of the app.
   useEffect(() => {
@@ -100,7 +127,41 @@ function App() {
     !!activeProfile &&
     /^(demo$|demo:|mock:)/i.test(activeProfile.jiraUrl.trim());
 
-  if (loading) {
+  // Health check hasn't returned yet.
+  if (!health) {
+    return <div className="centered muted">Loading…</div>;
+  }
+
+  // Startup failed — show the actual error and the log path so the user can
+  // diagnose without a console window.
+  if (!health.ok) {
+    return (
+      <div className="centered">
+        <div className="onboard">
+          <h2>Backend failed to start</h2>
+          <pre className="backend-error">{health.error || "(no error message reported)"}</pre>
+          {health.dbPath && (
+            <p className="muted">
+              Database path:{" "}
+              <code>{health.dbPath}</code>
+            </p>
+          )}
+          {health.logPath && (
+            <p className="muted">
+              Full log:{" "}
+              <code>{health.logPath}</code>
+            </p>
+          )}
+          <p className="muted">
+            Try removing the database file and relaunching, or check the log
+            for a more detailed error.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingProfiles) {
     return <div className="centered muted">Loading…</div>;
   }
 

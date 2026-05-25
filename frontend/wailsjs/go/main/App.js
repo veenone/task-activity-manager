@@ -30,6 +30,10 @@ export function GetTestPreconditions(arg1, arg2) {
   return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
 }
 
+export function Health() {
+  return window['go']['main']['App']['Health']();
+}
+
 export function ListAuditEntries(arg1, arg2) {
   return window['go']['main']['App']['ListAuditEntries'](arg1, arg2);
 }

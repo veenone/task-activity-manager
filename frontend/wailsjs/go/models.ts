@@ -1,3 +1,26 @@
+export namespace main {
+	
+	export class HealthInfo {
+	    ok: boolean;
+	    error: string;
+	    dbPath: string;
+	    logPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HealthInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.error = source["error"];
+	        this.dbPath = source["dbPath"];
+	        this.logPath = source["logPath"];
+	    }
+	}
+
+}
+
 export namespace profile {
 	
 	export class Profile {
