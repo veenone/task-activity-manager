@@ -134,9 +134,12 @@ func NewRepository(s *store.Store) *Repository {
 
 // UpsertTests inserts or updates a batch of Tests in one transaction.
 //
-// TODO(xtm): preserve local pending edits — currently an incoming sync
-// overwrites the test_case row regardless of any pending_change. Phase 2
-// conflict detection (FR-1.4) will fix this.
+// For Tests that have local pending edits, the ON CONFLICT clause preserves
+// the user's edited value for each editable field that has a pending row —
+// only fields without a pending change are overwritten by the incoming
+// sync. base_version on the pending change stays untouched, so commit-time
+// conflict detection (FR-1.4, next slice) still has the original watermark
+// to compare against.
 func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 	tx, err := r.db.Begin()
 	if err != nil {
@@ -144,17 +147,44 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	// Each editable field's UPDATE branch checks for a pending change on
+	// that (profile, test, field) and, if one exists, keeps the existing
+	// local value instead of overwriting from the incoming sync.
 	stmt, err := tx.Prepare(
 		`INSERT INTO test_case
 		   (profile_id, jira_key, jira_id, summary, description, status, priority, labels, updated_at, folder_id)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
 		   jira_id     = excluded.jira_id,
-		   summary     = excluded.summary,
-		   description = excluded.description,
+		   summary     = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = 'summary'
+		     ) THEN test_case.summary ELSE excluded.summary END,
+		   description = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = 'description'
+		     ) THEN test_case.description ELSE excluded.description END,
 		   status      = excluded.status,
-		   priority    = excluded.priority,
-		   labels      = excluded.labels,
+		   priority    = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = 'priority'
+		     ) THEN test_case.priority ELSE excluded.priority END,
+		   labels      = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = 'labels'
+		     ) THEN test_case.labels ELSE excluded.labels END,
 		   updated_at  = excluded.updated_at,
 		   folder_id   = excluded.folder_id`)
 	if err != nil {

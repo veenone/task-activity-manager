@@ -389,6 +389,95 @@ func TestCommitPendingChangesIsIdempotentForUnknownIDs(t *testing.T) {
 	}
 }
 
+func TestUpsertTestsPreservesPendingFieldValuesOnResync(t *testing.T) {
+	repo := newRepo(t)
+
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Original", Status: "Open", Priority: "Medium"},
+	}); err != nil {
+		t.Fatalf("initial sync: %v", err)
+	}
+	if err := repo.EditTestField("p1", "QA-1", "summary", "Local edit"); err != nil {
+		t.Fatalf("local edit: %v", err)
+	}
+
+	// A subsequent sync brings new remote values for BOTH summary (which
+	// has a pending edit) and status (which doesn't).
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Remote changed it too", Status: "In Progress", Priority: "Medium"},
+	}); err != nil {
+		t.Fatalf("re-sync: %v", err)
+	}
+
+	got, err := repo.GetTest("p1", "QA-1")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Summary != "Local edit" {
+		t.Errorf("Summary = %q after re-sync, want %q (pending edit must survive sync)",
+			got.Summary, "Local edit")
+	}
+	if got.Status != "In Progress" {
+		t.Errorf("Status = %q after re-sync, want %q (non-pending field should update)",
+			got.Status, "In Progress")
+	}
+}
+
+func TestUpsertTestsOverwritesAllFieldsWhenNoPending(t *testing.T) {
+	repo := newRepo(t)
+
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Original", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("initial sync: %v", err)
+	}
+
+	// No pending edits, so the next sync should overwrite freely.
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Updated", Status: "Done"},
+	}); err != nil {
+		t.Fatalf("re-sync: %v", err)
+	}
+
+	got, _ := repo.GetTest("p1", "QA-1")
+	if got.Summary != "Updated" || got.Status != "Done" {
+		t.Errorf("got Summary=%q Status=%q; both should be the new values",
+			got.Summary, got.Status)
+	}
+}
+
+func TestUpsertTestsPreservesPendingForOneFieldButUpdatesAnother(t *testing.T) {
+	repo := newRepo(t)
+
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Orig summary", Description: "Orig desc", Priority: "Low"},
+	}); err != nil {
+		t.Fatalf("initial sync: %v", err)
+	}
+	// User only edits summary.
+	if err := repo.EditTestField("p1", "QA-1", "summary", "User summary"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	// Sync changes summary, description, and priority on the remote.
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Remote summary", Description: "Remote desc", Priority: "High"},
+	}); err != nil {
+		t.Fatalf("re-sync: %v", err)
+	}
+
+	got, _ := repo.GetTest("p1", "QA-1")
+	if got.Summary != "User summary" {
+		t.Errorf("summary should stay edited: got %q", got.Summary)
+	}
+	if got.Description != "Remote desc" {
+		t.Errorf("description has no pending — should take remote, got %q", got.Description)
+	}
+	if got.Priority != "High" {
+		t.Errorf("priority has no pending — should take remote, got %q", got.Priority)
+	}
+}
+
 // seedFolders populates a fresh repo with three tests across two folder
 // branches so the FolderID filter tests can exercise leaf and ancestor
 // selections.
