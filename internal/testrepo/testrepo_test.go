@@ -478,6 +478,143 @@ func TestUpsertTestsPreservesPendingForOneFieldButUpdatesAnother(t *testing.T) {
 	}
 }
 
+func TestBulkEditSetsFieldOnAllSelected(t *testing.T) {
+	repo := seedBulkTests(t)
+
+	result, err := repo.BulkEditTests(
+		"p1",
+		[]string{"QA-1", "QA-2", "QA-3"},
+		testrepo.BulkEdit{Operation: "set", Field: "priority", Value: "Critical"},
+	)
+	if err != nil {
+		t.Fatalf("bulk: %v", err)
+	}
+
+	if len(result.Succeeded) != 3 {
+		t.Errorf("succeeded = %d, want 3", len(result.Succeeded))
+	}
+	for _, key := range []string{"QA-1", "QA-2", "QA-3"} {
+		got, _ := repo.GetTest("p1", key)
+		if got.Priority != "Critical" {
+			t.Errorf("%s priority = %q, want Critical", key, got.Priority)
+		}
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 3 {
+		t.Errorf("pending = %d, want 3 (one per test)", len(changes))
+	}
+}
+
+func TestBulkEditAddLabelIsNoopWhenAlreadyPresent(t *testing.T) {
+	repo := seedBulkTests(t)
+	// QA-1 already has the label; QA-2 doesn't.
+	if err := repo.EditTestField("p1", "QA-1", "labels", "smoke regression"); err != nil {
+		t.Fatalf("seed labels: %v", err)
+	}
+
+	result, err := repo.BulkEditTests(
+		"p1",
+		[]string{"QA-1", "QA-2"},
+		testrepo.BulkEdit{Operation: "add_label", Value: "smoke"},
+	)
+	if err != nil {
+		t.Fatalf("bulk: %v", err)
+	}
+
+	// Both succeed: QA-1 is a no-op (already present), QA-2 gets the label.
+	if len(result.Succeeded) != 2 {
+		t.Errorf("succeeded = %d, want 2", len(result.Succeeded))
+	}
+
+	qa1, _ := repo.GetTest("p1", "QA-1")
+	qa2, _ := repo.GetTest("p1", "QA-2")
+	if !containsString(qa1.Labels, "smoke") {
+		t.Errorf("QA-1 should still have smoke: %v", qa1.Labels)
+	}
+	if !containsString(qa2.Labels, "smoke") {
+		t.Errorf("QA-2 should have smoke after add: %v", qa2.Labels)
+	}
+}
+
+func TestBulkEditRemoveLabelRemovesWhenPresent(t *testing.T) {
+	repo := seedBulkTests(t)
+	if err := repo.EditTestField("p1", "QA-1", "labels", "smoke regression"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if _, err := repo.BulkEditTests(
+		"p1",
+		[]string{"QA-1", "QA-2"},
+		testrepo.BulkEdit{Operation: "remove_label", Value: "smoke"},
+	); err != nil {
+		t.Fatalf("bulk: %v", err)
+	}
+
+	qa1, _ := repo.GetTest("p1", "QA-1")
+	if containsString(qa1.Labels, "smoke") {
+		t.Errorf("QA-1 should no longer have smoke: %v", qa1.Labels)
+	}
+}
+
+func TestBulkEditReportsFailureForUnknownTest(t *testing.T) {
+	repo := seedBulkTests(t)
+
+	result, err := repo.BulkEditTests(
+		"p1",
+		[]string{"QA-1", "QA-NONEXIST"},
+		testrepo.BulkEdit{Operation: "set", Field: "summary", Value: "New"},
+	)
+	if err != nil {
+		t.Fatalf("bulk: %v", err)
+	}
+
+	if len(result.Succeeded) != 1 || result.Succeeded[0] != "QA-1" {
+		t.Errorf("succeeded = %v, want [QA-1]", result.Succeeded)
+	}
+	if len(result.Failed) != 1 || result.Failed[0].TestKey != "QA-NONEXIST" {
+		t.Errorf("failed = %v, want one entry for QA-NONEXIST", result.Failed)
+	}
+}
+
+func TestBulkEditAppendIsRejectedForNonDescriptionFields(t *testing.T) {
+	repo := seedBulkTests(t)
+
+	result, err := repo.BulkEditTests(
+		"p1",
+		[]string{"QA-1"},
+		testrepo.BulkEdit{Operation: "append", Field: "summary", Value: "extra"},
+	)
+	if err != nil {
+		t.Fatalf("bulk: %v", err)
+	}
+	if len(result.Failed) != 1 {
+		t.Errorf("append-on-summary should fail; got %+v", result)
+	}
+}
+
+func seedBulkTests(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "First", Priority: "Low"},
+		{Key: "QA-2", ID: "2", Summary: "Second", Priority: "Low"},
+		{Key: "QA-3", ID: "3", Summary: "Third", Priority: "Low"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	return repo
+}
+
+func containsString(s []string, want string) bool {
+	for _, v := range s {
+		if v == want {
+			return true
+		}
+	}
+	return false
+}
+
 // seedFolders populates a fresh repo with three tests across two folder
 // branches so the FolderID filter tests can exercise leaf and ancestor
 // selections.

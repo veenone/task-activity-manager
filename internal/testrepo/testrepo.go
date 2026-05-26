@@ -682,6 +682,150 @@ func (r *Repository) ListAuditEntries(profileID string, limit int) ([]AuditEntry
 	return out, rows.Err()
 }
 
+// --- Bulk operations (FR-3) ---
+
+// BulkEdit describes a single field-level operation to apply to a set of
+// Tests. Operations:
+//
+//   - "set":          replace the field's value with op.Value (any editable field)
+//   - "append":       append op.Value to the existing value with a newline
+//     (description only)
+//   - "add_label":    add op.Value as a label if not already present
+//   - "remove_label": remove op.Value from the labels list if present
+//
+// For label operations the Field is implied to be "labels" regardless of
+// what the caller sets.
+type BulkEdit struct {
+	Operation string `json:"operation"`
+	Field     string `json:"field"`
+	Value     string `json:"value"`
+}
+
+// BulkEditResult reports the outcome of a bulk operation, per Test.
+type BulkEditResult struct {
+	Succeeded []string      `json:"succeeded"`
+	Failed    []BulkFailure `json:"failed"`
+}
+
+// BulkFailure is one Test the bulk operation could not be applied to.
+type BulkFailure struct {
+	TestKey string `json:"testKey"`
+	Error   string `json:"error"`
+}
+
+// BulkEditTests applies a single field-level operation to a batch of Tests,
+// queuing a pending change for each modified Test (FR-3.2 / FR-3.3 / FR-3.7).
+// Each Test is processed in its own transaction (via EditTestField) so one
+// failure doesn't block the others. No-op edits — for example, add_label
+// when the label is already present — are reported as succeeded.
+func (r *Repository) BulkEditTests(profileID string, testKeys []string, op BulkEdit) (BulkEditResult, error) {
+	result := BulkEditResult{
+		Succeeded: []string{},
+		Failed:    []BulkFailure{},
+	}
+
+	field, err := resolveBulkField(op)
+	if err != nil {
+		return result, fmt.Errorf("bulk edit: %w", err)
+	}
+	col, ok := editableFields[field]
+	if !ok {
+		return result, fmt.Errorf("bulk edit: field %q is not editable", field)
+	}
+
+	readSQL := fmt.Sprintf(
+		`SELECT %s FROM test_case WHERE profile_id = ? AND jira_key = ?`, col,
+	)
+
+	for _, key := range testKeys {
+		var current string
+		err := r.db.QueryRow(readSQL, profileID, key).Scan(&current)
+		if errors.Is(err, sql.ErrNoRows) {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: "not found"})
+			continue
+		}
+		if err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
+			continue
+		}
+		newVal, applyErr := applyBulkOperation(op, current)
+		if applyErr != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: applyErr.Error()})
+			continue
+		}
+		if newVal == current {
+			// No-op (e.g. add_label when the label is already present) —
+			// still report success so the user knows the request was handled.
+			result.Succeeded = append(result.Succeeded, key)
+			continue
+		}
+		if err := r.EditTestField(profileID, key, field, newVal); err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
+	}
+	return result, nil
+}
+
+// resolveBulkField derives which test_case column the operation targets.
+// Label operations always target the labels column; other operations need
+// an explicit field.
+func resolveBulkField(op BulkEdit) (string, error) {
+	if op.Operation == "add_label" || op.Operation == "remove_label" {
+		return "labels", nil
+	}
+	if op.Field == "" {
+		return "", fmt.Errorf("field is required")
+	}
+	return op.Field, nil
+}
+
+// applyBulkOperation computes the new field value given the current value
+// and the operation. It does not write anything.
+func applyBulkOperation(op BulkEdit, current string) (string, error) {
+	switch op.Operation {
+	case "set":
+		return op.Value, nil
+
+	case "append":
+		if op.Field != "description" {
+			return "", fmt.Errorf("append is only supported for description")
+		}
+		if current == "" {
+			return op.Value, nil
+		}
+		return current + "\n" + op.Value, nil
+
+	case "add_label":
+		if strings.TrimSpace(op.Value) == "" {
+			return "", fmt.Errorf("label value is required")
+		}
+		labels := strings.Fields(current)
+		for _, l := range labels {
+			if l == op.Value {
+				return current, nil
+			}
+		}
+		labels = append(labels, op.Value)
+		return strings.Join(labels, " "), nil
+
+	case "remove_label":
+		if strings.TrimSpace(op.Value) == "" {
+			return "", fmt.Errorf("label value is required")
+		}
+		labels := strings.Fields(current)
+		out := make([]string, 0, len(labels))
+		for _, l := range labels {
+			if l != op.Value {
+				out = append(out, l)
+			}
+		}
+		return strings.Join(out, " "), nil
+	}
+	return "", fmt.Errorf("unknown operation %q", op.Operation)
+}
+
 // --- Helpers ---
 
 // upsertPendingChange records (or coalesces) a pending field change. If a row

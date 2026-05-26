@@ -21,6 +21,7 @@ export {
   ListPendingChanges,
   ListAuditEntries,
   CommitPendingChanges,
+  BulkEditTests,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 
@@ -133,6 +134,23 @@ export interface Conflict {
 }
 
 export interface FailedCommit {
+  testKey: string;
+  error: string;
+}
+
+// Bulk-edit (FR-3) operation descriptor and result types.
+export interface BulkEdit {
+  operation: string;
+  field: string;
+  value: string;
+}
+
+export interface BulkEditResult {
+  succeeded: string[];
+  failed: BulkFailure[];
+}
+
+export interface BulkFailure {
   testKey: string;
   error: string;
 }

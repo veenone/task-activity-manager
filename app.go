@@ -286,6 +286,22 @@ func (a *App) CommitPendingChanges(profileID string) (syncer.CommitResult, error
 	return engine.CommitChanges(a.ctx, profileID)
 }
 
+// --- Bulk operations (FR-3) ---
+
+// BulkEditTests applies a single field-level operation to a batch of Tests,
+// queuing a pending change for each modified Test. The changes are then
+// pushed to Jira through the existing commit flow.
+func (a *App) BulkEditTests(profileID string, testKeys []string, op testrepo.BulkEdit) (testrepo.BulkEditResult, error) {
+	empty := testrepo.BulkEditResult{
+		Succeeded: []string{},
+		Failed:    []testrepo.BulkFailure{},
+	}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkEditTests(profileID, testKeys, op)
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.

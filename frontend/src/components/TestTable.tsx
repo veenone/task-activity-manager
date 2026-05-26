@@ -8,7 +8,10 @@ interface Props {
   refreshKey: number;
   selectedKey: string | null;
   pendingByTestKey: Map<string, PendingChange[]>;
+  selectedSet: Set<string>;
   onSelect: (key: string) => void;
+  onToggleSelect: (key: string) => void;
+  onToggleSelectPage: (keys: string[]) => void;
 }
 
 const PAGE_SIZE = 100;
@@ -21,7 +24,10 @@ export function TestTable({
   refreshKey,
   selectedKey,
   pendingByTestKey,
+  selectedSet,
   onSelect,
+  onToggleSelect,
+  onToggleSelectPage,
 }: Props) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -92,6 +98,12 @@ export function TestTable({
   const from = page.total === 0 ? 0 : offset + 1;
   const to = Math.min(offset + PAGE_SIZE, page.total);
 
+  const pageKeys = page.tests.map((t) => t.key);
+  const allOnPageSelected =
+    pageKeys.length > 0 && pageKeys.every((k) => selectedSet.has(k));
+  const someOnPageSelected =
+    !allOnPageSelected && pageKeys.some((k) => selectedSet.has(k));
+
   return (
     <div className="testtable">
       <div className="filters">
@@ -136,6 +148,22 @@ export function TestTable({
         <table>
           <thead>
             <tr>
+              <th className="select-col">
+                <input
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someOnPageSelected;
+                  }}
+                  disabled={pageKeys.length === 0}
+                  onChange={() => onToggleSelectPage(pageKeys)}
+                  title={
+                    allOnPageSelected
+                      ? "Clear page selection"
+                      : "Select all on this page"
+                  }
+                />
+              </th>
               <SortHeader col="key" label="Key" sortBy={sortBy} desc={desc} onSort={toggleSort} />
               <SortHeader col="summary" label="Summary" sortBy={sortBy} desc={desc} onSort={toggleSort} />
               <SortHeader col="status" label="Status" sortBy={sortBy} desc={desc} onSort={toggleSort} />
@@ -147,12 +175,26 @@ export function TestTable({
           <tbody>
             {page.tests.map((t) => {
               const hasPending = pendingByTestKey.has(t.key);
+              const isSelected = selectedSet.has(t.key);
               return (
                 <tr
                   key={t.key}
-                  className={t.key === selectedKey ? "row-selected" : ""}
+                  className={
+                    (t.key === selectedKey ? "row-selected " : "") +
+                    (isSelected ? "row-checked" : "")
+                  }
                   onClick={() => onSelect(t.key)}
                 >
+                  <td
+                    className="select-col"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleSelect(t.key)}
+                    />
+                  </td>
                   <td className="mono">
                     {hasPending && (
                       <span className="row-dirty-dot" title="Pending edits">
@@ -187,7 +229,7 @@ export function TestTable({
             })}
             {!loading && page.tests.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty-row muted">
+                <td colSpan={7} className="empty-row muted">
                   {page.total === 0 &&
                   debouncedSearch === "" &&
                   status.trim() === "" &&

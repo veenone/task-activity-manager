@@ -26,6 +26,7 @@ import { TestTable } from "./components/TestTable";
 import { TestDetail } from "./components/TestDetail";
 import { FolderTree } from "./components/FolderTree";
 import { PendingChangesModal } from "./components/PendingChangesModal";
+import { BulkEditModal } from "./components/BulkEditModal";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -53,6 +54,9 @@ function App() {
   const [lastCommitResult, setLastCommitResult] = useState<CommitResult | null>(
     null,
   );
+
+  const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set());
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -133,10 +137,33 @@ function App() {
     loadProfileData();
   }, [loadProfileData, refreshKey]);
 
-  // Clear folder selection when the profile changes.
+  // Clear folder + row selection when the profile changes.
   useEffect(() => {
     setSelectedFolder("");
+    setSelectedSet(new Set());
   }, [activeId]);
+
+  function toggleSelect(key: string) {
+    setSelectedSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleSelectPage(keys: string[]) {
+    setSelectedSet((prev) => {
+      const allSelected = keys.every((k) => prev.has(k));
+      const next = new Set(prev);
+      if (allSelected) {
+        for (const k of keys) next.delete(k);
+      } else {
+        for (const k of keys) next.add(k);
+      }
+      return next;
+    });
+  }
 
   async function runSync() {
     if (!activeId || syncing) return;
@@ -326,6 +353,21 @@ function App() {
         </button>
       </header>
 
+      {selectedSet.size > 0 && (
+        <div className="bulk-toolbar">
+          <span className="bulk-count">{selectedSet.size} selected</span>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowBulkEdit(true)}
+          >
+            Bulk edit…
+          </button>
+          <button className="btn" onClick={() => setSelectedSet(new Set())}>
+            Clear
+          </button>
+        </div>
+      )}
+
       <main className="content">
         {folders.length > 0 && (
           <FolderTree
@@ -343,7 +385,10 @@ function App() {
           refreshKey={refreshKey}
           selectedKey={selectedKey}
           pendingByTestKey={pendingByTestKey}
+          selectedSet={selectedSet}
           onSelect={setSelectedKey}
+          onToggleSelect={toggleSelect}
+          onToggleSelectPage={toggleSelectPage}
         />
         {selectedKey && (
           <TestDetail
@@ -380,6 +425,26 @@ function App() {
           onClose={closePendingModal}
           committing={committing}
           lastResult={lastCommitResult}
+        />
+      )}
+
+      {showBulkEdit && (
+        <BulkEditModal
+          profileId={activeId}
+          testKeys={[...selectedSet]}
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setSelectedSet(new Set());
+            setShowBulkEdit(false);
+          }}
+          onCancel={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setShowBulkEdit(false);
+          }}
         />
       )}
     </div>
