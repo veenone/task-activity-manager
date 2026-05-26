@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { ListTests, errMsg } from "../api";
-import type { TestPage, TestQuery } from "../api";
+import type { TestPage, TestQuery, PendingChange } from "../api";
 
 interface Props {
   profileId: string;
   folderId: string;
   refreshKey: number;
   selectedKey: string | null;
+  pendingByTestKey: Map<string, PendingChange[]>;
   onSelect: (key: string) => void;
 }
 
@@ -19,6 +20,7 @@ export function TestTable({
   folderId,
   refreshKey,
   selectedKey,
+  pendingByTestKey,
   onSelect,
 }: Props) {
   const [search, setSearch] = useState("");
@@ -32,13 +34,11 @@ export function TestTable({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Debounce the search box so typing does not fire a query per keystroke.
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 250);
     return () => clearTimeout(t);
   }, [search]);
 
-  // Return to the first page whenever the query changes.
   useEffect(() => {
     setOffset(0);
   }, [debouncedSearch, status, folderId, sortBy, desc, profileId]);
@@ -145,36 +145,46 @@ export function TestTable({
             </tr>
           </thead>
           <tbody>
-            {page.tests.map((t) => (
-              <tr
-                key={t.key}
-                className={t.key === selectedKey ? "row-selected" : ""}
-                onClick={() => onSelect(t.key)}
-              >
-                <td className="mono">{t.key}</td>
-                <td className="summary-cell">{t.summary}</td>
-                <td>
-                  {t.status ? (
-                    <span className="status-pill">{t.status}</span>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </td>
-                <td>{t.priority || "—"}</td>
-                <td className="labels-cell">
-                  {t.labels && t.labels.length > 0 ? (
-                    t.labels.map((l) => (
-                      <span key={l} className="label-chip">
-                        {l}
+            {page.tests.map((t) => {
+              const hasPending = pendingByTestKey.has(t.key);
+              return (
+                <tr
+                  key={t.key}
+                  className={t.key === selectedKey ? "row-selected" : ""}
+                  onClick={() => onSelect(t.key)}
+                >
+                  <td className="mono">
+                    {hasPending && (
+                      <span className="row-dirty-dot" title="Pending edits">
+                        ●
                       </span>
-                    ))
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </td>
-                <td className="muted">{formatDate(t.updated)}</td>
-              </tr>
-            ))}
+                    )}
+                    {t.key}
+                  </td>
+                  <td className="summary-cell">{t.summary}</td>
+                  <td>
+                    {t.status ? (
+                      <span className="status-pill">{t.status}</span>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td>{t.priority || "—"}</td>
+                  <td className="labels-cell">
+                    {t.labels && t.labels.length > 0 ? (
+                      t.labels.map((l) => (
+                        <span key={l} className="label-chip">
+                          {l}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td className="muted">{formatDate(t.updated)}</td>
+                </tr>
+              );
+            })}
             {!loading && page.tests.length === 0 && (
               <tr>
                 <td colSpan={6} className="empty-row muted">

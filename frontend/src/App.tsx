@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import {
   Health,
@@ -6,6 +6,8 @@ import {
   SyncProfile,
   GetSyncState,
   ListFolders,
+  ListPendingChanges,
+  DiscardPendingChange,
   EventsOn,
   errMsg,
 } from "./api";
@@ -15,11 +17,13 @@ import type {
   SyncState,
   SyncProgress,
   Folder,
+  PendingChange,
 } from "./api";
 import { ProfileForm } from "./components/ProfileForm";
 import { TestTable } from "./components/TestTable";
 import { TestDetail } from "./components/TestDetail";
 import { FolderTree } from "./components/FolderTree";
+import { PendingChangesModal } from "./components/PendingChangesModal";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -39,10 +43,12 @@ function App() {
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [detailVersion, setDetailVersion] = useState(0);
 
-  // First: check whether the backend started up cleanly. If not, render a
-  // diagnostic screen so the user sees the actual failure instead of a
-  // blank window or a cryptic nil-pointer panic.
+  const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
+  const [showPending, setShowPending] = useState(false);
+
+  // First: check whether the backend started up cleanly.
   useEffect(() => {
     Health()
       .then(setHealth)
@@ -73,6 +79,33 @@ function App() {
   useEffect(() => {
     return EventsOn("sync:progress", (p: SyncProgress) => setProgress(p));
   }, []);
+
+  // Pending changes grouped by test key — drives the dirty markers in the
+  // grid and the per-field dot in the detail panel.
+  const pendingByTestKey = useMemo(() => {
+    const m = new Map<string, PendingChange[]>();
+    for (const p of pendingChanges) {
+      if (p.entityType !== "test_case") continue;
+      const arr = m.get(p.entityKey);
+      if (arr) arr.push(p);
+      else m.set(p.entityKey, [p]);
+    }
+    return m;
+  }, [pendingChanges]);
+
+  const reloadPending = useCallback(() => {
+    if (!activeId) {
+      setPendingChanges([]);
+      return;
+    }
+    ListPendingChanges(activeId)
+      .then(setPendingChanges)
+      .catch((e) => console.error("list pending:", errMsg(e)));
+  }, [activeId]);
+
+  useEffect(() => {
+    reloadPending();
+  }, [reloadPending, refreshKey]);
 
   // Refresh the sync summary and folder tree when the active profile changes
   // or a sync finishes.
@@ -107,6 +140,7 @@ function App() {
     try {
       await SyncProfile(activeId);
       setRefreshKey((k) => k + 1);
+      setDetailVersion((v) => v + 1);
     } catch (e) {
       setSyncError(errMsg(e));
     } finally {
@@ -122,34 +156,56 @@ function App() {
     setSelectedKey(null);
   }
 
+  // Called by TestDetail after a successful inline edit. Refreshes the
+  // grid (so it shows the new value) and the pending list. Deliberately
+  // does NOT bump detailVersion — TestDetail already has the new value in
+  // its own local state, and re-fetching mid-edit would risk clobbering
+  // a field the user is still typing in.
+  function handleEdited() {
+    setRefreshKey((k) => k + 1);
+    reloadPending();
+  }
+
+  // Called when the user discards a pending change from the modal. The
+  // backend reverts test_case to before_val, so the detail panel needs to
+  // re-fetch too.
+  async function handleDiscard(id: number) {
+    if (!activeId) return;
+    try {
+      await DiscardPendingChange(activeId, id);
+      setRefreshKey((k) => k + 1);
+      setDetailVersion((v) => v + 1);
+      reloadPending();
+    } catch (e) {
+      console.error("discard:", errMsg(e));
+    }
+  }
+
   const activeProfile = profiles.find((p) => p.id === activeId);
   const isDemo =
     !!activeProfile &&
     /^(demo$|demo:|mock:)/i.test(activeProfile.jiraUrl.trim());
 
-  // Health check hasn't returned yet.
   if (!health) {
     return <div className="centered muted">Loading…</div>;
   }
 
-  // Startup failed — show the actual error and the log path so the user can
-  // diagnose without a console window.
   if (!health.ok) {
     return (
       <div className="centered">
         <div className="onboard">
           <h2>Backend failed to start</h2>
-          <pre className="backend-error">{health.error || "(no error message reported)"}</pre>
+          <pre className="backend-error">
+            {health.error || "(no error message reported)"}
+          </pre>
           {health.dbPath && (
             <p className="muted">
-              Database path:{" "}
-              <code>{health.dbPath}</code>
+              Database path: <code>{health.dbPath}</code>
             </p>
           )}
           {health.logPath && (
             <p className="muted">
-              Full log:{" "}
-              <code>{health.logPath}</code>
+              Full log: <code>{health.logPath}</code>
             </p>
           )}
           <p className="muted">
@@ -165,7 +221,6 @@ function App() {
     return <div className="centered muted">Loading…</div>;
   }
 
-  // First-run onboarding — no profiles configured yet (FR-12.1).
   if (profiles.length === 0) {
     return (
       <div className="centered">
@@ -205,6 +260,16 @@ function App() {
 
         <div className="spacer" />
 
+        {pendingChanges.length > 0 && (
+          <button
+            className="btn btn-pending"
+            onClick={() => setShowPending(true)}
+            title="Show uncommitted edits"
+          >
+            Pending {pendingChanges.length}
+          </button>
+        )}
+
         {progress && !progress.done && <SyncBar progress={progress} />}
         {syncError && (
           <span className="error-text">Sync failed: {syncError}</span>
@@ -242,13 +307,17 @@ function App() {
           folderId={selectedFolder}
           refreshKey={refreshKey}
           selectedKey={selectedKey}
+          pendingByTestKey={pendingByTestKey}
           onSelect={setSelectedKey}
         />
         {selectedKey && (
           <TestDetail
             profileId={activeId}
             testKey={selectedKey}
+            version={detailVersion}
+            pendingForTest={pendingByTestKey.get(selectedKey) ?? []}
             onClose={() => setSelectedKey(null)}
+            onEdited={handleEdited}
           />
         )}
       </main>
@@ -262,6 +331,18 @@ function App() {
             />
           </div>
         </div>
+      )}
+
+      {showPending && (
+        <PendingChangesModal
+          changes={pendingChanges}
+          onDiscard={handleDiscard}
+          onJumpTo={(key) => {
+            setSelectedKey(key);
+            setShowPending(false);
+          }}
+          onClose={() => setShowPending(false)}
+        />
       )}
     </div>
   );
