@@ -542,6 +542,57 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 	return tx.Commit()
 }
 
+// CommitPendingChanges deletes the given pending_change rows and writes a
+// "commit" audit entry for each, in one transaction. Called by the sync
+// engine after Jira accepts the corresponding PUT for that Test.
+func (r *Repository) CommitPendingChanges(profileID string, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	selectStmt, err := tx.Prepare(
+		`SELECT entity_key, field, before_val, after_val FROM pending_change
+		 WHERE profile_id = ? AND id = ?`)
+	if err != nil {
+		return fmt.Errorf("prepare select: %w", err)
+	}
+	defer selectStmt.Close()
+
+	deleteStmt, err := tx.Prepare(
+		`DELETE FROM pending_change WHERE profile_id = ? AND id = ?`)
+	if err != nil {
+		return fmt.Errorf("prepare delete: %w", err)
+	}
+	defer deleteStmt.Close()
+
+	for _, id := range ids {
+		var entityKey, field, beforeVal, afterVal string
+		err := selectStmt.QueryRow(profileID, id).Scan(
+			&entityKey, &field, &beforeVal, &afterVal,
+		)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue // already gone — commit stays idempotent
+		}
+		if err != nil {
+			return fmt.Errorf("read pending %d: %w", id, err)
+		}
+		if _, err := deleteStmt.Exec(profileID, id); err != nil {
+			return fmt.Errorf("delete pending %d: %w", id, err)
+		}
+		if err := writeAudit(
+			tx, profileID, entityKey, "commit", field, beforeVal, afterVal, "",
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // ListPendingChanges returns all uncommitted local edits for a profile,
 // newest first.
 func (r *Repository) ListPendingChanges(profileID string) ([]PendingChange, error) {

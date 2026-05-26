@@ -8,6 +8,7 @@ import {
   ListFolders,
   ListPendingChanges,
   DiscardPendingChange,
+  CommitPendingChanges,
   EventsOn,
   errMsg,
 } from "./api";
@@ -18,6 +19,7 @@ import type {
   SyncProgress,
   Folder,
   PendingChange,
+  CommitResult,
 } from "./api";
 import { ProfileForm } from "./components/ProfileForm";
 import { TestTable } from "./components/TestTable";
@@ -47,6 +49,10 @@ function App() {
 
   const [pendingChanges, setPendingChanges] = useState<PendingChange[]>([]);
   const [showPending, setShowPending] = useState(false);
+  const [committing, setCommitting] = useState(false);
+  const [lastCommitResult, setLastCommitResult] = useState<CommitResult | null>(
+    null,
+  );
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -179,6 +185,34 @@ function App() {
     } catch (e) {
       console.error("discard:", errMsg(e));
     }
+  }
+
+  // Called when the user clicks "Commit" in the pending modal. Pushes all
+  // pending changes to Jira; per-Test results land in lastCommitResult.
+  // Committed pending rows are deleted by the backend; failures stay.
+  async function handleCommit() {
+    if (!activeId || committing) return;
+    setCommitting(true);
+    setLastCommitResult(null);
+    try {
+      const result = await CommitPendingChanges(activeId);
+      setLastCommitResult(result);
+      setRefreshKey((k) => k + 1);
+      setDetailVersion((v) => v + 1);
+      reloadPending();
+    } catch (e) {
+      setLastCommitResult({
+        succeeded: [],
+        failed: [{ testKey: "", error: errMsg(e) }],
+      });
+    } finally {
+      setCommitting(false);
+    }
+  }
+
+  function closePendingModal() {
+    setShowPending(false);
+    setLastCommitResult(null);
   }
 
   const activeProfile = profiles.find((p) => p.id === activeId);
@@ -337,11 +371,14 @@ function App() {
         <PendingChangesModal
           changes={pendingChanges}
           onDiscard={handleDiscard}
+          onCommit={handleCommit}
           onJumpTo={(key) => {
             setSelectedKey(key);
-            setShowPending(false);
+            closePendingModal();
           }}
-          onClose={() => setShowPending(false)}
+          onClose={closePendingModal}
+          committing={committing}
+          lastResult={lastCommitResult}
         />
       )}
     </div>

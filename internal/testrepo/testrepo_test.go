@@ -347,6 +347,48 @@ func TestAuditLogRecordsEditAndDiscard(t *testing.T) {
 	}
 }
 
+func TestCommitPendingChangesClearsRowsAndWritesCommitAudit(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	if err := repo.EditTestField("p1", "QA-1", "summary", "edited summary"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 pending before commit, got %d", len(changes))
+	}
+
+	if err := repo.CommitPendingChanges("p1", []int64{changes[0].ID}); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	after, _ := repo.ListPendingChanges("p1")
+	if len(after) != 0 {
+		t.Errorf("expected 0 pending after commit, got %d", len(after))
+	}
+
+	entries, _ := repo.ListAuditEntries("p1", 100)
+	var hasCommit bool
+	for _, e := range entries {
+		if e.Action == "commit" && e.Field == "summary" && e.AfterVal == "edited summary" {
+			hasCommit = true
+		}
+	}
+	if !hasCommit {
+		t.Error("audit log missing commit entry for the committed change")
+	}
+}
+
+func TestCommitPendingChangesIsIdempotentForUnknownIDs(t *testing.T) {
+	repo := seedTestForEditing(t)
+
+	// No edits made, so id=999 doesn't exist — commit should still succeed
+	// without error (idempotent).
+	if err := repo.CommitPendingChanges("p1", []int64{999}); err != nil {
+		t.Errorf("commit of non-existent id should be a no-op, got %v", err)
+	}
+}
+
 // seedFolders populates a fresh repo with three tests across two folder
 // branches so the FolderID filter tests can exercise leaf and ancestor
 // selections.

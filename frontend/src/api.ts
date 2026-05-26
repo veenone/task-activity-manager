@@ -20,6 +20,7 @@ export {
   DiscardPendingChange,
   ListPendingChanges,
   ListAuditEntries,
+  CommitPendingChanges,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 
@@ -113,6 +114,18 @@ export interface SyncProgress {
   fetched: number;
   total: number;
   done: boolean;
+}
+
+// CommitResult mirrors syncer.CommitResult — per-Test outcome of pushing
+// pending changes to Jira.
+export interface CommitResult {
+  succeeded: string[];
+  failed: FailedCommit[];
+}
+
+export interface FailedCommit {
+  testKey: string;
+  error: string;
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

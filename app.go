@@ -261,6 +261,30 @@ func (a *App) ListAuditEntries(profileID string, limit int) ([]testrepo.AuditEnt
 	return a.repo.ListAuditEntries(profileID, limit)
 }
 
+// CommitPendingChanges pushes a profile's local edits to Jira (FR-1.5).
+// Returns a per-Test result describing what succeeded and what failed —
+// failed entries stay in the local pending list so the user can retry or
+// discard them.
+func (a *App) CommitPendingChanges(profileID string) (syncer.CommitResult, error) {
+	empty := syncer.CommitResult{
+		Succeeded: []string{},
+		Failed:    []syncer.FailedCommit{},
+	}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return empty, err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return empty, fmt.Errorf("load credentials: %w", err)
+	}
+	engine := syncer.New(jira.NewClient(p.JiraURL, token), a.repo)
+	return engine.CommitChanges(a.ctx, profileID)
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.
