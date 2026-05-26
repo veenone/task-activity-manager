@@ -81,8 +81,25 @@ export namespace syncer {
 	        this.error = source["error"];
 	    }
 	}
+	export class Conflict {
+	    testKey: string;
+	    baseVersion: string;
+	    remoteVersion: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Conflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.baseVersion = source["baseVersion"];
+	        this.remoteVersion = source["remoteVersion"];
+	    }
+	}
 	export class CommitResult {
 	    succeeded: string[];
+	    conflicted: Conflict[];
 	    failed: FailedCommit[];
 	
 	    static createFrom(source: any = {}) {
@@ -92,6 +109,7 @@ export namespace syncer {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.succeeded = source["succeeded"];
+	        this.conflicted = this.convertValues(source["conflicted"], Conflict);
 	        this.failed = this.convertValues(source["failed"], FailedCommit);
 	    }
 	
@@ -113,6 +131,7 @@ export namespace syncer {
 		    return a;
 		}
 	}
+	
 
 }
 

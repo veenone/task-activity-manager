@@ -267,8 +267,9 @@ func (a *App) ListAuditEntries(profileID string, limit int) ([]testrepo.AuditEnt
 // discard them.
 func (a *App) CommitPendingChanges(profileID string) (syncer.CommitResult, error) {
 	empty := syncer.CommitResult{
-		Succeeded: []string{},
-		Failed:    []syncer.FailedCommit{},
+		Succeeded:  []string{},
+		Conflicted: []syncer.Conflict{},
+		Failed:     []syncer.FailedCommit{},
 	}
 	if err := a.requireStore(); err != nil {
 		return empty, err

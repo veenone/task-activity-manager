@@ -570,6 +570,25 @@ tr.row-selected {
   padding: 0;
   font-size: 12px;
 }
+.conflict-text {
+  color: #92400e;
+  background: #fff7e6;
+  border-left: 3px solid #fbbf24;
+  padding: 6px 8px;
+  margin: 6px 0;
+  border-radius: 2px;
+  font-size: 12px;
+}
+.conflict-text p {
+  margin: 0 0 4px;
+}
+.conflict-ts {
+  font-family: "Consolas", "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0 4px;
+  border-radius: 2px;
+}
 
 .link-btn {
   background: none;

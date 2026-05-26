@@ -117,10 +117,19 @@ export interface SyncProgress {
 }
 
 // CommitResult mirrors syncer.CommitResult — per-Test outcome of pushing
-// pending changes to Jira.
+// pending changes to Jira. Succeeded / Conflicted / Failed are disjoint sets.
 export interface CommitResult {
   succeeded: string[];
+  conflicted: Conflict[];
   failed: FailedCommit[];
+}
+
+// Conflict means the remote `updated` has advanced since the user's earliest
+// pending edit on that Test — the PUT was held back so they can resolve.
+export interface Conflict {
+  testKey: string;
+  baseVersion: string;
+  remoteVersion: string;
 }
 
 export interface FailedCommit {

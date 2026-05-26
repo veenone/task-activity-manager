@@ -21,7 +21,9 @@ export function PendingChangesModal({
 }: Props) {
   const hasResult =
     lastResult &&
-    (lastResult.succeeded.length > 0 || lastResult.failed.length > 0);
+    (lastResult.succeeded.length > 0 ||
+      lastResult.conflicted.length > 0 ||
+      lastResult.failed.length > 0);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -44,11 +46,39 @@ export function PendingChangesModal({
                 {lastResult!.succeeded.length === 1 ? "test" : "tests"} to Jira.
               </p>
             )}
+            {lastResult!.conflicted.length > 0 && (
+              <div className="conflict-text">
+                <p>
+                  <strong>
+                    Conflict{lastResult!.conflicted.length === 1 ? "" : "s"} (
+                    {lastResult!.conflicted.length})
+                  </strong>{" "}
+                  — remote moved since your edit. These stay in pending; sync
+                  to pull the remote change, then re-commit or discard.
+                </p>
+                <ul className="commit-fail-list">
+                  {lastResult!.conflicted.map((c, i) => (
+                    <li key={i}>
+                      <button
+                        className="link-btn mono"
+                        onClick={() => onJumpTo(c.testKey)}
+                      >
+                        {c.testKey}
+                      </button>
+                      : base{" "}
+                      <code className="conflict-ts">{c.baseVersion}</code>{" "}
+                      vs remote{" "}
+                      <code className="conflict-ts">{c.remoteVersion}</code>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {lastResult!.failed.length > 0 && (
               <div className="error-text">
                 <p>
                   Failed ({lastResult!.failed.length}) — these changes remain
-                  in the pending list:
+                  in pending:
                 </p>
                 <ul className="commit-fail-list">
                   {lastResult!.failed.map((f, i) => (
@@ -116,8 +146,8 @@ export function PendingChangesModal({
 
         <div className="pending-actions">
           <p className="muted pending-footnote-inline">
-            Successful commits leave this list; failures stay and can be
-            retried or discarded.
+            Successful commits leave this list; failures and conflicts stay
+            and can be retried or discarded.
           </p>
           <button
             className="btn btn-primary"

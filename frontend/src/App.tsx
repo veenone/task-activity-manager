@@ -203,6 +203,7 @@ function App() {
     } catch (e) {
       setLastCommitResult({
         succeeded: [],
+        conflicted: [],
         failed: [{ testKey: "", error: errMsg(e) }],
       });
     } finally {

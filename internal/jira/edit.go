@@ -16,6 +16,25 @@ func (c *Client) UpdateIssue(ctx context.Context, key string, fields map[string]
 	return c.put(ctx, "/rest/api/2/issue/"+key, body)
 }
 
+// GetIssueUpdated returns the current `updated` timestamp of a Jira issue.
+// Used as the conflict pre-check before a commit (FR-1.4) — compared to the
+// pending change's base_version. Demo URLs return "" so the caller can
+// short-circuit the check.
+func (c *Client) GetIssueUpdated(ctx context.Context, key string) (string, error) {
+	if isDemoURL(c.baseURL) {
+		return "", nil
+	}
+	var resp struct {
+		Fields struct {
+			Updated string `json:"updated"`
+		} `json:"fields"`
+	}
+	if err := c.get(ctx, "/rest/api/2/issue/"+key+"?fields=updated", &resp); err != nil {
+		return "", err
+	}
+	return resp.Fields.Updated, nil
+}
+
 // FieldsForJira translates the app's internal field/value pairs into the
 // Jira REST field-update payload shape:
 //
