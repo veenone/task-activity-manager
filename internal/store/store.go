@@ -19,9 +19,12 @@ import (
 // schemaVersion is bumped whenever the schema changes.
 const schemaVersion = 5
 
-// schema is the canonical database layout for a fresh install. Existing
-// databases are upgraded by applyMigrations.
-const schema = `
+// baseSchema is the canonical table layout for a fresh install. Indexes that
+// might reference columns added by a migration live in indexSchema instead,
+// so applyMigrations runs *between* baseSchema and indexSchema — that way an
+// older database has its missing columns added before any index tries to
+// reference them.
+const baseSchema = `
 CREATE TABLE IF NOT EXISTS meta (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -49,8 +52,6 @@ CREATE TABLE IF NOT EXISTS test_folder (
 	PRIMARY KEY (profile_id, id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_test_folder_parent ON test_folder(profile_id, parent_id);
-
 CREATE TABLE IF NOT EXISTS test_case (
 	profile_id  TEXT NOT NULL,
 	jira_key    TEXT NOT NULL,
@@ -64,10 +65,6 @@ CREATE TABLE IF NOT EXISTS test_case (
 	folder_id   TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, jira_key)
 );
-
-CREATE INDEX IF NOT EXISTS idx_test_case_status  ON test_case(profile_id, status);
-CREATE INDEX IF NOT EXISTS idx_test_case_updated ON test_case(profile_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_test_case_folder  ON test_case(profile_id, folder_id);
 
 CREATE TABLE IF NOT EXISTS precondition (
 	profile_id  TEXT NOT NULL,
@@ -85,8 +82,6 @@ CREATE TABLE IF NOT EXISTS test_precondition (
 	PRIMARY KEY (profile_id, test_key, precondition_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_test_precondition_test ON test_precondition(profile_id, test_key);
-
 CREATE TABLE IF NOT EXISTS pending_change (
 	id           INTEGER PRIMARY KEY AUTOINCREMENT,
 	profile_id   TEXT NOT NULL,
@@ -99,8 +94,6 @@ CREATE TABLE IF NOT EXISTS pending_change (
 	created_at   TEXT NOT NULL,
 	UNIQUE (profile_id, entity_type, entity_key, field)
 );
-
-CREATE INDEX IF NOT EXISTS idx_pending_change_profile ON pending_change(profile_id);
 
 CREATE TABLE IF NOT EXISTS audit_log (
 	id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,9 +108,19 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	after_val   TEXT NOT NULL DEFAULT '',
 	note        TEXT NOT NULL DEFAULT ''
 );
+`
 
-CREATE INDEX IF NOT EXISTS idx_audit_log_profile_time
-	ON audit_log(profile_id, occurred_at DESC);
+// indexSchema is applied *after* applyMigrations so every column referenced
+// here is guaranteed to exist (either from baseSchema on a fresh install or
+// from an ALTER on an upgraded database).
+const indexSchema = `
+CREATE INDEX IF NOT EXISTS idx_test_folder_parent      ON test_folder(profile_id, parent_id);
+CREATE INDEX IF NOT EXISTS idx_test_case_status        ON test_case(profile_id, status);
+CREATE INDEX IF NOT EXISTS idx_test_case_updated       ON test_case(profile_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_test_case_folder        ON test_case(profile_id, folder_id);
+CREATE INDEX IF NOT EXISTS idx_test_precondition_test  ON test_precondition(profile_id, test_key);
+CREATE INDEX IF NOT EXISTS idx_pending_change_profile  ON pending_change(profile_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_profile_time  ON audit_log(profile_id, occurred_at DESC);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -125,20 +128,25 @@ type Store struct {
 	db *sql.DB
 }
 
-// Open opens (creating if absent) the SQLite database at path, applies the
-// canonical schema, and runs any upgrade migrations.
+// Open opens (creating if absent) the SQLite database at path. The sequence
+// is: create / verify tables → run migrations → create indexes. Splitting
+// indexes off ensures every column an index references already exists.
 func Open(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := db.Exec(baseSchema); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("apply schema: %w", err)
+		return nil, fmt.Errorf("apply tables: %w", err)
 	}
 	if err := applyMigrations(db); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("apply migrations: %w", err)
+	}
+	if _, err := db.Exec(indexSchema); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("apply indexes: %w", err)
 	}
 	if _, err := db.Exec(
 		"INSERT INTO meta (key, value) VALUES ('schema_version', ?) "+
@@ -172,7 +180,7 @@ func applyMigrations(db *sql.DB) error {
 		}
 	}
 	// v4: precondition / test_precondition tables. Additive — covered by
-	// CREATE TABLE IF NOT EXISTS, no explicit step needed.
+	// CREATE TABLE IF NOT EXISTS in baseSchema, no explicit step needed.
 	// v5: pending_change / audit_log tables. Also additive.
 	return nil
 }
