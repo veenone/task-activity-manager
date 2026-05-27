@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -28,7 +29,8 @@ type Conflict struct {
 }
 
 // FailedCommit is one Test whose pending changes could not be committed
-// for a non-conflict reason (network error, Jira validation, etc).
+// for a non-conflict reason (network error, Jira validation, missing
+// transition, etc.).
 type FailedCommit struct {
 	TestKey string `json:"testKey"`
 	Error   string `json:"error"`
@@ -37,13 +39,16 @@ type FailedCommit struct {
 // CommitChanges pushes a profile's pending changes to Jira (FR-1.5). For
 // each Test:
 //
-//  1. Fetch the current remote `updated` (FR-1.4 conflict pre-check).
-//  2. If the remote has moved since the oldest pending edit's base_version,
-//     report a conflict and skip the PUT.
-//  3. Otherwise PUT the batched field updates and delete the pending rows,
-//     writing a "commit" audit entry for each.
+//  1. Fetch the current remote `updated` (FR-1.4 conflict pre-check). If
+//     the remote has moved since the oldest pending edit's base_version,
+//     skip the Test and surface a conflict.
+//  2. PUT any non-status field updates.
+//  3. POST a workflow transition (FR-4.2) if a status change is queued —
+//     transitions go to /transitions instead of the field-update PUT, with
+//     the transition ID discovered by name from GetTransitions.
+//  4. Delete the pending rows and audit "commit".
 //
-// Failures and conflicts both leave pending rows in place so the user can
+// Failures and conflicts leave pending rows in place so the user can
 // resolve and retry.
 func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitResult, error) {
 	result := CommitResult{
@@ -95,16 +100,45 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitRes
 			}
 		}
 
-		updates := make(map[string]string, len(testChanges))
-		for _, c := range testChanges {
-			updates[c.Field] = c.AfterVal
+		// Separate the status-transition change (if any) from the rest.
+		// Field updates go through a single PUT; the transition uses the
+		// dedicated transitions endpoint.
+		var statusChange *testrepo.PendingChange
+		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
+		for i := range testChanges {
+			c := testChanges[i]
+			if c.Field == "status" {
+				cc := c
+				statusChange = &cc
+			} else {
+				fieldChanges = append(fieldChanges, c)
+			}
 		}
-		if err := e.client.UpdateIssue(ctx, testKey, jira.FieldsForJira(updates)); err != nil {
-			result.Failed = append(result.Failed, FailedCommit{
-				TestKey: testKey,
-				Error:   sanitizeError(err.Error()),
-			})
-			continue
+
+		// PUT non-status field updates.
+		if len(fieldChanges) > 0 {
+			updates := make(map[string]string, len(fieldChanges))
+			for _, c := range fieldChanges {
+				updates[c.Field] = c.AfterVal
+			}
+			if err := e.client.UpdateIssue(ctx, testKey, jira.FieldsForJira(updates)); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   sanitizeError(err.Error()),
+				})
+				continue
+			}
+		}
+
+		// POST workflow transition if a status change is pending.
+		if statusChange != nil {
+			if err := e.applyTransition(ctx, testKey, statusChange); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   err.Error(),
+				})
+				continue
+			}
 		}
 
 		ids := make([]int64, len(testChanges))
@@ -122,6 +156,33 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitRes
 	}
 
 	return result, nil
+}
+
+// applyTransition resolves the transition ID by target status name and POSTs
+// it. The current Jira status is the pending change's BeforeVal — that's
+// what Jira holds until our commit lands.
+func (e *Engine) applyTransition(ctx context.Context, testKey string, change *testrepo.PendingChange) error {
+	transitions, err := e.client.GetTransitions(ctx, testKey, change.BeforeVal)
+	if err != nil {
+		return fmt.Errorf("fetch transitions: %s", sanitizeError(err.Error()))
+	}
+	var transitionID string
+	for _, t := range transitions {
+		if t.To == change.AfterVal {
+			transitionID = t.ID
+			break
+		}
+	}
+	if transitionID == "" {
+		return fmt.Errorf(
+			"no transition available to status %q from %q",
+			change.AfterVal, change.BeforeVal,
+		)
+	}
+	if err := e.client.PostTransition(ctx, testKey, transitionID); err != nil {
+		return fmt.Errorf("post transition: %s", sanitizeError(err.Error()))
+	}
+	return nil
 }
 
 // oldestBaseVersion returns the earliest base_version among a Test's pending

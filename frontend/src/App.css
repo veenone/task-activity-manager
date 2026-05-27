@@ -441,6 +441,26 @@ tr.row-selected {
   padding: 3px 6px;
   font-size: 12px;
 }
+/* Status row groups the current-status pill with the workflow transition
+   picker (FR-4.2). */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.transition-select {
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid #c4c9d4;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f2933;
+  cursor: pointer;
+}
+.transition-select:hover {
+  border-color: #5b6273;
+}
 .detail-desc-edit {
   width: 100%;
   border: 1px solid #c4c9d4;

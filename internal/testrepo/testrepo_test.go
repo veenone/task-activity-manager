@@ -593,6 +593,107 @@ func TestBulkEditAppendIsRejectedForNonDescriptionFields(t *testing.T) {
 	}
 }
 
+func TestTransitionTestRecordsStatusPendingChange(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := repo.TransitionTest("p1", "QA-1", "In Progress"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+
+	got, err := repo.GetTest("p1", "QA-1")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Status != "In Progress" {
+		t.Errorf("Status = %q, want In Progress", got.Status)
+	}
+
+	changes, err := repo.ListPendingChanges("p1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending change, got %d", len(changes))
+	}
+	c := changes[0]
+	if c.Field != "status" || c.BeforeVal != "Open" || c.AfterVal != "In Progress" {
+		t.Errorf("change = %+v, want field=status before=Open after=In Progress", c)
+	}
+}
+
+func TestTransitionTestToCurrentStatusIsNoop(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := repo.TransitionTest("p1", "QA-1", "Open"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("transition to current status should not create a pending row; got %+v", changes)
+	}
+}
+
+func TestUpsertTestsPreservesPendingStatusOnResync(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := repo.TransitionTest("p1", "QA-1", "In Progress"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+
+	// Re-sync with a different remote status — the local pending transition
+	// must not be clobbered.
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", Status: "Approved"},
+	}); err != nil {
+		t.Fatalf("resync: %v", err)
+	}
+
+	got, _ := repo.GetTest("p1", "QA-1")
+	if got.Status != "In Progress" {
+		t.Errorf("status = %q after resync, want In Progress (pending preserved)", got.Status)
+	}
+}
+
+func TestDiscardStatusPendingChangeRevertsStatus(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := repo.TransitionTest("p1", "QA-1", "Done"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending, got %d", len(changes))
+	}
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	got, _ := repo.GetTest("p1", "QA-1")
+	if got.Status != "Open" {
+		t.Errorf("status = %q after discard, want Open (reverted)", got.Status)
+	}
+}
+
 func seedBulkTests(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)

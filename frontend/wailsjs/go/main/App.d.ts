@@ -3,6 +3,7 @@
 import {testrepo} from '../models';
 import {syncer} from '../models';
 import {profile} from '../models';
+import {jira} from '../models';
 import {main} from '../models';
 
 export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
@@ -23,6 +24,8 @@ export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;
 
 export function GetTestPreconditions(arg1:string,arg2:string):Promise<Array<testrepo.Precondition>>;
 
+export function GetTestTransitions(arg1:string,arg2:string):Promise<Array<jira.Transition>>;
+
 export function Health():Promise<main.HealthInfo>;
 
 export function ListAuditEntries(arg1:string,arg2:number):Promise<Array<testrepo.AuditEntry>>;
@@ -38,3 +41,5 @@ export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page
 export function SyncProfile(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:string,arg2:string):Promise<string>;
+
+export function TransitionTest(arg1:string,arg2:string,arg3:string):Promise<void>;

@@ -286,6 +286,41 @@ func (a *App) CommitPendingChanges(profileID string) (syncer.CommitResult, error
 	return engine.CommitChanges(a.ctx, profileID)
 }
 
+// --- Workflow transitions (FR-4.2) ---
+
+// GetTestTransitions returns the workflow transitions available from a
+// Test's current local status — used by the detail UI to populate the
+// "Move to…" picker. Behind the scenes this reads the Test's current
+// status from the local store and asks Jira (or the demo generator) what
+// is reachable from there.
+func (a *App) GetTestTransitions(profileID, testKey string) ([]jira.Transition, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	test, err := a.repo.GetTest(profileID, testKey)
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return nil, err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return nil, fmt.Errorf("load credentials: %w", err)
+	}
+	return jira.NewClient(p.JiraURL, token).GetTransitions(a.ctx, testKey, test.Status)
+}
+
+// TransitionTest queues a workflow transition locally (FR-4.2). The change
+// is pushed to Jira on commit via POST /rest/api/2/issue/{key}/transitions.
+func (a *App) TransitionTest(profileID, testKey, targetStatus string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.TransitionTest(profileID, testKey, targetStatus)
+}
+
 // --- Bulk operations (FR-3) ---
 
 // BulkEditTests applies a single field-level operation to a batch of Tests,

@@ -22,6 +22,8 @@ export {
   ListAuditEntries,
   CommitPendingChanges,
   BulkEditTests,
+  GetTestTransitions,
+  TransitionTest,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 
@@ -153,6 +155,14 @@ export interface BulkEditResult {
 export interface BulkFailure {
   testKey: string;
   error: string;
+}
+
+// Transition is one workflow move available from a Test's current status
+// (FR-4.2). The detail panel uses {name → to} as the dropdown label.
+export interface Transition {
+  id: string;
+  name: string;
+  to: string;
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

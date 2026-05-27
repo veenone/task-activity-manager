@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
-import { GetTest, GetTestPreconditions, EditTestField, errMsg } from "../api";
-import type { TestCase, Precondition, PendingChange } from "../api";
+import {
+  GetTest,
+  GetTestPreconditions,
+  GetTestTransitions,
+  TransitionTest,
+  EditTestField,
+  errMsg,
+} from "../api";
+import type {
+  TestCase,
+  Precondition,
+  PendingChange,
+  Transition,
+} from "../api";
 
 interface Props {
   profileId: string;
@@ -23,6 +35,7 @@ export function TestDetail({
 }: Props) {
   const [test, setTest] = useState<TestCase | null>(null);
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
+  const [transitions, setTransitions] = useState<Transition[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState("");
@@ -52,6 +65,16 @@ export function TestDetail({
         setPriority(t.priority);
         setLabels((t.labels ?? []).join(" "));
         setPreconditions(pre);
+        // Transitions load alongside but can fail without blocking the
+        // rest of the detail panel — workflow may not be set up yet, or
+        // the user may not have edit permission.
+        GetTestTransitions(profileId, testKey)
+          .then((ts) => {
+            if (!cancelled) setTransitions(ts ?? []);
+          })
+          .catch((e) => {
+            if (!cancelled) console.error("transitions:", errMsg(e));
+          });
       })
       .catch((e) => {
         if (!cancelled) setError(errMsg(e));
@@ -110,6 +133,27 @@ export function TestDetail({
     }
   }
 
+  // applyTransition records the workflow transition locally (FR-4.2). After
+  // the local write, we re-query for the transitions available from the new
+  // status so the next pick reflects the post-transition workflow position.
+  async function applyTransition(targetStatus: string) {
+    if (!test || !targetStatus) return;
+    setSaveError("");
+    try {
+      await TransitionTest(profileId, testKey, targetStatus);
+      setTest({ ...test, status: targetStatus });
+      try {
+        const ts = await GetTestTransitions(profileId, testKey);
+        setTransitions(ts ?? []);
+      } catch (e) {
+        console.error("re-fetch transitions:", errMsg(e));
+      }
+      onEdited();
+    } catch (e) {
+      setSaveError(`Transition failed: ${errMsg(e)}`);
+    }
+  }
+
   const isDirty = (field: string) =>
     pendingForTest.some((p) => p.field === field);
 
@@ -142,8 +186,30 @@ export function TestDetail({
           />
 
           <dl className="detail-fields">
-            <dt>Status</dt>
-            <dd>{test.status || "—"}</dd>
+            <dt>
+              Status {isDirty("status") && <DirtyDot />}
+            </dt>
+            <dd>
+              <div className="status-row">
+                <span className="status-pill">{test.status || "—"}</span>
+                {transitions.length > 0 && (
+                  <select
+                    className="transition-select"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) applyTransition(e.target.value);
+                    }}
+                  >
+                    <option value="">Move to…</option>
+                    {transitions.map((t) => (
+                      <option key={t.id} value={t.to}>
+                        {t.name} → {t.to}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </dd>
 
             <dt>
               Priority {isDirty("priority") && <DirtyDot />}

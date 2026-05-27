@@ -203,6 +203,48 @@ var featurePreconditions = map[string][]int{
 	"Bulk operations":   {9, 14},
 }
 
+// demoTransitionsByStatus is the demo workflow: from each status, which
+// transitions are available and where they lead. Every active status has a
+// "Deprecate" path so the FR-2.4 deprecate-instead-of-delete flow can be
+// exercised end-to-end without a real Jira.
+var demoTransitionsByStatus = map[string][]Transition{
+	"Open": {
+		{ID: "11", Name: "Start Progress", To: "In Progress"},
+		{ID: "12", Name: "Approve", To: "Approved"},
+		{ID: "13", Name: "Deprecate", To: "Deprecated"},
+	},
+	"In Progress": {
+		{ID: "21", Name: "Mark Done", To: "Done"},
+		{ID: "22", Name: "Block", To: "Blocked"},
+		{ID: "23", Name: "Approve", To: "Approved"},
+	},
+	"Approved": {
+		{ID: "31", Name: "Mark Done", To: "Done"},
+		{ID: "32", Name: "Deprecate", To: "Deprecated"},
+	},
+	"Done": {
+		{ID: "41", Name: "Reopen", To: "Open"},
+		{ID: "42", Name: "Deprecate", To: "Deprecated"},
+	},
+	"Blocked": {
+		{ID: "51", Name: "Unblock", To: "In Progress"},
+		{ID: "52", Name: "Deprecate", To: "Deprecated"},
+	},
+	"Deprecated": {
+		{ID: "61", Name: "Reactivate", To: "Open"},
+	},
+}
+
+func demoTransitionsForStatus(status string) []Transition {
+	if ts, ok := demoTransitionsByStatus[status]; ok {
+		// Return a copy so callers can't accidentally mutate the source.
+		out := make([]Transition, len(ts))
+		copy(out, ts)
+		return out
+	}
+	return []Transition{}
+}
+
 // demoPreconditionsAndLinks returns the demo precondition master list plus
 // the test-key → precondition-keys mapping. Keys use a "<project>-P-N"
 // convention so they read like Jira keys without colliding with the test

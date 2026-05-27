@@ -75,16 +75,26 @@ func (c *Client) get(ctx context.Context, path string, out any) error {
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// put performs an authenticated JSON PUT. A 2xx response yields nil; any
-// other status returns an error that includes a short slice of the response
-// body for diagnostics.
+// put performs an authenticated JSON PUT.
 func (c *Client) put(ctx context.Context, path string, body any) error {
+	return c.writeJSON(ctx, http.MethodPut, path, body)
+}
+
+// post performs an authenticated JSON POST.
+func (c *Client) post(ctx context.Context, path string, body any) error {
+	return c.writeJSON(ctx, http.MethodPost, path, body)
+}
+
+// writeJSON marshals body as JSON and sends it with the given method. A 2xx
+// response yields nil; any other status returns an error that includes a
+// short slice of the response body for diagnostics.
+func (c *Client) writeJSON(ctx context.Context, method, path string, body any) error {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(payload),
+		ctx, method, c.baseURL+path, bytes.NewReader(payload),
 	)
 	if err != nil {
 		return err
@@ -102,8 +112,8 @@ func (c *Client) put(ctx context.Context, path string, body any) error {
 	if resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf(
-			"jira: PUT %s -> %s: %s",
-			path, resp.Status, strings.TrimSpace(string(respBody)),
+			"jira: %s %s -> %s: %s",
+			method, path, resp.Status, strings.TrimSpace(string(respBody)),
 		)
 	}
 	return nil

@@ -1,3 +1,24 @@
+export namespace jira {
+	
+	export class Transition {
+	    id: string;
+	    name: string;
+	    to: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Transition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.to = source["to"];
+	    }
+	}
+
+}
+
 export namespace main {
 	
 	export class HealthInfo {

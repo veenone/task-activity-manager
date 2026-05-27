@@ -38,6 +38,10 @@ export function GetTestPreconditions(arg1, arg2) {
   return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
 }
 
+export function GetTestTransitions(arg1, arg2) {
+  return window['go']['main']['App']['GetTestTransitions'](arg1, arg2);
+}
+
 export function Health() {
   return window['go']['main']['App']['Health']();
 }
@@ -68,4 +72,8 @@ export function SyncProfile(arg1) {
 
 export function TestConnection(arg1, arg2) {
   return window['go']['main']['App']['TestConnection'](arg1, arg2);
+}
+
+export function TransitionTest(arg1, arg2, arg3) {
+  return window['go']['main']['App']['TransitionTest'](arg1, arg2, arg3);
 }

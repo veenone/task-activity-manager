@@ -122,6 +122,21 @@ var editableFields = map[string]string{
 	"labels":      "labels",
 }
 
+// columnForField returns the test_case column corresponding to a field
+// name. It includes 'status' — which isn't free-text editable (status is
+// changed via TransitionTest, not EditTestField) but is still tracked in
+// pending_change rows and needs a column lookup for the discard / sync
+// paths.
+func columnForField(field string) (string, bool) {
+	if c, ok := editableFields[field]; ok {
+		return c, true
+	}
+	if field == "status" {
+		return "status", true
+	}
+	return "", false
+}
+
 // Repository reads and writes cached data, scoped per profile.
 type Repository struct {
 	db *sql.DB
@@ -170,7 +185,13 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 		         AND pending_change.entity_key  = excluded.jira_key
 		         AND pending_change.field       = 'description'
 		     ) THEN test_case.description ELSE excluded.description END,
-		   status      = excluded.status,
+		   status      = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = 'status'
+		     ) THEN test_case.status ELSE excluded.status END,
 		   priority    = CASE WHEN EXISTS (
 		       SELECT 1 FROM pending_change
 		       WHERE pending_change.profile_id  = excluded.profile_id
@@ -544,7 +565,7 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		return fmt.Errorf("read pending change: %w", err)
 	}
 
-	col, ok := editableFields[field]
+	col, ok := columnForField(field)
 	if !ok {
 		return fmt.Errorf("field %q is not editable (audit log corrupt?)", field)
 	}
@@ -566,6 +587,60 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 	if err := writeAudit(
 		tx, profileID, entityKey, "discard-pending", field, afterVal, beforeVal,
 		fmt.Sprintf("discarded change #%d", changeID),
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// TransitionTest queues a workflow transition on a Test (FR-4.2). The
+// resulting status is recorded as a pending change on the "status" field;
+// commit posts to /rest/api/2/issue/{key}/transitions rather than PUTting
+// the status field.
+//
+// The caller is responsible for picking a targetStatus that's reachable
+// from the Test's current status — the UI does this by listing available
+// transitions via GetTransitions before invoking this method.
+//
+// TODO(xtm): multi-step transitions (A->B->C locally) coalesce to a single
+// pending row A->C, which needs a direct A->C transition to exist on the
+// remote workflow at commit time. A future slice could record the
+// transition path instead of just the target status.
+func (r *Repository) TransitionTest(profileID, testKey, targetStatus string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var currentVal, baseVersion string
+	err = tx.QueryRow(
+		`SELECT status, updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+		profileID, testKey,
+	).Scan(&currentVal, &baseVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read current status: %w", err)
+	}
+	if currentVal == targetStatus {
+		return nil
+	}
+	if _, err := tx.Exec(
+		`UPDATE test_case SET status = ? WHERE profile_id = ? AND jira_key = ?`,
+		targetStatus, profileID, testKey,
+	); err != nil {
+		return fmt.Errorf("update status: %w", err)
+	}
+	if err := upsertPendingChange(
+		tx, profileID, testKey, "status", currentVal, targetStatus, baseVersion,
+	); err != nil {
+		return err
+	}
+	if err := writeAudit(
+		tx, profileID, testKey, "transition-local", "status",
+		currentVal, targetStatus, "",
 	); err != nil {
 		return err
 	}
