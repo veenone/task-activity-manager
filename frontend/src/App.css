@@ -116,6 +116,16 @@
 .ok-text {
   color: #1e7e34;
 }
+.warn-text {
+  color: #a06000;
+}
+/* Status summary shows the histogram of current statuses in the
+   bulk-transition modal (FR-3.8). */
+.status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 
 /* Onboarding */
 .onboard {

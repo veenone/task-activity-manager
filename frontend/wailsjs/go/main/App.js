@@ -6,6 +6,10 @@ export function BulkEditTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkEditTests'](arg1, arg2, arg3);
 }
 
+export function BulkTransitionTests(arg1, arg2, arg3) {
+  return window['go']['main']['App']['BulkTransitionTests'](arg1, arg2, arg3);
+}
+
 export function CommitPendingChanges(arg1) {
   return window['go']['main']['App']['CommitPendingChanges'](arg1);
 }
@@ -24,6 +28,10 @@ export function DiscardPendingChange(arg1, arg2) {
 
 export function EditTestField(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditTestField'](arg1, arg2, arg3, arg4);
+}
+
+export function GetBulkTransitionOptions(arg1, arg2) {
+  return window['go']['main']['App']['GetBulkTransitionOptions'](arg1, arg2);
 }
 
 export function GetSyncState(arg1) {

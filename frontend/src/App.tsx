@@ -27,6 +27,7 @@ import { TestDetail } from "./components/TestDetail";
 import { FolderTree } from "./components/FolderTree";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkEditModal } from "./components/BulkEditModal";
+import { BulkTransitionModal } from "./components/BulkTransitionModal";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -57,6 +58,7 @@ function App() {
 
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set());
   const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [showBulkTransition, setShowBulkTransition] = useState(false);
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -362,6 +364,12 @@ function App() {
           >
             Bulk edit…
           </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowBulkTransition(true)}
+          >
+            Bulk transition…
+          </button>
           <button className="btn" onClick={() => setSelectedSet(new Set())}>
             Clear
           </button>
@@ -444,6 +452,26 @@ function App() {
             setDetailVersion((v) => v + 1);
             reloadPending();
             setShowBulkEdit(false);
+          }}
+        />
+      )}
+
+      {showBulkTransition && (
+        <BulkTransitionModal
+          profileId={activeId}
+          testKeys={[...selectedSet]}
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setSelectedSet(new Set());
+            setShowBulkTransition(false);
+          }}
+          onCancel={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setShowBulkTransition(false);
           }}
         />
       )}

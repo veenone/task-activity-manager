@@ -24,6 +24,8 @@ export {
   BulkEditTests,
   GetTestTransitions,
   TransitionTest,
+  GetBulkTransitionOptions,
+  BulkTransitionTests,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 
@@ -163,6 +165,27 @@ export interface Transition {
   id: string;
   name: string;
   to: string;
+}
+
+// BulkTransitionOptions is what the bulk-transition modal asks for on
+// open: a histogram of current statuses across the selection, and the
+// union of target statuses reachable from at least one of those.
+export interface BulkTransitionOptions {
+  currentStatusCounts: { [status: string]: number };
+  reachableTargets: string[];
+}
+
+// BulkTransitionResult mirrors app.BulkTransitionResult — per-Test outcome
+// of a bulk transition. Succeeded / Skipped / Failed are disjoint sets.
+export interface BulkTransitionResult {
+  succeeded: string[];
+  skipped: BulkTransitionSkip[];
+  failed: BulkFailure[];
+}
+
+export interface BulkTransitionSkip {
+  testKey: string;
+  reason: string;
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

@@ -21,6 +21,69 @@ export namespace jira {
 
 export namespace main {
 	
+	export class BulkTransitionOptions {
+	    currentStatusCounts: Record<string, number>;
+	    reachableTargets: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BulkTransitionOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.currentStatusCounts = source["currentStatusCounts"];
+	        this.reachableTargets = source["reachableTargets"];
+	    }
+	}
+	export class BulkTransitionSkip {
+	    testKey: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BulkTransitionSkip(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class BulkTransitionResult {
+	    succeeded: string[];
+	    skipped: BulkTransitionSkip[];
+	    failed: testrepo.BulkFailure[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BulkTransitionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.succeeded = source["succeeded"];
+	        this.skipped = this.convertValues(source["skipped"], BulkTransitionSkip);
+	        this.failed = this.convertValues(source["failed"], testrepo.BulkFailure);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class HealthInfo {
 	    ok: boolean;
 	    error: string;

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -335,6 +336,195 @@ func (a *App) BulkEditTests(profileID string, testKeys []string, op testrepo.Bul
 		return empty, err
 	}
 	return a.repo.BulkEditTests(profileID, testKeys, op)
+}
+
+// BulkTransitionOptions answers two questions the bulk-transition modal
+// needs before the user can confirm: how the selected Tests break down by
+// current status, and which target statuses are reachable from at least
+// one of those current statuses (FR-3.8).
+type BulkTransitionOptions struct {
+	CurrentStatusCounts map[string]int `json:"currentStatusCounts"`
+	ReachableTargets    []string       `json:"reachableTargets"`
+}
+
+// BulkTransitionResult reports per-Test outcomes from a bulk workflow
+// transition. Succeeded / Skipped / Failed are disjoint sets of Test keys.
+// Skipped means the Test exists in the selection but no transition leads
+// to the chosen target (or the Test is already at the target).
+type BulkTransitionResult struct {
+	Succeeded []string               `json:"succeeded"`
+	Skipped   []BulkTransitionSkip   `json:"skipped"`
+	Failed    []testrepo.BulkFailure `json:"failed"`
+}
+
+// BulkTransitionSkip is one Test that wasn't queued for transition with an
+// explanation the UI can show next to its key.
+type BulkTransitionSkip struct {
+	TestKey string `json:"testKey"`
+	Reason  string `json:"reason"`
+}
+
+// GetBulkTransitionOptions inspects a selection of Tests and returns the
+// data the bulk-transition modal needs to render: a histogram of current
+// statuses and the union of reachable target statuses across those
+// statuses.
+//
+// To keep API calls down, we fetch transitions once per distinct current
+// status. For real Jira this trades strict correctness on conditional
+// transitions (where availability can vary per-issue) for far fewer round
+// trips — any conditional-only transition that isn't actually reachable
+// for a given Test will surface as a per-Test failure at commit time.
+func (a *App) GetBulkTransitionOptions(profileID string, testKeys []string) (BulkTransitionOptions, error) {
+	out := BulkTransitionOptions{
+		CurrentStatusCounts: map[string]int{},
+		ReachableTargets:    []string{},
+	}
+	if err := a.requireStore(); err != nil {
+		return out, err
+	}
+	if len(testKeys) == 0 {
+		return out, nil
+	}
+
+	// Tally current statuses; skip unreadable rows silently (the test may
+	// have been removed since the user selected it).
+	for _, key := range testKeys {
+		test, err := a.repo.GetTest(profileID, key)
+		if err != nil {
+			continue
+		}
+		out.CurrentStatusCounts[test.Status]++
+	}
+	if len(out.CurrentStatusCounts) == 0 {
+		return out, nil
+	}
+
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return out, err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return out, fmt.Errorf("load credentials: %w", err)
+	}
+	client := jira.NewClient(p.JiraURL, token)
+
+	// We need a representative key per status to call GetTransitions for
+	// real Jira — the demo path ignores the key. Walk testKeys once and
+	// snapshot the first key for each status seen.
+	repByStatus := make(map[string]string, len(out.CurrentStatusCounts))
+	for _, key := range testKeys {
+		test, err := a.repo.GetTest(profileID, key)
+		if err != nil {
+			continue
+		}
+		if _, ok := repByStatus[test.Status]; !ok {
+			repByStatus[test.Status] = key
+		}
+	}
+
+	targets := make(map[string]struct{})
+	for status, key := range repByStatus {
+		ts, err := client.GetTransitions(a.ctx, key, status)
+		if err != nil {
+			return out, fmt.Errorf("fetch transitions for %q: %w", status, err)
+		}
+		for _, t := range ts {
+			targets[t.To] = struct{}{}
+		}
+	}
+	for t := range targets {
+		out.ReachableTargets = append(out.ReachableTargets, t)
+	}
+	sort.Strings(out.ReachableTargets)
+	return out, nil
+}
+
+// BulkTransitionTests queues a workflow transition to targetStatus for each
+// selected Test where such a transition exists (FR-3.8). Tests already in
+// the target status are skipped; tests with no transition to the target are
+// skipped with a reason; other failures (DB / API) are surfaced per-Test
+// without aborting the run.
+//
+// Transitions are looked up once per distinct current status and cached
+// for the duration of the call — see GetBulkTransitionOptions for the
+// caveat about conditional transitions.
+func (a *App) BulkTransitionTests(profileID string, testKeys []string, targetStatus string) (BulkTransitionResult, error) {
+	result := BulkTransitionResult{
+		Succeeded: []string{},
+		Skipped:   []BulkTransitionSkip{},
+		Failed:    []testrepo.BulkFailure{},
+	}
+	if err := a.requireStore(); err != nil {
+		return result, err
+	}
+	if len(testKeys) == 0 {
+		return result, nil
+	}
+	if targetStatus == "" {
+		return result, fmt.Errorf("target status is required")
+	}
+
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return result, err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return result, fmt.Errorf("load credentials: %w", err)
+	}
+	client := jira.NewClient(p.JiraURL, token)
+
+	transitionsByStatus := make(map[string][]jira.Transition)
+
+	for _, key := range testKeys {
+		test, err := a.repo.GetTest(profileID, key)
+		if err != nil {
+			result.Failed = append(result.Failed, testrepo.BulkFailure{
+				TestKey: key, Error: err.Error(),
+			})
+			continue
+		}
+		if test.Status == targetStatus {
+			result.Skipped = append(result.Skipped, BulkTransitionSkip{
+				TestKey: key, Reason: "already in target status",
+			})
+			continue
+		}
+		ts, cached := transitionsByStatus[test.Status]
+		if !cached {
+			ts, err = client.GetTransitions(a.ctx, key, test.Status)
+			if err != nil {
+				result.Failed = append(result.Failed, testrepo.BulkFailure{
+					TestKey: key, Error: "fetch transitions: " + err.Error(),
+				})
+				continue
+			}
+			transitionsByStatus[test.Status] = ts
+		}
+		reachable := false
+		for _, t := range ts {
+			if t.To == targetStatus {
+				reachable = true
+				break
+			}
+		}
+		if !reachable {
+			result.Skipped = append(result.Skipped, BulkTransitionSkip{
+				TestKey: key,
+				Reason:  fmt.Sprintf("no transition to %q from %q", targetStatus, test.Status),
+			})
+			continue
+		}
+		if err := a.repo.TransitionTest(profileID, key, targetStatus); err != nil {
+			result.Failed = append(result.Failed, testrepo.BulkFailure{
+				TestKey: key, Error: err.Error(),
+			})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
+	}
+	return result, nil
 }
 
 // --- Browse (FR-11) ---
