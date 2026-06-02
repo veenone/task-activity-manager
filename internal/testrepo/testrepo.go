@@ -366,10 +366,11 @@ func (r *Repository) ListTestPreconditions(profileID, testKey string) ([]Precond
 	return out, rows.Err()
 }
 
-// ListTests returns a filtered, sorted, paginated page of Tests for a profile.
-// A FolderID filter matches the folder itself plus any descendants so
-// selecting a category in the tree shows everything beneath it.
-func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
+// buildTestFilter builds the WHERE clause + args for a Test query. Shared
+// by ListTests and ListMatchingKeys so both see the same filter semantics
+// — when the user clicks "select all matching", they get the exact set
+// the grid is showing across all pages.
+func buildTestFilter(profileID string, q Query) (string, []any) {
 	where := []string{"profile_id = ?"}
 	args := []any{profileID}
 
@@ -386,7 +387,14 @@ func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 		where = append(where, "(folder_id = ? OR folder_id LIKE ?)")
 		args = append(args, q.FolderID, q.FolderID+"/%")
 	}
-	whereSQL := "WHERE " + strings.Join(where, " AND ")
+	return "WHERE " + strings.Join(where, " AND "), args
+}
+
+// ListTests returns a filtered, sorted, paginated page of Tests for a profile.
+// A FolderID filter matches the folder itself plus any descendants so
+// selecting a category in the tree shows everything beneath it.
+func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
+	whereSQL, args := buildTestFilter(profileID, q)
 
 	var total int
 	if err := r.db.QueryRow(
@@ -428,6 +436,34 @@ func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 		page.Tests = append(page.Tests, t)
 	}
 	return page, rows.Err()
+}
+
+// ListMatchingKeys returns every Test key matching the query's filter,
+// ignoring pagination and sort. The bulk toolbar uses this to honor
+// "select all 4,812 matching" without forcing the user to paginate
+// through 96 pages (FR-3.1).
+//
+// Order is unspecified — the frontend treats the result as an unordered
+// set when building the selection.
+func (r *Repository) ListMatchingKeys(profileID string, q Query) ([]string, error) {
+	whereSQL, args := buildTestFilter(profileID, q)
+	rows, err := r.db.Query(
+		"SELECT jira_key FROM test_case "+whereSQL, args...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list matching keys: %w", err)
+	}
+	defer rows.Close()
+
+	out := []string{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		out = append(out, k)
+	}
+	return out, rows.Err()
 }
 
 // GetTest returns one Test by its Jira key, or ErrNotFound.

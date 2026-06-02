@@ -1,6 +1,7 @@
 package testrepo_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -590,6 +591,60 @@ func TestBulkEditAppendIsRejectedForNonDescriptionFields(t *testing.T) {
 	}
 	if len(result.Failed) != 1 {
 		t.Errorf("append-on-summary should fail; got %+v", result)
+	}
+}
+
+func TestListMatchingKeysReturnsAllKeysAcrossPages(t *testing.T) {
+	repo := newRepo(t)
+	cases := []testrepo.TestCase{}
+	for i := 1; i <= 150; i++ {
+		cases = append(cases, testrepo.TestCase{
+			Key:    fmt.Sprintf("QA-%d", i),
+			ID:     fmt.Sprintf("%d", i),
+			Status: "Open",
+		})
+	}
+	if err := repo.UpsertTests("p1", cases); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	keys, err := repo.ListMatchingKeys("p1", testrepo.Query{})
+	if err != nil {
+		t.Fatalf("list matching: %v", err)
+	}
+	if len(keys) != 150 {
+		t.Errorf("len(keys) = %d, want 150", len(keys))
+	}
+}
+
+func TestListMatchingKeysAppliesStatusFilter(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Status: "Open"},
+		{Key: "QA-2", ID: "2", Status: "Done"},
+		{Key: "QA-3", ID: "3", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	keys, err := repo.ListMatchingKeys("p1", testrepo.Query{Status: "Open"})
+	if err != nil {
+		t.Fatalf("list matching: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Fatalf("len(keys) = %d, want 2", len(keys))
+	}
+}
+
+func TestListMatchingKeysFolderFilterIncludesDescendants(t *testing.T) {
+	repo := seedFolders(t)
+
+	keys, err := repo.ListMatchingKeys("p1", testrepo.Query{FolderID: "/Authentication"})
+	if err != nil {
+		t.Fatalf("list matching: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Errorf("expected 2 matches under /Authentication (Login + Logout); got %d (%v)", len(keys), keys)
 	}
 }
 

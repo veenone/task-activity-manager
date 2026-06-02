@@ -62,6 +62,10 @@ export function ListFolders(arg1) {
   return window['go']['main']['App']['ListFolders'](arg1);
 }
 
+export function ListMatchingKeys(arg1, arg2) {
+  return window['go']['main']['App']['ListMatchingKeys'](arg1, arg2);
+}
+
 export function ListPendingChanges(arg1) {
   return window['go']['main']['App']['ListPendingChanges'](arg1);
 }

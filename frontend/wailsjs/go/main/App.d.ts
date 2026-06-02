@@ -36,6 +36,8 @@ export function ListAuditEntries(arg1:string,arg2:number):Promise<Array<testrepo
 
 export function ListFolders(arg1:string):Promise<Array<testrepo.Folder>>;
 
+export function ListMatchingKeys(arg1:string,arg2:testrepo.Query):Promise<Array<string>>;
+
 export function ListPendingChanges(arg1:string):Promise<Array<testrepo.PendingChange>>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;

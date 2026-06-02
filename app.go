@@ -537,6 +537,17 @@ func (a *App) ListTests(profileID string, q testrepo.Query) (testrepo.Page, erro
 	return a.repo.ListTests(profileID, q)
 }
 
+// ListMatchingKeys returns the Jira keys of every Test that matches the
+// query's filter (FR-3.1), regardless of pagination. Used by the
+// "select all N matching" banner to fill the bulk selection from the
+// full result set in a single round trip.
+func (a *App) ListMatchingKeys(profileID string, q testrepo.Query) ([]string, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListMatchingKeys(profileID, q)
+}
+
 // GetTest returns one Test by its Jira key.
 func (a *App) GetTest(profileID, key string) (testrepo.TestCase, error) {
 	if err := a.requireStore(); err != nil {

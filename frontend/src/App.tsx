@@ -167,6 +167,13 @@ function App() {
     });
   }
 
+  // selectAllMatching replaces the current selection with every key that
+  // matches the table's filter (FR-3.1). TestTable owns the query and the
+  // backend call; this handler just absorbs the result.
+  function selectAllMatching(keys: string[]) {
+    setSelectedSet(new Set(keys));
+  }
+
   async function runSync() {
     if (!activeId || syncing) return;
     setSyncing(true);
@@ -397,6 +404,7 @@ function App() {
           onSelect={setSelectedKey}
           onToggleSelect={toggleSelect}
           onToggleSelectPage={toggleSelectPage}
+          onSelectAllMatching={selectAllMatching}
         />
         {selectedKey && (
           <TestDetail

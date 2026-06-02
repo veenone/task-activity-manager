@@ -127,6 +127,32 @@
   gap: 6px;
 }
 
+/* Gmail-style banner offering to extend the page selection to every Test
+   matching the current filter (FR-3.1). Sits between the filter row and
+   the table headers. */
+.select-all-banner {
+  background: #fff8e1;
+  border: 1px solid #f0d97d;
+  border-radius: 4px;
+  margin: 0 12px 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #5a4500;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: #2f49b3;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:disabled {
+  color: #888;
+  cursor: default;
+}
+
 /* Onboarding */
 .onboard {
   width: 440px;

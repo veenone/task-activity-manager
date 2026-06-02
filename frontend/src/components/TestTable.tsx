@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ListTests, errMsg } from "../api";
+import { ListTests, ListMatchingKeys, errMsg } from "../api";
 import type { TestPage, TestQuery, PendingChange } from "../api";
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   onSelect: (key: string) => void;
   onToggleSelect: (key: string) => void;
   onToggleSelectPage: (keys: string[]) => void;
+  onSelectAllMatching: (keys: string[]) => void;
 }
 
 const PAGE_SIZE = 100;
@@ -28,6 +29,7 @@ export function TestTable({
   onSelect,
   onToggleSelect,
   onToggleSelectPage,
+  onSelectAllMatching,
 }: Props) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -39,6 +41,8 @@ export function TestTable({
   const [page, setPage] = useState<TestPage>({ tests: [], total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectingAll, setSelectingAll] = useState(false);
+  const [selectAllError, setSelectAllError] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 250);
@@ -104,6 +108,38 @@ export function TestTable({
   const someOnPageSelected =
     !allOnPageSelected && pageKeys.some((k) => selectedSet.has(k));
 
+  // The Gmail-style "select all matching" banner shows when the current
+  // page is fully selected AND the filter has more results we haven't yet
+  // included. selectedSet.size meeting page.total means the user already
+  // extended to the full result set — hide the banner in that case.
+  const canSelectAllMatching =
+    allOnPageSelected &&
+    page.total > pageKeys.length &&
+    selectedSet.size < page.total;
+
+  async function selectAllMatching() {
+    if (selectingAll) return;
+    setSelectingAll(true);
+    setSelectAllError("");
+    try {
+      const q: TestQuery = {
+        search: debouncedSearch,
+        status: status.trim(),
+        folderId,
+        sortBy,
+        desc,
+        limit: 0,
+        offset: 0,
+      };
+      const keys = await ListMatchingKeys(profileId, q);
+      onSelectAllMatching(keys);
+    } catch (e) {
+      setSelectAllError(errMsg(e));
+    } finally {
+      setSelectingAll(false);
+    }
+  }
+
   return (
     <div className="testtable">
       <div className="filters">
@@ -143,6 +179,24 @@ export function TestTable({
       </div>
 
       {error && <div className="error-text table-error">{error}</div>}
+
+      {canSelectAllMatching && (
+        <div className="select-all-banner">
+          All {pageKeys.length} tests on this page are selected.{" "}
+          <button
+            className="link-btn"
+            onClick={selectAllMatching}
+            disabled={selectingAll}
+          >
+            {selectingAll
+              ? "Selecting…"
+              : `Select all ${page.total.toLocaleString()} matching this filter`}
+          </button>
+          {selectAllError && (
+            <span className="error-text">  {selectAllError}</span>
+          )}
+        </div>
+      )}
 
       <div className="table-scroll">
         <table>

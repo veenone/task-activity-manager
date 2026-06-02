@@ -15,6 +15,7 @@ export {
   ListFolders,
   GetTestPreconditions,
   ListTests,
+  ListMatchingKeys,
   GetTest,
   EditTestField,
   DiscardPendingChange,
