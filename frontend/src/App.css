@@ -153,6 +153,44 @@
   cursor: default;
 }
 
+/* Test Steps list in the detail panel (FR-2.5). Each <li> stacks the
+   action and, optionally, Data and Expected rows. */
+.steps-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.steps-refresh {
+  font-size: 11px;
+}
+.steps-list {
+  margin: 6px 0 12px;
+  padding-left: 20px;
+  font-size: 12px;
+}
+.steps-list li {
+  margin-bottom: 8px;
+}
+.step-action {
+  color: #1f2933;
+  margin-bottom: 2px;
+}
+.step-row {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: #4b5563;
+}
+.step-label {
+  font-weight: 600;
+  color: #6b7280;
+  min-width: 64px;
+}
+.step-value {
+  flex: 1;
+  white-space: pre-wrap;
+}
+
 /* Onboarding */
 .onboard {
   width: 440px;

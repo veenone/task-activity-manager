@@ -46,6 +46,10 @@ export function GetTestPreconditions(arg1, arg2) {
   return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
 }
 
+export function GetTestSteps(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTestSteps'](arg1, arg2, arg3);
+}
+
 export function GetTestTransitions(arg1, arg2) {
   return window['go']['main']['App']['GetTestTransitions'](arg1, arg2);
 }

@@ -458,6 +458,26 @@ export namespace testrepo {
 	        this.offset = source["offset"];
 	    }
 	}
+	export class Step {
+	    xrayId: string;
+	    index: number;
+	    action: string;
+	    data: string;
+	    expected: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Step(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.xrayId = source["xrayId"];
+	        this.index = source["index"];
+	        this.action = source["action"];
+	        this.data = source["data"];
+	        this.expected = source["expected"];
+	    }
+	}
 	export class SyncState {
 	    profileId: string;
 	    lastSyncedAt: string;

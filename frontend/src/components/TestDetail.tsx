@@ -3,6 +3,7 @@ import {
   GetTest,
   GetTestPreconditions,
   GetTestTransitions,
+  GetTestSteps,
   TransitionTest,
   EditTestField,
   errMsg,
@@ -12,6 +13,7 @@ import type {
   Precondition,
   PendingChange,
   Transition,
+  Step,
 } from "../api";
 
 interface Props {
@@ -36,6 +38,9 @@ export function TestDetail({
   const [test, setTest] = useState<TestCase | null>(null);
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
   const [transitions, setTransitions] = useState<Transition[]>([]);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [stepsLoading, setStepsLoading] = useState(false);
+  const [stepsError, setStepsError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState("");
@@ -74,6 +79,21 @@ export function TestDetail({
           })
           .catch((e) => {
             if (!cancelled) console.error("transitions:", errMsg(e));
+          });
+        // Steps load lazily: cache hit is instant, cache miss makes one
+        // Xray call. Failure renders inline next to the Steps heading
+        // rather than blocking the whole panel.
+        setStepsLoading(true);
+        setStepsError("");
+        GetTestSteps(profileId, testKey, false)
+          .then((s) => {
+            if (!cancelled) setSteps(s ?? []);
+          })
+          .catch((e) => {
+            if (!cancelled) setStepsError(errMsg(e));
+          })
+          .finally(() => {
+            if (!cancelled) setStepsLoading(false);
           });
       })
       .catch((e) => {
@@ -130,6 +150,21 @@ export function TestDetail({
       onEdited();
     } catch (e) {
       setSaveError(`Save failed: ${errMsg(e)}`);
+    }
+  }
+
+  // refreshSteps re-fetches Steps from Xray, bypassing the cache. Useful
+  // after someone else edits steps directly in Jira.
+  async function refreshSteps() {
+    setStepsLoading(true);
+    setStepsError("");
+    try {
+      const s = await GetTestSteps(profileId, testKey, true);
+      setSteps(s ?? []);
+    } catch (e) {
+      setStepsError(errMsg(e));
+    } finally {
+      setStepsLoading(false);
     }
   }
 
@@ -264,9 +299,46 @@ export function TestDetail({
             rows={8}
           />
 
+          <h4 className="steps-head">
+            Steps
+            <button
+              className="link-btn steps-refresh"
+              onClick={refreshSteps}
+              disabled={stepsLoading}
+              title="Re-fetch steps from Jira"
+            >
+              {stepsLoading ? "Loading…" : "Refresh"}
+            </button>
+          </h4>
+          {stepsError && <div className="error-text">{stepsError}</div>}
+          {!stepsError && !stepsLoading && steps.length === 0 && (
+            <p className="muted">No steps defined for this test.</p>
+          )}
+          {steps.length > 0 && (
+            <ol className="steps-list">
+              {steps.map((s) => (
+                <li key={s.xrayId}>
+                  <div className="step-action">{s.action || "—"}</div>
+                  {s.data && (
+                    <div className="step-row">
+                      <span className="step-label">Data</span>
+                      <span className="step-value">{s.data}</span>
+                    </div>
+                  )}
+                  {s.expected && (
+                    <div className="step-row">
+                      <span className="step-label">Expected</span>
+                      <span className="step-value">{s.expected}</span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+
           <p className="muted detail-note">
             Edits are saved locally and queued in <b>Pending</b> until you
-            commit them to Jira. Test steps load in a later update.
+            commit them to Jira. Step editing lands in a later update.
           </p>
         </div>
       )}

@@ -322,6 +322,59 @@ func (a *App) TransitionTest(profileID, testKey, targetStatus string) error {
 	return a.repo.TransitionTest(profileID, testKey, targetStatus)
 }
 
+// --- Test steps (FR-2.5) ---
+
+// GetTestSteps returns the cached Steps for a Test, fetching from Xray on
+// a cache miss. forceRefresh bypasses the cache so the user can pull the
+// latest steps without a full sync — handy after someone else edits in
+// Jira directly.
+//
+// We don't refresh during the bulk sync flow: that would mean one extra
+// HTTP call per Test (5,000 round trips for a typical demo dataset). The
+// detail panel calls this lazily on first open instead.
+func (a *App) GetTestSteps(profileID, testKey string, forceRefresh bool) ([]testrepo.Step, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	if !forceRefresh {
+		cached, err := a.repo.ListTestSteps(profileID, testKey)
+		if err != nil {
+			return nil, err
+		}
+		if len(cached) > 0 {
+			return cached, nil
+		}
+	}
+
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return nil, err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return nil, fmt.Errorf("load credentials: %w", err)
+	}
+	remote, err := jira.NewClient(p.JiraURL, token).GetTestSteps(a.ctx, testKey)
+	if err != nil {
+		return nil, err
+	}
+
+	steps := make([]testrepo.Step, len(remote))
+	for i, s := range remote {
+		steps[i] = testrepo.Step{
+			XrayID:   s.ID,
+			Index:    s.Index,
+			Action:   s.Action,
+			Data:     s.Data,
+			Expected: s.Expected,
+		}
+	}
+	if err := a.repo.SetTestSteps(profileID, testKey, steps); err != nil {
+		return nil, err
+	}
+	return steps, nil
+}
+
 // --- Bulk operations (FR-3) ---
 
 // BulkEditTests applies a single field-level operation to a batch of Tests,

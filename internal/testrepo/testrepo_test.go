@@ -594,6 +594,63 @@ func TestBulkEditAppendIsRejectedForNonDescriptionFields(t *testing.T) {
 	}
 }
 
+func TestSetTestStepsThenListReturnsThemInIndexOrder(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	in := []testrepo.Step{
+		{XrayID: "s3", Index: 3, Action: "third", Expected: "ok"},
+		{XrayID: "s1", Index: 1, Action: "first", Expected: "ok"},
+		{XrayID: "s2", Index: 2, Action: "second", Expected: "ok"},
+	}
+	if err := repo.SetTestSteps("p1", "QA-1", in); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+
+	got, err := repo.ListTestSteps("p1", "QA-1")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("len = %d, want 3", len(got))
+	}
+	for i, want := range []int{1, 2, 3} {
+		if got[i].Index != want {
+			t.Errorf("got[%d].Index = %d, want %d (steps not ordered)", i, got[i].Index, want)
+		}
+	}
+}
+
+func TestSetTestStepsReplacesPreviousList(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := repo.SetTestSteps("p1", "QA-1", []testrepo.Step{
+		{XrayID: "old1", Index: 1, Action: "old A"},
+		{XrayID: "old2", Index: 2, Action: "old B"},
+	}); err != nil {
+		t.Fatalf("set old: %v", err)
+	}
+	if err := repo.SetTestSteps("p1", "QA-1", []testrepo.Step{
+		{XrayID: "new1", Index: 1, Action: "new A"},
+	}); err != nil {
+		t.Fatalf("set new: %v", err)
+	}
+
+	got, _ := repo.ListTestSteps("p1", "QA-1")
+	if len(got) != 1 || got[0].XrayID != "new1" {
+		t.Errorf("after replace got %+v, want [{XrayID:new1...}]", got)
+	}
+}
+
 func TestListMatchingKeysReturnsAllKeysAcrossPages(t *testing.T) {
 	repo := newRepo(t)
 	cases := []testrepo.TestCase{}

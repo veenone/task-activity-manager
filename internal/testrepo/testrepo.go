@@ -49,6 +49,17 @@ type Precondition struct {
 	Description string `json:"description"`
 }
 
+// Step is one cached Xray Test Step (FR-2.5). XrayID is Xray's per-step
+// identifier — kept on the row so the future edit-steps API can target
+// each step individually without us having to rebuild the list.
+type Step struct {
+	XrayID   string `json:"xrayId"`
+	Index    int    `json:"index"`
+	Action   string `json:"action"`
+	Data     string `json:"data"`
+	Expected string `json:"expected"`
+}
+
 // PendingChange is one uncommitted local edit awaiting a push (FR-1.5 / 1.6).
 // At most one PendingChange exists per (profile, entity, field); repeated
 // edits to the same field are coalesced — BeforeVal stays at the original
@@ -388,6 +399,63 @@ func buildTestFilter(profileID string, q Query) (string, []any) {
 		args = append(args, q.FolderID, q.FolderID+"/%")
 	}
 	return "WHERE " + strings.Join(where, " AND "), args
+}
+
+// SetTestSteps replaces the cached Step list for one Test (FR-2.5). The
+// whole list is rewritten on each call — Xray returns steps as an ordered
+// array and we mirror that semantic rather than trying to diff. Pass an
+// empty slice to clear the cache for a Test.
+func (r *Repository) SetTestSteps(profileID, testKey string, steps []Step) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`DELETE FROM test_step WHERE profile_id = ? AND test_key = ?`,
+		profileID, testKey,
+	); err != nil {
+		return fmt.Errorf("clear steps: %w", err)
+	}
+	for _, s := range steps {
+		if _, err := tx.Exec(
+			`INSERT INTO test_step
+			   (profile_id, test_key, xray_id, idx, action, data, expected)
+			   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			profileID, testKey, s.XrayID, s.Index, s.Action, s.Data, s.Expected,
+		); err != nil {
+			return fmt.Errorf("insert step: %w", err)
+		}
+	}
+	return tx.Commit()
+}
+
+// ListTestSteps returns the cached Steps for a Test in index order.
+// Returns an empty slice (not an error) for tests with no cached steps —
+// the caller is responsible for deciding whether to fetch from Jira.
+func (r *Repository) ListTestSteps(profileID, testKey string) ([]Step, error) {
+	rows, err := r.db.Query(
+		`SELECT xray_id, idx, action, data, expected
+		 FROM test_step
+		 WHERE profile_id = ? AND test_key = ?
+		 ORDER BY idx`,
+		profileID, testKey,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list test steps: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Step{}
+	for rows.Next() {
+		var s Step
+		if err := rows.Scan(&s.XrayID, &s.Index, &s.Action, &s.Data, &s.Expected); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.

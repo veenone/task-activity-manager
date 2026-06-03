@@ -245,6 +245,33 @@ func demoTransitionsForStatus(status string) []Transition {
 	return []Transition{}
 }
 
+// demoStepsForKey returns a deterministic three-step skeleton for any test
+// in demo mode (FR-2.5). The steps are generic on purpose — they exercise
+// the panel layout, not Jira fidelity. Real Xray returns whatever the
+// authors wrote.
+func demoStepsForKey(testKey string) []Step {
+	return []Step{
+		{
+			ID:       testKey + "-s1",
+			Index:    1,
+			Action:   "Set up the preconditions described in the test description.",
+			Expected: "All preconditions are met and the system is in a known state.",
+		},
+		{
+			ID:       testKey + "-s2",
+			Index:    2,
+			Action:   "Execute the action under test.",
+			Expected: "The action completes without error.",
+		},
+		{
+			ID:       testKey + "-s3",
+			Index:    3,
+			Action:   "Verify the resulting system state matches the test's expected behaviour.",
+			Expected: "The observed outcome equals the expected outcome.",
+		},
+	}
+}
+
 // demoPreconditionsAndLinks returns the demo precondition master list plus
 // the test-key → precondition-keys mapping. Keys use a "<project>-P-N"
 // convention so they read like Jira keys without colliding with the test

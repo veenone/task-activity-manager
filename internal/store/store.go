@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 5
+const schemaVersion = 6
 
 // baseSchema is the canonical table layout for a fresh install. Indexes that
 // might reference columns added by a migration live in indexSchema instead,
@@ -108,6 +108,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	after_val   TEXT NOT NULL DEFAULT '',
 	note        TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS test_step (
+	profile_id TEXT NOT NULL,
+	test_key   TEXT NOT NULL,
+	xray_id    TEXT NOT NULL,
+	idx        INTEGER NOT NULL,
+	action     TEXT NOT NULL DEFAULT '',
+	data       TEXT NOT NULL DEFAULT '',
+	expected   TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, test_key, xray_id)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -121,6 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_test_case_folder        ON test_case(profile_id, 
 CREATE INDEX IF NOT EXISTS idx_test_precondition_test  ON test_precondition(profile_id, test_key);
 CREATE INDEX IF NOT EXISTS idx_pending_change_profile  ON pending_change(profile_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_profile_time  ON audit_log(profile_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_test_step_test          ON test_step(profile_id, test_key, idx);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -182,6 +194,7 @@ func applyMigrations(db *sql.DB) error {
 	// v4: precondition / test_precondition tables. Additive — covered by
 	// CREATE TABLE IF NOT EXISTS in baseSchema, no explicit step needed.
 	// v5: pending_change / audit_log tables. Also additive.
+	// v6: test_step table for cached Xray Test Steps. Also additive.
 	return nil
 }
 

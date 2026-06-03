@@ -27,6 +27,7 @@ export {
   TransitionTest,
   GetBulkTransitionOptions,
   BulkTransitionTests,
+  GetTestSteps,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 
@@ -89,6 +90,17 @@ export interface Precondition {
   summary: string;
   type: string;
   description: string;
+}
+
+// Step mirrors testrepo.Step — one ordered step in an Xray Test (FR-2.5).
+// xrayId is Xray's per-step identifier, kept around so a future step
+// editor can target each row individually.
+export interface Step {
+  xrayId: string;
+  index: number;
+  action: string;
+  data: string;
+  expected: string;
 }
 
 export interface PendingChange {
