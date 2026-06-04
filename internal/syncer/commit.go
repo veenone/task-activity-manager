@@ -43,10 +43,9 @@ type FailedCommit struct {
 //     the remote has moved since the oldest pending edit's base_version,
 //     skip the Test and surface a conflict.
 //  2. PUT any non-status field updates.
-//  3. POST a workflow transition (FR-4.2) if a status change is queued —
-//     transitions go to /transitions instead of the field-update PUT, with
-//     the transition ID discovered by name from GetTransitions.
-//  4. Delete the pending rows and audit "commit".
+//  3. POST a workflow transition (FR-4.2) if a status change is queued.
+//  4. PUT any pending Step field updates, one PUT per step (FR-2.5).
+//  5. Delete the pending rows and audit "commit".
 //
 // Failures and conflicts leave pending rows in place so the user can
 // resolve and retry.
@@ -62,20 +61,24 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitRes
 		return result, err
 	}
 
-	// Group by Test, preserving the order pending changes were returned in
-	// so the commit run is deterministic.
+	// Group by parent Test key, preserving discovery order so the commit
+	// run is deterministic. Step entity_keys are "<testKey>:<xrayID>" — we
+	// strip the suffix to put step changes under the same Test bucket as
+	// field changes on that Test.
 	byTest := make(map[string][]testrepo.PendingChange)
 	order := make([]string, 0)
 	for _, c := range changes {
-		if c.EntityType != "test_case" {
+		testKey, ok := parentTestKey(c)
+		if !ok {
 			continue
 		}
-		if _, seen := byTest[c.EntityKey]; !seen {
-			order = append(order, c.EntityKey)
+		if _, seen := byTest[testKey]; !seen {
+			order = append(order, testKey)
 		}
-		byTest[c.EntityKey] = append(byTest[c.EntityKey], c)
+		byTest[testKey] = append(byTest[testKey], c)
 	}
 
+testLoop:
 	for _, testKey := range order {
 		testChanges := byTest[testKey]
 
@@ -100,18 +103,33 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitRes
 			}
 		}
 
-		// Separate the status-transition change (if any) from the rest.
-		// Field updates go through a single PUT; the transition uses the
-		// dedicated transitions endpoint.
+		// Split the bucket into:
+		//   - one status transition (at most)
+		//   - test_case field updates (summary, description, priority, labels)
+		//   - per-step field updates, keyed by xrayID
 		var statusChange *testrepo.PendingChange
 		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
+		stepChanges := make(map[string][]testrepo.PendingChange)
 		for i := range testChanges {
 			c := testChanges[i]
-			if c.Field == "status" {
-				cc := c
-				statusChange = &cc
-			} else {
-				fieldChanges = append(fieldChanges, c)
+			switch c.EntityType {
+			case "test_case":
+				if c.Field == "status" {
+					cc := c
+					statusChange = &cc
+				} else {
+					fieldChanges = append(fieldChanges, c)
+				}
+			case "test_step":
+				_, xrayID, ok := parseStepKey(c.EntityKey)
+				if !ok {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("malformed step entity_key %q", c.EntityKey),
+					})
+					continue testLoop
+				}
+				stepChanges[xrayID] = append(stepChanges[xrayID], c)
 			}
 		}
 
@@ -141,6 +159,23 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitRes
 			}
 		}
 
+		// PUT each step that has pending edits, batching the step's changes
+		// into one body. The first step to fail aborts further step PUTs
+		// for this Test — the user resolves and retries.
+		for xrayID, changes := range stepChanges {
+			fields := make(map[string]string, len(changes))
+			for _, c := range changes {
+				fields[c.Field] = c.AfterVal
+			}
+			if err := e.client.UpdateTestStep(ctx, testKey, xrayID, fields); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   fmt.Sprintf("update step %s: %s", xrayID, sanitizeError(err.Error())),
+				})
+				continue testLoop
+			}
+		}
+
 		ids := make([]int64, len(testChanges))
 		for i, c := range testChanges {
 			ids[i] = c.ID
@@ -156,6 +191,31 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitRes
 	}
 
 	return result, nil
+}
+
+// parentTestKey extracts the parent Test key for a pending change so
+// CommitChanges can group test_case and test_step changes together per
+// Test. Returns false for unrecognised entity types.
+func parentTestKey(c testrepo.PendingChange) (string, bool) {
+	switch c.EntityType {
+	case "test_case":
+		return c.EntityKey, true
+	case "test_step":
+		k, _, ok := parseStepKey(c.EntityKey)
+		return k, ok
+	}
+	return "", false
+}
+
+// parseStepKey splits a "<testKey>:<xrayID>" pending entity_key. Mirrors
+// testrepo.parseStepEntityKey but lives here too so the syncer doesn't
+// depend on an exported helper for a one-line split.
+func parseStepKey(s string) (testKey, xrayID string, ok bool) {
+	i := strings.Index(s, ":")
+	if i < 0 {
+		return "", "", false
+	}
+	return s[:i], s[i+1:], true
 }
 
 // applyTransition resolves the transition ID by target status name and POSTs

@@ -28,6 +28,7 @@ export {
   GetBulkTransitionOptions,
   BulkTransitionTests,
   GetTestSteps,
+  EditTestStepField,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 

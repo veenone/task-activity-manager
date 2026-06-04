@@ -635,12 +635,83 @@ func (r *Repository) EditTestField(profileID, testKey, field, newValue string) e
 	}
 
 	if err := upsertPendingChange(
-		tx, profileID, testKey, field, currentVal, newValue, baseVersion,
+		tx, profileID, entityTestCase, testKey, field, currentVal, newValue, baseVersion,
 	); err != nil {
 		return err
 	}
 	if err := writeAudit(
-		tx, profileID, testKey, "edit-local", field, currentVal, newValue, "",
+		tx, profileID, entityTestCase, testKey,
+		"edit-local", field, currentVal, newValue, "",
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// stepFields whitelists which Step columns can be edited via
+// EditTestStepField. The map value is the on-disk column name in test_step.
+var stepFields = map[string]string{
+	"action":   "action",
+	"data":     "data",
+	"expected": "expected",
+}
+
+// EditTestStepField applies a local edit to one field of one Test Step
+// (FR-2.5). The change is queued in pending_change with entity_type =
+// "test_step" and entity_key = "<testKey>:<xrayID>" so the commit path
+// can route step updates to /rest/raven/2.0/api/test/{key}/steps/{stepId}
+// while keeping the same coalesce / discard machinery as test_case fields.
+func (r *Repository) EditTestStepField(profileID, testKey, xrayID, field, newValue string) error {
+	col, ok := stepFields[field]
+	if !ok {
+		return fmt.Errorf("step field %q is not editable", field)
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// The conflict base_version we capture is the parent Test's updated_at —
+	// step edits without parallel field edits still want to conflict-check
+	// against the same remote "updated" the syncer reads.
+	var currentVal, baseVersion string
+	readSQL := fmt.Sprintf(
+		`SELECT s.%s, t.updated_at
+		   FROM test_step s
+		   JOIN test_case t
+		     ON t.profile_id = s.profile_id AND t.jira_key = s.test_key
+		   WHERE s.profile_id = ? AND s.test_key = ? AND s.xray_id = ?`,
+		col,
+	)
+	err = tx.QueryRow(readSQL, profileID, testKey, xrayID).Scan(&currentVal, &baseVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read current step value: %w", err)
+	}
+	if currentVal == newValue {
+		return nil
+	}
+
+	updateSQL := fmt.Sprintf(
+		`UPDATE test_step SET %s = ? WHERE profile_id = ? AND test_key = ? AND xray_id = ?`, col,
+	)
+	if _, err := tx.Exec(updateSQL, newValue, profileID, testKey, xrayID); err != nil {
+		return fmt.Errorf("update test_step: %w", err)
+	}
+
+	ek := stepEntityKey(testKey, xrayID)
+	if err := upsertPendingChange(
+		tx, profileID, entityTestStep, ek, field, currentVal, newValue, baseVersion,
+	); err != nil {
+		return err
+	}
+	if err := writeAudit(
+		tx, profileID, entityTestStep, ek,
+		"edit-local", field, currentVal, newValue, "",
 	); err != nil {
 		return err
 	}
@@ -656,12 +727,12 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var entityKey, field, beforeVal, afterVal string
+	var entityType, entityKey, field, beforeVal, afterVal string
 	err = tx.QueryRow(
-		`SELECT entity_key, field, before_val, after_val FROM pending_change
+		`SELECT entity_type, entity_key, field, before_val, after_val FROM pending_change
 		 WHERE profile_id = ? AND id = ?`,
 		profileID, changeID,
-	).Scan(&entityKey, &field, &beforeVal, &afterVal)
+	).Scan(&entityType, &entityKey, &field, &beforeVal, &afterVal)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("pending change %d not found", changeID)
 	}
@@ -669,16 +740,36 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		return fmt.Errorf("read pending change: %w", err)
 	}
 
-	col, ok := columnForField(field)
-	if !ok {
-		return fmt.Errorf("field %q is not editable (audit log corrupt?)", field)
-	}
-
-	revertSQL := fmt.Sprintf(
-		`UPDATE test_case SET %s = ? WHERE profile_id = ? AND jira_key = ?`, col,
-	)
-	if _, err := tx.Exec(revertSQL, beforeVal, profileID, entityKey); err != nil {
-		return fmt.Errorf("revert test_case: %w", err)
+	switch entityType {
+	case entityTestCase:
+		col, ok := columnForField(field)
+		if !ok {
+			return fmt.Errorf("field %q is not editable (audit log corrupt?)", field)
+		}
+		revertSQL := fmt.Sprintf(
+			`UPDATE test_case SET %s = ? WHERE profile_id = ? AND jira_key = ?`, col,
+		)
+		if _, err := tx.Exec(revertSQL, beforeVal, profileID, entityKey); err != nil {
+			return fmt.Errorf("revert test_case: %w", err)
+		}
+	case entityTestStep:
+		col, ok := stepFields[field]
+		if !ok {
+			return fmt.Errorf("step field %q is not editable (audit log corrupt?)", field)
+		}
+		testKey, xrayID, ok := parseStepEntityKey(entityKey)
+		if !ok {
+			return fmt.Errorf("malformed step entity_key %q", entityKey)
+		}
+		revertSQL := fmt.Sprintf(
+			`UPDATE test_step SET %s = ?
+			   WHERE profile_id = ? AND test_key = ? AND xray_id = ?`, col,
+		)
+		if _, err := tx.Exec(revertSQL, beforeVal, profileID, testKey, xrayID); err != nil {
+			return fmt.Errorf("revert test_step: %w", err)
+		}
+	default:
+		return fmt.Errorf("unknown entity_type %q", entityType)
 	}
 
 	if _, err := tx.Exec(
@@ -689,7 +780,8 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 	}
 
 	if err := writeAudit(
-		tx, profileID, entityKey, "discard-pending", field, afterVal, beforeVal,
+		tx, profileID, entityType, entityKey,
+		"discard-pending", field, afterVal, beforeVal,
 		fmt.Sprintf("discarded change #%d", changeID),
 	); err != nil {
 		return err
@@ -738,12 +830,13 @@ func (r *Repository) TransitionTest(profileID, testKey, targetStatus string) err
 		return fmt.Errorf("update status: %w", err)
 	}
 	if err := upsertPendingChange(
-		tx, profileID, testKey, "status", currentVal, targetStatus, baseVersion,
+		tx, profileID, entityTestCase, testKey, "status", currentVal, targetStatus, baseVersion,
 	); err != nil {
 		return err
 	}
 	if err := writeAudit(
-		tx, profileID, testKey, "transition-local", "status",
+		tx, profileID, entityTestCase, testKey,
+		"transition-local", "status",
 		currentVal, targetStatus, "",
 	); err != nil {
 		return err
@@ -765,7 +858,7 @@ func (r *Repository) CommitPendingChanges(profileID string, ids []int64) error {
 	defer func() { _ = tx.Rollback() }()
 
 	selectStmt, err := tx.Prepare(
-		`SELECT entity_key, field, before_val, after_val FROM pending_change
+		`SELECT entity_type, entity_key, field, before_val, after_val FROM pending_change
 		 WHERE profile_id = ? AND id = ?`)
 	if err != nil {
 		return fmt.Errorf("prepare select: %w", err)
@@ -780,9 +873,9 @@ func (r *Repository) CommitPendingChanges(profileID string, ids []int64) error {
 	defer deleteStmt.Close()
 
 	for _, id := range ids {
-		var entityKey, field, beforeVal, afterVal string
+		var entityType, entityKey, field, beforeVal, afterVal string
 		err := selectStmt.QueryRow(profileID, id).Scan(
-			&entityKey, &field, &beforeVal, &afterVal,
+			&entityType, &entityKey, &field, &beforeVal, &afterVal,
 		)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue // already gone — commit stays idempotent
@@ -794,7 +887,8 @@ func (r *Repository) CommitPendingChanges(profileID string, ids []int64) error {
 			return fmt.Errorf("delete pending %d: %w", id, err)
 		}
 		if err := writeAudit(
-			tx, profileID, entityKey, "commit", field, beforeVal, afterVal, "",
+			tx, profileID, entityType, entityKey,
+			"commit", field, beforeVal, afterVal, "",
 		); err != nil {
 			return err
 		}
@@ -1007,16 +1101,41 @@ func applyBulkOperation(op BulkEdit, current string) (string, error) {
 
 // --- Helpers ---
 
+// Entity types for pending_change / audit_log rows. New ones get added
+// here so the switch/lookup code stays grep-friendly.
+const (
+	entityTestCase = "test_case"
+	entityTestStep = "test_step"
+)
+
+// stepEntityKey encodes a step's parent Test plus its Xray step ID into a
+// single entity_key, since pending_change has just one key column.
+// "QA-12:abc-uuid" — the first colon splits cleanly because Xray test
+// keys never contain one.
+const stepEntityKeySep = ":"
+
+func stepEntityKey(testKey, xrayID string) string {
+	return testKey + stepEntityKeySep + xrayID
+}
+
+func parseStepEntityKey(s string) (testKey, xrayID string, ok bool) {
+	i := strings.Index(s, stepEntityKeySep)
+	if i < 0 {
+		return "", "", false
+	}
+	return s[:i], s[i+1:], true
+}
+
 // upsertPendingChange records (or coalesces) a pending field change. If a row
-// already exists for this (profile, entity, field) the AfterVal is updated;
-// if the new value matches the existing BeforeVal (i.e. the user reverted to
-// the original), the row is deleted.
-func upsertPendingChange(tx *sql.Tx, profileID, entityKey, field, currentVal, newValue, baseVersion string) error {
+// already exists for this (profile, entityType, entity, field) the AfterVal
+// is updated; if the new value matches the existing BeforeVal (i.e. the user
+// reverted to the original), the row is deleted.
+func upsertPendingChange(tx *sql.Tx, profileID, entityType, entityKey, field, currentVal, newValue, baseVersion string) error {
 	var existingBefore string
 	err := tx.QueryRow(
 		`SELECT before_val FROM pending_change
-		 WHERE profile_id = ? AND entity_type = 'test_case' AND entity_key = ? AND field = ?`,
-		profileID, entityKey, field,
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
+		profileID, entityType, entityKey, field,
 	).Scan(&existingBefore)
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -1025,8 +1144,8 @@ func upsertPendingChange(tx *sql.Tx, profileID, entityKey, field, currentVal, ne
 		_, ierr := tx.Exec(
 			`INSERT INTO pending_change
 			   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
-			 VALUES (?, 'test_case', ?, ?, ?, ?, ?, ?)`,
-			profileID, entityKey, field, currentVal, newValue, baseVersion, now,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			profileID, entityType, entityKey, field, currentVal, newValue, baseVersion, now,
 		)
 		if ierr != nil {
 			return fmt.Errorf("insert pending change: %w", ierr)
@@ -1041,8 +1160,8 @@ func upsertPendingChange(tx *sql.Tx, profileID, entityKey, field, currentVal, ne
 		// Reverted to original — drop the pending change.
 		if _, derr := tx.Exec(
 			`DELETE FROM pending_change
-			 WHERE profile_id = ? AND entity_type = 'test_case' AND entity_key = ? AND field = ?`,
-			profileID, entityKey, field,
+			 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
+			profileID, entityType, entityKey, field,
 		); derr != nil {
 			return fmt.Errorf("delete pending: %w", derr)
 		}
@@ -1051,8 +1170,8 @@ func upsertPendingChange(tx *sql.Tx, profileID, entityKey, field, currentVal, ne
 
 	if _, uerr := tx.Exec(
 		`UPDATE pending_change SET after_val = ?, created_at = ?
-		 WHERE profile_id = ? AND entity_type = 'test_case' AND entity_key = ? AND field = ?`,
-		newValue, now, profileID, entityKey, field,
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
+		newValue, now, profileID, entityType, entityKey, field,
 	); uerr != nil {
 		return fmt.Errorf("update pending: %w", uerr)
 	}
@@ -1060,14 +1179,15 @@ func upsertPendingChange(tx *sql.Tx, profileID, entityKey, field, currentVal, ne
 }
 
 // writeAudit appends one row to audit_log. Called from EditTestField,
-// DiscardPendingChange, and (later) commit / conflict paths.
-func writeAudit(tx *sql.Tx, profileID, entityKey, action, field, beforeVal, afterVal, note string) error {
+// EditTestStepField, DiscardPendingChange, TransitionTest, and the
+// commit / conflict paths.
+func writeAudit(tx *sql.Tx, profileID, entityType, entityKey, action, field, beforeVal, afterVal, note string) error {
 	if _, err := tx.Exec(
 		`INSERT INTO audit_log
 		   (profile_id, occurred_at, actor, entity_type, entity_key, action, field, before_val, after_val, note)
-		 VALUES (?, ?, ?, 'test_case', ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		profileID, time.Now().UTC().Format(time.RFC3339),
-		currentActor(), entityKey, action, field, beforeVal, afterVal, note,
+		currentActor(), entityType, entityKey, action, field, beforeVal, afterVal, note,
 	); err != nil {
 		return fmt.Errorf("audit log: %w", err)
 	}

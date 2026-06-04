@@ -6,6 +6,7 @@ import {
   GetTestSteps,
   TransitionTest,
   EditTestField,
+  EditTestStepField,
   errMsg,
 } from "../api";
 import type {
@@ -317,32 +318,135 @@ export function TestDetail({
           {steps.length > 0 && (
             <ol className="steps-list">
               {steps.map((s) => (
-                <li key={s.xrayId}>
-                  <div className="step-action">{s.action || "—"}</div>
-                  {s.data && (
-                    <div className="step-row">
-                      <span className="step-label">Data</span>
-                      <span className="step-value">{s.data}</span>
-                    </div>
-                  )}
-                  {s.expected && (
-                    <div className="step-row">
-                      <span className="step-label">Expected</span>
-                      <span className="step-value">{s.expected}</span>
-                    </div>
-                  )}
-                </li>
+                <StepRow
+                  key={s.xrayId}
+                  profileId={profileId}
+                  testKey={testKey}
+                  step={s}
+                  pendingForTest={pendingForTest}
+                  onLocalChange={(field, value) => {
+                    setSteps((prev) =>
+                      prev.map((p) =>
+                        p.xrayId === s.xrayId ? { ...p, [field]: value } : p,
+                      ),
+                    );
+                  }}
+                  onEdited={onEdited}
+                />
               ))}
             </ol>
           )}
 
           <p className="muted detail-note">
             Edits are saved locally and queued in <b>Pending</b> until you
-            commit them to Jira. Step editing lands in a later update.
+            commit them to Jira. Add / remove / reorder steps lands in a
+            later update.
           </p>
         </div>
       )}
     </aside>
+  );
+}
+
+type StepField = "action" | "data" | "expected";
+
+interface StepRowProps {
+  profileId: string;
+  testKey: string;
+  step: Step;
+  pendingForTest: PendingChange[];
+  onLocalChange: (field: StepField, value: string) => void;
+  onEdited: () => void;
+}
+
+// StepRow renders one editable Test Step (FR-2.5). Each field saves on
+// blur, mirroring the same pattern used by the Test-level field editors.
+// Dirty markers come from the pendingForTest prop — we filter to rows
+// belonging to this step's entity_key.
+function StepRow({
+  profileId,
+  testKey,
+  step,
+  pendingForTest,
+  onLocalChange,
+  onEdited,
+}: StepRowProps) {
+  const [action, setAction] = useState(step.action);
+  const [data, setData] = useState(step.data);
+  const [expected, setExpected] = useState(step.expected);
+  const [saveError, setSaveError] = useState("");
+
+  const entityKey = `${testKey}:${step.xrayId}`;
+  const isDirty = (field: StepField) =>
+    pendingForTest.some(
+      (p) =>
+        p.entityType === "test_step" &&
+        p.entityKey === entityKey &&
+        p.field === field,
+    );
+
+  async function save(field: StepField, value: string) {
+    let backendValue: string;
+    switch (field) {
+      case "action":
+        backendValue = step.action;
+        break;
+      case "data":
+        backendValue = step.data;
+        break;
+      case "expected":
+        backendValue = step.expected;
+        break;
+    }
+    if (value === backendValue) return;
+    setSaveError("");
+    try {
+      await EditTestStepField(profileId, testKey, step.xrayId, field, value);
+      onLocalChange(field, value);
+      onEdited();
+    } catch (e) {
+      setSaveError(errMsg(e));
+    }
+  }
+
+  return (
+    <li>
+      <textarea
+        className="step-edit step-edit-action"
+        value={action}
+        onChange={(e) => setAction(e.target.value)}
+        onBlur={() => save("action", action)}
+        rows={2}
+        placeholder="(action)"
+      />
+      {isDirty("action") && <DirtyDot />}
+      <div className="step-row">
+        <span className="step-label">
+          Data {isDirty("data") && <DirtyDot />}
+        </span>
+        <input
+          className="step-edit"
+          value={data}
+          onChange={(e) => setData(e.target.value)}
+          onBlur={() => save("data", data)}
+          placeholder="(optional)"
+        />
+      </div>
+      <div className="step-row">
+        <span className="step-label">
+          Expected {isDirty("expected") && <DirtyDot />}
+        </span>
+        <textarea
+          className="step-edit"
+          value={expected}
+          onChange={(e) => setExpected(e.target.value)}
+          onBlur={() => save("expected", expected)}
+          rows={2}
+          placeholder="(expected result)"
+        />
+      </div>
+      {saveError && <div className="error-text step-save-error">{saveError}</div>}
+    </li>
   );
 }
 

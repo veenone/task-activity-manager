@@ -594,6 +594,74 @@ func TestBulkEditAppendIsRejectedForNonDescriptionFields(t *testing.T) {
 	}
 }
 
+func TestEditTestStepFieldQueuesStepPendingChange(t *testing.T) {
+	repo := seedTestWithSteps(t)
+
+	if err := repo.EditTestStepField("p1", "QA-1", "s1", "action", "new action"); err != nil {
+		t.Fatalf("edit step: %v", err)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	if steps[0].Action != "new action" {
+		t.Errorf("step action = %q, want %q", steps[0].Action, "new action")
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending change, got %d", len(changes))
+	}
+	c := changes[0]
+	if c.EntityType != "test_step" || c.EntityKey != "QA-1:s1" || c.Field != "action" {
+		t.Errorf("change = %+v, want entity_type=test_step entity_key=QA-1:s1 field=action", c)
+	}
+}
+
+func TestDiscardStepPendingChangeRevertsStepField(t *testing.T) {
+	repo := seedTestWithSteps(t)
+
+	if err := repo.EditTestStepField("p1", "QA-1", "s1", "expected", "new expected"); err != nil {
+		t.Fatalf("edit step: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending, got %d", len(changes))
+	}
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	if steps[0].Expected != "old expected" {
+		t.Errorf("step expected = %q after discard, want %q (reverted)", steps[0].Expected, "old expected")
+	}
+}
+
+func TestEditTestStepFieldRejectsUnknownField(t *testing.T) {
+	repo := seedTestWithSteps(t)
+
+	err := repo.EditTestStepField("p1", "QA-1", "s1", "summary", "x")
+	if err == nil {
+		t.Errorf("expected error for unknown step field, got nil")
+	}
+}
+
+func seedTestWithSteps(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed test: %v", err)
+	}
+	if err := repo.SetTestSteps("p1", "QA-1", []testrepo.Step{
+		{XrayID: "s1", Index: 1, Action: "old action", Data: "", Expected: "old expected"},
+	}); err != nil {
+		t.Fatalf("seed steps: %v", err)
+	}
+	return repo
+}
+
 func TestSetTestStepsThenListReturnsThemInIndexOrder(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{

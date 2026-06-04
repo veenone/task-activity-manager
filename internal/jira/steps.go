@@ -17,6 +17,34 @@ type Step struct {
 	Expected string `json:"expected"`
 }
 
+// UpdateTestStep applies field changes to a single Test Step (FR-2.5). The
+// fields map is keyed by the local domain names ("action", "data",
+// "expected"); only the keys present are sent — Xray leaves any field
+// absent from the body untouched. Demo URLs short-circuit to a no-op so
+// step edits in demo just clear local pending rows.
+//
+// Maps to PUT /rest/raven/2.0/api/test/{key}/steps/{stepId}. Xray's body
+// uses "step" (= our "action"), "data", and "result" (= our "expected").
+func (c *Client) UpdateTestStep(ctx context.Context, key, stepID string, fields map[string]string) error {
+	if isDemoURL(c.baseURL) {
+		return nil
+	}
+	body := map[string]any{}
+	if v, ok := fields["action"]; ok {
+		body["step"] = map[string]string{"raw": v}
+	}
+	if v, ok := fields["data"]; ok {
+		body["data"] = map[string]string{"raw": v}
+	}
+	if v, ok := fields["expected"]; ok {
+		body["result"] = map[string]string{"raw": v}
+	}
+	if len(body) == 0 {
+		return nil
+	}
+	return c.put(ctx, fmt.Sprintf("/rest/raven/2.0/api/test/%s/steps/%s", key, stepID), body)
+}
+
 // GetTestSteps returns the ordered list of Steps for a Test (FR-2.5). Demo
 // URLs fall through to a deterministic generator so the steps panel renders
 // without a real Xray.

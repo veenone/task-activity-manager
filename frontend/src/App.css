@@ -190,6 +190,28 @@
   flex: 1;
   white-space: pre-wrap;
 }
+.step-edit {
+  width: 100%;
+  border: 1px solid #c4c9d4;
+  border-radius: 3px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: #1f2933;
+  background: #fff;
+  resize: vertical;
+}
+.step-edit-action {
+  margin-bottom: 4px;
+}
+.step-save-error {
+  font-size: 11px;
+  margin-top: 2px;
+}
+.step-suffix {
+  font-size: 11px;
+  margin-left: 4px;
+}
 
 /* Onboarding */
 .onboard {

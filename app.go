@@ -322,6 +322,16 @@ func (a *App) TransitionTest(profileID, testKey, targetStatus string) error {
 	return a.repo.TransitionTest(profileID, testKey, targetStatus)
 }
 
+// EditTestStepField queues a local edit to one field of one Test Step
+// (FR-2.5). The change is pushed to Xray on commit via PUT
+// /rest/raven/2.0/api/test/{key}/steps/{stepId}.
+func (a *App) EditTestStepField(profileID, testKey, xrayID, field, newValue string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.EditTestStepField(profileID, testKey, xrayID, field, newValue)
+}
+
 // --- Test steps (FR-2.5) ---
 
 // GetTestSteps returns the cached Steps for a Test, fetching from Xray on

@@ -30,6 +30,10 @@ export function EditTestField(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditTestField'](arg1, arg2, arg3, arg4);
 }
 
+export function EditTestStepField(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['EditTestStepField'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function GetBulkTransitionOptions(arg1, arg2) {
   return window['go']['main']['App']['GetBulkTransitionOptions'](arg1, arg2);
 }

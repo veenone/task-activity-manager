@@ -92,15 +92,24 @@ function App() {
     return EventsOn("sync:progress", (p: SyncProgress) => setProgress(p));
   }, []);
 
-  // Pending changes grouped by test key — drives the dirty markers in the
-  // grid and the per-field dot in the detail panel.
+  // Pending changes grouped by parent Test key — drives the dirty markers
+  // in the grid and the per-field dot in the detail panel. test_step rows
+  // are bucketed under their parent Test so the row dot lights up for step
+  // edits too, and the detail panel can render per-step dirty markers.
   const pendingByTestKey = useMemo(() => {
     const m = new Map<string, PendingChange[]>();
     for (const p of pendingChanges) {
-      if (p.entityType !== "test_case") continue;
-      const arr = m.get(p.entityKey);
+      let testKey: string | null = null;
+      if (p.entityType === "test_case") {
+        testKey = p.entityKey;
+      } else if (p.entityType === "test_step") {
+        const colon = p.entityKey.indexOf(":");
+        if (colon > 0) testKey = p.entityKey.substring(0, colon);
+      }
+      if (!testKey) continue;
+      const arr = m.get(testKey);
       if (arr) arr.push(p);
-      else m.set(p.entityKey, [p]);
+      else m.set(testKey, [p]);
     }
     return m;
   }, [pendingChanges]);

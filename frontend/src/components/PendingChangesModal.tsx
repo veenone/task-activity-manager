@@ -110,35 +110,54 @@ export function PendingChangesModal({
                 </tr>
               </thead>
               <tbody>
-                {changes.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <button
-                        className="link-btn mono"
-                        onClick={() => onJumpTo(c.entityKey)}
-                        title="Open this test"
-                      >
-                        {c.entityKey}
-                      </button>
-                    </td>
-                    <td>{c.field}</td>
-                    <td className="pending-before">
-                      {truncate(c.beforeVal, 100)}
-                    </td>
-                    <td className="pending-after">
-                      {truncate(c.afterVal, 100)}
-                    </td>
-                    <td>
-                      <button
-                        className="btn"
-                        onClick={() => onDiscard(c.id)}
-                        disabled={committing}
-                      >
-                        Discard
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {changes.map((c) => {
+                  // Step entity_keys are "<testKey>:<xrayID>"; we route
+                  // the jump-to action to the parent test and label the
+                  // field as "step:<field>" so the modal makes it clear
+                  // which kind of edit this is.
+                  const isStep = c.entityType === "test_step";
+                  const parentKey = isStep
+                    ? c.entityKey.split(":")[0]
+                    : c.entityKey;
+                  const stepID = isStep
+                    ? c.entityKey.substring(c.entityKey.indexOf(":") + 1)
+                    : "";
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <button
+                          className="link-btn mono"
+                          onClick={() => onJumpTo(parentKey)}
+                          title="Open this test"
+                        >
+                          {parentKey}
+                        </button>
+                        {isStep && (
+                          <span className="muted step-suffix">
+                            {" · step "}
+                            <span className="mono">{stepID}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td>{isStep ? `step:${c.field}` : c.field}</td>
+                      <td className="pending-before">
+                        {truncate(c.beforeVal, 100)}
+                      </td>
+                      <td className="pending-after">
+                        {truncate(c.afterVal, 100)}
+                      </td>
+                      <td>
+                        <button
+                          className="btn"
+                          onClick={() => onDiscard(c.id)}
+                          disabled={committing}
+                        >
+                          Discard
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
