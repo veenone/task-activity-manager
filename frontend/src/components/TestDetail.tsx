@@ -7,6 +7,7 @@ import {
   TransitionTest,
   EditTestField,
   EditTestStepField,
+  DeleteTestStep,
   errMsg,
 } from "../api";
 import type {
@@ -331,6 +332,9 @@ export function TestDetail({
                       ),
                     );
                   }}
+                  onLocalDelete={(xrayId) => {
+                    setSteps((prev) => prev.filter((p) => p.xrayId !== xrayId));
+                  }}
                   onEdited={onEdited}
                 />
               ))}
@@ -356,6 +360,7 @@ interface StepRowProps {
   step: Step;
   pendingForTest: PendingChange[];
   onLocalChange: (field: StepField, value: string) => void;
+  onLocalDelete: (xrayId: string) => void;
   onEdited: () => void;
 }
 
@@ -369,12 +374,27 @@ function StepRow({
   step,
   pendingForTest,
   onLocalChange,
+  onLocalDelete,
   onEdited,
 }: StepRowProps) {
   const [action, setAction] = useState(step.action);
   const [data, setData] = useState(step.data);
   const [expected, setExpected] = useState(step.expected);
   const [saveError, setSaveError] = useState("");
+
+  async function deleteStep() {
+    if (!window.confirm(`Delete this step? It will be removed from Jira on commit.`)) {
+      return;
+    }
+    setSaveError("");
+    try {
+      await DeleteTestStep(profileId, testKey, step.xrayId);
+      onLocalDelete(step.xrayId);
+      onEdited();
+    } catch (e) {
+      setSaveError(errMsg(e));
+    }
+  }
 
   const entityKey = `${testKey}:${step.xrayId}`;
   const isDirty = (field: StepField) =>
@@ -411,14 +431,23 @@ function StepRow({
 
   return (
     <li>
-      <textarea
-        className="step-edit step-edit-action"
-        value={action}
-        onChange={(e) => setAction(e.target.value)}
-        onBlur={() => save("action", action)}
-        rows={2}
-        placeholder="(action)"
-      />
+      <div className="step-head">
+        <textarea
+          className="step-edit step-edit-action"
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          onBlur={() => save("action", action)}
+          rows={2}
+          placeholder="(action)"
+        />
+        <button
+          className="btn btn-ghost step-delete"
+          onClick={deleteStep}
+          title="Delete this step"
+        >
+          ✕
+        </button>
+      </div>
       {isDirty("action") && <DirtyDot />}
       <div className="step-row">
         <span className="step-label">

@@ -22,6 +22,10 @@ export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
+export function DeleteTestStep(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteTestStep'](arg1, arg2, arg3);
+}
+
 export function DiscardPendingChange(arg1, arg2) {
   return window['go']['main']['App']['DiscardPendingChange'](arg1, arg2);
 }

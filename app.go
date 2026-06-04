@@ -332,6 +332,15 @@ func (a *App) EditTestStepField(profileID, testKey, xrayID, field, newValue stri
 	return a.repo.EditTestStepField(profileID, testKey, xrayID, field, newValue)
 }
 
+// DeleteTestStep queues a Test Step for deletion (FR-2.5). The step is
+// hidden locally and the DELETE call to Xray fires at commit time.
+func (a *App) DeleteTestStep(profileID, testKey, xrayID string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.DeleteTestStep(profileID, testKey, xrayID)
+}
+
 // --- Test steps (FR-2.5) ---
 
 // GetTestSteps returns the cached Steps for a Test, fetching from Xray on

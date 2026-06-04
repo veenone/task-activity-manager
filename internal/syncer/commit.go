@@ -107,9 +107,11 @@ testLoop:
 		//   - one status transition (at most)
 		//   - test_case field updates (summary, description, priority, labels)
 		//   - per-step field updates, keyed by xrayID
+		//   - step deletions, keyed by xrayID
 		var statusChange *testrepo.PendingChange
 		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
 		stepChanges := make(map[string][]testrepo.PendingChange)
+		stepDeletes := make([]string, 0)
 		for i := range testChanges {
 			c := testChanges[i]
 			switch c.EntityType {
@@ -130,6 +132,16 @@ testLoop:
 					continue testLoop
 				}
 				stepChanges[xrayID] = append(stepChanges[xrayID], c)
+			case "test_step_delete":
+				_, xrayID, ok := parseStepKey(c.EntityKey)
+				if !ok {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("malformed step entity_key %q", c.EntityKey),
+					})
+					continue testLoop
+				}
+				stepDeletes = append(stepDeletes, xrayID)
 			}
 		}
 
@@ -156,6 +168,19 @@ testLoop:
 					Error:   err.Error(),
 				})
 				continue
+			}
+		}
+
+		// DELETE removed steps first — Xray validates the rest of the
+		// commit against whatever steps remain, so removing before edits
+		// avoids touching a step a parallel commit might also be removing.
+		for _, xrayID := range stepDeletes {
+			if err := e.client.DeleteTestStep(ctx, testKey, xrayID); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   fmt.Sprintf("delete step %s: %s", xrayID, sanitizeError(err.Error())),
+				})
+				continue testLoop
 			}
 		}
 
@@ -200,7 +225,7 @@ func parentTestKey(c testrepo.PendingChange) (string, bool) {
 	switch c.EntityType {
 	case "test_case":
 		return c.EntityKey, true
-	case "test_step":
+	case "test_step", "test_step_delete":
 		k, _, ok := parseStepKey(c.EntityKey)
 		return k, ok
 	}

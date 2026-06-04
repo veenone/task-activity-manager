@@ -85,6 +85,33 @@ func (c *Client) post(ctx context.Context, path string, body any) error {
 	return c.writeJSON(ctx, http.MethodPost, path, body)
 }
 
+// delete performs an authenticated DELETE with no body. 2xx is success;
+// anything else returns an error with a short slice of the response body
+// for diagnostics.
+func (c *Client) delete(ctx context.Context, path string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+path, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf(
+			"jira: DELETE %s -> %s: %s",
+			path, resp.Status, strings.TrimSpace(string(respBody)),
+		)
+	}
+	return nil
+}
+
 // writeJSON marshals body as JSON and sends it with the given method. A 2xx
 // response yields nil; any other status returns an error that includes a
 // short slice of the response body for diagnostics.

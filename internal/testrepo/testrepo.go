@@ -7,6 +7,7 @@ package testrepo
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/user"
@@ -718,6 +719,71 @@ func (r *Repository) EditTestStepField(profileID, testKey, xrayID, field, newVal
 	return tx.Commit()
 }
 
+// DeleteTestStep queues a Test Step for deletion (FR-2.5). The step is
+// hidden from the local list immediately; the actual DELETE call to Xray
+// fires at commit time. Discarding the pending row restores the local
+// step from the JSON snapshot stashed in before_val.
+//
+// Parent test_case.updated_at is captured as base_version so the conflict
+// pre-check at commit time uses the same timestamp the field-edit path
+// does — a delete and an unrelated remote update on the same Test still
+// surface as a conflict.
+func (r *Repository) DeleteTestStep(profileID, testKey, xrayID string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var s Step
+	err = tx.QueryRow(
+		`SELECT xray_id, idx, action, data, expected
+		   FROM test_step WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
+		profileID, testKey, xrayID,
+	).Scan(&s.XrayID, &s.Index, &s.Action, &s.Data, &s.Expected)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read step: %w", err)
+	}
+
+	snapshot, err := json.Marshal(s)
+	if err != nil {
+		return fmt.Errorf("marshal snapshot: %w", err)
+	}
+
+	var baseVersion string
+	if err := tx.QueryRow(
+		`SELECT updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+		profileID, testKey,
+	).Scan(&baseVersion); err != nil {
+		return fmt.Errorf("read parent updated_at: %w", err)
+	}
+
+	if _, err := tx.Exec(
+		`DELETE FROM test_step WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
+		profileID, testKey, xrayID,
+	); err != nil {
+		return fmt.Errorf("delete test_step: %w", err)
+	}
+
+	ek := stepEntityKey(testKey, xrayID)
+	if err := upsertPendingChange(
+		tx, profileID, entityTestStepDelete, ek, "step",
+		string(snapshot), "1", baseVersion,
+	); err != nil {
+		return err
+	}
+	if err := writeAudit(
+		tx, profileID, entityTestStepDelete, ek,
+		"delete-local", "step", string(snapshot), "1", "",
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // DiscardPendingChange reverts a Test field to its before_val and removes the
 // pending change. An audit entry records the discard.
 func (r *Repository) DiscardPendingChange(profileID string, changeID int64) error {
@@ -767,6 +833,22 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		)
 		if _, err := tx.Exec(revertSQL, beforeVal, profileID, testKey, xrayID); err != nil {
 			return fmt.Errorf("revert test_step: %w", err)
+		}
+	case entityTestStepDelete:
+		testKey, _, ok := parseStepEntityKey(entityKey)
+		if !ok {
+			return fmt.Errorf("malformed step entity_key %q", entityKey)
+		}
+		var snap Step
+		if err := json.Unmarshal([]byte(beforeVal), &snap); err != nil {
+			return fmt.Errorf("decode step snapshot: %w", err)
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO test_step (profile_id, test_key, xray_id, idx, action, data, expected)
+			   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			profileID, testKey, snap.XrayID, snap.Index, snap.Action, snap.Data, snap.Expected,
+		); err != nil {
+			return fmt.Errorf("restore test_step: %w", err)
 		}
 	default:
 		return fmt.Errorf("unknown entity_type %q", entityType)
@@ -1104,8 +1186,9 @@ func applyBulkOperation(op BulkEdit, current string) (string, error) {
 // Entity types for pending_change / audit_log rows. New ones get added
 // here so the switch/lookup code stays grep-friendly.
 const (
-	entityTestCase = "test_case"
-	entityTestStep = "test_step"
+	entityTestCase       = "test_case"
+	entityTestStep       = "test_step"
+	entityTestStepDelete = "test_step_delete"
 )
 
 // stepEntityKey encodes a step's parent Test plus its Xray step ID into a

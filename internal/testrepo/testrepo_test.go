@@ -637,6 +637,49 @@ func TestDiscardStepPendingChangeRevertsStepField(t *testing.T) {
 	}
 }
 
+func TestDeleteTestStepHidesStepAndQueuesDelete(t *testing.T) {
+	repo := seedTestWithSteps(t)
+
+	if err := repo.DeleteTestStep("p1", "QA-1", "s1"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	if len(steps) != 0 {
+		t.Errorf("expected step hidden locally; got %+v", steps)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending change, got %d", len(changes))
+	}
+	if changes[0].EntityType != "test_step_delete" || changes[0].EntityKey != "QA-1:s1" {
+		t.Errorf("change = %+v, want entity_type=test_step_delete entity_key=QA-1:s1", changes[0])
+	}
+}
+
+func TestDiscardStepDeleteRestoresStepFromSnapshot(t *testing.T) {
+	repo := seedTestWithSteps(t)
+
+	if err := repo.DeleteTestStep("p1", "QA-1", "s1"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	if len(steps) != 1 {
+		t.Fatalf("want step restored; got %+v", steps)
+	}
+	got := steps[0]
+	if got.XrayID != "s1" || got.Action != "old action" || got.Expected != "old expected" {
+		t.Errorf("restored step = %+v, want {XrayID:s1 Action:old action Expected:old expected ...}", got)
+	}
+}
+
 func TestEditTestStepFieldRejectsUnknownField(t *testing.T) {
 	repo := seedTestWithSteps(t)
 

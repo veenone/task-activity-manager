@@ -45,6 +45,17 @@ func (c *Client) UpdateTestStep(ctx context.Context, key, stepID string, fields 
 	return c.put(ctx, fmt.Sprintf("/rest/raven/2.0/api/test/%s/steps/%s", key, stepID), body)
 }
 
+// DeleteTestStep removes one Test Step (FR-2.5). Demo URLs short-circuit
+// to a no-op.
+//
+// Maps to DELETE /rest/raven/2.0/api/test/{key}/steps/{stepId}.
+func (c *Client) DeleteTestStep(ctx context.Context, key, stepID string) error {
+	if isDemoURL(c.baseURL) {
+		return nil
+	}
+	return c.delete(ctx, fmt.Sprintf("/rest/raven/2.0/api/test/%s/steps/%s", key, stepID))
+}
+
 // GetTestSteps returns the ordered list of Steps for a Test (FR-2.5). Demo
 // URLs fall through to a deterministic generator so the steps panel renders
 // without a real Xray.
