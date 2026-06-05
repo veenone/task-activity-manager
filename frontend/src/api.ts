@@ -15,6 +15,8 @@ export {
   ListFolders,
   GetTestPreconditions,
   GetTestContainers,
+  ListContainers,
+  AllocateTests,
   ListTests,
   ListMatchingKeys,
   GetTest,
@@ -96,6 +98,22 @@ export interface Precondition {
   summary: string;
   type: string;
   description: string;
+}
+
+// Container mirrors testrepo.Container — a Test Set, Test Plan or Test
+// Execution (kind = "testset" / "testplan" / "testexec").
+export interface Container {
+  key: string;
+  kind: string;
+  summary: string;
+  status: string;
+}
+
+// AllocateResult mirrors testrepo.AllocateResult — the outcome of a bulk
+// allocation (FR-3.4–3.6).
+export interface AllocateResult {
+  added: string[];
+  alreadyMembers: string[];
 }
 
 // ContainerMembership mirrors testrepo.ContainerMembership — a Test Set, Test

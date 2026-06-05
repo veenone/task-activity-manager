@@ -70,7 +70,14 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitRes
 	// field changes on that Test.
 	byTest := make(map[string][]testrepo.PendingChange)
 	order := make([]string, 0)
+	// Container allocations (FR-3.4–3.6) are per-Container, not per-Test, so
+	// they're handled in their own pass after the per-Test commits.
+	membershipRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
+		if c.EntityType == "test_membership_add" {
+			membershipRows = append(membershipRows, c)
+			continue
+		}
 		testKey, ok := parentTestKey(c)
 		if !ok {
 			continue
@@ -309,7 +316,44 @@ testLoop:
 		result.Succeeded = append(result.Succeeded, testKey)
 	}
 
+	e.commitMemberships(ctx, profileID, membershipRows, &result)
+
 	return result, nil
+}
+
+// commitMemberships pushes container-allocation pending rows (FR-3.4–3.6). Each
+// row adds a batch of Tests to one Container via a single POST; success or
+// failure is reported under the Container key. These are additive, so no
+// conflict pre-check is applied.
+func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
+	for _, c := range rows {
+		var payload struct {
+			Kind    string   `json:"kind"`
+			Members []string `json:"members"`
+		}
+		if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: c.EntityKey,
+				Error:   fmt.Sprintf("malformed membership payload: %s", err),
+			})
+			continue
+		}
+		if err := e.client.AddTestsToContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: c.EntityKey,
+				Error:   fmt.Sprintf("allocate to %s: %s", c.EntityKey, sanitizeError(err.Error())),
+			})
+			continue
+		}
+		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: c.EntityKey,
+				Error:   "Jira accepted allocation but local cleanup failed: " + err.Error(),
+			})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, c.EntityKey)
+	}
 }
 
 // parentTestKey extracts the parent Test key for a pending change so

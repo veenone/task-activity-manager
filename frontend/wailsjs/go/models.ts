@@ -221,6 +221,20 @@ export namespace syncer {
 
 export namespace testrepo {
 	
+	export class AllocateResult {
+	    added: string[];
+	    alreadyMembers: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AllocateResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.added = source["added"];
+	        this.alreadyMembers = source["alreadyMembers"];
+	    }
+	}
 	export class AuditEntry {
 	    id: number;
 	    occurredAt: string;
@@ -328,6 +342,24 @@ export namespace testrepo {
 		}
 	}
 	
+	export class Container {
+	    key: string;
+	    kind: string;
+	    summary: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Container(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.kind = source["kind"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	    }
+	}
 	export class ContainerMembership {
 	    key: string;
 	    kind: string;

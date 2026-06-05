@@ -267,6 +267,101 @@ func TestReplaceAllContainerLinksClearsStaleMemberships(t *testing.T) {
 	}
 }
 
+func TestAllocateTestsAddsMembershipAndQueuesPending(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+
+	result, err := repo.AllocateTests("p1", "QA-TS-1", []string{"QA-1", "QA-2"})
+	if err != nil {
+		t.Fatalf("allocate: %v", err)
+	}
+	if len(result.Added) != 2 {
+		t.Errorf("Added = %v, want 2", result.Added)
+	}
+
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	if len(members) != 1 || members[0].Key != "QA-TS-1" {
+		t.Errorf("QA-1 memberships = %+v, want [QA-TS-1]", members)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 || changes[0].EntityType != "test_membership_add" || changes[0].EntityKey != "QA-TS-1" {
+		t.Fatalf("pending = %+v, want one test_membership_add for QA-TS-1", changes)
+	}
+}
+
+func TestAllocateTestsSkipsExistingMembers(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+	}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
+
+	result, err := repo.AllocateTests("p1", "QA-TS-1", []string{"QA-1", "QA-2"})
+	if err != nil {
+		t.Fatalf("allocate: %v", err)
+	}
+	if len(result.Added) != 1 || result.Added[0] != "QA-2" {
+		t.Errorf("Added = %v, want [QA-2]", result.Added)
+	}
+	if len(result.AlreadyMembers) != 1 || result.AlreadyMembers[0] != "QA-1" {
+		t.Errorf("AlreadyMembers = %v, want [QA-1]", result.AlreadyMembers)
+	}
+}
+
+func TestAllocateTestsCoalescesAcrossCalls(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+
+	if _, err := repo.AllocateTests("p1", "QA-TS-1", []string{"QA-1"}); err != nil {
+		t.Fatalf("allocate 1: %v", err)
+	}
+	if _, err := repo.AllocateTests("p1", "QA-TS-1", []string{"QA-2"}); err != nil {
+		t.Fatalf("allocate 2: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 coalesced pending row, got %d", len(changes))
+	}
+	if !strings.Contains(changes[0].AfterVal, "QA-1") || !strings.Contains(changes[0].AfterVal, "QA-2") {
+		t.Errorf("payload = %q, want both QA-1 and QA-2", changes[0].AfterVal)
+	}
+}
+
+func TestDiscardAllocationRemovesAddedMemberships(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+	if _, err := repo.AllocateTests("p1", "QA-TS-1", []string{"QA-1"}); err != nil {
+		t.Fatalf("allocate: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	if len(members) != 0 {
+		t.Errorf("discarding the allocation should remove the membership; got %+v", members)
+	}
+}
+
+func seedTestsAndContainer(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1"},
+		{Key: "QA-2", ID: "2"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TS-1", Kind: "testset", Summary: "Auth set", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed container: %v", err)
+	}
+	return repo
+}
+
 func TestSetSyncStateReflectsCurrentRowCount(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{

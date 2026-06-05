@@ -209,8 +209,26 @@ function describeChange(c: PendingChange): {
         before: orderSummary(c.beforeVal),
         after: orderSummary(c.afterVal),
       };
+    case "test_membership_add":
+      return {
+        field: "allocate",
+        before: "",
+        after: membershipSummary(c.afterVal),
+      };
     default:
       return { field: c.field, before: c.beforeVal, after: c.afterVal };
+  }
+}
+
+// membershipSummary renders an allocation payload ({kind, members}) as
+// "N tests" so the pending row reads clearly instead of showing raw JSON.
+function membershipSummary(json: string): string {
+  try {
+    const p = JSON.parse(json) as { members?: string[] };
+    const n = p.members?.length ?? 0;
+    return `${n} ${n === 1 ? "test" : "tests"}`;
+  } catch {
+    return json;
   }
 }
 

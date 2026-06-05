@@ -526,6 +526,170 @@ func (r *Repository) ListContainersForTest(profileID, testKey string) ([]Contain
 	return out, rows.Err()
 }
 
+// ListContainers returns the cached Containers of a given kind for a profile,
+// ordered by key — used by the bulk-allocation picker (FR-3.4–3.6).
+func (r *Repository) ListContainers(profileID, kind string) ([]Container, error) {
+	rows, err := r.db.Query(
+		`SELECT jira_key, kind, summary, status FROM test_container
+		 WHERE profile_id = ? AND kind = ? ORDER BY jira_key`,
+		profileID, kind)
+	if err != nil {
+		return nil, fmt.Errorf("list containers: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Container{}
+	for rows.Next() {
+		var c Container
+		if err := rows.Scan(&c.Key, &c.Kind, &c.Summary, &c.Status); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// AllocateResult reports a bulk allocation's outcome: which Tests were newly
+// added to the Container and which were already members (FR-3.4–3.6).
+type AllocateResult struct {
+	Added          []string `json:"added"`
+	AlreadyMembers []string `json:"alreadyMembers"`
+}
+
+// AllocateTests adds Tests to an existing Container locally and queues the
+// membership for commit (FR-3.4–3.6, add-only). Tests already in the Container
+// are reported as such and not re-queued. The queued change coalesces per
+// Container, so repeated allocations to the same Container union their Test
+// lists into one pending row.
+func (r *Repository) AllocateTests(profileID, containerKey string, testKeys []string) (AllocateResult, error) {
+	result := AllocateResult{Added: []string{}, AlreadyMembers: []string{}}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return result, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var kind string
+	err = tx.QueryRow(
+		`SELECT kind FROM test_container WHERE profile_id = ? AND jira_key = ?`,
+		profileID, containerKey,
+	).Scan(&kind)
+	if errors.Is(err, sql.ErrNoRows) {
+		return result, fmt.Errorf("container %s not found", containerKey)
+	}
+	if err != nil {
+		return result, fmt.Errorf("read container: %w", err)
+	}
+
+	for _, testKey := range testKeys {
+		var one int
+		err := tx.QueryRow(
+			`SELECT 1 FROM test_container_test
+			 WHERE profile_id = ? AND container_key = ? AND test_key = ?`,
+			profileID, containerKey, testKey,
+		).Scan(&one)
+		if err == nil {
+			result.AlreadyMembers = append(result.AlreadyMembers, testKey)
+			continue
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return result, fmt.Errorf("check membership: %w", err)
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO test_container_test (profile_id, container_key, test_key, run_status)
+			 VALUES (?, ?, ?, '')`,
+			profileID, containerKey, testKey,
+		); err != nil {
+			return result, fmt.Errorf("insert membership: %w", err)
+		}
+		result.Added = append(result.Added, testKey)
+	}
+
+	if len(result.Added) == 0 {
+		return result, nil
+	}
+
+	if err := mergeMembershipPending(tx, profileID, containerKey, kind, result.Added); err != nil {
+		return result, err
+	}
+	if err := writeAudit(
+		tx, profileID, entityMembershipAdd, containerKey,
+		"allocate-local", "members", "", strings.Join(result.Added, " "), "",
+	); err != nil {
+		return result, err
+	}
+	if err := tx.Commit(); err != nil {
+		return result, fmt.Errorf("commit allocation: %w", err)
+	}
+	return result, nil
+}
+
+// membershipPayload is the JSON shape stored in a test_membership_add pending
+// row's after_val — the target Container kind plus the Test keys to add.
+type membershipPayload struct {
+	Kind    string   `json:"kind"`
+	Members []string `json:"members"`
+}
+
+// mergeMembershipPending coalesces a membership allocation into the per-
+// Container pending row, unioning the new Test keys with any already queued so
+// the commit issues one add per Container.
+func mergeMembershipPending(tx *sql.Tx, profileID, containerKey, kind string, newMembers []string) error {
+	var afterVal string
+	err := tx.QueryRow(
+		`SELECT after_val FROM pending_change
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'members'`,
+		profileID, entityMembershipAdd, containerKey,
+	).Scan(&afterVal)
+
+	payload := membershipPayload{Kind: kind, Members: []string{}}
+	if err == nil {
+		if uerr := json.Unmarshal([]byte(afterVal), &payload); uerr != nil {
+			return fmt.Errorf("decode pending membership: %w", uerr)
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("read pending membership: %w", err)
+	}
+
+	seen := make(map[string]struct{}, len(payload.Members))
+	for _, m := range payload.Members {
+		seen[m] = struct{}{}
+	}
+	for _, m := range newMembers {
+		if _, dup := seen[m]; !dup {
+			payload.Members = append(payload.Members, m)
+			seen[m] = struct{}{}
+		}
+	}
+
+	encoded, merr := json.Marshal(payload)
+	if merr != nil {
+		return fmt.Errorf("encode pending membership: %w", merr)
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		if _, ierr := tx.Exec(
+			`INSERT INTO pending_change
+			   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
+			 VALUES (?, ?, ?, 'members', '', ?, '', ?)`,
+			profileID, entityMembershipAdd, containerKey, string(encoded), now,
+		); ierr != nil {
+			return fmt.Errorf("insert pending membership: %w", ierr)
+		}
+		return nil
+	}
+	if _, uerr := tx.Exec(
+		`UPDATE pending_change SET after_val = ?, created_at = ?
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'members'`,
+		string(encoded), now, profileID, entityMembershipAdd, containerKey,
+	); uerr != nil {
+		return fmt.Errorf("update pending membership: %w", uerr)
+	}
+	return nil
+}
+
 // buildTestFilter builds the WHERE clause + args for a Test query. Shared
 // by ListTests and ListMatchingKeys so both see the same filter semantics
 // — when the user clicks "select all matching", they get the exact set
@@ -1534,6 +1698,23 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		if err := applyStepOrder(tx, profileID, entityKey, order); err != nil {
 			return err
 		}
+	case entityMembershipAdd:
+		// entity_key is the Container key; remove the locally-added
+		// memberships listed in the after_val payload. Pre-existing
+		// memberships were never queued, so they're untouched.
+		var payload membershipPayload
+		if err := json.Unmarshal([]byte(afterVal), &payload); err != nil {
+			return fmt.Errorf("decode membership payload: %w", err)
+		}
+		for _, testKey := range payload.Members {
+			if _, err := tx.Exec(
+				`DELETE FROM test_container_test
+				 WHERE profile_id = ? AND container_key = ? AND test_key = ?`,
+				profileID, entityKey, testKey,
+			); err != nil {
+				return fmt.Errorf("remove membership: %w", err)
+			}
+		}
 	default:
 		return fmt.Errorf("unknown entity_type %q", entityType)
 	}
@@ -1875,6 +2056,7 @@ const (
 	entityTestStepDelete = "test_step_delete"
 	entityTestStepAdd    = "test_step_add"
 	entityTestStepOrder  = "test_step_order"
+	entityMembershipAdd  = "test_membership_add"
 )
 
 // stepEntityKey encodes a step's parent Test plus its Xray step ID into a

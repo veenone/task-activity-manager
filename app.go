@@ -629,6 +629,28 @@ func (a *App) BulkTransitionTests(profileID string, testKeys []string, targetSta
 	return result, nil
 }
 
+// --- Container allocation (FR-3.4–3.6) ---
+
+// ListContainers returns the cached Test Sets / Plans / Executions of a kind
+// ("testset" / "testplan" / "testexec") for the allocation picker.
+func (a *App) ListContainers(profileID, kind string) ([]testrepo.Container, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListContainers(profileID, kind)
+}
+
+// AllocateTests adds Tests to an existing Container locally and queues the
+// membership for commit (FR-3.4–3.6, add-only). Tests already in the Container
+// are reported back without being re-queued.
+func (a *App) AllocateTests(profileID, containerKey string, testKeys []string) (testrepo.AllocateResult, error) {
+	empty := testrepo.AllocateResult{Added: []string{}, AlreadyMembers: []string{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.AllocateTests(profileID, containerKey, testKeys)
+}
+
 // --- Statistics dashboard (FR-9) ---
 
 // GetStatistics returns the dashboard rollup for a profile, computed entirely

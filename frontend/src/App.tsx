@@ -28,6 +28,7 @@ import { FolderTree } from "./components/FolderTree";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
+import { BulkAllocateModal } from "./components/BulkAllocateModal";
 import { Dashboard } from "./components/Dashboard";
 
 function App() {
@@ -60,6 +61,7 @@ function App() {
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set());
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showBulkTransition, setShowBulkTransition] = useState(false);
+  const [showBulkAllocate, setShowBulkAllocate] = useState(false);
 
   const [view, setView] = useState<"browse" | "dashboard">("browse");
 
@@ -408,6 +410,12 @@ function App() {
           >
             Bulk transition…
           </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowBulkAllocate(true)}
+          >
+            Allocate…
+          </button>
           <button className="btn" onClick={() => setSelectedSet(new Set())}>
             Clear
           </button>
@@ -517,6 +525,26 @@ function App() {
             setDetailVersion((v) => v + 1);
             reloadPending();
             setShowBulkTransition(false);
+          }}
+        />
+      )}
+
+      {showBulkAllocate && (
+        <BulkAllocateModal
+          profileId={activeId}
+          testKeys={[...selectedSet]}
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setSelectedSet(new Set());
+            setShowBulkAllocate(false);
+          }}
+          onCancel={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setShowBulkAllocate(false);
           }}
         />
       )}
