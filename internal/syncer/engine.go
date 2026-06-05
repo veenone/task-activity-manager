@@ -81,6 +81,10 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, since string, 
 		return err
 	}
 
+	if err := e.syncContainers(ctx, profileID, projectKey); err != nil {
+		return err
+	}
+
 	if err := e.repo.SetSyncState(profileID); err != nil {
 		return err
 	}
@@ -137,6 +141,41 @@ func (e *Engine) syncPreconditions(ctx context.Context, profileID, projectKey st
 		return err
 	}
 	return e.repo.ReplaceAllTestPreconditions(profileID, links)
+}
+
+// syncContainers pulls the project's Test Sets, Test Plans and Test
+// Executions and reconciles their Test memberships (FR-1.3). An empty result
+// is tolerated — the real-Jira implementation is currently a no-op pending
+// live verification, but demo mode populates them.
+func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey string) error {
+	containers, links, err := e.client.ListContainers(ctx, projectKey)
+	if err != nil {
+		return fmt.Errorf("list containers: %w", err)
+	}
+	if len(containers) == 0 && len(links) == 0 {
+		return nil
+	}
+	repoContainers := make([]testrepo.Container, len(containers))
+	for i, c := range containers {
+		repoContainers[i] = testrepo.Container{
+			Key:     c.Key,
+			Kind:    c.Kind,
+			Summary: c.Summary,
+			Status:  c.Status,
+		}
+	}
+	if err := e.repo.UpsertContainers(profileID, repoContainers); err != nil {
+		return err
+	}
+	repoLinks := make([]testrepo.ContainerLink, len(links))
+	for i, l := range links {
+		repoLinks[i] = testrepo.ContainerLink{
+			ContainerKey: l.ContainerKey,
+			TestKey:      l.TestKey,
+			RunStatus:    l.RunStatus,
+		}
+	}
+	return e.repo.ReplaceAllContainerLinks(profileID, repoLinks)
 }
 
 // toRepoTests maps the Jira client's Test type to the repository's TestCase.

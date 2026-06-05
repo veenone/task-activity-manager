@@ -14,6 +14,7 @@ export {
   GetSyncState,
   ListFolders,
   GetTestPreconditions,
+  GetTestContainers,
   ListTests,
   ListMatchingKeys,
   GetTest,
@@ -95,6 +96,18 @@ export interface Precondition {
   summary: string;
   type: string;
   description: string;
+}
+
+// ContainerMembership mirrors testrepo.ContainerMembership — a Test Set, Test
+// Plan or Test Execution a Test belongs to (FR-1.3). kind is
+// "testset" / "testplan" / "testexec"; runStatus is the Test Run result for
+// execution memberships, empty otherwise.
+export interface ContainerMembership {
+  key: string;
+  kind: string;
+  summary: string;
+  status: string;
+  runStatus: string;
 }
 
 // Step mirrors testrepo.Step — one ordered step in an Xray Test (FR-2.5).

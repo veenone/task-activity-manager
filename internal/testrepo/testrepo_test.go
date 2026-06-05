@@ -186,6 +186,87 @@ func TestReplaceAllTestPreconditionsClearsStaleLinks(t *testing.T) {
 	}
 }
 
+func TestListContainersForTestReturnsMembershipsWithRunStatus(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login test"},
+	}); err != nil {
+		t.Fatalf("upsert tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TS-1", Kind: "testset", Summary: "Auth set", Status: "Open"},
+		{Key: "QA-TE-1", Kind: "testexec", Summary: "Cycle 1", Status: "In Progress"},
+	}); err != nil {
+		t.Fatalf("upsert containers: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+		{ContainerKey: "QA-TE-1", TestKey: "QA-1", RunStatus: "PASS"},
+	}); err != nil {
+		t.Fatalf("replace links: %v", err)
+	}
+
+	got, err := repo.ListContainersForTest("p1", "QA-1")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d memberships, want 2", len(got))
+	}
+}
+
+func TestListContainersForTestCarriesExecutionRunStatus(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login test"},
+	}); err != nil {
+		t.Fatalf("upsert tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TE-1", Kind: "testexec", Summary: "Cycle 1", Status: "In Progress"},
+	}); err != nil {
+		t.Fatalf("upsert containers: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TE-1", TestKey: "QA-1", RunStatus: "FAIL"},
+	}); err != nil {
+		t.Fatalf("replace links: %v", err)
+	}
+
+	got, _ := repo.ListContainersForTest("p1", "QA-1")
+	if got[0].RunStatus != "FAIL" {
+		t.Errorf("RunStatus = %q, want FAIL", got[0].RunStatus)
+	}
+}
+
+func TestReplaceAllContainerLinksClearsStaleMemberships(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login test"},
+	}); err != nil {
+		t.Fatalf("upsert tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TS-1", Kind: "testset", Summary: "Auth set", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("upsert containers: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+	}); err != nil {
+		t.Fatalf("first replace: %v", err)
+	}
+
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{}); err != nil {
+		t.Fatalf("second replace: %v", err)
+	}
+
+	got, _ := repo.ListContainersForTest("p1", "QA-1")
+	if len(got) != 0 {
+		t.Errorf("got %d memberships, want 0 after clearing", len(got))
+	}
+}
+
 func TestSetSyncStateReflectsCurrentRowCount(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{

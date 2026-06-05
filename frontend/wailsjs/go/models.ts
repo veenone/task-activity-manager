@@ -328,6 +328,26 @@ export namespace testrepo {
 		}
 	}
 	
+	export class ContainerMembership {
+	    key: string;
+	    kind: string;
+	    summary: string;
+	    status: string;
+	    runStatus: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ContainerMembership(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.kind = source["kind"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.runStatus = source["runStatus"];
+	    }
+	}
 	export class Folder {
 	    id: string;
 	    parentId: string;

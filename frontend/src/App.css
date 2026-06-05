@@ -275,6 +275,40 @@
   color: #2563eb;
 }
 
+/* Test Run status badges (FR-1.3 — execution memberships) */
+.run-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+  background: #e5e7eb;
+  color: #374151;
+}
+.run-pass {
+  background: #d1fae5;
+  color: #047857;
+}
+.run-fail {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.run-todo {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+.run-executing {
+  background: #fef3c7;
+  color: #b45309;
+}
+.run-aborted {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
 /* View tabs (Browse / Dashboard) */
 .view-tabs {
   display: flex;

@@ -272,6 +272,105 @@ func demoStepsForKey(testKey string) []Step {
 	}
 }
 
+// demoContainerStatuses / demoExecStatuses drive the issue status shown for
+// generated Test Sets, Plans and Executions.
+var demoContainerStatuses = []string{"Open", "In Progress", "Done"}
+var demoExecStatuses = []string{"In Progress", "Done", "Open"}
+
+// demoRunStatuses is the weighted Test Run result vocabulary for execution
+// memberships — mostly passing, some failing / not-yet-run.
+var demoRunStatuses = []string{
+	"PASS", "PASS", "PASS", "PASS",
+	"FAIL", "FAIL",
+	"TODO", "TODO", "TODO",
+	"EXECUTING",
+	"ABORTED",
+}
+
+// demoLinkedTests caps how many of the low-numbered demo Tests get container
+// memberships, keeping the demo link table small while still giving the most
+// commonly-opened Tests (DEMO-1…) sets, plans and executions to display.
+const demoLinkedTests = 200
+
+// demoContainersAndLinks generates Test Sets (one per Test Repository
+// category), Test Plans and Test Executions plus their Test memberships
+// (FR-1.3). Execution memberships carry a deterministic run status so the
+// coverage view has data to chart.
+func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, error) {
+	if projectKey == "" {
+		projectKey = "DEMO"
+	}
+	containers := make([]Container, 0)
+	links := make([]ContainerLink, 0)
+
+	setKeys := make([]string, len(demoFolderCategories))
+	for i, cat := range demoFolderCategories {
+		key := fmt.Sprintf("%s-TS-%d", projectKey, i+1)
+		setKeys[i] = key
+		containers = append(containers, Container{
+			Key:     key,
+			Kind:    KindTestSet,
+			Summary: cat.Name + " test set",
+			Status:  demoContainerStatuses[i%len(demoContainerStatuses)],
+		})
+	}
+
+	const planCount = 5
+	planKeys := make([]string, planCount)
+	for i := 0; i < planCount; i++ {
+		key := fmt.Sprintf("%s-TP-%d", projectKey, i+1)
+		planKeys[i] = key
+		containers = append(containers, Container{
+			Key:     key,
+			Kind:    KindTestPlan,
+			Summary: fmt.Sprintf("Release %d.0 test plan", i+1),
+			Status:  demoContainerStatuses[i%len(demoContainerStatuses)],
+		})
+	}
+
+	const execCount = 8
+	execKeys := make([]string, execCount)
+	for i := 0; i < execCount; i++ {
+		key := fmt.Sprintf("%s-TE-%d", projectKey, i+1)
+		execKeys[i] = key
+		containers = append(containers, Container{
+			Key:     key,
+			Kind:    KindTestExec,
+			Summary: fmt.Sprintf("Cycle %d execution", i+1),
+			Status:  demoExecStatuses[i%len(demoExecStatuses)],
+		})
+	}
+
+	for i := 0; i < demoLinkedTests && i < demoTestCount; i++ {
+		testKey := fmt.Sprintf("%s-%d", projectKey, i+1)
+		feature := demoFeatures[i%len(demoFeatures)]
+		if catIdx := demoCategoryIndexForFeature(feature); catIdx >= 0 {
+			links = append(links, ContainerLink{ContainerKey: setKeys[catIdx], TestKey: testKey})
+		}
+		links = append(links, ContainerLink{ContainerKey: planKeys[i%planCount], TestKey: testKey})
+		links = append(links, ContainerLink{
+			ContainerKey: execKeys[i%execCount],
+			TestKey:      testKey,
+			RunStatus:    demoRunStatuses[i%len(demoRunStatuses)],
+		})
+	}
+
+	return containers, links, nil
+}
+
+// demoCategoryIndexForFeature returns the index of the Test Repository category
+// holding a feature, or -1 if unmapped.
+func demoCategoryIndexForFeature(feature string) int {
+	for i, cat := range demoFolderCategories {
+		for _, f := range cat.Features {
+			if f == feature {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
 // demoPreconditionsAndLinks returns the demo precondition master list plus
 // the test-key → precondition-keys mapping. Keys use a "<project>-P-N"
 // convention so they read like Jira keys without colliding with the test

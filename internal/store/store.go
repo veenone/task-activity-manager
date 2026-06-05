@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 6
+const schemaVersion = 7
 
 // baseSchema is the canonical table layout for a fresh install. Indexes that
 // might reference columns added by a migration live in indexSchema instead,
@@ -119,6 +119,23 @@ CREATE TABLE IF NOT EXISTS test_step (
 	expected   TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, test_key, xray_id)
 );
+
+CREATE TABLE IF NOT EXISTS test_container (
+	profile_id TEXT NOT NULL,
+	jira_key   TEXT NOT NULL,
+	kind       TEXT NOT NULL,
+	summary    TEXT NOT NULL DEFAULT '',
+	status     TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, jira_key)
+);
+
+CREATE TABLE IF NOT EXISTS test_container_test (
+	profile_id    TEXT NOT NULL,
+	container_key TEXT NOT NULL,
+	test_key      TEXT NOT NULL,
+	run_status    TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, container_key, test_key)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -133,6 +150,8 @@ CREATE INDEX IF NOT EXISTS idx_test_precondition_test  ON test_precondition(prof
 CREATE INDEX IF NOT EXISTS idx_pending_change_profile  ON pending_change(profile_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_profile_time  ON audit_log(profile_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_test_step_test          ON test_step(profile_id, test_key, idx);
+CREATE INDEX IF NOT EXISTS idx_test_container_kind     ON test_container(profile_id, kind);
+CREATE INDEX IF NOT EXISTS idx_test_container_test_key ON test_container_test(profile_id, test_key);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -195,6 +214,8 @@ func applyMigrations(db *sql.DB) error {
 	// CREATE TABLE IF NOT EXISTS in baseSchema, no explicit step needed.
 	// v5: pending_change / audit_log tables. Also additive.
 	// v6: test_step table for cached Xray Test Steps. Also additive.
+	// v7: test_container / test_container_test tables for Test Sets, Test
+	// Plans and Test Executions plus their Test memberships. Also additive.
 	return nil
 }
 

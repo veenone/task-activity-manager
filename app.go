@@ -223,6 +223,16 @@ func (a *App) GetTestPreconditions(profileID, testKey string) ([]testrepo.Precon
 	return a.repo.ListTestPreconditions(profileID, testKey)
 }
 
+// GetTestContainers returns the Test Sets, Test Plans and Test Executions a
+// Test belongs to (FR-1.3), each with the Test's run status for execution
+// memberships.
+func (a *App) GetTestContainers(profileID, testKey string) ([]testrepo.ContainerMembership, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListContainersForTest(profileID, testKey)
+}
+
 // --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---
 
 // EditTestField applies a local edit to a Test field and queues a pending

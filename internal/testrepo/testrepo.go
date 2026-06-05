@@ -51,6 +51,35 @@ type Precondition struct {
 	Description string `json:"description"`
 }
 
+// Container is a cached Xray Test Set, Test Plan or Test Execution (FR-1.3).
+// Kind is one of "testset" / "testplan" / "testexec" — the three share a shape
+// and differ only in how they relate to Tests.
+type Container struct {
+	Key     string `json:"key"`
+	Kind    string `json:"kind"`
+	Summary string `json:"summary"`
+	Status  string `json:"status"`
+}
+
+// ContainerLink is one Test's membership in a Container. RunStatus carries the
+// Test Run result for execution memberships and is empty for sets / plans.
+type ContainerLink struct {
+	ContainerKey string `json:"containerKey"`
+	TestKey      string `json:"testKey"`
+	RunStatus    string `json:"runStatus"`
+}
+
+// ContainerMembership is a Container a Test belongs to, joined with that Test's
+// run status — what the detail panel lists under Test Sets / Plans /
+// Executions.
+type ContainerMembership struct {
+	Key       string `json:"key"`
+	Kind      string `json:"kind"`
+	Summary   string `json:"summary"`
+	Status    string `json:"status"`
+	RunStatus string `json:"runStatus"`
+}
+
 // Step is one cached Xray Test Step (FR-2.5). XrayID is Xray's per-step
 // identifier — kept on the row so the future edit-steps API can target
 // each step individually without us having to rebuild the list.
@@ -396,6 +425,101 @@ func (r *Repository) ListTestPreconditions(profileID, testKey string) ([]Precond
 			return nil, err
 		}
 		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// UpsertContainers inserts or updates a batch of Test Sets / Plans /
+// Executions (FR-1.3).
+func (r *Repository) UpsertContainers(profileID string, containers []Container) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(
+		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
+		   kind    = excluded.kind,
+		   summary = excluded.summary,
+		   status  = excluded.status`)
+	if err != nil {
+		return fmt.Errorf("prepare upsert container: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, c := range containers {
+		if _, err := stmt.Exec(profileID, c.Key, c.Kind, c.Summary, c.Status); err != nil {
+			return fmt.Errorf("upsert container %s: %w", c.Key, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// ReplaceAllContainerLinks wipes a profile's Test-to-Container memberships and
+// rewrites them from the provided list, so memberships removed in Jira
+// actually disappear on resync (mirrors ReplaceAllTestPreconditions).
+func (r *Repository) ReplaceAllContainerLinks(profileID string, links []ContainerLink) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`DELETE FROM test_container_test WHERE profile_id = ?`, profileID,
+	); err != nil {
+		return fmt.Errorf("clear container links: %w", err)
+	}
+
+	if len(links) == 0 {
+		return tx.Commit()
+	}
+
+	stmt, err := tx.Prepare(
+		`INSERT INTO test_container_test (profile_id, container_key, test_key, run_status)
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT(profile_id, container_key, test_key) DO UPDATE SET
+		   run_status = excluded.run_status`)
+	if err != nil {
+		return fmt.Errorf("prepare insert container link: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, l := range links {
+		if _, err := stmt.Exec(profileID, l.ContainerKey, l.TestKey, l.RunStatus); err != nil {
+			return fmt.Errorf("link %s -> %s: %w", l.ContainerKey, l.TestKey, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// ListContainersForTest returns the Test Sets, Plans and Executions a Test
+// belongs to, ordered by kind then key, with the run status for execution
+// memberships.
+func (r *Repository) ListContainersForTest(profileID, testKey string) ([]ContainerMembership, error) {
+	rows, err := r.db.Query(
+		`SELECT c.jira_key, c.kind, c.summary, c.status, l.run_status
+		 FROM test_container_test l
+		 JOIN test_container c
+		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+		 WHERE l.profile_id = ? AND l.test_key = ?
+		 ORDER BY c.kind, c.jira_key`,
+		profileID, testKey)
+	if err != nil {
+		return nil, fmt.Errorf("list containers for test: %w", err)
+	}
+	defer rows.Close()
+
+	out := []ContainerMembership{}
+	for rows.Next() {
+		var m ContainerMembership
+		if err := rows.Scan(&m.Key, &m.Kind, &m.Summary, &m.Status, &m.RunStatus); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
 	}
 	return out, rows.Err()
 }

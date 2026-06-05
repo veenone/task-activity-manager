@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   GetTest,
   GetTestPreconditions,
+  GetTestContainers,
   GetTestTransitions,
   GetTestSteps,
   TransitionTest,
@@ -15,6 +16,7 @@ import {
 import type {
   TestCase,
   Precondition,
+  ContainerMembership,
   PendingChange,
   Transition,
   Step,
@@ -41,6 +43,7 @@ export function TestDetail({
 }: Props) {
   const [test, setTest] = useState<TestCase | null>(null);
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
+  const [containers, setContainers] = useState<ContainerMembership[]>([]);
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
@@ -65,8 +68,9 @@ export function TestDetail({
     Promise.all([
       GetTest(profileId, testKey),
       GetTestPreconditions(profileId, testKey),
+      GetTestContainers(profileId, testKey),
     ])
-      .then(([t, pre]) => {
+      .then(([t, pre, cons]) => {
         if (cancelled) return;
         setTest(t);
         setSummary(t.summary);
@@ -74,6 +78,7 @@ export function TestDetail({
         setPriority(t.priority);
         setLabels((t.labels ?? []).join(" "));
         setPreconditions(pre);
+        setContainers(cons ?? []);
         // Transitions load alongside but can fail without blocking the
         // rest of the detail panel — workflow may not be set up yet, or
         // the user may not have edit permission.
@@ -330,6 +335,20 @@ export function TestDetail({
             </ul>
           )}
 
+          <ContainerSection
+            title="Test Sets"
+            items={containers.filter((c) => c.kind === "testset")}
+          />
+          <ContainerSection
+            title="Test Plans"
+            items={containers.filter((c) => c.kind === "testplan")}
+          />
+          <ContainerSection
+            title="Test Executions"
+            items={containers.filter((c) => c.kind === "testexec")}
+            showRunStatus
+          />
+
           <h4>
             Description {isDirty("description") && <DirtyDot />}
           </h4>
@@ -563,6 +582,47 @@ function StepRow({
       </div>
       {saveError && <div className="error-text step-save-error">{saveError}</div>}
     </li>
+  );
+}
+
+// ContainerSection lists the Test Sets / Plans / Executions a Test belongs to
+// (FR-1.3). Execution memberships also show the Test Run status badge.
+function ContainerSection({
+  title,
+  items,
+  showRunStatus,
+}: {
+  title: string;
+  items: ContainerMembership[];
+  showRunStatus?: boolean;
+}) {
+  return (
+    <>
+      <h4>{title}</h4>
+      {items.length === 0 ? (
+        <p className="muted">None linked</p>
+      ) : (
+        <ul className="pre-list">
+          {items.map((c) => (
+            <li key={c.key}>
+              <span className="mono">{c.key}</span> — {c.summary}
+              {showRunStatus && c.runStatus && (
+                <RunStatusBadge status={c.runStatus} />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+// RunStatusBadge renders a Test Run result with a status-coloured pill. The
+// class is derived from the lowercased status so the CSS can theme PASS / FAIL
+// / TODO distinctly while unknown statuses fall back to a neutral style.
+function RunStatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`run-badge run-${status.toLowerCase()}`}>{status}</span>
   );
 }
 
