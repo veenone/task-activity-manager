@@ -80,6 +80,26 @@ type ContainerMembership struct {
 	RunStatus string `json:"runStatus"`
 }
 
+// TestPlanBoardRow is one Test within a Test Plan board (FR-13.7): the Test's
+// workflow status plus its consolidated execution result across the Test
+// Executions it appears in.
+type TestPlanBoardRow struct {
+	TestKey   string `json:"testKey"`
+	Summary   string `json:"summary"`
+	Status    string `json:"status"`
+	RunStatus string `json:"runStatus"`
+}
+
+// TestPlanBoard is the read-only board for one Test Plan (FR-13.7) — its member
+// Tests with consolidated execution status, plus a run-status histogram for the
+// header.
+type TestPlanBoard struct {
+	Key       string             `json:"key"`
+	Summary   string             `json:"summary"`
+	Rows      []TestPlanBoardRow `json:"rows"`
+	RunCounts []Bucket           `json:"runCounts"`
+}
+
 // Step is one cached Xray Test Step (FR-2.5). XrayID is Xray's per-step
 // identifier — kept on the row so the future edit-steps API can target
 // each step individually without us having to rebuild the list.
@@ -524,6 +544,129 @@ func (r *Repository) ListContainersForTest(profileID, testKey string) ([]Contain
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+// GetTestPlanBoard builds the read-only board for a Test Plan (FR-13.7): each
+// member Test with a consolidated execution status derived from the Test
+// Executions it belongs to. The consolidation is worst-wins so failures
+// surface; a Test in no execution reads as not run. Computed entirely from the
+// local store.
+func (r *Repository) GetTestPlanBoard(profileID, planKey string) (TestPlanBoard, error) {
+	board := TestPlanBoard{Key: planKey, Rows: []TestPlanBoardRow{}, RunCounts: []Bucket{}}
+
+	err := r.db.QueryRow(
+		`SELECT summary FROM test_container
+		 WHERE profile_id = ? AND jira_key = ? AND kind = ?`,
+		profileID, planKey, "testplan",
+	).Scan(&board.Summary)
+	if errors.Is(err, sql.ErrNoRows) {
+		return board, fmt.Errorf("test plan %s not found", planKey)
+	}
+	if err != nil {
+		return board, fmt.Errorf("read test plan: %w", err)
+	}
+
+	memberRows, err := r.db.Query(
+		`SELECT t.jira_key, t.summary, t.status
+		 FROM test_container_test l
+		 JOIN test_case t
+		   ON t.profile_id = l.profile_id AND t.jira_key = l.test_key
+		 WHERE l.profile_id = ? AND l.container_key = ?
+		 ORDER BY t.jira_key`,
+		profileID, planKey)
+	if err != nil {
+		return board, fmt.Errorf("read plan members: %w", err)
+	}
+	defer memberRows.Close()
+
+	type member struct{ summary, status string }
+	members := map[string]member{}
+	memberOrder := []string{}
+	for memberRows.Next() {
+		var key, summary, status string
+		if err := memberRows.Scan(&key, &summary, &status); err != nil {
+			return board, err
+		}
+		members[key] = member{summary: summary, status: status}
+		memberOrder = append(memberOrder, key)
+	}
+	if err := memberRows.Err(); err != nil {
+		return board, err
+	}
+	if len(memberOrder) == 0 {
+		return board, nil
+	}
+
+	// Gather each member Test's run statuses across all Test Executions, then
+	// consolidate per Test.
+	execRows, err := r.db.Query(
+		`SELECT l.test_key, l.run_status
+		 FROM test_container_test l
+		 JOIN test_container c
+		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+		 WHERE l.profile_id = ? AND c.kind = ?`,
+		profileID, "testexec")
+	if err != nil {
+		return board, fmt.Errorf("read execution runs: %w", err)
+	}
+	defer execRows.Close()
+
+	runsByTest := map[string][]string{}
+	for execRows.Next() {
+		var testKey, runStatus string
+		if err := execRows.Scan(&testKey, &runStatus); err != nil {
+			return board, err
+		}
+		if _, isMember := members[testKey]; isMember {
+			runsByTest[testKey] = append(runsByTest[testKey], runStatus)
+		}
+	}
+	if err := execRows.Err(); err != nil {
+		return board, err
+	}
+
+	runCounts := map[string]int{}
+	for _, key := range memberOrder {
+		m := members[key]
+		consolidated := consolidateRunStatus(runsByTest[key])
+		board.Rows = append(board.Rows, TestPlanBoardRow{
+			TestKey:   key,
+			Summary:   m.summary,
+			Status:    m.status,
+			RunStatus: consolidated,
+		})
+		runCounts[blankAs(consolidated, "(not run)")]++
+	}
+	board.RunCounts = topBuckets(runCounts, 0)
+	return board, nil
+}
+
+// runStatusPriority ranks Test Run results so a Test appearing in several
+// executions consolidates to its worst (most attention-worthy) outcome.
+var runStatusPriority = map[string]int{
+	"FAIL":      5,
+	"ABORTED":   4,
+	"EXECUTING": 3,
+	"TODO":      2,
+	"PASS":      1,
+}
+
+// consolidateRunStatus reduces a Test's run statuses across executions to a
+// single worst-wins result, or "" when the Test is in no execution.
+func consolidateRunStatus(statuses []string) string {
+	best := ""
+	bestRank := 0
+	for _, s := range statuses {
+		rank := runStatusPriority[strings.ToUpper(s)]
+		if rank == 0 {
+			rank = 1 // unknown statuses rank lowest
+		}
+		if rank > bestRank {
+			bestRank = rank
+			best = s
+		}
+	}
+	return best
 }
 
 // ListContainers returns the cached Containers of a given kind for a profile,

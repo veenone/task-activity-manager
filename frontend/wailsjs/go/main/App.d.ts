@@ -40,6 +40,8 @@ export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;
 
 export function GetTestContainers(arg1:string,arg2:string):Promise<Array<testrepo.ContainerMembership>>;
 
+export function GetTestPlanBoard(arg1:string,arg2:string):Promise<testrepo.TestPlanBoard>;
+
 export function GetTestPreconditions(arg1:string,arg2:string):Promise<Array<testrepo.Precondition>>;
 
 export function GetTestSteps(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.Step>>;

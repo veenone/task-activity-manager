@@ -30,6 +30,7 @@ import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
 import { BulkAllocateModal } from "./components/BulkAllocateModal";
 import { Dashboard } from "./components/Dashboard";
+import { TestPlanBoardView } from "./components/TestPlanBoardView";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -63,7 +64,7 @@ function App() {
   const [showBulkTransition, setShowBulkTransition] = useState(false);
   const [showBulkAllocate, setShowBulkAllocate] = useState(false);
 
-  const [view, setView] = useState<"browse" | "dashboard">("browse");
+  const [view, setView] = useState<"browse" | "dashboard" | "plans">("browse");
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -360,6 +361,12 @@ function App() {
           >
             Dashboard
           </button>
+          <button
+            className={`view-tab${view === "plans" ? " view-tab-active" : ""}`}
+            onClick={() => setView("plans")}
+          >
+            Test Plans
+          </button>
         </nav>
 
         <div className="spacer" />
@@ -425,6 +432,10 @@ function App() {
       {view === "dashboard" ? (
         <main className="content content-dashboard">
           <Dashboard profileId={activeId} refreshKey={refreshKey} />
+        </main>
+      ) : view === "plans" ? (
+        <main className="content content-dashboard">
+          <TestPlanBoardView profileId={activeId} refreshKey={refreshKey} />
         </main>
       ) : (
         <main className="content">

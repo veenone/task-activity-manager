@@ -18,6 +18,7 @@ export {
   ListContainers,
   AllocateTests,
   CreateContainerAndAllocate,
+  GetTestPlanBoard,
   ListTests,
   ListMatchingKeys,
   GetTest,
@@ -122,6 +123,24 @@ export interface AllocateResult {
 export interface CreateContainerResult {
   tempKey: string;
   added: number;
+}
+
+// TestPlanBoardRow mirrors testrepo.TestPlanBoardRow — one Test on a Test Plan
+// board (FR-13.7) with its consolidated execution status.
+export interface TestPlanBoardRow {
+  testKey: string;
+  summary: string;
+  status: string;
+  runStatus: string;
+}
+
+// TestPlanBoard mirrors testrepo.TestPlanBoard — a Test Plan's member Tests
+// with consolidated execution status, plus a run-status histogram.
+export interface TestPlanBoard {
+  key: string;
+  summary: string;
+  rows: TestPlanBoardRow[];
+  runCounts: Bucket[];
 }
 
 // ContainerMembership mirrors testrepo.ContainerMembership — a Test Set, Test

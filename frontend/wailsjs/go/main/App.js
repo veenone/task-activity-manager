@@ -70,6 +70,10 @@ export function GetTestContainers(arg1, arg2) {
   return window['go']['main']['App']['GetTestContainers'](arg1, arg2);
 }
 
+export function GetTestPlanBoard(arg1, arg2) {
+  return window['go']['main']['App']['GetTestPlanBoard'](arg1, arg2);
+}
+
 export function GetTestPreconditions(arg1, arg2) {
   return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
 }

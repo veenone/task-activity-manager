@@ -419,6 +419,90 @@ func TestCreateContainerAllocationRejectsBlankName(t *testing.T) {
 	}
 }
 
+func TestGetTestPlanBoardListsMembersWithConsolidatedRunStatus(t *testing.T) {
+	repo := seedPlanBoard(t)
+
+	board, err := repo.GetTestPlanBoard("p1", "QA-TP-1")
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if board.Summary != "Release plan" {
+		t.Errorf("Summary = %q, want Release plan", board.Summary)
+	}
+	if len(board.Rows) != 2 {
+		t.Fatalf("rows = %d, want 2 (QA-1, QA-2)", len(board.Rows))
+	}
+}
+
+func TestGetTestPlanBoardConsolidatesWorstStatusAcrossExecutions(t *testing.T) {
+	repo := seedPlanBoard(t)
+
+	board, _ := repo.GetTestPlanBoard("p1", "QA-TP-1")
+	var qa1 testrepo.TestPlanBoardRow
+	for _, r := range board.Rows {
+		if r.TestKey == "QA-1" {
+			qa1 = r
+		}
+	}
+	if qa1.RunStatus != "FAIL" {
+		t.Errorf("QA-1 RunStatus = %q, want FAIL (worst of PASS+FAIL across executions)", qa1.RunStatus)
+	}
+}
+
+func TestGetTestPlanBoardMarksUnexecutedMembersNotRun(t *testing.T) {
+	repo := seedPlanBoard(t)
+
+	board, _ := repo.GetTestPlanBoard("p1", "QA-TP-1")
+	var qa2 testrepo.TestPlanBoardRow
+	for _, r := range board.Rows {
+		if r.TestKey == "QA-2" {
+			qa2 = r
+		}
+	}
+	if qa2.RunStatus != "" {
+		t.Errorf("QA-2 RunStatus = %q, want empty (not in any execution)", qa2.RunStatus)
+	}
+}
+
+func TestGetTestPlanBoardRejectsNonPlanKey(t *testing.T) {
+	repo := seedPlanBoard(t)
+
+	_, err := repo.GetTestPlanBoard("p1", "QA-TE-1")
+	if err == nil {
+		t.Error("asking for a board on a Test Execution key should error")
+	}
+}
+
+func seedPlanBoard(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login", Status: "Approved"},
+		{Key: "QA-2", ID: "2", Summary: "Logout", Status: "Approved"},
+		{Key: "QA-3", ID: "3", Summary: "Search", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TP-1", Kind: "testplan", Summary: "Release plan", Status: "Open"},
+		{Key: "QA-TE-1", Kind: "testexec", Summary: "Cycle 1", Status: "Done"},
+		{Key: "QA-TE-2", Kind: "testexec", Summary: "Cycle 2", Status: "In Progress"},
+	}); err != nil {
+		t.Fatalf("seed containers: %v", err)
+	}
+	// QA-1 and QA-2 are in the plan (QA-3 is not). QA-1 passed in cycle 1 but
+	// failed in cycle 2; QA-2 was never executed.
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TP-1", TestKey: "QA-1"},
+		{ContainerKey: "QA-TP-1", TestKey: "QA-2"},
+		{ContainerKey: "QA-TE-1", TestKey: "QA-1", RunStatus: "PASS"},
+		{ContainerKey: "QA-TE-2", TestKey: "QA-1", RunStatus: "FAIL"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+	return repo
+}
+
 func seedTestsAndContainer(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)

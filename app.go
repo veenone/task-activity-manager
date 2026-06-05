@@ -629,6 +629,17 @@ func (a *App) BulkTransitionTests(profileID string, testKeys []string, targetSta
 	return result, nil
 }
 
+// --- Test Plan board (FR-13.7) ---
+
+// GetTestPlanBoard returns the read-only board for a Test Plan: its member
+// Tests with consolidated execution status, computed from the local store.
+func (a *App) GetTestPlanBoard(profileID, planKey string) (testrepo.TestPlanBoard, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.TestPlanBoard{}, err
+	}
+	return a.repo.GetTestPlanBoard(profileID, planKey)
+}
+
 // --- Container allocation (FR-3.4–3.6) ---
 
 // ListContainers returns the cached Test Sets / Plans / Executions of a kind
