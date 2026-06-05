@@ -6,6 +6,8 @@ import {syncer} from '../models';
 import {profile} from '../models';
 import {jira} from '../models';
 
+export function AddTestStep(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<testrepo.Step>;
+
 export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
 export function BulkTransitionTests(arg1:string,arg2:Array<string>,arg3:string):Promise<main.BulkTransitionResult>;

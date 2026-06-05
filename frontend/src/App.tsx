@@ -102,7 +102,10 @@ function App() {
       let testKey: string | null = null;
       if (p.entityType === "test_case") {
         testKey = p.entityKey;
-      } else if (p.entityType === "test_step") {
+      } else if (p.entityType.startsWith("test_step")) {
+        // test_step / test_step_delete / test_step_add all key as
+        // "<testKey>:<xrayID>" — bucket them under the parent Test so the
+        // grid + detail dirty markers cover edits, deletes and adds alike.
         const colon = p.entityKey.indexOf(":");
         if (colon > 0) testKey = p.entityKey.substring(0, colon);
       }

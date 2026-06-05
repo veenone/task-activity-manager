@@ -705,10 +705,20 @@ func (r *Repository) EditTestStepField(profileID, testKey, xrayID, field, newVal
 	}
 
 	ek := stepEntityKey(testKey, xrayID)
-	if err := upsertPendingChange(
-		tx, profileID, entityTestStep, ek, field, currentVal, newValue, baseVersion,
-	); err != nil {
+	// A not-yet-committed step has no remote id to PUT against, so its edits
+	// fold into the queued add's JSON instead of becoming standalone
+	// step-edit rows. Reverting such an edit doesn't drop anything — the add
+	// row stays until the step is committed or discarded.
+	folded, err := foldStepEditIntoAdd(tx, profileID, ek, field, newValue)
+	if err != nil {
 		return err
+	}
+	if !folded {
+		if err := upsertPendingChange(
+			tx, profileID, entityTestStep, ek, field, currentVal, newValue, baseVersion,
+		); err != nil {
+			return err
+		}
 	}
 	if err := writeAudit(
 		tx, profileID, entityTestStep, ek,
@@ -717,6 +727,51 @@ func (r *Repository) EditTestStepField(profileID, testKey, xrayID, field, newVal
 		return err
 	}
 	return tx.Commit()
+}
+
+// foldStepEditIntoAdd updates the field inside a pending test_step_add row's
+// JSON snapshot, returning false (without touching anything) when no add row
+// exists for the step. This keeps a brand-new step to a single pending row so
+// the commit POST carries the latest content.
+func foldStepEditIntoAdd(tx *sql.Tx, profileID, ek, field, newValue string) (bool, error) {
+	var afterVal string
+	err := tx.QueryRow(
+		`SELECT after_val FROM pending_change
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'step'`,
+		profileID, entityTestStepAdd, ek,
+	).Scan(&afterVal)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read pending add: %w", err)
+	}
+
+	var s Step
+	if err := json.Unmarshal([]byte(afterVal), &s); err != nil {
+		return false, fmt.Errorf("decode pending add: %w", err)
+	}
+	switch field {
+	case "action":
+		s.Action = newValue
+	case "data":
+		s.Data = newValue
+	case "expected":
+		s.Expected = newValue
+	}
+	snapshot, err := json.Marshal(s)
+	if err != nil {
+		return false, fmt.Errorf("marshal pending add: %w", err)
+	}
+	if _, err := tx.Exec(
+		`UPDATE pending_change SET after_val = ?, created_at = ?
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'step'`,
+		string(snapshot), time.Now().UTC().Format(time.RFC3339),
+		profileID, entityTestStepAdd, ek,
+	); err != nil {
+		return false, fmt.Errorf("update pending add: %w", err)
+	}
+	return true, nil
 }
 
 // DeleteTestStep queues a Test Step for deletion (FR-2.5). The step is
@@ -752,14 +807,7 @@ func (r *Repository) DeleteTestStep(profileID, testKey, xrayID string) error {
 	if err != nil {
 		return fmt.Errorf("marshal snapshot: %w", err)
 	}
-
-	var baseVersion string
-	if err := tx.QueryRow(
-		`SELECT updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
-		profileID, testKey,
-	).Scan(&baseVersion); err != nil {
-		return fmt.Errorf("read parent updated_at: %w", err)
-	}
+	ek := stepEntityKey(testKey, xrayID)
 
 	if _, err := tx.Exec(
 		`DELETE FROM test_step WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
@@ -768,7 +816,53 @@ func (r *Repository) DeleteTestStep(profileID, testKey, xrayID string) error {
 		return fmt.Errorf("delete test_step: %w", err)
 	}
 
-	ek := stepEntityKey(testKey, xrayID)
+	// Deleting a step that was only ever added locally cancels the add — the
+	// step never reached Xray, so there's nothing to delete remotely. Drop
+	// the queued add (its folded edits go with it) instead of recording a
+	// delete.
+	var addID int64
+	err = tx.QueryRow(
+		`SELECT id FROM pending_change
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'step'`,
+		profileID, entityTestStepAdd, ek,
+	).Scan(&addID)
+	if err == nil {
+		if _, derr := tx.Exec(
+			`DELETE FROM pending_change WHERE profile_id = ? AND id = ?`,
+			profileID, addID,
+		); derr != nil {
+			return fmt.Errorf("cancel pending add: %w", derr)
+		}
+		if aerr := writeAudit(
+			tx, profileID, entityTestStepAdd, ek,
+			"add-cancelled", "step", string(snapshot), "", "",
+		); aerr != nil {
+			return aerr
+		}
+		return tx.Commit()
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("probe pending add: %w", err)
+	}
+
+	// Deleting a committed step: any queued field edits on it are superseded
+	// by the delete — drop them so the commit doesn't PUT a step it's about
+	// to DELETE.
+	if _, err := tx.Exec(
+		`DELETE FROM pending_change
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
+		profileID, entityTestStep, ek,
+	); err != nil {
+		return fmt.Errorf("clear superseded step edits: %w", err)
+	}
+
+	var baseVersion string
+	if err := tx.QueryRow(
+		`SELECT updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+		profileID, testKey,
+	).Scan(&baseVersion); err != nil {
+		return fmt.Errorf("read parent updated_at: %w", err)
+	}
 	if err := upsertPendingChange(
 		tx, profileID, entityTestStepDelete, ek, "step",
 		string(snapshot), "1", baseVersion,
@@ -782,6 +876,116 @@ func (r *Repository) DeleteTestStep(profileID, testKey, xrayID string) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+// AddTestStep appends a new Step to a Test locally and queues it for creation
+// in Xray on commit (FR-2.5). The new step gets a temporary xray_id ("new-N")
+// because Xray only assigns the real one when the POST lands; the commit path
+// renames the cached row to the real id afterwards. The step content travels
+// in the pending row's after_val as JSON so the commit POST has everything it
+// needs, and later field edits on a not-yet-committed step fold into that same
+// JSON (see EditTestStepField) rather than spawning step-edit rows that would
+// PUT to a non-existent remote step.
+//
+// Returns the created Step so the caller can render it without a re-fetch.
+func (r *Repository) AddTestStep(profileID, testKey, action, data, expected string) (Step, error) {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return Step{}, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var baseVersion string
+	err = tx.QueryRow(
+		`SELECT updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+		profileID, testKey,
+	).Scan(&baseVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Step{}, ErrNotFound
+	}
+	if err != nil {
+		return Step{}, fmt.Errorf("read parent updated_at: %w", err)
+	}
+
+	var nextIdx int
+	if err := tx.QueryRow(
+		`SELECT COALESCE(MAX(idx), 0) + 1 FROM test_step WHERE profile_id = ? AND test_key = ?`,
+		profileID, testKey,
+	).Scan(&nextIdx); err != nil {
+		return Step{}, fmt.Errorf("compute next step index: %w", err)
+	}
+
+	tempID, err := nextTempStepID(tx, profileID, testKey)
+	if err != nil {
+		return Step{}, err
+	}
+
+	s := Step{XrayID: tempID, Index: nextIdx, Action: action, Data: data, Expected: expected}
+	if _, err := tx.Exec(
+		`INSERT INTO test_step (profile_id, test_key, xray_id, idx, action, data, expected)
+		   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		profileID, testKey, s.XrayID, s.Index, s.Action, s.Data, s.Expected,
+	); err != nil {
+		return Step{}, fmt.Errorf("insert test_step: %w", err)
+	}
+
+	snapshot, err := json.Marshal(s)
+	if err != nil {
+		return Step{}, fmt.Errorf("marshal step: %w", err)
+	}
+	ek := stepEntityKey(testKey, tempID)
+	if err := upsertPendingChange(
+		tx, profileID, entityTestStepAdd, ek, "step", "", string(snapshot), baseVersion,
+	); err != nil {
+		return Step{}, err
+	}
+	if err := writeAudit(
+		tx, profileID, entityTestStepAdd, ek,
+		"add-local", "step", "", string(snapshot), "",
+	); err != nil {
+		return Step{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Step{}, fmt.Errorf("commit add step: %w", err)
+	}
+	return s, nil
+}
+
+// nextTempStepID returns a step xray_id of the form "new-N" not already used
+// by another step on this Test. New steps need a placeholder id until Xray
+// assigns the real one at commit time.
+func nextTempStepID(tx *sql.Tx, profileID, testKey string) (string, error) {
+	for n := 1; ; n++ {
+		id := fmt.Sprintf("new-%d", n)
+		var one int
+		err := tx.QueryRow(
+			`SELECT 1 FROM test_step WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
+			profileID, testKey, id,
+		).Scan(&one)
+		if errors.Is(err, sql.ErrNoRows) {
+			return id, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("probe temp step id: %w", err)
+		}
+	}
+}
+
+// RenameTestStepID rewrites a cached step's xray_id, used by the commit path
+// to swap a "new-N" placeholder for the real id Xray returned from the create
+// POST. A no-op when newID is empty (Xray didn't return one) or unchanged.
+func (r *Repository) RenameTestStepID(profileID, testKey, oldID, newID string) error {
+	if newID == "" || newID == oldID {
+		return nil
+	}
+	if _, err := r.db.Exec(
+		`UPDATE test_step SET xray_id = ?
+		   WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
+		newID, profileID, testKey, oldID,
+	); err != nil {
+		return fmt.Errorf("rename step id: %w", err)
+	}
+	return nil
 }
 
 // DiscardPendingChange reverts a Test field to its before_val and removes the
@@ -849,6 +1053,19 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 			profileID, testKey, snap.XrayID, snap.Index, snap.Action, snap.Data, snap.Expected,
 		); err != nil {
 			return fmt.Errorf("restore test_step: %w", err)
+		}
+	case entityTestStepAdd:
+		// Discarding an add removes the locally-created step entirely — it
+		// never existed remotely, so there's nothing to restore.
+		testKey, xrayID, ok := parseStepEntityKey(entityKey)
+		if !ok {
+			return fmt.Errorf("malformed step entity_key %q", entityKey)
+		}
+		if _, err := tx.Exec(
+			`DELETE FROM test_step WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
+			profileID, testKey, xrayID,
+		); err != nil {
+			return fmt.Errorf("remove added test_step: %w", err)
 		}
 	default:
 		return fmt.Errorf("unknown entity_type %q", entityType)
@@ -1189,6 +1406,7 @@ const (
 	entityTestCase       = "test_case"
 	entityTestStep       = "test_step"
 	entityTestStepDelete = "test_step_delete"
+	entityTestStepAdd    = "test_step_add"
 )
 
 // stepEntityKey encodes a step's parent Test plus its Xray step ID into a

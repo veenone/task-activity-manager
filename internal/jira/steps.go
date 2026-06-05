@@ -3,6 +3,7 @@ package jira
 import (
 	"context"
 	"fmt"
+	"net/http"
 )
 
 // Step is one ordered step in an Xray Test (FR-2.5). Xray stores step
@@ -43,6 +44,36 @@ func (c *Client) UpdateTestStep(ctx context.Context, key, stepID string, fields 
 		return nil
 	}
 	return c.put(ctx, fmt.Sprintf("/rest/raven/2.0/api/test/%s/steps/%s", key, stepID), body)
+}
+
+// CreateTestStep appends a new Test Step (FR-2.5) and returns the new step's
+// Xray id when the create response includes one — the commit path uses it to
+// swap the local "new-N" placeholder for the real id. Demo URLs short-circuit
+// to a no-op, returning an empty id (the demo backend has no persistence, so
+// the placeholder is reconciled by the next steps refresh).
+//
+// Maps to POST /rest/raven/2.0/api/test/{key}/steps, reusing the same
+// step/data/result raw-wrapped body shape as UpdateTestStep.
+func (c *Client) CreateTestStep(ctx context.Context, key, action, data, expected string) (string, error) {
+	if isDemoURL(c.baseURL) {
+		return "", nil
+	}
+	body := map[string]any{
+		"step":   map[string]string{"raw": action},
+		"data":   map[string]string{"raw": data},
+		"result": map[string]string{"raw": expected},
+	}
+	var resp map[string]any
+	if err := c.writeJSONReturning(
+		ctx, http.MethodPost,
+		fmt.Sprintf("/rest/raven/2.0/api/test/%s/steps", key), body, &resp,
+	); err != nil {
+		return "", err
+	}
+	if id, ok := resp["id"]; ok && id != nil {
+		return fmt.Sprint(id), nil
+	}
+	return "", nil
 }
 
 // DeleteTestStep removes one Test Step (FR-2.5). Demo URLs short-circuit

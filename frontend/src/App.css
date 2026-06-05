@@ -229,6 +229,23 @@
 .step-delete:hover {
   color: #c0392b;
 }
+.step-new-badge {
+  flex-shrink: 0;
+  align-self: center;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #047857;
+  background: #d1fae5;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.steps-add {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+}
 
 /* Onboarding */
 .onboard {

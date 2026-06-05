@@ -3,6 +3,7 @@ package testrepo_test
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"xray-test-manager/internal/store"
@@ -677,6 +678,117 @@ func TestDiscardStepDeleteRestoresStepFromSnapshot(t *testing.T) {
 	got := steps[0]
 	if got.XrayID != "s1" || got.Action != "old action" || got.Expected != "old expected" {
 		t.Errorf("restored step = %+v, want {XrayID:s1 Action:old action Expected:old expected ...}", got)
+	}
+}
+
+func TestAddTestStepAppendsStepAndQueuesAdd(t *testing.T) {
+	repo := seedTestWithSteps(t)
+
+	added, err := repo.AddTestStep("p1", "QA-1", "new action", "new data", "new expected")
+	if err != nil {
+		t.Fatalf("add step: %v", err)
+	}
+
+	if added.Index != 2 {
+		t.Errorf("new step Index = %d, want 2 (appended after the seeded step)", added.Index)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	if len(steps) != 2 {
+		t.Fatalf("want 2 steps after add, got %d", len(steps))
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending change, got %d", len(changes))
+	}
+	c := changes[0]
+	if c.EntityType != "test_step_add" || c.EntityKey != "QA-1:"+added.XrayID || c.Field != "step" {
+		t.Errorf("change = %+v, want entity_type=test_step_add entity_key=QA-1:%s field=step", c, added.XrayID)
+	}
+}
+
+func TestEditNewStepFoldsIntoAddInsteadOfNewPending(t *testing.T) {
+	repo := seedTestWithSteps(t)
+	added, err := repo.AddTestStep("p1", "QA-1", "", "", "")
+	if err != nil {
+		t.Fatalf("add step: %v", err)
+	}
+
+	if err := repo.EditTestStepField("p1", "QA-1", added.XrayID, "action", "typed action"); err != nil {
+		t.Fatalf("edit new step: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending change (edit folded into add), got %d", len(changes))
+	}
+	if changes[0].EntityType != "test_step_add" {
+		t.Errorf("pending entity_type = %q, want test_step_add (no standalone edit row)", changes[0].EntityType)
+	}
+	if !strings.Contains(changes[0].AfterVal, "typed action") {
+		t.Errorf("add payload = %q, want it to carry the edited action", changes[0].AfterVal)
+	}
+}
+
+func TestDeleteNewStepCancelsAdd(t *testing.T) {
+	repo := seedTestWithSteps(t)
+	added, err := repo.AddTestStep("p1", "QA-1", "x", "", "")
+	if err != nil {
+		t.Fatalf("add step: %v", err)
+	}
+
+	if err := repo.DeleteTestStep("p1", "QA-1", added.XrayID); err != nil {
+		t.Fatalf("delete new step: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("add-then-delete should leave no pending rows; got %+v", changes)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	if len(steps) != 1 {
+		t.Errorf("want only the seeded step left, got %d", len(steps))
+	}
+}
+
+func TestDiscardAddRemovesNewStep(t *testing.T) {
+	repo := seedTestWithSteps(t)
+	if _, err := repo.AddTestStep("p1", "QA-1", "x", "", ""); err != nil {
+		t.Fatalf("add step: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending, got %d", len(changes))
+	}
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard add: %v", err)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	if len(steps) != 1 {
+		t.Errorf("discarding the add should remove the new step; got %d steps", len(steps))
+	}
+}
+
+func TestDeleteCommittedStepDropsSupersededEditRows(t *testing.T) {
+	repo := seedTestWithSteps(t)
+
+	if err := repo.EditTestStepField("p1", "QA-1", "s1", "action", "edited then deleted"); err != nil {
+		t.Fatalf("edit step: %v", err)
+	}
+	if err := repo.DeleteTestStep("p1", "QA-1", "s1"); err != nil {
+		t.Fatalf("delete step: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending row after edit-then-delete, got %d (%+v)", len(changes), changes)
+	}
+	if changes[0].EntityType != "test_step_delete" {
+		t.Errorf("remaining pending = %q, want test_step_delete (the edit row is superseded)", changes[0].EntityType)
 	}
 }
 

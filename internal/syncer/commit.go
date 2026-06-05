@@ -2,7 +2,9 @@ package syncer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -44,7 +46,8 @@ type FailedCommit struct {
 //     skip the Test and surface a conflict.
 //  2. PUT any non-status field updates.
 //  3. POST a workflow transition (FR-4.2) if a status change is queued.
-//  4. PUT any pending Step field updates, one PUT per step (FR-2.5).
+//  4. DELETE removed steps, then PUT step field updates, then POST new
+//     steps (FR-2.5).
 //  5. Delete the pending rows and audit "commit".
 //
 // Failures and conflicts leave pending rows in place so the user can
@@ -112,6 +115,7 @@ testLoop:
 		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
 		stepChanges := make(map[string][]testrepo.PendingChange)
 		stepDeletes := make([]string, 0)
+		stepAdds := make([]testrepo.Step, 0)
 		for i := range testChanges {
 			c := testChanges[i]
 			switch c.EntityType {
@@ -142,6 +146,25 @@ testLoop:
 					continue testLoop
 				}
 				stepDeletes = append(stepDeletes, xrayID)
+			case "test_step_add":
+				_, tempID, ok := parseStepKey(c.EntityKey)
+				if !ok {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("malformed step entity_key %q", c.EntityKey),
+					})
+					continue testLoop
+				}
+				var s testrepo.Step
+				if err := json.Unmarshal([]byte(c.AfterVal), &s); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("malformed step_add payload for %q: %s", c.EntityKey, err),
+					})
+					continue testLoop
+				}
+				s.XrayID = tempID
+				stepAdds = append(stepAdds, s)
 			}
 		}
 
@@ -201,6 +224,30 @@ testLoop:
 			}
 		}
 
+		// POST new steps last, in index order — Xray appends each created
+		// step to the end of the list, so creating them ascending preserves
+		// the order the user arranged. On success we rename the local "new-N"
+		// placeholder to the real id Xray returned.
+		sort.SliceStable(stepAdds, func(i, j int) bool {
+			return stepAdds[i].Index < stepAdds[j].Index
+		})
+		for _, s := range stepAdds {
+			newID, err := e.client.CreateTestStep(ctx, testKey, s.Action, s.Data, s.Expected)
+			if err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   fmt.Sprintf("add step: %s", sanitizeError(err.Error())),
+				})
+				continue testLoop
+			}
+			if err := e.repo.RenameTestStepID(profileID, testKey, s.XrayID, newID); err != nil {
+				// The remote create already succeeded; a cache-rename hiccup
+				// must not fail the commit. The stale placeholder reconciles
+				// on the next steps refresh.
+				continue
+			}
+		}
+
 		ids := make([]int64, len(testChanges))
 		for i, c := range testChanges {
 			ids[i] = c.ID
@@ -225,7 +272,7 @@ func parentTestKey(c testrepo.PendingChange) (string, bool) {
 	switch c.EntityType {
 	case "test_case":
 		return c.EntityKey, true
-	case "test_step", "test_step_delete":
+	case "test_step", "test_step_delete", "test_step_add":
 		k, _, ok := parseStepKey(c.EntityKey)
 		return k, ok
 	}

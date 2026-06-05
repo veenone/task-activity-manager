@@ -111,17 +111,18 @@ export function PendingChangesModal({
               </thead>
               <tbody>
                 {changes.map((c) => {
-                  // Step entity_keys are "<testKey>:<xrayID>"; we route
-                  // the jump-to action to the parent test and label the
-                  // field as "step:<field>" so the modal makes it clear
-                  // which kind of edit this is.
-                  const isStep = c.entityType === "test_step";
+                  // Step entity_keys are "<testKey>:<xrayID>"; route the
+                  // jump-to action to the parent test and label the row so
+                  // the modal makes clear which kind of step change this is
+                  // (edit / add / delete).
+                  const isStep = c.entityType.startsWith("test_step");
                   const parentKey = isStep
                     ? c.entityKey.split(":")[0]
                     : c.entityKey;
                   const stepID = isStep
                     ? c.entityKey.substring(c.entityKey.indexOf(":") + 1)
                     : "";
+                  const { field, before, after } = describeChange(c);
                   return (
                     <tr key={c.id}>
                       <td>
@@ -139,12 +140,12 @@ export function PendingChangesModal({
                           </span>
                         )}
                       </td>
-                      <td>{isStep ? `step:${c.field}` : c.field}</td>
+                      <td>{field}</td>
                       <td className="pending-before">
-                        {truncate(c.beforeVal, 100)}
+                        {truncate(before, 100)}
                       </td>
                       <td className="pending-after">
-                        {truncate(c.afterVal, 100)}
+                        {truncate(after, 100)}
                       </td>
                       <td>
                         <button
@@ -183,6 +184,38 @@ export function PendingChangesModal({
       </div>
     </div>
   );
+}
+
+// describeChange renders a pending row's field label and before/after for the
+// table. Structural step ops (add / delete) carry the step as JSON in one
+// column; we surface the action text so the row reads sensibly instead of
+// dumping raw JSON.
+function describeChange(c: PendingChange): {
+  field: string;
+  before: string;
+  after: string;
+} {
+  switch (c.entityType) {
+    case "test_step":
+      return { field: `step:${c.field}`, before: c.beforeVal, after: c.afterVal };
+    case "test_step_add":
+      return { field: "step: new", before: "", after: stepAction(c.afterVal) };
+    case "test_step_delete":
+      return { field: "step: delete", before: stepAction(c.beforeVal), after: "" };
+    default:
+      return { field: c.field, before: c.beforeVal, after: c.afterVal };
+  }
+}
+
+// stepAction pulls the human-readable action out of a step JSON snapshot,
+// falling back to the raw string if it isn't the expected shape.
+function stepAction(json: string): string {
+  try {
+    const s = JSON.parse(json) as { action?: string };
+    return s.action ?? "";
+  } catch {
+    return json;
+  }
 }
 
 function truncate(s: string, n: number): string {

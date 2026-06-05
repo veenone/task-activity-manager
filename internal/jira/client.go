@@ -112,10 +112,19 @@ func (c *Client) delete(ctx context.Context, path string) error {
 	return nil
 }
 
-// writeJSON marshals body as JSON and sends it with the given method. A 2xx
-// response yields nil; any other status returns an error that includes a
-// short slice of the response body for diagnostics.
+// writeJSON marshals body as JSON and sends it with the given method,
+// discarding the response body. See writeJSONReturning when the caller needs
+// the response decoded.
 func (c *Client) writeJSON(ctx context.Context, method, path string, body any) error {
+	return c.writeJSONReturning(ctx, method, path, body, nil)
+}
+
+// writeJSONReturning marshals body as JSON, sends it with the given method,
+// and decodes a 2xx response into out when out is non-nil and a body is
+// present. Any non-2xx status returns an error that includes a short slice of
+// the response body for diagnostics. A non-nil out tolerates an empty body
+// (some endpoints answer 201/204 with nothing).
+func (c *Client) writeJSONReturning(ctx context.Context, method, path string, body, out any) error {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
@@ -142,6 +151,12 @@ func (c *Client) writeJSON(ctx context.Context, method, path string, body any) e
 			"jira: %s %s -> %s: %s",
 			method, path, resp.Status, strings.TrimSpace(string(respBody)),
 		)
+	}
+	if out == nil {
+		return nil
+	}
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil && err != io.EOF {
+		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
 }

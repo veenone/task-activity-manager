@@ -8,6 +8,7 @@ import {
   EditTestField,
   EditTestStepField,
   DeleteTestStep,
+  AddTestStep,
   errMsg,
 } from "../api";
 import type {
@@ -167,6 +168,20 @@ export function TestDetail({
       setStepsError(errMsg(e));
     } finally {
       setStepsLoading(false);
+    }
+  }
+
+  // addStep appends a new, empty step locally (FR-2.5). The backend returns
+  // it with a temporary id; the user fills the fields in place (each blur
+  // folds into the queued create) and it lands in Jira on commit.
+  async function addStep() {
+    setSaveError("");
+    try {
+      const s = await AddTestStep(profileId, testKey, "", "", "");
+      setSteps((prev) => [...prev, s]);
+      onEdited();
+    } catch (e) {
+      setSaveError(`Add step failed: ${errMsg(e)}`);
     }
   }
 
@@ -340,11 +355,15 @@ export function TestDetail({
               ))}
             </ol>
           )}
+          {!stepsError && !stepsLoading && (
+            <button className="link-btn steps-add" onClick={addStep}>
+              + Add step
+            </button>
+          )}
 
           <p className="muted detail-note">
             Edits are saved locally and queued in <b>Pending</b> until you
-            commit them to Jira. Add / remove / reorder steps lands in a
-            later update.
+            commit them to Jira. Reordering steps lands in a later update.
           </p>
         </div>
       )}
@@ -382,8 +401,19 @@ function StepRow({
   const [expected, setExpected] = useState(step.expected);
   const [saveError, setSaveError] = useState("");
 
+  const entityKey = `${testKey}:${step.xrayId}`;
+  // A step that's only queued for creation (not yet in Jira) shows a "new"
+  // badge and, on delete, just cancels the queued add rather than scheduling
+  // a remote removal.
+  const isNew = pendingForTest.some(
+    (p) => p.entityType === "test_step_add" && p.entityKey === entityKey,
+  );
+
   async function deleteStep() {
-    if (!window.confirm(`Delete this step? It will be removed from Jira on commit.`)) {
+    const prompt = isNew
+      ? "Discard this new step? It hasn't been sent to Jira yet."
+      : "Delete this step? It will be removed from Jira on commit.";
+    if (!window.confirm(prompt)) {
       return;
     }
     setSaveError("");
@@ -396,7 +426,6 @@ function StepRow({
     }
   }
 
-  const entityKey = `${testKey}:${step.xrayId}`;
   const isDirty = (field: StepField) =>
     pendingForTest.some(
       (p) =>
@@ -440,10 +469,11 @@ function StepRow({
           rows={2}
           placeholder="(action)"
         />
+        {isNew && <span className="step-new-badge">new</span>}
         <button
           className="btn btn-ghost step-delete"
           onClick={deleteStep}
-          title="Delete this step"
+          title={isNew ? "Discard this new step" : "Delete this step"}
         >
           ✕
         </button>

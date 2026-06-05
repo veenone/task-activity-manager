@@ -341,6 +341,16 @@ func (a *App) DeleteTestStep(profileID, testKey, xrayID string) error {
 	return a.repo.DeleteTestStep(profileID, testKey, xrayID)
 }
 
+// AddTestStep appends a new Step to a Test locally and queues it for creation
+// in Xray on commit (FR-2.5). The returned Step carries a temporary xray_id
+// the commit path swaps for the real one once Xray assigns it.
+func (a *App) AddTestStep(profileID, testKey, action, data, expected string) (testrepo.Step, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.Step{}, err
+	}
+	return a.repo.AddTestStep(profileID, testKey, action, data, expected)
+}
+
 // --- Test steps (FR-2.5) ---
 
 // GetTestSteps returns the cached Steps for a Test, fetching from Xray on
