@@ -380,6 +380,20 @@ export namespace testrepo {
 	        this.runStatus = source["runStatus"];
 	    }
 	}
+	export class CreateContainerResult {
+	    tempKey: string;
+	    added: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateContainerResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tempKey = source["tempKey"];
+	        this.added = source["added"];
+	    }
+	}
 	export class Folder {
 	    id: string;
 	    parentId: string;

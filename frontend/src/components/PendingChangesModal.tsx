@@ -215,6 +215,12 @@ function describeChange(c: PendingChange): {
         before: "",
         after: membershipSummary(c.afterVal),
       };
+    case "test_container_add":
+      return {
+        field: "new container",
+        before: "",
+        after: containerSummary(c.afterVal),
+      };
     default:
       return { field: c.field, before: c.beforeVal, after: c.afterVal };
   }
@@ -227,6 +233,18 @@ function membershipSummary(json: string): string {
     const p = JSON.parse(json) as { members?: string[] };
     const n = p.members?.length ?? 0;
     return `${n} ${n === 1 ? "test" : "tests"}`;
+  } catch {
+    return json;
+  }
+}
+
+// containerSummary renders a create-container payload ({kind, summary,
+// members}) as 'summary (N tests)'.
+function containerSummary(json: string): string {
+  try {
+    const p = JSON.parse(json) as { summary?: string; members?: string[] };
+    const n = p.members?.length ?? 0;
+    return `${p.summary ?? ""} (${n} ${n === 1 ? "test" : "tests"})`;
   } catch {
     return json;
   }

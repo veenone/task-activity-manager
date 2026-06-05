@@ -16,6 +16,8 @@ export function BulkTransitionTests(arg1:string,arg2:Array<string>,arg3:string):
 
 export function CommitPendingChanges(arg1:string):Promise<syncer.CommitResult>;
 
+export function CreateContainerAndAllocate(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<testrepo.CreateContainerResult>;
+
 export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<profile.Profile>;
 
 export function DeleteProfile(arg1:string):Promise<void>;

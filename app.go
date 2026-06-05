@@ -651,6 +651,22 @@ func (a *App) AllocateTests(profileID, containerKey string, testKeys []string) (
 	return a.repo.AllocateTests(profileID, containerKey, testKeys)
 }
 
+// CreateContainerAndAllocate creates a new Test Set / Plan / Execution locally
+// and allocates the given Tests to it (FR-3.4–3.6). The Container is created in
+// Jira on commit; until then it carries a temporary key. The project comes
+// from the active profile.
+func (a *App) CreateContainerAndAllocate(profileID, kind, summary string, testKeys []string) (testrepo.CreateContainerResult, error) {
+	var empty testrepo.CreateContainerResult
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return empty, err
+	}
+	return a.repo.CreateContainerAllocation(profileID, p.ProjectKey, kind, summary, testKeys)
+}
+
 // --- Statistics dashboard (FR-9) ---
 
 // GetStatistics returns the dashboard rollup for a profile, computed entirely

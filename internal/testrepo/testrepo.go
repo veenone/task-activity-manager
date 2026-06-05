@@ -632,6 +632,148 @@ type membershipPayload struct {
 	Members []string `json:"members"`
 }
 
+// CreateContainerResult reports a create-and-allocate operation: the temporary
+// Container key assigned locally (swapped for the real one on commit) and how
+// many Tests were allocated to it (FR-3.4–3.6).
+type CreateContainerResult struct {
+	TempKey string `json:"tempKey"`
+	Added   int    `json:"added"`
+}
+
+// containerPayload is the JSON stored in a test_container_add pending row's
+// after_val — everything the commit needs to create the issue and populate it.
+type containerPayload struct {
+	Kind       string   `json:"kind"`
+	Summary    string   `json:"summary"`
+	ProjectKey string   `json:"projectKey"`
+	Members    []string `json:"members"`
+}
+
+// containerKinds whitelists the Container kinds that can be created.
+var containerKinds = map[string]struct{}{
+	"testset":  {},
+	"testplan": {},
+	"testexec": {},
+}
+
+// CreateContainerAllocation creates a new Container locally and queues it for
+// creation in Jira on commit, allocating the given Tests to it (FR-3.4–3.6).
+// The Container gets a temporary key until commit POSTs the issue and learns
+// the real one. Everything the commit needs travels in the pending row.
+func (r *Repository) CreateContainerAllocation(profileID, projectKey, kind, summary string, testKeys []string) (CreateContainerResult, error) {
+	var result CreateContainerResult
+	if _, ok := containerKinds[kind]; !ok {
+		return result, fmt.Errorf("unknown container kind %q", kind)
+	}
+	if strings.TrimSpace(summary) == "" {
+		return result, fmt.Errorf("a name is required for the new container")
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return result, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	tempKey, err := nextTempContainerKey(tx, profileID)
+	if err != nil {
+		return result, err
+	}
+
+	if _, err := tx.Exec(
+		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status)
+		 VALUES (?, ?, ?, ?, '')`,
+		profileID, tempKey, kind, summary,
+	); err != nil {
+		return result, fmt.Errorf("insert container: %w", err)
+	}
+
+	members := make([]string, 0, len(testKeys))
+	for _, testKey := range testKeys {
+		if _, err := tx.Exec(
+			`INSERT OR IGNORE INTO test_container_test
+			   (profile_id, container_key, test_key, run_status)
+			 VALUES (?, ?, ?, '')`,
+			profileID, tempKey, testKey,
+		); err != nil {
+			return result, fmt.Errorf("insert membership: %w", err)
+		}
+		members = append(members, testKey)
+	}
+
+	payload := containerPayload{Kind: kind, Summary: summary, ProjectKey: projectKey, Members: members}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return result, fmt.Errorf("encode container payload: %w", err)
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO pending_change
+		   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
+		 VALUES (?, ?, ?, 'container', '', ?, '', ?)`,
+		profileID, entityContainerAdd, tempKey, string(encoded),
+		time.Now().UTC().Format(time.RFC3339),
+	); err != nil {
+		return result, fmt.Errorf("insert pending container: %w", err)
+	}
+	if err := writeAudit(
+		tx, profileID, entityContainerAdd, tempKey,
+		"create-container-local", "container", "", summary, "",
+	); err != nil {
+		return result, err
+	}
+	if err := tx.Commit(); err != nil {
+		return result, fmt.Errorf("commit create-container: %w", err)
+	}
+	return CreateContainerResult{TempKey: tempKey, Added: len(members)}, nil
+}
+
+// nextTempContainerKey returns a container key of the form "new-container-N"
+// not already used by another container in this profile.
+func nextTempContainerKey(tx *sql.Tx, profileID string) (string, error) {
+	for n := 1; ; n++ {
+		key := fmt.Sprintf("new-container-%d", n)
+		var one int
+		err := tx.QueryRow(
+			`SELECT 1 FROM test_container WHERE profile_id = ? AND jira_key = ?`,
+			profileID, key,
+		).Scan(&one)
+		if errors.Is(err, sql.ErrNoRows) {
+			return key, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("probe temp container key: %w", err)
+		}
+	}
+}
+
+// RenameContainer rewrites a Container's key across the cache, used by the
+// commit path to swap a "new-container-N" placeholder for the real key Jira
+// assigned. A no-op when newKey is empty or unchanged.
+func (r *Repository) RenameContainer(profileID, oldKey, newKey string) error {
+	if newKey == "" || newKey == oldKey {
+		return nil
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`UPDATE test_container SET jira_key = ? WHERE profile_id = ? AND jira_key = ?`,
+		newKey, profileID, oldKey,
+	); err != nil {
+		return fmt.Errorf("rename container: %w", err)
+	}
+	if _, err := tx.Exec(
+		`UPDATE test_container_test SET container_key = ? WHERE profile_id = ? AND container_key = ?`,
+		newKey, profileID, oldKey,
+	); err != nil {
+		return fmt.Errorf("rename container links: %w", err)
+	}
+	return tx.Commit()
+}
+
 // mergeMembershipPending coalesces a membership allocation into the per-
 // Container pending row, unioning the new Test keys with any already queued so
 // the commit issues one add per Container.
@@ -1715,6 +1857,21 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 				return fmt.Errorf("remove membership: %w", err)
 			}
 		}
+	case entityContainerAdd:
+		// entity_key is the temporary Container key; discarding drops the
+		// not-yet-created Container and all its local memberships.
+		if _, err := tx.Exec(
+			`DELETE FROM test_container_test WHERE profile_id = ? AND container_key = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("remove container links: %w", err)
+		}
+		if _, err := tx.Exec(
+			`DELETE FROM test_container WHERE profile_id = ? AND jira_key = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("remove container: %w", err)
+		}
 	default:
 		return fmt.Errorf("unknown entity_type %q", entityType)
 	}
@@ -2057,6 +2214,7 @@ const (
 	entityTestStepAdd    = "test_step_add"
 	entityTestStepOrder  = "test_step_order"
 	entityMembershipAdd  = "test_membership_add"
+	entityContainerAdd   = "test_container_add"
 )
 
 // stepEntityKey encodes a step's parent Test plus its Xray step ID into a

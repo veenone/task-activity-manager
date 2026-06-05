@@ -3,6 +3,7 @@ package jira
 import (
 	"context"
 	"fmt"
+	"net/http"
 )
 
 // Container kinds — the three Xray issue types that group Tests. The values
@@ -62,6 +63,51 @@ func containerPathSegment(kind string) (string, error) {
 		return "testexec", nil
 	}
 	return "", fmt.Errorf("unknown container kind %q", kind)
+}
+
+// containerIssueType maps a Container kind to its Jira issue type name.
+func containerIssueType(kind string) (string, error) {
+	switch kind {
+	case KindTestSet:
+		return "Test Set", nil
+	case KindTestPlan:
+		return "Test Plan", nil
+	case KindTestExec:
+		return "Test Execution", nil
+	}
+	return "", fmt.Errorf("unknown container kind %q", kind)
+}
+
+// CreateContainer creates a new Test Set, Test Plan or Test Execution issue and
+// returns its key (FR-3.4–3.6). Demo URLs short-circuit to a no-op, returning
+// an empty key (the demo backend has no persistence, so the placeholder is
+// reconciled on the next sync).
+//
+// Maps to POST /rest/api/2/issue with the matching issue type. NOTE(xtm):
+// required fields beyond summary vary per project/screen and may need to be
+// supplied — verify against a live instance.
+func (c *Client) CreateContainer(ctx context.Context, projectKey, kind, summary string) (string, error) {
+	if isDemoURL(c.baseURL) {
+		return "", nil
+	}
+	issueType, err := containerIssueType(kind)
+	if err != nil {
+		return "", err
+	}
+	body := map[string]any{
+		"fields": map[string]any{
+			"project":   map[string]string{"key": projectKey},
+			"issuetype": map[string]string{"name": issueType},
+			"summary":   summary,
+		},
+	}
+	var resp struct {
+		Key string `json:"key"`
+	}
+	if err := c.writeJSONReturning(ctx, http.MethodPost, "/rest/api/2/issue", body, &resp); err != nil {
+		return "", err
+	}
+	return resp.Key, nil
 }
 
 // AddTestsToContainer adds Tests to a Test Set, Test Plan or Test Execution

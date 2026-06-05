@@ -22,6 +22,10 @@ export function CommitPendingChanges(arg1) {
   return window['go']['main']['App']['CommitPendingChanges'](arg1);
 }
 
+export function CreateContainerAndAllocate(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateContainerAndAllocate'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateProfile(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3, arg4);
 }

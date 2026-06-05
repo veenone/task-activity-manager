@@ -17,6 +17,7 @@ export {
   GetTestContainers,
   ListContainers,
   AllocateTests,
+  CreateContainerAndAllocate,
   ListTests,
   ListMatchingKeys,
   GetTest,
@@ -114,6 +115,13 @@ export interface Container {
 export interface AllocateResult {
   added: string[];
   alreadyMembers: string[];
+}
+
+// CreateContainerResult mirrors testrepo.CreateContainerResult — the outcome
+// of creating a new container and allocating Tests to it (FR-3.4–3.6).
+export interface CreateContainerResult {
+  tempKey: string;
+  added: number;
 }
 
 // ContainerMembership mirrors testrepo.ContainerMembership — a Test Set, Test

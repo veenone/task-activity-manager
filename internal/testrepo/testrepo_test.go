@@ -345,6 +345,80 @@ func TestDiscardAllocationRemovesAddedMemberships(t *testing.T) {
 	}
 }
 
+func TestCreateContainerAllocationQueuesContainerAndMemberships(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+
+	result, err := repo.CreateContainerAllocation("p1", "QA", "testplan", "Release 2.0", []string{"QA-1", "QA-2"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if result.Added != 2 || result.TempKey == "" {
+		t.Errorf("result = %+v, want Added=2 and a temp key", result)
+	}
+
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	var found bool
+	for _, m := range members {
+		if m.Key == result.TempKey && m.Kind == "testplan" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("QA-1 should belong to the new container %s; got %+v", result.TempKey, members)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	var hasContainerAdd bool
+	for _, c := range changes {
+		if c.EntityType == "test_container_add" && c.EntityKey == result.TempKey {
+			hasContainerAdd = true
+		}
+	}
+	if !hasContainerAdd {
+		t.Errorf("expected a test_container_add pending row for %s; got %+v", result.TempKey, changes)
+	}
+}
+
+func TestDiscardContainerCreateRemovesContainerAndMemberships(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+	result, err := repo.CreateContainerAllocation("p1", "QA", "testset", "New set", []string{"QA-1"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	var id int64
+	for _, c := range changes {
+		if c.EntityType == "test_container_add" {
+			id = c.ID
+		}
+	}
+
+	if err := repo.DiscardPendingChange("p1", id); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	for _, m := range members {
+		if m.Key == result.TempKey {
+			t.Errorf("discarding the create should remove the new container membership; got %+v", members)
+		}
+	}
+	cons, _ := repo.ListContainers("p1", "testset")
+	for _, c := range cons {
+		if c.Key == result.TempKey {
+			t.Errorf("discarding the create should remove the container %s", result.TempKey)
+		}
+	}
+}
+
+func TestCreateContainerAllocationRejectsBlankName(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+	_, err := repo.CreateContainerAllocation("p1", "QA", "testset", "  ", []string{"QA-1"})
+	if err == nil {
+		t.Error("a blank container name should be rejected")
+	}
+}
+
 func seedTestsAndContainer(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)
