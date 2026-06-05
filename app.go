@@ -619,6 +619,18 @@ func (a *App) BulkTransitionTests(profileID string, testKeys []string, targetSta
 	return result, nil
 }
 
+// --- Statistics dashboard (FR-9) ---
+
+// GetStatistics returns the dashboard rollup for a profile, computed entirely
+// from the local store (FR-9.5) — status / priority / label / folder
+// distributions, a last-updated trend, and the pending-change count.
+func (a *App) GetStatistics(profileID string) (testrepo.Statistics, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.Statistics{}, err
+	}
+	return a.repo.GetStatistics(profileID)
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"os/user"
+	"sort"
 	"strings"
 	"time"
 
@@ -113,6 +114,27 @@ type SyncState struct {
 	ProfileID    string `json:"profileId"`
 	LastSyncedAt string `json:"lastSyncedAt"`
 	TestCount    int    `json:"testCount"`
+}
+
+// Statistics is a per-profile rollup of the local Test cache for the dashboard
+// (FR-9). Everything here is computed from SQLite with no Jira round-trips
+// (FR-9.5). Test type and execution coverage (FR-9.3/9.4) are absent because
+// the sync doesn't store them yet.
+type Statistics struct {
+	Total          int      `json:"total"`
+	PendingChanges int      `json:"pendingChanges"`
+	ByStatus       []Bucket `json:"byStatus"`
+	ByPriority     []Bucket `json:"byPriority"`
+	ByLabel        []Bucket `json:"byLabel"`
+	ByFolder       []Bucket `json:"byFolder"`
+	UpdatedTrend   []Bucket `json:"updatedTrend"`
+}
+
+// Bucket is one (label, count) pair in a distribution — also used for the
+// month-keyed update trend.
+type Bucket struct {
+	Label string `json:"label"`
+	Count int    `json:"count"`
 }
 
 // sortColumns whitelists user-supplied sort keys to real columns, so Query.SortBy
@@ -588,6 +610,140 @@ func (r *Repository) GetSyncState(profileID string) (SyncState, error) {
 	}
 	s.LastSyncedAt = last.String
 	return s, nil
+}
+
+// GetStatistics computes the dashboard rollup for a profile (FR-9) in a single
+// table scan plus one count query — fast enough to recompute on demand even at
+// 50k Tests. Status / priority distributions are returned in full; labels and
+// folders are capped to the top buckets; the trend is the most recent months
+// keyed by the Test's last-updated month.
+func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
+	stats := Statistics{
+		ByStatus:     []Bucket{},
+		ByPriority:   []Bucket{},
+		ByLabel:      []Bucket{},
+		ByFolder:     []Bucket{},
+		UpdatedTrend: []Bucket{},
+	}
+
+	rows, err := r.db.Query(
+		`SELECT status, priority, labels, folder_id, updated_at
+		 FROM test_case WHERE profile_id = ?`, profileID)
+	if err != nil {
+		return stats, fmt.Errorf("read tests for stats: %w", err)
+	}
+	defer rows.Close()
+
+	statusCounts := map[string]int{}
+	priorityCounts := map[string]int{}
+	labelCounts := map[string]int{}
+	folderCounts := map[string]int{}
+	trendCounts := map[string]int{}
+
+	for rows.Next() {
+		var status, priority, labels, folderID, updated string
+		if err := rows.Scan(&status, &priority, &labels, &folderID, &updated); err != nil {
+			return stats, err
+		}
+		stats.Total++
+		statusCounts[blankAs(status, "(none)")]++
+		priorityCounts[blankAs(priority, "(none)")]++
+		for _, l := range strings.Fields(labels) {
+			labelCounts[l]++
+		}
+		folderCounts[topFolder(folderID)]++
+		if m := monthOf(updated); m != "" {
+			trendCounts[m]++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return stats, err
+	}
+
+	stats.ByStatus = topBuckets(statusCounts, 0)
+	stats.ByPriority = topBuckets(priorityCounts, 0)
+	stats.ByLabel = topBuckets(labelCounts, 12)
+	stats.ByFolder = topBuckets(folderCounts, 12)
+	stats.UpdatedTrend = recentMonths(trendCounts, 12)
+
+	if err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM pending_change WHERE profile_id = ?`, profileID,
+	).Scan(&stats.PendingChanges); err != nil {
+		return stats, fmt.Errorf("count pending for stats: %w", err)
+	}
+	return stats, nil
+}
+
+// blankAs returns def when s is empty, else s — so empty status / priority
+// values show as a labelled bucket rather than a blank one.
+func blankAs(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+// topFolder reduces a folder path ("/Authentication/Login") to its top-level
+// category ("Authentication") so the folder distribution stays readable.
+func topFolder(id string) string {
+	if id == "" {
+		return "(none)"
+	}
+	s := strings.TrimPrefix(id, "/")
+	if i := strings.Index(s, "/"); i >= 0 {
+		s = s[:i]
+	}
+	if s == "" {
+		return "(none)"
+	}
+	return s
+}
+
+// monthOf extracts the "YYYY-MM" prefix from a Jira timestamp. Both the demo
+// format ("2006-01-02T15:04:05.000-0700") and RFC 3339 start with the date, so
+// a prefix slice is enough — no full parse needed.
+func monthOf(updated string) string {
+	if len(updated) >= 7 && updated[4] == '-' {
+		return updated[:7]
+	}
+	return ""
+}
+
+// topBuckets turns a count map into buckets sorted by count descending (ties
+// broken by label) and, when limit > 0, keeps only the top `limit`.
+func topBuckets(counts map[string]int, limit int) []Bucket {
+	out := make([]Bucket, 0, len(counts))
+	for k, v := range counts {
+		out = append(out, Bucket{Label: k, Count: v})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Label < out[j].Label
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+// recentMonths returns up to n trend buckets in chronological order, keeping
+// the most recent months (YYYY-MM sorts lexicographically by time).
+func recentMonths(counts map[string]int, n int) []Bucket {
+	months := make([]string, 0, len(counts))
+	for k := range counts {
+		months = append(months, k)
+	}
+	sort.Strings(months)
+	if n > 0 && len(months) > n {
+		months = months[len(months)-n:]
+	}
+	out := make([]Bucket, 0, len(months))
+	for _, m := range months {
+		out = append(out, Bucket{Label: m, Count: counts[m]})
+	}
+	return out
 }
 
 // --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---

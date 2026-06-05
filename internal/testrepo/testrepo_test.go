@@ -1126,6 +1126,63 @@ func TestDiscardStatusPendingChangeRevertsStatus(t *testing.T) {
 	}
 }
 
+func TestGetStatisticsCountsByStatusAndPriority(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Status: "Open", Priority: "High", Labels: []string{"smoke"}},
+		{Key: "QA-2", ID: "2", Status: "Open", Priority: "Low", Labels: []string{"smoke", "api"}},
+		{Key: "QA-3", ID: "3", Status: "Done", Priority: "High"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	stats, err := repo.GetStatistics("p1")
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+
+	if stats.Total != 3 {
+		t.Errorf("Total = %d, want 3", stats.Total)
+	}
+	if stats.ByStatus[0].Label != "Open" || stats.ByStatus[0].Count != 2 {
+		t.Errorf("top status = %+v, want {Open 2}", stats.ByStatus[0])
+	}
+}
+
+func TestGetStatisticsTalliesLabelsAcrossTests(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Labels: []string{"smoke"}},
+		{Key: "QA-2", ID: "2", Labels: []string{"smoke", "api"}},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	stats, err := repo.GetStatistics("p1")
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+
+	if stats.ByLabel[0].Label != "smoke" || stats.ByLabel[0].Count != 2 {
+		t.Errorf("top label = %+v, want {smoke 2}", stats.ByLabel[0])
+	}
+}
+
+func TestGetStatisticsIncludesPendingCount(t *testing.T) {
+	repo := seedTestForEditing(t)
+	if err := repo.EditTestField("p1", "QA-1", "summary", "edited"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	stats, err := repo.GetStatistics("p1")
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.PendingChanges != 1 {
+		t.Errorf("PendingChanges = %d, want 1", stats.PendingChanges)
+	}
+}
+
 func seedBulkTests(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)

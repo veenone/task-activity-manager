@@ -28,6 +28,8 @@ export function EditTestStepField(arg1:string,arg2:string,arg3:string,arg4:strin
 
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
 
+export function GetStatistics(arg1:string):Promise<testrepo.Statistics>;
+
 export function GetSyncState(arg1:string):Promise<testrepo.SyncState>;
 
 export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;

@@ -32,6 +32,7 @@ export {
   DeleteTestStep,
   AddTestStep,
   ReorderTestSteps,
+  GetStatistics,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 
@@ -203,6 +204,24 @@ export interface BulkTransitionResult {
 export interface BulkTransitionSkip {
   testKey: string;
   reason: string;
+}
+
+// Bucket is one (label, count) pair in a dashboard distribution (FR-9).
+export interface Bucket {
+  label: string;
+  count: number;
+}
+
+// Statistics mirrors testrepo.Statistics — the per-profile dashboard rollup
+// computed from the local store (FR-9).
+export interface Statistics {
+  total: number;
+  pendingChanges: number;
+  byStatus: Bucket[];
+  byPriority: Bucket[];
+  byLabel: Bucket[];
+  byFolder: Bucket[];
+  updatedTrend: Bucket[];
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

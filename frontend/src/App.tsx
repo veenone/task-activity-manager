@@ -28,6 +28,7 @@ import { FolderTree } from "./components/FolderTree";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
+import { Dashboard } from "./components/Dashboard";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -59,6 +60,8 @@ function App() {
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set());
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showBulkTransition, setShowBulkTransition] = useState(false);
+
+  const [view, setView] = useState<"browse" | "dashboard">("browse");
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -342,6 +345,21 @@ function App() {
           + Profile
         </button>
 
+        <nav className="view-tabs">
+          <button
+            className={`view-tab${view === "browse" ? " view-tab-active" : ""}`}
+            onClick={() => setView("browse")}
+          >
+            Browse
+          </button>
+          <button
+            className={`view-tab${view === "dashboard" ? " view-tab-active" : ""}`}
+            onClick={() => setView("dashboard")}
+          >
+            Dashboard
+          </button>
+        </nav>
+
         <div className="spacer" />
 
         {pendingChanges.length > 0 && (
@@ -375,7 +393,7 @@ function App() {
         </button>
       </header>
 
-      {selectedSet.size > 0 && (
+      {view === "browse" && selectedSet.size > 0 && (
         <div className="bulk-toolbar">
           <span className="bulk-count">{selectedSet.size} selected</span>
           <button
@@ -396,40 +414,46 @@ function App() {
         </div>
       )}
 
-      <main className="content">
-        {folders.length > 0 && (
-          <FolderTree
-            folders={folders}
-            selected={selectedFolder}
-            onSelect={(id) => {
-              setSelectedFolder(id);
-              setSelectedKey(null);
-            }}
-          />
-        )}
-        <TestTable
-          profileId={activeId}
-          folderId={selectedFolder}
-          refreshKey={refreshKey}
-          selectedKey={selectedKey}
-          pendingByTestKey={pendingByTestKey}
-          selectedSet={selectedSet}
-          onSelect={setSelectedKey}
-          onToggleSelect={toggleSelect}
-          onToggleSelectPage={toggleSelectPage}
-          onSelectAllMatching={selectAllMatching}
-        />
-        {selectedKey && (
-          <TestDetail
+      {view === "dashboard" ? (
+        <main className="content content-dashboard">
+          <Dashboard profileId={activeId} refreshKey={refreshKey} />
+        </main>
+      ) : (
+        <main className="content">
+          {folders.length > 0 && (
+            <FolderTree
+              folders={folders}
+              selected={selectedFolder}
+              onSelect={(id) => {
+                setSelectedFolder(id);
+                setSelectedKey(null);
+              }}
+            />
+          )}
+          <TestTable
             profileId={activeId}
-            testKey={selectedKey}
-            version={detailVersion}
-            pendingForTest={pendingByTestKey.get(selectedKey) ?? []}
-            onClose={() => setSelectedKey(null)}
-            onEdited={handleEdited}
+            folderId={selectedFolder}
+            refreshKey={refreshKey}
+            selectedKey={selectedKey}
+            pendingByTestKey={pendingByTestKey}
+            selectedSet={selectedSet}
+            onSelect={setSelectedKey}
+            onToggleSelect={toggleSelect}
+            onToggleSelectPage={toggleSelectPage}
+            onSelectAllMatching={selectAllMatching}
           />
-        )}
-      </main>
+          {selectedKey && (
+            <TestDetail
+              profileId={activeId}
+              testKey={selectedKey}
+              version={detailVersion}
+              pendingForTest={pendingByTestKey.get(selectedKey) ?? []}
+              onClose={() => setSelectedKey(null)}
+              onEdited={handleEdited}
+            />
+          )}
+        </main>
+      )}
 
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>

@@ -46,6 +46,10 @@ export function GetBulkTransitionOptions(arg1, arg2) {
   return window['go']['main']['App']['GetBulkTransitionOptions'](arg1, arg2);
 }
 
+export function GetStatistics(arg1) {
+  return window['go']['main']['App']['GetStatistics'](arg1);
+}
+
 export function GetSyncState(arg1) {
   return window['go']['main']['App']['GetSyncState'](arg1);
 }
