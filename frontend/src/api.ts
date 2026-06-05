@@ -230,11 +230,13 @@ export interface Bucket {
 export interface Statistics {
   total: number;
   pendingChanges: number;
+  executedTests: number;
   byStatus: Bucket[];
   byPriority: Bucket[];
   byLabel: Bucket[];
   byFolder: Bucket[];
   updatedTrend: Bucket[];
+  byRunStatus: Bucket[];
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

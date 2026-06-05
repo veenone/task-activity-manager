@@ -495,11 +495,13 @@ export namespace testrepo {
 	export class Statistics {
 	    total: number;
 	    pendingChanges: number;
+	    executedTests: number;
 	    byStatus: Bucket[];
 	    byPriority: Bucket[];
 	    byLabel: Bucket[];
 	    byFolder: Bucket[];
 	    updatedTrend: Bucket[];
+	    byRunStatus: Bucket[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Statistics(source);
@@ -509,11 +511,13 @@ export namespace testrepo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.total = source["total"];
 	        this.pendingChanges = source["pendingChanges"];
+	        this.executedTests = source["executedTests"];
 	        this.byStatus = this.convertValues(source["byStatus"], Bucket);
 	        this.byPriority = this.convertValues(source["byPriority"], Bucket);
 	        this.byLabel = this.convertValues(source["byLabel"], Bucket);
 	        this.byFolder = this.convertValues(source["byFolder"], Bucket);
 	        this.updatedTrend = this.convertValues(source["updatedTrend"], Bucket);
+	        this.byRunStatus = this.convertValues(source["byRunStatus"], Bucket);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

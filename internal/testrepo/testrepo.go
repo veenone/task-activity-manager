@@ -152,11 +152,13 @@ type SyncState struct {
 type Statistics struct {
 	Total          int      `json:"total"`
 	PendingChanges int      `json:"pendingChanges"`
+	ExecutedTests  int      `json:"executedTests"`
 	ByStatus       []Bucket `json:"byStatus"`
 	ByPriority     []Bucket `json:"byPriority"`
 	ByLabel        []Bucket `json:"byLabel"`
 	ByFolder       []Bucket `json:"byFolder"`
 	UpdatedTrend   []Bucket `json:"updatedTrend"`
+	ByRunStatus    []Bucket `json:"byRunStatus"`
 }
 
 // Bucket is one (label, count) pair in a distribution — also used for the
@@ -748,6 +750,7 @@ func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
 		ByLabel:      []Bucket{},
 		ByFolder:     []Bucket{},
 		UpdatedTrend: []Bucket{},
+		ByRunStatus:  []Bucket{},
 	}
 
 	rows, err := r.db.Query(
@@ -795,7 +798,47 @@ func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
 	).Scan(&stats.PendingChanges); err != nil {
 		return stats, fmt.Errorf("count pending for stats: %w", err)
 	}
+
+	if err := r.addExecutionCoverage(profileID, &stats); err != nil {
+		return stats, err
+	}
 	return stats, nil
+}
+
+// addExecutionCoverage rolls up Test Run statuses across all Test Execution
+// memberships (FR-9.3): the run-status distribution plus the count of distinct
+// Tests that appear in at least one execution. Each Test-in-execution is one
+// data point, so a Test in two executions counts twice in the distribution but
+// once in ExecutedTests.
+func (r *Repository) addExecutionCoverage(profileID string, stats *Statistics) error {
+	rows, err := r.db.Query(
+		`SELECT l.run_status, l.test_key
+		 FROM test_container_test l
+		 JOIN test_container c
+		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+		 WHERE l.profile_id = ? AND c.kind = ?`,
+		profileID, "testexec")
+	if err != nil {
+		return fmt.Errorf("read execution coverage: %w", err)
+	}
+	defer rows.Close()
+
+	runCounts := map[string]int{}
+	executed := map[string]struct{}{}
+	for rows.Next() {
+		var runStatus, testKey string
+		if err := rows.Scan(&runStatus, &testKey); err != nil {
+			return err
+		}
+		runCounts[blankAs(runStatus, "(none)")]++
+		executed[testKey] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	stats.ByRunStatus = topBuckets(runCounts, 0)
+	stats.ExecutedTests = len(executed)
+	return nil
 }
 
 // blankAs returns def when s is empty, else s — so empty status / priority

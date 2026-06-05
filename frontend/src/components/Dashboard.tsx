@@ -83,6 +83,15 @@ export function Dashboard({ profileId, refreshKey }: Props) {
         />
       </div>
 
+      {stats.byRunStatus.length > 0 && (
+        <BarPanel
+          title="Execution coverage"
+          subtitle={`${stats.executedTests.toLocaleString()} of ${stats.total.toLocaleString()} tests in an execution`}
+          buckets={stats.byRunStatus}
+          runColors
+        />
+      )}
+
       <TrendPanel buckets={stats.updatedTrend} />
 
       <p className="muted dashboard-note">
@@ -112,17 +121,24 @@ function Tile({
 
 function BarPanel({
   title,
+  subtitle,
   buckets,
   empty,
+  runColors,
 }: {
   title: string;
+  subtitle?: string;
   buckets: Bucket[];
   empty?: string;
+  runColors?: boolean;
 }) {
   const max = buckets.reduce((m, b) => Math.max(m, b.count), 0) || 1;
   return (
     <div className="stat-panel">
-      <h4>{title}</h4>
+      <h4>
+        {title}
+        {subtitle && <span className="stat-panel-sub">{subtitle}</span>}
+      </h4>
       {buckets.length === 0 ? (
         <p className="muted">{empty ?? "No data."}</p>
       ) : (
@@ -134,7 +150,11 @@ function BarPanel({
               </span>
               <span className="stat-bar-track">
                 <span
-                  className="stat-bar-fill"
+                  className={
+                    runColors
+                      ? `stat-bar-fill run-${b.label.toLowerCase()}`
+                      : "stat-bar-fill"
+                  }
                   style={{ width: `${(b.count / max) * 100}%` }}
                 />
               </span>

@@ -1264,6 +1264,62 @@ func TestGetStatisticsIncludesPendingCount(t *testing.T) {
 	}
 }
 
+func TestGetStatisticsRollsUpExecutionCoverage(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1"},
+		{Key: "QA-2", ID: "2"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TE-1", Kind: "testexec", Summary: "Cycle 1", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed containers: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TE-1", TestKey: "QA-1", RunStatus: "PASS"},
+		{ContainerKey: "QA-TE-1", TestKey: "QA-2", RunStatus: "FAIL"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+
+	stats, err := repo.GetStatistics("p1")
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.ExecutedTests != 2 {
+		t.Errorf("ExecutedTests = %d, want 2", stats.ExecutedTests)
+	}
+	if len(stats.ByRunStatus) != 2 {
+		t.Fatalf("ByRunStatus buckets = %d, want 2 (PASS, FAIL)", len(stats.ByRunStatus))
+	}
+}
+
+func TestGetStatisticsIgnoresNonExecutionMembershipsForCoverage(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TS-1", Kind: "testset", Summary: "Set", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed containers: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+
+	stats, _ := repo.GetStatistics("p1")
+	if stats.ExecutedTests != 0 {
+		t.Errorf("ExecutedTests = %d, want 0 (a Test Set is not an execution)", stats.ExecutedTests)
+	}
+}
+
 func seedBulkTests(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)
