@@ -87,6 +87,24 @@ func (c *Client) DeleteTestStep(ctx context.Context, key, stepID string) error {
 	return c.delete(ctx, fmt.Sprintf("/rest/raven/2.0/api/test/%s/steps/%s", key, stepID))
 }
 
+// MoveTestStep repositions a step to a 1-based index (FR-2.5). Demo URLs
+// short-circuit to a no-op.
+//
+// Maps to PUT /rest/raven/2.0/api/test/{key}/steps/{stepId} with just an
+// "index" field. NOTE(xtm): Xray Server/DC's step PUT is assumed to accept a
+// bare index and reflow the other steps; the commit path PUTs steps in target
+// order so the final sequence is deterministic regardless of reflow semantics.
+func (c *Client) MoveTestStep(ctx context.Context, key, stepID string, index int) error {
+	if isDemoURL(c.baseURL) {
+		return nil
+	}
+	return c.put(
+		ctx,
+		fmt.Sprintf("/rest/raven/2.0/api/test/%s/steps/%s", key, stepID),
+		map[string]any{"index": index},
+	)
+}
+
 // GetTestSteps returns the ordered list of Steps for a Test (FR-2.5). Demo
 // URLs fall through to a deterministic generator so the steps panel renders
 // without a real Xray.

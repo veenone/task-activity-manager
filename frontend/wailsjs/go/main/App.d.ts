@@ -52,6 +52,8 @@ export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 
+export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
+
 export function SyncProfile(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:string,arg2:string):Promise<string>;

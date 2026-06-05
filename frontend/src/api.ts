@@ -31,6 +31,7 @@ export {
   EditTestStepField,
   DeleteTestStep,
   AddTestStep,
+  ReorderTestSteps,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 

@@ -94,6 +94,10 @@ export function ListTests(arg1, arg2) {
   return window['go']['main']['App']['ListTests'](arg1, arg2);
 }
 
+export function ReorderTestSteps(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ReorderTestSteps'](arg1, arg2, arg3);
+}
+
 export function SyncProfile(arg1) {
   return window['go']['main']['App']['SyncProfile'](arg1);
 }

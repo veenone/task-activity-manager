@@ -792,6 +792,103 @@ func TestDeleteCommittedStepDropsSupersededEditRows(t *testing.T) {
 	}
 }
 
+func TestReorderTestStepsUpdatesIndicesAndQueuesOrder(t *testing.T) {
+	repo := seedTestWithThreeSteps(t)
+
+	if err := repo.ReorderTestSteps("p1", "QA-1", []string{"s3", "s1", "s2"}); err != nil {
+		t.Fatalf("reorder: %v", err)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	got := []string{steps[0].XrayID, steps[1].XrayID, steps[2].XrayID}
+	want := []string{"s3", "s1", "s2"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("order = %v, want %v", got, want)
+		}
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending change, got %d", len(changes))
+	}
+	c := changes[0]
+	if c.EntityType != "test_step_order" || c.EntityKey != "QA-1" || c.Field != "order" {
+		t.Errorf("change = %+v, want entity_type=test_step_order entity_key=QA-1 field=order", c)
+	}
+	if !strings.Contains(c.AfterVal, "s3") {
+		t.Errorf("after_val = %q, want it to carry the new order", c.AfterVal)
+	}
+}
+
+func TestReorderToOriginalOrderDropsPending(t *testing.T) {
+	repo := seedTestWithThreeSteps(t)
+
+	if err := repo.ReorderTestSteps("p1", "QA-1", []string{"s3", "s1", "s2"}); err != nil {
+		t.Fatalf("reorder: %v", err)
+	}
+	if err := repo.ReorderTestSteps("p1", "QA-1", []string{"s1", "s2", "s3"}); err != nil {
+		t.Fatalf("reorder back: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("reordering back to original should drop the pending row; got %+v", changes)
+	}
+}
+
+func TestDiscardReorderRestoresOriginalOrder(t *testing.T) {
+	repo := seedTestWithThreeSteps(t)
+
+	if err := repo.ReorderTestSteps("p1", "QA-1", []string{"s3", "s2", "s1"}); err != nil {
+		t.Fatalf("reorder: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending, got %d", len(changes))
+	}
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	steps, _ := repo.ListTestSteps("p1", "QA-1")
+	got := []string{steps[0].XrayID, steps[1].XrayID, steps[2].XrayID}
+	want := []string{"s1", "s2", "s3"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("order after discard = %v, want original %v", got, want)
+		}
+	}
+}
+
+func TestReorderRejectsMismatchedSet(t *testing.T) {
+	repo := seedTestWithThreeSteps(t)
+
+	err := repo.ReorderTestSteps("p1", "QA-1", []string{"s1", "s2"})
+	if err == nil {
+		t.Error("reorder with a step missing from the set should error")
+	}
+}
+
+func seedTestWithThreeSteps(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed test: %v", err)
+	}
+	if err := repo.SetTestSteps("p1", "QA-1", []testrepo.Step{
+		{XrayID: "s1", Index: 1, Action: "first"},
+		{XrayID: "s2", Index: 2, Action: "second"},
+		{XrayID: "s3", Index: 3, Action: "third"},
+	}); err != nil {
+		t.Fatalf("seed steps: %v", err)
+	}
+	return repo
+}
+
 func TestEditTestStepFieldRejectsUnknownField(t *testing.T) {
 	repo := seedTestWithSteps(t)
 

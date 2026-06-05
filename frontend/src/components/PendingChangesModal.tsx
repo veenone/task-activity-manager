@@ -116,10 +116,11 @@ export function PendingChangesModal({
                   // the modal makes clear which kind of step change this is
                   // (edit / add / delete).
                   const isStep = c.entityType.startsWith("test_step");
-                  const parentKey = isStep
+                  const hasStepID = isStep && c.entityKey.includes(":");
+                  const parentKey = hasStepID
                     ? c.entityKey.split(":")[0]
                     : c.entityKey;
-                  const stepID = isStep
+                  const stepID = hasStepID
                     ? c.entityKey.substring(c.entityKey.indexOf(":") + 1)
                     : "";
                   const { field, before, after } = describeChange(c);
@@ -133,7 +134,7 @@ export function PendingChangesModal({
                         >
                           {parentKey}
                         </button>
-                        {isStep && (
+                        {hasStepID && (
                           <span className="muted step-suffix">
                             {" · step "}
                             <span className="mono">{stepID}</span>
@@ -202,8 +203,25 @@ function describeChange(c: PendingChange): {
       return { field: "step: new", before: "", after: stepAction(c.afterVal) };
     case "test_step_delete":
       return { field: "step: delete", before: stepAction(c.beforeVal), after: "" };
+    case "test_step_order":
+      return {
+        field: "steps: reorder",
+        before: orderSummary(c.beforeVal),
+        after: orderSummary(c.afterVal),
+      };
     default:
       return { field: c.field, before: c.beforeVal, after: c.afterVal };
+  }
+}
+
+// orderSummary renders a step-order JSON array as a compact "N steps: a → b →
+// …" line so the reorder row reads at a glance.
+function orderSummary(json: string): string {
+  try {
+    const ids = JSON.parse(json) as string[];
+    return `${ids.length} steps: ${ids.join(" → ")}`;
+  } catch {
+    return json;
   }
 }
 

@@ -112,6 +112,7 @@ testLoop:
 		//   - per-step field updates, keyed by xrayID
 		//   - step deletions, keyed by xrayID
 		var statusChange *testrepo.PendingChange
+		var orderChange *testrepo.PendingChange
 		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
 		stepChanges := make(map[string][]testrepo.PendingChange)
 		stepDeletes := make([]string, 0)
@@ -165,6 +166,9 @@ testLoop:
 				}
 				s.XrayID = tempID
 				stepAdds = append(stepAdds, s)
+			case "test_step_order":
+				cc := c
+				orderChange = &cc
 			}
 		}
 
@@ -231,6 +235,10 @@ testLoop:
 		sort.SliceStable(stepAdds, func(i, j int) bool {
 			return stepAdds[i].Index < stepAdds[j].Index
 		})
+		// idMap translates a newly-created step's temporary "new-N" id to the
+		// real id Xray assigned, so a reorder queued against the temp id can
+		// still target the right remote step.
+		idMap := make(map[string]string, len(stepAdds))
 		for _, s := range stepAdds {
 			newID, err := e.client.CreateTestStep(ctx, testKey, s.Action, s.Data, s.Expected)
 			if err != nil {
@@ -240,11 +248,50 @@ testLoop:
 				})
 				continue testLoop
 			}
+			if newID != "" {
+				idMap[s.XrayID] = newID
+			}
 			if err := e.repo.RenameTestStepID(profileID, testKey, s.XrayID, newID); err != nil {
 				// The remote create already succeeded; a cache-rename hiccup
 				// must not fail the commit. The stale placeholder reconciles
 				// on the next steps refresh.
 				continue
+			}
+		}
+
+		// Apply the new step order last, once every step has its real id.
+		// PUT each step to its target 1-based position in order; steps deleted
+		// in this same commit are skipped, and temp ids are mapped to real
+		// ones.
+		if orderChange != nil {
+			deleted := make(map[string]struct{}, len(stepDeletes))
+			for _, id := range stepDeletes {
+				deleted[id] = struct{}{}
+			}
+			var order []string
+			if err := json.Unmarshal([]byte(orderChange.AfterVal), &order); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   fmt.Sprintf("malformed step order payload: %s", err),
+				})
+				continue testLoop
+			}
+			pos := 0
+			for _, id := range order {
+				if _, gone := deleted[id]; gone {
+					continue
+				}
+				if real, ok := idMap[id]; ok {
+					id = real
+				}
+				pos++
+				if err := e.client.MoveTestStep(ctx, testKey, id, pos); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("reorder step %s: %s", id, sanitizeError(err.Error())),
+					})
+					continue testLoop
+				}
 			}
 		}
 
@@ -270,7 +317,9 @@ testLoop:
 // Test. Returns false for unrecognised entity types.
 func parentTestKey(c testrepo.PendingChange) (string, bool) {
 	switch c.EntityType {
-	case "test_case":
+	case "test_case", "test_step_order":
+		// test_step_order is a test-level change — its entity_key is the
+		// Test key itself, no "<key>:<step>" suffix.
 		return c.EntityKey, true
 	case "test_step", "test_step_delete", "test_step_add":
 		k, _, ok := parseStepKey(c.EntityKey)

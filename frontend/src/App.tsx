@@ -100,7 +100,8 @@ function App() {
     const m = new Map<string, PendingChange[]>();
     for (const p of pendingChanges) {
       let testKey: string | null = null;
-      if (p.entityType === "test_case") {
+      if (p.entityType === "test_case" || p.entityType === "test_step_order") {
+        // test_step_order is a test-level change keyed by the bare Test key.
         testKey = p.entityKey;
       } else if (p.entityType.startsWith("test_step")) {
         // test_step / test_step_delete / test_step_add all key as

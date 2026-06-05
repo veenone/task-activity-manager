@@ -9,6 +9,7 @@ import {
   EditTestStepField,
   DeleteTestStep,
   AddTestStep,
+  ReorderTestSteps,
   errMsg,
 } from "../api";
 import type {
@@ -185,6 +186,30 @@ export function TestDetail({
     }
   }
 
+  // moveStep swaps a step with its neighbour and persists the whole new order
+  // (FR-2.5). The reorder is a single test-level pending change; on failure we
+  // roll the local list back so the UI matches what was actually saved.
+  async function moveStep(index: number, dir: "up" | "down") {
+    const target = dir === "up" ? index - 1 : index + 1;
+    if (target < 0 || target >= steps.length) return;
+    const previous = steps;
+    const next = [...steps];
+    [next[index], next[target]] = [next[target], next[index]];
+    setSteps(next);
+    setSaveError("");
+    try {
+      await ReorderTestSteps(
+        profileId,
+        testKey,
+        next.map((s) => s.xrayId),
+      );
+      onEdited();
+    } catch (e) {
+      setSteps(previous);
+      setSaveError(`Reorder failed: ${errMsg(e)}`);
+    }
+  }
+
   // applyTransition records the workflow transition locally (FR-4.2). After
   // the local write, we re-query for the transitions available from the new
   // status so the next pick reflects the post-transition workflow position.
@@ -318,6 +343,11 @@ export function TestDetail({
 
           <h4 className="steps-head">
             Steps
+            {pendingForTest.some((p) => p.entityType === "test_step_order") && (
+              <span className="steps-reordered" title="Step order changed">
+                reordered
+              </span>
+            )}
             <button
               className="link-btn steps-refresh"
               onClick={refreshSteps}
@@ -333,13 +363,16 @@ export function TestDetail({
           )}
           {steps.length > 0 && (
             <ol className="steps-list">
-              {steps.map((s) => (
+              {steps.map((s, i) => (
                 <StepRow
                   key={s.xrayId}
                   profileId={profileId}
                   testKey={testKey}
                   step={s}
                   pendingForTest={pendingForTest}
+                  isFirst={i === 0}
+                  isLast={i === steps.length - 1}
+                  onMove={(dir) => moveStep(i, dir)}
                   onLocalChange={(field, value) => {
                     setSteps((prev) =>
                       prev.map((p) =>
@@ -378,6 +411,9 @@ interface StepRowProps {
   testKey: string;
   step: Step;
   pendingForTest: PendingChange[];
+  isFirst: boolean;
+  isLast: boolean;
+  onMove: (dir: "up" | "down") => void;
   onLocalChange: (field: StepField, value: string) => void;
   onLocalDelete: (xrayId: string) => void;
   onEdited: () => void;
@@ -392,6 +428,9 @@ function StepRow({
   testKey,
   step,
   pendingForTest,
+  isFirst,
+  isLast,
+  onMove,
   onLocalChange,
   onLocalDelete,
   onEdited,
@@ -470,6 +509,24 @@ function StepRow({
           placeholder="(action)"
         />
         {isNew && <span className="step-new-badge">new</span>}
+        <div className="step-move">
+          <button
+            className="btn btn-ghost step-move-btn"
+            onClick={() => onMove("up")}
+            disabled={isFirst}
+            title="Move step up"
+          >
+            ▲
+          </button>
+          <button
+            className="btn btn-ghost step-move-btn"
+            onClick={() => onMove("down")}
+            disabled={isLast}
+            title="Move step down"
+          >
+            ▼
+          </button>
+        </div>
         <button
           className="btn btn-ghost step-delete"
           onClick={deleteStep}

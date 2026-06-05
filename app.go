@@ -351,6 +351,16 @@ func (a *App) AddTestStep(profileID, testKey, action, data, expected string) (te
 	return a.repo.AddTestStep(profileID, testKey, action, data, expected)
 }
 
+// ReorderTestSteps records a new ordering for a Test's steps (FR-2.5). The
+// orderedXrayIDs slice must be exactly the current step set, permuted; the new
+// positions are pushed to Xray on commit.
+func (a *App) ReorderTestSteps(profileID, testKey string, orderedXrayIDs []string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.ReorderTestSteps(profileID, testKey, orderedXrayIDs)
+}
+
 // --- Test steps (FR-2.5) ---
 
 // GetTestSteps returns the cached Steps for a Test, fetching from Xray on

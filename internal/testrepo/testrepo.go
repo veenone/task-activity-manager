@@ -988,6 +988,140 @@ func (r *Repository) RenameTestStepID(profileID, testKey, oldID, newID string) e
 	return nil
 }
 
+// ReorderTestSteps records a new ordering for a Test's steps (FR-2.5). The
+// caller passes the full set of step xray_ids in their new order; the order is
+// stored as a single test-level pending row (before/after id-lists) rather
+// than per-step edits, because reordering is a property of the list, not of
+// any one step. Xray gets the new positions on commit.
+//
+// orderedXrayIDs must be exactly the current step set, just permuted — adding
+// or removing a step is the job of AddTestStep / DeleteTestStep, not this.
+// Reordering back to the original order drops the pending row.
+func (r *Repository) ReorderTestSteps(profileID, testKey string, orderedXrayIDs []string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(
+		`SELECT xray_id FROM test_step WHERE profile_id = ? AND test_key = ? ORDER BY idx`,
+		profileID, testKey,
+	)
+	if err != nil {
+		return fmt.Errorf("read current step order: %w", err)
+	}
+	currentIDs := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		currentIDs = append(currentIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	if len(currentIDs) == 0 {
+		return fmt.Errorf("test %s has no steps to reorder", testKey)
+	}
+	if !samePermutation(currentIDs, orderedXrayIDs) {
+		return fmt.Errorf("reorder set must match the current steps exactly")
+	}
+	if equalOrder(currentIDs, orderedXrayIDs) {
+		return nil // no-op
+	}
+
+	var baseVersion string
+	if err := tx.QueryRow(
+		`SELECT updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+		profileID, testKey,
+	).Scan(&baseVersion); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("read parent updated_at: %w", err)
+	}
+
+	if err := applyStepOrder(tx, profileID, testKey, orderedXrayIDs); err != nil {
+		return err
+	}
+
+	beforeJSON, err := json.Marshal(currentIDs)
+	if err != nil {
+		return fmt.Errorf("marshal current order: %w", err)
+	}
+	afterJSON, err := json.Marshal(orderedXrayIDs)
+	if err != nil {
+		return fmt.Errorf("marshal new order: %w", err)
+	}
+	if err := upsertPendingChange(
+		tx, profileID, entityTestStepOrder, testKey, "order",
+		string(beforeJSON), string(afterJSON), baseVersion,
+	); err != nil {
+		return err
+	}
+	if err := writeAudit(
+		tx, profileID, entityTestStepOrder, testKey,
+		"reorder-local", "order", string(beforeJSON), string(afterJSON), "",
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// samePermutation reports whether a and b contain exactly the same ids
+// (ignoring order). Used to reject a reorder that secretly adds or drops a
+// step.
+func samePermutation(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[string]int, len(a))
+	for _, x := range a {
+		counts[x]++
+	}
+	for _, x := range b {
+		counts[x]--
+		if counts[x] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// equalOrder reports whether a and b are identical in order.
+func equalOrder(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// applyStepOrder rewrites the idx column so steps fall in the order given by
+// orderedXrayIDs. Shared by the reorder-discard path. Caller supplies an open
+// transaction.
+func applyStepOrder(tx *sql.Tx, profileID, testKey string, orderedXrayIDs []string) error {
+	for i, id := range orderedXrayIDs {
+		if _, err := tx.Exec(
+			`UPDATE test_step SET idx = ? WHERE profile_id = ? AND test_key = ? AND xray_id = ?`,
+			i+1, profileID, testKey, id,
+		); err != nil {
+			return fmt.Errorf("restore step index: %w", err)
+		}
+	}
+	return nil
+}
+
 // DiscardPendingChange reverts a Test field to its before_val and removes the
 // pending change. An audit entry records the discard.
 func (r *Repository) DiscardPendingChange(profileID string, changeID int64) error {
@@ -1066,6 +1200,16 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 			profileID, testKey, xrayID,
 		); err != nil {
 			return fmt.Errorf("remove added test_step: %w", err)
+		}
+	case entityTestStepOrder:
+		// entity_key is the test key itself; restore the idx column from the
+		// original order snapshot in before_val.
+		var order []string
+		if err := json.Unmarshal([]byte(beforeVal), &order); err != nil {
+			return fmt.Errorf("decode order snapshot: %w", err)
+		}
+		if err := applyStepOrder(tx, profileID, entityKey, order); err != nil {
+			return err
 		}
 	default:
 		return fmt.Errorf("unknown entity_type %q", entityType)
@@ -1407,6 +1551,7 @@ const (
 	entityTestStep       = "test_step"
 	entityTestStepDelete = "test_step_delete"
 	entityTestStepAdd    = "test_step_add"
+	entityTestStepOrder  = "test_step_order"
 )
 
 // stepEntityKey encodes a step's parent Test plus its Xray step ID into a
