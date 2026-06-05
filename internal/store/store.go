@@ -163,10 +163,19 @@ type Store struct {
 // is: create / verify tables → run migrations → create indexes. Splitting
 // indexes off ensures every column an index references already exists.
 func Open(path string) (*Store, error) {
-	db, err := sql.Open("sqlite", path)
+	// busy_timeout makes a transiently-locked database wait rather than fail
+	// immediately with "database is locked" — e.g. when a previous instance
+	// is still releasing the file as a new one launches. The _pragma query
+	// is applied by the modernc driver to every pooled connection.
+	dsn := path + "?_pragma=busy_timeout(5000)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
+	// SQLite serialises writes; a single connection avoids in-process lock
+	// contention entirely and keeps the busy_timeout guarantee simple. The
+	// workload is a single desktop user, so this costs nothing.
+	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(baseSchema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("apply tables: %w", err)
