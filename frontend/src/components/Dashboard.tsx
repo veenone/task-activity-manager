@@ -83,6 +83,38 @@ export function Dashboard({ profileId, refreshKey }: Props) {
         />
       </div>
 
+      {(stats.testSets > 0 ||
+        stats.testPlans > 0 ||
+        stats.testExecutions > 0) && (
+        <div className="stat-panel">
+          <h4>Test Sets &amp; Plans</h4>
+          <ul className="container-stat-list">
+            <li>
+              <span>Test Sets</span>
+              <span>
+                {stats.testSets} ·{" "}
+                {stats.testsInSet.toLocaleString()} of{" "}
+                {stats.total.toLocaleString()} tests covered
+              </span>
+            </li>
+            <li>
+              <span>Test Plans</span>
+              <span>
+                {stats.testPlans} ·{" "}
+                {stats.testsInPlan.toLocaleString()} tests covered
+              </span>
+            </li>
+            <li>
+              <span>Test Executions</span>
+              <span>
+                {stats.testExecutions} ·{" "}
+                {stats.executedTests.toLocaleString()} tests executed
+              </span>
+            </li>
+          </ul>
+        </div>
+      )}
+
       {stats.byRunStatus.length > 0 && (
         <BarPanel
           title="Execution coverage"

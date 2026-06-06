@@ -542,6 +542,11 @@ export namespace testrepo {
 	    total: number;
 	    pendingChanges: number;
 	    executedTests: number;
+	    testSets: number;
+	    testPlans: number;
+	    testExecutions: number;
+	    testsInSet: number;
+	    testsInPlan: number;
 	    byStatus: Bucket[];
 	    byPriority: Bucket[];
 	    byLabel: Bucket[];
@@ -558,6 +563,11 @@ export namespace testrepo {
 	        this.total = source["total"];
 	        this.pendingChanges = source["pendingChanges"];
 	        this.executedTests = source["executedTests"];
+	        this.testSets = source["testSets"];
+	        this.testPlans = source["testPlans"];
+	        this.testExecutions = source["testExecutions"];
+	        this.testsInSet = source["testsInSet"];
+	        this.testsInPlan = source["testsInPlan"];
 	        this.byStatus = this.convertValues(source["byStatus"], Bucket);
 	        this.byPriority = this.convertValues(source["byPriority"], Bucket);
 	        this.byLabel = this.convertValues(source["byLabel"], Bucket);

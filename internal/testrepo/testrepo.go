@@ -173,6 +173,11 @@ type Statistics struct {
 	Total          int      `json:"total"`
 	PendingChanges int      `json:"pendingChanges"`
 	ExecutedTests  int      `json:"executedTests"`
+	TestSets       int      `json:"testSets"`
+	TestPlans      int      `json:"testPlans"`
+	TestExecutions int      `json:"testExecutions"`
+	TestsInSet     int      `json:"testsInSet"`
+	TestsInPlan    int      `json:"testsInPlan"`
 	ByStatus       []Bucket `json:"byStatus"`
 	ByPriority     []Bucket `json:"byPriority"`
 	ByLabel        []Bucket `json:"byLabel"`
@@ -1251,7 +1256,68 @@ func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
 	if err := r.addExecutionCoverage(profileID, &stats); err != nil {
 		return stats, err
 	}
+	if err := r.addContainerStats(profileID, &stats); err != nil {
+		return stats, err
+	}
 	return stats, nil
+}
+
+// addContainerStats fills the Test Set / Plan / Execution counts and the
+// set / plan coverage — how many distinct Tests belong to at least one set or
+// plan (FR-9.4).
+func (r *Repository) addContainerStats(profileID string, stats *Statistics) error {
+	kindRows, err := r.db.Query(
+		`SELECT kind, COUNT(*) FROM test_container WHERE profile_id = ? GROUP BY kind`,
+		profileID)
+	if err != nil {
+		return fmt.Errorf("count containers: %w", err)
+	}
+	defer kindRows.Close()
+	for kindRows.Next() {
+		var kind string
+		var n int
+		if err := kindRows.Scan(&kind, &n); err != nil {
+			return err
+		}
+		switch kind {
+		case "testset":
+			stats.TestSets = n
+		case "testplan":
+			stats.TestPlans = n
+		case "testexec":
+			stats.TestExecutions = n
+		}
+	}
+	if err := kindRows.Err(); err != nil {
+		return err
+	}
+
+	covRows, err := r.db.Query(
+		`SELECT c.kind, COUNT(DISTINCT l.test_key)
+		 FROM test_container_test l
+		 JOIN test_container c
+		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+		 WHERE l.profile_id = ?
+		 GROUP BY c.kind`,
+		profileID)
+	if err != nil {
+		return fmt.Errorf("count container coverage: %w", err)
+	}
+	defer covRows.Close()
+	for covRows.Next() {
+		var kind string
+		var n int
+		if err := covRows.Scan(&kind, &n); err != nil {
+			return err
+		}
+		switch kind {
+		case "testset":
+			stats.TestsInSet = n
+		case "testplan":
+			stats.TestsInPlan = n
+		}
+	}
+	return covRows.Err()
 }
 
 // addExecutionCoverage rolls up Test Run statuses across all Test Execution

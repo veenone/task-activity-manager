@@ -276,6 +276,11 @@ export interface Statistics {
   total: number;
   pendingChanges: number;
   executedTests: number;
+  testSets: number;
+  testPlans: number;
+  testExecutions: number;
+  testsInSet: number;
+  testsInPlan: number;
   byStatus: Bucket[];
   byPriority: Bucket[];
   byLabel: Bucket[];

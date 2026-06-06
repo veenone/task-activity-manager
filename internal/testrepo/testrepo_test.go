@@ -1517,6 +1517,44 @@ func TestGetStatisticsIncludesPendingCount(t *testing.T) {
 	}
 }
 
+func TestGetStatisticsCountsContainersAndCoverage(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1"},
+		{Key: "QA-2", ID: "2"},
+		{Key: "QA-3", ID: "3"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TS-1", Kind: "testset", Summary: "Set", Status: "Open"},
+		{Key: "QA-TP-1", Kind: "testplan", Summary: "Plan", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed containers: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+		{ContainerKey: "QA-TS-1", TestKey: "QA-2"},
+		{ContainerKey: "QA-TP-1", TestKey: "QA-1"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+
+	stats, err := repo.GetStatistics("p1")
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.TestSets != 1 || stats.TestPlans != 1 {
+		t.Errorf("counts: sets=%d plans=%d, want 1/1", stats.TestSets, stats.TestPlans)
+	}
+	if stats.TestsInSet != 2 {
+		t.Errorf("TestsInSet = %d, want 2 (QA-1, QA-2)", stats.TestsInSet)
+	}
+	if stats.TestsInPlan != 1 {
+		t.Errorf("TestsInPlan = %d, want 1 (QA-1)", stats.TestsInPlan)
+	}
+}
+
 func TestGetStatisticsRollsUpExecutionCoverage(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{
