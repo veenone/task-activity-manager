@@ -307,6 +307,56 @@ func TestBulkAssociatePreconditionsAddsAndRemoves(t *testing.T) {
 	}
 }
 
+func TestEditPreconditionFieldQueuesPreconditionEdit(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+
+	if err := repo.EditPreconditionField("p1", "QA-P-1", "summary", "Account must exist"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	all, _ := repo.ListAllPreconditions("p1")
+	var got testrepo.Precondition
+	for _, p := range all {
+		if p.Key == "QA-P-1" {
+			got = p
+		}
+	}
+	if got.Summary != "Account must exist" {
+		t.Errorf("summary = %q, want edited value", got.Summary)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 || changes[0].EntityType != "precondition_edit" || changes[0].EntityKey != "QA-P-1" {
+		t.Fatalf("pending = %+v, want one precondition_edit for QA-P-1", changes)
+	}
+}
+
+func TestDiscardPreconditionEditRevertsValue(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	if err := repo.EditPreconditionField("p1", "QA-P-1", "summary", "changed"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	all, _ := repo.ListAllPreconditions("p1")
+	for _, p := range all {
+		if p.Key == "QA-P-1" && p.Summary != "Account exists" {
+			t.Errorf("summary = %q after discard, want original 'Account exists'", p.Summary)
+		}
+	}
+}
+
+func TestEditPreconditionFieldRejectsUnknownField(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	if err := repo.EditPreconditionField("p1", "QA-P-1", "type", "Manual"); err == nil {
+		t.Error("editing a non-whitelisted precondition field should error")
+	}
+}
+
 func seedTestWithPreconditions(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)

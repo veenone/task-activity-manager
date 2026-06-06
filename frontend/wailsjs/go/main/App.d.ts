@@ -30,6 +30,8 @@ export function DeleteTestStep(arg1:string,arg2:string,arg3:string):Promise<void
 
 export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
 
+export function EditPreconditionField(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function EditTestField(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function EditTestStepField(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;

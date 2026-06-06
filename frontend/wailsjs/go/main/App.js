@@ -50,6 +50,10 @@ export function DiscardPendingChange(arg1, arg2) {
   return window['go']['main']['App']['DiscardPendingChange'](arg1, arg2);
 }
 
+export function EditPreconditionField(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['EditPreconditionField'](arg1, arg2, arg3, arg4);
+}
+
 export function EditTestField(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditTestField'](arg1, arg2, arg3, arg4);
 }

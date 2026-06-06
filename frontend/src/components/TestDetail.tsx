@@ -4,6 +4,7 @@ import {
   GetTestPreconditions,
   ListAllPreconditions,
   SetTestPreconditions,
+  EditPreconditionField,
   GetTestContainers,
   GetTestTransitions,
   GetTestSteps,
@@ -400,16 +401,13 @@ export function TestDetail({
           ) : (
             <ul className="pre-list">
               {preconditions.map((p) => (
-                <li key={p.key}>
-                  <span className="mono">{p.key}</span> — {p.summary}
-                  <button
-                    className="btn btn-ghost pre-remove"
-                    onClick={() => removePrecondition(p.key)}
-                    title="Remove this precondition"
-                  >
-                    ✕
-                  </button>
-                </li>
+                <PreconditionRow
+                  key={p.key}
+                  profileId={profileId}
+                  precondition={p}
+                  onRemove={removePrecondition}
+                  onEdited={onEdited}
+                />
               ))}
             </ul>
           )}
@@ -680,6 +678,57 @@ function StepRow({
         />
       </div>
       {saveError && <div className="error-text step-save-error">{saveError}</div>}
+    </li>
+  );
+}
+
+// PreconditionRow renders one linked Precondition with an inline-editable
+// summary (FR-13.5 update) and a remove button (FR-13.6). Editing the summary
+// updates the Precondition issue itself, so it changes everywhere that
+// precondition is linked.
+function PreconditionRow({
+  profileId,
+  precondition,
+  onRemove,
+  onEdited,
+}: {
+  profileId: string;
+  precondition: Precondition;
+  onRemove: (key: string) => void;
+  onEdited: () => void;
+}) {
+  const [summary, setSummary] = useState(precondition.summary);
+  const [saveError, setSaveError] = useState("");
+
+  async function save() {
+    if (summary === precondition.summary) return;
+    setSaveError("");
+    try {
+      await EditPreconditionField(profileId, precondition.key, "summary", summary);
+      onEdited();
+    } catch (e) {
+      setSummary(precondition.summary);
+      setSaveError(errMsg(e));
+    }
+  }
+
+  return (
+    <li>
+      <span className="mono">{precondition.key}</span>
+      <input
+        className="pre-summary-edit"
+        value={summary}
+        onChange={(e) => setSummary(e.target.value)}
+        onBlur={save}
+      />
+      <button
+        className="btn btn-ghost pre-remove"
+        onClick={() => onRemove(precondition.key)}
+        title="Remove this precondition"
+      >
+        ✕
+      </button>
+      {saveError && <span className="error-text">{saveError}</span>}
     </li>
   );
 }

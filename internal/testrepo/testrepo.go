@@ -491,6 +491,59 @@ func (r *Repository) ListAllPreconditions(profileID string) ([]Precondition, err
 	return out, rows.Err()
 }
 
+// EditPreconditionField applies a local edit to one field of a Precondition
+// (FR-13.5) — summary or description — coalescing it into a per-field pending
+// change keyed by the Precondition's own key. Commit pushes it as an issue
+// update. Reverting to the original value drops the pending change.
+func (r *Repository) EditPreconditionField(profileID, preconditionKey, field, newValue string) error {
+	col, ok := preconditionFields[field]
+	if !ok {
+		return fmt.Errorf("precondition field %q is not editable", field)
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var currentVal string
+	readSQL := fmt.Sprintf(
+		`SELECT %s FROM precondition WHERE profile_id = ? AND jira_key = ?`, col,
+	)
+	err = tx.QueryRow(readSQL, profileID, preconditionKey).Scan(&currentVal)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read precondition value: %w", err)
+	}
+	if currentVal == newValue {
+		return nil
+	}
+
+	updateSQL := fmt.Sprintf(
+		`UPDATE precondition SET %s = ? WHERE profile_id = ? AND jira_key = ?`, col,
+	)
+	if _, err := tx.Exec(updateSQL, newValue, profileID, preconditionKey); err != nil {
+		return fmt.Errorf("update precondition: %w", err)
+	}
+	// Preconditions have no cached updated_at, so there's no per-issue
+	// conflict watermark — commit is best-effort last-writer-wins.
+	if err := upsertPendingChange(
+		tx, profileID, entityPreconditionEdit, preconditionKey, field, currentVal, newValue, "",
+	); err != nil {
+		return err
+	}
+	if err := writeAudit(
+		tx, profileID, entityPreconditionEdit, preconditionKey,
+		"edit-precondition-local", field, currentVal, newValue, "",
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // SetTestPreconditions replaces a Test's Precondition associations with the
 // given set and queues the change for commit (FR-13.5). The whole desired set
 // is stored as one pending row (before / after key-lists) rather than per-link
@@ -2423,6 +2476,18 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 				return fmt.Errorf("remove membership: %w", err)
 			}
 		}
+	case entityPreconditionEdit:
+		// entity_key is the Precondition key; revert the edited column.
+		col, ok := preconditionFields[field]
+		if !ok {
+			return fmt.Errorf("precondition field %q is not editable (audit log corrupt?)", field)
+		}
+		revertSQL := fmt.Sprintf(
+			`UPDATE precondition SET %s = ? WHERE profile_id = ? AND jira_key = ?`, col,
+		)
+		if _, err := tx.Exec(revertSQL, beforeVal, profileID, entityKey); err != nil {
+			return fmt.Errorf("revert precondition: %w", err)
+		}
 	case entityPreconditionSet:
 		// entity_key is the test key; restore the original Precondition set
 		// from the before snapshot.
@@ -2857,15 +2922,23 @@ func applyBulkOperation(op BulkEdit, current string) (string, error) {
 // Entity types for pending_change / audit_log rows. New ones get added
 // here so the switch/lookup code stays grep-friendly.
 const (
-	entityTestCase        = "test_case"
-	entityTestStep        = "test_step"
-	entityTestStepDelete  = "test_step_delete"
-	entityTestStepAdd     = "test_step_add"
-	entityTestStepOrder   = "test_step_order"
-	entityMembershipAdd   = "test_membership_add"
-	entityContainerAdd    = "test_container_add"
-	entityPreconditionSet = "precondition_set"
+	entityTestCase         = "test_case"
+	entityTestStep         = "test_step"
+	entityTestStepDelete   = "test_step_delete"
+	entityTestStepAdd      = "test_step_add"
+	entityTestStepOrder    = "test_step_order"
+	entityMembershipAdd    = "test_membership_add"
+	entityContainerAdd     = "test_container_add"
+	entityPreconditionSet  = "precondition_set"
+	entityPreconditionEdit = "precondition_edit"
 )
+
+// preconditionFields whitelists which Precondition columns can be edited via
+// EditPreconditionField (FR-13.5).
+var preconditionFields = map[string]string{
+	"summary":     "summary",
+	"description": "description",
+}
 
 // stepEntityKey encodes a step's parent Test plus its Xray step ID into a
 // single entity_key, since pending_change has just one key column.

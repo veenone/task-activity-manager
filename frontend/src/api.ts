@@ -16,6 +16,7 @@ export {
   GetTestPreconditions,
   ListAllPreconditions,
   SetTestPreconditions,
+  EditPreconditionField,
   BulkAssociatePreconditions,
   GetTestContainers,
   ListContainers,

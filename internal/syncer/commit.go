@@ -73,9 +73,16 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 	// Container allocations (FR-3.4–3.6) are per-Container, not per-Test, so
 	// they're handled in their own pass after the per-Test commits.
 	membershipRows := make([]testrepo.PendingChange, 0)
+	// Precondition edits are keyed by the Precondition's own issue key, not a
+	// Test, so they commit in their own pass grouped by precondition.
+	preconditionEditRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" || c.EntityType == "test_container_add" {
 			membershipRows = append(membershipRows, c)
+			continue
+		}
+		if c.EntityType == "precondition_edit" {
+			preconditionEditRows = append(preconditionEditRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -356,8 +363,48 @@ testLoop:
 	}
 
 	e.commitMemberships(ctx, profileID, membershipRows, &result)
+	e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
 
 	return result, nil
+}
+
+// commitPreconditionEdits pushes Precondition field edits (FR-13.5), grouping a
+// Precondition's pending field changes into one issue update. Reported under
+// the Precondition key.
+func (e *Engine) commitPreconditionEdits(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
+	byPrecondition := make(map[string][]testrepo.PendingChange)
+	order := make([]string, 0)
+	for _, c := range rows {
+		if _, seen := byPrecondition[c.EntityKey]; !seen {
+			order = append(order, c.EntityKey)
+		}
+		byPrecondition[c.EntityKey] = append(byPrecondition[c.EntityKey], c)
+	}
+
+	for _, key := range order {
+		group := byPrecondition[key]
+		updates := make(map[string]string, len(group))
+		ids := make([]int64, len(group))
+		for i, c := range group {
+			updates[c.Field] = c.AfterVal
+			ids[i] = c.ID
+		}
+		if err := e.client.UpdateIssue(ctx, key, jira.FieldsForJira(updates)); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: key,
+				Error:   "update precondition: " + sanitizeError(err.Error()),
+			})
+			continue
+		}
+		if err := e.repo.CommitPendingChanges(profileID, ids); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: key,
+				Error:   "Jira accepted precondition update but local cleanup failed: " + err.Error(),
+			})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
+	}
 }
 
 // commitMemberships pushes container-allocation pending rows (FR-3.4–3.6).

@@ -253,6 +253,15 @@ func (a *App) SetTestPreconditions(profileID, testKey string, precondKeys []stri
 	return a.repo.SetTestPreconditions(profileID, testKey, precondKeys)
 }
 
+// EditPreconditionField applies a local edit to a Precondition's summary or
+// description and queues it for commit (FR-13.5).
+func (a *App) EditPreconditionField(profileID, preconditionKey, field, newValue string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.EditPreconditionField(profileID, preconditionKey, field, newValue)
+}
+
 // BulkAssociatePreconditions adds (add=true) or removes (add=false) the given
 // Preconditions across a batch of Tests (FR-13.6).
 func (a *App) BulkAssociatePreconditions(profileID string, testKeys, precondKeys []string, add bool) (testrepo.BulkEditResult, error) {

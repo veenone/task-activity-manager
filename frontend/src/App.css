@@ -866,6 +866,24 @@ tr.row-selected {
 .pre-add {
   margin-bottom: 12px;
 }
+.pre-summary-edit {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #1f2933;
+}
+.pre-summary-edit:hover {
+  border-color: #e3e6ec;
+}
+.pre-summary-edit:focus {
+  border-color: #3b5bdb;
+  background: #fff;
+  outline: none;
+}
 
 /* Profile form and modal */
 .profile-form {
