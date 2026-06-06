@@ -225,6 +225,11 @@ func columnForField(field string) (string, bool) {
 	if field == "status" {
 		return "status", true
 	}
+	if field == "folder" {
+		// Test Repository moves (FR-13.3) are tracked like a field change but
+		// committed via the test-repository API, not a plain issue PUT.
+		return "folder_id", true
+	}
 	return "", false
 }
 
@@ -298,7 +303,13 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 		         AND pending_change.field       = 'labels'
 		     ) THEN test_case.labels ELSE excluded.labels END,
 		   updated_at  = excluded.updated_at,
-		   folder_id   = excluded.folder_id`)
+		   folder_id   = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = 'folder'
+		     ) THEN test_case.folder_id ELSE excluded.folder_id END`)
 	if err != nil {
 		return fmt.Errorf("prepare upsert: %w", err)
 	}
@@ -2301,6 +2312,68 @@ func (r *Repository) TransitionTest(profileID, testKey, targetStatus string) err
 		return err
 	}
 	return tx.Commit()
+}
+
+// MoveTestToFolder relocates a Test in the Test Repository tree (FR-13.3),
+// queuing the move as a pending change on the "folder" field. Commit pushes it
+// via the test-repository API rather than a plain issue PUT. Moving to the
+// folder the Test is already in is a no-op; moving back to the original folder
+// drops the pending change.
+func (r *Repository) MoveTestToFolder(profileID, testKey, targetFolderID string) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var currentVal, baseVersion string
+	err = tx.QueryRow(
+		`SELECT folder_id, updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+		profileID, testKey,
+	).Scan(&currentVal, &baseVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read current folder: %w", err)
+	}
+	if currentVal == targetFolderID {
+		return nil
+	}
+	if _, err := tx.Exec(
+		`UPDATE test_case SET folder_id = ? WHERE profile_id = ? AND jira_key = ?`,
+		targetFolderID, profileID, testKey,
+	); err != nil {
+		return fmt.Errorf("update folder: %w", err)
+	}
+	if err := upsertPendingChange(
+		tx, profileID, entityTestCase, testKey, "folder", currentVal, targetFolderID, baseVersion,
+	); err != nil {
+		return err
+	}
+	if err := writeAudit(
+		tx, profileID, entityTestCase, testKey,
+		"move-local", "folder", currentVal, targetFolderID, "",
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// BulkMoveToFolder moves a batch of Tests to one Test Repository folder
+// (FR-13.3 bulk), queuing a pending change per moved Test. Each Test is moved
+// in its own transaction so one failure doesn't block the rest; a Test already
+// in the target folder is reported as succeeded.
+func (r *Repository) BulkMoveToFolder(profileID string, testKeys []string, targetFolderID string) (BulkEditResult, error) {
+	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
+	for _, key := range testKeys {
+		if err := r.MoveTestToFolder(profileID, key, targetFolderID); err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
+	}
+	return result, nil
 }
 
 // CommitPendingChanges deletes the given pending_change rows and writes a

@@ -1567,6 +1567,121 @@ func TestUpsertTestsPreservesPendingStatusOnResync(t *testing.T) {
 	}
 }
 
+func TestMoveTestToFolderRecordsFolderPendingChange(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", FolderID: "/Auth/Login"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := repo.MoveTestToFolder("p1", "QA-1", "/Browse/Search"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	got, _ := repo.GetTest("p1", "QA-1")
+	if got.FolderID != "/Browse/Search" {
+		t.Errorf("FolderID = %q, want /Browse/Search", got.FolderID)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 {
+		t.Fatalf("want 1 pending change, got %d", len(changes))
+	}
+	c := changes[0]
+	if c.Field != "folder" || c.BeforeVal != "/Auth/Login" || c.AfterVal != "/Browse/Search" {
+		t.Errorf("change = %+v, want field=folder before=/Auth/Login after=/Browse/Search", c)
+	}
+}
+
+func TestMoveTestToFolderToSameFolderIsNoop(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", FolderID: "/Auth/Login"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := repo.MoveTestToFolder("p1", "QA-1", "/Auth/Login"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("moving to the same folder should not queue a change; got %+v", changes)
+	}
+}
+
+func TestDiscardFolderMoveRevertsFolder(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", FolderID: "/Auth/Login"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := repo.MoveTestToFolder("p1", "QA-1", "/Browse/Search"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	got, _ := repo.GetTest("p1", "QA-1")
+	if got.FolderID != "/Auth/Login" {
+		t.Errorf("FolderID = %q after discard, want /Auth/Login (reverted)", got.FolderID)
+	}
+}
+
+func TestUpsertTestsPreservesPendingFolderOnResync(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", FolderID: "/Auth/Login"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := repo.MoveTestToFolder("p1", "QA-1", "/Browse/Search"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	// Resync with a different remote folder — the local move must survive.
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "X", FolderID: "/Admin/Audit"},
+	}); err != nil {
+		t.Fatalf("resync: %v", err)
+	}
+
+	got, _ := repo.GetTest("p1", "QA-1")
+	if got.FolderID != "/Browse/Search" {
+		t.Errorf("FolderID = %q after resync, want /Browse/Search (pending move preserved)", got.FolderID)
+	}
+}
+
+func TestBulkMoveToFolderMovesAllSelected(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", FolderID: "/A"},
+		{Key: "QA-2", ID: "2", FolderID: "/B"},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	result, err := repo.BulkMoveToFolder("p1", []string{"QA-1", "QA-2"}, "/Target")
+	if err != nil {
+		t.Fatalf("bulk move: %v", err)
+	}
+	if len(result.Succeeded) != 2 {
+		t.Errorf("succeeded = %d, want 2", len(result.Succeeded))
+	}
+	for _, key := range []string{"QA-1", "QA-2"} {
+		got, _ := repo.GetTest("p1", key)
+		if got.FolderID != "/Target" {
+			t.Errorf("%s FolderID = %q, want /Target", key, got.FolderID)
+		}
+	}
+}
+
 func TestDiscardStatusPendingChangeRevertsStatus(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{

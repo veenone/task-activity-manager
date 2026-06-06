@@ -52,7 +52,7 @@ type FailedCommit struct {
 //
 // Failures and conflicts leave pending rows in place so the user can
 // resolve and retry.
-func (e *Engine) CommitChanges(ctx context.Context, profileID string) (CommitResult, error) {
+func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string) (CommitResult, error) {
 	result := CommitResult{
 		Succeeded:  []string{},
 		Conflicted: []Conflict{},
@@ -120,6 +120,7 @@ testLoop:
 		//   - step deletions, keyed by xrayID
 		var statusChange *testrepo.PendingChange
 		var orderChange *testrepo.PendingChange
+		var folderChange *testrepo.PendingChange
 		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
 		stepChanges := make(map[string][]testrepo.PendingChange)
 		stepDeletes := make([]string, 0)
@@ -128,10 +129,14 @@ testLoop:
 			c := testChanges[i]
 			switch c.EntityType {
 			case "test_case":
-				if c.Field == "status" {
+				switch c.Field {
+				case "status":
 					cc := c
 					statusChange = &cc
-				} else {
+				case "folder":
+					cc := c
+					folderChange = &cc
+				default:
 					fieldChanges = append(fieldChanges, c)
 				}
 			case "test_step":
@@ -208,6 +213,16 @@ testLoop:
 		// DELETE removed steps first — Xray validates the rest of the
 		// commit against whatever steps remain, so removing before edits
 		// avoids touching a step a parallel commit might also be removing.
+		if folderChange != nil {
+			if err := e.client.MoveTestToFolder(ctx, projectKey, testKey, folderChange.AfterVal); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   "move to folder: " + sanitizeError(err.Error()),
+				})
+				continue
+			}
+		}
+
 		for _, xrayID := range stepDeletes {
 			if err := e.client.DeleteTestStep(ctx, testKey, xrayID); err != nil {
 				result.Failed = append(result.Failed, FailedCommit{

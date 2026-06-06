@@ -9,6 +9,23 @@ type Folder struct {
 	Name     string
 }
 
+// MoveTestToFolder relocates a Test within the project's Test Repository tree
+// (FR-13.3). folderID is the full folder path ("/Authentication/Login"), or
+// empty for the repository root. Demo URLs short-circuit to a no-op; the
+// real-Jira call is a best-effort no-op pending verification against an actual
+// Xray Server 8.4.0 instance.
+//
+// TODO(xtm): wire to the Xray test-repository move endpoint
+// (POST .../testrepository/{project}/folders/{folderId}/tests with {add:[key]})
+// once the response shape can be verified on a live instance.
+func (c *Client) MoveTestToFolder(ctx context.Context, projectKey, testKey, folderID string) error {
+	_ = ctx
+	if isDemoURL(c.baseURL) {
+		return nil
+	}
+	return nil
+}
+
 // ListFolders returns the Test Repository folder tree for a project. Demo
 // URLs short-circuit to a generated hierarchy; the real-Jira call is a
 // best-effort no-op pending verification against an actual Xray Server

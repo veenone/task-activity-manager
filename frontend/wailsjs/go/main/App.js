@@ -14,6 +14,10 @@ export function BulkEditTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkEditTests'](arg1, arg2, arg3);
 }
 
+export function BulkMoveToFolder(arg1, arg2, arg3) {
+  return window['go']['main']['App']['BulkMoveToFolder'](arg1, arg2, arg3);
+}
+
 export function BulkTransitionTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkTransitionTests'](arg1, arg2, arg3);
 }
@@ -116,6 +120,10 @@ export function ListProfiles() {
 
 export function ListTests(arg1, arg2) {
   return window['go']['main']['App']['ListTests'](arg1, arg2);
+}
+
+export function MoveTestToFolder(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MoveTestToFolder'](arg1, arg2, arg3);
 }
 
 export function ReorderTestSteps(arg1, arg2, arg3) {

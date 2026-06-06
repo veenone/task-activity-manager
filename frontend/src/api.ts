@@ -20,6 +20,8 @@ export {
   CreateContainerAndAllocate,
   SeedSampleContainers,
   GetTestPlanBoard,
+  MoveTestToFolder,
+  BulkMoveToFolder,
   ListTests,
   ListMatchingKeys,
   GetTest,

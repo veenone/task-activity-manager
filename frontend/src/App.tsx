@@ -32,6 +32,7 @@ import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
 import { BulkAllocateModal } from "./components/BulkAllocateModal";
+import { BulkMoveModal } from "./components/BulkMoveModal";
 import { Dashboard } from "./components/Dashboard";
 import { TestPlanBoardView } from "./components/TestPlanBoardView";
 
@@ -75,6 +76,7 @@ function App() {
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showBulkTransition, setShowBulkTransition] = useState(false);
   const [showBulkAllocate, setShowBulkAllocate] = useState(false);
+  const [showBulkMove, setShowBulkMove] = useState(false);
 
   const [view, setView] = useState<"browse" | "dashboard" | "plans">("browse");
 
@@ -456,6 +458,14 @@ function App() {
           >
             Allocate…
           </button>
+          {folders.length > 0 && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowBulkMove(true)}
+            >
+              Move to folder…
+            </button>
+          )}
           <button className="btn" onClick={() => setSelectedSet(new Set())}>
             Clear
           </button>
@@ -538,6 +548,7 @@ function App() {
               testKey={selectedKey}
               version={detailVersion}
               pendingForTest={pendingByTestKey.get(selectedKey) ?? []}
+              folders={folders}
               onClose={() => setSelectedKey(null)}
               onEdited={handleEdited}
             />
@@ -627,6 +638,27 @@ function App() {
             setDetailVersion((v) => v + 1);
             reloadPending();
             setShowBulkAllocate(false);
+          }}
+        />
+      )}
+
+      {showBulkMove && (
+        <BulkMoveModal
+          profileId={activeId}
+          testKeys={[...selectedSet]}
+          folders={folders}
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setSelectedSet(new Set());
+            setShowBulkMove(false);
+          }}
+          onCancel={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setShowBulkMove(false);
           }}
         />
       )}

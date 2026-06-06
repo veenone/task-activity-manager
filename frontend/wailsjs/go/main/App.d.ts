@@ -12,6 +12,8 @@ export function AllocateTests(arg1:string,arg2:string,arg3:Array<string>):Promis
 
 export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
+export function BulkMoveToFolder(arg1:string,arg2:Array<string>,arg3:string):Promise<testrepo.BulkEditResult>;
+
 export function BulkTransitionTests(arg1:string,arg2:Array<string>,arg3:string):Promise<main.BulkTransitionResult>;
 
 export function CommitPendingChanges(arg1:string):Promise<syncer.CommitResult>;
@@ -63,6 +65,8 @@ export function ListPendingChanges(arg1:string):Promise<Array<testrepo.PendingCh
 export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
+
+export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 

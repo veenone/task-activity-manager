@@ -294,7 +294,7 @@ func (a *App) CommitPendingChanges(profileID string) (syncer.CommitResult, error
 		return empty, fmt.Errorf("load credentials: %w", err)
 	}
 	engine := syncer.New(jira.NewClient(p.JiraURL, token), a.repo)
-	return engine.CommitChanges(a.ctx, profileID)
+	return engine.CommitChanges(a.ctx, profileID, p.ProjectKey)
 }
 
 // --- Workflow transitions (FR-4.2) ---
@@ -703,6 +703,28 @@ func (a *App) GetStatistics(profileID string) (testrepo.Statistics, error) {
 		return testrepo.Statistics{}, err
 	}
 	return a.repo.GetStatistics(profileID)
+}
+
+// --- Test Repository moves (FR-13.3) ---
+
+// MoveTestToFolder relocates a Test in the Test Repository tree locally and
+// queues the move for commit (FR-13.3). folderID is the full folder path, or
+// empty for the repository root.
+func (a *App) MoveTestToFolder(profileID, testKey, folderID string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.MoveTestToFolder(profileID, testKey, folderID)
+}
+
+// BulkMoveToFolder moves a batch of Tests to one Test Repository folder
+// (FR-13.3 bulk), queuing a pending change per moved Test.
+func (a *App) BulkMoveToFolder(profileID string, testKeys []string, folderID string) (testrepo.BulkEditResult, error) {
+	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkMoveToFolder(profileID, testKeys, folderID)
 }
 
 // --- Browse (FR-11) ---

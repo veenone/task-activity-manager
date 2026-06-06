@@ -11,6 +11,7 @@ import {
   DeleteTestStep,
   AddTestStep,
   ReorderTestSteps,
+  MoveTestToFolder,
   errMsg,
 } from "../api";
 import type {
@@ -20,6 +21,7 @@ import type {
   PendingChange,
   Transition,
   Step,
+  Folder,
 } from "../api";
 
 interface Props {
@@ -27,6 +29,7 @@ interface Props {
   testKey: string;
   version: number;
   pendingForTest: PendingChange[];
+  folders: Folder[];
   onClose: () => void;
   onEdited: () => void;
 }
@@ -38,6 +41,7 @@ export function TestDetail({
   testKey,
   version,
   pendingForTest,
+  folders,
   onClose,
   onEdited,
 }: Props) {
@@ -174,6 +178,20 @@ export function TestDetail({
       setStepsError(errMsg(e));
     } finally {
       setStepsLoading(false);
+    }
+  }
+
+  // moveToFolder relocates the test in the Test Repository (FR-13.3). The new
+  // folder is reflected locally so the next diff works, then queued for commit.
+  async function moveToFolder(folderId: string) {
+    if (!test || folderId === test.folderId) return;
+    setSaveError("");
+    try {
+      await MoveTestToFolder(profileId, testKey, folderId);
+      setTest({ ...test, folderId });
+      onEdited();
+    } catch (e) {
+      setSaveError(`Move failed: ${errMsg(e)}`);
     }
   }
 
@@ -317,6 +335,28 @@ export function TestDetail({
                 placeholder="space-separated"
               />
             </dd>
+
+            {folders.length > 0 && (
+              <>
+                <dt>
+                  Folder {isDirty("folder") && <DirtyDot />}
+                </dt>
+                <dd>
+                  <select
+                    className="detail-input detail-input-inline"
+                    value={test.folderId}
+                    onChange={(e) => moveToFolder(e.target.value)}
+                  >
+                    <option value="">(repository root)</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.id}
+                      </option>
+                    ))}
+                  </select>
+                </dd>
+              </>
+            )}
 
             <dt>Updated</dt>
             <dd>{test.updated || "—"}</dd>
