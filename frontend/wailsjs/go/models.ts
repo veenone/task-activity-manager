@@ -540,6 +540,24 @@ export namespace testrepo {
 	        this.offset = source["offset"];
 	    }
 	}
+	export class SeedResult {
+	    sets: number;
+	    plans: number;
+	    executions: number;
+	    linked: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SeedResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sets = source["sets"];
+	        this.plans = source["plans"];
+	        this.executions = source["executions"];
+	        this.linked = source["linked"];
+	    }
+	}
 	export class Statistics {
 	    total: number;
 	    pendingChanges: number;

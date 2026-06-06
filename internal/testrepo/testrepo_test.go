@@ -536,6 +536,75 @@ func TestGetTestPlanBoardRejectsNonPlanKey(t *testing.T) {
 	}
 }
 
+func TestSeedSampleContainersPopulatesAllThreeKinds(t *testing.T) {
+	repo := newRepo(t)
+	tests := []testrepo.TestCase{}
+	for i := 1; i <= 20; i++ {
+		tests = append(tests, testrepo.TestCase{Key: fmt.Sprintf("QA-%d", i), ID: fmt.Sprintf("%d", i)})
+	}
+	if err := repo.UpsertTests("p1", tests); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+
+	result, err := repo.SeedSampleContainers("p1", "QA")
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if result.Sets == 0 || result.Plans == 0 || result.Executions == 0 {
+		t.Errorf("result = %+v, want non-zero sets/plans/executions", result)
+	}
+	if result.Linked != 20 {
+		t.Errorf("Linked = %d, want 20", result.Linked)
+	}
+
+	sets, _ := repo.ListContainers("p1", "testset")
+	plans, _ := repo.ListContainers("p1", "testplan")
+	execs, _ := repo.ListContainers("p1", "testexec")
+	if len(sets) == 0 || len(plans) == 0 || len(execs) == 0 {
+		t.Errorf("containers not created: sets=%d plans=%d execs=%d", len(sets), len(plans), len(execs))
+	}
+
+	stats, _ := repo.GetStatistics("p1")
+	if stats.ExecutedTests == 0 {
+		t.Errorf("expected seeded execution runs; ExecutedTests=0")
+	}
+}
+
+func TestSeedSampleContainersIsIdempotent(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1"},
+		{Key: "QA-2", ID: "2"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+
+	if _, err := repo.SeedSampleContainers("p1", "QA"); err != nil {
+		t.Fatalf("seed 1: %v", err)
+	}
+	if _, err := repo.SeedSampleContainers("p1", "QA"); err != nil {
+		t.Fatalf("seed 2: %v", err)
+	}
+
+	// Re-seeding must not duplicate memberships for a test.
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	seen := map[string]bool{}
+	for _, m := range members {
+		if seen[m.Key] {
+			t.Errorf("duplicate membership %s after re-seed", m.Key)
+		}
+		seen[m.Key] = true
+	}
+}
+
+func TestSeedSampleContainersRejectsEmptyProfile(t *testing.T) {
+	repo := newRepo(t)
+	_, err := repo.SeedSampleContainers("p1", "QA")
+	if err == nil {
+		t.Error("seeding a profile with no tests should error")
+	}
+}
+
 func seedPlanBoard(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)

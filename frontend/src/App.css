@@ -532,6 +532,10 @@
   gap: 6px;
   flex-wrap: wrap;
 }
+.board-seed {
+  margin-left: auto;
+  font-size: 12px;
+}
 .board-table {
   width: 100%;
   border-collapse: collapse;

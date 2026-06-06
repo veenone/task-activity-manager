@@ -1,22 +1,42 @@
 import { useEffect, useState } from "react";
-import { ListContainers, GetTestPlanBoard, errMsg } from "../api";
+import {
+  ListContainers,
+  GetTestPlanBoard,
+  SeedSampleContainers,
+  errMsg,
+} from "../api";
 import type { Container, TestPlanBoard } from "../api";
 
 interface Props {
   profileId: string;
   refreshKey: number;
+  onSeeded: () => void;
 }
 
 // TestPlanBoardView is the read-only Test Plan board (FR-13.7): pick a plan and
 // see each member Test with its consolidated execution status, computed from
 // the local store. Recomputes when the profile changes or a sync/commit bumps
 // refreshKey.
-export function TestPlanBoardView({ profileId, refreshKey }: Props) {
+export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
   const [plans, setPlans] = useState<Container[]>([]);
   const [selected, setSelected] = useState("");
   const [board, setBoard] = useState<TestPlanBoard | null>(null);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [error, setError] = useState("");
+  const [seeding, setSeeding] = useState(false);
+
+  async function seed() {
+    setSeeding(true);
+    setError("");
+    try {
+      await SeedSampleContainers(profileId);
+      onSeeded();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   useEffect(() => {
     if (!profileId) return;
@@ -69,8 +89,13 @@ export function TestPlanBoardView({ profileId, refreshKey }: Props) {
     return (
       <div className="board">
         <p className="muted">
-          No Test Plans cached yet. Run a sync to populate the board.
+          No Test Plans cached yet. Run a sync to populate the board, or
+          generate sample data to try it out.
         </p>
+        <button className="btn btn-primary" onClick={seed} disabled={seeding}>
+          {seeding ? "Generating…" : "Generate sample sets / plans / executions"}
+        </button>
+        {error && <div className="error-text">{error}</div>}
       </div>
     );
   }
@@ -98,6 +123,14 @@ export function TestPlanBoardView({ profileId, refreshKey }: Props) {
             ))}
           </div>
         )}
+        <button
+          className="link-btn board-seed"
+          onClick={seed}
+          disabled={seeding}
+          title="Regenerate sample sets / plans / executions from synced tests"
+        >
+          {seeding ? "Generating…" : "Regenerate sample data"}
+        </button>
       </div>
 
       {error && <div className="error-text">{error}</div>}

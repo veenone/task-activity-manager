@@ -18,6 +18,7 @@ export {
   ListContainers,
   AllocateTests,
   CreateContainerAndAllocate,
+  SeedSampleContainers,
   GetTestPlanBoard,
   ListTests,
   ListMatchingKeys,
@@ -124,6 +125,15 @@ export interface AllocateResult {
 export interface CreateContainerResult {
   tempKey: string;
   added: number;
+}
+
+// SeedResult mirrors testrepo.SeedResult — how much sample container data was
+// generated.
+export interface SeedResult {
+  sets: number;
+  plans: number;
+  executions: number;
+  linked: number;
 }
 
 // TestPlanBoardRow mirrors testrepo.TestPlanBoardRow — one Test on a Test Plan

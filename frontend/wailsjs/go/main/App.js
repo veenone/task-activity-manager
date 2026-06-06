@@ -122,6 +122,10 @@ export function ReorderTestSteps(arg1, arg2, arg3) {
   return window['go']['main']['App']['ReorderTestSteps'](arg1, arg2, arg3);
 }
 
+export function SeedSampleContainers(arg1) {
+  return window['go']['main']['App']['SeedSampleContainers'](arg1);
+}
+
 export function SyncProfile(arg1) {
   return window['go']['main']['App']['SyncProfile'](arg1);
 }

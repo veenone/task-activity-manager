@@ -629,6 +629,21 @@ func (a *App) BulkTransitionTests(profileID string, testKeys []string, targetSta
 	return result, nil
 }
 
+// SeedSampleContainers populates the local store with sample Test Sets, Test
+// Plans and Test Executions linked to the profile's synced Tests, so the
+// board / grouping / coverage features can be exercised before the real Xray
+// container endpoints are wired. Project key comes from the active profile.
+func (a *App) SeedSampleContainers(profileID string) (testrepo.SeedResult, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.SeedResult{}, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return testrepo.SeedResult{}, err
+	}
+	return a.repo.SeedSampleContainers(profileID, p.ProjectKey)
+}
+
 // --- Test Plan board (FR-13.7) ---
 
 // GetTestPlanBoard returns the read-only board for a Test Plan: its member

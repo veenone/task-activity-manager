@@ -675,6 +675,141 @@ func consolidateRunStatus(statuses []string) string {
 	return best
 }
 
+// SeedResult reports how much sample container data SeedSampleContainers
+// generated.
+type SeedResult struct {
+	Sets       int `json:"sets"`
+	Plans      int `json:"plans"`
+	Executions int `json:"executions"`
+	Linked     int `json:"linked"`
+}
+
+// seedRunStatuses is the weighted Test Run vocabulary used when seeding sample
+// Test Executions — mostly passing, some failing / not-yet-run.
+var seedRunStatuses = []string{
+	"PASS", "PASS", "PASS", "FAIL", "TODO", "TODO", "EXECUTING", "ABORTED",
+}
+
+// seedContainerStatuses cycles issue statuses for the generated containers.
+var seedContainerStatuses = []string{"Open", "In Progress", "Done"}
+
+// SeedSampleContainers populates the local store with sample Test Sets, Test
+// Plans and Test Executions (with run statuses) linked to the profile's
+// already-synced Tests. It exists so the board / grouping / coverage features
+// can be exercised before the real Xray container endpoints are wired — the
+// real-Jira sync is a no-op today, so seeded data survives a sync.
+//
+// Re-running is idempotent: the same containers and memberships are upserted,
+// refreshing run statuses. Up to seedTestCap Tests are linked to keep the
+// board readable.
+func (r *Repository) SeedSampleContainers(profileID, projectKey string) (SeedResult, error) {
+	var result SeedResult
+	if projectKey == "" {
+		projectKey = "SAMPLE"
+	}
+
+	const seedTestCap = 400
+	rows, err := r.db.Query(
+		`SELECT jira_key FROM test_case WHERE profile_id = ?
+		 ORDER BY jira_key LIMIT ?`, profileID, seedTestCap)
+	if err != nil {
+		return result, fmt.Errorf("read tests to seed: %w", err)
+	}
+	testKeys := []string{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			rows.Close()
+			return result, err
+		}
+		testKeys = append(testKeys, k)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return result, err
+	}
+	if len(testKeys) == 0 {
+		return result, fmt.Errorf("no tests cached for this profile — run a sync first")
+	}
+
+	const nSets, nPlans, nExecs = 5, 3, 4
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return result, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	containerStmt, err := tx.Prepare(
+		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
+		   kind = excluded.kind, summary = excluded.summary, status = excluded.status`)
+	if err != nil {
+		return result, fmt.Errorf("prepare container: %w", err)
+	}
+	defer containerStmt.Close()
+
+	makeContainers := func(prefix, kind, label string, count int) ([]string, error) {
+		keys := make([]string, count)
+		for i := 0; i < count; i++ {
+			key := fmt.Sprintf("%s-%s-%d", projectKey, prefix, i+1)
+			keys[i] = key
+			if _, err := containerStmt.Exec(
+				profileID, key, kind,
+				fmt.Sprintf("Sample %s %d", label, i+1),
+				seedContainerStatuses[i%len(seedContainerStatuses)],
+			); err != nil {
+				return nil, fmt.Errorf("seed container %s: %w", key, err)
+			}
+		}
+		return keys, nil
+	}
+
+	setKeys, err := makeContainers("SET", "testset", "test set", nSets)
+	if err != nil {
+		return result, err
+	}
+	planKeys, err := makeContainers("PLAN", "testplan", "test plan", nPlans)
+	if err != nil {
+		return result, err
+	}
+	execKeys, err := makeContainers("EXEC", "testexec", "execution", nExecs)
+	if err != nil {
+		return result, err
+	}
+
+	linkStmt, err := tx.Prepare(
+		`INSERT INTO test_container_test (profile_id, container_key, test_key, run_status)
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT(profile_id, container_key, test_key) DO UPDATE SET
+		   run_status = excluded.run_status`)
+	if err != nil {
+		return result, fmt.Errorf("prepare link: %w", err)
+	}
+	defer linkStmt.Close()
+
+	for i, testKey := range testKeys {
+		if _, err := linkStmt.Exec(profileID, setKeys[i%nSets], testKey, ""); err != nil {
+			return result, fmt.Errorf("seed set link: %w", err)
+		}
+		if _, err := linkStmt.Exec(profileID, planKeys[i%nPlans], testKey, ""); err != nil {
+			return result, fmt.Errorf("seed plan link: %w", err)
+		}
+		if _, err := linkStmt.Exec(
+			profileID, execKeys[i%nExecs], testKey,
+			seedRunStatuses[i%len(seedRunStatuses)],
+		); err != nil {
+			return result, fmt.Errorf("seed exec link: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return result, fmt.Errorf("commit seed: %w", err)
+	}
+	return SeedResult{Sets: nSets, Plans: nPlans, Executions: nExecs, Linked: len(testKeys)}, nil
+}
+
 // ListContainers returns the cached Containers of a given kind for a profile,
 // ordered by key — used by the bulk-allocation picker (FR-3.4–3.6).
 func (r *Repository) ListContainers(profileID, kind string) ([]Container, error) {

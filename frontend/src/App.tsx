@@ -468,7 +468,11 @@ function App() {
         </main>
       ) : view === "plans" ? (
         <main className="content content-dashboard">
-          <TestPlanBoardView profileId={activeId} refreshKey={refreshKey} />
+          <TestPlanBoardView
+            profileId={activeId}
+            refreshKey={refreshKey}
+            onSeeded={() => setRefreshKey((k) => k + 1)}
+          />
         </main>
       ) : (
         <main className="content">
