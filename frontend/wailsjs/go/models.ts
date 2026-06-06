@@ -518,6 +518,7 @@ export namespace testrepo {
 	    search: string;
 	    status: string;
 	    folderId: string;
+	    containerKey: string;
 	    sortBy: string;
 	    desc: boolean;
 	    limit: number;
@@ -532,6 +533,7 @@ export namespace testrepo {
 	        this.search = source["search"];
 	        this.status = source["status"];
 	        this.folderId = source["folderId"];
+	        this.containerKey = source["containerKey"];
 	        this.sortBy = source["sortBy"];
 	        this.desc = source["desc"];
 	        this.limit = source["limit"];

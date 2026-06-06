@@ -687,6 +687,36 @@ tr.row-selected {
 }
 
 /* Folder tree */
+/* Browse sidebar wrapper — holds the group-by selector and the folder tree
+   or container list (FR-11.6). */
+.browse-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fafbfc;
+  border-right: 1px solid #dfe1e6;
+  overflow: hidden;
+}
+.groupby-select {
+  margin: 8px;
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid #c4c9d4;
+  border-radius: 4px;
+  background: #fff;
+}
+.browse-sidebar-empty {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+.browse-sidebar .folder-tree {
+  width: auto;
+  flex: 1;
+  border-right: none;
+  background: transparent;
+}
+
 .folder-tree {
   width: 240px;
   flex-shrink: 0;

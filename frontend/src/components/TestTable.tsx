@@ -5,6 +5,7 @@ import type { TestPage, TestQuery, PendingChange } from "../api";
 interface Props {
   profileId: string;
   folderId: string;
+  containerKey: string;
   refreshKey: number;
   selectedKey: string | null;
   pendingByTestKey: Map<string, PendingChange[]>;
@@ -22,6 +23,7 @@ type SortCol = "key" | "summary" | "status" | "updated";
 export function TestTable({
   profileId,
   folderId,
+  containerKey,
   refreshKey,
   selectedKey,
   pendingByTestKey,
@@ -51,7 +53,7 @@ export function TestTable({
 
   useEffect(() => {
     setOffset(0);
-  }, [debouncedSearch, status, folderId, sortBy, desc, profileId]);
+  }, [debouncedSearch, status, folderId, containerKey, sortBy, desc, profileId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +63,7 @@ export function TestTable({
       search: debouncedSearch,
       status: status.trim(),
       folderId,
+      containerKey,
       sortBy,
       desc,
       limit: PAGE_SIZE,
@@ -84,6 +87,7 @@ export function TestTable({
     debouncedSearch,
     status,
     folderId,
+    containerKey,
     sortBy,
     desc,
     offset,
@@ -126,6 +130,7 @@ export function TestTable({
         search: debouncedSearch,
         status: status.trim(),
         folderId,
+        containerKey,
         sortBy,
         desc,
         limit: 0,
@@ -287,7 +292,8 @@ export function TestTable({
                   {page.total === 0 &&
                   debouncedSearch === "" &&
                   status.trim() === "" &&
-                  folderId === ""
+                  folderId === "" &&
+                  containerKey === ""
                     ? "No tests yet — run a sync to pull them from Jira."
                     : "No tests match the current filter."}
                 </td>

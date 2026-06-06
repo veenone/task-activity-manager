@@ -125,6 +125,69 @@ func TestListTestsFilterByCategoryFolderIncludesDescendants(t *testing.T) {
 	}
 }
 
+func TestListTestsFilterByContainerReturnsOnlyMembers(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "a"},
+		{Key: "QA-2", ID: "2", Summary: "b"},
+		{Key: "QA-3", ID: "3", Summary: "c"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TS-1", Kind: "testset", Summary: "Set", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed container: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+		{ContainerKey: "QA-TS-1", TestKey: "QA-3"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+
+	page, err := repo.ListTests("p1", testrepo.Query{ContainerKey: "QA-TS-1"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if page.Total != 2 {
+		t.Fatalf("Total = %d, want 2 (QA-1, QA-3)", page.Total)
+	}
+	for _, tc := range page.Tests {
+		if tc.Key == "QA-2" {
+			t.Errorf("QA-2 is not in the container; should be filtered out")
+		}
+	}
+}
+
+func TestListMatchingKeysAppliesContainerFilter(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1"},
+		{Key: "QA-2", ID: "2"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TP-1", Kind: "testplan", Summary: "Plan", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed container: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TP-1", TestKey: "QA-2"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+
+	keys, err := repo.ListMatchingKeys("p1", testrepo.Query{ContainerKey: "QA-TP-1"})
+	if err != nil {
+		t.Fatalf("matching: %v", err)
+	}
+	if len(keys) != 1 || keys[0] != "QA-2" {
+		t.Errorf("keys = %v, want [QA-2]", keys)
+	}
+}
+
 func TestListTestPreconditionsReturnsLinkedItems(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{

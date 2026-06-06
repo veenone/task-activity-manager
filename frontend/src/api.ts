@@ -77,6 +77,7 @@ export interface TestQuery {
   search: string;
   status: string;
   folderId: string;
+  containerKey: string;
   sortBy: string;
   desc: boolean;
   limit: number;

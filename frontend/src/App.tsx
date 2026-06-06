@@ -6,6 +6,7 @@ import {
   SyncProfile,
   GetSyncState,
   ListFolders,
+  ListContainers,
   ListPendingChanges,
   DiscardPendingChange,
   CommitPendingChanges,
@@ -18,6 +19,7 @@ import type {
   SyncState,
   SyncProgress,
   Folder,
+  Container,
   PendingChange,
   CommitResult,
 } from "./api";
@@ -25,6 +27,7 @@ import { ProfileForm } from "./components/ProfileForm";
 import { TestTable } from "./components/TestTable";
 import { TestDetail } from "./components/TestDetail";
 import { FolderTree } from "./components/FolderTree";
+import { ContainerList } from "./components/ContainerList";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
@@ -47,6 +50,15 @@ function App() {
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("");
+
+  // Browse grouping (FR-11.6): group the grid by folder (the default tree),
+  // Test Set or Test Plan. The container dimensions filter the grid to a
+  // chosen container's members.
+  const [groupBy, setGroupBy] = useState<"folder" | "testset" | "testplan">(
+    "folder",
+  );
+  const [groupContainers, setGroupContainers] = useState<Container[]>([]);
+  const [selectedContainer, setSelectedContainer] = useState<string>("");
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -158,11 +170,32 @@ function App() {
     loadProfileData();
   }, [loadProfileData, refreshKey]);
 
-  // Clear folder + row selection when the profile changes.
+  // Clear folder + container + row selection when the profile changes.
   useEffect(() => {
     setSelectedFolder("");
+    setSelectedContainer("");
     setSelectedSet(new Set());
   }, [activeId]);
+
+  // Load the containers backing the group-by sidebar when grouping by Test Set
+  // or Test Plan, and reset the chosen container whenever the dimension or
+  // profile changes so the grid doesn't keep filtering by a now-hidden key.
+  useEffect(() => {
+    setSelectedContainer("");
+    if (!activeId || groupBy === "folder") {
+      setGroupContainers([]);
+      return;
+    }
+    let cancelled = false;
+    ListContainers(activeId, groupBy)
+      .then((cs) => {
+        if (!cancelled) setGroupContainers(cs ?? []);
+      })
+      .catch((e) => console.error("list containers:", errMsg(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId, groupBy, refreshKey]);
 
   function toggleSelect(key: string) {
     setSelectedSet((prev) => {
@@ -439,19 +472,53 @@ function App() {
         </main>
       ) : (
         <main className="content">
-          {folders.length > 0 && (
-            <FolderTree
-              folders={folders}
-              selected={selectedFolder}
-              onSelect={(id) => {
-                setSelectedFolder(id);
+          <div className="browse-sidebar">
+            <select
+              className="groupby-select"
+              value={groupBy}
+              onChange={(e) => {
+                setGroupBy(e.target.value as "folder" | "testset" | "testplan");
+                setSelectedFolder("");
                 setSelectedKey(null);
               }}
-            />
-          )}
+            >
+              <option value="folder">Group by: Folder</option>
+              <option value="testset">Group by: Test Set</option>
+              <option value="testplan">Group by: Test Plan</option>
+            </select>
+            {groupBy === "folder" ? (
+              folders.length > 0 ? (
+                <FolderTree
+                  folders={folders}
+                  selected={selectedFolder}
+                  onSelect={(id) => {
+                    setSelectedFolder(id);
+                    setSelectedKey(null);
+                  }}
+                />
+              ) : (
+                <p className="muted browse-sidebar-empty">No folders synced.</p>
+              )
+            ) : (
+              <ContainerList
+                containers={groupContainers}
+                selected={selectedContainer}
+                emptyLabel={
+                  groupBy === "testset"
+                    ? "No Test Sets synced."
+                    : "No Test Plans synced."
+                }
+                onSelect={(key) => {
+                  setSelectedContainer(key);
+                  setSelectedKey(null);
+                }}
+              />
+            )}
+          </div>
           <TestTable
             profileId={activeId}
-            folderId={selectedFolder}
+            folderId={groupBy === "folder" ? selectedFolder : ""}
+            containerKey={groupBy === "folder" ? "" : selectedContainer}
             refreshKey={refreshKey}
             selectedKey={selectedKey}
             pendingByTestKey={pendingByTestKey}

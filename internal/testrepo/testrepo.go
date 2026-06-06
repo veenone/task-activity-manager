@@ -143,13 +143,14 @@ type AuditEntry struct {
 
 // Query drives a ListTests call: free-text search, filters, sorting, paging.
 type Query struct {
-	Search   string `json:"search"`
-	Status   string `json:"status"`
-	FolderID string `json:"folderId"` // empty = any folder
-	SortBy   string `json:"sortBy"`
-	Desc     bool   `json:"desc"`
-	Limit    int    `json:"limit"`
-	Offset   int    `json:"offset"`
+	Search       string `json:"search"`
+	Status       string `json:"status"`
+	FolderID     string `json:"folderId"`     // empty = any folder
+	ContainerKey string `json:"containerKey"` // empty = any container (FR-11.6)
+	SortBy       string `json:"sortBy"`
+	Desc         bool   `json:"desc"`
+	Limit        int    `json:"limit"`
+	Offset       int    `json:"offset"`
 }
 
 // Page is one page of list results plus the total matching count.
@@ -1000,6 +1001,16 @@ func buildTestFilter(profileID string, q Query) (string, []any) {
 	if q.FolderID != "" {
 		where = append(where, "(folder_id = ? OR folder_id LIKE ?)")
 		args = append(args, q.FolderID, q.FolderID+"/%")
+	}
+	if q.ContainerKey != "" {
+		// Restrict to Tests belonging to the given Test Set / Plan / Execution
+		// (FR-11.6 grouping). The subquery is profile-scoped already via the
+		// outer profile_id predicate, but we re-scope here too so a stray
+		// container key from another profile can't leak rows.
+		where = append(where,
+			"jira_key IN (SELECT test_key FROM test_container_test "+
+				"WHERE profile_id = ? AND container_key = ?)")
+		args = append(args, profileID, q.ContainerKey)
 	}
 	return "WHERE " + strings.Join(where, " AND "), args
 }
