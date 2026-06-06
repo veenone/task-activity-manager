@@ -889,6 +889,9 @@ tr.row-selected {
 }
 .modal {
   width: 440px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 }
 
 /* Editable fields in the detail panel */
