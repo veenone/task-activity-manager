@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import {
   GetTest,
   GetTestPreconditions,
+  ListAllPreconditions,
+  SetTestPreconditions,
   GetTestContainers,
   GetTestTransitions,
   GetTestSteps,
@@ -47,6 +49,7 @@ export function TestDetail({
 }: Props) {
   const [test, setTest] = useState<TestCase | null>(null);
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
+  const [allPreconditions, setAllPreconditions] = useState<Precondition[]>([]);
   const [containers, setContainers] = useState<ContainerMembership[]>([]);
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -73,8 +76,9 @@ export function TestDetail({
       GetTest(profileId, testKey),
       GetTestPreconditions(profileId, testKey),
       GetTestContainers(profileId, testKey),
+      ListAllPreconditions(profileId),
     ])
-      .then(([t, pre, cons]) => {
+      .then(([t, pre, cons, allPre]) => {
         if (cancelled) return;
         setTest(t);
         setSummary(t.summary);
@@ -83,6 +87,7 @@ export function TestDetail({
         setLabels((t.labels ?? []).join(" "));
         setPreconditions(pre);
         setContainers(cons ?? []);
+        setAllPreconditions(allPre ?? []);
         // Transitions load alongside but can fail without blocking the
         // rest of the detail panel — workflow may not be set up yet, or
         // the user may not have edit permission.
@@ -193,6 +198,31 @@ export function TestDetail({
     } catch (e) {
       setSaveError(`Move failed: ${errMsg(e)}`);
     }
+  }
+
+  // applyPreconditions replaces the test's precondition set, then refreshes the
+  // displayed list from the store (FR-13.5). Add/remove both route here.
+  async function applyPreconditions(nextKeys: string[]) {
+    setSaveError("");
+    try {
+      await SetTestPreconditions(profileId, testKey, nextKeys);
+      const refreshed = await GetTestPreconditions(profileId, testKey);
+      setPreconditions(refreshed ?? []);
+      onEdited();
+    } catch (e) {
+      setSaveError(`Precondition update failed: ${errMsg(e)}`);
+    }
+  }
+
+  function removePrecondition(key: string) {
+    applyPreconditions(
+      preconditions.map((p) => p.key).filter((k) => k !== key),
+    );
+  }
+
+  function addPrecondition(key: string) {
+    if (!key || preconditions.some((p) => p.key === key)) return;
+    applyPreconditions([...preconditions.map((p) => p.key), key]);
   }
 
   // addStep appends a new, empty step locally (FR-2.5). The backend returns
@@ -362,7 +392,9 @@ export function TestDetail({
             <dd>{test.updated || "—"}</dd>
           </dl>
 
-          <h4>Preconditions</h4>
+          <h4>
+            Preconditions {isDirty("preconditions") && <DirtyDot />}
+          </h4>
           {preconditions.length === 0 ? (
             <p className="muted">None linked</p>
           ) : (
@@ -370,9 +402,36 @@ export function TestDetail({
               {preconditions.map((p) => (
                 <li key={p.key}>
                   <span className="mono">{p.key}</span> — {p.summary}
+                  <button
+                    className="btn btn-ghost pre-remove"
+                    onClick={() => removePrecondition(p.key)}
+                    title="Remove this precondition"
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>
+          )}
+          {allPreconditions.some(
+            (p) => !preconditions.some((lp) => lp.key === p.key),
+          ) && (
+            <select
+              className="detail-input detail-input-inline pre-add"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) addPrecondition(e.target.value);
+              }}
+            >
+              <option value="">+ Add precondition…</option>
+              {allPreconditions
+                .filter((p) => !preconditions.some((lp) => lp.key === p.key))
+                .map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.key} — {p.summary}
+                  </option>
+                ))}
+            </select>
           )}
 
           <ContainerSection

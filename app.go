@@ -233,6 +233,36 @@ func (a *App) GetTestContainers(profileID, testKey string) ([]testrepo.Container
 	return a.repo.ListContainersForTest(profileID, testKey)
 }
 
+// --- Precondition associations (FR-13.5 / 13.6) ---
+
+// ListAllPreconditions returns every cached Precondition for a profile — the
+// master list the association pickers use.
+func (a *App) ListAllPreconditions(profileID string) ([]testrepo.Precondition, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListAllPreconditions(profileID)
+}
+
+// SetTestPreconditions replaces a Test's Precondition associations with the
+// given set and queues the change for commit (FR-13.5).
+func (a *App) SetTestPreconditions(profileID, testKey string, precondKeys []string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.SetTestPreconditions(profileID, testKey, precondKeys)
+}
+
+// BulkAssociatePreconditions adds (add=true) or removes (add=false) the given
+// Preconditions across a batch of Tests (FR-13.6).
+func (a *App) BulkAssociatePreconditions(profileID string, testKeys, precondKeys []string, add bool) (testrepo.BulkEditResult, error) {
+	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkAssociatePreconditions(profileID, testKeys, precondKeys, add)
+}
+
 // --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---
 
 // EditTestField applies a local edit to a Test field and queues a pending

@@ -217,6 +217,114 @@ func TestListTestPreconditionsReturnsLinkedItems(t *testing.T) {
 	}
 }
 
+func TestSetTestPreconditionsQueuesPreconditionSet(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+
+	if err := repo.SetTestPreconditions("p1", "QA-1", []string{"QA-P-1", "QA-P-2"}); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+
+	linked, _ := repo.ListTestPreconditions("p1", "QA-1")
+	if len(linked) != 2 {
+		t.Fatalf("linked = %d, want 2", len(linked))
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 || changes[0].EntityType != "precondition_set" || changes[0].EntityKey != "QA-1" {
+		t.Fatalf("pending = %+v, want one precondition_set for QA-1", changes)
+	}
+}
+
+func TestSetTestPreconditionsToCurrentSetIsNoop(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	if err := repo.ReplaceAllTestPreconditions("p1", map[string][]string{
+		"QA-1": {"QA-P-1"},
+	}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
+
+	if err := repo.SetTestPreconditions("p1", "QA-1", []string{"QA-P-1"}); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("setting the current set should not queue a change; got %+v", changes)
+	}
+}
+
+func TestDiscardPreconditionSetRestoresOriginal(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	if err := repo.ReplaceAllTestPreconditions("p1", map[string][]string{
+		"QA-1": {"QA-P-1"},
+	}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
+
+	if err := repo.SetTestPreconditions("p1", "QA-1", []string{"QA-P-2", "QA-P-3"}); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	linked, _ := repo.ListTestPreconditions("p1", "QA-1")
+	if len(linked) != 1 || linked[0].Key != "QA-P-1" {
+		t.Errorf("after discard linked = %+v, want only QA-P-1", linked)
+	}
+}
+
+func TestBulkAssociatePreconditionsAddsAndRemoves(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-2", ID: "2", Summary: "b"},
+	}); err != nil {
+		t.Fatalf("seed test 2: %v", err)
+	}
+
+	addRes, err := repo.BulkAssociatePreconditions("p1", []string{"QA-1", "QA-2"}, []string{"QA-P-1"}, true)
+	if err != nil {
+		t.Fatalf("bulk add: %v", err)
+	}
+	if len(addRes.Succeeded) != 2 {
+		t.Errorf("add succeeded = %d, want 2", len(addRes.Succeeded))
+	}
+	for _, key := range []string{"QA-1", "QA-2"} {
+		linked, _ := repo.ListTestPreconditions("p1", key)
+		if len(linked) != 1 || linked[0].Key != "QA-P-1" {
+			t.Errorf("%s linked = %+v, want QA-P-1", key, linked)
+		}
+	}
+
+	if _, err := repo.BulkAssociatePreconditions("p1", []string{"QA-1"}, []string{"QA-P-1"}, false); err != nil {
+		t.Fatalf("bulk remove: %v", err)
+	}
+	linked, _ := repo.ListTestPreconditions("p1", "QA-1")
+	if len(linked) != 0 {
+		t.Errorf("QA-1 should have no preconditions after remove; got %+v", linked)
+	}
+}
+
+func seedTestWithPreconditions(t *testing.T) *testrepo.Repository {
+	t.Helper()
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "a"},
+	}); err != nil {
+		t.Fatalf("seed test: %v", err)
+	}
+	if err := repo.UpsertPreconditions("p1", []testrepo.Precondition{
+		{Key: "QA-P-1", Summary: "Account exists"},
+		{Key: "QA-P-2", Summary: "Logged in"},
+		{Key: "QA-P-3", Summary: "Email available"},
+	}); err != nil {
+		t.Fatalf("seed preconditions: %v", err)
+	}
+	return repo
+}
+
 func TestReplaceAllTestPreconditionsClearsStaleLinks(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{

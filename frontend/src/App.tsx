@@ -33,6 +33,7 @@ import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
 import { BulkAllocateModal } from "./components/BulkAllocateModal";
 import { BulkMoveModal } from "./components/BulkMoveModal";
+import { BulkPreconditionsModal } from "./components/BulkPreconditionsModal";
 import { Dashboard } from "./components/Dashboard";
 import { TestPlanBoardView } from "./components/TestPlanBoardView";
 
@@ -77,6 +78,7 @@ function App() {
   const [showBulkTransition, setShowBulkTransition] = useState(false);
   const [showBulkAllocate, setShowBulkAllocate] = useState(false);
   const [showBulkMove, setShowBulkMove] = useState(false);
+  const [showBulkPreconditions, setShowBulkPreconditions] = useState(false);
 
   const [view, setView] = useState<"browse" | "dashboard" | "plans">("browse");
 
@@ -120,8 +122,12 @@ function App() {
     const m = new Map<string, PendingChange[]>();
     for (const p of pendingChanges) {
       let testKey: string | null = null;
-      if (p.entityType === "test_case" || p.entityType === "test_step_order") {
-        // test_step_order is a test-level change keyed by the bare Test key.
+      if (
+        p.entityType === "test_case" ||
+        p.entityType === "test_step_order" ||
+        p.entityType === "precondition_set"
+      ) {
+        // Test-level changes keyed by the bare Test key.
         testKey = p.entityKey;
       } else if (p.entityType.startsWith("test_step")) {
         // test_step / test_step_delete / test_step_add all key as
@@ -466,6 +472,12 @@ function App() {
               Move to folder…
             </button>
           )}
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowBulkPreconditions(true)}
+          >
+            Preconditions…
+          </button>
           <button className="btn" onClick={() => setSelectedSet(new Set())}>
             Clear
           </button>
@@ -659,6 +671,26 @@ function App() {
             setDetailVersion((v) => v + 1);
             reloadPending();
             setShowBulkMove(false);
+          }}
+        />
+      )}
+
+      {showBulkPreconditions && (
+        <BulkPreconditionsModal
+          profileId={activeId}
+          testKeys={[...selectedSet]}
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setSelectedSet(new Set());
+            setShowBulkPreconditions(false);
+          }}
+          onCancel={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setShowBulkPreconditions(false);
           }}
         />
       )}

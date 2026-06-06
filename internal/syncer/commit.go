@@ -121,6 +121,7 @@ testLoop:
 		var statusChange *testrepo.PendingChange
 		var orderChange *testrepo.PendingChange
 		var folderChange *testrepo.PendingChange
+		var preconditionChange *testrepo.PendingChange
 		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
 		stepChanges := make(map[string][]testrepo.PendingChange)
 		stepDeletes := make([]string, 0)
@@ -181,6 +182,9 @@ testLoop:
 			case "test_step_order":
 				cc := c
 				orderChange = &cc
+			case "precondition_set":
+				cc := c
+				preconditionChange = &cc
 			}
 		}
 
@@ -218,6 +222,26 @@ testLoop:
 				result.Failed = append(result.Failed, FailedCommit{
 					TestKey: testKey,
 					Error:   "move to folder: " + sanitizeError(err.Error()),
+				})
+				continue
+			}
+		}
+
+		// Associate / disassociate Preconditions (FR-13.5 / 13.6) by diffing
+		// the before / after sets into add and remove lists.
+		if preconditionChange != nil {
+			add, remove, perr := diffPreconditionSets(preconditionChange.BeforeVal, preconditionChange.AfterVal)
+			if perr != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   "preconditions: " + perr.Error(),
+				})
+				continue
+			}
+			if err := e.client.UpdateTestPreconditions(ctx, testKey, add, remove); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   "preconditions: " + sanitizeError(err.Error()),
 				})
 				continue
 			}
@@ -413,14 +437,46 @@ func (e *Engine) commitContainerCreate(ctx context.Context, profileID string, c 
 	return target, nil
 }
 
+// diffPreconditionSets decodes the before / after Precondition key-lists from a
+// precondition_set pending row and returns the keys to add (in after, not
+// before) and remove (in before, not after).
+func diffPreconditionSets(beforeJSON, afterJSON string) (add, remove []string, err error) {
+	var before, after []string
+	if err := json.Unmarshal([]byte(beforeJSON), &before); err != nil {
+		return nil, nil, fmt.Errorf("decode before set: %w", err)
+	}
+	if err := json.Unmarshal([]byte(afterJSON), &after); err != nil {
+		return nil, nil, fmt.Errorf("decode after set: %w", err)
+	}
+	beforeSet := make(map[string]struct{}, len(before))
+	for _, k := range before {
+		beforeSet[k] = struct{}{}
+	}
+	afterSet := make(map[string]struct{}, len(after))
+	for _, k := range after {
+		afterSet[k] = struct{}{}
+	}
+	for _, k := range after {
+		if _, ok := beforeSet[k]; !ok {
+			add = append(add, k)
+		}
+	}
+	for _, k := range before {
+		if _, ok := afterSet[k]; !ok {
+			remove = append(remove, k)
+		}
+	}
+	return add, remove, nil
+}
+
 // parentTestKey extracts the parent Test key for a pending change so
 // CommitChanges can group test_case and test_step changes together per
 // Test. Returns false for unrecognised entity types.
 func parentTestKey(c testrepo.PendingChange) (string, bool) {
 	switch c.EntityType {
-	case "test_case", "test_step_order":
-		// test_step_order is a test-level change — its entity_key is the
-		// Test key itself, no "<key>:<step>" suffix.
+	case "test_case", "test_step_order", "precondition_set":
+		// These are test-level changes — entity_key is the Test key itself,
+		// no "<key>:<step>" suffix.
 		return c.EntityKey, true
 	case "test_step", "test_step_delete", "test_step_add":
 		k, _, ok := parseStepKey(c.EntityKey)

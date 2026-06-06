@@ -848,6 +848,24 @@ tr.row-selected {
 .pre-list li:last-child {
   border-bottom: none;
 }
+.pre-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pre-remove {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 1px 6px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+.pre-remove:hover {
+  color: #c0392b;
+}
+.pre-add {
+  margin-bottom: 12px;
+}
 
 /* Profile form and modal */
 .profile-form {

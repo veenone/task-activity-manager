@@ -10,6 +10,8 @@ export function AddTestStep(arg1:string,arg2:string,arg3:string,arg4:string,arg5
 
 export function AllocateTests(arg1:string,arg2:string,arg3:Array<string>):Promise<testrepo.AllocateResult>;
 
+export function BulkAssociatePreconditions(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:boolean):Promise<testrepo.BulkEditResult>;
+
 export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
 export function BulkMoveToFolder(arg1:string,arg2:Array<string>,arg3:string):Promise<testrepo.BulkEditResult>;
@@ -52,6 +54,8 @@ export function GetTestTransitions(arg1:string,arg2:string):Promise<Array<jira.T
 
 export function Health():Promise<main.HealthInfo>;
 
+export function ListAllPreconditions(arg1:string):Promise<Array<testrepo.Precondition>>;
+
 export function ListAuditEntries(arg1:string,arg2:number):Promise<Array<testrepo.AuditEntry>>;
 
 export function ListContainers(arg1:string,arg2:string):Promise<Array<testrepo.Container>>;
@@ -71,6 +75,8 @@ export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<vo
 export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SeedSampleContainers(arg1:string):Promise<testrepo.SeedResult>;
+
+export function SetTestPreconditions(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SyncProfile(arg1:string):Promise<void>;
 

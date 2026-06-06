@@ -10,6 +10,10 @@ export function AllocateTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['AllocateTests'](arg1, arg2, arg3);
 }
 
+export function BulkAssociatePreconditions(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['BulkAssociatePreconditions'](arg1, arg2, arg3, arg4);
+}
+
 export function BulkEditTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkEditTests'](arg1, arg2, arg3);
 }
@@ -94,6 +98,10 @@ export function Health() {
   return window['go']['main']['App']['Health']();
 }
 
+export function ListAllPreconditions(arg1) {
+  return window['go']['main']['App']['ListAllPreconditions'](arg1);
+}
+
 export function ListAuditEntries(arg1, arg2) {
   return window['go']['main']['App']['ListAuditEntries'](arg1, arg2);
 }
@@ -132,6 +140,10 @@ export function ReorderTestSteps(arg1, arg2, arg3) {
 
 export function SeedSampleContainers(arg1) {
   return window['go']['main']['App']['SeedSampleContainers'](arg1);
+}
+
+export function SetTestPreconditions(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetTestPreconditions'](arg1, arg2, arg3);
 }
 
 export function SyncProfile(arg1) {

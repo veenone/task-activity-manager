@@ -468,6 +468,206 @@ func (r *Repository) ListTestPreconditions(profileID, testKey string) ([]Precond
 	return out, rows.Err()
 }
 
+// ListAllPreconditions returns every cached Precondition for a profile,
+// ordered by key — the master list the association pickers draw from
+// (FR-13.5 / 13.6).
+func (r *Repository) ListAllPreconditions(profileID string) ([]Precondition, error) {
+	rows, err := r.db.Query(
+		`SELECT jira_key, summary, type, description FROM precondition
+		 WHERE profile_id = ? ORDER BY jira_key`, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("list preconditions: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Precondition{}
+	for rows.Next() {
+		var p Precondition
+		if err := rows.Scan(&p.Key, &p.Summary, &p.Type, &p.Description); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// SetTestPreconditions replaces a Test's Precondition associations with the
+// given set and queues the change for commit (FR-13.5). The whole desired set
+// is stored as one pending row (before / after key-lists) rather than per-link
+// add/remove rows, so associating and disassociating share one mechanism and
+// reverting to the original set drops the row. No-op when the set is unchanged.
+func (r *Repository) SetTestPreconditions(profileID, testKey string, precondKeys []string) error {
+	newSet := uniqueSorted(precondKeys)
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var baseVersion string
+	err = tx.QueryRow(
+		`SELECT updated_at FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+		profileID, testKey,
+	).Scan(&baseVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read test: %w", err)
+	}
+
+	currentSet, err := preconditionKeysTx(tx, profileID, testKey)
+	if err != nil {
+		return err
+	}
+	if equalOrder(currentSet, newSet) {
+		return nil
+	}
+
+	if _, err := tx.Exec(
+		`DELETE FROM test_precondition WHERE profile_id = ? AND test_key = ?`,
+		profileID, testKey,
+	); err != nil {
+		return fmt.Errorf("clear precondition links: %w", err)
+	}
+	for _, pk := range newSet {
+		if _, err := tx.Exec(
+			`INSERT INTO test_precondition (profile_id, test_key, precondition_key)
+			 VALUES (?, ?, ?)`, profileID, testKey, pk,
+		); err != nil {
+			return fmt.Errorf("insert precondition link: %w", err)
+		}
+	}
+
+	beforeJSON, err := json.Marshal(currentSet)
+	if err != nil {
+		return fmt.Errorf("marshal current preconditions: %w", err)
+	}
+	afterJSON, err := json.Marshal(newSet)
+	if err != nil {
+		return fmt.Errorf("marshal new preconditions: %w", err)
+	}
+	if err := upsertPendingChange(
+		tx, profileID, entityPreconditionSet, testKey, "preconditions",
+		string(beforeJSON), string(afterJSON), baseVersion,
+	); err != nil {
+		return err
+	}
+	if err := writeAudit(
+		tx, profileID, entityPreconditionSet, testKey,
+		"set-preconditions-local", "preconditions",
+		string(beforeJSON), string(afterJSON), "",
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// BulkAssociatePreconditions adds (add=true) or removes (add=false) the given
+// Preconditions across a batch of Tests (FR-13.6), computing each Test's new
+// set and queuing it via SetTestPreconditions. A Test already in the desired
+// state is reported as succeeded.
+func (r *Repository) BulkAssociatePreconditions(profileID string, testKeys, precondKeys []string, add bool) (BulkEditResult, error) {
+	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
+	for _, testKey := range testKeys {
+		current, err := r.preconditionKeys(profileID, testKey)
+		if err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
+			continue
+		}
+		newSet := applyPreconditionDelta(current, precondKeys, add)
+		if err := r.SetTestPreconditions(profileID, testKey, newSet); err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, testKey)
+	}
+	return result, nil
+}
+
+// preconditionKeys returns the Precondition keys currently linked to a Test.
+func (r *Repository) preconditionKeys(profileID, testKey string) ([]string, error) {
+	rows, err := r.db.Query(
+		`SELECT precondition_key FROM test_precondition
+		 WHERE profile_id = ? AND test_key = ? ORDER BY precondition_key`,
+		profileID, testKey)
+	if err != nil {
+		return nil, fmt.Errorf("read precondition keys: %w", err)
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		out = append(out, k)
+	}
+	return out, rows.Err()
+}
+
+// preconditionKeysTx is preconditionKeys within an open transaction.
+func preconditionKeysTx(tx *sql.Tx, profileID, testKey string) ([]string, error) {
+	rows, err := tx.Query(
+		`SELECT precondition_key FROM test_precondition
+		 WHERE profile_id = ? AND test_key = ? ORDER BY precondition_key`,
+		profileID, testKey)
+	if err != nil {
+		return nil, fmt.Errorf("read precondition keys: %w", err)
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		out = append(out, k)
+	}
+	return out, rows.Err()
+}
+
+// uniqueSorted returns the input with duplicates removed and sorted, so a
+// Precondition set compares stably regardless of input order.
+func uniqueSorted(in []string) []string {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if s == "" {
+			continue
+		}
+		if _, dup := seen[s]; dup {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// applyPreconditionDelta returns the sorted set produced by adding or removing
+// delta keys from current.
+func applyPreconditionDelta(current, delta []string, add bool) []string {
+	set := make(map[string]struct{}, len(current))
+	for _, k := range current {
+		set[k] = struct{}{}
+	}
+	for _, k := range delta {
+		if add {
+			set[k] = struct{}{}
+		} else {
+			delete(set, k)
+		}
+	}
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	return uniqueSorted(out)
+}
+
 // UpsertContainers inserts or updates a batch of Test Sets / Plans /
 // Executions (FR-1.3).
 func (r *Repository) UpsertContainers(profileID string, containers []Container) error {
@@ -2223,6 +2423,27 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 				return fmt.Errorf("remove membership: %w", err)
 			}
 		}
+	case entityPreconditionSet:
+		// entity_key is the test key; restore the original Precondition set
+		// from the before snapshot.
+		var set []string
+		if err := json.Unmarshal([]byte(beforeVal), &set); err != nil {
+			return fmt.Errorf("decode precondition snapshot: %w", err)
+		}
+		if _, err := tx.Exec(
+			`DELETE FROM test_precondition WHERE profile_id = ? AND test_key = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("clear precondition links: %w", err)
+		}
+		for _, pk := range set {
+			if _, err := tx.Exec(
+				`INSERT INTO test_precondition (profile_id, test_key, precondition_key)
+				 VALUES (?, ?, ?)`, profileID, entityKey, pk,
+			); err != nil {
+				return fmt.Errorf("restore precondition link: %w", err)
+			}
+		}
 	case entityContainerAdd:
 		// entity_key is the temporary Container key; discarding drops the
 		// not-yet-created Container and all its local memberships.
@@ -2636,13 +2857,14 @@ func applyBulkOperation(op BulkEdit, current string) (string, error) {
 // Entity types for pending_change / audit_log rows. New ones get added
 // here so the switch/lookup code stays grep-friendly.
 const (
-	entityTestCase       = "test_case"
-	entityTestStep       = "test_step"
-	entityTestStepDelete = "test_step_delete"
-	entityTestStepAdd    = "test_step_add"
-	entityTestStepOrder  = "test_step_order"
-	entityMembershipAdd  = "test_membership_add"
-	entityContainerAdd   = "test_container_add"
+	entityTestCase        = "test_case"
+	entityTestStep        = "test_step"
+	entityTestStepDelete  = "test_step_delete"
+	entityTestStepAdd     = "test_step_add"
+	entityTestStepOrder   = "test_step_order"
+	entityMembershipAdd   = "test_membership_add"
+	entityContainerAdd    = "test_container_add"
+	entityPreconditionSet = "precondition_set"
 )
 
 // stepEntityKey encodes a step's parent Test plus its Xray step ID into a
