@@ -34,6 +34,10 @@ export function CreateContainerAndAllocate(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateContainerAndAllocate'](arg1, arg2, arg3, arg4);
 }
 
+export function CreateFolder(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateFolder'](arg1, arg2, arg3);
+}
+
 export function CreatePrecondition(arg1, arg2) {
   return window['go']['main']['App']['CreatePrecondition'](arg1, arg2);
 }
@@ -48,6 +52,10 @@ export function CreateSavedView(arg1, arg2, arg3) {
 
 export function DeallocateTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeallocateTests'](arg1, arg2, arg3);
+}
+
+export function DeleteFolder(arg1, arg2) {
+  return window['go']['main']['App']['DeleteFolder'](arg1, arg2);
 }
 
 export function DeleteProfile(arg1) {
@@ -192,6 +200,10 @@ export function MoveTestToFolder(arg1, arg2, arg3) {
 
 export function ReadLog(arg1) {
   return window['go']['main']['App']['ReadLog'](arg1);
+}
+
+export function RenameFolder(arg1, arg2, arg3) {
+  return window['go']['main']['App']['RenameFolder'](arg1, arg2, arg3);
 }
 
 export function ReorderTestSteps(arg1, arg2, arg3) {

@@ -23,6 +23,8 @@ export function CommitPendingChanges(arg1:string):Promise<syncer.CommitResult>;
 
 export function CreateContainerAndAllocate(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<testrepo.CreateContainerResult>;
 
+export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<testrepo.Folder>;
+
 export function CreatePrecondition(arg1:string,arg2:string):Promise<string>;
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
@@ -30,6 +32,8 @@ export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,ar
 export function CreateSavedView(arg1:string,arg2:string,arg3:string):Promise<testrepo.SavedView>;
 
 export function DeallocateTests(arg1:string,arg2:string,arg3:Array<string>):Promise<testrepo.DeallocateResult>;
+
+export function DeleteFolder(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
 
@@ -102,6 +106,8 @@ export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page
 export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ReadLog(arg1:number):Promise<string>;
+
+export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 

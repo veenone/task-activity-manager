@@ -6,6 +6,9 @@ import {
   SyncProfile,
   GetSyncState,
   ListFolders,
+  CreateFolder,
+  RenameFolder,
+  DeleteFolder,
   ListContainers,
   UpdateProfileScope,
   ExportProfile,
@@ -225,6 +228,52 @@ function App() {
       cancelled = true;
     };
   }, [activeId, groupBy, refreshKey]);
+
+  // --- Test Repository folder management (FR-13.3) ---
+
+  async function createFolder(parentPath: string) {
+    if (!activeId) return;
+    const name = window.prompt(
+      parentPath ? `New subfolder under ${parentPath}:` : "New top-level folder name:",
+    );
+    if (!name || !name.trim()) return;
+    try {
+      await CreateFolder(activeId, parentPath, name.trim());
+      setRefreshKey((k) => k + 1);
+      reloadPending();
+    } catch (e) {
+      window.alert(errMsg(e));
+    }
+  }
+
+  async function renameFolder(path: string, currentName: string) {
+    if (!activeId) return;
+    const name = window.prompt(`Rename "${currentName}" to:`, currentName);
+    if (name === null || !name.trim() || name.trim() === currentName) return;
+    try {
+      await RenameFolder(activeId, path, name.trim());
+      if (selectedFolder === path || selectedFolder.startsWith(path + "/")) {
+        setSelectedFolder("");
+      }
+      setRefreshKey((k) => k + 1);
+      reloadPending();
+    } catch (e) {
+      window.alert(errMsg(e));
+    }
+  }
+
+  async function deleteFolder(path: string) {
+    if (!activeId) return;
+    if (!window.confirm(`Delete folder "${path}"? It must be empty.`)) return;
+    try {
+      await DeleteFolder(activeId, path);
+      if (selectedFolder === path) setSelectedFolder("");
+      setRefreshKey((k) => k + 1);
+      reloadPending();
+    } catch (e) {
+      window.alert(errMsg(e));
+    }
+  }
 
   function toggleSelect(key: string) {
     setSelectedSet((prev) => {
@@ -677,9 +726,20 @@ function App() {
                     setSelectedFolder(id);
                     setSelectedKey(null);
                   }}
+                  onCreate={createFolder}
+                  onRename={renameFolder}
+                  onDelete={deleteFolder}
                 />
               ) : (
-                <p className="muted browse-sidebar-empty">No folders synced.</p>
+                <div className="browse-sidebar-empty">
+                  <p className="muted">No folders synced.</p>
+                  <button
+                    className="link-btn"
+                    onClick={() => createFolder("")}
+                  >
+                    ＋ New folder
+                  </button>
+                </div>
               )
             ) : (
               <ContainerList

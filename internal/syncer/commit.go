@@ -87,6 +87,8 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 	// Precondition edits are keyed by the Precondition's own issue key, not a
 	// Test, so they commit in their own pass grouped by precondition.
 	preconditionEditRows := make([]testrepo.PendingChange, 0)
+	// Folder operations (FR-13.3) are repository-level, keyed by folder path.
+	folderRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -96,6 +98,10 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "precondition_edit" {
 			preconditionEditRows = append(preconditionEditRows, c)
+			continue
+		}
+		if c.EntityType == "folder_create" || c.EntityType == "folder_rename" || c.EntityType == "folder_delete" {
+			folderRows = append(folderRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -394,8 +400,50 @@ testLoop:
 
 	e.commitMemberships(ctx, profileID, membershipRows, &result)
 	e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
+	e.commitFolders(ctx, profileID, projectKey, folderRows, &result)
 
 	return result, nil
+}
+
+// commitFolders pushes Test Repository folder operations (FR-13.3), reported
+// under the folder path.
+func (e *Engine) commitFolders(ctx context.Context, profileID, projectKey string, rows []testrepo.PendingChange, result *CommitResult) {
+	for _, c := range rows {
+		var err error
+		switch c.EntityType {
+		case "folder_create":
+			var p struct {
+				Name       string `json:"name"`
+				ParentPath string `json:"parentPath"`
+			}
+			if jErr := json.Unmarshal([]byte(c.AfterVal), &p); jErr != nil {
+				result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed folder payload: " + jErr.Error()})
+				continue
+			}
+			err = e.client.CreateFolder(ctx, projectKey, p.ParentPath, p.Name)
+		case "folder_rename":
+			var p struct {
+				Path string `json:"path"`
+				Name string `json:"name"`
+			}
+			if jErr := json.Unmarshal([]byte(c.AfterVal), &p); jErr != nil {
+				result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed folder payload: " + jErr.Error()})
+				continue
+			}
+			err = e.client.RenameFolder(ctx, projectKey, c.EntityKey, p.Name)
+		case "folder_delete":
+			err = e.client.DeleteFolder(ctx, projectKey, c.EntityKey)
+		}
+		if err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "folder: " + sanitizeError(err.Error())})
+			continue
+		}
+		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira accepted folder change but local cleanup failed: " + err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, c.EntityKey)
+	}
 }
 
 // commitPreconditionCreates creates new Preconditions (FR-13.5), renaming each

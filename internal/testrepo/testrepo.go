@@ -2836,6 +2836,37 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		); err != nil {
 			return fmt.Errorf("revert custom field: %w", err)
 		}
+	case entityFolderCreate:
+		// entity_key is the new folder path; discarding removes the
+		// locally-created (empty) folder.
+		if _, err := tx.Exec(
+			`DELETE FROM test_folder WHERE profile_id = ? AND id = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("remove created folder: %w", err)
+		}
+	case entityFolderRename:
+		// Reverse the rename: entity_key is the current (new) path; before_val
+		// snapshots the original path + name.
+		var snap folderRenameSnapshot
+		if err := json.Unmarshal([]byte(beforeVal), &snap); err != nil {
+			return fmt.Errorf("decode folder rename snapshot: %w", err)
+		}
+		if err := renameFolderTree(tx, profileID, entityKey, snap.Path, snap.Name); err != nil {
+			return err
+		}
+	case entityFolderDelete:
+		// Restore the deleted (empty) folder from the snapshot.
+		var snap folderDeleteSnapshot
+		if err := json.Unmarshal([]byte(beforeVal), &snap); err != nil {
+			return fmt.Errorf("decode folder delete snapshot: %w", err)
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO test_folder (profile_id, id, parent_id, name) VALUES (?, ?, ?, ?)`,
+			profileID, entityKey, snap.ParentPath, snap.Name,
+		); err != nil {
+			return fmt.Errorf("restore deleted folder: %w", err)
+		}
 	case entityPreconditionEdit:
 		// entity_key is the Precondition key; revert the edited column.
 		col, ok := preconditionFields[field]
@@ -3313,6 +3344,9 @@ const (
 	entityPreconditionEdit = "precondition_edit"
 	entityPreconditionAdd  = "precondition_add"
 	entityCustomField      = "custom_field"
+	entityFolderCreate     = "folder_create"
+	entityFolderRename     = "folder_rename"
+	entityFolderDelete     = "folder_delete"
 )
 
 // preconditionFields whitelists which Precondition columns can be edited via

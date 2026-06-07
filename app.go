@@ -465,6 +465,33 @@ func (a *App) ListFolders(profileID string) ([]testrepo.Folder, error) {
 	return a.repo.ListFolders(profileID)
 }
 
+// CreateFolder adds a Test Repository folder under parentPath ("" = top level)
+// and queues it for creation on commit (FR-13.3).
+func (a *App) CreateFolder(profileID, parentPath, name string) (testrepo.Folder, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.Folder{}, err
+	}
+	return a.repo.CreateFolder(profileID, parentPath, name)
+}
+
+// RenameFolder renames a folder (cascading to descendants and their Tests) and
+// queues the change for commit (FR-13.3).
+func (a *App) RenameFolder(profileID, path, newName string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.RenameFolder(profileID, path, newName)
+}
+
+// DeleteFolder removes an empty folder and queues the deletion for commit
+// (FR-13.3).
+func (a *App) DeleteFolder(profileID, path string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.DeleteFolder(profileID, path)
+}
+
 // GetTestPreconditions returns the Preconditions linked to a Test.
 func (a *App) GetTestPreconditions(profileID, testKey string) ([]testrepo.Precondition, error) {
 	if err := a.requireStore(); err != nil {

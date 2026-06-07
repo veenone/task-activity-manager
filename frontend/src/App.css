@@ -804,6 +804,34 @@ tr.row-selected {
   padding: 6px 0;
   font-size: 12px;
 }
+.folder-actions {
+  display: none;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.folder-item:hover .folder-actions {
+  display: inline-flex;
+  gap: 1px;
+}
+.folder-action {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 11px;
+  padding: 0 3px;
+  line-height: 1;
+}
+.folder-action:hover {
+  color: #2563eb;
+}
+.folder-item > .folder-action {
+  display: none;
+  margin-left: auto;
+}
+.folder-item:hover > .folder-action {
+  display: inline-block;
+}
 .folder-item {
   display: flex;
   align-items: center;
