@@ -118,6 +118,10 @@ export function GetBulkTransitionOptions(arg1, arg2) {
   return window['go']['main']['App']['GetBulkTransitionOptions'](arg1, arg2);
 }
 
+export function GetContainerBoard(arg1, arg2) {
+  return window['go']['main']['App']['GetContainerBoard'](arg1, arg2);
+}
+
 export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
@@ -144,10 +148,6 @@ export function GetTestContainers(arg1, arg2) {
 
 export function GetTestCustomFields(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetTestCustomFields'](arg1, arg2, arg3);
-}
-
-export function GetTestPlanBoard(arg1, arg2) {
-  return window['go']['main']['App']['GetTestPlanBoard'](arg1, arg2);
 }
 
 export function GetTestPreconditions(arg1, arg2) {

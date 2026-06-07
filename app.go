@@ -1024,15 +1024,16 @@ func (a *App) SeedSampleContainers(profileID string) (testrepo.SeedResult, error
 	return a.repo.SeedSampleContainers(profileID, p.ProjectKey)
 }
 
-// --- Test Plan board (FR-13.7) ---
+// --- Container board (FR-13.7) ---
 
-// GetTestPlanBoard returns the read-only board for a Test Plan: its member
-// Tests with consolidated execution status, computed from the local store.
-func (a *App) GetTestPlanBoard(profileID, planKey string) (testrepo.TestPlanBoard, error) {
+// GetContainerBoard returns the read-only board for a Test Set / Plan /
+// Execution: its member Tests with run status (direct for an execution,
+// consolidated across executions otherwise), computed from the local store.
+func (a *App) GetContainerBoard(profileID, containerKey string) (testrepo.TestPlanBoard, error) {
 	if err := a.requireStore(); err != nil {
 		return testrepo.TestPlanBoard{}, err
 	}
-	return a.repo.GetTestPlanBoard(profileID, planKey)
+	return a.repo.GetContainerBoard(profileID, containerKey)
 }
 
 // --- Container allocation (FR-3.4–3.6) ---

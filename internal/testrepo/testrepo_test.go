@@ -739,7 +739,7 @@ func TestCreateContainerAllocationRejectsBlankName(t *testing.T) {
 func TestGetTestPlanBoardListsMembersWithConsolidatedRunStatus(t *testing.T) {
 	repo := seedPlanBoard(t)
 
-	board, err := repo.GetTestPlanBoard("p1", "QA-TP-1")
+	board, err := repo.GetContainerBoard("p1", "QA-TP-1")
 	if err != nil {
 		t.Fatalf("board: %v", err)
 	}
@@ -754,7 +754,7 @@ func TestGetTestPlanBoardListsMembersWithConsolidatedRunStatus(t *testing.T) {
 func TestGetTestPlanBoardConsolidatesWorstStatusAcrossExecutions(t *testing.T) {
 	repo := seedPlanBoard(t)
 
-	board, _ := repo.GetTestPlanBoard("p1", "QA-TP-1")
+	board, _ := repo.GetContainerBoard("p1", "QA-TP-1")
 	var qa1 testrepo.TestPlanBoardRow
 	for _, r := range board.Rows {
 		if r.TestKey == "QA-1" {
@@ -769,7 +769,7 @@ func TestGetTestPlanBoardConsolidatesWorstStatusAcrossExecutions(t *testing.T) {
 func TestGetTestPlanBoardMarksUnexecutedMembersNotRun(t *testing.T) {
 	repo := seedPlanBoard(t)
 
-	board, _ := repo.GetTestPlanBoard("p1", "QA-TP-1")
+	board, _ := repo.GetContainerBoard("p1", "QA-TP-1")
 	var qa2 testrepo.TestPlanBoardRow
 	for _, r := range board.Rows {
 		if r.TestKey == "QA-2" {
@@ -781,12 +781,30 @@ func TestGetTestPlanBoardMarksUnexecutedMembersNotRun(t *testing.T) {
 	}
 }
 
-func TestGetTestPlanBoardRejectsNonPlanKey(t *testing.T) {
+func TestGetContainerBoardForExecutionUsesDirectRunStatus(t *testing.T) {
+	repo := seedPlanBoard(t)
+	// QA-TE-1 is a Test Execution with QA-1 = PASS (direct membership status).
+	board, err := repo.GetContainerBoard("p1", "QA-TE-1")
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	var qa1 testrepo.TestPlanBoardRow
+	for _, r := range board.Rows {
+		if r.TestKey == "QA-1" {
+			qa1 = r
+		}
+	}
+	if qa1.RunStatus != "PASS" {
+		t.Errorf("QA-1 in execution board = %q, want PASS (direct status, not consolidated)", qa1.RunStatus)
+	}
+}
+
+func TestGetContainerBoardRejectsUnknownKey(t *testing.T) {
 	repo := seedPlanBoard(t)
 
-	_, err := repo.GetTestPlanBoard("p1", "QA-TE-1")
+	_, err := repo.GetContainerBoard("p1", "NOPE-1")
 	if err == nil {
-		t.Error("asking for a board on a Test Execution key should error")
+		t.Error("asking for a board on an unknown container should error")
 	}
 }
 

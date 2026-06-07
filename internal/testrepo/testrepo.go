@@ -1015,43 +1015,45 @@ func (r *Repository) ListContainersForTest(profileID, testKey string) ([]Contain
 // Executions it belongs to. The consolidation is worst-wins so failures
 // surface; a Test in no execution reads as not run. Computed entirely from the
 // local store.
-func (r *Repository) GetTestPlanBoard(profileID, planKey string) (TestPlanBoard, error) {
-	board := TestPlanBoard{Key: planKey, Rows: []TestPlanBoardRow{}, RunCounts: []Bucket{}}
+func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlanBoard, error) {
+	board := TestPlanBoard{Key: containerKey, Rows: []TestPlanBoardRow{}, RunCounts: []Bucket{}}
 
+	var kind string
 	err := r.db.QueryRow(
-		`SELECT summary FROM test_container
-		 WHERE profile_id = ? AND jira_key = ? AND kind = ?`,
-		profileID, planKey, "testplan",
-	).Scan(&board.Summary)
+		`SELECT kind, summary FROM test_container WHERE profile_id = ? AND jira_key = ?`,
+		profileID, containerKey,
+	).Scan(&kind, &board.Summary)
 	if errors.Is(err, sql.ErrNoRows) {
-		return board, fmt.Errorf("test plan %s not found", planKey)
+		return board, fmt.Errorf("container %s not found", containerKey)
 	}
 	if err != nil {
-		return board, fmt.Errorf("read test plan: %w", err)
+		return board, fmt.Errorf("read container: %w", err)
 	}
 
+	// Member Tests, plus this container's direct run status (meaningful for a
+	// Test Execution).
 	memberRows, err := r.db.Query(
-		`SELECT t.jira_key, t.summary, t.status
+		`SELECT t.jira_key, t.summary, t.status, l.run_status
 		 FROM test_container_test l
 		 JOIN test_case t
 		   ON t.profile_id = l.profile_id AND t.jira_key = l.test_key
 		 WHERE l.profile_id = ? AND l.container_key = ?
 		 ORDER BY t.jira_key`,
-		profileID, planKey)
+		profileID, containerKey)
 	if err != nil {
-		return board, fmt.Errorf("read plan members: %w", err)
+		return board, fmt.Errorf("read container members: %w", err)
 	}
 	defer memberRows.Close()
 
-	type member struct{ summary, status string }
+	type member struct{ summary, status, directRun string }
 	members := map[string]member{}
 	memberOrder := []string{}
 	for memberRows.Next() {
-		var key, summary, status string
-		if err := memberRows.Scan(&key, &summary, &status); err != nil {
+		var key, summary, status, directRun string
+		if err := memberRows.Scan(&key, &summary, &status, &directRun); err != nil {
 			return board, err
 		}
-		members[key] = member{summary: summary, status: status}
+		members[key] = member{summary: summary, status: status, directRun: directRun}
 		memberOrder = append(memberOrder, key)
 	}
 	if err := memberRows.Err(); err != nil {
@@ -1061,45 +1063,50 @@ func (r *Repository) GetTestPlanBoard(profileID, planKey string) (TestPlanBoard,
 		return board, nil
 	}
 
-	// Gather each member Test's run statuses across all Test Executions, then
-	// consolidate per Test.
-	execRows, err := r.db.Query(
-		`SELECT l.test_key, l.run_status
-		 FROM test_container_test l
-		 JOIN test_container c
-		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
-		 WHERE l.profile_id = ? AND c.kind = ?`,
-		profileID, "testexec")
-	if err != nil {
-		return board, fmt.Errorf("read execution runs: %w", err)
-	}
-	defer execRows.Close()
-
+	// For a Test Execution, the run status is the Test's result in this
+	// execution. For a Test Set / Plan, consolidate each member's run status
+	// across all executions (worst-wins).
 	runsByTest := map[string][]string{}
-	for execRows.Next() {
-		var testKey, runStatus string
-		if err := execRows.Scan(&testKey, &runStatus); err != nil {
+	if kind != "testexec" {
+		execRows, err := r.db.Query(
+			`SELECT l.test_key, l.run_status
+			 FROM test_container_test l
+			 JOIN test_container c
+			   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+			 WHERE l.profile_id = ? AND c.kind = ?`,
+			profileID, "testexec")
+		if err != nil {
+			return board, fmt.Errorf("read execution runs: %w", err)
+		}
+		defer execRows.Close()
+		for execRows.Next() {
+			var testKey, runStatus string
+			if err := execRows.Scan(&testKey, &runStatus); err != nil {
+				return board, err
+			}
+			if _, isMember := members[testKey]; isMember {
+				runsByTest[testKey] = append(runsByTest[testKey], runStatus)
+			}
+		}
+		if err := execRows.Err(); err != nil {
 			return board, err
 		}
-		if _, isMember := members[testKey]; isMember {
-			runsByTest[testKey] = append(runsByTest[testKey], runStatus)
-		}
-	}
-	if err := execRows.Err(); err != nil {
-		return board, err
 	}
 
 	runCounts := map[string]int{}
 	for _, key := range memberOrder {
 		m := members[key]
-		consolidated := consolidateRunStatus(runsByTest[key])
+		runStatus := m.directRun
+		if kind != "testexec" {
+			runStatus = consolidateRunStatus(runsByTest[key])
+		}
 		board.Rows = append(board.Rows, TestPlanBoardRow{
 			TestKey:   key,
 			Summary:   m.summary,
 			Status:    m.status,
-			RunStatus: consolidated,
+			RunStatus: runStatus,
 		})
-		runCounts[blankAs(consolidated, "(not run)")]++
+		runCounts[blankAs(runStatus, "(not run)")]++
 	}
 	board.RunCounts = topBuckets(runCounts, 0)
 	return board, nil

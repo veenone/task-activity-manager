@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ListContainers,
-  GetTestPlanBoard,
+  GetContainerBoard,
   SeedSampleContainers,
   CreateContainerAndAllocate,
   EditContainer,
@@ -13,27 +13,36 @@ import type { Container, TestPlanBoard } from "../api";
 interface Props {
   profileId: string;
   refreshKey: number;
-  onSeeded: () => void;
+  onChanged: () => void;
 }
 
-// TestPlanBoardView is the read-only Test Plan board (FR-13.7): pick a plan and
-// see each member Test with its consolidated execution status, computed from
-// the local store. Recomputes when the profile changes or a sync/commit bumps
-// refreshKey.
-export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
-  const [plans, setPlans] = useState<Container[]>([]);
+const KINDS: Array<{ value: string; label: string }> = [
+  { value: "testset", label: "Test Set" },
+  { value: "testplan", label: "Test Plan" },
+  { value: "testexec", label: "Test Execution" },
+];
+
+// ContainersView manages Test Sets / Plans / Executions (FR-13.7 + container
+// CRUD): pick a kind and a container, see its member Tests with run status, and
+// create / rename / delete. Computed from the local store; recomputes when the
+// profile changes or a sync/commit bumps refreshKey.
+export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
+  const [kind, setKind] = useState("testplan");
+  const [containers, setContainers] = useState<Container[]>([]);
   const [selected, setSelected] = useState("");
   const [board, setBoard] = useState<TestPlanBoard | null>(null);
-  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [seeding, setSeeding] = useState(false);
+
+  const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
 
   async function seed() {
     setSeeding(true);
     setError("");
     try {
       await SeedSampleContainers(profileId);
-      onSeeded();
+      onChanged();
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -41,37 +50,37 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
     }
   }
 
-  async function newPlan() {
-    const name = window.prompt("New Test Plan name:");
+  async function newContainer() {
+    const name = window.prompt(`New ${kindLabel} name:`);
     if (!name || !name.trim()) return;
     setError("");
     try {
-      await CreateContainerAndAllocate(profileId, "testplan", name.trim(), []);
-      onSeeded();
+      await CreateContainerAndAllocate(profileId, kind, name.trim(), []);
+      onChanged();
     } catch (e) {
       setError(errMsg(e));
     }
   }
 
-  async function renamePlan() {
+  async function renameContainer() {
     if (!selected) return;
-    const cur = plans.find((p) => p.key === selected);
-    const name = window.prompt("Rename Test Plan to:", cur?.summary ?? "");
+    const cur = containers.find((c) => c.key === selected);
+    const name = window.prompt(`Rename ${kindLabel} to:`, cur?.summary ?? "");
     if (name === null || !name.trim()) return;
     setError("");
     try {
       await EditContainer(profileId, selected, name.trim());
-      onSeeded();
+      onChanged();
     } catch (e) {
       setError(errMsg(e));
     }
   }
 
-  async function deletePlan() {
+  async function deleteContainer() {
     if (!selected) return;
     if (
       !window.confirm(
-        "Delete this Test Plan? Its test memberships are removed (committed on sync).",
+        `Delete this ${kindLabel}? Its test memberships are removed (committed on sync).`,
       )
     )
       return;
@@ -79,7 +88,7 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
     try {
       await DeleteContainer(profileId, selected);
       setSelected("");
-      onSeeded();
+      onChanged();
     } catch (e) {
       setError(errMsg(e));
     }
@@ -88,27 +97,27 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
   useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
-    setLoadingPlans(true);
+    setLoading(true);
     setError("");
-    ListContainers(profileId, "testplan")
-      .then((ps) => {
+    ListContainers(profileId, kind)
+      .then((cs) => {
         if (cancelled) return;
-        setPlans(ps ?? []);
+        setContainers(cs ?? []);
         setSelected((cur) => {
-          if (cur && (ps ?? []).some((p) => p.key === cur)) return cur;
-          return ps && ps.length > 0 ? ps[0].key : "";
+          if (cur && (cs ?? []).some((c) => c.key === cur)) return cur;
+          return cs && cs.length > 0 ? cs[0].key : "";
         });
       })
       .catch((e) => {
         if (!cancelled) setError(errMsg(e));
       })
       .finally(() => {
-        if (!cancelled) setLoadingPlans(false);
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [profileId, refreshKey]);
+  }, [profileId, kind, refreshKey]);
 
   useEffect(() => {
     if (!profileId || !selected) {
@@ -117,7 +126,7 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
     }
     let cancelled = false;
     setError("");
-    GetTestPlanBoard(profileId, selected)
+    GetContainerBoard(profileId, selected)
       .then((b) => {
         if (!cancelled) setBoard(b);
       })
@@ -129,44 +138,37 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
     };
   }, [profileId, selected, refreshKey]);
 
-  if (loadingPlans && plans.length === 0) {
-    return <div className="board muted">Loading…</div>;
-  }
-  if (plans.length === 0) {
-    return (
-      <div className="board">
-        <p className="muted">
-          No Test Plans cached yet. Create one, run a sync, or generate sample
-          data to try it out.
-        </p>
-        <div className="board-head-actions">
-          <button className="btn btn-primary" onClick={newPlan}>
-            New Test Plan
-          </button>
-          <button className="btn" onClick={seed} disabled={seeding}>
-            {seeding ? "Generating…" : "Generate sample data"}
-          </button>
-        </div>
-        {error && <div className="error-text">{error}</div>}
-      </div>
-    );
-  }
-
   return (
     <div className="board">
       <div className="board-head">
         <label className="board-picker">
-          <span>Test Plan</span>
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            {plans.map((p) => (
-              <option key={p.key} value={p.key}>
-                {p.key} — {p.summary}
+          <span>Type</span>
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            {KINDS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
               </option>
             ))}
           </select>
+        </label>
+        <label className="board-picker">
+          <span>{kindLabel}</span>
+          {loading ? (
+            <span className="muted">Loading…</span>
+          ) : (
+            <select
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+              disabled={containers.length === 0}
+            >
+              {containers.length === 0 && <option value="">None</option>}
+              {containers.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.key} — {c.summary}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
         {board && board.runCounts.length > 0 && (
           <div className="board-counts">
@@ -176,22 +178,22 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
           </div>
         )}
         <div className="board-head-actions">
-          <button className="btn" onClick={newPlan} title="Create a new Test Plan">
+          <button className="btn" onClick={newContainer} title={`New ${kindLabel}`}>
             New
           </button>
           <button
             className="btn"
-            onClick={renamePlan}
+            onClick={renameContainer}
             disabled={!selected}
-            title="Rename the selected Test Plan"
+            title={`Rename the selected ${kindLabel}`}
           >
             Rename
           </button>
           <button
             className="btn"
-            onClick={deletePlan}
+            onClick={deleteContainer}
             disabled={!selected}
-            title="Delete the selected Test Plan"
+            title={`Delete the selected ${kindLabel}`}
           >
             Delete
           </button>
@@ -202,13 +204,19 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
           disabled={seeding}
           title="Regenerate sample sets / plans / executions from synced tests"
         >
-          {seeding ? "Generating…" : "Regenerate sample data"}
+          {seeding ? "Generating…" : "Sample data"}
         </button>
       </div>
 
       {error && <div className="error-text">{error}</div>}
 
-      {board && (
+      {!loading && containers.length === 0 && (
+        <p className="muted">
+          No {kindLabel}s yet. Create one, run a sync, or generate sample data.
+        </p>
+      )}
+
+      {board && containers.length > 0 && (
         <table className="board-table">
           <thead>
             <tr>
@@ -222,7 +230,7 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
             {board.rows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="muted">
-                  This plan has no tests.
+                  This {kindLabel.toLowerCase()} has no tests.
                 </td>
               </tr>
             ) : (

@@ -44,7 +44,7 @@ import { BulkAllocateModal } from "./components/BulkAllocateModal";
 import { BulkMoveModal } from "./components/BulkMoveModal";
 import { BulkPreconditionsModal } from "./components/BulkPreconditionsModal";
 import { Dashboard } from "./components/Dashboard";
-import { TestPlanBoardView } from "./components/TestPlanBoardView";
+import { ContainersView } from "./components/ContainersView";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { SyncHistoryModal } from "./components/SyncHistoryModal";
 import { ImportTestsModal } from "./components/ImportTestsModal";
@@ -606,7 +606,7 @@ function App() {
             className={`view-tab${view === "plans" ? " view-tab-active" : ""}`}
             onClick={() => setView("plans")}
           >
-            Test Plans
+            Containers
           </button>
         </nav>
 
@@ -704,10 +704,13 @@ function App() {
         </main>
       ) : view === "plans" ? (
         <main className="content content-dashboard">
-          <TestPlanBoardView
+          <ContainersView
             profileId={activeId}
             refreshKey={refreshKey}
-            onSeeded={() => setRefreshKey((k) => k + 1)}
+            onChanged={() => {
+              setRefreshKey((k) => k + 1);
+              reloadPending();
+            }}
           />
         </main>
       ) : (

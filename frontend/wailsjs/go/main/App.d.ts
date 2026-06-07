@@ -65,6 +65,8 @@ export function ExportTests(arg1:string,arg2:testrepo.Query):Promise<string>;
 
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
 
+export function GetContainerBoard(arg1:string,arg2:string):Promise<testrepo.TestPlanBoard>;
+
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
 export function GetSettings():Promise<settings.Settings>;
@@ -78,8 +80,6 @@ export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;
 export function GetTestContainers(arg1:string,arg2:string):Promise<Array<testrepo.ContainerMembership>>;
 
 export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.CustomFieldValue>>;
-
-export function GetTestPlanBoard(arg1:string,arg2:string):Promise<testrepo.TestPlanBoard>;
 
 export function GetTestPreconditions(arg1:string,arg2:string):Promise<Array<testrepo.Precondition>>;
 

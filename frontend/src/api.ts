@@ -40,7 +40,7 @@ export {
   EditContainer,
   DeleteContainer,
   SeedSampleContainers,
-  GetTestPlanBoard,
+  GetContainerBoard,
   MoveTestToFolder,
   BulkMoveToFolder,
   ListTests,
