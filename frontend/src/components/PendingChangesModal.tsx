@@ -221,6 +221,24 @@ function describeChange(c: PendingChange): {
         before: "",
         after: containerSummary(c.afterVal),
       };
+    case "precondition_set":
+      return {
+        field: "preconditions",
+        before: keyCountSummary(c.beforeVal, "precondition"),
+        after: keyCountSummary(c.afterVal, "precondition"),
+      };
+    case "precondition_add":
+      return {
+        field: "new precondition",
+        before: "",
+        after: stepActionLike(c.afterVal, "summary"),
+      };
+    case "precondition_edit":
+      return {
+        field: `precondition:${c.field}`,
+        before: c.beforeVal,
+        after: c.afterVal,
+      };
     default:
       return { field: c.field, before: c.beforeVal, after: c.afterVal };
   }
@@ -267,6 +285,29 @@ function stepAction(json: string): string {
   try {
     const s = JSON.parse(json) as { action?: string };
     return s.action ?? "";
+  } catch {
+    return json;
+  }
+}
+
+// keyCountSummary renders a JSON key-list as "N <noun>(s)".
+function keyCountSummary(json: string, noun: string): string {
+  try {
+    const keys = JSON.parse(json) as string[];
+    const n = keys.length;
+    return `${n} ${noun}${n === 1 ? "" : "s"}`;
+  } catch {
+    return json;
+  }
+}
+
+// stepActionLike pulls a named string field out of a JSON object payload,
+// falling back to the raw string.
+function stepActionLike(json: string, field: string): string {
+  try {
+    const o = JSON.parse(json) as Record<string, unknown>;
+    const v = o[field];
+    return typeof v === "string" ? v : json;
   } catch {
     return json;
   }

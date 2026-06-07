@@ -34,6 +34,10 @@ export function CreateContainerAndAllocate(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateContainerAndAllocate'](arg1, arg2, arg3, arg4);
 }
 
+export function CreatePrecondition(arg1, arg2) {
+  return window['go']['main']['App']['CreatePrecondition'](arg1, arg2);
+}
+
 export function CreateProfile(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3, arg4);
 }

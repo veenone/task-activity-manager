@@ -5,6 +5,7 @@ import {
   ListAllPreconditions,
   SetTestPreconditions,
   EditPreconditionField,
+  CreatePrecondition,
   GetTestContainers,
   GetTestTransitions,
   GetTestSteps,
@@ -226,6 +227,23 @@ export function TestDetail({
     applyPreconditions([...preconditions.map((p) => p.key), key]);
   }
 
+  // createAndAssociatePrecondition creates a brand-new Precondition (FR-13.5)
+  // and links it to this test. It gets a temporary key until commit creates
+  // the issue in Jira.
+  async function createAndAssociatePrecondition() {
+    const summary = window.prompt("New precondition summary:");
+    if (!summary || !summary.trim()) return;
+    setSaveError("");
+    try {
+      const tempKey = await CreatePrecondition(profileId, summary.trim());
+      const all = await ListAllPreconditions(profileId);
+      setAllPreconditions(all ?? []);
+      await applyPreconditions([...preconditions.map((p) => p.key), tempKey]);
+    } catch (e) {
+      setSaveError(`Create precondition failed: ${errMsg(e)}`);
+    }
+  }
+
   // addStep appends a new, empty step locally (FR-2.5). The backend returns
   // it with a temporary id; the user fills the fields in place (each blur
   // folds into the queued create) and it lands in Jira on commit.
@@ -411,26 +429,25 @@ export function TestDetail({
               ))}
             </ul>
           )}
-          {allPreconditions.some(
-            (p) => !preconditions.some((lp) => lp.key === p.key),
-          ) && (
-            <select
-              className="detail-input detail-input-inline pre-add"
-              value=""
-              onChange={(e) => {
-                if (e.target.value) addPrecondition(e.target.value);
-              }}
-            >
-              <option value="">+ Add precondition…</option>
-              {allPreconditions
-                .filter((p) => !preconditions.some((lp) => lp.key === p.key))
-                .map((p) => (
-                  <option key={p.key} value={p.key}>
-                    {p.key} — {p.summary}
-                  </option>
-                ))}
-            </select>
-          )}
+          <select
+            className="detail-input detail-input-inline pre-add"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "__new__") createAndAssociatePrecondition();
+              else if (v) addPrecondition(v);
+            }}
+          >
+            <option value="">+ Add precondition…</option>
+            {allPreconditions
+              .filter((p) => !preconditions.some((lp) => lp.key === p.key))
+              .map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.key} — {p.summary}
+                </option>
+              ))}
+            <option value="__new__">＋ Create new precondition…</option>
+          </select>
 
           <ContainerSection
             title="Test Sets"

@@ -64,6 +64,17 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 		return result, err
 	}
 
+	// Create new Preconditions first (FR-13.5) so any pending association that
+	// references a temporary precondition key is rewritten to the real key
+	// before the per-Test pass reads it; re-read on success to pick up the
+	// rewritten association rows.
+	if e.commitPreconditionCreates(ctx, profileID, projectKey, changes, &result) {
+		changes, err = e.repo.ListPendingChanges(profileID)
+		if err != nil {
+			return result, err
+		}
+	}
+
 	// Group by parent Test key, preserving discovery order so the commit
 	// run is deterministic. Step entity_keys are "<testKey>:<xrayID>" — we
 	// strip the suffix to put step changes under the same Test bucket as
@@ -366,6 +377,65 @@ testLoop:
 	e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
 
 	return result, nil
+}
+
+// commitPreconditionCreates creates new Preconditions (FR-13.5), renaming each
+// local "new-precond-N" placeholder to the real key Jira assigned so pending
+// associations against it are rewritten. Returns true if any were processed
+// (so the caller re-reads pending changes).
+func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, projectKey string, changes []testrepo.PendingChange, result *CommitResult) bool {
+	processed := false
+	for _, c := range changes {
+		if c.EntityType != "precondition_add" {
+			continue
+		}
+		var payload struct {
+			Summary     string `json:"summary"`
+			Type        string `json:"type"`
+			Description string `json:"description"`
+			ProjectKey  string `json:"projectKey"`
+		}
+		if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: c.EntityKey,
+				Error:   fmt.Sprintf("malformed precondition payload: %s", err),
+			})
+			continue
+		}
+		pk := payload.ProjectKey
+		if pk == "" {
+			pk = projectKey
+		}
+		realKey, err := e.client.CreatePrecondition(ctx, pk, payload.Summary, payload.Type, payload.Description)
+		if err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: c.EntityKey,
+				Error:   "create precondition: " + sanitizeError(err.Error()),
+			})
+			continue
+		}
+		if realKey != "" {
+			if err := e.repo.RenamePrecondition(profileID, c.EntityKey, realKey); err != nil {
+				// Remote create already succeeded; a cache-rename hiccup must
+				// not fail the commit.
+				_ = err
+			}
+		}
+		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{
+				TestKey: c.EntityKey,
+				Error:   "Jira created precondition but local cleanup failed: " + err.Error(),
+			})
+			continue
+		}
+		key := realKey
+		if key == "" {
+			key = c.EntityKey
+		}
+		result.Succeeded = append(result.Succeeded, key)
+		processed = true
+	}
+	return processed
 }
 
 // commitPreconditionEdits pushes Precondition field edits (FR-13.5), grouping a

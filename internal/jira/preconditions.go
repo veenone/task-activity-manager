@@ -2,6 +2,23 @@ package jira
 
 import "context"
 
+// CreatePrecondition creates a new Precondition issue and returns its key
+// (FR-13.5). Demo URLs short-circuit to a no-op, returning an empty key (the
+// placeholder is reconciled on the next sync). The real-Jira call is a
+// best-effort no-op pending verification against an actual Xray Server 8.4.0
+// instance.
+//
+// TODO(xtm): POST /rest/api/2/issue with issuetype "Precondition" and the Xray
+// precondition-type custom field, then return the new key — verify the field
+// id and response on a live instance.
+func (c *Client) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string) (string, error) {
+	_ = ctx
+	if isDemoURL(c.baseURL) {
+		return "", nil
+	}
+	return "", nil
+}
+
 // UpdateTestPreconditions associates / disassociates Preconditions with a Test
 // (FR-13.5 / 13.6). add and remove are Precondition keys. Demo URLs
 // short-circuit to a no-op; the real-Jira call is a best-effort no-op pending

@@ -721,6 +721,200 @@ func applyPreconditionDelta(current, delta []string, add bool) []string {
 	return uniqueSorted(out)
 }
 
+// CreatePrecondition creates a new Precondition locally and queues it for
+// creation in Jira on commit (FR-13.5). It gets a temporary key until commit
+// POSTs the issue and learns the real one; associations made against the temp
+// key are rewritten to the real key on commit (see RenamePrecondition).
+// Returns the temporary key so the caller can associate it immediately.
+func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, description string) (string, error) {
+	if strings.TrimSpace(summary) == "" {
+		return "", fmt.Errorf("a summary is required for the new precondition")
+	}
+	if projectKey == "" {
+		projectKey = "PRECOND"
+	}
+	if ptype == "" {
+		ptype = "Manual"
+	}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return "", fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	tempKey, err := nextTempPreconditionKey(tx, profileID)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := tx.Exec(
+		`INSERT INTO precondition (profile_id, jira_key, summary, type, description)
+		 VALUES (?, ?, ?, ?, ?)`,
+		profileID, tempKey, summary, ptype, description,
+	); err != nil {
+		return "", fmt.Errorf("insert precondition: %w", err)
+	}
+
+	payload, err := json.Marshal(struct {
+		Summary     string `json:"summary"`
+		Type        string `json:"type"`
+		Description string `json:"description"`
+		ProjectKey  string `json:"projectKey"`
+	}{summary, ptype, description, projectKey})
+	if err != nil {
+		return "", fmt.Errorf("encode precondition payload: %w", err)
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO pending_change
+		   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
+		 VALUES (?, ?, ?, 'precondition', '', ?, '', ?)`,
+		profileID, entityPreconditionAdd, tempKey, string(payload),
+		time.Now().UTC().Format(time.RFC3339),
+	); err != nil {
+		return "", fmt.Errorf("insert pending precondition: %w", err)
+	}
+	if err := writeAudit(
+		tx, profileID, entityPreconditionAdd, tempKey,
+		"create-precondition-local", "precondition", "", summary, "",
+	); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("commit create-precondition: %w", err)
+	}
+	return tempKey, nil
+}
+
+// nextTempPreconditionKey returns a precondition key of the form
+// "new-precond-N" not already used in this profile.
+func nextTempPreconditionKey(tx *sql.Tx, profileID string) (string, error) {
+	for n := 1; ; n++ {
+		key := fmt.Sprintf("new-precond-%d", n)
+		var one int
+		err := tx.QueryRow(
+			`SELECT 1 FROM precondition WHERE profile_id = ? AND jira_key = ?`,
+			profileID, key,
+		).Scan(&one)
+		if errors.Is(err, sql.ErrNoRows) {
+			return key, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("probe temp precondition key: %w", err)
+		}
+	}
+}
+
+// RenamePrecondition rewrites a Precondition's key across the cache and any
+// pending associations, used by the commit path to swap a "new-precond-N"
+// placeholder for the real key Jira assigned. A no-op when newKey is empty or
+// unchanged.
+func (r *Repository) RenamePrecondition(profileID, oldKey, newKey string) error {
+	if newKey == "" || newKey == oldKey {
+		return nil
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`UPDATE precondition SET jira_key = ? WHERE profile_id = ? AND jira_key = ?`,
+		newKey, profileID, oldKey,
+	); err != nil {
+		return fmt.Errorf("rename precondition: %w", err)
+	}
+	if _, err := tx.Exec(
+		`UPDATE test_precondition SET precondition_key = ?
+		 WHERE profile_id = ? AND precondition_key = ?`,
+		newKey, profileID, oldKey,
+	); err != nil {
+		return fmt.Errorf("rename precondition links: %w", err)
+	}
+	if err := rewritePreconditionSets(tx, profileID, oldKey, newKey); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// rewritePreconditionSets substitutes oldKey for newKey (newKey == "" removes
+// it) inside every precondition_set pending row's before / after key-lists. A
+// row whose after-set ends up equal to its before-set is dropped (no-op).
+func rewritePreconditionSets(tx *sql.Tx, profileID, oldKey, newKey string) error {
+	rows, err := tx.Query(
+		`SELECT id, before_val, after_val FROM pending_change
+		 WHERE profile_id = ? AND entity_type = ?`,
+		profileID, entityPreconditionSet)
+	if err != nil {
+		return fmt.Errorf("read precondition sets: %w", err)
+	}
+	type row struct {
+		id            int64
+		before, after string
+	}
+	var rs []row
+	for rows.Next() {
+		var x row
+		if err := rows.Scan(&x.id, &x.before, &x.after); err != nil {
+			rows.Close()
+			return err
+		}
+		rs = append(rs, x)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, x := range rs {
+		before := substituteKey(decodeKeys(x.before), oldKey, newKey)
+		after := substituteKey(decodeKeys(x.after), oldKey, newKey)
+		if equalOrder(before, after) {
+			if _, err := tx.Exec(
+				`DELETE FROM pending_change WHERE profile_id = ? AND id = ?`,
+				profileID, x.id,
+			); err != nil {
+				return fmt.Errorf("drop precondition set: %w", err)
+			}
+			continue
+		}
+		bj, _ := json.Marshal(before)
+		aj, _ := json.Marshal(after)
+		if _, err := tx.Exec(
+			`UPDATE pending_change SET before_val = ?, after_val = ?
+			 WHERE profile_id = ? AND id = ?`,
+			string(bj), string(aj), profileID, x.id,
+		); err != nil {
+			return fmt.Errorf("update precondition set: %w", err)
+		}
+	}
+	return nil
+}
+
+// decodeKeys parses a JSON string array, returning nil on malformed input.
+func decodeKeys(s string) []string {
+	var out []string
+	_ = json.Unmarshal([]byte(s), &out)
+	return out
+}
+
+// substituteKey replaces oldKey with newKey in a key set (newKey == "" drops
+// it), returning a deduped sorted set.
+func substituteKey(keys []string, oldKey, newKey string) []string {
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if k == oldKey {
+			if newKey != "" {
+				out = append(out, newKey)
+			}
+			continue
+		}
+		out = append(out, k)
+	}
+	return uniqueSorted(out)
+}
+
 // UpsertContainers inserts or updates a batch of Test Sets / Plans /
 // Executions (FR-1.3).
 func (r *Repository) UpsertContainers(profileID string, containers []Container) error {
@@ -2509,6 +2703,25 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 				return fmt.Errorf("restore precondition link: %w", err)
 			}
 		}
+	case entityPreconditionAdd:
+		// entity_key is the temporary Precondition key; discarding removes the
+		// not-yet-created Precondition, its Test links, and any pending
+		// association referencing it.
+		if _, err := tx.Exec(
+			`DELETE FROM precondition WHERE profile_id = ? AND jira_key = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("remove precondition: %w", err)
+		}
+		if _, err := tx.Exec(
+			`DELETE FROM test_precondition WHERE profile_id = ? AND precondition_key = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("remove precondition links: %w", err)
+		}
+		if err := rewritePreconditionSets(tx, profileID, entityKey, ""); err != nil {
+			return err
+		}
 	case entityContainerAdd:
 		// entity_key is the temporary Container key; discarding drops the
 		// not-yet-created Container and all its local memberships.
@@ -2931,6 +3144,7 @@ const (
 	entityContainerAdd     = "test_container_add"
 	entityPreconditionSet  = "precondition_set"
 	entityPreconditionEdit = "precondition_edit"
+	entityPreconditionAdd  = "precondition_add"
 )
 
 // preconditionFields whitelists which Precondition columns can be edited via

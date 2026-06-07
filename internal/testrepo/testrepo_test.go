@@ -357,6 +357,102 @@ func TestEditPreconditionFieldRejectsUnknownField(t *testing.T) {
 	}
 }
 
+func TestCreatePreconditionQueuesAddAndAppearsInList(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+
+	tempKey, err := repo.CreatePrecondition("p1", "QA", "Network is up", "", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if tempKey == "" {
+		t.Fatal("expected a temp key")
+	}
+
+	all, _ := repo.ListAllPreconditions("p1")
+	var found bool
+	for _, p := range all {
+		if p.Key == tempKey && p.Summary == "Network is up" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("new precondition %s not in master list", tempKey)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	var hasAdd bool
+	for _, c := range changes {
+		if c.EntityType == "precondition_add" && c.EntityKey == tempKey {
+			hasAdd = true
+		}
+	}
+	if !hasAdd {
+		t.Errorf("expected a precondition_add pending row for %s", tempKey)
+	}
+}
+
+func TestRenamePreconditionRewritesAssociations(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	tempKey, err := repo.CreatePrecondition("p1", "QA", "New cond", "", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// Associate the new (temp-key) precondition with QA-1.
+	if err := repo.SetTestPreconditions("p1", "QA-1", []string{tempKey}); err != nil {
+		t.Fatalf("associate: %v", err)
+	}
+
+	if err := repo.RenamePrecondition("p1", tempKey, "QA-P-99"); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+
+	linked, _ := repo.ListTestPreconditions("p1", "QA-1")
+	if len(linked) != 1 || linked[0].Key != "QA-P-99" {
+		t.Errorf("QA-1 linked = %+v, want QA-P-99 after rename", linked)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	for _, c := range changes {
+		if c.EntityType == "precondition_set" && strings.Contains(c.AfterVal, tempKey) {
+			t.Errorf("precondition_set still references temp key: %q", c.AfterVal)
+		}
+	}
+}
+
+func TestDiscardPreconditionAddRemovesItEverywhere(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	tempKey, err := repo.CreatePrecondition("p1", "QA", "New cond", "", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := repo.SetTestPreconditions("p1", "QA-1", []string{tempKey}); err != nil {
+		t.Fatalf("associate: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+	var addID int64
+	for _, c := range changes {
+		if c.EntityType == "precondition_add" {
+			addID = c.ID
+		}
+	}
+
+	if err := repo.DiscardPendingChange("p1", addID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	all, _ := repo.ListAllPreconditions("p1")
+	for _, p := range all {
+		if p.Key == tempKey {
+			t.Errorf("discarded precondition %s should be gone from master list", tempKey)
+		}
+	}
+	linked, _ := repo.ListTestPreconditions("p1", "QA-1")
+	for _, p := range linked {
+		if p.Key == tempKey {
+			t.Errorf("discarded precondition %s should be unlinked from QA-1", tempKey)
+		}
+	}
+}
+
 func seedTestWithPreconditions(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)

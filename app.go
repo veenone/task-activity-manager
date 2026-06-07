@@ -262,6 +262,20 @@ func (a *App) EditPreconditionField(profileID, preconditionKey, field, newValue 
 	return a.repo.EditPreconditionField(profileID, preconditionKey, field, newValue)
 }
 
+// CreatePrecondition creates a new Precondition locally and queues it for
+// creation in Jira on commit (FR-13.5), returning its temporary key so the
+// caller can associate it immediately. Project key comes from the profile.
+func (a *App) CreatePrecondition(profileID, summary string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return "", err
+	}
+	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, "", "")
+}
+
 // BulkAssociatePreconditions adds (add=true) or removes (add=false) the given
 // Preconditions across a batch of Tests (FR-13.6).
 func (a *App) BulkAssociatePreconditions(profileID string, testKeys, precondKeys []string, add bool) (testrepo.BulkEditResult, error) {
