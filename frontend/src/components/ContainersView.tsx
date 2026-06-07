@@ -9,7 +9,7 @@ import {
   ExportPytest,
   errMsg,
 } from "../api";
-import type { Container, TestPlanBoard } from "../api";
+import type { Container, TestPlanBoard, Bucket } from "../api";
 import { Menu } from "./Menu";
 
 interface Props {
@@ -36,8 +36,26 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [seeding, setSeeding] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
+  const selectedContainer = containers.find((c) => c.key === selected) ?? null;
+
+  // commitInlineRename saves the detail card's editable name (an inline path to
+  // the same rename CRUD as the Actions menu).
+  async function commitInlineRename() {
+    setEditingName(false);
+    const name = nameDraft.trim();
+    if (!selectedContainer || !name || name === selectedContainer.summary) return;
+    setError("");
+    try {
+      await EditContainer(profileId, selected, name);
+      onChanged();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
 
   async function seed() {
     setSeeding(true);
@@ -183,13 +201,6 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
             </select>
           )}
         </label>
-        {board && board.runCounts.length > 0 && (
-          <div className="board-counts">
-            {board.runCounts.map((b) => (
-              <RunBadge key={b.label} status={b.label} count={b.count} />
-            ))}
-          </div>
-        )}
         <div className="board-head-actions">
           <button className="btn btn-primary" onClick={newContainer} title={`New ${kindLabel}`}>
             + New
@@ -241,6 +252,60 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
         </p>
       )}
 
+      {selectedContainer && (
+        <div className="container-card">
+          <div className="container-card-top">
+            <span className={`kind-badge kind-${kind}`}>{kindLabel}</span>
+            <span className="mono container-card-key">
+              {selectedContainer.key}
+            </span>
+            {selectedContainer.status && (
+              <span className="status-pill">{selectedContainer.status}</span>
+            )}
+            <span className="container-card-count">
+              {(board?.rows.length ?? 0).toLocaleString()} test
+              {(board?.rows.length ?? 0) === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          {editingName ? (
+            <input
+              className="container-card-name-edit"
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={commitInlineRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitInlineRename();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+            />
+          ) : (
+            <h2
+              className="container-card-name"
+              title="Click to rename"
+              onClick={() => {
+                setNameDraft(selectedContainer.summary);
+                setEditingName(true);
+              }}
+            >
+              {selectedContainer.summary || "(untitled)"}
+            </h2>
+          )}
+
+          {board && board.runCounts.length > 0 && (
+            <div className="container-card-runs">
+              <RunBar counts={board.runCounts} />
+              <div className="board-counts">
+                {board.runCounts.map((b) => (
+                  <RunBadge key={b.label} status={b.label} count={b.count} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {board && containers.length > 0 && (
         <table className="board-table">
           <thead>
@@ -283,6 +348,29 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
       )}
     </div>
   );
+}
+
+// RunBar is a compact stacked bar of run-status proportions for the selected
+// container — a glanceable view of how its tests are doing.
+function RunBar({ counts }: { counts: Bucket[] }) {
+  const sum = counts.reduce((a, b) => a + b.count, 0) || 1;
+  return (
+    <div className="run-bar" title="Run-status distribution">
+      {counts.map((b) => (
+        <span
+          key={b.label}
+          className={runSegClass(b.label)}
+          style={{ width: `${(b.count / sum) * 100}%` }}
+          title={`${b.label}: ${b.count}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function runSegClass(label: string): string {
+  if (label === "(not run)") return "run-seg";
+  return `run-seg run-${label.toLowerCase()}`;
 }
 
 function RunBadge({ status, count }: { status: string; count: number }) {
