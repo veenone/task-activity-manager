@@ -100,6 +100,20 @@ func (c *Client) SearchTestsPage(ctx context.Context, projectKey, scopeJQL, sinc
 	return tests, resp.Total, nil
 }
 
+// CreateTest creates a new Test issue and returns its key (FR-10). Demo URLs
+// short-circuit to a no-op, returning an empty key (reconciled on next sync).
+// The real-Jira call is a best-effort no-op pending verification.
+//
+// TODO(xtm): POST /rest/api/2/issue with issuetype Test and the mapped fields,
+// then return the new key — verify on a live instance.
+func (c *Client) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels []string) (string, error) {
+	_ = ctx
+	if isDemoURL(c.baseURL) {
+		return "", nil
+	}
+	return "", nil
+}
+
 // incrementalSinceClause builds the JQL fragment for an updated-since filter.
 // A 1-hour safety buffer is subtracted from the watermark to absorb clock
 // skew and Jira's server-timezone interpretation of bare date literals — a

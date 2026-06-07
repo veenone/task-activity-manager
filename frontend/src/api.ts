@@ -43,6 +43,9 @@ export {
   BulkMoveToFolder,
   ListTests,
   ListMatchingKeys,
+  PreviewImport,
+  ImportTests,
+  ExportImportTemplate,
   CreateSavedView,
   ListSavedViews,
   DeleteSavedView,
@@ -378,6 +381,31 @@ export interface Statistics {
   byFolder: Bucket[];
   updatedTrend: Bucket[];
   byRunStatus: Bucket[];
+}
+
+// Import types (FR-10) mirror the testrepo shapes.
+export interface ImportPreview {
+  headers: string[];
+  rowCount: number;
+}
+
+export interface ImportMapping {
+  summary: string;
+  description: string;
+  priority: string;
+  labels: string;
+  folder: string;
+}
+
+export interface ImportError {
+  row: number;
+  message: string;
+}
+
+export interface ImportResult {
+  created: number;
+  skipped: number;
+  errors: ImportError[];
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

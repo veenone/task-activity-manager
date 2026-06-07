@@ -47,6 +47,7 @@ import { Dashboard } from "./components/Dashboard";
 import { TestPlanBoardView } from "./components/TestPlanBoardView";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { SyncHistoryModal } from "./components/SyncHistoryModal";
+import { ImportTestsModal } from "./components/ImportTestsModal";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -95,6 +96,7 @@ function App() {
   const [view, setView] = useState<"browse" | "dashboard" | "plans">("browse");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showSyncHistory, setShowSyncHistory] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -634,6 +636,13 @@ function App() {
         )}
         <button
           className="btn"
+          onClick={() => setShowImport(true)}
+          title="Import tests from a CSV file"
+        >
+          Import tests
+        </button>
+        <button
+          className="btn"
           onClick={() => setShowSyncHistory(true)}
           title="Sync history"
         >
@@ -900,6 +909,18 @@ function App() {
           profileId={activeId}
           refreshKey={refreshKey}
           onClose={() => setShowSyncHistory(false)}
+        />
+      )}
+
+      {showImport && (
+        <ImportTestsModal
+          profileId={activeId}
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            reloadPending();
+            setShowImport(false);
+          }}
+          onCancel={() => setShowImport(false)}
         />
       )}
 

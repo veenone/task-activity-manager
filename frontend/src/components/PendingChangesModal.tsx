@@ -251,6 +251,18 @@ function describeChange(c: PendingChange): {
       };
     case "custom_field":
       return { field: "custom field", before: c.beforeVal, after: c.afterVal };
+    case "test_create":
+      return {
+        field: "new test",
+        before: "",
+        after: stepActionLike(c.afterVal, "summary"),
+      };
+    case "folder_create":
+      return { field: "new folder", before: "", after: c.entityKey };
+    case "folder_rename":
+      return { field: "rename folder", before: "", after: c.entityKey };
+    case "folder_delete":
+      return { field: "delete folder", before: c.entityKey, after: "" };
     default:
       return { field: c.field, before: c.beforeVal, after: c.afterVal };
   }

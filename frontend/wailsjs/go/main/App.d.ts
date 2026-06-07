@@ -53,6 +53,8 @@ export function EditTestStepField(arg1:string,arg2:string,arg3:string,arg4:strin
 
 export function ExportDiagnostics():Promise<string>;
 
+export function ExportImportTemplate():Promise<string>;
+
 export function ExportProfile(arg1:string):Promise<string>;
 
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
@@ -83,6 +85,8 @@ export function Health():Promise<main.HealthInfo>;
 
 export function ImportProfile():Promise<profile.Profile>;
 
+export function ImportTests(arg1:string,arg2:string,arg3:testrepo.ImportMapping,arg4:boolean):Promise<testrepo.ImportResult>;
+
 export function ListAllPreconditions(arg1:string):Promise<Array<testrepo.Precondition>>;
 
 export function ListAuditEntries(arg1:string,arg2:number):Promise<Array<testrepo.AuditEntry>>;
@@ -104,6 +108,8 @@ export function ListSyncLog(arg1:string,arg2:number):Promise<Array<testrepo.Sync
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 
 export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function PreviewImport(arg1:string):Promise<testrepo.ImportPreview>;
 
 export function ReadLog(arg1:number):Promise<string>;
 

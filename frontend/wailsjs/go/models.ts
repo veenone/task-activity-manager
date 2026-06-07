@@ -487,6 +487,88 @@ export namespace testrepo {
 	        this.name = source["name"];
 	    }
 	}
+	export class ImportError {
+	    row: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportError(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = source["row"];
+	        this.message = source["message"];
+	    }
+	}
+	export class ImportMapping {
+	    summary: string;
+	    description: string;
+	    priority: string;
+	    labels: string;
+	    folder: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportMapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.summary = source["summary"];
+	        this.description = source["description"];
+	        this.priority = source["priority"];
+	        this.labels = source["labels"];
+	        this.folder = source["folder"];
+	    }
+	}
+	export class ImportPreview {
+	    headers: string[];
+	    rowCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.headers = source["headers"];
+	        this.rowCount = source["rowCount"];
+	    }
+	}
+	export class ImportResult {
+	    created: number;
+	    skipped: number;
+	    errors: ImportError[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.created = source["created"];
+	        this.skipped = source["skipped"];
+	        this.errors = this.convertValues(source["errors"], ImportError);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class TestCase {
 	    key: string;
 	    id: string;

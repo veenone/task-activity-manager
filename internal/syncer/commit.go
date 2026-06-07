@@ -89,6 +89,8 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 	preconditionEditRows := make([]testrepo.PendingChange, 0)
 	// Folder operations (FR-13.3) are repository-level, keyed by folder path.
 	folderRows := make([]testrepo.PendingChange, 0)
+	// Imported Test creates (FR-10), keyed by a temporary "NEW-N" Test key.
+	testCreateRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -102,6 +104,10 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "folder_create" || c.EntityType == "folder_rename" || c.EntityType == "folder_delete" {
 			folderRows = append(folderRows, c)
+			continue
+		}
+		if c.EntityType == "test_create" {
+			testCreateRows = append(testCreateRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -401,8 +407,49 @@ testLoop:
 	e.commitMemberships(ctx, profileID, membershipRows, &result)
 	e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
 	e.commitFolders(ctx, profileID, projectKey, folderRows, &result)
+	e.commitTestCreates(ctx, profileID, projectKey, testCreateRows, &result)
 
 	return result, nil
+}
+
+// commitTestCreates creates imported Tests (FR-10), renaming each local "NEW-N"
+// placeholder to the real key Jira assigned. Reported under the created key.
+func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey string, rows []testrepo.PendingChange, result *CommitResult) {
+	for _, c := range rows {
+		var p struct {
+			Summary     string `json:"summary"`
+			Description string `json:"description"`
+			Priority    string `json:"priority"`
+			Labels      string `json:"labels"`
+		}
+		if err := json.Unmarshal([]byte(c.AfterVal), &p); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed test payload: " + err.Error()})
+			continue
+		}
+		var labels []string
+		if p.Labels != "" {
+			labels = strings.Fields(p.Labels)
+		}
+		realKey, err := e.client.CreateTest(ctx, projectKey, p.Summary, p.Description, p.Priority, labels)
+		if err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "create test: " + sanitizeError(err.Error())})
+			continue
+		}
+		key := c.EntityKey
+		if realKey != "" {
+			if rErr := e.repo.RenameTest(profileID, c.EntityKey, realKey); rErr != nil {
+				// Remote create succeeded; a cache-rename hiccup must not fail
+				// the commit.
+				_ = rErr
+			}
+			key = realKey
+		}
+		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "Jira created test but local cleanup failed: " + err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
+	}
 }
 
 // commitFolders pushes Test Repository folder operations (FR-13.3), reported

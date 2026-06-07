@@ -1,0 +1,221 @@
+import { useState } from "react";
+import {
+  PreviewImport,
+  ImportTests,
+  ExportImportTemplate,
+  errMsg,
+} from "../api";
+import type { ImportMapping, ImportResult } from "../api";
+
+interface Props {
+  profileId: string;
+  onComplete: () => void;
+  onCancel: () => void;
+}
+
+const FIELDS: Array<{ key: keyof ImportMapping; label: string; required?: boolean }> = [
+  { key: "summary", label: "Summary", required: true },
+  { key: "description", label: "Description" },
+  { key: "priority", label: "Priority" },
+  { key: "labels", label: "Labels" },
+  { key: "folder", label: "Folder" },
+];
+
+const EMPTY_MAPPING: ImportMapping = {
+  summary: "",
+  description: "",
+  priority: "",
+  labels: "",
+  folder: "",
+};
+
+// ImportTestsModal imports Tests from a CSV file (FR-10): pick a file, map
+// columns to Test fields, validate (dry run), then import as local pending
+// creates committed on the next sync.
+export function ImportTestsModal({ profileId, onComplete, onCancel }: Props) {
+  const [content, setContent] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [rowCount, setRowCount] = useState(0);
+  const [mapping, setMapping] = useState<ImportMapping>(EMPTY_MAPPING);
+  const [validation, setValidation] = useState<ImportResult | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const text = String(reader.result ?? "");
+      setContent(text);
+      setValidation(null);
+      setResult(null);
+      setError("");
+      try {
+        const pv = await PreviewImport(text);
+        setHeaders(pv.headers ?? []);
+        setRowCount(pv.rowCount ?? 0);
+        setMapping(guessMapping(pv.headers ?? []));
+      } catch (err) {
+        setError(errMsg(err));
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function run(dryRun: boolean) {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await ImportTests(profileId, content, mapping, dryRun);
+      if (dryRun) setValidation(r);
+      else setResult(r);
+    } catch (err) {
+      setError(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadTemplate() {
+    try {
+      const path = await ExportImportTemplate();
+      if (path) window.alert(`Template saved to:\n${path}`);
+    } catch (err) {
+      window.alert(`Template export failed: ${errMsg(err)}`);
+    }
+  }
+
+  const canRun = headers.length > 0 && mapping.summary !== "";
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal pending-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="pending-head">
+          <h2>Import tests from CSV</h2>
+          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+            ✕
+          </button>
+        </div>
+
+        <div className="bulk-body">
+          {!result && (
+            <>
+              <div className="import-row">
+                <input type="file" accept=".csv,text/csv" onChange={pickFile} />
+                <button className="link-btn" onClick={downloadTemplate}>
+                  Download template
+                </button>
+              </div>
+              {fileName && (
+                <p className="muted">
+                  {fileName} — {rowCount} row{rowCount === 1 ? "" : "s"}
+                </p>
+              )}
+
+              {headers.length > 0 && (
+                <div className="import-mapping">
+                  {FIELDS.map((f) => (
+                    <label key={f.key} className="bulk-row">
+                      <span>
+                        {f.label}
+                        {f.required ? " *" : ""}
+                      </span>
+                      <select
+                        value={mapping[f.key]}
+                        onChange={(e) =>
+                          setMapping((m) => ({ ...m, [f.key]: e.target.value }))
+                        }
+                      >
+                        <option value="">(not mapped)</option>
+                        {headers.map((h) => (
+                          <option key={h} value={h}>
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {validation && (
+                <div className="import-validation">
+                  <p className={validation.errors.length ? "warn-text" : "ok-text"}>
+                    {validation.created} valid row
+                    {validation.created === 1 ? "" : "s"}
+                    {validation.errors.length > 0 &&
+                      `, ${validation.errors.length} skipped`}
+                    .
+                  </p>
+                  {validation.errors.length > 0 && (
+                    <ul className="commit-fail-list">
+                      {validation.errors.slice(0, 20).map((er, i) => (
+                        <li key={i}>row {er.row}: {er.message}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {error && <div className="error-text">{error}</div>}
+            </>
+          )}
+
+          {result && (
+            <p className="ok-text">
+              ✓ Imported {result.created} test{result.created === 1 ? "" : "s"} as
+              pending creates
+              {result.skipped > 0 ? ` (${result.skipped} skipped)` : ""}. Commit
+              them from the Pending list.
+            </p>
+          )}
+        </div>
+
+        <div className="pending-actions">
+          {!result ? (
+            <>
+              <button className="btn" onClick={onCancel} disabled={busy}>
+                Cancel
+              </button>
+              <button
+                className="btn"
+                onClick={() => run(true)}
+                disabled={busy || !canRun}
+              >
+                Validate
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => run(false)}
+                disabled={busy || !canRun}
+              >
+                {busy ? "Working…" : "Import"}
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-primary" onClick={onComplete}>
+              Done
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// guessMapping pre-selects columns whose header matches a field name.
+function guessMapping(headers: string[]): ImportMapping {
+  const find = (name: string) =>
+    headers.find((h) => h.trim().toLowerCase() === name) ?? "";
+  return {
+    summary: find("summary"),
+    description: find("description"),
+    priority: find("priority"),
+    labels: find("labels"),
+    folder: find("folder"),
+  };
+}

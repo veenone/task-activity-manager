@@ -1143,6 +1143,47 @@ func (a *App) DeleteSavedView(profileID, id string) error {
 	return a.repo.DeleteSavedView(profileID, id)
 }
 
+// --- Import (FR-10) ---
+
+// PreviewImport parses a CSV file's header row and counts its data rows so the
+// import UI can offer column mapping (FR-10.4 / 10.5).
+func (a *App) PreviewImport(content string) (testrepo.ImportPreview, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.ImportPreview{}, err
+	}
+	return a.repo.ParseImportPreview(content)
+}
+
+// ImportTests validates a CSV import against a column mapping and, unless
+// dryRun, creates a local pending Test per valid row (FR-10.2 / 10.5 / 10.6).
+func (a *App) ImportTests(profileID, content string, mapping testrepo.ImportMapping, dryRun bool) (testrepo.ImportResult, error) {
+	empty := testrepo.ImportResult{Errors: []testrepo.ImportError{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.ImportTests(profileID, content, mapping, dryRun)
+}
+
+// ExportImportTemplate writes a starter CSV import template to a user-chosen
+// file (FR-10.3). Returns the saved path, or "" if cancelled.
+func (a *App) ExportImportTemplate() (string, error) {
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save import template",
+		DefaultFilename: "test-import-template.csv",
+		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, []byte(testrepo.ImportTemplateCSV()), 0o644); err != nil {
+		return "", fmt.Errorf("write template: %w", err)
+	}
+	return path, nil
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.
