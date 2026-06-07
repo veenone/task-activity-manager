@@ -143,6 +143,7 @@ testLoop:
 		var folderChange *testrepo.PendingChange
 		var preconditionChange *testrepo.PendingChange
 		fieldChanges := make([]testrepo.PendingChange, 0, len(testChanges))
+		customFields := make(map[string]string)
 		stepChanges := make(map[string][]testrepo.PendingChange)
 		stepDeletes := make([]string, 0)
 		stepAdds := make([]testrepo.Step, 0)
@@ -205,16 +206,32 @@ testLoop:
 			case "precondition_set":
 				cc := c
 				preconditionChange = &cc
+			case "custom_field":
+				_, fieldID, ok := parseStepKey(c.EntityKey)
+				if !ok {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("malformed custom field entity_key %q", c.EntityKey),
+					})
+					continue testLoop
+				}
+				customFields[fieldID] = c.AfterVal
 			}
 		}
 
-		// PUT non-status field updates.
-		if len(fieldChanges) > 0 {
+		// PUT non-status field updates plus any custom fields in one call.
+		// Standard fields go through FieldsForJira; custom fields are keyed by
+		// their raw Jira id (FR-2.6).
+		if len(fieldChanges) > 0 || len(customFields) > 0 {
 			updates := make(map[string]string, len(fieldChanges))
 			for _, c := range fieldChanges {
 				updates[c.Field] = c.AfterVal
 			}
-			if err := e.client.UpdateIssue(ctx, testKey, jira.FieldsForJira(updates)); err != nil {
+			fields := jira.FieldsForJira(updates)
+			for fieldID, value := range customFields {
+				fields[fieldID] = value
+			}
+			if err := e.client.UpdateIssue(ctx, testKey, fields); err != nil {
 				result.Failed = append(result.Failed, FailedCommit{
 					TestKey: testKey,
 					Error:   sanitizeError(err.Error()),
@@ -616,7 +633,7 @@ func parentTestKey(c testrepo.PendingChange) (string, bool) {
 		// These are test-level changes — entity_key is the Test key itself,
 		// no "<key>:<step>" suffix.
 		return c.EntityKey, true
-	case "test_step", "test_step_delete", "test_step_add":
+	case "test_step", "test_step_delete", "test_step_add", "custom_field":
 		k, _, ok := parseStepKey(c.EntityKey)
 		return k, ok
 	}

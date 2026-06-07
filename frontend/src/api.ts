@@ -48,6 +48,8 @@ export {
   GetBulkTransitionOptions,
   BulkTransitionTests,
   GetTestSteps,
+  GetTestCustomFields,
+  EditTestCustomField,
   EditTestStepField,
   DeleteTestStep,
   AddTestStep,
@@ -218,6 +220,15 @@ export interface Step {
   action: string;
   data: string;
   expected: string;
+}
+
+// CustomFieldValue mirrors testrepo.CustomFieldValue — a Jira custom field on
+// the Test issue type with this Test's value (FR-2.6).
+export interface CustomFieldValue {
+  fieldId: string;
+  name: string;
+  type: string;
+  value: string;
 }
 
 export interface PendingChange {

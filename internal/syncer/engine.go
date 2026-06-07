@@ -85,6 +85,10 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, since string, 
 		return err
 	}
 
+	if err := e.syncCustomFields(ctx, profileID, projectKey); err != nil {
+		return err
+	}
+
 	if err := e.repo.SetSyncState(profileID); err != nil {
 		return err
 	}
@@ -176,6 +180,25 @@ func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey strin
 		}
 	}
 	return e.repo.ReplaceAllContainerLinks(profileID, repoLinks)
+}
+
+// syncCustomFields pulls the custom field definitions configured for the
+// project's Test issue type (FR-2.6) and caches them. An empty result is
+// tolerated — the real-Jira implementation is currently a no-op pending live
+// verification, but demo mode populates them.
+func (e *Engine) syncCustomFields(ctx context.Context, profileID, projectKey string) error {
+	defs, err := e.client.ListCustomFields(ctx, projectKey)
+	if err != nil {
+		return fmt.Errorf("list custom fields: %w", err)
+	}
+	if len(defs) == 0 {
+		return nil
+	}
+	repoDefs := make([]testrepo.CustomFieldDef, len(defs))
+	for i, d := range defs {
+		repoDefs[i] = testrepo.CustomFieldDef{FieldID: d.ID, Name: d.Name, Type: d.Type}
+	}
+	return e.repo.UpsertCustomFields(profileID, repoDefs)
 }
 
 // toRepoTests maps the Jira client's Test type to the repository's TestCase.

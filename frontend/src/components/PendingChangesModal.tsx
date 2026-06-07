@@ -115,8 +115,12 @@ export function PendingChangesModal({
                   // jump-to action to the parent test and label the row so
                   // the modal makes clear which kind of step change this is
                   // (edit / add / delete).
-                  const isStep = c.entityType.startsWith("test_step");
-                  const hasStepID = isStep && c.entityKey.includes(":");
+                  const isStepLike =
+                    c.entityType.startsWith("test_step") ||
+                    c.entityType === "custom_field";
+                  const hasStepID = isStepLike && c.entityKey.includes(":");
+                  const suffixLabel =
+                    c.entityType === "custom_field" ? "field" : "step";
                   const parentKey = hasStepID
                     ? c.entityKey.split(":")[0]
                     : c.entityKey;
@@ -136,7 +140,7 @@ export function PendingChangesModal({
                         </button>
                         {hasStepID && (
                           <span className="muted step-suffix">
-                            {" · step "}
+                            {` · ${suffixLabel} `}
                             <span className="mono">{stepID}</span>
                           </span>
                         )}
@@ -245,6 +249,8 @@ function describeChange(c: PendingChange): {
         before: c.beforeVal,
         after: c.afterVal,
       };
+    case "custom_field":
+      return { field: "custom field", before: c.beforeVal, after: c.afterVal };
     default:
       return { field: c.field, before: c.beforeVal, after: c.afterVal };
   }

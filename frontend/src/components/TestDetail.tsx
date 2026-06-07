@@ -10,6 +10,8 @@ import {
   DeallocateTests,
   GetTestTransitions,
   GetTestSteps,
+  GetTestCustomFields,
+  EditTestCustomField,
   TransitionTest,
   EditTestField,
   EditTestStepField,
@@ -27,6 +29,7 @@ import type {
   Transition,
   Step,
   Folder,
+  CustomFieldValue,
 } from "../api";
 
 interface Props {
@@ -54,6 +57,7 @@ export function TestDetail({
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
   const [allPreconditions, setAllPreconditions] = useState<Precondition[]>([]);
   const [containers, setContainers] = useState<ContainerMembership[]>([]);
+  const [customFields, setCustomFields] = useState<CustomFieldValue[]>([]);
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
@@ -115,6 +119,15 @@ export function TestDetail({
           })
           .finally(() => {
             if (!cancelled) setStepsLoading(false);
+          });
+        // Custom fields load lazily too — definitions come from sync, values
+        // on first open. Failure is non-blocking.
+        GetTestCustomFields(profileId, testKey, false)
+          .then((cf) => {
+            if (!cancelled) setCustomFields(cf ?? []);
+          })
+          .catch((e) => {
+            if (!cancelled) console.error("custom fields:", errMsg(e));
           });
       })
       .catch((e) => {
@@ -426,6 +439,31 @@ export function TestDetail({
             <dd>{test.updated || "—"}</dd>
           </dl>
 
+          {customFields.length > 0 && (
+            <>
+              <h4>Custom Fields</h4>
+              <dl className="detail-fields">
+                {customFields.map((f) => (
+                  <CustomFieldRow
+                    key={f.fieldId}
+                    profileId={profileId}
+                    testKey={testKey}
+                    field={f}
+                    pendingForTest={pendingForTest}
+                    onLocalChange={(value) =>
+                      setCustomFields((prev) =>
+                        prev.map((p) =>
+                          p.fieldId === f.fieldId ? { ...p, value } : p,
+                        ),
+                      )
+                    }
+                    onEdited={onEdited}
+                  />
+                ))}
+              </dl>
+            </>
+          )}
+
           <h4>
             Preconditions {isDirty("preconditions") && <DirtyDot />}
           </h4>
@@ -714,6 +752,63 @@ function StepRow({
       </div>
       {saveError && <div className="error-text step-save-error">{saveError}</div>}
     </li>
+  );
+}
+
+// CustomFieldRow renders one Jira custom field as a label + editable value
+// (FR-2.6). All types edit as text — typed editors (select / date) need live
+// editmeta. Saves on blur; a dirty marker comes from the pending journal.
+function CustomFieldRow({
+  profileId,
+  testKey,
+  field,
+  pendingForTest,
+  onLocalChange,
+  onEdited,
+}: {
+  profileId: string;
+  testKey: string;
+  field: CustomFieldValue;
+  pendingForTest: PendingChange[];
+  onLocalChange: (value: string) => void;
+  onEdited: () => void;
+}) {
+  const [value, setValue] = useState(field.value);
+  const [saveError, setSaveError] = useState("");
+
+  const entityKey = `${testKey}:${field.fieldId}`;
+  const isDirty = pendingForTest.some(
+    (p) => p.entityType === "custom_field" && p.entityKey === entityKey,
+  );
+
+  async function save() {
+    if (value === field.value) return;
+    setSaveError("");
+    try {
+      await EditTestCustomField(profileId, testKey, field.fieldId, value);
+      onLocalChange(value);
+      onEdited();
+    } catch (e) {
+      setValue(field.value);
+      setSaveError(errMsg(e));
+    }
+  }
+
+  return (
+    <>
+      <dt>
+        {field.name} {isDirty && <DirtyDot />}
+      </dt>
+      <dd>
+        <input
+          className="detail-input detail-input-inline"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+        />
+        {saveError && <div className="error-text">{saveError}</div>}
+      </dd>
+    </>
   );
 }
 

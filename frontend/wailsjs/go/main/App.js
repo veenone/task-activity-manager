@@ -70,6 +70,10 @@ export function EditPreconditionField(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditPreconditionField'](arg1, arg2, arg3, arg4);
 }
 
+export function EditTestCustomField(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['EditTestCustomField'](arg1, arg2, arg3, arg4);
+}
+
 export function EditTestField(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditTestField'](arg1, arg2, arg3, arg4);
 }
@@ -104,6 +108,10 @@ export function GetTest(arg1, arg2) {
 
 export function GetTestContainers(arg1, arg2) {
   return window['go']['main']['App']['GetTestContainers'](arg1, arg2);
+}
+
+export function GetTestCustomFields(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTestCustomFields'](arg1, arg2, arg3);
 }
 
 export function GetTestPlanBoard(arg1, arg2) {

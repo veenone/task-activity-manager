@@ -2823,6 +2823,19 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 				return fmt.Errorf("restore membership: %w", err)
 			}
 		}
+	case entityCustomField:
+		// entity_key is "<testKey>:<fieldId>"; revert the cached value.
+		testKey, fieldID, ok := parseStepEntityKey(entityKey)
+		if !ok {
+			return fmt.Errorf("malformed custom field entity_key %q", entityKey)
+		}
+		if _, err := tx.Exec(
+			`UPDATE test_custom_field SET value = ?
+			 WHERE profile_id = ? AND test_key = ? AND field_id = ?`,
+			beforeVal, profileID, testKey, fieldID,
+		); err != nil {
+			return fmt.Errorf("revert custom field: %w", err)
+		}
 	case entityPreconditionEdit:
 		// entity_key is the Precondition key; revert the edited column.
 		col, ok := preconditionFields[field]
@@ -3299,6 +3312,7 @@ const (
 	entityPreconditionSet  = "precondition_set"
 	entityPreconditionEdit = "precondition_edit"
 	entityPreconditionAdd  = "precondition_add"
+	entityCustomField      = "custom_field"
 )
 
 // preconditionFields whitelists which Precondition columns can be edited via

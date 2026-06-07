@@ -40,6 +40,8 @@ export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
 
 export function EditPreconditionField(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
+export function EditTestCustomField(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function EditTestField(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function EditTestStepField(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
@@ -57,6 +59,8 @@ export function GetSyncState(arg1:string):Promise<testrepo.SyncState>;
 export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;
 
 export function GetTestContainers(arg1:string,arg2:string):Promise<Array<testrepo.ContainerMembership>>;
+
+export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.CustomFieldValue>>;
 
 export function GetTestPlanBoard(arg1:string,arg2:string):Promise<testrepo.TestPlanBoard>;
 

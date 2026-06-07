@@ -567,6 +567,55 @@ func (a *App) GetTestSteps(profileID, testKey string, forceRefresh bool) ([]test
 	return steps, nil
 }
 
+// --- Custom fields (FR-2.6) ---
+
+// GetTestCustomFields returns a Test's custom fields (definition + value),
+// fetching values from Jira on a cache miss. forceRefresh re-pulls from Jira.
+// Definitions come from the sync; values are fetched lazily on first open, the
+// same pattern as steps.
+func (a *App) GetTestCustomFields(profileID, testKey string, forceRefresh bool) ([]testrepo.CustomFieldValue, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	if !forceRefresh {
+		has, err := a.repo.HasCustomFieldValues(profileID, testKey)
+		if err != nil {
+			return nil, err
+		}
+		if has {
+			return a.repo.ListTestCustomFields(profileID, testKey)
+		}
+	}
+
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return nil, err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return nil, fmt.Errorf("load credentials: %w", err)
+	}
+	values, err := jira.NewClient(p.JiraURL, token).GetTestCustomFields(a.ctx, testKey)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) > 0 {
+		if err := a.repo.SetTestCustomFields(profileID, testKey, values); err != nil {
+			return nil, err
+		}
+	}
+	return a.repo.ListTestCustomFields(profileID, testKey)
+}
+
+// EditTestCustomField queues a local edit to one custom field of a Test
+// (FR-2.6). The change is pushed to Jira on commit as an issue field update.
+func (a *App) EditTestCustomField(profileID, testKey, fieldID, newValue string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.EditTestCustomField(profileID, testKey, fieldID, newValue)
+}
+
 // --- Bulk operations (FR-3) ---
 
 // BulkEditTests applies a single field-level operation to a batch of Tests,

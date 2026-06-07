@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 8
+const schemaVersion = 9
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -149,6 +149,22 @@ CREATE TABLE IF NOT EXISTS saved_view (
 	created_at TEXT NOT NULL,
 	PRIMARY KEY (profile_id, id)
 );
+
+CREATE TABLE IF NOT EXISTS custom_field (
+	profile_id TEXT NOT NULL,
+	field_id   TEXT NOT NULL,
+	name       TEXT NOT NULL,
+	type       TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, field_id)
+);
+
+CREATE TABLE IF NOT EXISTS test_custom_field (
+	profile_id TEXT NOT NULL,
+	test_key   TEXT NOT NULL,
+	field_id   TEXT NOT NULL,
+	value      TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, test_key, field_id)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -239,6 +255,8 @@ func applyMigrations(db *sql.DB) error {
 	// v7: test_container / test_container_test tables for Test Sets, Test
 	// Plans and Test Executions plus their Test memberships. Also additive.
 	// v8: saved_view table for saved browse filters. Also additive.
+	// v9: custom_field / test_custom_field tables for Jira custom fields on the
+	// Test issue type. Also additive.
 	return nil
 }
 

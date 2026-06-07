@@ -420,6 +420,24 @@ export namespace testrepo {
 	        this.added = source["added"];
 	    }
 	}
+	export class CustomFieldValue {
+	    fieldId: string;
+	    name: string;
+	    type: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CustomFieldValue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fieldId = source["fieldId"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.value = source["value"];
+	    }
+	}
 	export class DeallocateResult {
 	    removed: string[];
 	    notMembers: string[];
