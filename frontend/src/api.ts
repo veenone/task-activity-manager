@@ -11,6 +11,7 @@ export {
   ExportDiagnostics,
   GetSettings,
   SetDefaultProfile,
+  SetTheme,
   ListProfiles,
   CreateProfile,
   UpdateProfileScope,
@@ -88,6 +89,7 @@ export interface HealthInfo {
 // Settings mirrors settings.Settings — global app preferences (FR-12.2).
 export interface Settings {
   defaultProfileId: string;
+  theme: string; // "light" | "dark" | "system" | "" (= light)
 }
 
 export interface Profile {

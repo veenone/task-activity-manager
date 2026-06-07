@@ -367,7 +367,7 @@ func (a *App) DeleteProfile(id string) error {
 	}
 	// Clear the default-profile setting if it pointed at this profile.
 	if s, err := a.settings.Get(); err == nil && s.DefaultProfileID == id {
-		if err := a.settings.Set(settings.Settings{DefaultProfileID: ""}); err != nil {
+		if err := a.settings.SetDefaultProfileID(""); err != nil {
 			log.Printf("xtm: clear default profile after delete: %v", err)
 		}
 	}
@@ -390,7 +390,16 @@ func (a *App) SetDefaultProfile(profileID string) error {
 	if err := a.requireStore(); err != nil {
 		return err
 	}
-	return a.settings.Set(settings.Settings{DefaultProfileID: profileID})
+	return a.settings.SetDefaultProfileID(profileID)
+}
+
+// SetTheme records the colour theme preference (FR-12.2): "light", "dark" or
+// "system".
+func (a *App) SetTheme(theme string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.settings.SetTheme(theme)
 }
 
 // --- Connection & sync (FR-1, FR-8) ---

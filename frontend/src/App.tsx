@@ -16,6 +16,7 @@ import {
   UpdateProfileToken,
   GetSettings,
   SetDefaultProfile,
+  SetTheme,
   ListPendingChanges,
   DiscardPendingChange,
   CommitPendingChanges,
@@ -50,12 +51,23 @@ import { SyncHistoryModal } from "./components/SyncHistoryModal";
 import { ImportTestsModal } from "./components/ImportTestsModal";
 import { Menu } from "./components/Menu";
 
+// applyTheme resolves the preference ("system" follows the OS) and sets the
+// data-theme attribute the CSS tokens key off (FR-12.2).
+function applyTheme(theme: string) {
+  const dark =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+}
+
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [defaultProfileId, setDefaultProfileId] = useState<string>("");
+  const [theme, setThemeState] = useState<string>("light");
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -121,6 +133,9 @@ function App() {
       .then(([ps, s]) => {
         setProfiles(ps);
         setDefaultProfileId(s.defaultProfileId ?? "");
+        const t = s.theme || "light";
+        setThemeState(t);
+        applyTheme(t);
         if (ps.length > 0) {
           const def =
             s.defaultProfileId && ps.some((p) => p.id === s.defaultProfileId)
@@ -355,6 +370,17 @@ function App() {
       setDefaultProfileId(next);
     } catch (e) {
       console.error("set default profile:", errMsg(e));
+    }
+  }
+
+  // chooseTheme applies + persists a colour-theme preference (FR-12.2).
+  async function chooseTheme(next: string) {
+    setThemeState(next);
+    applyTheme(next);
+    try {
+      await SetTheme(next);
+    } catch (e) {
+      console.error("set theme:", errMsg(e));
     }
   }
 
@@ -660,6 +686,25 @@ function App() {
                 label: "Diagnostics",
                 onClick: () => setShowDiagnostics(true),
                 title: "Logs & diagnostics",
+              },
+              { key: "td", divider: true },
+              {
+                key: "t-light",
+                label: "Theme: Light",
+                checked: theme === "light",
+                onClick: () => chooseTheme("light"),
+              },
+              {
+                key: "t-dark",
+                label: "Theme: Dark",
+                checked: theme === "dark",
+                onClick: () => chooseTheme("dark"),
+              },
+              {
+                key: "t-system",
+                label: "Theme: System",
+                checked: theme === "system",
+                onClick: () => chooseTheme("system"),
               },
             ]}
           />

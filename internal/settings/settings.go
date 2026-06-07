@@ -10,11 +10,15 @@ import (
 	"xray-test-manager/internal/store"
 )
 
-const keyDefaultProfileID = "default_profile_id"
+const (
+	keyDefaultProfileID = "default_profile_id"
+	keyTheme            = "theme"
+)
 
 // Settings holds the global application preferences.
 type Settings struct {
 	DefaultProfileID string `json:"defaultProfileId"`
+	Theme            string `json:"theme"` // "light" | "dark" | "system" | "" (= light)
 }
 
 // Manager reads and writes global settings.
@@ -30,17 +34,27 @@ func NewManager(s *store.Store) *Manager {
 // Get returns the current settings, with zero values for anything unset.
 func (m *Manager) Get() (Settings, error) {
 	var s Settings
-	v, err := m.value(keyDefaultProfileID)
+	def, err := m.value(keyDefaultProfileID)
 	if err != nil {
 		return Settings{}, err
 	}
-	s.DefaultProfileID = v
+	theme, err := m.value(keyTheme)
+	if err != nil {
+		return Settings{}, err
+	}
+	s.DefaultProfileID = def
+	s.Theme = theme
 	return s, nil
 }
 
-// Set persists the given settings.
-func (m *Manager) Set(s Settings) error {
-	return m.setValue(keyDefaultProfileID, s.DefaultProfileID)
+// SetDefaultProfileID records which profile is auto-selected on launch.
+func (m *Manager) SetDefaultProfileID(id string) error {
+	return m.setValue(keyDefaultProfileID, id)
+}
+
+// SetTheme records the colour theme preference.
+func (m *Manager) SetTheme(theme string) error {
+	return m.setValue(keyTheme, theme)
 }
 
 func (m *Manager) value(key string) (string, error) {

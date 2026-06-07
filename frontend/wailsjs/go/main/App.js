@@ -262,6 +262,10 @@ export function SetTestReview(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SetTestReview'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function SetTheme(arg1) {
+  return window['go']['main']['App']['SetTheme'](arg1);
+}
+
 export function SyncProfile(arg1) {
   return window['go']['main']['App']['SyncProfile'](arg1);
 }

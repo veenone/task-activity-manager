@@ -32,7 +32,7 @@ func TestDefaultSettingsAreEmpty(t *testing.T) {
 func TestSetAndGetDefaultProfile(t *testing.T) {
 	m := newManager(t)
 
-	if err := m.Set(settings.Settings{DefaultProfileID: "abc-123"}); err != nil {
+	if err := m.SetDefaultProfileID("abc-123"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 
@@ -42,11 +42,20 @@ func TestSetAndGetDefaultProfile(t *testing.T) {
 	}
 
 	// Overwrite (upsert).
-	if err := m.Set(settings.Settings{DefaultProfileID: "def-456"}); err != nil {
+	if err := m.SetDefaultProfileID("def-456"); err != nil {
 		t.Fatalf("set 2: %v", err)
 	}
 	s, _ = m.Get()
 	if s.DefaultProfileID != "def-456" {
 		t.Errorf("DefaultProfileID = %q, want def-456 after overwrite", s.DefaultProfileID)
+	}
+
+	// Theme persists independently of the default profile.
+	if err := m.SetTheme("dark"); err != nil {
+		t.Fatalf("set theme: %v", err)
+	}
+	s, _ = m.Get()
+	if s.Theme != "dark" || s.DefaultProfileID != "def-456" {
+		t.Errorf("settings = %+v, want theme dark + default def-456", s)
 	}
 }
