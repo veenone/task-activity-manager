@@ -507,6 +507,9 @@ export namespace testrepo {
 	    priority: string;
 	    labels: string;
 	    folder: string;
+	    action: string;
+	    data: string;
+	    expected: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ImportMapping(source);
@@ -519,6 +522,9 @@ export namespace testrepo {
 	        this.priority = source["priority"];
 	        this.labels = source["labels"];
 	        this.folder = source["folder"];
+	        this.action = source["action"];
+	        this.data = source["data"];
+	        this.expected = source["expected"];
 	    }
 	}
 	export class ImportPreview {

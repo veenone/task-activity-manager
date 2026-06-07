@@ -17,13 +17,25 @@ type ImportPreview struct {
 }
 
 // ImportMapping maps Test fields to spreadsheet column headers (FR-10.4). An
-// empty value means the field is unmapped. Summary is required.
+// empty value means the field is unmapped. Summary is required. The step
+// columns support a Test that spans several rows (FR-10.7): a row with a
+// Summary starts a Test; following rows with an empty Summary add steps to it.
 type ImportMapping struct {
 	Summary     string `json:"summary"`
 	Description string `json:"description"`
 	Priority    string `json:"priority"`
 	Labels      string `json:"labels"`
 	Folder      string `json:"folder"`
+	Action      string `json:"action"`
+	Data        string `json:"data"`
+	Expected    string `json:"expected"`
+}
+
+// importStep is one step parsed from an import row (FR-10.7).
+type importStep struct {
+	Action   string `json:"action"`
+	Data     string `json:"data"`
+	Expected string `json:"expected"`
 }
 
 // ImportError is one row that failed validation (FR-10.5).
@@ -41,11 +53,12 @@ type ImportResult struct {
 
 // testCreatePayload is the JSON stored in a test_create pending row.
 type testCreatePayload struct {
-	Summary     string `json:"summary"`
-	Description string `json:"description"`
-	Priority    string `json:"priority"`
-	Labels      string `json:"labels"`
-	Folder      string `json:"folder"`
+	Summary     string       `json:"summary"`
+	Description string       `json:"description"`
+	Priority    string       `json:"priority"`
+	Labels      string       `json:"labels"`
+	Folder      string       `json:"folder"`
+	Steps       []importStep `json:"steps,omitempty"`
 }
 
 // ParseImportPreview reads the header row and counts data rows of a CSV file
@@ -95,6 +108,9 @@ func (r *Repository) ImportTests(profileID, content string, mapping ImportMappin
 	prioIdx := col(mapping.Priority)
 	labelsIdx := col(mapping.Labels)
 	folderIdx := col(mapping.Folder)
+	actionIdx := col(mapping.Action)
+	dataIdx := col(mapping.Data)
+	expectedIdx := col(mapping.Expected)
 
 	get := func(row []string, idx int) string {
 		if idx < 0 || idx >= len(row) {
@@ -103,45 +119,67 @@ func (r *Repository) ImportTests(profileID, content string, mapping ImportMappin
 		return strings.TrimSpace(row[idx])
 	}
 
-	var tx *sql.Tx
-	if !dryRun {
-		tx, err = r.db.Begin()
-		if err != nil {
-			return result, fmt.Errorf("begin transaction: %w", err)
+	// First pass: group rows into Tests. A row with a Summary starts a Test;
+	// a row with an empty Summary but step content extends the previous Test's
+	// steps (FR-10.7).
+	tests := []testCreatePayload{}
+	curIdx := -1
+	for i := 1; i < len(records); i++ {
+		rowNum := i + 1
+		summary := get(records[i], summaryIdx)
+		step := importStep{
+			Action:   get(records[i], actionIdx),
+			Data:     get(records[i], dataIdx),
+			Expected: get(records[i], expectedIdx),
 		}
-		defer func() { _ = tx.Rollback() }()
+		hasStep := step.Action != "" || step.Data != "" || step.Expected != ""
+
+		if summary != "" {
+			tests = append(tests, testCreatePayload{
+				Summary:     summary,
+				Description: get(records[i], descIdx),
+				Priority:    get(records[i], prioIdx),
+				Labels:      get(records[i], labelsIdx),
+				Folder:      get(records[i], folderIdx),
+			})
+			curIdx = len(tests) - 1
+			if hasStep {
+				tests[curIdx].Steps = append(tests[curIdx].Steps, step)
+			}
+			continue
+		}
+		// Empty summary.
+		if hasStep {
+			if curIdx < 0 {
+				result.Errors = append(result.Errors, ImportError{Row: rowNum, Message: "step row before any test summary"})
+				result.Skipped++
+				continue
+			}
+			tests[curIdx].Steps = append(tests[curIdx].Steps, step)
+			continue
+		}
+		result.Errors = append(result.Errors, ImportError{Row: rowNum, Message: "row has neither a summary nor step content"})
+		result.Skipped++
 	}
 
-	for i := 1; i < len(records); i++ {
-		rowNum := i + 1 // 1-based, counting the header row
-		summary := get(records[i], summaryIdx)
-		if summary == "" {
-			result.Errors = append(result.Errors, ImportError{Row: rowNum, Message: "summary is empty"})
-			result.Skipped++
-			continue
-		}
-		if dryRun {
-			result.Created++
-			continue
-		}
+	result.Created = len(tests)
+	if dryRun {
+		return result, nil
+	}
 
-		payload := testCreatePayload{
-			Summary:     summary,
-			Description: get(records[i], descIdx),
-			Priority:    get(records[i], prioIdx),
-			Labels:      get(records[i], labelsIdx),
-			Folder:      get(records[i], folderIdx),
-		}
-		if err := insertImportedTest(tx, profileID, payload); err != nil {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return result, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, p := range tests {
+		if err := insertImportedTest(tx, profileID, p); err != nil {
 			return result, err
 		}
-		result.Created++
 	}
-
-	if !dryRun {
-		if err := tx.Commit(); err != nil {
-			return result, fmt.Errorf("commit import: %w", err)
-		}
+	if err := tx.Commit(); err != nil {
+		return result, fmt.Errorf("commit import: %w", err)
 	}
 	return result, nil
 }
@@ -159,6 +197,15 @@ func insertImportedTest(tx *sql.Tx, profileID string, p testCreatePayload) error
 		profileID, tempKey, p.Summary, p.Description, p.Priority, p.Labels, p.Folder,
 	); err != nil {
 		return fmt.Errorf("insert imported test: %w", err)
+	}
+	for i, s := range p.Steps {
+		if _, err := tx.Exec(
+			`INSERT INTO test_step (profile_id, test_key, xray_id, idx, action, data, expected)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			profileID, tempKey, fmt.Sprintf("imp-%d", i+1), i+1, s.Action, s.Data, s.Expected,
+		); err != nil {
+			return fmt.Errorf("insert imported step: %w", err)
+		}
 	}
 	encoded, _ := json.Marshal(p)
 	if err := upsertPendingChange(
@@ -234,7 +281,11 @@ func readCSV(content string) ([][]string, error) {
 }
 
 // ImportTemplateCSV returns a starter CSV with the supported columns (FR-10.3).
+// The second test shows the multi-row step format (FR-10.7): a row with a
+// Summary starts a test; following rows with an empty Summary add steps.
 func ImportTemplateCSV() string {
-	return "Summary,Description,Priority,Labels,Folder\n" +
-		"Login with valid credentials,Verify a user can log in,High,smoke api,/Authentication/Login\n"
+	return "Summary,Description,Priority,Labels,Folder,Action,Data,Expected\n" +
+		"Login with valid credentials,Verify a user can log in,High,smoke api,/Authentication/Login,,,\n" +
+		"Login flow with steps,Multi-step example,Medium,smoke,/Authentication/Login,Open the login page,,Login form is shown\n" +
+		",,,,,Enter credentials and submit,user / pass,User is logged in\n"
 }

@@ -75,6 +75,61 @@ func TestImportTestsCreatesPendingTests(t *testing.T) {
 	}
 }
 
+func TestImportTestsGroupsMultiRowSteps(t *testing.T) {
+	repo := newRepo(t)
+	csv := "Summary,Action,Data,Expected\n" +
+		"Login flow,Open login page,,Page shown\n" +
+		",Enter credentials,user/pass,Fields filled\n" +
+		",Submit,,Logged in\n" +
+		"Logout flow,Click logout,,Logged out\n"
+	mapping := testrepo.ImportMapping{
+		Summary: "Summary", Action: "Action", Data: "Data", Expected: "Expected",
+	}
+
+	res, err := repo.ImportTests("p1", csv, mapping, false)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if res.Created != 2 {
+		t.Fatalf("Created = %d, want 2 tests (rows 2-4 are one test, row 5 another)", res.Created)
+	}
+
+	// The first imported test should have 3 steps.
+	page, _ := repo.ListTests("p1", testrepo.Query{})
+	var loginKey string
+	for _, tc := range page.Tests {
+		if tc.Summary == "Login flow" {
+			loginKey = tc.Key
+		}
+	}
+	if loginKey == "" {
+		t.Fatal("Login flow test not created")
+	}
+	steps, _ := repo.ListTestSteps("p1", loginKey)
+	if len(steps) != 3 {
+		t.Errorf("Login flow steps = %d, want 3", len(steps))
+	}
+}
+
+func TestImportStepRowBeforeSummaryIsError(t *testing.T) {
+	repo := newRepo(t)
+	csv := "Summary,Action\n" +
+		",orphan step\n" +
+		"A test,first step\n"
+	mapping := testrepo.ImportMapping{Summary: "Summary", Action: "Action"}
+
+	res, err := repo.ImportTests("p1", csv, mapping, true)
+	if err != nil {
+		t.Fatalf("dry run: %v", err)
+	}
+	if len(res.Errors) != 1 || res.Errors[0].Row != 2 {
+		t.Errorf("errors = %+v, want one for row 2 (step before any summary)", res.Errors)
+	}
+	if res.Created != 1 {
+		t.Errorf("Created = %d, want 1 (the real test)", res.Created)
+	}
+}
+
 func TestImportTestsRequiresSummaryMapping(t *testing.T) {
 	repo := newRepo(t)
 	_, err := repo.ImportTests("p1", importCSV, testrepo.ImportMapping{}, true)

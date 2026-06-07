@@ -421,6 +421,11 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 			Description string `json:"description"`
 			Priority    string `json:"priority"`
 			Labels      string `json:"labels"`
+			Steps       []struct {
+				Action   string `json:"action"`
+				Data     string `json:"data"`
+				Expected string `json:"expected"`
+			} `json:"steps"`
 		}
 		if err := json.Unmarshal([]byte(c.AfterVal), &p); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed test payload: " + err.Error()})
@@ -443,6 +448,20 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 				_ = rErr
 			}
 			key = realKey
+		}
+		// Create the imported Test's steps (FR-10.7).
+		stepErr := ""
+		for _, s := range p.Steps {
+			if _, sErr := e.client.CreateTestStep(ctx, key, s.Action, s.Data, s.Expected); sErr != nil {
+				stepErr = sanitizeError(sErr.Error())
+				break
+			}
+		}
+		if stepErr != "" {
+			// The Test was created but a step failed; leave the pending row so
+			// the user can resolve and retry.
+			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "create step: " + stepErr})
+			continue
 		}
 		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "Jira created test but local cleanup failed: " + err.Error()})

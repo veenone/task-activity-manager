@@ -395,6 +395,9 @@ export interface ImportMapping {
   priority: string;
   labels: string;
   folder: string;
+  action: string;
+  data: string;
+  expected: string;
 }
 
 export interface ImportError {

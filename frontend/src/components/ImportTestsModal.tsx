@@ -19,6 +19,9 @@ const FIELDS: Array<{ key: keyof ImportMapping; label: string; required?: boolea
   { key: "priority", label: "Priority" },
   { key: "labels", label: "Labels" },
   { key: "folder", label: "Folder" },
+  { key: "action", label: "Step action" },
+  { key: "data", label: "Step data" },
+  { key: "expected", label: "Step expected" },
 ];
 
 const EMPTY_MAPPING: ImportMapping = {
@@ -27,6 +30,9 @@ const EMPTY_MAPPING: ImportMapping = {
   priority: "",
   labels: "",
   folder: "",
+  action: "",
+  data: "",
+  expected: "",
 };
 
 // ImportTestsModal imports Tests from a CSV file (FR-10): pick a file, map
@@ -217,5 +223,8 @@ function guessMapping(headers: string[]): ImportMapping {
     priority: find("priority"),
     labels: find("labels"),
     folder: find("folder"),
+    action: find("action"),
+    data: find("data"),
+    expected: find("expected"),
   };
 }
