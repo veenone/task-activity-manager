@@ -7,7 +7,13 @@ import {
   DeleteSavedView,
   errMsg,
 } from "../api";
-import type { TestPage, TestQuery, PendingChange, SavedView } from "../api";
+import type {
+  TestPage,
+  TestQuery,
+  TestCase,
+  PendingChange,
+  SavedView,
+} from "../api";
 
 interface Props {
   profileId: string;
@@ -26,6 +32,124 @@ interface Props {
 const PAGE_SIZE = 100;
 
 type SortCol = "key" | "summary" | "status" | "updated";
+
+// Configurable grid columns (FR-11.3). The select-checkbox column is fixed and
+// not part of this list. Column visibility + order persist in localStorage.
+type ColKey = "key" | "summary" | "status" | "priority" | "labels" | "updated";
+
+interface ColDef {
+  key: ColKey;
+  label: string;
+  sortCol?: SortCol;
+}
+
+const ALL_COLUMNS: ColDef[] = [
+  { key: "key", label: "Key", sortCol: "key" },
+  { key: "summary", label: "Summary", sortCol: "summary" },
+  { key: "status", label: "Status", sortCol: "status" },
+  { key: "priority", label: "Priority" },
+  { key: "labels", label: "Labels" },
+  { key: "updated", label: "Updated", sortCol: "updated" },
+];
+
+const COL_LABEL = Object.fromEntries(
+  ALL_COLUMNS.map((c) => [c.key, c.label]),
+) as Record<ColKey, string>;
+const COL_SORT = Object.fromEntries(
+  ALL_COLUMNS.filter((c) => c.sortCol).map((c) => [c.key, c.sortCol]),
+) as Partial<Record<ColKey, SortCol>>;
+
+interface ColState {
+  key: ColKey;
+  visible: boolean;
+}
+
+const COLUMNS_STORAGE_KEY = "xtm.gridColumns";
+
+function defaultColumns(): ColState[] {
+  return ALL_COLUMNS.map((c) => ({ key: c.key, visible: true }));
+}
+
+// loadColumns reads the saved config and reconciles it with the known columns,
+// so a column added in a newer version still appears and an unknown one is
+// dropped.
+function loadColumns(): ColState[] {
+  try {
+    const raw = localStorage.getItem(COLUMNS_STORAGE_KEY);
+    if (!raw) return defaultColumns();
+    const saved = JSON.parse(raw) as ColState[];
+    const known = new Set<string>(ALL_COLUMNS.map((c) => c.key));
+    const seen = new Set<string>();
+    const result: ColState[] = [];
+    for (const s of saved) {
+      if (known.has(s.key) && !seen.has(s.key)) {
+        result.push({ key: s.key, visible: !!s.visible });
+        seen.add(s.key);
+      }
+    }
+    for (const c of ALL_COLUMNS) {
+      if (!seen.has(c.key)) result.push({ key: c.key, visible: true });
+    }
+    return result;
+  } catch {
+    return defaultColumns();
+  }
+}
+
+// renderCell returns the table cell for one column of one Test row.
+function renderCell(key: ColKey, t: TestCase, hasPending: boolean) {
+  switch (key) {
+    case "key":
+      return (
+        <td key="key" className="mono">
+          {hasPending && (
+            <span className="row-dirty-dot" title="Pending edits">
+              ●
+            </span>
+          )}
+          {t.key}
+        </td>
+      );
+    case "summary":
+      return (
+        <td key="summary" className="summary-cell">
+          {t.summary}
+        </td>
+      );
+    case "status":
+      return (
+        <td key="status">
+          {t.status ? (
+            <span className="status-pill">{t.status}</span>
+          ) : (
+            <span className="muted">—</span>
+          )}
+        </td>
+      );
+    case "priority":
+      return <td key="priority">{t.priority || "—"}</td>;
+    case "labels":
+      return (
+        <td key="labels" className="labels-cell">
+          {t.labels && t.labels.length > 0 ? (
+            t.labels.map((l) => (
+              <span key={l} className="label-chip">
+                {l}
+              </span>
+            ))
+          ) : (
+            <span className="muted">—</span>
+          )}
+        </td>
+      );
+    case "updated":
+      return (
+        <td key="updated" className="muted">
+          {formatDate(t.updated)}
+        </td>
+      );
+  }
+}
 
 export function TestTable({
   profileId,
@@ -55,6 +179,29 @@ export function TestTable({
 
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [activeView, setActiveView] = useState("");
+
+  const [columns, setColumns] = useState<ColState[]>(loadColumns);
+  const [showColumns, setShowColumns] = useState(false);
+  useEffect(() => {
+    localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(columns));
+  }, [columns]);
+  const visibleColumns = columns.filter((c) => c.visible);
+
+  function toggleColumn(key: ColKey) {
+    setColumns((prev) =>
+      prev.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c)),
+    );
+  }
+  function moveColumn(key: ColKey, dir: -1 | 1) {
+    setColumns((prev) => {
+      const i = prev.findIndex((c) => c.key === key);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -254,6 +401,55 @@ export function TestTable({
             Save view
           </button>
         </div>
+        <div className="columns-menu">
+          <button
+            className="btn"
+            onClick={() => setShowColumns((s) => !s)}
+            title="Show / hide / reorder columns"
+          >
+            Columns
+          </button>
+          {showColumns && (
+            <>
+              <div
+                className="columns-backdrop"
+                onClick={() => setShowColumns(false)}
+              />
+              <div className="columns-panel">
+                {columns.map((c, i) => (
+                  <div key={c.key} className="columns-row">
+                    <label className="columns-label">
+                      <input
+                        type="checkbox"
+                        checked={c.visible}
+                        onChange={() => toggleColumn(c.key)}
+                      />
+                      {COL_LABEL[c.key]}
+                    </label>
+                    <span className="columns-reorder">
+                      <button
+                        className="btn btn-ghost"
+                        disabled={i === 0}
+                        onClick={() => moveColumn(c.key, -1)}
+                        title="Move up"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        disabled={i === columns.length - 1}
+                        onClick={() => moveColumn(c.key, 1)}
+                        title="Move down"
+                      >
+                        ▼
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         <span className="muted count">
           {loading
             ? "Loading…"
@@ -317,12 +513,21 @@ export function TestTable({
                   }
                 />
               </th>
-              <SortHeader col="key" label="Key" sortBy={sortBy} desc={desc} onSort={toggleSort} />
-              <SortHeader col="summary" label="Summary" sortBy={sortBy} desc={desc} onSort={toggleSort} />
-              <SortHeader col="status" label="Status" sortBy={sortBy} desc={desc} onSort={toggleSort} />
-              <th>Priority</th>
-              <th>Labels</th>
-              <SortHeader col="updated" label="Updated" sortBy={sortBy} desc={desc} onSort={toggleSort} />
+              {visibleColumns.map((c) => {
+                const sortCol = COL_SORT[c.key];
+                return sortCol ? (
+                  <SortHeader
+                    key={c.key}
+                    col={sortCol}
+                    label={COL_LABEL[c.key]}
+                    sortBy={sortBy}
+                    desc={desc}
+                    onSort={toggleSort}
+                  />
+                ) : (
+                  <th key={c.key}>{COL_LABEL[c.key]}</th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -348,41 +553,16 @@ export function TestTable({
                       onChange={() => onToggleSelect(t.key)}
                     />
                   </td>
-                  <td className="mono">
-                    {hasPending && (
-                      <span className="row-dirty-dot" title="Pending edits">
-                        ●
-                      </span>
-                    )}
-                    {t.key}
-                  </td>
-                  <td className="summary-cell">{t.summary}</td>
-                  <td>
-                    {t.status ? (
-                      <span className="status-pill">{t.status}</span>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td>{t.priority || "—"}</td>
-                  <td className="labels-cell">
-                    {t.labels && t.labels.length > 0 ? (
-                      t.labels.map((l) => (
-                        <span key={l} className="label-chip">
-                          {l}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td className="muted">{formatDate(t.updated)}</td>
+                  {visibleColumns.map((c) => renderCell(c.key, t, hasPending))}
                 </tr>
               );
             })}
             {!loading && page.tests.length === 0 && (
               <tr>
-                <td colSpan={7} className="empty-row muted">
+                <td
+                  colSpan={1 + visibleColumns.length}
+                  className="empty-row muted"
+                >
                   {page.total === 0 &&
                   debouncedSearch === "" &&
                   status.trim() === "" &&

@@ -676,6 +676,50 @@
 .view-save {
   font-size: 12px;
 }
+.columns-menu {
+  position: relative;
+}
+.columns-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+.columns-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 21;
+  background: #fff;
+  border: 1px solid #c4c9d4;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 6px;
+  min-width: 200px;
+}
+.columns-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 6px;
+  font-size: 13px;
+}
+.columns-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #1f2933;
+}
+.columns-reorder {
+  display: flex;
+  gap: 1px;
+}
+.columns-reorder .btn {
+  font-size: 9px;
+  padding: 1px 5px;
+  line-height: 1;
+}
 .count {
   margin-left: auto;
 }
