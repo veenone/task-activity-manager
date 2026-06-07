@@ -85,7 +85,7 @@ export function Health():Promise<main.HealthInfo>;
 
 export function ImportProfile():Promise<profile.Profile>;
 
-export function ImportTests(arg1:string,arg2:string,arg3:testrepo.ImportMapping,arg4:boolean):Promise<testrepo.ImportResult>;
+export function ImportTests(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.ImportMapping,arg5:boolean):Promise<testrepo.ImportResult>;
 
 export function ListAllPreconditions(arg1:string):Promise<Array<testrepo.Precondition>>;
 
@@ -109,7 +109,7 @@ export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page
 
 export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function PreviewImport(arg1:string):Promise<testrepo.ImportPreview>;
+export function PreviewImport(arg1:string,arg2:boolean):Promise<testrepo.ImportPreview>;
 
 export function ReadLog(arg1:number):Promise<string>;
 

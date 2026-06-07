@@ -12,9 +12,17 @@ const importCSV = "Summary,Description,Priority,Labels,Folder\n" +
 	",missing summary,Low,,\n" +
 	"Logout works,Verify logout,Medium,regression,/Auth\n"
 
+func recordsOf(t *testing.T, csv string) [][]string {
+	t.Helper()
+	recs, err := testrepo.ParseRecords([]byte(csv), false)
+	if err != nil {
+		t.Fatalf("parse records: %v", err)
+	}
+	return recs
+}
+
 func TestParseImportPreviewReportsHeadersAndRows(t *testing.T) {
-	repo := newRepo(t)
-	pv, err := repo.ParseImportPreview(importCSV)
+	pv, err := testrepo.ParseImportPreview(recordsOf(t, importCSV))
 	if err != nil {
 		t.Fatalf("preview: %v", err)
 	}
@@ -30,7 +38,7 @@ func TestImportTestsDryRunReportsErrorsWithoutCreating(t *testing.T) {
 	repo := newRepo(t)
 	mapping := testrepo.ImportMapping{Summary: "Summary", Description: "Description", Priority: "Priority", Labels: "Labels", Folder: "Folder"}
 
-	res, err := repo.ImportTests("p1", importCSV, mapping, true)
+	res, err := repo.ImportTests("p1", recordsOf(t, importCSV), mapping, true)
 	if err != nil {
 		t.Fatalf("dry run: %v", err)
 	}
@@ -51,7 +59,7 @@ func TestImportTestsCreatesPendingTests(t *testing.T) {
 	repo := newRepo(t)
 	mapping := testrepo.ImportMapping{Summary: "Summary", Description: "Description", Priority: "Priority", Labels: "Labels", Folder: "Folder"}
 
-	res, err := repo.ImportTests("p1", importCSV, mapping, false)
+	res, err := repo.ImportTests("p1", recordsOf(t, importCSV), mapping, false)
 	if err != nil {
 		t.Fatalf("import: %v", err)
 	}
@@ -86,7 +94,7 @@ func TestImportTestsGroupsMultiRowSteps(t *testing.T) {
 		Summary: "Summary", Action: "Action", Data: "Data", Expected: "Expected",
 	}
 
-	res, err := repo.ImportTests("p1", csv, mapping, false)
+	res, err := repo.ImportTests("p1", recordsOf(t, csv), mapping, false)
 	if err != nil {
 		t.Fatalf("import: %v", err)
 	}
@@ -118,7 +126,7 @@ func TestImportStepRowBeforeSummaryIsError(t *testing.T) {
 		"A test,first step\n"
 	mapping := testrepo.ImportMapping{Summary: "Summary", Action: "Action"}
 
-	res, err := repo.ImportTests("p1", csv, mapping, true)
+	res, err := repo.ImportTests("p1", recordsOf(t, csv), mapping, true)
 	if err != nil {
 		t.Fatalf("dry run: %v", err)
 	}
@@ -132,7 +140,7 @@ func TestImportStepRowBeforeSummaryIsError(t *testing.T) {
 
 func TestImportTestsRequiresSummaryMapping(t *testing.T) {
 	repo := newRepo(t)
-	_, err := repo.ImportTests("p1", importCSV, testrepo.ImportMapping{}, true)
+	_, err := repo.ImportTests("p1", recordsOf(t, importCSV), testrepo.ImportMapping{}, true)
 	if err == nil {
 		t.Error("importing without a Summary mapping should error")
 	}
@@ -141,7 +149,7 @@ func TestImportTestsRequiresSummaryMapping(t *testing.T) {
 func TestDiscardImportedTestRemovesIt(t *testing.T) {
 	repo := newRepo(t)
 	mapping := testrepo.ImportMapping{Summary: "Summary"}
-	if _, err := repo.ImportTests("p1", "Summary\nOne test\n", mapping, false); err != nil {
+	if _, err := repo.ImportTests("p1", recordsOf(t, "Summary\nOne test\n"), mapping, false); err != nil {
 		t.Fatalf("import: %v", err)
 	}
 	changes, _ := repo.ListPendingChanges("p1")

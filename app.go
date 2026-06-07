@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1145,23 +1146,41 @@ func (a *App) DeleteSavedView(profileID, id string) error {
 
 // --- Import (FR-10) ---
 
-// PreviewImport parses a CSV file's header row and counts its data rows so the
-// import UI can offer column mapping (FR-10.4 / 10.5).
-func (a *App) PreviewImport(content string) (testrepo.ImportPreview, error) {
+// PreviewImport parses an import file's header row and counts its data rows so
+// the import UI can offer column mapping (FR-10.4 / 10.5). contentB64 is the
+// base64-encoded file; isXlsx selects the XLSX parser over CSV.
+func (a *App) PreviewImport(contentB64 string, isXlsx bool) (testrepo.ImportPreview, error) {
 	if err := a.requireStore(); err != nil {
 		return testrepo.ImportPreview{}, err
 	}
-	return a.repo.ParseImportPreview(content)
+	records, err := decodeImport(contentB64, isXlsx)
+	if err != nil {
+		return testrepo.ImportPreview{}, err
+	}
+	return testrepo.ParseImportPreview(records)
 }
 
-// ImportTests validates a CSV import against a column mapping and, unless
-// dryRun, creates a local pending Test per valid row (FR-10.2 / 10.5 / 10.6).
-func (a *App) ImportTests(profileID, content string, mapping testrepo.ImportMapping, dryRun bool) (testrepo.ImportResult, error) {
+// ImportTests validates an import against a column mapping and, unless dryRun,
+// creates a local pending Test per valid row (FR-10.1 / 10.2 / 10.5 / 10.6).
+func (a *App) ImportTests(profileID, contentB64 string, isXlsx bool, mapping testrepo.ImportMapping, dryRun bool) (testrepo.ImportResult, error) {
 	empty := testrepo.ImportResult{Errors: []testrepo.ImportError{}}
 	if err := a.requireStore(); err != nil {
 		return empty, err
 	}
-	return a.repo.ImportTests(profileID, content, mapping, dryRun)
+	records, err := decodeImport(contentB64, isXlsx)
+	if err != nil {
+		return empty, err
+	}
+	return a.repo.ImportTests(profileID, records, mapping, dryRun)
+}
+
+// decodeImport base64-decodes an uploaded file and parses it into rows.
+func decodeImport(contentB64 string, isXlsx bool) ([][]string, error) {
+	data, err := base64.StdEncoding.DecodeString(contentB64)
+	if err != nil {
+		return nil, fmt.Errorf("decode upload: %w", err)
+	}
+	return testrepo.ParseRecords(data, isXlsx)
 }
 
 // ExportImportTemplate writes a starter CSV import template to a user-chosen

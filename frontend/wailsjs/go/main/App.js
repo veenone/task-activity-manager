@@ -158,8 +158,8 @@ export function ImportProfile() {
   return window['go']['main']['App']['ImportProfile']();
 }
 
-export function ImportTests(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['ImportTests'](arg1, arg2, arg3, arg4);
+export function ImportTests(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ImportTests'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function ListAllPreconditions(arg1) {
@@ -206,8 +206,8 @@ export function MoveTestToFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveTestToFolder'](arg1, arg2, arg3);
 }
 
-export function PreviewImport(arg1) {
-  return window['go']['main']['App']['PreviewImport'](arg1);
+export function PreviewImport(arg1, arg2) {
+  return window['go']['main']['App']['PreviewImport'](arg1, arg2);
 }
 
 export function ReadLog(arg1) {

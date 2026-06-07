@@ -39,7 +39,8 @@ const EMPTY_MAPPING: ImportMapping = {
 // columns to Test fields, validate (dry run), then import as local pending
 // creates committed on the next sync.
 export function ImportTestsModal({ profileId, onComplete, onCancel }: Props) {
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(""); // base64 of the file
+  const [isXlsx, setIsXlsx] = useState(false);
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rowCount, setRowCount] = useState(0);
@@ -53,15 +54,17 @@ export function ImportTestsModal({ profileId, onComplete, onCancel }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
+    const xlsx = file.name.toLowerCase().endsWith(".xlsx");
+    setIsXlsx(xlsx);
     const reader = new FileReader();
     reader.onload = async () => {
-      const text = String(reader.result ?? "");
-      setContent(text);
+      const b64 = arrayBufferToBase64(reader.result as ArrayBuffer);
+      setContent(b64);
       setValidation(null);
       setResult(null);
       setError("");
       try {
-        const pv = await PreviewImport(text);
+        const pv = await PreviewImport(b64, xlsx);
         setHeaders(pv.headers ?? []);
         setRowCount(pv.rowCount ?? 0);
         setMapping(guessMapping(pv.headers ?? []));
@@ -69,14 +72,14 @@ export function ImportTestsModal({ profileId, onComplete, onCancel }: Props) {
         setError(errMsg(err));
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   }
 
   async function run(dryRun: boolean) {
     setBusy(true);
     setError("");
     try {
-      const r = await ImportTests(profileId, content, mapping, dryRun);
+      const r = await ImportTests(profileId, content, isXlsx, mapping, dryRun);
       if (dryRun) setValidation(r);
       else setResult(r);
     } catch (err) {
@@ -101,7 +104,7 @@ export function ImportTestsModal({ profileId, onComplete, onCancel }: Props) {
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal pending-modal" onClick={(e) => e.stopPropagation()}>
         <div className="pending-head">
-          <h2>Import tests from CSV</h2>
+          <h2>Import tests (CSV or XLSX)</h2>
           <button className="btn btn-ghost" onClick={onCancel} title="Close">
             ✕
           </button>
@@ -111,7 +114,11 @@ export function ImportTestsModal({ profileId, onComplete, onCancel }: Props) {
           {!result && (
             <>
               <div className="import-row">
-                <input type="file" accept=".csv,text/csv" onChange={pickFile} />
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,text/csv"
+                  onChange={pickFile}
+                />
                 <button className="link-btn" onClick={downloadTemplate}>
                   Download template
                 </button>
@@ -211,6 +218,18 @@ export function ImportTestsModal({ profileId, onComplete, onCancel }: Props) {
       </div>
     </div>
   );
+}
+
+// arrayBufferToBase64 encodes a file's bytes for transport to the Go backend,
+// which handles both CSV and binary XLSX uniformly.
+function arrayBufferToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 // guessMapping pre-selects columns whose header matches a field name.

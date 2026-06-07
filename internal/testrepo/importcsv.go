@@ -1,12 +1,15 @@
 package testrepo
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/xuri/excelize/v2"
 )
 
 // ImportPreview is what a freshly-parsed import file looks like before mapping
@@ -61,13 +64,8 @@ type testCreatePayload struct {
 	Steps       []importStep `json:"steps,omitempty"`
 }
 
-// ParseImportPreview reads the header row and counts data rows of a CSV file
-// (FR-10.2 / 10.5).
-func (r *Repository) ParseImportPreview(content string) (ImportPreview, error) {
-	records, err := readCSV(content)
-	if err != nil {
-		return ImportPreview{}, err
-	}
+// ParseImportPreview reads the header row and counts data rows (FR-10.2 / 10.5).
+func ParseImportPreview(records [][]string) (ImportPreview, error) {
 	if len(records) == 0 {
 		return ImportPreview{}, fmt.Errorf("the file is empty")
 	}
@@ -78,13 +76,9 @@ func (r *Repository) ParseImportPreview(content string) (ImportPreview, error) {
 // dryRun, creates a local pending Test for each valid row (FR-10.2 / 10.4 /
 // 10.5 / 10.6). Each created Test gets a temporary "NEW-N" key until commit
 // assigns the real one. Invalid rows are reported and skipped, not fatal.
-func (r *Repository) ImportTests(profileID, content string, mapping ImportMapping, dryRun bool) (ImportResult, error) {
+func (r *Repository) ImportTests(profileID string, records [][]string, mapping ImportMapping, dryRun bool) (ImportResult, error) {
 	result := ImportResult{Errors: []ImportError{}}
 
-	records, err := readCSV(content)
-	if err != nil {
-		return result, err
-	}
 	if len(records) < 2 {
 		return result, fmt.Errorf("the file has no data rows")
 	}
@@ -268,6 +262,15 @@ func (r *Repository) RenameTest(profileID, oldKey, newKey string) error {
 	return tx.Commit()
 }
 
+// ParseRecords parses raw import file bytes into rows — CSV or XLSX (FR-10.1 /
+// 10.2). For XLSX the first worksheet is used.
+func ParseRecords(data []byte, isXlsx bool) ([][]string, error) {
+	if isXlsx {
+		return parseXLSX(data)
+	}
+	return readCSV(string(data))
+}
+
 // readCSV parses CSV content leniently (variable field counts allowed).
 func readCSV(content string) ([][]string, error) {
 	reader := csv.NewReader(strings.NewReader(content))
@@ -278,6 +281,25 @@ func readCSV(content string) ([][]string, error) {
 		return nil, fmt.Errorf("parse CSV: %w", err)
 	}
 	return records, nil
+}
+
+// parseXLSX reads the first worksheet of an XLSX file into rows (FR-10.1).
+func parseXLSX(data []byte) ([][]string, error) {
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("open xlsx: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	sheets := f.GetSheetList()
+	if len(sheets) == 0 {
+		return nil, fmt.Errorf("the workbook has no sheets")
+	}
+	rows, err := f.GetRows(sheets[0])
+	if err != nil {
+		return nil, fmt.Errorf("read xlsx rows: %w", err)
+	}
+	return rows, nil
 }
 
 // ImportTemplateCSV returns a starter CSV with the supported columns (FR-10.3).
