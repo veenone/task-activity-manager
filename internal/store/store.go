@@ -208,15 +208,16 @@ func Open(path string) (*Store, error) {
 	// immediately with "database is locked" — e.g. when a previous instance
 	// is still releasing the file as a new one launches. The _pragma query
 	// is applied by the modernc driver to every pooled connection.
-	dsn := path + "?_pragma=busy_timeout(5000)"
+	// WAL lets readers and a writer proceed concurrently (so the UI's many
+	// parallel queries don't serialise behind a sync's write transaction), and
+	// busy_timeout makes a transiently-locked database wait rather than fail
+	// Open with "database is locked". Both pragmas are applied by the modernc
+	// driver to every pooled connection.
+	dsn := path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	// SQLite serialises writes; a single connection avoids in-process lock
-	// contention entirely and keeps the busy_timeout guarantee simple. The
-	// workload is a single desktop user, so this costs nothing.
-	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(baseSchema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("apply tables: %w", err)
