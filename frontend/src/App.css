@@ -9,15 +9,35 @@
 .topbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 8px 14px;
   background: #1b2638;
   color: #e8eaed;
   flex-shrink: 0;
+  border-bottom: 1px solid #0f1722;
+}
+/* Three balanced zones: equal-flex sides center the nav tabs between them. */
+.topbar-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.topbar-left {
+  flex: 1;
+}
+.topbar-center {
+  flex: 0 0 auto;
+}
+.topbar-right {
+  flex: 1;
+  justify-content: flex-end;
 }
 .brand {
   font-weight: 600;
   font-size: 14px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
 }
 .spacer {
   flex: 1;
@@ -26,12 +46,124 @@
   background: #2a3850;
   color: #e8eaed;
   border: 1px solid #3a4a66;
-  border-radius: 4px;
-  padding: 4px 8px;
+  border-radius: 5px;
+  padding: 5px 8px;
+  max-width: 220px;
+  text-overflow: ellipsis;
+}
+
+/* Bar-native button: blends into the dark topbar instead of a bright chip. */
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #2a3850;
+  border: 1px solid #3a4a66;
+  border-radius: 5px;
+  padding: 5px 11px;
+  cursor: pointer;
+  color: #e8eaed;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.topbar-btn:hover:not(:disabled) {
+  background: #344563;
+  border-color: #4a5d80;
+}
+
+/* Dropdown menu */
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+.menu-caret {
+  font-size: 9px;
+  color: #9aa7bd;
+  margin-top: 1px;
+}
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 41;
+  min-width: 210px;
+  padding: 5px;
+  background: #243349;
+  border: 1px solid #3a4a66;
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  animation: menu-in 0.12s ease;
+}
+.menu-panel-left {
+  left: 0;
+}
+.menu-panel-right {
+  right: 0;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 7px 9px;
+  cursor: pointer;
+  color: #d7dce6;
+  font-size: 13px;
+  text-align: left;
+}
+.menu-item:hover:not(:disabled) {
+  background: #34507e;
+  color: #fff;
+}
+.menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.menu-item-danger {
+  color: #f0a0a0;
+}
+.menu-item-danger:hover:not(:disabled) {
+  background: #5a2b2b;
+  color: #fff;
+}
+.menu-check {
+  width: 13px;
+  flex-shrink: 0;
+  color: #6ea8fe;
+  font-size: 11px;
+}
+.menu-label {
+  flex: 1;
+}
+.menu-divider {
+  height: 1px;
+  margin: 5px 7px;
+  background: #3a4a66;
 }
 .sync-info {
   font-size: 12px;
   color: #9aa7bd !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .demo-chip {
   background: #f4b942;
@@ -1174,12 +1306,25 @@ tr.row-selected {
 
 /* Pending changes button + modal */
 .btn-pending {
-  background: #fff7e6;
-  border-color: #fbbf24;
-  color: #92400e;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(244, 185, 66, 0.14);
+  border: 1px solid #f4b942;
+  color: #f4b942;
+  border-radius: 5px;
+  padding: 5px 11px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 .btn-pending:hover:not(:disabled) {
-  background: #ffeec0;
+  background: rgba(244, 185, 66, 0.24);
+}
+.pending-dot {
+  font-size: 9px;
+  line-height: 1;
 }
 .pending-modal {
   width: min(840px, 92vw);

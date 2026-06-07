@@ -48,6 +48,7 @@ import { ContainersView } from "./components/ContainersView";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { SyncHistoryModal } from "./components/SyncHistoryModal";
 import { ImportTestsModal } from "./components/ImportTestsModal";
+import { Menu } from "./components/Menu";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -523,73 +524,74 @@ function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">Xray Test Manager</span>
-        {isDemo && <span className="demo-chip">DEMO</span>}
-        <select
-          className="profile-select"
-          value={activeId}
-          onChange={(e) => {
-            setActiveId(e.target.value);
-            setSelectedKey(null);
-          }}
-        >
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({p.projectKey})
-            </option>
-          ))}
-        </select>
-        <button
-          className="btn"
-          onClick={toggleDefault}
-          title={
-            defaultProfileId === activeId
-              ? "This is the default profile (click to clear)"
-              : "Set as the default profile (auto-selected on launch)"
-          }
-        >
-          {defaultProfileId === activeId ? "★" : "☆"}
-        </button>
-        <button className="btn" onClick={() => setShowForm(true)}>
-          + Profile
-        </button>
-        <button className="btn" onClick={importProfile} title="Import a profile from a file">
-          Import
-        </button>
-        <button
-          className="btn"
-          onClick={exportProfile}
-          title="Export the active profile (without its token)"
-        >
-          Export
-        </button>
-        <button
-          className="btn"
-          onClick={setToken}
-          title="Set or rotate the active profile's token"
-        >
-          Token
-        </button>
-        <button
-          className="btn"
-          onClick={editScope}
-          title={
-            activeProfile?.scopeJql
-              ? `Scope: ${activeProfile.scopeJql}`
-              : "Set a JQL scope to narrow which tests sync"
-          }
-        >
-          Scope{activeProfile?.scopeJql ? " ●" : ""}
-        </button>
-        <button
-          className="btn"
-          onClick={() => setShowDiagnostics(true)}
-          title="Logs & diagnostics"
-        >
-          Diagnostics
-        </button>
+        <div className="topbar-zone topbar-left">
+          <span className="brand">Xray Test Manager</span>
+          {isDemo && <span className="demo-chip">DEMO</span>}
+          <select
+            className="profile-select"
+            value={activeId}
+            onChange={(e) => {
+              setActiveId(e.target.value);
+              setSelectedKey(null);
+            }}
+          >
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.projectKey})
+              </option>
+            ))}
+          </select>
+          <Menu
+            label="Profile"
+            title="Profile actions"
+            items={[
+              {
+                key: "default",
+                label:
+                  defaultProfileId === activeId
+                    ? "Default on launch"
+                    : "Set as default",
+                checked: defaultProfileId === activeId,
+                onClick: toggleDefault,
+                title: "Auto-select this profile when the app starts",
+              },
+              {
+                key: "scope",
+                label: activeProfile?.scopeJql ? "Edit scope ●" : "Set scope…",
+                onClick: editScope,
+                title: activeProfile?.scopeJql
+                  ? `Scope: ${activeProfile.scopeJql}`
+                  : "Narrow which tests sync with a JQL scope",
+              },
+              {
+                key: "token",
+                label: "Set token…",
+                onClick: setToken,
+                title: "Set or rotate the active profile's token",
+              },
+              { key: "d1", divider: true },
+              {
+                key: "export",
+                label: "Export profile…",
+                onClick: exportProfile,
+                title: "Export the active profile (without its token)",
+              },
+              {
+                key: "import",
+                label: "Import profile…",
+                onClick: importProfile,
+              },
+              { key: "d2", divider: true },
+              {
+                key: "new",
+                label: "New profile…",
+                onClick: () => setShowForm(true),
+              },
+            ]}
+          />
+        </div>
 
-        <nav className="view-tabs">
+        <nav className="view-tabs topbar-zone topbar-center">
           <button
             className={`view-tab${view === "browse" ? " view-tab-active" : ""}`}
             onClick={() => setView("browse")}
@@ -610,51 +612,66 @@ function App() {
           </button>
         </nav>
 
-        <div className="spacer" />
+        <div className="topbar-zone topbar-right">
+          {progress && !progress.done && <SyncBar progress={progress} />}
+          {syncError && (
+            <span className="error-text">Sync failed: {syncError}</span>
+          )}
+          {!progress && !syncError && syncState && (
+            <span className="muted sync-info">
+              {syncState.testCount.toLocaleString()} tests
+              {syncState.lastSyncedAt
+                ? ` · ${new Date(syncState.lastSyncedAt).toLocaleDateString()}`
+                : " · never synced"}
+            </span>
+          )}
 
-        {pendingChanges.length > 0 && (
+          {pendingChanges.length > 0 && (
+            <button
+              className="btn-pending"
+              onClick={() => setShowPending(true)}
+              title="Show uncommitted edits"
+            >
+              <span className="pending-dot" aria-hidden="true">
+                ●
+              </span>
+              {pendingChanges.length} pending
+            </button>
+          )}
+
+          <Menu
+            label="More"
+            align="right"
+            title="Tools & diagnostics"
+            items={[
+              {
+                key: "importtests",
+                label: "Import tests…",
+                onClick: () => setShowImport(true),
+                title: "Import tests from a CSV or XLSX file",
+              },
+              {
+                key: "history",
+                label: "Sync history",
+                onClick: () => setShowSyncHistory(true),
+              },
+              {
+                key: "diag",
+                label: "Diagnostics",
+                onClick: () => setShowDiagnostics(true),
+                title: "Logs & diagnostics",
+              },
+            ]}
+          />
+
           <button
-            className="btn btn-pending"
-            onClick={() => setShowPending(true)}
-            title="Show uncommitted edits"
+            className="btn btn-primary"
+            onClick={runSync}
+            disabled={syncing}
           >
-            Pending {pendingChanges.length}
+            {syncing ? "Syncing…" : "Sync"}
           </button>
-        )}
-
-        {progress && !progress.done && <SyncBar progress={progress} />}
-        {syncError && (
-          <span className="error-text">Sync failed: {syncError}</span>
-        )}
-        {!progress && !syncError && syncState && (
-          <span className="muted sync-info">
-            {syncState.testCount.toLocaleString()} tests
-            {syncState.lastSyncedAt
-              ? ` · synced ${new Date(syncState.lastSyncedAt).toLocaleString()}`
-              : " · never synced"}
-          </span>
-        )}
-        <button
-          className="btn"
-          onClick={() => setShowImport(true)}
-          title="Import tests from a CSV file"
-        >
-          Import tests
-        </button>
-        <button
-          className="btn"
-          onClick={() => setShowSyncHistory(true)}
-          title="Sync history"
-        >
-          History
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={runSync}
-          disabled={syncing}
-        >
-          {syncing ? "Syncing…" : "Sync"}
-        </button>
+        </div>
       </header>
 
       {view === "browse" && selectedSet.size > 0 && (
