@@ -134,6 +134,7 @@ export interface TestQuery {
   status: string;
   folderId: string;
   containerKey: string;
+  review: string;
   sortBy: string;
   desc: boolean;
   limit: number;

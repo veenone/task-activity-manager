@@ -168,6 +168,7 @@ export function TestTable({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [review, setReview] = useState("");
   const [sortBy, setSortBy] = useState<SortCol>("key");
   const [desc, setDesc] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -219,7 +220,7 @@ export function TestTable({
   async function saveView() {
     const name = window.prompt("Save current filter as:");
     if (!name || !name.trim()) return;
-    const query = JSON.stringify({ search, status, sortBy, desc });
+    const query = JSON.stringify({ search, status, review, sortBy, desc });
     try {
       const v = await CreateSavedView(profileId, name.trim(), query);
       setSavedViews((prev) => [v, ...prev]);
@@ -238,11 +239,13 @@ export function TestTable({
       const q = JSON.parse(v.query) as Partial<{
         search: string;
         status: string;
+        review: string;
         sortBy: SortCol;
         desc: boolean;
       }>;
       setSearch(q.search ?? "");
       setStatus(q.status ?? "");
+      setReview(q.review ?? "");
       setSortBy(q.sortBy ?? "key");
       setDesc(q.desc ?? false);
     } catch {
@@ -268,7 +271,16 @@ export function TestTable({
 
   useEffect(() => {
     setOffset(0);
-  }, [debouncedSearch, status, folderId, containerKey, sortBy, desc, profileId]);
+  }, [
+    debouncedSearch,
+    status,
+    review,
+    folderId,
+    containerKey,
+    sortBy,
+    desc,
+    profileId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -279,6 +291,7 @@ export function TestTable({
       status: status.trim(),
       folderId,
       containerKey,
+      review,
       sortBy,
       desc,
       limit: PAGE_SIZE,
@@ -303,6 +316,7 @@ export function TestTable({
     status,
     folderId,
     containerKey,
+    review,
     sortBy,
     desc,
     offset,
@@ -343,6 +357,7 @@ export function TestTable({
         status: status.trim(),
         folderId,
         containerKey,
+        review,
         sortBy,
         desc,
         limit: 0,
@@ -365,6 +380,7 @@ export function TestTable({
         status: status.trim(),
         folderId,
         containerKey,
+        review,
         sortBy,
         desc,
         limit: 0,
@@ -394,6 +410,18 @@ export function TestTable({
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         />
+        <select
+          className="review-filter"
+          value={review}
+          onChange={(e) => setReview(e.target.value)}
+          title="Filter by review verdict"
+        >
+          <option value="">Any review</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="pending">Pending review</option>
+          <option value="unreviewed">Unreviewed</option>
+        </select>
         <div className="saved-views">
           <select
             className="view-select"
@@ -599,7 +627,8 @@ export function TestTable({
                   debouncedSearch === "" &&
                   status.trim() === "" &&
                   folderId === "" &&
-                  containerKey === ""
+                  containerKey === "" &&
+                  review === ""
                     ? "No tests yet — run a sync to pull them from Jira."
                     : "No tests match the current filter."}
                 </td>

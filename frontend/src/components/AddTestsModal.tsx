@@ -38,6 +38,7 @@ export function AddTestsModal({
         status: "",
         folderId: "",
         containerKey: "",
+        review: "",
         sortBy: "key",
         desc: false,
         limit: 50,

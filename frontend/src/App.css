@@ -1026,6 +1026,14 @@ i.sankey-node-l2 {
   flex: 1;
   max-width: 420px;
 }
+.review-filter {
+  border: 1px solid #c4c9d4;
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: #fff;
+  color: #1f2933;
+  font-size: 13px;
+}
 .search,
 .status-filter,
 .profile-form input {

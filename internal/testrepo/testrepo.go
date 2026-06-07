@@ -147,6 +147,7 @@ type Query struct {
 	Status       string `json:"status"`
 	FolderID     string `json:"folderId"`     // empty = any folder
 	ContainerKey string `json:"containerKey"` // empty = any container (FR-11.6)
+	Review       string `json:"review"`       // "approved"|"rejected"|"pending"|"unreviewed"|"" = any
 	SortBy       string `json:"sortBy"`
 	Desc         bool   `json:"desc"`
 	Limit        int    `json:"limit"`
@@ -1747,6 +1748,21 @@ func buildTestFilter(profileID string, q Query) (string, []any) {
 			"jira_key IN (SELECT test_key FROM test_container_test "+
 				"WHERE profile_id = ? AND container_key = ?)")
 		args = append(args, profileID, q.ContainerKey)
+	}
+	if q.Review != "" {
+		// Filter by review verdict. "unreviewed" means no review row with a
+		// non-empty verdict; any other value matches that verdict exactly.
+		if q.Review == "unreviewed" {
+			where = append(where,
+				"NOT EXISTS (SELECT 1 FROM test_review tr "+
+					"WHERE tr.profile_id = ? AND tr.test_key = test_case.jira_key AND tr.verdict <> '')")
+			args = append(args, profileID)
+		} else {
+			where = append(where,
+				"EXISTS (SELECT 1 FROM test_review tr "+
+					"WHERE tr.profile_id = ? AND tr.test_key = test_case.jira_key AND tr.verdict = ?)")
+			args = append(args, profileID, q.Review)
+		}
 	}
 	return "WHERE " + strings.Join(where, " AND "), args
 }
