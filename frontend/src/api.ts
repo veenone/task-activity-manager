@@ -37,6 +37,8 @@ export {
   AllocateTests,
   DeallocateTests,
   CreateContainerAndAllocate,
+  EditContainer,
+  DeleteContainer,
   SeedSampleContainers,
   GetTestPlanBoard,
   MoveTestToFolder,

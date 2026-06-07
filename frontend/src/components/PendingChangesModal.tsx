@@ -263,6 +263,14 @@ function describeChange(c: PendingChange): {
       return { field: "rename folder", before: "", after: c.entityKey };
     case "folder_delete":
       return { field: "delete folder", before: c.entityKey, after: "" };
+    case "container_edit":
+      return { field: "rename container", before: c.beforeVal, after: c.afterVal };
+    case "container_delete":
+      return {
+        field: "delete container",
+        before: stepActionLike(c.beforeVal, "summary"),
+        after: "",
+      };
     default:
       return { field: c.field, before: c.beforeVal, after: c.afterVal };
   }

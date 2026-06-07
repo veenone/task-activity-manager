@@ -94,7 +94,9 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
-			c.EntityType == "test_container_add" {
+			c.EntityType == "test_container_add" ||
+			c.EntityType == "container_edit" ||
+			c.EntityType == "container_delete" {
 			membershipRows = append(membershipRows, c)
 			continue
 		}
@@ -624,6 +626,10 @@ func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows [
 			key, err = e.commitContainerCreate(ctx, profileID, c)
 		case "test_membership_remove":
 			key, err = e.commitMembershipRemove(ctx, c)
+		case "container_edit":
+			key, err = c.EntityKey, e.client.UpdateIssue(ctx, c.EntityKey, jira.FieldsForJira(map[string]string{"summary": c.AfterVal}))
+		case "container_delete":
+			key, err = e.commitContainerDelete(ctx, c)
 		default:
 			key, err = e.commitMembershipAdd(ctx, c)
 		}
@@ -670,6 +676,21 @@ func (e *Engine) commitMembershipRemove(ctx context.Context, c testrepo.PendingC
 	}
 	if err := e.client.RemoveTestsFromContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
 		return c.EntityKey, fmt.Errorf("deallocate from %s: %s", c.EntityKey, sanitizeError(err.Error()))
+	}
+	return c.EntityKey, nil
+}
+
+// commitContainerDelete deletes a Container, reading its kind from the delete
+// snapshot. Returns the Container key for result reporting.
+func (e *Engine) commitContainerDelete(ctx context.Context, c testrepo.PendingChange) (string, error) {
+	var snap struct {
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal([]byte(c.BeforeVal), &snap); err != nil {
+		return c.EntityKey, fmt.Errorf("malformed container snapshot: %s", err)
+	}
+	if err := e.client.DeleteContainer(ctx, snap.Kind, c.EntityKey); err != nil {
+		return c.EntityKey, fmt.Errorf("delete container %s: %s", c.EntityKey, sanitizeError(err.Error()))
 	}
 	return c.EntityKey, nil
 }

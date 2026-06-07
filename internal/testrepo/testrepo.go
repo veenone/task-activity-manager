@@ -2934,6 +2934,36 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		if err := rewritePreconditionSets(tx, profileID, entityKey, ""); err != nil {
 			return err
 		}
+	case entityContainerEdit:
+		// entity_key is the Container key; revert the summary.
+		if _, err := tx.Exec(
+			`UPDATE test_container SET summary = ? WHERE profile_id = ? AND jira_key = ?`,
+			beforeVal, profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("revert container summary: %w", err)
+		}
+	case entityContainerDelete:
+		// Restore the deleted Container and its memberships from the snapshot.
+		var snap containerDeleteSnapshot
+		if err := json.Unmarshal([]byte(beforeVal), &snap); err != nil {
+			return fmt.Errorf("decode container snapshot: %w", err)
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO test_container (profile_id, jira_key, kind, summary, status)
+			   VALUES (?, ?, ?, ?, ?)`,
+			profileID, entityKey, snap.Kind, snap.Summary, snap.Status,
+		); err != nil {
+			return fmt.Errorf("restore container: %w", err)
+		}
+		for _, m := range snap.Members {
+			if _, err := tx.Exec(
+				`INSERT OR IGNORE INTO test_container_test
+				   (profile_id, container_key, test_key, run_status) VALUES (?, ?, ?, '')`,
+				profileID, entityKey, m,
+			); err != nil {
+				return fmt.Errorf("restore container membership: %w", err)
+			}
+		}
 	case entityContainerAdd:
 		// entity_key is the temporary Container key; discarding drops the
 		// not-yet-created Container and all its local memberships.
@@ -3355,6 +3385,8 @@ const (
 	entityMembershipAdd    = "test_membership_add"
 	entityMembershipRemove = "test_membership_remove"
 	entityContainerAdd     = "test_container_add"
+	entityContainerEdit    = "container_edit"
+	entityContainerDelete  = "container_delete"
 	entityPreconditionSet  = "precondition_set"
 	entityPreconditionEdit = "precondition_edit"
 	entityPreconditionAdd  = "precondition_add"

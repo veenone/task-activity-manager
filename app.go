@@ -1067,6 +1067,24 @@ func (a *App) DeallocateTests(profileID, containerKey string, testKeys []string)
 	return a.repo.DeallocateTests(profileID, containerKey, testKeys)
 }
 
+// EditContainer renames a Test Set / Plan / Execution and queues the change
+// for commit (container CRUD).
+func (a *App) EditContainer(profileID, key, summary string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.EditContainer(profileID, key, summary)
+}
+
+// DeleteContainer removes a Test Set / Plan / Execution and queues the deletion
+// for commit (container CRUD).
+func (a *App) DeleteContainer(profileID, key string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.DeleteContainer(profileID, key)
+}
+
 // CreateContainerAndAllocate creates a new Test Set / Plan / Execution locally
 // and allocates the given Tests to it (FR-3.4–3.6). The Container is created in
 // Jira on commit; until then it carries a temporary key. The project comes

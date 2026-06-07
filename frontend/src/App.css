@@ -532,6 +532,14 @@
   gap: 6px;
   flex-wrap: wrap;
 }
+.board-head-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.board-head-actions .btn {
+  font-size: 12px;
+}
 .board-seed {
   margin-left: auto;
   font-size: 12px;

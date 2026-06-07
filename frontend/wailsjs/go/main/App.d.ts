@@ -33,6 +33,8 @@ export function CreateSavedView(arg1:string,arg2:string,arg3:string):Promise<tes
 
 export function DeallocateTests(arg1:string,arg2:string,arg3:Array<string>):Promise<testrepo.DeallocateResult>;
 
+export function DeleteContainer(arg1:string,arg2:string):Promise<void>;
+
 export function DeleteFolder(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
@@ -42,6 +44,8 @@ export function DeleteSavedView(arg1:string,arg2:string):Promise<void>;
 export function DeleteTestStep(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
+
+export function EditContainer(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function EditPreconditionField(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 

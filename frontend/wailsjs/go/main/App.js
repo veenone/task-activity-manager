@@ -54,6 +54,10 @@ export function DeallocateTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeallocateTests'](arg1, arg2, arg3);
 }
 
+export function DeleteContainer(arg1, arg2) {
+  return window['go']['main']['App']['DeleteContainer'](arg1, arg2);
+}
+
 export function DeleteFolder(arg1, arg2) {
   return window['go']['main']['App']['DeleteFolder'](arg1, arg2);
 }
@@ -72,6 +76,10 @@ export function DeleteTestStep(arg1, arg2, arg3) {
 
 export function DiscardPendingChange(arg1, arg2) {
   return window['go']['main']['App']['DiscardPendingChange'](arg1, arg2);
+}
+
+export function EditContainer(arg1, arg2, arg3) {
+  return window['go']['main']['App']['EditContainer'](arg1, arg2, arg3);
 }
 
 export function EditPreconditionField(arg1, arg2, arg3, arg4) {

@@ -3,6 +3,9 @@ import {
   ListContainers,
   GetTestPlanBoard,
   SeedSampleContainers,
+  CreateContainerAndAllocate,
+  EditContainer,
+  DeleteContainer,
   errMsg,
 } from "../api";
 import type { Container, TestPlanBoard } from "../api";
@@ -35,6 +38,50 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
       setError(errMsg(e));
     } finally {
       setSeeding(false);
+    }
+  }
+
+  async function newPlan() {
+    const name = window.prompt("New Test Plan name:");
+    if (!name || !name.trim()) return;
+    setError("");
+    try {
+      await CreateContainerAndAllocate(profileId, "testplan", name.trim(), []);
+      onSeeded();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
+  async function renamePlan() {
+    if (!selected) return;
+    const cur = plans.find((p) => p.key === selected);
+    const name = window.prompt("Rename Test Plan to:", cur?.summary ?? "");
+    if (name === null || !name.trim()) return;
+    setError("");
+    try {
+      await EditContainer(profileId, selected, name.trim());
+      onSeeded();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
+  async function deletePlan() {
+    if (!selected) return;
+    if (
+      !window.confirm(
+        "Delete this Test Plan? Its test memberships are removed (committed on sync).",
+      )
+    )
+      return;
+    setError("");
+    try {
+      await DeleteContainer(profileId, selected);
+      setSelected("");
+      onSeeded();
+    } catch (e) {
+      setError(errMsg(e));
     }
   }
 
@@ -89,12 +136,17 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
     return (
       <div className="board">
         <p className="muted">
-          No Test Plans cached yet. Run a sync to populate the board, or
-          generate sample data to try it out.
+          No Test Plans cached yet. Create one, run a sync, or generate sample
+          data to try it out.
         </p>
-        <button className="btn btn-primary" onClick={seed} disabled={seeding}>
-          {seeding ? "Generating…" : "Generate sample sets / plans / executions"}
-        </button>
+        <div className="board-head-actions">
+          <button className="btn btn-primary" onClick={newPlan}>
+            New Test Plan
+          </button>
+          <button className="btn" onClick={seed} disabled={seeding}>
+            {seeding ? "Generating…" : "Generate sample data"}
+          </button>
+        </div>
         {error && <div className="error-text">{error}</div>}
       </div>
     );
@@ -123,6 +175,27 @@ export function TestPlanBoardView({ profileId, refreshKey, onSeeded }: Props) {
             ))}
           </div>
         )}
+        <div className="board-head-actions">
+          <button className="btn" onClick={newPlan} title="Create a new Test Plan">
+            New
+          </button>
+          <button
+            className="btn"
+            onClick={renamePlan}
+            disabled={!selected}
+            title="Rename the selected Test Plan"
+          >
+            Rename
+          </button>
+          <button
+            className="btn"
+            onClick={deletePlan}
+            disabled={!selected}
+            title="Delete the selected Test Plan"
+          >
+            Delete
+          </button>
+        </div>
         <button
           className="link-btn board-seed"
           onClick={seed}

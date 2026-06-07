@@ -131,6 +131,19 @@ func (c *Client) AddTestsToContainer(ctx context.Context, kind, containerKey str
 	return c.post(ctx, fmt.Sprintf("/rest/raven/2.0/api/%s/%s/test", segment, containerKey), body)
 }
 
+// DeleteContainer deletes a Test Set, Test Plan or Test Execution issue
+// (container CRUD). Demo URLs short-circuit to a no-op.
+//
+// Maps to DELETE /rest/api/2/issue/{key}. NOTE(xtm): verify on a live instance
+// — issue deletion can be permission-restricted; the project may prefer a
+// deprecate workflow instead.
+func (c *Client) DeleteContainer(ctx context.Context, kind, containerKey string) error {
+	if isDemoURL(c.baseURL) {
+		return nil
+	}
+	return c.delete(ctx, fmt.Sprintf("/rest/api/2/issue/%s", containerKey))
+}
+
 // RemoveTestsFromContainer removes Tests from a Test Set, Test Plan or Test
 // Execution (FR-3.4–3.6). Demo URLs short-circuit to a no-op.
 //
