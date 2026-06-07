@@ -88,6 +88,8 @@ export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListSavedViews(arg1:string):Promise<Array<testrepo.SavedView>>;
 
+export function ListSyncLog(arg1:string,arg2:number):Promise<Array<testrepo.SyncLogEntry>>;
+
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 
 export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<void>;

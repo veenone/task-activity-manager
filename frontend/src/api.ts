@@ -15,6 +15,7 @@ export {
   TestConnection,
   SyncProfile,
   GetSyncState,
+  ListSyncLog,
   ListFolders,
   GetTestPreconditions,
   ListAllPreconditions,
@@ -118,6 +119,16 @@ export interface SyncState {
   profileId: string;
   lastSyncedAt: string;
   testCount: number;
+}
+
+// SyncLogEntry mirrors testrepo.SyncLogEntry — one sync run's outcome (FR-1.7).
+export interface SyncLogEntry {
+  id: number;
+  startedAt: string;
+  finishedAt: string;
+  outcome: string;
+  fetched: number;
+  error: string;
 }
 
 // SavedView mirrors testrepo.SavedView — a named browse filter (FR-11.4). The

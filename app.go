@@ -282,9 +282,35 @@ func (a *App) SyncProfile(profileID string) error {
 		return fmt.Errorf("read sync state: %w", err)
 	}
 	engine := syncer.New(jira.NewClient(p.JiraURL, token), a.repo)
-	return engine.Sync(a.ctx, profileID, p.ProjectKey, state.LastSyncedAt, func(pr syncer.Progress) {
+	started := time.Now().UTC()
+	var lastFetched int
+	syncErr := engine.Sync(a.ctx, profileID, p.ProjectKey, state.LastSyncedAt, func(pr syncer.Progress) {
+		lastFetched = pr.Fetched
 		runtime.EventsEmit(a.ctx, "sync:progress", pr)
 	})
+
+	// Record the run in the sync history (FR-1.7). A logging failure must not
+	// mask the sync result.
+	outcome, errMsg := "success", ""
+	if syncErr != nil {
+		outcome, errMsg = "error", syncErr.Error()
+	}
+	if logErr := a.repo.RecordSyncLog(
+		profileID, started.Format(time.RFC3339),
+		time.Now().UTC().Format(time.RFC3339), outcome, lastFetched, errMsg,
+	); logErr != nil {
+		log.Printf("xtm: record sync log: %v", logErr)
+	}
+	return syncErr
+}
+
+// ListSyncLog returns a profile's recent sync runs with success / failure
+// detail (FR-1.7).
+func (a *App) ListSyncLog(profileID string, limit int) ([]testrepo.SyncLogEntry, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListSyncLog(profileID, limit)
 }
 
 // GetSyncState reports when a profile last synced and how many Tests it holds.

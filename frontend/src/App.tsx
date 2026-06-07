@@ -37,6 +37,7 @@ import { BulkPreconditionsModal } from "./components/BulkPreconditionsModal";
 import { Dashboard } from "./components/Dashboard";
 import { TestPlanBoardView } from "./components/TestPlanBoardView";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
+import { SyncHistoryModal } from "./components/SyncHistoryModal";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -83,6 +84,7 @@ function App() {
 
   const [view, setView] = useState<"browse" | "dashboard" | "plans">("browse");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showSyncHistory, setShowSyncHistory] = useState(false);
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -447,6 +449,13 @@ function App() {
           </span>
         )}
         <button
+          className="btn"
+          onClick={() => setShowSyncHistory(true)}
+          title="Sync history"
+        >
+          History
+        </button>
+        <button
           className="btn btn-primary"
           onClick={runSync}
           disabled={syncing}
@@ -689,6 +698,14 @@ function App() {
 
       {showDiagnostics && (
         <DiagnosticsModal onClose={() => setShowDiagnostics(false)} />
+      )}
+
+      {showSyncHistory && (
+        <SyncHistoryModal
+          profileId={activeId}
+          refreshKey={refreshKey}
+          onClose={() => setShowSyncHistory(false)}
+        />
       )}
 
       {showBulkPreconditions && (

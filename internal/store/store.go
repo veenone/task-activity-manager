@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 9
+const schemaVersion = 10
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -165,6 +165,16 @@ CREATE TABLE IF NOT EXISTS test_custom_field (
 	value      TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, test_key, field_id)
 );
+
+CREATE TABLE IF NOT EXISTS sync_log (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	profile_id  TEXT NOT NULL,
+	started_at  TEXT NOT NULL,
+	finished_at TEXT NOT NULL DEFAULT '',
+	outcome     TEXT NOT NULL DEFAULT '',
+	fetched     INTEGER NOT NULL DEFAULT 0,
+	error       TEXT NOT NULL DEFAULT ''
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -181,6 +191,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_profile_time  ON audit_log(profile_id, 
 CREATE INDEX IF NOT EXISTS idx_test_step_test          ON test_step(profile_id, test_key, idx);
 CREATE INDEX IF NOT EXISTS idx_test_container_kind     ON test_container(profile_id, kind);
 CREATE INDEX IF NOT EXISTS idx_test_container_test_key ON test_container_test(profile_id, test_key);
+CREATE INDEX IF NOT EXISTS idx_sync_log_profile_time   ON sync_log(profile_id, started_at DESC);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -257,6 +268,7 @@ func applyMigrations(db *sql.DB) error {
 	// v8: saved_view table for saved browse filters. Also additive.
 	// v9: custom_field / test_custom_field tables for Jira custom fields on the
 	// Test issue type. Also additive.
+	// v10: sync_log table for sync history. Also additive.
 	return nil
 }
 

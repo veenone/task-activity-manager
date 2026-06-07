@@ -710,6 +710,28 @@ export namespace testrepo {
 	        this.expected = source["expected"];
 	    }
 	}
+	export class SyncLogEntry {
+	    id: number;
+	    startedAt: string;
+	    finishedAt: string;
+	    outcome: string;
+	    fetched: number;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SyncLogEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.startedAt = source["startedAt"];
+	        this.finishedAt = source["finishedAt"];
+	        this.outcome = source["outcome"];
+	        this.fetched = source["fetched"];
+	        this.error = source["error"];
+	    }
+	}
 	export class SyncState {
 	    profileId: string;
 	    lastSyncedAt: string;

@@ -560,6 +560,14 @@
   border-bottom: none;
 }
 
+.sync-detail {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #6b7280;
+}
+
 /* Diagnostics (FR-12.4) */
 .diag-body {
   padding: 14px 16px;
