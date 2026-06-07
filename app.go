@@ -361,6 +361,16 @@ func (a *App) DeleteProfile(id string) error {
 	if err := a.creds.Delete(id); err != nil {
 		log.Printf("xtm: delete credentials for %s: %v", id, err)
 	}
+	// Remove the profile's cached data so it doesn't linger (FR-5.3).
+	if err := a.repo.PurgeProfile(id); err != nil {
+		log.Printf("xtm: purge cached data for %s: %v", id, err)
+	}
+	// Clear the default-profile setting if it pointed at this profile.
+	if s, err := a.settings.Get(); err == nil && s.DefaultProfileID == id {
+		if err := a.settings.Set(settings.Settings{DefaultProfileID: ""}); err != nil {
+			log.Printf("xtm: clear default profile after delete: %v", err)
+		}
+	}
 	return nil
 }
 
