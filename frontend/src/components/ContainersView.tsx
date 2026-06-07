@@ -10,6 +10,7 @@ import {
   errMsg,
 } from "../api";
 import type { Container, TestPlanBoard } from "../api";
+import { Menu } from "./Menu";
 
 interface Props {
   profileId: string;
@@ -190,42 +191,46 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
           </div>
         )}
         <div className="board-head-actions">
-          <button className="btn" onClick={newContainer} title={`New ${kindLabel}`}>
-            New
+          <button className="btn btn-primary" onClick={newContainer} title={`New ${kindLabel}`}>
+            + New
           </button>
-          <button
-            className="btn"
-            onClick={renameContainer}
-            disabled={!selected}
-            title={`Rename the selected ${kindLabel}`}
-          >
-            Rename
-          </button>
-          <button
-            className="btn"
-            onClick={deleteContainer}
-            disabled={!selected}
-            title={`Delete the selected ${kindLabel}`}
-          >
-            Delete
-          </button>
-          <button
-            className="btn"
-            onClick={generatePytest}
-            disabled={!selected}
-            title="Generate a pytest scaffold from this container's tests"
-          >
-            pytest
-          </button>
+          <Menu
+            label="Actions"
+            align="right"
+            triggerClassName="btn"
+            title={`${kindLabel} actions`}
+            items={[
+              {
+                key: "rename",
+                label: `Rename ${kindLabel}…`,
+                onClick: renameContainer,
+                disabled: !selected,
+              },
+              {
+                key: "pytest",
+                label: "Generate pytest…",
+                onClick: generatePytest,
+                disabled: !selected,
+                title: "Generate a pytest scaffold from this container's tests",
+              },
+              {
+                key: "delete",
+                label: `Delete ${kindLabel}…`,
+                onClick: deleteContainer,
+                disabled: !selected,
+                danger: true,
+              },
+              { key: "d", divider: true },
+              {
+                key: "seed",
+                label: seeding ? "Generating…" : "Regenerate sample data",
+                onClick: seed,
+                disabled: seeding,
+                title: "Regenerate sample sets / plans / executions from synced tests",
+              },
+            ]}
+          />
         </div>
-        <button
-          className="link-btn board-seed"
-          onClick={seed}
-          disabled={seeding}
-          title="Regenerate sample sets / plans / executions from synced tests"
-        >
-          {seeding ? "Generating…" : "Sample data"}
-        </button>
       </div>
 
       {error && <div className="error-text">{error}</div>}

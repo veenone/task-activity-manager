@@ -337,8 +337,19 @@ export function TestDetail({
   return (
     <aside className="detail">
       <div className="detail-head">
-        <span className="mono detail-key">{testKey}</span>
-        <button className="btn btn-ghost" onClick={onClose} title="Close">
+        <div className="detail-head-id">
+          <span className="mono detail-key">{testKey}</span>
+          {test && (
+            <span className="status-pill detail-head-status">
+              {test.status || "—"}
+            </span>
+          )}
+        </div>
+        <button
+          className="btn btn-ghost detail-close"
+          onClick={onClose}
+          title="Close"
+        >
           ✕
         </button>
       </div>
@@ -502,22 +513,45 @@ export function TestDetail({
             <option value="__new__">＋ Create new precondition…</option>
           </select>
 
-          <ContainerSection
-            title="Test Sets"
-            items={containers.filter((c) => c.kind === "testset")}
-            onRemove={deallocateContainer}
-          />
-          <ContainerSection
-            title="Test Plans"
-            items={containers.filter((c) => c.kind === "testplan")}
-            onRemove={deallocateContainer}
-          />
-          <ContainerSection
-            title="Test Executions"
-            items={containers.filter((c) => c.kind === "testexec")}
-            showRunStatus
-            onRemove={deallocateContainer}
-          />
+          {(() => {
+            const sets = containers.filter((c) => c.kind === "testset");
+            const plans = containers.filter((c) => c.kind === "testplan");
+            const execs = containers.filter((c) => c.kind === "testexec");
+            if (containers.length === 0) {
+              return (
+                <>
+                  <h4>Memberships</h4>
+                  <p className="muted">Not in any set, plan or execution.</p>
+                </>
+              );
+            }
+            return (
+              <>
+                {sets.length > 0 && (
+                  <ContainerSection
+                    title="Test Sets"
+                    items={sets}
+                    onRemove={deallocateContainer}
+                  />
+                )}
+                {plans.length > 0 && (
+                  <ContainerSection
+                    title="Test Plans"
+                    items={plans}
+                    onRemove={deallocateContainer}
+                  />
+                )}
+                {execs.length > 0 && (
+                  <ContainerSection
+                    title="Test Executions"
+                    items={execs}
+                    showRunStatus
+                    onRemove={deallocateContainer}
+                  />
+                )}
+              </>
+            );
+          })()}
 
           <h4>
             Description {isDirty("description") && <DirtyDot />}
