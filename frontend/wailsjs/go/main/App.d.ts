@@ -89,6 +89,8 @@ export function GetTestSteps(arg1:string,arg2:string,arg3:boolean):Promise<Array
 
 export function GetTestTransitions(arg1:string,arg2:string):Promise<Array<jira.Transition>>;
 
+export function GetTraceabilitySankey(arg1:string):Promise<testrepo.Sankey>;
+
 export function Health():Promise<main.HealthInfo>;
 
 export function ImportProfile():Promise<profile.Profile>;

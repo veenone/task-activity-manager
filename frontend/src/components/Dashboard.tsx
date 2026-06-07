@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { GetStatistics, errMsg } from "../api";
-import type { Statistics, Bucket } from "../api";
+import { GetStatistics, GetTraceabilitySankey, errMsg } from "../api";
+import type { Statistics, Bucket, Sankey } from "../api";
+import { SankeyChart } from "./SankeyChart";
 
 interface Props {
   profileId: string;
@@ -12,6 +13,7 @@ interface Props {
 // commit bumps refreshKey, so the numbers track the cache without a Jira call.
 export function Dashboard({ profileId, refreshKey }: Props) {
   const [stats, setStats] = useState<Statistics | null>(null);
+  const [sankey, setSankey] = useState<Sankey | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -20,9 +22,11 @@ export function Dashboard({ profileId, refreshKey }: Props) {
     let cancelled = false;
     setLoading(true);
     setError("");
-    GetStatistics(profileId)
-      .then((s) => {
-        if (!cancelled) setStats(s);
+    Promise.all([GetStatistics(profileId), GetTraceabilitySankey(profileId)])
+      .then(([s, sk]) => {
+        if (cancelled) return;
+        setStats(s);
+        setSankey(sk);
       })
       .catch((e) => {
         if (!cancelled) setError(errMsg(e));
@@ -122,6 +126,29 @@ export function Dashboard({ profileId, refreshKey }: Props) {
           buckets={stats.byRunStatus}
           runColors
         />
+      )}
+
+      {sankey && sankey.nodes.length > 0 && (
+        <div className="stat-panel sankey-panel">
+          <h4>
+            Traceability
+            <span className="stat-panel-sub">
+              how test runs flow from plans through executions to outcomes
+            </span>
+          </h4>
+          <div className="sankey-legend">
+            <span>
+              <i className="sankey-swatch sankey-node-l0" /> Test Plan
+            </span>
+            <span>
+              <i className="sankey-swatch sankey-node-l1" /> Test Execution
+            </span>
+            <span>
+              <i className="sankey-swatch sankey-node-l2" /> Run status
+            </span>
+          </div>
+          <SankeyChart data={sankey} />
+        </div>
       )}
 
       <TrendPanel buckets={stats.updatedTrend} />

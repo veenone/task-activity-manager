@@ -72,6 +72,7 @@ export {
   AddTestStep,
   ReorderTestSteps,
   GetStatistics,
+  GetTraceabilitySankey,
 } from "../wailsjs/go/main/App";
 export { EventsOn } from "../wailsjs/runtime/runtime";
 
@@ -413,6 +414,25 @@ export interface ImportResult {
   created: number;
   skipped: number;
   errors: ImportError[];
+}
+
+// Traceability Sankey (FR-9): Plan -> Execution -> run-status flow.
+export interface SankeyNode {
+  id: string;
+  label: string;
+  layer: number;
+  value: number;
+}
+
+export interface SankeyLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface Sankey {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

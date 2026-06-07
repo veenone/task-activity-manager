@@ -1024,6 +1024,15 @@ func (a *App) SeedSampleContainers(profileID string) (testrepo.SeedResult, error
 	return a.repo.SeedSampleContainers(profileID, p.ProjectKey)
 }
 
+// GetTraceabilitySankey returns the Plan -> Execution -> run-status traceability
+// flow for the dashboard (FR-9).
+func (a *App) GetTraceabilitySankey(profileID string) (testrepo.Sankey, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.Sankey{}, err
+	}
+	return a.repo.GetTraceabilitySankey(profileID)
+}
+
 // --- pytest helper (FR-7.2) ---
 
 // ExportPytest generates a pytest scaffold from a Test Set / Plan / Execution

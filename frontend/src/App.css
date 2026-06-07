@@ -677,6 +677,92 @@
   margin-left: auto;
   font-size: 12px;
 }
+/* Traceability Sankey (FR-9) */
+.sankey-panel {
+  overflow: hidden;
+}
+.sankey-legend {
+  display: flex;
+  gap: 18px;
+  margin: 2px 0 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.sankey-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sankey-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.sankey {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.sankey-empty {
+  padding: 16px 0;
+}
+/* Nodes */
+.sankey-node {
+  stroke: rgba(0, 0, 0, 0.12);
+  stroke-width: 0.5;
+}
+.sankey-node-l0,
+i.sankey-node-l0 {
+  fill: #6d28d9;
+  background: #6d28d9;
+}
+.sankey-node-l1,
+i.sankey-node-l1 {
+  fill: #b45309;
+  background: #b45309;
+}
+.sankey-node-l2,
+i.sankey-node-l2 {
+  fill: #475569;
+  background: #475569;
+}
+.sankey-label {
+  font-size: 11px;
+  fill: #374151;
+}
+/* Links: translucent ribbons, coloured by destination */
+.sankey-link {
+  fill-opacity: 0.32;
+  transition: fill-opacity 0.12s ease;
+}
+.sankey-link:hover {
+  fill-opacity: 0.6;
+}
+.link-plan {
+  fill: #9aa7bd;
+}
+.link-status.link-pass,
+.link-status.link-passed {
+  fill: #22c55e;
+}
+.link-status.link-fail,
+.link-status.link-failed {
+  fill: #ef4444;
+}
+.link-status.link-todo {
+  fill: #6366f1;
+}
+.link-status.link-executing {
+  fill: #f59e0b;
+}
+.link-status.link-aborted {
+  fill: #6b7280;
+}
+.link-status {
+  fill: #94a3b8;
+}
+
 /* Container detail card (Sets / Plans / Executions) */
 .container-card {
   background: #fff;

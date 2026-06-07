@@ -705,6 +705,74 @@ export namespace testrepo {
 	        this.offset = source["offset"];
 	    }
 	}
+	export class SankeyLink {
+	    source: string;
+	    target: string;
+	    value: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SankeyLink(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.source = source["source"];
+	        this.target = source["target"];
+	        this.value = source["value"];
+	    }
+	}
+	export class SankeyNode {
+	    id: string;
+	    label: string;
+	    layer: number;
+	    value: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SankeyNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.layer = source["layer"];
+	        this.value = source["value"];
+	    }
+	}
+	export class Sankey {
+	    nodes: SankeyNode[];
+	    links: SankeyLink[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Sankey(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nodes = this.convertValues(source["nodes"], SankeyNode);
+	        this.links = this.convertValues(source["links"], SankeyLink);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
 	export class SavedView {
 	    id: string;
 	    name: string;

@@ -166,6 +166,10 @@ export function GetTestTransitions(arg1, arg2) {
   return window['go']['main']['App']['GetTestTransitions'](arg1, arg2);
 }
 
+export function GetTraceabilitySankey(arg1) {
+  return window['go']['main']['App']['GetTraceabilitySankey'](arg1);
+}
+
 export function Health() {
   return window['go']['main']['App']['Health']();
 }
