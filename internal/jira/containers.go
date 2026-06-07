@@ -130,3 +130,24 @@ func (c *Client) AddTestsToContainer(ctx context.Context, kind, containerKey str
 	body := map[string]any{"add": testKeys}
 	return c.post(ctx, fmt.Sprintf("/rest/raven/2.0/api/%s/%s/test", segment, containerKey), body)
 }
+
+// RemoveTestsFromContainer removes Tests from a Test Set, Test Plan or Test
+// Execution (FR-3.4–3.6). Demo URLs short-circuit to a no-op.
+//
+// Maps to POST /rest/raven/2.0/api/{testset|testplan|testexec}/{key}/test with
+// a {"remove": [keys]} body. NOTE(xtm): endpoint + body shape assumed from the
+// Xray Server/DC API; verify on a live instance.
+func (c *Client) RemoveTestsFromContainer(ctx context.Context, kind, containerKey string, testKeys []string) error {
+	if len(testKeys) == 0 {
+		return nil
+	}
+	if isDemoURL(c.baseURL) {
+		return nil
+	}
+	segment, err := containerPathSegment(kind)
+	if err != nil {
+		return err
+	}
+	body := map[string]any{"remove": testKeys}
+	return c.post(ctx, fmt.Sprintf("/rest/raven/2.0/api/%s/%s/test", segment, containerKey), body)
+}

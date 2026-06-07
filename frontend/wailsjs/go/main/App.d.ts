@@ -26,6 +26,8 @@ export function CreatePrecondition(arg1:string,arg2:string):Promise<string>;
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<profile.Profile>;
 
+export function DeallocateTests(arg1:string,arg2:string,arg3:Array<string>):Promise<testrepo.DeallocateResult>;
+
 export function DeleteProfile(arg1:string):Promise<void>;
 
 export function DeleteTestStep(arg1:string,arg2:string,arg3:string):Promise<void>;

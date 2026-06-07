@@ -1299,10 +1299,9 @@ type AllocateResult struct {
 }
 
 // AllocateTests adds Tests to an existing Container locally and queues the
-// membership for commit (FR-3.4–3.6, add-only). Tests already in the Container
-// are reported as such and not re-queued. The queued change coalesces per
-// Container, so repeated allocations to the same Container union their Test
-// lists into one pending row.
+// membership for commit (FR-3.4–3.6). Tests already in the Container are
+// reported as such. The pending add / remove sets are kept disjoint: adding a
+// Test that's pending removal just cancels the removal.
 func (r *Repository) AllocateTests(profileID, containerKey string, testKeys []string) (AllocateResult, error) {
 	result := AllocateResult{Added: []string{}, AlreadyMembers: []string{}}
 
@@ -1312,31 +1311,28 @@ func (r *Repository) AllocateTests(profileID, containerKey string, testKeys []st
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var kind string
-	err = tx.QueryRow(
-		`SELECT kind FROM test_container WHERE profile_id = ? AND jira_key = ?`,
-		profileID, containerKey,
-	).Scan(&kind)
-	if errors.Is(err, sql.ErrNoRows) {
-		return result, fmt.Errorf("container %s not found", containerKey)
-	}
+	kind, err := containerKindTx(tx, profileID, containerKey)
 	if err != nil {
-		return result, fmt.Errorf("read container: %w", err)
+		return result, err
+	}
+
+	adds, err := readMembers(tx, profileID, entityMembershipAdd, containerKey)
+	if err != nil {
+		return result, err
+	}
+	removes, err := readMembers(tx, profileID, entityMembershipRemove, containerKey)
+	if err != nil {
+		return result, err
 	}
 
 	for _, testKey := range testKeys {
-		var one int
-		err := tx.QueryRow(
-			`SELECT 1 FROM test_container_test
-			 WHERE profile_id = ? AND container_key = ? AND test_key = ?`,
-			profileID, containerKey, testKey,
-		).Scan(&one)
-		if err == nil {
+		linked, err := isMember(tx, profileID, containerKey, testKey)
+		if err != nil {
+			return result, err
+		}
+		if linked {
 			result.AlreadyMembers = append(result.AlreadyMembers, testKey)
 			continue
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return result, fmt.Errorf("check membership: %w", err)
 		}
 		if _, err := tx.Exec(
 			`INSERT INTO test_container_test (profile_id, container_key, test_key, run_status)
@@ -1345,14 +1341,23 @@ func (r *Repository) AllocateTests(profileID, containerKey string, testKeys []st
 		); err != nil {
 			return result, fmt.Errorf("insert membership: %w", err)
 		}
+		// Re-adding a Test that was pending removal cancels the removal;
+		// otherwise queue it as an add.
+		if containsStr(removes, testKey) {
+			removes = withoutStr(removes, testKey)
+		} else if !containsStr(adds, testKey) {
+			adds = append(adds, testKey)
+		}
 		result.Added = append(result.Added, testKey)
 	}
 
 	if len(result.Added) == 0 {
 		return result, nil
 	}
-
-	if err := mergeMembershipPending(tx, profileID, containerKey, kind, result.Added); err != nil {
+	if err := writeMembers(tx, profileID, entityMembershipAdd, containerKey, kind, adds); err != nil {
+		return result, err
+	}
+	if err := writeMembers(tx, profileID, entityMembershipRemove, containerKey, kind, removes); err != nil {
 		return result, err
 	}
 	if err := writeAudit(
@@ -1365,6 +1370,120 @@ func (r *Repository) AllocateTests(profileID, containerKey string, testKeys []st
 		return result, fmt.Errorf("commit allocation: %w", err)
 	}
 	return result, nil
+}
+
+// DeallocateResult reports a bulk de-allocation's outcome: which Tests were
+// removed from the Container and which weren't members to begin with.
+type DeallocateResult struct {
+	Removed    []string `json:"removed"`
+	NotMembers []string `json:"notMembers"`
+}
+
+// DeallocateTests removes Tests from a Container locally and queues the removal
+// for commit (FR-3.4–3.6). Removing a Test that was only locally added cancels
+// the add instead of queuing a remote removal; the add / remove sets stay
+// disjoint.
+func (r *Repository) DeallocateTests(profileID, containerKey string, testKeys []string) (DeallocateResult, error) {
+	result := DeallocateResult{Removed: []string{}, NotMembers: []string{}}
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return result, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	kind, err := containerKindTx(tx, profileID, containerKey)
+	if err != nil {
+		return result, err
+	}
+
+	adds, err := readMembers(tx, profileID, entityMembershipAdd, containerKey)
+	if err != nil {
+		return result, err
+	}
+	removes, err := readMembers(tx, profileID, entityMembershipRemove, containerKey)
+	if err != nil {
+		return result, err
+	}
+
+	for _, testKey := range testKeys {
+		linked, err := isMember(tx, profileID, containerKey, testKey)
+		if err != nil {
+			return result, err
+		}
+		if !linked {
+			result.NotMembers = append(result.NotMembers, testKey)
+			continue
+		}
+		if _, err := tx.Exec(
+			`DELETE FROM test_container_test
+			 WHERE profile_id = ? AND container_key = ? AND test_key = ?`,
+			profileID, containerKey, testKey,
+		); err != nil {
+			return result, fmt.Errorf("delete membership: %w", err)
+		}
+		// Removing a Test that was only locally added cancels the add;
+		// otherwise queue a removal of the committed membership.
+		if containsStr(adds, testKey) {
+			adds = withoutStr(adds, testKey)
+		} else if !containsStr(removes, testKey) {
+			removes = append(removes, testKey)
+		}
+		result.Removed = append(result.Removed, testKey)
+	}
+
+	if len(result.Removed) == 0 {
+		return result, nil
+	}
+	if err := writeMembers(tx, profileID, entityMembershipAdd, containerKey, kind, adds); err != nil {
+		return result, err
+	}
+	if err := writeMembers(tx, profileID, entityMembershipRemove, containerKey, kind, removes); err != nil {
+		return result, err
+	}
+	if err := writeAudit(
+		tx, profileID, entityMembershipRemove, containerKey,
+		"deallocate-local", "members", strings.Join(result.Removed, " "), "", "",
+	); err != nil {
+		return result, err
+	}
+	if err := tx.Commit(); err != nil {
+		return result, fmt.Errorf("commit deallocation: %w", err)
+	}
+	return result, nil
+}
+
+// containerKindTx returns a Container's kind, or an error if it doesn't exist.
+func containerKindTx(tx *sql.Tx, profileID, containerKey string) (string, error) {
+	var kind string
+	err := tx.QueryRow(
+		`SELECT kind FROM test_container WHERE profile_id = ? AND jira_key = ?`,
+		profileID, containerKey,
+	).Scan(&kind)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("container %s not found", containerKey)
+	}
+	if err != nil {
+		return "", fmt.Errorf("read container: %w", err)
+	}
+	return kind, nil
+}
+
+// isMember reports whether a Test is currently linked to a Container.
+func isMember(tx *sql.Tx, profileID, containerKey, testKey string) (bool, error) {
+	var one int
+	err := tx.QueryRow(
+		`SELECT 1 FROM test_container_test
+		 WHERE profile_id = ? AND container_key = ? AND test_key = ?`,
+		profileID, containerKey, testKey,
+	).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("check membership: %w", err)
+	}
+	return true, nil
 }
 
 // membershipPayload is the JSON shape stored in a test_membership_add pending
@@ -1516,62 +1635,79 @@ func (r *Repository) RenameContainer(profileID, oldKey, newKey string) error {
 	return tx.Commit()
 }
 
-// mergeMembershipPending coalesces a membership allocation into the per-
-// Container pending row, unioning the new Test keys with any already queued so
-// the commit issues one add per Container.
-func mergeMembershipPending(tx *sql.Tx, profileID, containerKey, kind string, newMembers []string) error {
+// readMembers returns the member list of a membership add/remove pending row,
+// or an empty list when the row doesn't exist.
+func readMembers(tx *sql.Tx, profileID, entityType, containerKey string) ([]string, error) {
 	var afterVal string
 	err := tx.QueryRow(
 		`SELECT after_val FROM pending_change
 		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'members'`,
-		profileID, entityMembershipAdd, containerKey,
+		profileID, entityType, containerKey,
 	).Scan(&afterVal)
-
-	payload := membershipPayload{Kind: kind, Members: []string{}}
-	if err == nil {
-		if uerr := json.Unmarshal([]byte(afterVal), &payload); uerr != nil {
-			return fmt.Errorf("decode pending membership: %w", uerr)
-		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("read pending membership: %w", err)
-	}
-
-	seen := make(map[string]struct{}, len(payload.Members))
-	for _, m := range payload.Members {
-		seen[m] = struct{}{}
-	}
-	for _, m := range newMembers {
-		if _, dup := seen[m]; !dup {
-			payload.Members = append(payload.Members, m)
-			seen[m] = struct{}{}
-		}
-	}
-
-	encoded, merr := json.Marshal(payload)
-	if merr != nil {
-		return fmt.Errorf("encode pending membership: %w", merr)
-	}
-	now := time.Now().UTC().Format(time.RFC3339)
-
 	if errors.Is(err, sql.ErrNoRows) {
-		if _, ierr := tx.Exec(
-			`INSERT INTO pending_change
-			   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
-			 VALUES (?, ?, ?, 'members', '', ?, '', ?)`,
-			profileID, entityMembershipAdd, containerKey, string(encoded), now,
-		); ierr != nil {
-			return fmt.Errorf("insert pending membership: %w", ierr)
+		return []string{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read pending membership: %w", err)
+	}
+	var p membershipPayload
+	if err := json.Unmarshal([]byte(afterVal), &p); err != nil {
+		return nil, fmt.Errorf("decode pending membership: %w", err)
+	}
+	return p.Members, nil
+}
+
+// writeMembers upserts a membership add/remove pending row to the given member
+// list, deleting the row when the list is empty so a fully-cancelled delta
+// leaves nothing behind.
+func writeMembers(tx *sql.Tx, profileID, entityType, containerKey, kind string, members []string) error {
+	if len(members) == 0 {
+		if _, err := tx.Exec(
+			`DELETE FROM pending_change
+			 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'members'`,
+			profileID, entityType, containerKey,
+		); err != nil {
+			return fmt.Errorf("clear pending membership: %w", err)
 		}
 		return nil
 	}
-	if _, uerr := tx.Exec(
-		`UPDATE pending_change SET after_val = ?, created_at = ?
-		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'members'`,
-		string(encoded), now, profileID, entityMembershipAdd, containerKey,
-	); uerr != nil {
-		return fmt.Errorf("update pending membership: %w", uerr)
+	encoded, err := json.Marshal(membershipPayload{Kind: kind, Members: uniqueSorted(members)})
+	if err != nil {
+		return fmt.Errorf("encode pending membership: %w", err)
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO pending_change
+		   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
+		 VALUES (?, ?, ?, 'members', '', ?, '', ?)
+		 ON CONFLICT(profile_id, entity_type, entity_key, field)
+		   DO UPDATE SET after_val = excluded.after_val, created_at = excluded.created_at`,
+		profileID, entityType, containerKey, string(encoded),
+		time.Now().UTC().Format(time.RFC3339),
+	); err != nil {
+		return fmt.Errorf("write pending membership: %w", err)
 	}
 	return nil
+}
+
+// containsStr reports whether s contains v.
+func containsStr(s []string, v string) bool {
+	for _, x := range s {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// withoutStr returns s with v removed.
+func withoutStr(s []string, v string) []string {
+	out := make([]string, 0, len(s))
+	for _, x := range s {
+		if x != v {
+			out = append(out, x)
+		}
+	}
+	return out
 }
 
 // buildTestFilter builds the WHERE clause + args for a Test query. Shared
@@ -2670,6 +2806,23 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 				return fmt.Errorf("remove membership: %w", err)
 			}
 		}
+	case entityMembershipRemove:
+		// entity_key is the Container key; restore the locally-removed
+		// memberships listed in the after_val payload.
+		var payload membershipPayload
+		if err := json.Unmarshal([]byte(afterVal), &payload); err != nil {
+			return fmt.Errorf("decode membership payload: %w", err)
+		}
+		for _, testKey := range payload.Members {
+			if _, err := tx.Exec(
+				`INSERT OR IGNORE INTO test_container_test
+				   (profile_id, container_key, test_key, run_status)
+				 VALUES (?, ?, ?, '')`,
+				profileID, entityKey, testKey,
+			); err != nil {
+				return fmt.Errorf("restore membership: %w", err)
+			}
+		}
 	case entityPreconditionEdit:
 		// entity_key is the Precondition key; revert the edited column.
 		col, ok := preconditionFields[field]
@@ -3141,6 +3294,7 @@ const (
 	entityTestStepAdd      = "test_step_add"
 	entityTestStepOrder    = "test_step_order"
 	entityMembershipAdd    = "test_membership_add"
+	entityMembershipRemove = "test_membership_remove"
 	entityContainerAdd     = "test_container_add"
 	entityPreconditionSet  = "precondition_set"
 	entityPreconditionEdit = "precondition_edit"

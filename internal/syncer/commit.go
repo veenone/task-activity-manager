@@ -88,7 +88,9 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 	// Test, so they commit in their own pass grouped by precondition.
 	preconditionEditRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
-		if c.EntityType == "test_membership_add" || c.EntityType == "test_container_add" {
+		if c.EntityType == "test_membership_add" ||
+			c.EntityType == "test_membership_remove" ||
+			c.EntityType == "test_container_add" {
 			membershipRows = append(membershipRows, c)
 			continue
 		}
@@ -486,9 +488,12 @@ func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows [
 	for _, c := range rows {
 		var key string
 		var err error
-		if c.EntityType == "test_container_add" {
+		switch c.EntityType {
+		case "test_container_add":
 			key, err = e.commitContainerCreate(ctx, profileID, c)
-		} else {
+		case "test_membership_remove":
+			key, err = e.commitMembershipRemove(ctx, c)
+		default:
 			key, err = e.commitMembershipAdd(ctx, c)
 		}
 		if err != nil {
@@ -518,6 +523,22 @@ func (e *Engine) commitMembershipAdd(ctx context.Context, c testrepo.PendingChan
 	}
 	if err := e.client.AddTestsToContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
 		return c.EntityKey, fmt.Errorf("allocate to %s: %s", c.EntityKey, sanitizeError(err.Error()))
+	}
+	return c.EntityKey, nil
+}
+
+// commitMembershipRemove removes Tests from an existing Container, returning the
+// Container key for result reporting.
+func (e *Engine) commitMembershipRemove(ctx context.Context, c testrepo.PendingChange) (string, error) {
+	var payload struct {
+		Kind    string   `json:"kind"`
+		Members []string `json:"members"`
+	}
+	if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
+		return c.EntityKey, fmt.Errorf("malformed membership payload: %s", err)
+	}
+	if err := e.client.RemoveTestsFromContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
+		return c.EntityKey, fmt.Errorf("deallocate from %s: %s", c.EntityKey, sanitizeError(err.Error()))
 	}
 	return c.EntityKey, nil
 }

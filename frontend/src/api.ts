@@ -22,6 +22,7 @@ export {
   GetTestContainers,
   ListContainers,
   AllocateTests,
+  DeallocateTests,
   CreateContainerAndAllocate,
   SeedSampleContainers,
   GetTestPlanBoard,
@@ -125,6 +126,13 @@ export interface Container {
 export interface AllocateResult {
   added: string[];
   alreadyMembers: string[];
+}
+
+// DeallocateResult mirrors testrepo.DeallocateResult — the outcome of removing
+// Tests from a container (FR-3.4–3.6).
+export interface DeallocateResult {
+  removed: string[];
+  notMembers: string[];
 }
 
 // CreateContainerResult mirrors testrepo.CreateContainerResult — the outcome

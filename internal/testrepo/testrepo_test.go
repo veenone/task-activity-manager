@@ -889,6 +889,116 @@ func seedPlanBoard(t *testing.T) *testrepo.Repository {
 	return repo
 }
 
+func TestDeallocateCommittedMemberQueuesRemove(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+	// QA-1 is a synced (committed) member.
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+	}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
+
+	result, err := repo.DeallocateTests("p1", "QA-TS-1", []string{"QA-1"})
+	if err != nil {
+		t.Fatalf("deallocate: %v", err)
+	}
+	if len(result.Removed) != 1 {
+		t.Errorf("Removed = %v, want 1", result.Removed)
+	}
+
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	if len(members) != 0 {
+		t.Errorf("QA-1 should no longer be a member; got %+v", members)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 1 || changes[0].EntityType != "test_membership_remove" {
+		t.Fatalf("pending = %+v, want one test_membership_remove", changes)
+	}
+}
+
+func TestAllocateThenDeallocateCancelsOut(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+
+	if _, err := repo.AllocateTests("p1", "QA-TS-1", []string{"QA-1"}); err != nil {
+		t.Fatalf("allocate: %v", err)
+	}
+	if _, err := repo.DeallocateTests("p1", "QA-TS-1", []string{"QA-1"}); err != nil {
+		t.Fatalf("deallocate: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("allocate-then-deallocate should leave no pending rows; got %+v", changes)
+	}
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	if len(members) != 0 {
+		t.Errorf("QA-1 should not be a member after cancel; got %+v", members)
+	}
+}
+
+func TestDeallocateThenAllocateCancelsOut(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+	}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
+
+	if _, err := repo.DeallocateTests("p1", "QA-TS-1", []string{"QA-1"}); err != nil {
+		t.Fatalf("deallocate: %v", err)
+	}
+	if _, err := repo.AllocateTests("p1", "QA-TS-1", []string{"QA-1"}); err != nil {
+		t.Fatalf("re-allocate: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 0 {
+		t.Errorf("deallocate-then-allocate should leave no pending rows; got %+v", changes)
+	}
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	if len(members) != 1 {
+		t.Errorf("QA-1 should be a member again; got %+v", members)
+	}
+}
+
+func TestDiscardDeallocationRestoresMembership(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TS-1", TestKey: "QA-1"},
+	}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
+	if _, err := repo.DeallocateTests("p1", "QA-TS-1", []string{"QA-1"}); err != nil {
+		t.Fatalf("deallocate: %v", err)
+	}
+	changes, _ := repo.ListPendingChanges("p1")
+
+	if err := repo.DiscardPendingChange("p1", changes[0].ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	members, _ := repo.ListContainersForTest("p1", "QA-1")
+	if len(members) != 1 {
+		t.Errorf("discarding the removal should restore membership; got %+v", members)
+	}
+}
+
+func TestDeallocateNonMemberReports(t *testing.T) {
+	repo := seedTestsAndContainer(t)
+
+	result, err := repo.DeallocateTests("p1", "QA-TS-1", []string{"QA-1"})
+	if err != nil {
+		t.Fatalf("deallocate: %v", err)
+	}
+	if len(result.NotMembers) != 1 || result.NotMembers[0] != "QA-1" {
+		t.Errorf("NotMembers = %v, want [QA-1]", result.NotMembers)
+	}
+	if len(result.Removed) != 0 {
+		t.Errorf("Removed = %v, want empty", result.Removed)
+	}
+}
+
 func seedTestsAndContainer(t *testing.T) *testrepo.Repository {
 	t.Helper()
 	repo := newRepo(t)

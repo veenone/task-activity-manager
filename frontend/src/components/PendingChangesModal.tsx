@@ -215,6 +215,12 @@ function describeChange(c: PendingChange): {
         before: "",
         after: membershipSummary(c.afterVal),
       };
+    case "test_membership_remove":
+      return {
+        field: "deallocate",
+        before: membershipSummary(c.afterVal),
+        after: "",
+      };
     case "test_container_add":
       return {
         field: "new container",

@@ -730,6 +730,16 @@ func (a *App) AllocateTests(profileID, containerKey string, testKeys []string) (
 	return a.repo.AllocateTests(profileID, containerKey, testKeys)
 }
 
+// DeallocateTests removes Tests from a Container locally and queues the removal
+// for commit (FR-3.4–3.6). Tests that weren't members are reported back.
+func (a *App) DeallocateTests(profileID, containerKey string, testKeys []string) (testrepo.DeallocateResult, error) {
+	empty := testrepo.DeallocateResult{Removed: []string{}, NotMembers: []string{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.DeallocateTests(profileID, containerKey, testKeys)
+}
+
 // CreateContainerAndAllocate creates a new Test Set / Plan / Execution locally
 // and allocates the given Tests to it (FR-3.4–3.6). The Container is created in
 // Jira on commit; until then it carries a temporary key. The project comes

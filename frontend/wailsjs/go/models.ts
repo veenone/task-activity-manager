@@ -394,6 +394,20 @@ export namespace testrepo {
 	        this.added = source["added"];
 	    }
 	}
+	export class DeallocateResult {
+	    removed: string[];
+	    notMembers: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DeallocateResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.removed = source["removed"];
+	        this.notMembers = source["notMembers"];
+	    }
+	}
 	export class Folder {
 	    id: string;
 	    parentId: string;

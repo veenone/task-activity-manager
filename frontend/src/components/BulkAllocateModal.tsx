@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ListContainers,
   AllocateTests,
+  DeallocateTests,
   CreateContainerAndAllocate,
   errMsg,
 } from "../api";
@@ -27,6 +28,7 @@ interface ApplyResult {
   already: number;
   createdName?: string;
   target: string;
+  removed?: boolean;
 }
 
 // BulkAllocateModal adds the selected Tests to a Test Set, Test Plan or Test
@@ -38,6 +40,7 @@ export function BulkAllocateModal({
   onComplete,
   onCancel,
 }: Props) {
+  const [action, setAction] = useState<"allocate" | "remove">("allocate");
   const [kind, setKind] = useState("testset");
   const [containers, setContainers] = useState<Container[]>([]);
   const [target, setTarget] = useState("");
@@ -74,11 +77,22 @@ export function BulkAllocateModal({
 
   const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
 
+  const useCreateNew = action === "allocate" && createNew;
+
   async function apply() {
     setApplying(true);
     setApplyError("");
     try {
-      if (createNew) {
+      if (action === "remove") {
+        if (!target) return;
+        const r = await DeallocateTests(profileId, target, testKeys);
+        setResult({
+          added: r.removed.length,
+          already: r.notMembers.length,
+          target,
+          removed: true,
+        });
+      } else if (useCreateNew) {
         const name = newName.trim();
         if (!name) return;
         const r = await CreateContainerAndAllocate(
@@ -104,7 +118,7 @@ export function BulkAllocateModal({
     }
   }
 
-  const canApply = createNew ? newName.trim().length > 0 : !!target;
+  const canApply = useCreateNew ? newName.trim().length > 0 : !!target;
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
@@ -122,6 +136,19 @@ export function BulkAllocateModal({
         {!result && (
           <div className="bulk-body">
             <label className="bulk-row">
+              <span>Action</span>
+              <select
+                value={action}
+                onChange={(e) =>
+                  setAction(e.target.value as "allocate" | "remove")
+                }
+              >
+                <option value="allocate">Allocate</option>
+                <option value="remove">Remove</option>
+              </select>
+            </label>
+
+            <label className="bulk-row">
               <span>Type</span>
               <select value={kind} onChange={(e) => setKind(e.target.value)}>
                 {KINDS.map((k) => (
@@ -132,16 +159,18 @@ export function BulkAllocateModal({
               </select>
             </label>
 
-            <label className="bulk-row">
-              <span>Create new</span>
-              <input
-                type="checkbox"
-                checked={createNew}
-                onChange={(e) => setCreateNew(e.target.checked)}
-              />
-            </label>
+            {action === "allocate" && (
+              <label className="bulk-row">
+                <span>Create new</span>
+                <input
+                  type="checkbox"
+                  checked={createNew}
+                  onChange={(e) => setCreateNew(e.target.checked)}
+                />
+              </label>
+            )}
 
-            {createNew ? (
+            {useCreateNew ? (
               <label className="bulk-row">
                 <span>Name</span>
                 <input
@@ -178,9 +207,11 @@ export function BulkAllocateModal({
             {loadError && <div className="error-text">{loadError}</div>}
 
             <p className="muted bulk-preview">
-              {createNew
-                ? `A new ${kindLabel} is created in Jira on commit, then the selected tests are added to it.`
-                : "Selected tests are added to the container. Tests already in it are skipped."}{" "}
+              {action === "remove"
+                ? "Selected tests are removed from the container. Tests not in it are skipped."
+                : useCreateNew
+                  ? `A new ${kindLabel} is created in Jira on commit, then the selected tests are added to it.`
+                  : "Selected tests are added to the container. Tests already in it are skipped."}{" "}
               Changes are queued locally; commit them from the Pending list.
             </p>
 
@@ -196,6 +227,26 @@ export function BulkAllocateModal({
                 <span className="mono">{result.createdName}</span> with{" "}
                 {result.added} {result.added === 1 ? "test" : "tests"}.
               </p>
+            ) : result.removed ? (
+              <>
+                {result.added > 0 && (
+                  <p className="ok-text">
+                    ✓ Queued removal of {result.added}{" "}
+                    {result.added === 1 ? "test" : "tests"} from{" "}
+                    <span className="mono">{result.target}</span>.
+                  </p>
+                )}
+                {result.already > 0 && (
+                  <p className="muted">
+                    {result.already}{" "}
+                    {result.already === 1 ? "test wasn't" : "tests weren't"} in
+                    the container.
+                  </p>
+                )}
+                {result.added === 0 && (
+                  <p className="muted">Nothing to remove.</p>
+                )}
+              </>
             ) : (
               <>
                 {result.added > 0 && (
@@ -229,9 +280,13 @@ export function BulkAllocateModal({
               <button
                 className="btn btn-primary"
                 onClick={apply}
-                disabled={applying || (!createNew && loading) || !canApply}
+                disabled={applying || (!useCreateNew && loading) || !canApply}
               >
-                {applying ? "Allocating…" : "Allocate"}
+                {applying
+                  ? "Working…"
+                  : action === "remove"
+                    ? "Remove"
+                    : "Allocate"}
               </button>
             </>
           ) : (

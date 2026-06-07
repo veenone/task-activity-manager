@@ -7,6 +7,7 @@ import {
   EditPreconditionField,
   CreatePrecondition,
   GetTestContainers,
+  DeallocateTests,
   GetTestTransitions,
   GetTestSteps,
   TransitionTest,
@@ -185,6 +186,20 @@ export function TestDetail({
       setStepsError(errMsg(e));
     } finally {
       setStepsLoading(false);
+    }
+  }
+
+  // deallocateContainer removes this test from a Test Set / Plan / Execution
+  // (FR-3.4–3.6) and refreshes the membership list.
+  async function deallocateContainer(containerKey: string) {
+    setSaveError("");
+    try {
+      await DeallocateTests(profileId, containerKey, [testKey]);
+      const cons = await GetTestContainers(profileId, testKey);
+      setContainers(cons ?? []);
+      onEdited();
+    } catch (e) {
+      setSaveError(`Remove failed: ${errMsg(e)}`);
     }
   }
 
@@ -452,15 +467,18 @@ export function TestDetail({
           <ContainerSection
             title="Test Sets"
             items={containers.filter((c) => c.kind === "testset")}
+            onRemove={deallocateContainer}
           />
           <ContainerSection
             title="Test Plans"
             items={containers.filter((c) => c.kind === "testplan")}
+            onRemove={deallocateContainer}
           />
           <ContainerSection
             title="Test Executions"
             items={containers.filter((c) => c.kind === "testexec")}
             showRunStatus
+            onRemove={deallocateContainer}
           />
 
           <h4>
@@ -756,10 +774,12 @@ function ContainerSection({
   title,
   items,
   showRunStatus,
+  onRemove,
 }: {
   title: string;
   items: ContainerMembership[];
   showRunStatus?: boolean;
+  onRemove: (containerKey: string) => void;
 }) {
   return (
     <>
@@ -774,6 +794,13 @@ function ContainerSection({
               {showRunStatus && c.runStatus && (
                 <RunStatusBadge status={c.runStatus} />
               )}
+              <button
+                className="btn btn-ghost pre-remove"
+                onClick={() => onRemove(c.key)}
+                title="Remove this test from the container"
+              >
+                ✕
+              </button>
             </li>
           ))}
         </ul>
