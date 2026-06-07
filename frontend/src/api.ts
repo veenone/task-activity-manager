@@ -6,6 +6,9 @@
 
 export {
   Health,
+  GetDiagnostics,
+  ReadLog,
+  ExportDiagnostics,
   ListProfiles,
   CreateProfile,
   DeleteProfile,
@@ -66,6 +69,19 @@ export interface Profile {
   jiraUrl: string;
   projectKey: string;
   createdAt: string;
+}
+
+// Diagnostics mirrors app.Diagnostics — the environment + state summary shown
+// in the diagnostics view (FR-12.4).
+export interface Diagnostics {
+  dbPath: string;
+  logPath: string;
+  os: string;
+  arch: string;
+  goVersion: string;
+  schemaVersion: number;
+  profileCount: number;
+  startupError: string;
 }
 
 export interface TestCase {

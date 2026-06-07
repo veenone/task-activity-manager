@@ -36,6 +36,7 @@ import { BulkMoveModal } from "./components/BulkMoveModal";
 import { BulkPreconditionsModal } from "./components/BulkPreconditionsModal";
 import { Dashboard } from "./components/Dashboard";
 import { TestPlanBoardView } from "./components/TestPlanBoardView";
+import { DiagnosticsModal } from "./components/DiagnosticsModal";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -81,6 +82,7 @@ function App() {
   const [showBulkPreconditions, setShowBulkPreconditions] = useState(false);
 
   const [view, setView] = useState<"browse" | "dashboard" | "plans">("browse");
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // First: check whether the backend started up cleanly.
   useEffect(() => {
@@ -388,6 +390,13 @@ function App() {
         <button className="btn" onClick={() => setShowForm(true)}>
           + Profile
         </button>
+        <button
+          className="btn"
+          onClick={() => setShowDiagnostics(true)}
+          title="Logs & diagnostics"
+        >
+          Diagnostics
+        </button>
 
         <nav className="view-tabs">
           <button
@@ -673,6 +682,10 @@ function App() {
             setShowBulkMove(false);
           }}
         />
+      )}
+
+      {showDiagnostics && (
+        <DiagnosticsModal onClose={() => setShowDiagnostics(false)} />
       )}
 
       {showBulkPreconditions && (

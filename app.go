@@ -7,7 +7,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -102,6 +105,93 @@ func (a *App) Health() HealthInfo {
 		DBPath:  a.dbPath,
 		LogPath: a.logPath,
 	}
+}
+
+// --- Logs & diagnostics (FR-12.4) ---
+
+// Diagnostics is the environment + state summary shown in the diagnostics view.
+type Diagnostics struct {
+	DBPath        string `json:"dbPath"`
+	LogPath       string `json:"logPath"`
+	OS            string `json:"os"`
+	Arch          string `json:"arch"`
+	GoVersion     string `json:"goVersion"`
+	SchemaVersion int    `json:"schemaVersion"`
+	ProfileCount  int    `json:"profileCount"`
+	StartupError  string `json:"startupError"`
+}
+
+// GetDiagnostics returns an environment + state summary for the diagnostics
+// view (FR-12.4). Safe to call even if the store failed to initialise.
+func (a *App) GetDiagnostics() Diagnostics {
+	d := Diagnostics{
+		DBPath:        a.dbPath,
+		LogPath:       a.logPath,
+		OS:            goruntime.GOOS,
+		Arch:          goruntime.GOARCH,
+		GoVersion:     goruntime.Version(),
+		SchemaVersion: store.SchemaVersion(),
+		StartupError:  a.startupErr,
+	}
+	if a.profiles != nil {
+		if ps, err := a.profiles.List(); err == nil {
+			d.ProfileCount = len(ps)
+		}
+	}
+	return d
+}
+
+// ReadLog returns the last maxLines lines of the app log (FR-12.4). A maxLines
+// of 0 or less returns the whole file.
+func (a *App) ReadLog(maxLines int) (string, error) {
+	if a.logPath == "" {
+		return "(no log file configured)", nil
+	}
+	data, err := os.ReadFile(a.logPath)
+	if err != nil {
+		return "", fmt.Errorf("read log: %w", err)
+	}
+	if maxLines <= 0 {
+		return string(data), nil
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+// ExportDiagnostics writes the environment summary plus the recent log to a
+// timestamped text file in the app data dir and returns its path (FR-12.4).
+func (a *App) ExportDiagnostics() (string, error) {
+	d := a.GetDiagnostics()
+	logTail, _ := a.ReadLog(1000)
+
+	var b strings.Builder
+	fmt.Fprintln(&b, "Xray Test Manager — diagnostics")
+	fmt.Fprintf(&b, "Generated:      %s\n", time.Now().UTC().Format(time.RFC3339))
+	fmt.Fprintf(&b, "OS / Arch:      %s / %s\n", d.OS, d.Arch)
+	fmt.Fprintf(&b, "Go version:     %s\n", d.GoVersion)
+	fmt.Fprintf(&b, "Schema version: %d\n", d.SchemaVersion)
+	fmt.Fprintf(&b, "Profiles:       %d\n", d.ProfileCount)
+	fmt.Fprintf(&b, "Database:       %s\n", d.DBPath)
+	fmt.Fprintf(&b, "Log file:       %s\n", d.LogPath)
+	if d.StartupError != "" {
+		fmt.Fprintf(&b, "Startup error:  %s\n", d.StartupError)
+	}
+	fmt.Fprintf(&b, "\n--- recent log ---\n%s\n", logTail)
+
+	dir := filepath.Dir(a.dbPath)
+	if dir == "" || dir == "." {
+		if cfg, err := os.UserConfigDir(); err == nil {
+			dir = filepath.Join(cfg, "xray-test-manager")
+		}
+	}
+	path := filepath.Join(dir, fmt.Sprintf("diagnostics-%d.txt", time.Now().Unix()))
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return "", fmt.Errorf("write diagnostics: %w", err)
+	}
+	return path, nil
 }
 
 // requireStore is the guard every store-dependent bound method calls. It

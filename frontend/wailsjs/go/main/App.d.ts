@@ -44,7 +44,11 @@ export function EditTestField(arg1:string,arg2:string,arg3:string,arg4:string):P
 
 export function EditTestStepField(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
+export function ExportDiagnostics():Promise<string>;
+
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
+
+export function GetDiagnostics():Promise<main.Diagnostics>;
 
 export function GetStatistics(arg1:string):Promise<testrepo.Statistics>;
 
@@ -83,6 +87,8 @@ export function ListSavedViews(arg1:string):Promise<Array<testrepo.SavedView>>;
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 
 export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function ReadLog(arg1:number):Promise<string>;
 
 export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 

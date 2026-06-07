@@ -78,8 +78,16 @@ export function EditTestStepField(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['EditTestStepField'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function ExportDiagnostics() {
+  return window['go']['main']['App']['ExportDiagnostics']();
+}
+
 export function GetBulkTransitionOptions(arg1, arg2) {
   return window['go']['main']['App']['GetBulkTransitionOptions'](arg1, arg2);
+}
+
+export function GetDiagnostics() {
+  return window['go']['main']['App']['GetDiagnostics']();
 }
 
 export function GetStatistics(arg1) {
@@ -156,6 +164,10 @@ export function ListTests(arg1, arg2) {
 
 export function MoveTestToFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveTestToFolder'](arg1, arg2, arg3);
+}
+
+export function ReadLog(arg1) {
+  return window['go']['main']['App']['ReadLog'](arg1);
 }
 
 export function ReorderTestSteps(arg1, arg2, arg3) {

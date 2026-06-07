@@ -19,6 +19,10 @@ import (
 // schemaVersion is bumped whenever the schema changes.
 const schemaVersion = 8
 
+// SchemaVersion returns the schema version this build writes — surfaced in the
+// diagnostics view (FR-12.4).
+func SchemaVersion() int { return schemaVersion }
+
 // baseSchema is the canonical table layout for a fresh install. Indexes that
 // might reference columns added by a migration live in indexSchema instead,
 // so applyMigrations runs *between* baseSchema and indexSchema — that way an

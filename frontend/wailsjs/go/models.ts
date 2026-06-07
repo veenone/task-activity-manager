@@ -84,6 +84,32 @@ export namespace main {
 		}
 	}
 	
+	export class Diagnostics {
+	    dbPath: string;
+	    logPath: string;
+	    os: string;
+	    arch: string;
+	    goVersion: string;
+	    schemaVersion: number;
+	    profileCount: number;
+	    startupError: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Diagnostics(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dbPath = source["dbPath"];
+	        this.logPath = source["logPath"];
+	        this.os = source["os"];
+	        this.arch = source["arch"];
+	        this.goVersion = source["goVersion"];
+	        this.schemaVersion = source["schemaVersion"];
+	        this.profileCount = source["profileCount"];
+	        this.startupError = source["startupError"];
+	    }
+	}
 	export class HealthInfo {
 	    ok: boolean;
 	    error: string;
