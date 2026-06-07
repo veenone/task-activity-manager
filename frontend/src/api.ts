@@ -11,6 +11,7 @@ export {
   ExportDiagnostics,
   ListProfiles,
   CreateProfile,
+  UpdateProfileScope,
   DeleteProfile,
   TestConnection,
   SyncProfile,
@@ -71,6 +72,7 @@ export interface Profile {
   name: string;
   jiraUrl: string;
   projectKey: string;
+  scopeJql: string;
   createdAt: string;
 }
 

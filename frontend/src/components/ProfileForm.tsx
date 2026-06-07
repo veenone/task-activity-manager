@@ -11,6 +11,7 @@ export function ProfileForm({ onCreated, onCancel }: Props) {
   const [name, setName] = useState("");
   const [jiraUrl, setJiraUrl] = useState("");
   const [projectKey, setProjectKey] = useState("");
+  const [scopeJql, setScopeJql] = useState("");
   const [token, setToken] = useState("");
 
   const [testing, setTesting] = useState(false);
@@ -49,6 +50,7 @@ export function ProfileForm({ onCreated, onCancel }: Props) {
         name.trim(),
         jiraUrl.trim(),
         projectKey.trim(),
+        scopeJql.trim(),
         token.trim(),
       );
       onCreated(p);
@@ -84,6 +86,14 @@ export function ProfileForm({ onCreated, onCancel }: Props) {
           value={projectKey}
           onChange={(e) => setProjectKey(e.target.value)}
           placeholder="QA"
+        />
+      </label>
+      <label>
+        Scope JQL (optional)
+        <input
+          value={scopeJql}
+          onChange={(e) => setScopeJql(e.target.value)}
+          placeholder="e.g. labels = smoke — narrows which tests sync"
         />
       </label>
       <label>

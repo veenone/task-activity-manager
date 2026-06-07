@@ -27,6 +27,7 @@ type Profile struct {
 	Name       string    `json:"name"`
 	JiraURL    string    `json:"jiraUrl"`
 	ProjectKey string    `json:"projectKey"`
+	ScopeJQL   string    `json:"scopeJql"`
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
@@ -43,7 +44,7 @@ func NewManager(s *store.Store) *Manager {
 // List returns all profiles, ordered by name.
 func (m *Manager) List() ([]Profile, error) {
 	rows, err := m.db.Query(
-		`SELECT id, name, jira_url, project_key, created_at FROM profiles ORDER BY name`)
+		`SELECT id, name, jira_url, project_key, scope_jql, created_at FROM profiles ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("list profiles: %w", err)
 	}
@@ -63,7 +64,7 @@ func (m *Manager) List() ([]Profile, error) {
 // Get returns one profile by id, or ErrNotFound.
 func (m *Manager) Get(id string) (Profile, error) {
 	row := m.db.QueryRow(
-		`SELECT id, name, jira_url, project_key, created_at FROM profiles WHERE id = ?`, id)
+		`SELECT id, name, jira_url, project_key, scope_jql, created_at FROM profiles WHERE id = ?`, id)
 	p, err := scanProfile(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Profile{}, ErrNotFound
@@ -72,22 +73,37 @@ func (m *Manager) Get(id string) (Profile, error) {
 }
 
 // Create persists a new profile, generating its id and creation timestamp.
-func (m *Manager) Create(name, jiraURL, projectKey string) (Profile, error) {
+// scopeJQL is an optional JQL fragment that narrows which Tests sync (FR-5.4).
+func (m *Manager) Create(name, jiraURL, projectKey, scopeJQL string) (Profile, error) {
 	p := Profile{
 		ID:         uuid.NewString(),
 		Name:       name,
 		JiraURL:    jiraURL,
 		ProjectKey: projectKey,
+		ScopeJQL:   scopeJQL,
 		CreatedAt:  time.Now().UTC(),
 	}
 	_, err := m.db.Exec(
-		`INSERT INTO profiles (id, name, jira_url, project_key, created_at)
-		 VALUES (?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.JiraURL, p.ProjectKey, p.CreatedAt.Format(time.RFC3339))
+		`INSERT INTO profiles (id, name, jira_url, project_key, scope_jql, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.JiraURL, p.ProjectKey, p.ScopeJQL, p.CreatedAt.Format(time.RFC3339))
 	if err != nil {
 		return Profile{}, fmt.Errorf("create profile: %w", err)
 	}
 	return p, nil
+}
+
+// UpdateScope changes a profile's JQL scope override (FR-5.4).
+func (m *Manager) UpdateScope(id, scopeJQL string) error {
+	res, err := m.db.Exec(
+		`UPDATE profiles SET scope_jql = ? WHERE id = ?`, scopeJQL, id)
+	if err != nil {
+		return fmt.Errorf("update profile scope: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Delete removes a profile, or returns ErrNotFound.
@@ -113,7 +129,7 @@ func scanProfile(s scanner) (Profile, error) {
 		p       Profile
 		created string
 	)
-	if err := s.Scan(&p.ID, &p.Name, &p.JiraURL, &p.ProjectKey, &created); err != nil {
+	if err := s.Scan(&p.ID, &p.Name, &p.JiraURL, &p.ProjectKey, &p.ScopeJQL, &created); err != nil {
 		return Profile{}, err
 	}
 	p.CreatedAt, _ = time.Parse(time.RFC3339, created)

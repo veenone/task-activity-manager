@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -49,14 +50,19 @@ type searchResponse struct {
 // at startAt. If `since` is non-empty (RFC3339), only Tests updated at or
 // after that time are returned — the incremental-sync path (FR-1.2). The
 // caller pages until the total reported by Jira is reached.
-func (c *Client) SearchTestsPage(ctx context.Context, projectKey, since string, startAt, maxResults int) ([]Test, int, error) {
+func (c *Client) SearchTestsPage(ctx context.Context, projectKey, scopeJQL, since string, startAt, maxResults int) ([]Test, int, error) {
 	if isDemoURL(c.baseURL) {
-		// Demo mode ignores `since` so an incremental sync still fills the
-		// progress bar against the regenerated dataset.
+		// Demo mode ignores `since` and the scope so an incremental sync still
+		// fills the progress bar against the regenerated dataset.
 		tests, total := demoTestsPage(projectKey, startAt, maxResults)
 		return tests, total, nil
 	}
 	jql := fmt.Sprintf("project = %s AND issuetype = Test", projectKey)
+	// Per-profile scope override (FR-5.4) — wrapped in parens so it can't break
+	// the surrounding clause structure.
+	if s := strings.TrimSpace(scopeJQL); s != "" {
+		jql += " AND (" + s + ")"
+	}
 	if extra := incrementalSinceClause(since); extra != "" {
 		jql += " AND " + extra
 	}

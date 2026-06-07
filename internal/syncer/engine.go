@@ -41,7 +41,7 @@ func New(client *jira.Client, repo *testrepo.Repository) *Engine {
 // Test page. If `since` is empty, this is a full sync; otherwise it is an
 // incremental sync that only fetches Tests updated since the watermark
 // (FR-1.2). Upserts are idempotent, so an interrupted sync is safe to re-run.
-func (e *Engine) Sync(ctx context.Context, profileID, projectKey, since string, onProgress func(Progress)) error {
+func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL, since string, onProgress func(Progress)) error {
 	if err := e.syncFolders(ctx, profileID, projectKey); err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, since string, 
 			return err
 		}
 
-		tests, pageTotal, err := e.client.SearchTestsPage(ctx, projectKey, since, fetched, pageSize)
+		tests, pageTotal, err := e.client.SearchTestsPage(ctx, projectKey, scopeJQL, since, fetched, pageSize)
 		if err != nil {
 			return fmt.Errorf("fetch page at offset %d: %w", fetched, err)
 		}

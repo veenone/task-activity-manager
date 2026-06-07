@@ -218,12 +218,13 @@ func (a *App) ListProfiles() ([]profile.Profile, error) {
 }
 
 // CreateProfile stores a new profile and saves its PAT to the OS credential
-// manager. The token is never written to the database.
-func (a *App) CreateProfile(name, jiraURL, projectKey, token string) (profile.Profile, error) {
+// manager. The token is never written to the database. scopeJQL is an optional
+// JQL fragment that narrows which Tests sync (FR-5.4).
+func (a *App) CreateProfile(name, jiraURL, projectKey, scopeJQL, token string) (profile.Profile, error) {
 	if err := a.requireStore(); err != nil {
 		return profile.Profile{}, err
 	}
-	p, err := a.profiles.Create(name, jiraURL, projectKey)
+	p, err := a.profiles.Create(name, jiraURL, projectKey, scopeJQL)
 	if err != nil {
 		return profile.Profile{}, err
 	}
@@ -232,6 +233,15 @@ func (a *App) CreateProfile(name, jiraURL, projectKey, token string) (profile.Pr
 		return profile.Profile{}, fmt.Errorf("save credentials: %w", err)
 	}
 	return p, nil
+}
+
+// UpdateProfileScope changes a profile's JQL scope override (FR-5.4). It takes
+// effect on the next sync.
+func (a *App) UpdateProfileScope(id, scopeJQL string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.profiles.UpdateScope(id, scopeJQL)
 }
 
 // DeleteProfile removes a profile and its stored credentials.
@@ -284,7 +294,7 @@ func (a *App) SyncProfile(profileID string) error {
 	engine := syncer.New(jira.NewClient(p.JiraURL, token), a.repo)
 	started := time.Now().UTC()
 	var lastFetched int
-	syncErr := engine.Sync(a.ctx, profileID, p.ProjectKey, state.LastSyncedAt, func(pr syncer.Progress) {
+	syncErr := engine.Sync(a.ctx, profileID, p.ProjectKey, p.ScopeJQL, state.LastSyncedAt, func(pr syncer.Progress) {
 		lastFetched = pr.Fetched
 		runtime.EventsEmit(a.ctx, "sync:progress", pr)
 	})

@@ -7,6 +7,7 @@ import {
   GetSyncState,
   ListFolders,
   ListContainers,
+  UpdateProfileScope,
   ListPendingChanges,
   DiscardPendingChange,
   CommitPendingChanges,
@@ -258,6 +259,27 @@ function App() {
     }
   }
 
+  // editScope adjusts the active profile's JQL scope override (FR-5.4). It
+  // takes effect on the next sync.
+  async function editScope() {
+    if (!activeProfile) return;
+    const next = window.prompt(
+      "Scope JQL — narrows which tests sync (blank = all). Applies on next sync.",
+      activeProfile.scopeJql,
+    );
+    if (next === null) return;
+    try {
+      await UpdateProfileScope(activeId, next.trim());
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.id === activeId ? { ...p, scopeJql: next.trim() } : p,
+        ),
+      );
+    } catch (e) {
+      console.error("update scope:", errMsg(e));
+    }
+  }
+
   function handleCreated(p: Profile) {
     setProfiles((prev) => [...prev, p]);
     setActiveId(p.id);
@@ -394,6 +416,17 @@ function App() {
         </select>
         <button className="btn" onClick={() => setShowForm(true)}>
           + Profile
+        </button>
+        <button
+          className="btn"
+          onClick={editScope}
+          title={
+            activeProfile?.scopeJql
+              ? `Scope: ${activeProfile.scopeJql}`
+              : "Set a JQL scope to narrow which tests sync"
+          }
+        >
+          Scope{activeProfile?.scopeJql ? " ●" : ""}
         </button>
         <button
           className="btn"

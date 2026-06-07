@@ -24,7 +24,7 @@ export function CreateContainerAndAllocate(arg1:string,arg2:string,arg3:string,a
 
 export function CreatePrecondition(arg1:string,arg2:string):Promise<string>;
 
-export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<profile.Profile>;
+export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
 
 export function CreateSavedView(arg1:string,arg2:string,arg3:string):Promise<testrepo.SavedView>;
 
@@ -107,3 +107,5 @@ export function SyncProfile(arg1:string):Promise<void>;
 export function TestConnection(arg1:string,arg2:string):Promise<string>;
 
 export function TransitionTest(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function UpdateProfileScope(arg1:string,arg2:string):Promise<void>;
