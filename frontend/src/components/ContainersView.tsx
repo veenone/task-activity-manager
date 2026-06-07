@@ -6,11 +6,13 @@ import {
   CreateContainerAndAllocate,
   EditContainer,
   DeleteContainer,
+  DeallocateTests,
   ExportPytest,
   errMsg,
 } from "../api";
 import type { Container, TestPlanBoard, Bucket } from "../api";
 import { Menu } from "./Menu";
+import { AddTestsModal } from "./AddTestsModal";
 
 interface Props {
   profileId: string;
@@ -38,6 +40,20 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
   const [seeding, setSeeding] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+
+  // removeTest unassigns a single Test from the selected container (FR-3.4–3.6),
+  // queued for commit.
+  async function removeTest(testKey: string) {
+    if (!selected) return;
+    setError("");
+    try {
+      await DeallocateTests(profileId, selected, [testKey]);
+      onChanged();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
 
   const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
   const selectedContainer = containers.find((c) => c.key === selected) ?? null;
@@ -266,6 +282,13 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
               {(board?.rows.length ?? 0).toLocaleString()} test
               {(board?.rows.length ?? 0) === 1 ? "" : "s"}
             </span>
+            <button
+              className="btn container-card-add"
+              onClick={() => setShowAdd(true)}
+              title={`Assign tests to this ${kindLabel}`}
+            >
+              + Add tests
+            </button>
           </div>
 
           {editingName ? (
@@ -314,13 +337,15 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
               <th>Summary</th>
               <th>Status</th>
               <th>Execution</th>
+              <th aria-label="Remove" />
             </tr>
           </thead>
           <tbody>
             {board.rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="muted">
-                  This {kindLabel.toLowerCase()} has no tests.
+                <td colSpan={5} className="muted">
+                  This {kindLabel.toLowerCase()} has no tests yet — use “+ Add
+                  tests”.
                 </td>
               </tr>
             ) : (
@@ -340,11 +365,33 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
                       <span className="muted">not run</span>
                     )}
                   </td>
+                  <td className="board-remove-cell">
+                    <button
+                      className="btn btn-ghost board-remove"
+                      onClick={() => removeTest(r.testKey)}
+                      title={`Remove from this ${kindLabel}`}
+                    >
+                      ✕
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+      )}
+
+      {showAdd && selectedContainer && (
+        <AddTestsModal
+          profileId={profileId}
+          containerKey={selected}
+          existingKeys={(board?.rows ?? []).map((r) => r.testKey)}
+          onCancel={() => setShowAdd(false)}
+          onDone={() => {
+            setShowAdd(false);
+            onChanged();
+          }}
+        />
       )}
     </div>
   );

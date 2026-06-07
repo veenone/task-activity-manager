@@ -806,6 +806,44 @@ i.sankey-node-l2 {
   font-size: 12px;
   color: #6b7280;
 }
+.container-card-add {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+.board-remove-cell {
+  width: 1%;
+  text-align: right;
+}
+.board-remove {
+  font-size: 11px;
+  padding: 1px 7px;
+  color: #6b7280;
+}
+.board-remove:hover {
+  color: #c0392b;
+}
+.add-test-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow: auto;
+}
+.add-test-list li {
+  padding: 5px 4px;
+  border-bottom: 1px solid #f0f1f4;
+  font-size: 13px;
+}
+.add-test-list li label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  cursor: pointer;
+}
+.add-test-already label {
+  cursor: default;
+  opacity: 0.65;
+}
 .container-card-name {
   font-size: 18px;
   font-weight: 600;
