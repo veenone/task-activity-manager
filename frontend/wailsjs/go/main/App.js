@@ -86,6 +86,10 @@ export function ExportDiagnostics() {
   return window['go']['main']['App']['ExportDiagnostics']();
 }
 
+export function ExportProfile(arg1) {
+  return window['go']['main']['App']['ExportProfile'](arg1);
+}
+
 export function GetBulkTransitionOptions(arg1, arg2) {
   return window['go']['main']['App']['GetBulkTransitionOptions'](arg1, arg2);
 }
@@ -132,6 +136,10 @@ export function GetTestTransitions(arg1, arg2) {
 
 export function Health() {
   return window['go']['main']['App']['Health']();
+}
+
+export function ImportProfile() {
+  return window['go']['main']['App']['ImportProfile']();
 }
 
 export function ListAllPreconditions(arg1) {
@@ -208,4 +216,8 @@ export function TransitionTest(arg1, arg2, arg3) {
 
 export function UpdateProfileScope(arg1, arg2) {
   return window['go']['main']['App']['UpdateProfileScope'](arg1, arg2);
+}
+
+export function UpdateProfileToken(arg1, arg2) {
+  return window['go']['main']['App']['UpdateProfileToken'](arg1, arg2);
 }

@@ -8,6 +8,9 @@ import {
   ListFolders,
   ListContainers,
   UpdateProfileScope,
+  ExportProfile,
+  ImportProfile,
+  UpdateProfileToken,
   ListPendingChanges,
   DiscardPendingChange,
   CommitPendingChanges,
@@ -280,6 +283,54 @@ function App() {
     }
   }
 
+  // exportProfile writes the active profile's config (no credential) to a file
+  // the user picks (FR-5.5).
+  async function exportProfile() {
+    if (!activeId) return;
+    try {
+      const path = await ExportProfile(activeId);
+      if (path) window.alert(`Profile exported to:\n${path}`);
+    } catch (e) {
+      window.alert(`Export failed: ${errMsg(e)}`);
+    }
+  }
+
+  // importProfile creates a profile from a chosen config file, then prompts for
+  // its PAT (the credential isn't part of the exported file) (FR-5.5).
+  async function importProfile() {
+    try {
+      const p = await ImportProfile();
+      if (!p.id) return; // cancelled
+      setProfiles((prev) => [...prev, p]);
+      setActiveId(p.id);
+      setSelectedKey(null);
+      const token = window.prompt(
+        `Imported "${p.name}". Enter its Personal Access Token to enable syncing (or cancel to set it later):`,
+      );
+      if (token && token.trim()) {
+        await UpdateProfileToken(p.id, token.trim());
+      }
+    } catch (e) {
+      window.alert(`Import failed: ${errMsg(e)}`);
+    }
+  }
+
+  // setToken updates the active profile's stored PAT (FR-5.5) — for imported
+  // profiles or token rotation.
+  async function setToken() {
+    if (!activeProfile) return;
+    const token = window.prompt(
+      `Enter a new Personal Access Token for "${activeProfile.name}":`,
+    );
+    if (token === null || !token.trim()) return;
+    try {
+      await UpdateProfileToken(activeId, token.trim());
+      window.alert("Token updated.");
+    } catch (e) {
+      window.alert(`Token update failed: ${errMsg(e)}`);
+    }
+  }
+
   function handleCreated(p: Profile) {
     setProfiles((prev) => [...prev, p]);
     setActiveId(p.id);
@@ -416,6 +467,23 @@ function App() {
         </select>
         <button className="btn" onClick={() => setShowForm(true)}>
           + Profile
+        </button>
+        <button className="btn" onClick={importProfile} title="Import a profile from a file">
+          Import
+        </button>
+        <button
+          className="btn"
+          onClick={exportProfile}
+          title="Export the active profile (without its token)"
+        >
+          Export
+        </button>
+        <button
+          className="btn"
+          onClick={setToken}
+          title="Set or rotate the active profile's token"
+        >
+          Token
         </button>
         <button
           className="btn"

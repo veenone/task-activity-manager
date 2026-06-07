@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -242,6 +243,107 @@ func (a *App) UpdateProfileScope(id, scopeJQL string) error {
 		return err
 	}
 	return a.profiles.UpdateScope(id, scopeJQL)
+}
+
+// profileConfig is the shareable shape of a profile — everything except the
+// credential, which never leaves the OS credential manager (FR-5.5).
+type profileConfig struct {
+	Name       string `json:"name"`
+	JiraURL    string `json:"jiraUrl"`
+	ProjectKey string `json:"projectKey"`
+	ScopeJQL   string `json:"scopeJql"`
+}
+
+// ExportProfile writes a profile's configuration (without its token) to a
+// user-chosen JSON file (FR-5.5). Returns the saved path, or "" if cancelled.
+func (a *App) ExportProfile(id string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	p, err := a.profiles.Get(id)
+	if err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(profileConfig{
+		Name: p.Name, JiraURL: p.JiraURL, ProjectKey: p.ProjectKey, ScopeJQL: p.ScopeJQL,
+	}, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("encode profile: %w", err)
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export profile",
+		DefaultFilename: sanitizeFilename(p.Name) + "-profile.json",
+		Filters:         []runtime.FileFilter{{DisplayName: "JSON", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("write profile: %w", err)
+	}
+	return path, nil
+}
+
+// ImportProfile creates a profile from a user-chosen JSON config file (FR-5.5).
+// The new profile has no credential — set one with UpdateProfileToken before
+// syncing. A zero-value profile (empty id) is returned when the dialog is
+// cancelled.
+func (a *App) ImportProfile() (profile.Profile, error) {
+	if err := a.requireStore(); err != nil {
+		return profile.Profile{}, err
+	}
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:   "Import profile",
+		Filters: []runtime.FileFilter{{DisplayName: "JSON", Pattern: "*.json"}},
+	})
+	if err != nil {
+		return profile.Profile{}, fmt.Errorf("open dialog: %w", err)
+	}
+	if path == "" {
+		return profile.Profile{}, nil // cancelled
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return profile.Profile{}, fmt.Errorf("read file: %w", err)
+	}
+	var cfg profileConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return profile.Profile{}, fmt.Errorf("not a valid profile file: %w", err)
+	}
+	if strings.TrimSpace(cfg.Name) == "" || strings.TrimSpace(cfg.JiraURL) == "" || strings.TrimSpace(cfg.ProjectKey) == "" {
+		return profile.Profile{}, fmt.Errorf("profile file is missing name, URL or project key")
+	}
+	return a.profiles.Create(cfg.Name, cfg.JiraURL, cfg.ProjectKey, cfg.ScopeJQL)
+}
+
+// UpdateProfileToken replaces a profile's stored PAT in the OS credential
+// manager (FR-5.5 / FR-8.3) — used to complete an imported profile or rotate a
+// token. The token is never written to the database.
+func (a *App) UpdateProfileToken(id, token string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if _, err := a.profiles.Get(id); err != nil {
+		return err
+	}
+	return a.creds.Save(id, token)
+}
+
+// sanitizeFilename strips path-unsafe characters from a profile name for use in
+// a default export filename.
+func sanitizeFilename(name string) string {
+	repl := strings.NewReplacer(
+		"/", "-", "\\", "-", ":", "-", "*", "-", "?", "-",
+		"\"", "-", "<", "-", ">", "-", "|", "-", " ", "_",
+	)
+	out := strings.TrimSpace(repl.Replace(name))
+	if out == "" {
+		return "profile"
+	}
+	return out
 }
 
 // DeleteProfile removes a profile and its stored credentials.

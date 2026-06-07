@@ -48,6 +48,8 @@ export function EditTestStepField(arg1:string,arg2:string,arg3:string,arg4:strin
 
 export function ExportDiagnostics():Promise<string>;
 
+export function ExportProfile(arg1:string):Promise<string>;
+
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
@@ -71,6 +73,8 @@ export function GetTestSteps(arg1:string,arg2:string,arg3:boolean):Promise<Array
 export function GetTestTransitions(arg1:string,arg2:string):Promise<Array<jira.Transition>>;
 
 export function Health():Promise<main.HealthInfo>;
+
+export function ImportProfile():Promise<profile.Profile>;
 
 export function ListAllPreconditions(arg1:string):Promise<Array<testrepo.Precondition>>;
 
@@ -109,3 +113,5 @@ export function TestConnection(arg1:string,arg2:string):Promise<string>;
 export function TransitionTest(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function UpdateProfileScope(arg1:string,arg2:string):Promise<void>;
+
+export function UpdateProfileToken(arg1:string,arg2:string):Promise<void>;
