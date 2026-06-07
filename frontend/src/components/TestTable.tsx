@@ -429,6 +429,7 @@ export function TestTable({
         >
           Export
         </button>
+        {!selectedKey && (
         <div className="columns-menu">
           <button
             className="btn"
@@ -478,27 +479,30 @@ export function TestTable({
             </>
           )}
         </div>
+        )}
         <span className="muted count">
           {loading
             ? "Loading…"
             : `${from}–${to} of ${page.total.toLocaleString()}`}
         </span>
-        <div className="pager">
-          <button
-            className="btn"
-            disabled={offset === 0 || loading}
-            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-          >
-            ‹ Prev
-          </button>
-          <button
-            className="btn"
-            disabled={offset + PAGE_SIZE >= page.total || loading}
-            onClick={() => setOffset(offset + PAGE_SIZE)}
-          >
-            Next ›
-          </button>
-        </div>
+        {!selectedKey && (
+          <div className="pager">
+            <button
+              className="btn"
+              disabled={offset === 0 || loading}
+              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+            >
+              ‹ Prev
+            </button>
+            <button
+              className="btn"
+              disabled={offset + PAGE_SIZE >= page.total || loading}
+              onClick={() => setOffset(offset + PAGE_SIZE)}
+            >
+              Next ›
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <div className="error-text table-error">{error}</div>}
