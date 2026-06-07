@@ -1183,6 +1183,41 @@ func decodeImport(contentB64 string, isXlsx bool) ([][]string, error) {
 	return testrepo.ParseRecords(data, isXlsx)
 }
 
+// ExportTests writes the Tests matching a query to a user-chosen CSV or XLSX
+// file (FR-10.8). The format follows the saved file's extension. Returns the
+// saved path, or "" if cancelled.
+func (a *App) ExportTests(profileID string, q testrepo.Query) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export tests",
+		DefaultFilename: "tests-export.csv",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "CSV", Pattern: "*.csv"},
+			{DisplayName: "Excel", Pattern: "*.xlsx"},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil
+	}
+	format := "csv"
+	if strings.HasSuffix(strings.ToLower(path), ".xlsx") {
+		format = "xlsx"
+	}
+	data, err := a.repo.ExportTests(profileID, q, format)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("write export: %w", err)
+	}
+	return path, nil
+}
+
 // ExportImportTemplate writes a starter CSV import template to a user-chosen
 // file (FR-10.3). Returns the saved path, or "" if cancelled.
 func (a *App) ExportImportTemplate() (string, error) {

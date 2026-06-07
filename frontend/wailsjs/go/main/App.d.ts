@@ -57,6 +57,8 @@ export function ExportImportTemplate():Promise<string>;
 
 export function ExportProfile(arg1:string):Promise<string>;
 
+export function ExportTests(arg1:string,arg2:testrepo.Query):Promise<string>;
+
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
 
 export function GetDiagnostics():Promise<main.Diagnostics>;

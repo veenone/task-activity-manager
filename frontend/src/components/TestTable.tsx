@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ListTests,
   ListMatchingKeys,
+  ExportTests,
   CreateSavedView,
   ListSavedViews,
   DeleteSavedView,
@@ -335,6 +336,25 @@ export function TestTable({
     page.total > pageKeys.length &&
     selectedSet.size < page.total;
 
+  async function exportTests() {
+    try {
+      const q: TestQuery = {
+        search: debouncedSearch,
+        status: status.trim(),
+        folderId,
+        containerKey,
+        sortBy,
+        desc,
+        limit: 0,
+        offset: 0,
+      };
+      const path = await ExportTests(profileId, q);
+      if (path) window.alert(`Exported ${page.total} test(s) to:\n${path}`);
+    } catch (e) {
+      window.alert(`Export failed: ${errMsg(e)}`);
+    }
+  }
+
   async function selectAllMatching() {
     if (selectingAll) return;
     setSelectingAll(true);
@@ -401,6 +421,14 @@ export function TestTable({
             Save view
           </button>
         </div>
+        <button
+          className="btn"
+          onClick={exportTests}
+          title="Export the filtered tests to CSV or XLSX"
+          disabled={page.total === 0}
+        >
+          Export
+        </button>
         <div className="columns-menu">
           <button
             className="btn"

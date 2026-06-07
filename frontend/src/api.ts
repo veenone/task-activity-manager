@@ -45,6 +45,7 @@ export {
   ListMatchingKeys,
   PreviewImport,
   ImportTests,
+  ExportTests,
   ExportImportTemplate,
   CreateSavedView,
   ListSavedViews,

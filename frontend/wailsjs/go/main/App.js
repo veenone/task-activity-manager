@@ -102,6 +102,10 @@ export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
 }
 
+export function ExportTests(arg1, arg2) {
+  return window['go']['main']['App']['ExportTests'](arg1, arg2);
+}
+
 export function GetBulkTransitionOptions(arg1, arg2) {
   return window['go']['main']['App']['GetBulkTransitionOptions'](arg1, arg2);
 }
