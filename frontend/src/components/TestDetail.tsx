@@ -10,6 +10,8 @@ import {
   DeallocateTests,
   GetTestTransitions,
   GetTestSteps,
+  GetTestReview,
+  SetTestReview,
   GetTestCustomFields,
   EditTestCustomField,
   TransitionTest,
@@ -30,7 +32,10 @@ import type {
   Step,
   Folder,
   CustomFieldValue,
+  Review,
 } from "../api";
+
+const REVIEWER_KEY = "xtm.reviewer";
 
 interface Props {
   profileId: string;
@@ -58,6 +63,11 @@ export function TestDetail({
   const [allPreconditions, setAllPreconditions] = useState<Precondition[]>([]);
   const [containers, setContainers] = useState<ContainerMembership[]>([]);
   const [customFields, setCustomFields] = useState<CustomFieldValue[]>([]);
+  const [review, setReview] = useState<Review | null>(null);
+  const [reviewer, setReviewer] = useState(
+    () => localStorage.getItem(REVIEWER_KEY) ?? "",
+  );
+  const [reviewNote, setReviewNote] = useState("");
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
@@ -84,8 +94,9 @@ export function TestDetail({
       GetTestPreconditions(profileId, testKey),
       GetTestContainers(profileId, testKey),
       ListAllPreconditions(profileId),
+      GetTestReview(profileId, testKey),
     ])
-      .then(([t, pre, cons, allPre]) => {
+      .then(([t, pre, cons, allPre, rev]) => {
         if (cancelled) return;
         setTest(t);
         setSummary(t.summary);
@@ -95,6 +106,8 @@ export function TestDetail({
         setPreconditions(pre);
         setContainers(cons ?? []);
         setAllPreconditions(allPre ?? []);
+        setReview(rev);
+        setReviewNote(rev?.note ?? "");
         // Transitions load alongside but can fail without blocking the
         // rest of the detail panel — workflow may not be set up yet, or
         // the user may not have edit permission.
@@ -331,6 +344,23 @@ export function TestDetail({
     }
   }
 
+  // setVerdict records (or clears) a review verdict (test review). The reviewer
+  // name is remembered across tests via localStorage.
+  async function setVerdict(verdict: string) {
+    const who = reviewer.trim();
+    localStorage.setItem(REVIEWER_KEY, who);
+    setSaveError("");
+    try {
+      await SetTestReview(profileId, testKey, verdict, who, reviewNote.trim());
+      const rev = await GetTestReview(profileId, testKey);
+      setReview(rev);
+      setReviewNote(rev?.note ?? "");
+      onEdited();
+    } catch (e) {
+      setSaveError(`Review failed: ${errMsg(e)}`);
+    }
+  }
+
   const isDirty = (field: string) =>
     pendingForTest.some((p) => p.field === field);
 
@@ -449,6 +479,65 @@ export function TestDetail({
             <dt>Updated</dt>
             <dd>{test.updated || "—"}</dd>
           </dl>
+
+          <h4>
+            Review {isDirty("review") && <DirtyDot />}
+          </h4>
+          <div className="review-box">
+            <div className="review-state">
+              <span
+                className={`review-verdict review-${review?.verdict || "none"}`}
+              >
+                {verdictLabel(review?.verdict)}
+              </span>
+              {review?.verdict && (review.reviewer || review.reviewedAt) && (
+                <span className="muted review-meta">
+                  {review.reviewer ? `by ${review.reviewer}` : ""}
+                  {review.reviewedAt
+                    ? ` · ${new Date(review.reviewedAt).toLocaleDateString()}`
+                    : ""}
+                </span>
+              )}
+            </div>
+            <input
+              className="detail-input detail-input-inline review-reviewer"
+              value={reviewer}
+              onChange={(e) => setReviewer(e.target.value)}
+              placeholder="Reviewer name"
+            />
+            <input
+              className="detail-input detail-input-inline review-note"
+              value={reviewNote}
+              onChange={(e) => setReviewNote(e.target.value)}
+              placeholder="Review note (optional)"
+            />
+            <div className="review-actions">
+              <button
+                className="btn review-approve"
+                onClick={() => setVerdict("approved")}
+              >
+                Approve
+              </button>
+              <button
+                className="btn review-reject"
+                onClick={() => setVerdict("rejected")}
+              >
+                Reject
+              </button>
+              <button className="btn" onClick={() => setVerdict("pending")}>
+                Pending
+              </button>
+              {review?.verdict && (
+                <button
+                  className="btn btn-ghost review-clear"
+                  onClick={() => setVerdict("")}
+                  title="Clear the review"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
 
           {customFields.length > 0 && (
             <>
@@ -945,6 +1034,19 @@ function RunStatusBadge({ status }: { status: string }) {
   return (
     <span className={`run-badge run-${status.toLowerCase()}`}>{status}</span>
   );
+}
+
+function verdictLabel(verdict?: string): string {
+  switch (verdict) {
+    case "approved":
+      return "Approved";
+    case "rejected":
+      return "Rejected";
+    case "pending":
+      return "Pending review";
+    default:
+      return "Not reviewed";
+  }
 }
 
 function DirtyDot() {

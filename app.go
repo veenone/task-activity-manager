@@ -1202,6 +1202,25 @@ func (a *App) DeleteSavedView(profileID, id string) error {
 	return a.repo.DeleteSavedView(profileID, id)
 }
 
+// --- Test review ---
+
+// GetTestReview returns a Test's current review state.
+func (a *App) GetTestReview(profileID, testKey string) (testrepo.Review, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.Review{}, err
+	}
+	return a.repo.GetTestReview(profileID, testKey)
+}
+
+// SetTestReview records a review verdict (approved / rejected / pending, or ""
+// to clear) for a Test and queues it for commit as a Jira comment.
+func (a *App) SetTestReview(profileID, testKey, verdict, reviewer, note string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.SetTestReview(profileID, testKey, verdict, reviewer, note)
+}
+
 // --- Import (FR-10) ---
 
 // PreviewImport parses an import file's header row and counts its data rows so

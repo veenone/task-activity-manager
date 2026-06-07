@@ -1574,6 +1574,72 @@ tr.row-selected {
   font-size: 12px;
 }
 
+/* Test review */
+.review-box {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+.review-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.review-verdict {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 5px;
+}
+.review-none {
+  background: #eef1f5;
+  color: #6b7280;
+}
+.review-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+.review-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.review-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.review-meta {
+  font-size: 12px;
+}
+.review-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.review-actions .btn {
+  font-size: 12px;
+  padding: 4px 12px;
+}
+.review-approve {
+  border-color: #22c55e;
+  color: #166534;
+}
+.review-approve:hover:not(:disabled) {
+  background: #dcfce7;
+}
+.review-reject {
+  border-color: #ef4444;
+  color: #991b1b;
+}
+.review-reject:hover:not(:disabled) {
+  background: #fee2e2;
+}
+.review-clear {
+  margin-left: auto;
+}
+
 /* Dirty markers */
 .dirty-dot {
   color: #f59e0b;

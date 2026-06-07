@@ -85,6 +85,8 @@ export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promis
 
 export function GetTestPreconditions(arg1:string,arg2:string):Promise<Array<testrepo.Precondition>>;
 
+export function GetTestReview(arg1:string,arg2:string):Promise<testrepo.Review>;
+
 export function GetTestSteps(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.Step>>;
 
 export function GetTestTransitions(arg1:string,arg2:string):Promise<Array<jira.Transition>>;
@@ -132,6 +134,8 @@ export function SeedSampleContainers(arg1:string):Promise<testrepo.SeedResult>;
 export function SetDefaultProfile(arg1:string):Promise<void>;
 
 export function SetTestPreconditions(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
+
+export function SetTestReview(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function SyncProfile(arg1:string):Promise<void>;
 

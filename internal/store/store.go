@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 12
+const schemaVersion = 13
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -180,6 +180,16 @@ CREATE TABLE IF NOT EXISTS sync_log (
 CREATE TABLE IF NOT EXISTS app_setting (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS test_review (
+	profile_id  TEXT NOT NULL,
+	test_key    TEXT NOT NULL,
+	verdict     TEXT NOT NULL DEFAULT '',
+	reviewer    TEXT NOT NULL DEFAULT '',
+	note        TEXT NOT NULL DEFAULT '',
+	reviewed_at TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, test_key)
 );
 `
 

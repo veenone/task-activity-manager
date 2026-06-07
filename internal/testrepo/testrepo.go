@@ -2843,6 +2843,30 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		); err != nil {
 			return fmt.Errorf("revert custom field: %w", err)
 		}
+	case entityTestReview:
+		// Restore the prior review from the before snapshot (empty verdict
+		// means there was no review, so the row is removed).
+		var prev Review
+		if err := json.Unmarshal([]byte(beforeVal), &prev); err != nil {
+			return fmt.Errorf("decode review snapshot: %w", err)
+		}
+		if prev.Verdict == "" {
+			if _, err := tx.Exec(
+				`DELETE FROM test_review WHERE profile_id = ? AND test_key = ?`,
+				profileID, entityKey,
+			); err != nil {
+				return fmt.Errorf("revert review: %w", err)
+			}
+		} else if _, err := tx.Exec(
+			`INSERT INTO test_review (profile_id, test_key, verdict, reviewer, note, reviewed_at)
+			 VALUES (?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(profile_id, test_key) DO UPDATE SET
+			   verdict = excluded.verdict, reviewer = excluded.reviewer,
+			   note = excluded.note, reviewed_at = excluded.reviewed_at`,
+			profileID, entityKey, prev.Verdict, prev.Reviewer, prev.Note, prev.ReviewedAt,
+		); err != nil {
+			return fmt.Errorf("revert review: %w", err)
+		}
 	case entityTestCreate:
 		// entity_key is the temporary Test key; discarding removes the
 		// not-yet-created Test and any steps imported with it.
@@ -3402,6 +3426,7 @@ const (
 	entityFolderRename     = "folder_rename"
 	entityFolderDelete     = "folder_delete"
 	entityTestCreate       = "test_create"
+	entityTestReview       = "test_review"
 )
 
 // preconditionFields whitelists which Precondition columns can be edited via

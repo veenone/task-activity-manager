@@ -91,6 +91,8 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 	folderRows := make([]testrepo.PendingChange, 0)
 	// Imported Test creates (FR-10), keyed by a temporary "NEW-N" Test key.
 	testCreateRows := make([]testrepo.PendingChange, 0)
+	// Test reviews commit as a Jira comment on the Test, keyed by Test key.
+	reviewRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -110,6 +112,10 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "test_create" {
 			testCreateRows = append(testCreateRows, c)
+			continue
+		}
+		if c.EntityType == "test_review" {
+			reviewRows = append(reviewRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -410,8 +416,50 @@ testLoop:
 	e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
 	e.commitFolders(ctx, profileID, projectKey, folderRows, &result)
 	e.commitTestCreates(ctx, profileID, projectKey, testCreateRows, &result)
+	e.commitReviews(ctx, profileID, reviewRows, &result)
 
 	return result, nil
+}
+
+// commitReviews posts each Test review as a comment on its Test (test review).
+func (e *Engine) commitReviews(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
+	for _, c := range rows {
+		var rv struct {
+			Verdict  string `json:"verdict"`
+			Reviewer string `json:"reviewer"`
+			Note     string `json:"note"`
+		}
+		if err := json.Unmarshal([]byte(c.AfterVal), &rv); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed review payload: " + err.Error()})
+			continue
+		}
+		body := reviewComment(rv.Verdict, rv.Reviewer, rv.Note)
+		if err := e.client.AddComment(ctx, c.EntityKey, body); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "post review: " + sanitizeError(err.Error())})
+			continue
+		}
+		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira accepted the review but local cleanup failed: " + err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, c.EntityKey)
+	}
+}
+
+// reviewComment renders the Jira comment body for a Test review.
+func reviewComment(verdict, reviewer, note string) string {
+	label := strings.ToUpper(verdict)
+	if label == "" {
+		label = "CLEARED"
+	}
+	body := "Test review: " + label
+	if reviewer != "" {
+		body += " by " + reviewer
+	}
+	if note != "" {
+		body += " — " + note
+	}
+	return body
 }
 
 // commitTestCreates creates imported Tests (FR-10), renaming each local "NEW-N"

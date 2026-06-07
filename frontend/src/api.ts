@@ -65,6 +65,8 @@ export {
   GetBulkTransitionOptions,
   BulkTransitionTests,
   GetTestSteps,
+  GetTestReview,
+  SetTestReview,
   GetTestCustomFields,
   EditTestCustomField,
   EditTestStepField,
@@ -414,6 +416,15 @@ export interface ImportResult {
   created: number;
   skipped: number;
   errors: ImportError[];
+}
+
+// Review mirrors testrepo.Review — a Test's review state. An empty verdict
+// means it hasn't been reviewed.
+export interface Review {
+  verdict: string; // "approved" | "rejected" | "pending" | ""
+  reviewer: string;
+  note: string;
+  reviewedAt: string;
 }
 
 // Traceability Sankey (FR-9): Plan -> Execution -> run-status flow.

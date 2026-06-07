@@ -705,6 +705,24 @@ export namespace testrepo {
 	        this.offset = source["offset"];
 	    }
 	}
+	export class Review {
+	    verdict: string;
+	    reviewer: string;
+	    note: string;
+	    reviewedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Review(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.verdict = source["verdict"];
+	        this.reviewer = source["reviewer"];
+	        this.note = source["note"];
+	        this.reviewedAt = source["reviewedAt"];
+	    }
+	}
 	export class SankeyLink {
 	    source: string;
 	    target: string;

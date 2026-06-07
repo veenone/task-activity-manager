@@ -158,6 +158,10 @@ export function GetTestPreconditions(arg1, arg2) {
   return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
 }
 
+export function GetTestReview(arg1, arg2) {
+  return window['go']['main']['App']['GetTestReview'](arg1, arg2);
+}
+
 export function GetTestSteps(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetTestSteps'](arg1, arg2, arg3);
 }
@@ -252,6 +256,10 @@ export function SetDefaultProfile(arg1) {
 
 export function SetTestPreconditions(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetTestPreconditions'](arg1, arg2, arg3);
+}
+
+export function SetTestReview(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetTestReview'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SyncProfile(arg1) {
