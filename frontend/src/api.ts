@@ -9,6 +9,8 @@ export {
   GetDiagnostics,
   ReadLog,
   ExportDiagnostics,
+  GetSettings,
+  SetDefaultProfile,
   ListProfiles,
   CreateProfile,
   UpdateProfileScope,
@@ -68,6 +70,11 @@ export interface HealthInfo {
   error: string;
   dbPath: string;
   logPath: string;
+}
+
+// Settings mirrors settings.Settings — global app preferences (FR-12.2).
+export interface Settings {
+  defaultProfileId: string;
 }
 
 export interface Profile {

@@ -4,6 +4,7 @@ import {testrepo} from '../models';
 import {main} from '../models';
 import {syncer} from '../models';
 import {profile} from '../models';
+import {settings} from '../models';
 import {jira} from '../models';
 
 export function AddTestStep(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<testrepo.Step>;
@@ -54,6 +55,8 @@ export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
+export function GetSettings():Promise<settings.Settings>;
+
 export function GetStatistics(arg1:string):Promise<testrepo.Statistics>;
 
 export function GetSyncState(arg1:string):Promise<testrepo.SyncState>;
@@ -103,6 +106,8 @@ export function ReadLog(arg1:number):Promise<string>;
 export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SeedSampleContainers(arg1:string):Promise<testrepo.SeedResult>;
+
+export function SetDefaultProfile(arg1:string):Promise<void>;
 
 export function SetTestPreconditions(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 

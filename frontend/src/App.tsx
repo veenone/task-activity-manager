@@ -11,6 +11,8 @@ import {
   ExportProfile,
   ImportProfile,
   UpdateProfileToken,
+  GetSettings,
+  SetDefaultProfile,
   ListPendingChanges,
   DiscardPendingChange,
   CommitPendingChanges,
@@ -48,6 +50,7 @@ function App() {
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  const [defaultProfileId, setDefaultProfileId] = useState<string>("");
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -108,10 +111,17 @@ function App() {
   useEffect(() => {
     if (!health || !health.ok) return;
     setLoadingProfiles(true);
-    ListProfiles()
-      .then((ps) => {
+    Promise.all([ListProfiles(), GetSettings()])
+      .then(([ps, s]) => {
         setProfiles(ps);
-        if (ps.length > 0) setActiveId(ps[0].id);
+        setDefaultProfileId(s.defaultProfileId ?? "");
+        if (ps.length > 0) {
+          const def =
+            s.defaultProfileId && ps.some((p) => p.id === s.defaultProfileId)
+              ? s.defaultProfileId
+              : ps[0].id;
+          setActiveId(def);
+        }
       })
       .catch((e) => console.error("load profiles:", errMsg(e)))
       .finally(() => setLoadingProfiles(false));
@@ -280,6 +290,19 @@ function App() {
       );
     } catch (e) {
       console.error("update scope:", errMsg(e));
+    }
+  }
+
+  // toggleDefault sets the active profile as the launch default, or clears it
+  // if it's already the default (FR-12.2).
+  async function toggleDefault() {
+    if (!activeId) return;
+    const next = defaultProfileId === activeId ? "" : activeId;
+    try {
+      await SetDefaultProfile(next);
+      setDefaultProfileId(next);
+    } catch (e) {
+      console.error("set default profile:", errMsg(e));
     }
   }
 
@@ -465,6 +488,17 @@ function App() {
             </option>
           ))}
         </select>
+        <button
+          className="btn"
+          onClick={toggleDefault}
+          title={
+            defaultProfileId === activeId
+              ? "This is the default profile (click to clear)"
+              : "Set as the default profile (auto-selected on launch)"
+          }
+        >
+          {defaultProfileId === activeId ? "★" : "☆"}
+        </button>
         <button className="btn" onClick={() => setShowForm(true)}>
           + Profile
         </button>

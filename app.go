@@ -17,6 +17,7 @@ import (
 
 	"xray-test-manager/internal/jira"
 	"xray-test-manager/internal/profile"
+	"xray-test-manager/internal/settings"
 	"xray-test-manager/internal/store"
 	"xray-test-manager/internal/syncer"
 	"xray-test-manager/internal/testrepo"
@@ -29,6 +30,7 @@ type App struct {
 	store      *store.Store
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
+	settings   *settings.Manager
 	repo       *testrepo.Repository
 	dbPath     string
 	logPath    string
@@ -84,6 +86,7 @@ func (a *App) initStore() error {
 	a.store = st
 	a.profiles = profile.NewManager(st)
 	a.creds = profile.NewCredentialStore()
+	a.settings = settings.NewManager(st)
 	a.repo = testrepo.NewRepository(st)
 	log.Printf("xtm: local store ready at %s", dbPath)
 	return nil
@@ -358,6 +361,25 @@ func (a *App) DeleteProfile(id string) error {
 		log.Printf("xtm: delete credentials for %s: %v", id, err)
 	}
 	return nil
+}
+
+// --- Global settings (FR-12.2) ---
+
+// GetSettings returns the global application preferences (default profile).
+func (a *App) GetSettings() (settings.Settings, error) {
+	if err := a.requireStore(); err != nil {
+		return settings.Settings{}, err
+	}
+	return a.settings.Get()
+}
+
+// SetDefaultProfile records which profile is auto-selected on launch (FR-12.2).
+// An empty id clears the default.
+func (a *App) SetDefaultProfile(profileID string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.settings.Set(settings.Settings{DefaultProfileID: profileID})
 }
 
 // --- Connection & sync (FR-1, FR-8) ---

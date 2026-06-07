@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 11
+const schemaVersion = 12
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -176,6 +176,11 @@ CREATE TABLE IF NOT EXISTS sync_log (
 	fetched     INTEGER NOT NULL DEFAULT 0,
 	error       TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS app_setting (
+	key   TEXT PRIMARY KEY,
+	value TEXT NOT NULL DEFAULT ''
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -271,6 +276,8 @@ func applyMigrations(db *sql.DB) error {
 	// v9: custom_field / test_custom_field tables for Jira custom fields on the
 	// Test issue type. Also additive.
 	// v10: sync_log table for sync history. Also additive.
+	// v12: app_setting table for global settings (default profile). Additive.
+	//
 	// v11: scope_jql column on profiles for the per-profile JQL scope override
 	// (FR-5.4). Fresh installs get it from the CREATE above; this ALTER catches
 	// pre-v11 databases.

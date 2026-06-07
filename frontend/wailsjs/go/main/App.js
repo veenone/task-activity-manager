@@ -98,6 +98,10 @@ export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
 
+export function GetSettings() {
+  return window['go']['main']['App']['GetSettings']();
+}
+
 export function GetStatistics(arg1) {
   return window['go']['main']['App']['GetStatistics'](arg1);
 }
@@ -196,6 +200,10 @@ export function ReorderTestSteps(arg1, arg2, arg3) {
 
 export function SeedSampleContainers(arg1) {
   return window['go']['main']['App']['SeedSampleContainers'](arg1);
+}
+
+export function SetDefaultProfile(arg1) {
+  return window['go']['main']['App']['SetDefaultProfile'](arg1);
 }
 
 export function SetTestPreconditions(arg1, arg2, arg3) {
