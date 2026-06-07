@@ -1024,6 +1024,36 @@ func (a *App) SeedSampleContainers(profileID string) (testrepo.SeedResult, error
 	return a.repo.SeedSampleContainers(profileID, p.ProjectKey)
 }
 
+// --- pytest helper (FR-7.2) ---
+
+// ExportPytest generates a pytest scaffold from a Test Set / Plan / Execution
+// and writes it to a user-chosen .py file (FR-7.2). Returns the saved path, or
+// "" if cancelled.
+func (a *App) ExportPytest(profileID, containerKey string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	code, err := a.repo.GeneratePytest(profileID, containerKey)
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save pytest scaffold",
+		DefaultFilename: "test_" + sanitizeFilename(containerKey) + ".py",
+		Filters:         []runtime.FileFilter{{DisplayName: "Python", Pattern: "*.py"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
+		return "", fmt.Errorf("write pytest: %w", err)
+	}
+	return path, nil
+}
+
 // --- Container board (FR-13.7) ---
 
 // GetContainerBoard returns the read-only board for a Test Set / Plan /

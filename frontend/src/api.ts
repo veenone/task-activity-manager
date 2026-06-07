@@ -41,6 +41,7 @@ export {
   DeleteContainer,
   SeedSampleContainers,
   GetContainerBoard,
+  ExportPytest,
   MoveTestToFolder,
   BulkMoveToFolder,
   ListTests,

@@ -6,6 +6,7 @@ import {
   CreateContainerAndAllocate,
   EditContainer,
   DeleteContainer,
+  ExportPytest,
   errMsg,
 } from "../api";
 import type { Container, TestPlanBoard } from "../api";
@@ -71,6 +72,17 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
     try {
       await EditContainer(profileId, selected, name.trim());
       onChanged();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
+  async function generatePytest() {
+    if (!selected) return;
+    setError("");
+    try {
+      const path = await ExportPytest(profileId, selected);
+      if (path) window.alert(`pytest scaffold saved to:\n${path}`);
     } catch (e) {
       setError(errMsg(e));
     }
@@ -196,6 +208,14 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
             title={`Delete the selected ${kindLabel}`}
           >
             Delete
+          </button>
+          <button
+            className="btn"
+            onClick={generatePytest}
+            disabled={!selected}
+            title="Generate a pytest scaffold from this container's tests"
+          >
+            pytest
           </button>
         </div>
         <button

@@ -110,6 +110,10 @@ export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
 }
 
+export function ExportPytest(arg1, arg2) {
+  return window['go']['main']['App']['ExportPytest'](arg1, arg2);
+}
+
 export function ExportTests(arg1, arg2) {
   return window['go']['main']['App']['ExportTests'](arg1, arg2);
 }
