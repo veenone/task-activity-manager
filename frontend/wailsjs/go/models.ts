@@ -554,6 +554,24 @@ export namespace testrepo {
 	        this.offset = source["offset"];
 	    }
 	}
+	export class SavedView {
+	    id: string;
+	    name: string;
+	    query: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SavedView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.query = source["query"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
 	export class SeedResult {
 	    sets: number;
 	    plans: number;

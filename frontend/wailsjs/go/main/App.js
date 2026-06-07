@@ -42,12 +42,20 @@ export function CreateProfile(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3, arg4);
 }
 
+export function CreateSavedView(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateSavedView'](arg1, arg2, arg3);
+}
+
 export function DeallocateTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeallocateTests'](arg1, arg2, arg3);
 }
 
 export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
+}
+
+export function DeleteSavedView(arg1, arg2) {
+  return window['go']['main']['App']['DeleteSavedView'](arg1, arg2);
 }
 
 export function DeleteTestStep(arg1, arg2, arg3) {
@@ -136,6 +144,10 @@ export function ListPendingChanges(arg1) {
 
 export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
+}
+
+export function ListSavedViews(arg1) {
+  return window['go']['main']['App']['ListSavedViews'](arg1);
 }
 
 export function ListTests(arg1, arg2) {

@@ -30,6 +30,9 @@ export {
   BulkMoveToFolder,
   ListTests,
   ListMatchingKeys,
+  CreateSavedView,
+  ListSavedViews,
+  DeleteSavedView,
   GetTest,
   EditTestField,
   DiscardPendingChange,
@@ -97,6 +100,15 @@ export interface SyncState {
   profileId: string;
   lastSyncedAt: string;
   testCount: number;
+}
+
+// SavedView mirrors testrepo.SavedView — a named browse filter (FR-11.4). The
+// query is an opaque JSON string the frontend owns.
+export interface SavedView {
+  id: string;
+  name: string;
+  query: string;
+  createdAt: string;
 }
 
 export interface Folder {

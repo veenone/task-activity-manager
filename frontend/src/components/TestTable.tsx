@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
-import { ListTests, ListMatchingKeys, errMsg } from "../api";
-import type { TestPage, TestQuery, PendingChange } from "../api";
+import {
+  ListTests,
+  ListMatchingKeys,
+  CreateSavedView,
+  ListSavedViews,
+  DeleteSavedView,
+  errMsg,
+} from "../api";
+import type { TestPage, TestQuery, PendingChange, SavedView } from "../api";
 
 interface Props {
   profileId: string;
@@ -45,6 +52,66 @@ export function TestTable({
   const [error, setError] = useState("");
   const [selectingAll, setSelectingAll] = useState(false);
   const [selectAllError, setSelectAllError] = useState("");
+
+  const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [activeView, setActiveView] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    ListSavedViews(profileId)
+      .then((vs) => {
+        if (!cancelled) setSavedViews(vs ?? []);
+      })
+      .catch((e) => console.error("list views:", errMsg(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
+  async function saveView() {
+    const name = window.prompt("Save current filter as:");
+    if (!name || !name.trim()) return;
+    const query = JSON.stringify({ search, status, sortBy, desc });
+    try {
+      const v = await CreateSavedView(profileId, name.trim(), query);
+      setSavedViews((prev) => [v, ...prev]);
+      setActiveView(v.id);
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
+  function applyView(id: string) {
+    setActiveView(id);
+    if (!id) return;
+    const v = savedViews.find((x) => x.id === id);
+    if (!v) return;
+    try {
+      const q = JSON.parse(v.query) as Partial<{
+        search: string;
+        status: string;
+        sortBy: SortCol;
+        desc: boolean;
+      }>;
+      setSearch(q.search ?? "");
+      setStatus(q.status ?? "");
+      setSortBy(q.sortBy ?? "key");
+      setDesc(q.desc ?? false);
+    } catch {
+      // Ignore a malformed saved query rather than break the grid.
+    }
+  }
+
+  async function deleteActiveView() {
+    if (!activeView) return;
+    try {
+      await DeleteSavedView(profileId, activeView);
+      setSavedViews((prev) => prev.filter((v) => v.id !== activeView));
+      setActiveView("");
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 250);
@@ -160,6 +227,33 @@ export function TestTable({
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         />
+        <div className="saved-views">
+          <select
+            className="view-select"
+            value={activeView}
+            onChange={(e) => applyView(e.target.value)}
+            title="Apply a saved filter"
+          >
+            <option value="">Saved views…</option>
+            {savedViews.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+          {activeView && (
+            <button
+              className="btn btn-ghost view-del"
+              onClick={deleteActiveView}
+              title="Delete this saved view"
+            >
+              ✕
+            </button>
+          )}
+          <button className="btn view-save" onClick={saveView}>
+            Save view
+          </button>
+        </div>
         <span className="muted count">
           {loading
             ? "Loading…"

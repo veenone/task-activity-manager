@@ -26,9 +26,13 @@ export function CreatePrecondition(arg1:string,arg2:string):Promise<string>;
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string):Promise<profile.Profile>;
 
+export function CreateSavedView(arg1:string,arg2:string,arg3:string):Promise<testrepo.SavedView>;
+
 export function DeallocateTests(arg1:string,arg2:string,arg3:Array<string>):Promise<testrepo.DeallocateResult>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
+
+export function DeleteSavedView(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteTestStep(arg1:string,arg2:string,arg3:string):Promise<void>;
 
@@ -73,6 +77,8 @@ export function ListMatchingKeys(arg1:string,arg2:testrepo.Query):Promise<Array<
 export function ListPendingChanges(arg1:string):Promise<Array<testrepo.PendingChange>>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;
+
+export function ListSavedViews(arg1:string):Promise<Array<testrepo.SavedView>>;
 
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 

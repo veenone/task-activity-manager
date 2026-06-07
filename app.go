@@ -790,6 +790,33 @@ func (a *App) BulkMoveToFolder(profileID string, testKeys []string, folderID str
 	return a.repo.BulkMoveToFolder(profileID, testKeys, folderID)
 }
 
+// --- Saved views (FR-11.4) ---
+
+// CreateSavedView stores the current browse filter under a name. The query is
+// an opaque JSON blob owned by the frontend.
+func (a *App) CreateSavedView(profileID, name, query string) (testrepo.SavedView, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.SavedView{}, err
+	}
+	return a.repo.CreateSavedView(profileID, name, query)
+}
+
+// ListSavedViews returns a profile's saved browse filters, newest first.
+func (a *App) ListSavedViews(profileID string) ([]testrepo.SavedView, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListSavedViews(profileID)
+}
+
+// DeleteSavedView removes a saved browse filter.
+func (a *App) DeleteSavedView(profileID, id string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.DeleteSavedView(profileID, id)
+}
+
 // --- Browse (FR-11) ---
 
 // ListTests returns a filtered, sorted, paginated page of Tests for a profile.

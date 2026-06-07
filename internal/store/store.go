@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 7
+const schemaVersion = 8
 
 // baseSchema is the canonical table layout for a fresh install. Indexes that
 // might reference columns added by a migration live in indexSchema instead,
@@ -136,6 +136,15 @@ CREATE TABLE IF NOT EXISTS test_container_test (
 	run_status    TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, container_key, test_key)
 );
+
+CREATE TABLE IF NOT EXISTS saved_view (
+	profile_id TEXT NOT NULL,
+	id         TEXT NOT NULL,
+	name       TEXT NOT NULL,
+	query      TEXT NOT NULL DEFAULT '',
+	created_at TEXT NOT NULL,
+	PRIMARY KEY (profile_id, id)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -225,6 +234,7 @@ func applyMigrations(db *sql.DB) error {
 	// v6: test_step table for cached Xray Test Steps. Also additive.
 	// v7: test_container / test_container_test tables for Test Sets, Test
 	// Plans and Test Executions plus their Test memberships. Also additive.
+	// v8: saved_view table for saved browse filters. Also additive.
 	return nil
 }
 
