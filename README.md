@@ -13,8 +13,20 @@ bulk-first interface, writing changes back to Jira on commit.
 
 ## Status
 
-🚧 **Phase 0 — Foundations.** Project scaffold; backend skeletons in place.
-See the roadmap below.
+✅ **Feature-complete in demo mode.** Phases 0–6 are implemented and exercised
+end to end against the built-in demo data: sync, fast browse/search/filter/sort,
+saved views, configurable columns, local field/step/custom-field editing with
+on-commit sync and conflict resolution, workflow transitions (single + bulk),
+all bulk operations, Test Sets / Plans / Executions (board, detail view, CRUD,
+assign/remove tests), Test Repository folders (browse/move + CRUD),
+preconditions, test review (single + bulk), CSV/XLSX import and export, a
+pytest scaffold generator, a statistics dashboard with a traceability Sankey,
+diagnostics, sync history, light/dark themes, and profile management.
+
+🔌 **Pending: live Xray/Jira wiring.** Every read/write is proven against demo
+data; the real-Jira REST calls are stubbed (`NOTE`/`TODO(xtm)` markers in
+`internal/jira/`) until they can be verified against an actual Xray Server/DC
+8.4.0 instance. Until then the app is fully usable in demo mode.
 
 ## Stack
 
@@ -38,21 +50,22 @@ go build ./... # compile-check the Go backend only
 
 No Jira instance handy? Create a profile with **Jira base URL `demo`** (any
 project key, any token). The backend short-circuits the sync and serves
-~5,000 deterministically-generated tests so the full UI — sync progress,
-browse, search, filter, sort, detail — can be exercised end to end. The
-header shows a yellow `DEMO` chip while a demo profile is active.
+~5,000 deterministically-generated tests — plus sample Test Sets / Plans /
+Executions, folders and preconditions — so the full UI can be exercised end to
+end. The header shows a yellow `DEMO` chip while a demo profile is active.
 
 ## Roadmap
 
-| Phase | Theme |
-| --- | --- |
-| 0 | Foundations — scaffold, local store, profiles, PAT auth |
-| 1 | MVP — fast browse / search / filter (read-only) |
-| 2 | Local editing + on-commit sync |
-| 3 | Bulk operations |
-| 4 | Workflow & dashboard |
-| 5 | XLSX / CSV import |
-| 6 | pytest helper, advanced features |
+| Phase | Theme | Status |
+| --- | --- | --- |
+| 0 | Foundations — scaffold, local store, profiles, PAT auth | ✅ |
+| 1 | MVP — fast browse / search / filter / sort, saved views, columns | ✅ |
+| 2 | Local editing (fields / steps / custom fields) + on-commit sync, conflict resolution | ✅ |
+| 3 | Bulk operations (edit / transition / allocate / move / preconditions / review) | ✅ |
+| 4 | Workflow transitions, statistics dashboard, traceability Sankey | ✅ |
+| 5 | XLSX / CSV import + export | ✅ |
+| 6 | pytest scaffold, containers & folder CRUD, test review, themes, diagnostics | ✅ |
+| 7 | Live Xray/Jira REST wiring (verify against a real instance) | 🔌 pending |
 
 Full planning, requirements (FR-1…FR-13) and design notes are maintained in the
 project's Outline documentation collection.
