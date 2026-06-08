@@ -3,6 +3,9 @@ build/bin
 node_modules
 frontend/dist
 
+# Release artifacts (produced by scripts/release.ps1)
+dist/
+
 # Go
 *.exe
 *.test

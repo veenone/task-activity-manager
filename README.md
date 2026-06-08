@@ -46,6 +46,39 @@ wails build    # build build/bin/xray-test-manager.exe
 go build ./... # compile-check the Go backend only
 ```
 
+## Releasing & distribution
+
+Releases ship two Windows artifacts plus checksums:
+
+| Artifact | Use |
+| --- | --- |
+| `xray-test-manager-<ver>-windows-amd64.exe` | Portable — run directly, no install |
+| `xray-test-manager-<ver>-windows-amd64-installer.exe` | NSIS installer (Start-menu entry, uninstaller) |
+| `SHA256SUMS.txt` | Integrity check for both |
+
+**Build locally** (`scripts/release.ps1` builds, version-stamps, bundles into
+`dist/`, and writes checksums):
+
+```powershell
+# Stamp + build the portable exe and the installer (needs NSIS / makensis)
+./scripts/release.ps1 -Version 0.2.0
+
+# Portable exe only (skip the installer)
+./scripts/release.ps1 -Version 0.2.0 -NoInstaller
+```
+
+The version is the single source of truth in `wails.json` (`info.productVersion`);
+the script stamps it and Wails bakes it into the installer and the exe metadata.
+
+**Cut a GitHub release** — push a tag and CI
+(`.github/workflows/release.yml`, on `windows-latest`) builds the installer and
+portable exe and publishes them to a GitHub Release:
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
+
 ## Demo mode
 
 No Jira instance handy? Create a profile with **Jira base URL `demo`** (any

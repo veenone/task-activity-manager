@@ -9,5 +9,12 @@
   "author": {
     "name": "Achmad Fienan Rahardianto",
     "email": "veenone@gmail.com"
+  },
+  "info": {
+    "companyName": "Achmad Fienan Rahardianto",
+    "productName": "Xray Test Manager",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 Achmad Fienan Rahardianto",
+    "comments": "Manage Xray test cases in Jira Data Center at scale"
   }
 }
