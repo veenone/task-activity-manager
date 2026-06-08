@@ -41,6 +41,7 @@ import { TestDetail } from "./components/TestDetail";
 import { FolderTree } from "./components/FolderTree";
 import { ContainerList } from "./components/ContainerList";
 import { PendingChangesModal } from "./components/PendingChangesModal";
+import { BulkReviewModal } from "./components/BulkReviewModal";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
 import { BulkAllocateModal } from "./components/BulkAllocateModal";
@@ -107,6 +108,7 @@ function App() {
   const [showBulkAllocate, setShowBulkAllocate] = useState(false);
   const [showBulkMove, setShowBulkMove] = useState(false);
   const [showBulkPreconditions, setShowBulkPreconditions] = useState(false);
+  const [showBulkReview, setShowBulkReview] = useState(false);
 
   const [view, setView] = useState<"browse" | "dashboard" | "plans">("browse");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -795,6 +797,12 @@ function App() {
           >
             Preconditions…
           </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowBulkReview(true)}
+          >
+            Review…
+          </button>
           <button className="btn" onClick={() => setSelectedSet(new Set())}>
             Clear
           </button>
@@ -1049,6 +1057,21 @@ function App() {
             reloadPending();
             setShowBulkPreconditions(false);
           }}
+        />
+      )}
+
+      {showBulkReview && (
+        <BulkReviewModal
+          profileId={activeId}
+          testKeys={[...selectedSet]}
+          onComplete={() => {
+            setRefreshKey((k) => k + 1);
+            setDetailVersion((v) => v + 1);
+            reloadPending();
+            setSelectedSet(new Set());
+            setShowBulkReview(false);
+          }}
+          onCancel={() => setShowBulkReview(false)}
         />
       )}
     </div>

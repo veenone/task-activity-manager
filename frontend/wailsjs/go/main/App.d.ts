@@ -17,6 +17,8 @@ export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkE
 
 export function BulkMoveToFolder(arg1:string,arg2:Array<string>,arg3:string):Promise<testrepo.BulkEditResult>;
 
+export function BulkReviewTests(arg1:string,arg2:Array<string>,arg3:string,arg4:string,arg5:string):Promise<testrepo.BulkEditResult>;
+
 export function BulkTransitionTests(arg1:string,arg2:Array<string>,arg3:string):Promise<main.BulkTransitionResult>;
 
 export function CommitPendingChanges(arg1:string):Promise<syncer.CommitResult>;

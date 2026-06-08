@@ -1258,6 +1258,15 @@ func (a *App) SetTestReview(profileID, testKey, verdict, reviewer, note string) 
 	return a.repo.SetTestReview(profileID, testKey, verdict, reviewer, note)
 }
 
+// BulkReviewTests applies one review verdict to many Tests at once.
+func (a *App) BulkReviewTests(profileID string, testKeys []string, verdict, reviewer, note string) (testrepo.BulkEditResult, error) {
+	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkSetReview(profileID, testKeys, verdict, reviewer, note)
+}
+
 // --- Import (FR-10) ---
 
 // PreviewImport parses an import file's header row and counts its data rows so

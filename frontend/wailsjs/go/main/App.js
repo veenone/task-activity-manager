@@ -22,6 +22,10 @@ export function BulkMoveToFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkMoveToFolder'](arg1, arg2, arg3);
 }
 
+export function BulkReviewTests(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['BulkReviewTests'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function BulkTransitionTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkTransitionTests'](arg1, arg2, arg3);
 }

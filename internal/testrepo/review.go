@@ -107,3 +107,20 @@ func (r *Repository) SetTestReview(profileID, testKey, verdict, reviewer, note s
 	}
 	return tx.Commit()
 }
+
+// BulkSetReview applies one review verdict to a batch of Tests (bulk sign-off),
+// reporting per-Test success/failure.
+func (r *Repository) BulkSetReview(profileID string, testKeys []string, verdict, reviewer, note string) (BulkEditResult, error) {
+	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
+	if !validVerdicts[verdict] {
+		return result, fmt.Errorf("unknown review verdict %q", verdict)
+	}
+	for _, key := range testKeys {
+		if err := r.SetTestReview(profileID, key, verdict, reviewer, note); err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
+	}
+	return result, nil
+}
