@@ -292,6 +292,8 @@ function describeChange(c: PendingChange): {
         before: stepActionLike(c.beforeVal, "verdict"),
         after: stepActionLike(c.afterVal, "verdict"),
       };
+    case "issue_comment":
+      return { field: "comment", before: "", after: c.afterVal };
     case "folder_create":
       return { field: "new folder", before: "", after: c.entityKey };
     case "folder_rename":

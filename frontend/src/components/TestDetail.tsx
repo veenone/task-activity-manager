@@ -15,6 +15,7 @@ import {
   GetTestCustomFields,
   EditTestCustomField,
   TransitionTest,
+  AddTestComment,
   EditTestField,
   EditTestStepField,
   DeleteTestStep,
@@ -332,6 +333,13 @@ export function TestDetail({
     try {
       await TransitionTest(profileId, testKey, targetStatus);
       setTest({ ...test, status: targetStatus });
+      // FR-4.4: optionally capture a comment for this transition.
+      const comment = window.prompt(
+        `Optional comment for moving to "${targetStatus}" (leave blank to skip):`,
+      );
+      if (comment && comment.trim()) {
+        await AddTestComment(profileId, testKey, comment.trim());
+      }
       try {
         const ts = await GetTestTransitions(profileId, testKey);
         setTransitions(ts ?? []);

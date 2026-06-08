@@ -93,6 +93,8 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 	testCreateRows := make([]testrepo.PendingChange, 0)
 	// Test reviews commit as a Jira comment on the Test, keyed by Test key.
 	reviewRows := make([]testrepo.PendingChange, 0)
+	// Free-text comments (FR-4.4) also post as Jira comments.
+	commentRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -116,6 +118,10 @@ func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "test_review" {
 			reviewRows = append(reviewRows, c)
+			continue
+		}
+		if c.EntityType == "issue_comment" {
+			commentRows = append(commentRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -417,8 +423,24 @@ testLoop:
 	e.commitFolders(ctx, profileID, projectKey, folderRows, &result)
 	e.commitTestCreates(ctx, profileID, projectKey, testCreateRows, &result)
 	e.commitReviews(ctx, profileID, reviewRows, &result)
+	e.commitComments(ctx, profileID, commentRows, &result)
 
 	return result, nil
+}
+
+// commitComments posts each queued free-text comment on its Test (FR-4.4).
+func (e *Engine) commitComments(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
+	for _, c := range rows {
+		if err := e.client.AddComment(ctx, c.EntityKey, c.AfterVal); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "post comment: " + sanitizeError(err.Error())})
+			continue
+		}
+		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "Jira accepted the comment but local cleanup failed: " + err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, c.EntityKey)
+	}
 }
 
 // commitReviews posts each Test review as a comment on its Test (test review).

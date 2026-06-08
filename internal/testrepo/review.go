@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -102,6 +103,37 @@ func (r *Repository) SetTestReview(profileID, testKey, verdict, reviewer, note s
 	}
 	if err := writeAudit(
 		tx, profileID, entityTestReview, testKey, "review-local", "review", before.Verdict, after.Verdict, note,
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// AddTestComment queues a free-text comment to post on a Test issue (FR-4.4 —
+// e.g. the reason for a workflow transition). Each comment is a distinct
+// pending row (keyed by time, so repeated comments don't coalesce) committed
+// via the Jira comment API.
+func (r *Repository) AddTestComment(profileID, testKey, body string) error {
+	if strings.TrimSpace(body) == "" {
+		return fmt.Errorf("a comment is required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`INSERT INTO pending_change
+		   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
+		 VALUES (?, ?, ?, ?, '', ?, '', ?)`,
+		profileID, entityIssueComment, testKey, "comment:"+now, body, now,
+	); err != nil {
+		return fmt.Errorf("queue comment: %w", err)
+	}
+	if err := writeAudit(
+		tx, profileID, entityIssueComment, testKey, "comment-local", "comment", "", body, "",
 	); err != nil {
 		return err
 	}

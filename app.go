@@ -1258,6 +1258,15 @@ func (a *App) SetTestReview(profileID, testKey, verdict, reviewer, note string) 
 	return a.repo.SetTestReview(profileID, testKey, verdict, reviewer, note)
 }
 
+// AddTestComment queues a free-text comment to post on a Test (FR-4.4), e.g.
+// the reason for a workflow transition.
+func (a *App) AddTestComment(profileID, testKey, body string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.AddTestComment(profileID, testKey, body)
+}
+
 // BulkReviewTests applies one review verdict to many Tests at once.
 func (a *App) BulkReviewTests(profileID string, testKeys []string, verdict, reviewer, note string) (testrepo.BulkEditResult, error) {
 	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}

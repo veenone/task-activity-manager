@@ -2859,6 +2859,9 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		); err != nil {
 			return fmt.Errorf("revert custom field: %w", err)
 		}
+	case entityIssueComment:
+		// A queued comment has no local cache state — discarding it just drops
+		// the pending row (handled after the switch).
 	case entityTestReview:
 		// Restore the prior review from the before snapshot (empty verdict
 		// means there was no review, so the row is removed).
@@ -3491,6 +3494,7 @@ const (
 	entityFolderDelete     = "folder_delete"
 	entityTestCreate       = "test_create"
 	entityTestReview       = "test_review"
+	entityIssueComment     = "issue_comment"
 )
 
 // preconditionFields whitelists which Precondition columns can be edited via

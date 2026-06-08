@@ -36,6 +36,34 @@ func TestSetTestReviewRecordsVerdictAndQueues(t *testing.T) {
 	}
 }
 
+func TestAddTestCommentQueuesDistinctRows(t *testing.T) {
+	repo := seedReviewRepo(t)
+
+	if err := repo.AddTestComment("p1", "QA-1", "Transitioned to In Review"); err != nil {
+		t.Fatalf("comment 1: %v", err)
+	}
+	if err := repo.AddTestComment("p1", "QA-1", "Second comment"); err != nil {
+		t.Fatalf("comment 2: %v", err)
+	}
+
+	changes, _ := repo.ListPendingChanges("p1")
+	if len(changes) != 2 {
+		t.Fatalf("want 2 distinct comment rows (no coalescing), got %d", len(changes))
+	}
+	for _, c := range changes {
+		if c.EntityType != "issue_comment" || c.EntityKey != "QA-1" {
+			t.Errorf("change = %+v, want issue_comment on QA-1", c)
+		}
+	}
+}
+
+func TestAddTestCommentRejectsEmpty(t *testing.T) {
+	repo := seedReviewRepo(t)
+	if err := repo.AddTestComment("p1", "QA-1", "   "); err == nil {
+		t.Error("empty comment should error")
+	}
+}
+
 func TestSetTestReviewRejectsUnknownVerdict(t *testing.T) {
 	repo := seedReviewRepo(t)
 	if err := repo.SetTestReview("p1", "QA-1", "maybe", "", ""); err == nil {

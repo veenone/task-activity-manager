@@ -65,6 +65,7 @@ export {
   BulkEditTests,
   GetTestTransitions,
   TransitionTest,
+  AddTestComment,
   GetBulkTransitionOptions,
   BulkTransitionTests,
   GetTestSteps,
