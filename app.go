@@ -605,6 +605,24 @@ func (a *App) DiscardPendingChange(profileID string, changeID int64) error {
 	return a.repo.DiscardPendingChange(profileID, changeID)
 }
 
+// ResolveConflictOverride re-bases a Test's pending changes onto the remote
+// version so the next commit overrides the remote change (FR-1.4).
+func (a *App) ResolveConflictOverride(profileID, testKey, remoteVersion string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.RebaseTestConflict(profileID, testKey, remoteVersion)
+}
+
+// ResolveConflictKeepRemote discards a Test's pending changes, keeping the
+// remote version (FR-1.4).
+func (a *App) ResolveConflictKeepRemote(profileID, testKey string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.DiscardTestChanges(profileID, testKey)
+}
+
 // ListPendingChanges returns all uncommitted local edits for a profile.
 func (a *App) ListPendingChanges(profileID string) ([]testrepo.PendingChange, error) {
 	if err := a.requireStore(); err != nil {

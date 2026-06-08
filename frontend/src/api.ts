@@ -57,6 +57,8 @@ export {
   GetTest,
   EditTestField,
   DiscardPendingChange,
+  ResolveConflictOverride,
+  ResolveConflictKeepRemote,
   ListPendingChanges,
   ListAuditEntries,
   CommitPendingChanges,

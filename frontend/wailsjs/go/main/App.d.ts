@@ -129,6 +129,10 @@ export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ReorderTestSteps(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
+export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>;
+
+export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function SeedSampleContainers(arg1:string):Promise<testrepo.SeedResult>;
 
 export function SetDefaultProfile(arg1:string):Promise<void>;

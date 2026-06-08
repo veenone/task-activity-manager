@@ -3216,6 +3216,54 @@ func (r *Repository) CommitPendingChanges(profileID string, ids []int64) error {
 	return tx.Commit()
 }
 
+// RebaseTestConflict re-bases a Test's pending changes onto a newer remote
+// version so a re-commit overrides the remote change instead of being held back
+// as a conflict (FR-1.4). It matches the Test's own rows plus its step /
+// custom-field / review rows, whose entity_key is "<testKey>:...".
+func (r *Repository) RebaseTestConflict(profileID, testKey, baseVersion string) error {
+	if _, err := r.db.Exec(
+		`UPDATE pending_change SET base_version = ?
+		 WHERE profile_id = ? AND (entity_key = ? OR entity_key LIKE ?)`,
+		baseVersion, profileID, testKey, testKey+":%",
+	); err != nil {
+		return fmt.Errorf("rebase conflict for %s: %w", testKey, err)
+	}
+	return nil
+}
+
+// DiscardTestChanges drops every pending change belonging to a Test, reverting
+// the local cache to match the committed/remote state (FR-1.4 conflict
+// resolution — "keep remote"). Step / custom-field / review rows are included.
+func (r *Repository) DiscardTestChanges(profileID, testKey string) error {
+	rows, err := r.db.Query(
+		`SELECT id FROM pending_change
+		 WHERE profile_id = ? AND (entity_key = ? OR entity_key LIKE ?)`,
+		profileID, testKey, testKey+":%",
+	)
+	if err != nil {
+		return fmt.Errorf("list test pending changes: %w", err)
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	_ = rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := r.DiscardPendingChange(profileID, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ListPendingChanges returns all uncommitted local edits for a profile,
 // newest first.
 func (r *Repository) ListPendingChanges(profileID string) ([]PendingChange, error) {

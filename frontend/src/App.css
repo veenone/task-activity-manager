@@ -1831,6 +1831,37 @@ tr.row-selected {
   padding: 0 4px;
   border-radius: 2px;
 }
+.conflict-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.conflict-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-top: 1px solid rgba(146, 64, 14, 0.18);
+}
+.conflict-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.conflict-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.conflict-row-actions .btn {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+:root[data-theme="dark"] .conflict-text {
+  color: #e8d9a0;
+  background: #2c2a1a;
+  border-left-color: #b08328;
+}
 
 /* Bulk-edit toolbar (FR-3) */
 .bulk-toolbar {

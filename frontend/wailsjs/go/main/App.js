@@ -246,6 +246,14 @@ export function ReorderTestSteps(arg1, arg2, arg3) {
   return window['go']['main']['App']['ReorderTestSteps'](arg1, arg2, arg3);
 }
 
+export function ResolveConflictKeepRemote(arg1, arg2) {
+  return window['go']['main']['App']['ResolveConflictKeepRemote'](arg1, arg2);
+}
+
+export function ResolveConflictOverride(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ResolveConflictOverride'](arg1, arg2, arg3);
+}
+
 export function SeedSampleContainers(arg1) {
   return window['go']['main']['App']['SeedSampleContainers'](arg1);
 }

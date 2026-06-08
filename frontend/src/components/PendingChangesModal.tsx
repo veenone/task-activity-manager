@@ -5,6 +5,8 @@ interface Props {
   onDiscard: (id: number) => Promise<void> | void;
   onCommit: () => Promise<void> | void;
   onJumpTo: (testKey: string) => void;
+  onResolveOverride: (testKey: string, remoteVersion: string) => void;
+  onResolveKeepRemote: (testKey: string) => void;
   onClose: () => void;
   committing: boolean;
   lastResult: CommitResult | null;
@@ -15,6 +17,8 @@ export function PendingChangesModal({
   onDiscard,
   onCommit,
   onJumpTo,
+  onResolveOverride,
+  onResolveKeepRemote,
   onClose,
   committing,
   lastResult,
@@ -53,22 +57,47 @@ export function PendingChangesModal({
                     Conflict{lastResult!.conflicted.length === 1 ? "" : "s"} (
                     {lastResult!.conflicted.length})
                   </strong>{" "}
-                  — remote moved since your edit. These stay in pending; sync
-                  to pull the remote change, then re-commit or discard.
+                  — the remote test changed since you started editing. Choose
+                  per test whether your edits win or the remote does.
                 </p>
-                <ul className="commit-fail-list">
+                <ul className="conflict-list">
                   {lastResult!.conflicted.map((c, i) => (
-                    <li key={i}>
-                      <button
-                        className="link-btn mono"
-                        onClick={() => onJumpTo(c.testKey)}
-                      >
-                        {c.testKey}
-                      </button>
-                      : base{" "}
-                      <code className="conflict-ts">{c.baseVersion}</code>{" "}
-                      vs remote{" "}
-                      <code className="conflict-ts">{c.remoteVersion}</code>
+                    <li key={i} className="conflict-row">
+                      <div className="conflict-row-main">
+                        <button
+                          className="link-btn mono"
+                          onClick={() => onJumpTo(c.testKey)}
+                          title="Open this test"
+                        >
+                          {c.testKey}
+                        </button>{" "}
+                        <span className="muted">
+                          yours from{" "}
+                          <code className="conflict-ts">{c.baseVersion}</code> ·
+                          remote now{" "}
+                          <code className="conflict-ts">{c.remoteVersion}</code>
+                        </span>
+                      </div>
+                      <div className="conflict-row-actions">
+                        <button
+                          className="btn"
+                          disabled={committing}
+                          onClick={() =>
+                            onResolveOverride(c.testKey, c.remoteVersion)
+                          }
+                          title="Re-base onto the remote version and push your edits over it"
+                        >
+                          Keep mine
+                        </button>
+                        <button
+                          className="btn"
+                          disabled={committing}
+                          onClick={() => onResolveKeepRemote(c.testKey)}
+                          title="Discard your edits and keep the remote version"
+                        >
+                          Keep remote
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

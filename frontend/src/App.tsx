@@ -17,6 +17,8 @@ import {
   GetSettings,
   SetDefaultProfile,
   SetTheme,
+  ResolveConflictOverride,
+  ResolveConflictKeepRemote,
   ListPendingChanges,
   DiscardPendingChange,
   CommitPendingChanges,
@@ -488,6 +490,45 @@ function App() {
     }
   }
 
+  // resolveConflictOverride re-bases a conflicting Test onto the remote version
+  // (keep mine) and immediately re-commits so the override takes effect.
+  async function resolveConflictOverride(testKey: string, remoteVersion: string) {
+    if (!activeId) return;
+    try {
+      await ResolveConflictOverride(activeId, testKey, remoteVersion);
+    } catch (e) {
+      setLastCommitResult({
+        succeeded: [],
+        conflicted: [],
+        failed: [{ testKey, error: errMsg(e) }],
+      });
+      return;
+    }
+    await handleCommit();
+  }
+
+  // resolveConflictKeepRemote discards a conflicting Test's local edits (keep
+  // remote) and refreshes.
+  async function resolveConflictKeepRemote(testKey: string) {
+    if (!activeId) return;
+    try {
+      await ResolveConflictKeepRemote(activeId, testKey);
+      setLastCommitResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              conflicted: prev.conflicted.filter((c) => c.testKey !== testKey),
+            }
+          : prev,
+      );
+      setRefreshKey((k) => k + 1);
+      setDetailVersion((v) => v + 1);
+      reloadPending();
+    } catch (e) {
+      console.error("keep remote:", errMsg(e));
+    }
+  }
+
   function closePendingModal() {
     setShowPending(false);
     setLastCommitResult(null);
@@ -878,6 +919,8 @@ function App() {
             setSelectedKey(key);
             closePendingModal();
           }}
+          onResolveOverride={resolveConflictOverride}
+          onResolveKeepRemote={resolveConflictKeepRemote}
           onClose={closePendingModal}
           committing={committing}
           lastResult={lastCommitResult}
