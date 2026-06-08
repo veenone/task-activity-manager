@@ -53,6 +53,7 @@ import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { SyncHistoryModal } from "./components/SyncHistoryModal";
 import { ImportTestsModal } from "./components/ImportTestsModal";
 import { Menu } from "./components/Menu";
+import { usePrompt } from "./components/usePrompt";
 
 // applyTheme resolves the preference ("system" follows the OS) and sets the
 // data-theme attribute the CSS tokens key off (FR-12.2).
@@ -71,6 +72,7 @@ function App() {
   const [activeId, setActiveId] = useState<string>("");
   const [defaultProfileId, setDefaultProfileId] = useState<string>("");
   const [theme, setThemeState] = useState<string>("light");
+  const { prompt, promptUI } = usePrompt();
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -255,9 +257,11 @@ function App() {
 
   async function createFolder(parentPath: string) {
     if (!activeId) return;
-    const name = window.prompt(
-      parentPath ? `New subfolder under ${parentPath}:` : "New top-level folder name:",
-    );
+    const name = await prompt({
+      title: parentPath ? `New subfolder under ${parentPath}` : "New top-level folder",
+      placeholder: "Folder name",
+      submitLabel: "Create",
+    });
     if (!name || !name.trim()) return;
     try {
       await CreateFolder(activeId, parentPath, name.trim());
@@ -270,7 +274,11 @@ function App() {
 
   async function renameFolder(path: string, currentName: string) {
     if (!activeId) return;
-    const name = window.prompt(`Rename "${currentName}" to:`, currentName);
+    const name = await prompt({
+      title: `Rename folder "${currentName}"`,
+      defaultValue: currentName,
+      submitLabel: "Rename",
+    });
     if (name === null || !name.trim() || name.trim() === currentName) return;
     try {
       await RenameFolder(activeId, path, name.trim());
@@ -347,10 +355,12 @@ function App() {
   // takes effect on the next sync.
   async function editScope() {
     if (!activeProfile) return;
-    const next = window.prompt(
-      "Scope JQL — narrows which tests sync (blank = all). Applies on next sync.",
-      activeProfile.scopeJql,
-    );
+    const next = await prompt({
+      title: "Scope JQL — narrows which tests sync (blank = all)",
+      defaultValue: activeProfile.scopeJql,
+      placeholder: "e.g. labels = smoke",
+      submitLabel: "Save",
+    });
     if (next === null) return;
     try {
       await UpdateProfileScope(activeId, next.trim());
@@ -409,9 +419,12 @@ function App() {
       setProfiles((prev) => [...prev, p]);
       setActiveId(p.id);
       setSelectedKey(null);
-      const token = window.prompt(
-        `Imported "${p.name}". Enter its Personal Access Token to enable syncing (or cancel to set it later):`,
-      );
+      const token = await prompt({
+        title: `Enter the Personal Access Token for "${p.name}"`,
+        placeholder: "Paste token (or cancel to set it later)",
+        password: true,
+        submitLabel: "Save token",
+      });
       if (token && token.trim()) {
         await UpdateProfileToken(p.id, token.trim());
       }
@@ -424,9 +437,12 @@ function App() {
   // profiles or token rotation.
   async function setToken() {
     if (!activeProfile) return;
-    const token = window.prompt(
-      `Enter a new Personal Access Token for "${activeProfile.name}":`,
-    );
+    const token = await prompt({
+      title: `New Personal Access Token for "${activeProfile.name}"`,
+      placeholder: "Paste token",
+      password: true,
+      submitLabel: "Update token",
+    });
     if (token === null || !token.trim()) return;
     try {
       await UpdateProfileToken(activeId, token.trim());
@@ -1074,6 +1090,8 @@ function App() {
           onCancel={() => setShowBulkReview(false)}
         />
       )}
+
+      {promptUI}
     </div>
   );
 }

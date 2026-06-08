@@ -1898,6 +1898,18 @@ tr.row-checked:hover {
   background: #ffeec0;
 }
 
+/* In-app prompt (replaces window.prompt, unsupported in WebView2) */
+.prompt-modal {
+  width: min(460px, 92vw);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.prompt-modal .bulk-body {
+  padding: 16px;
+}
+
 /* Bulk-edit modal */
 .bulk-modal {
   width: min(560px, 92vw);

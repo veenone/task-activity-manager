@@ -36,6 +36,8 @@ import type {
   Review,
 } from "../api";
 
+import { usePrompt } from "./usePrompt";
+
 const REVIEWER_KEY = "xtm.reviewer";
 
 interface Props {
@@ -59,6 +61,7 @@ export function TestDetail({
   onClose,
   onEdited,
 }: Props) {
+  const { prompt, promptUI } = usePrompt();
   const [test, setTest] = useState<TestCase | null>(null);
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
   const [allPreconditions, setAllPreconditions] = useState<Precondition[]>([]);
@@ -273,7 +276,11 @@ export function TestDetail({
   // and links it to this test. It gets a temporary key until commit creates
   // the issue in Jira.
   async function createAndAssociatePrecondition() {
-    const summary = window.prompt("New precondition summary:");
+    const summary = await prompt({
+      title: "New precondition",
+      placeholder: "Precondition summary",
+      submitLabel: "Create",
+    });
     if (!summary || !summary.trim()) return;
     setSaveError("");
     try {
@@ -334,9 +341,11 @@ export function TestDetail({
       await TransitionTest(profileId, testKey, targetStatus);
       setTest({ ...test, status: targetStatus });
       // FR-4.4: optionally capture a comment for this transition.
-      const comment = window.prompt(
-        `Optional comment for moving to "${targetStatus}" (leave blank to skip):`,
-      );
+      const comment = await prompt({
+        title: `Comment for moving to "${targetStatus}"`,
+        placeholder: "Optional — leave blank to skip",
+        submitLabel: "Save",
+      });
       if (comment && comment.trim()) {
         await AddTestComment(profileId, testKey, comment.trim());
       }
@@ -720,6 +729,7 @@ export function TestDetail({
           </p>
         </div>
       )}
+      {promptUI}
     </aside>
   );
 }

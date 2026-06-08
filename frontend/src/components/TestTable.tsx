@@ -8,6 +8,7 @@ import {
   DeleteSavedView,
   errMsg,
 } from "../api";
+import { usePrompt } from "./usePrompt";
 import type {
   TestPage,
   TestQuery,
@@ -181,6 +182,7 @@ export function TestTable({
 
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [activeView, setActiveView] = useState("");
+  const { prompt, promptUI } = usePrompt();
 
   const [columns, setColumns] = useState<ColState[]>(loadColumns);
   const [showColumns, setShowColumns] = useState(false);
@@ -218,7 +220,11 @@ export function TestTable({
   }, [profileId]);
 
   async function saveView() {
-    const name = window.prompt("Save current filter as:");
+    const name = await prompt({
+      title: "Save current filter as",
+      placeholder: "View name",
+      submitLabel: "Save",
+    });
     if (!name || !name.trim()) return;
     const query = JSON.stringify({ search, status, review, sortBy, desc });
     try {
@@ -637,6 +643,7 @@ export function TestTable({
           </tbody>
         </table>
       </div>
+      {promptUI}
     </div>
   );
 }

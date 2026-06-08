@@ -13,6 +13,7 @@ import {
 import type { Container, TestPlanBoard, Bucket } from "../api";
 import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
+import { usePrompt } from "./usePrompt";
 
 interface Props {
   profileId: string;
@@ -41,6 +42,7 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const { prompt, promptUI } = usePrompt();
 
   // removeTest unassigns a single Test from the selected container (FR-3.4–3.6),
   // queued for commit.
@@ -87,7 +89,11 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
   }
 
   async function newContainer() {
-    const name = window.prompt(`New ${kindLabel} name:`);
+    const name = await prompt({
+      title: `New ${kindLabel}`,
+      placeholder: `${kindLabel} name`,
+      submitLabel: "Create",
+    });
     if (!name || !name.trim()) return;
     setError("");
     try {
@@ -101,7 +107,11 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
   async function renameContainer() {
     if (!selected) return;
     const cur = containers.find((c) => c.key === selected);
-    const name = window.prompt(`Rename ${kindLabel} to:`, cur?.summary ?? "");
+    const name = await prompt({
+      title: `Rename ${kindLabel}`,
+      defaultValue: cur?.summary ?? "",
+      submitLabel: "Rename",
+    });
     if (name === null || !name.trim()) return;
     setError("");
     try {
@@ -393,6 +403,8 @@ export function ContainersView({ profileId, refreshKey, onChanged }: Props) {
           }}
         />
       )}
+
+      {promptUI}
     </div>
   );
 }
