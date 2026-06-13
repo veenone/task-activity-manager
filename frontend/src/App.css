@@ -4034,3 +4034,6 @@ tr.row-checked:hover {
   display: flex;
   gap: 8px;
 }
+.topbar-manage {
+  white-space: nowrap;
+}

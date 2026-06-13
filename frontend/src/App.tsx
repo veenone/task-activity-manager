@@ -12,7 +12,6 @@ import {
   DeleteFolder,
   ListContainers,
   ListComponents,
-  UpdateProfileScope,
   ExportProfile,
   ImportProfile,
   UpdateProfileToken,
