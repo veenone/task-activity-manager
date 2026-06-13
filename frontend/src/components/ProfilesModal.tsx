@@ -59,7 +59,7 @@ export function ProfilesModal({
       >
         <div className="profiles-modal-head">
           <h2>Manage Profiles</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -86,6 +86,9 @@ export function ProfilesModal({
                       defaultProfileId === p.id
                         ? "Default on launch — click to clear"
                         : "Set as default on launch"
+                    }
+                    aria-label={
+                      defaultProfileId === p.id ? "Clear default" : "Set as default"
                     }
                     onClick={(e) => {
                       e.stopPropagation();
@@ -156,7 +159,7 @@ export function ProfilesModal({
                     </button>
                     <button
                       className="btn btn-danger"
-                      onClick={() => onDelete(selected.id)}
+                      onClick={() => void onDelete(selected.id)}
                       title="Delete this profile"
                     >
                       Delete
