@@ -561,26 +561,17 @@ function App() {
     }
   }
 
-  // deleteProfile confirms, then removes a profile (its token + cached data are
-  // purged by the backend). If the active profile is deleted, switches to the
-  // default (if still set) or the first remaining profile. Resolves true when a
-  // delete happened. (FR-5.3)
-  async function deleteProfile(id: string): Promise<boolean> {
-    const target = profiles.find((p) => p.id === id);
-    if (!target) return false;
-    if (
-      !window.confirm(
-        `Delete profile "${target.name}"? This removes its stored token and all ` +
-          `cached test data. This cannot be undone.`,
-      )
-    ) {
-      return false;
-    }
+  // deleteProfile removes a profile (its token + cached data are purged by the
+  // backend). The Manage Profiles modal confirms first. If the active profile is
+  // deleted, switches to the default (if still set) or the first remaining
+  // profile. (FR-5.3)
+  async function deleteProfile(id: string) {
+    if (!profiles.some((p) => p.id === id)) return;
     try {
       await DeleteProfile(id);
     } catch (e) {
       window.alert(`Delete failed: ${errMsg(e)}`);
-      return false;
+      return;
     }
     const remaining = profiles.filter((p) => p.id !== id);
     setProfiles(remaining);
@@ -596,7 +587,6 @@ function App() {
       reloadPending();
     }
     if (remaining.length === 0) setShowProfiles(false);
-    return true;
   }
 
   // handleCreated handles both a newly-created profile and an edited one: it
@@ -898,7 +888,7 @@ function App() {
             ))}
           </select>
           <button
-            className="btn topbar-manage"
+            className="topbar-btn"
             onClick={() => setShowProfiles(true)}
             title="Manage profiles — add, edit, set default, export, delete"
           >

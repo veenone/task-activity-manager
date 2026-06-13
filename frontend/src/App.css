@@ -3956,6 +3956,7 @@ tr.row-checked:hover {
 .modal.profiles-modal {
   width: min(820px, 92vw);
   max-width: 820px;
+  padding: 18px 20px 20px;
 }
 .profiles-modal-head {
   display: flex;
@@ -4029,11 +4030,16 @@ tr.row-checked:hover {
   flex: 1;
   min-width: 0;
 }
+/* The detail pane reuses ProfileForm, which carries its own card padding /
+   background for standalone use; inside the modal the modal already provides
+   the inset, so flatten it to align with the list pane. */
+.profiles-detail .profile-form {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
 .profile-form-extra {
   margin-right: auto;
   display: flex;
   gap: 8px;
-}
-.topbar-manage {
-  white-space: nowrap;
 }

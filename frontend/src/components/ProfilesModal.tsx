@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Profile } from "../api";
 import { ProfileForm } from "./ProfileForm";
+import { useConfirm } from "./useConfirm";
 
 interface Props {
   profiles: Profile[];
@@ -15,8 +16,8 @@ interface Props {
   onImport: () => Promise<Profile | null>;
   // Persist a created/edited profile (replace-or-append + refresh in App).
   onSaved: (p: Profile) => void;
-  // Delete a profile after confirming; resolves true if it was deleted.
-  onDelete: (id: string) => Promise<boolean>;
+  // Delete a profile. The modal asks for confirmation first via useConfirm.
+  onDelete: (id: string) => Promise<void>;
 }
 
 // ProfilesModal is the master-detail profile manager: a list of every profile
@@ -39,6 +40,7 @@ export function ProfilesModal({
     activeId || profiles[0]?.id || "",
   );
   const [creating, setCreating] = useState(false);
+  const { confirm, confirmUI } = useConfirm();
 
   // Keep the selection valid: if the selected profile is deleted (and we're not
   // mid-create), fall back to the active profile, else the first one.
@@ -52,6 +54,7 @@ export function ProfilesModal({
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal profiles-modal"
@@ -159,7 +162,16 @@ export function ProfilesModal({
                     </button>
                     <button
                       className="btn btn-danger"
-                      onClick={() => void onDelete(selected.id)}
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: `Delete profile "${selected.name}"?`,
+                          message:
+                            "This removes its stored token and all cached test data. This cannot be undone.",
+                          confirmLabel: "Delete profile",
+                          danger: true,
+                        });
+                        if (ok) await onDelete(selected.id);
+                      }}
                       title="Delete this profile"
                     >
                       Delete
@@ -174,5 +186,7 @@ export function ProfilesModal({
         </div>
       </div>
     </div>
+    {confirmUI}
+    </>
   );
 }
