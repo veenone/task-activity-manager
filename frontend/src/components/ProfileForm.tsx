@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   CreateProfile,
   CreateProfileReusingToken,
@@ -15,6 +15,9 @@ interface Props {
   profile?: Profile;
   // Existing profiles — drives the "reuse token" option when creating (FR-5).
   profiles?: Profile[];
+  // Optional extra footer controls (e.g. Export / Delete) rendered left of
+  // Cancel / Save. Used by the Manage Profiles modal.
+  extraActions?: ReactNode;
 }
 
 // projectKeyError validates a Jira project key, rejecting trailing slashes,
@@ -63,7 +66,7 @@ function jiraUrlError(url: string): string {
   return "";
 }
 
-export function ProfileForm({ onCreated, onCancel, profile, profiles }: Props) {
+export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActions }: Props) {
   const isEdit = !!profile;
   const others = (profiles ?? []).filter((p) => p.id !== profile?.id);
   const [name, setName] = useState(profile?.name ?? "");
@@ -251,6 +254,7 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles }: Props) {
       {error && <div className="error-text">{error}</div>}
 
       <div className="form-actions form-actions-end">
+        {extraActions && <div className="profile-form-extra">{extraActions}</div>}
         {onCancel && (
           <button className="btn" onClick={onCancel} disabled={saving}>
             Cancel
