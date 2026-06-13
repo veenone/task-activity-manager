@@ -28,6 +28,7 @@ import {
   DiscardAllPendingChanges,
   CommitPendingChanges,
   CommitPendingChangesByIDs,
+  DeleteProfile,
   EventsOn,
   errMsg,
 } from "./api";
@@ -44,6 +45,7 @@ import type {
   ConflictDecision,
 } from "./api";
 import { ProfileForm } from "./components/ProfileForm";
+import { ProfilesModal } from "./components/ProfilesModal";
 import { TestTable } from "./components/TestTable";
 import { TestDetail } from "./components/TestDetail";
 import { NewTestPanel } from "./components/NewTestPanel";
@@ -91,6 +93,7 @@ function App() {
   const { prompt, promptUI } = usePrompt();
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showProfiles, setShowProfiles] = useState(false);
   // When set, the profile modal opens in edit mode for this profile (FR-5).
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
 
@@ -498,42 +501,6 @@ function App() {
     return () => unsubs.forEach((u) => u && u());
   }, []);
 
-  // editScope adjusts the active profile's JQL scope override (FR-5.4). It
-  // takes effect on the next sync.
-  async function editScope() {
-    if (!activeProfile) return;
-    const next = await prompt({
-      title: "Scope JQL — narrows which tests sync (blank = all)",
-      defaultValue: activeProfile.scopeJql,
-      placeholder: "e.g. labels = smoke",
-      submitLabel: "Save",
-    });
-    if (next === null) return;
-    try {
-      await UpdateProfileScope(activeId, next.trim());
-      setProfiles((prev) =>
-        prev.map((p) =>
-          p.id === activeId ? { ...p, scopeJql: next.trim() } : p,
-        ),
-      );
-    } catch (e) {
-      console.error("update scope:", errMsg(e));
-    }
-  }
-
-  // toggleDefault sets the active profile as the launch default, or clears it
-  // if it's already the default (FR-12.2).
-  async function toggleDefault() {
-    if (!activeId) return;
-    const next = defaultProfileId === activeId ? "" : activeId;
-    try {
-      await SetDefaultProfile(next);
-      setDefaultProfileId(next);
-    } catch (e) {
-      console.error("set default profile:", errMsg(e));
-    }
-  }
-
   // chooseTheme applies + persists a colour-theme preference (FR-12.2).
   async function chooseTheme(next: string) {
     setThemeState(next);
@@ -545,12 +512,12 @@ function App() {
     }
   }
 
-  // exportProfile writes the active profile's config (no credential) to a file
-  // the user picks (FR-5.5).
-  async function exportProfile() {
-    if (!activeId) return;
+  // exportProfile writes a profile's config (no credential) to a file the user
+  // picks (FR-5.5).
+  async function exportProfile(id: string) {
+    if (!id) return;
     try {
-      const path = await ExportProfile(activeId);
+      const path = await ExportProfile(id);
       if (path) window.alert(`Profile exported to:\n${path}`);
     } catch (e) {
       window.alert(`Export failed: ${errMsg(e)}`);
@@ -558,11 +525,12 @@ function App() {
   }
 
   // importProfile creates a profile from a chosen config file, then prompts for
-  // its PAT (the credential isn't part of the exported file) (FR-5.5).
-  async function importProfile() {
+  // its PAT (the credential isn't part of the exported file) (FR-5.5). Returns
+  // the created profile, or null if cancelled.
+  async function importProfile(): Promise<Profile | null> {
     try {
       const p = await ImportProfile();
-      if (!p.id) return; // cancelled
+      if (!p.id) return null; // cancelled
       setProfiles((prev) => [...prev, p]);
       setActiveId(p.id);
       setSelectedKey(null);
@@ -575,28 +543,61 @@ function App() {
       if (token && token.trim()) {
         await UpdateProfileToken(p.id, token.trim());
       }
+      return p;
     } catch (e) {
       window.alert(`Import failed: ${errMsg(e)}`);
+      return null;
     }
   }
 
-  // setToken updates the active profile's stored PAT (FR-5.5) — for imported
-  // profiles or token rotation.
-  async function setToken() {
-    if (!activeProfile) return;
-    const token = await prompt({
-      title: `New Personal Access Token for "${activeProfile.name}"`,
-      placeholder: "Paste token",
-      password: true,
-      submitLabel: "Update token",
-    });
-    if (token === null || !token.trim()) return;
+  // setDefaultFor toggles the launch-default for a specific profile (clears it
+  // if it's already the default), used by the Manage Profiles modal.
+  async function setDefaultFor(id: string) {
+    const next = defaultProfileId === id ? "" : id;
     try {
-      await UpdateProfileToken(activeId, token.trim());
-      window.alert("Token updated.");
+      await SetDefaultProfile(next);
+      setDefaultProfileId(next);
     } catch (e) {
-      window.alert(`Token update failed: ${errMsg(e)}`);
+      console.error("set default profile:", errMsg(e));
     }
+  }
+
+  // deleteProfile confirms, then removes a profile (its token + cached data are
+  // purged by the backend). If the active profile is deleted, switches to the
+  // default (if still set) or the first remaining profile. Resolves true when a
+  // delete happened. (FR-5.3)
+  async function deleteProfile(id: string): Promise<boolean> {
+    const target = profiles.find((p) => p.id === id);
+    if (!target) return false;
+    if (
+      !window.confirm(
+        `Delete profile "${target.name}"? This removes its stored token and all ` +
+          `cached test data. This cannot be undone.`,
+      )
+    ) {
+      return false;
+    }
+    try {
+      await DeleteProfile(id);
+    } catch (e) {
+      window.alert(`Delete failed: ${errMsg(e)}`);
+      return false;
+    }
+    const remaining = profiles.filter((p) => p.id !== id);
+    setProfiles(remaining);
+    if (defaultProfileId === id) setDefaultProfileId("");
+    if (activeId === id) {
+      const next =
+        defaultProfileId && defaultProfileId !== id
+          ? defaultProfileId
+          : remaining[0]?.id ?? "";
+      setActiveId(next);
+      setSelectedKey(null);
+      setRefreshKey((k) => k + 1);
+      reloadPending();
+    }
+    if (remaining.length === 0) setShowProfiles(false);
+    return true;
   }
 
   // handleCreated handles both a newly-created profile and an edited one: it
@@ -616,14 +617,6 @@ function App() {
     setRefreshKey((k) => k + 1);
     setDetailVersion((v) => v + 1);
     reloadPending();
-  }
-
-  // editActiveProfile opens the profile modal in edit mode for the active
-  // profile — e.g. to correct a wrong project key (FR-5).
-  function editActiveProfile() {
-    if (!activeProfile) return;
-    setEditingProfile(activeProfile);
-    setShowForm(true);
   }
 
   // Called by TestDetail after a successful inline edit. Refreshes the
@@ -905,60 +898,13 @@ function App() {
               </option>
             ))}
           </select>
-          <Menu
-            label="Profile"
-            title="Profile actions"
-            items={[
-              {
-                key: "default",
-                label:
-                  defaultProfileId === activeId
-                    ? "Default on launch"
-                    : "Set as default",
-                checked: defaultProfileId === activeId,
-                onClick: toggleDefault,
-                title: "Auto-select this profile when the app starts",
-              },
-              {
-                key: "edit",
-                label: "Edit profile…",
-                onClick: editActiveProfile,
-                title: "Edit name, Jira URL, project key, or scope",
-              },
-              {
-                key: "scope",
-                label: activeProfile?.scopeJql ? "Edit scope ●" : "Set scope…",
-                onClick: editScope,
-                title: activeProfile?.scopeJql
-                  ? `Scope: ${activeProfile.scopeJql}`
-                  : "Narrow which tests sync with a JQL scope",
-              },
-              {
-                key: "token",
-                label: "Set token…",
-                onClick: setToken,
-                title: "Set or rotate the active profile's token",
-              },
-              { key: "d1", divider: true },
-              {
-                key: "export",
-                label: "Export profile…",
-                onClick: exportProfile,
-                title: "Export the active profile (without its token)",
-              },
-              {
-                key: "import",
-                label: "Import profile…",
-                onClick: importProfile,
-              },
-              { key: "d2", divider: true },
-              {
-                key: "new",
-                label: "New profile…",
-                onClick: () => setShowForm(true),
-              },
-            ]}
-          />
+          <button
+            className="btn topbar-manage"
+            onClick={() => setShowProfiles(true)}
+            title="Manage profiles — add, edit, set default, export, delete"
+          >
+            ⚙ Manage
+          </button>
         </div>
 
         <nav className="view-tabs topbar-zone topbar-center">
@@ -1350,6 +1296,20 @@ function App() {
             />
           </div>
         </div>
+      )}
+
+      {showProfiles && (
+        <ProfilesModal
+          profiles={profiles}
+          activeId={activeId}
+          defaultProfileId={defaultProfileId}
+          onClose={() => setShowProfiles(false)}
+          onSetDefault={setDefaultFor}
+          onExport={exportProfile}
+          onImport={importProfile}
+          onSaved={handleCreated}
+          onDelete={deleteProfile}
+        />
       )}
 
       {showPending && (
