@@ -6,17 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version is single-sourced in `wails.json` (`info.productVersion`).
 
-## [1.3.1] - 2026-06-12
+## [1.4.0] - 2026-06-14
+
+### Added
+- **Commit conflict management.** When a Test changed in Jira since you started
+  editing it, commit now does a three-way merge: non-overlapping edits merge
+  automatically and only genuinely overlapping fields stop you, resolved per
+  field (keep mine / keep theirs) in a Base / Theirs / Mine table in the
+  pending-changes dialog. Covers test fields, step content, step reorder/delete,
+  and custom fields; a remotely deleted Test can be recreated as a new local
+  Test. (RND_P_4TFINT_05-198)
+- **macOS support.** Builds and runs on macOS as a universal `.app` (Apple
+  Silicon + Intel) alongside Windows. The PAT is stored in the macOS Keychain
+  (Windows Credential Manager on Windows). CI builds and publishes the `.app`
+  on each release, with optional code-signing + notarization.
+  (RND_P_4TFINT_05-199)
+- **Manage Profiles modal.** A master-detail Manage Profiles dialog (with delete
+  profile) in the top bar replaces the profile dropdown.
 
 ### Fixed
-- **Create / Edit Profile** — the Project Key field now accepts underscores, so
-  Jira Data Center keys like `RND_P_4TFINT_05` / `RND_I_XXXXX_XX` validate
-  correctly. Previously the client-side check allowed only letters and digits and
-  rejected valid keys. (RND_P_4TFINT_05-197)
-- **Create / Edit Profile** — the Jira base URL is now normalized (surrounding
+- **Create / Edit Profile** — the Project Key field accepts underscores, so Jira
+  Data Center keys like `RND_P_4TFINT_05` / `RND_I_XXXXX_XX` validate correctly
+  (previously only letters/digits were allowed). (RND_P_4TFINT_05-197)
+- **Create / Edit Profile** — the Jira base URL is normalized (surrounding
   whitespace and trailing slashes stripped) and validated as a well-formed
-  http(s) URL (or `demo`), so a pasted URL with a trailing `/` or stray
-  characters no longer slips through.
+  http(s) URL (or `demo`).
+
+### Changed
+- CI runs a build check (Windows + macOS + Go tests) on every pull request, and
+  the release workflow now publishes both Windows and macOS artifacts.
+- Frontend toolchain bumped (TypeScript 6, Vite) and GitHub Actions pin updates.
 
 ## [1.3.0] - 2026-06-12
 
@@ -93,7 +112,7 @@ with on-commit sync, bulk operations, Test Sets/Plans/Executions, Test
 Repository folders, preconditions, CSV/XLSX import & export, pytest scaffold,
 statistics dashboard, diagnostics, light/dark themes, profile management).
 
-[1.3.1]: https://github.com/veenone/xray-testcase-manager/releases/tag/v1.3.1
+[1.4.0]: https://github.com/veenone/xray-testcase-manager/releases/tag/v1.4.0
 [1.3.0]: https://github.com/veenone/xray-testcase-manager/releases/tag/v1.3.0
 [1.2.1]: https://github.com/veenone/xray-testcase-manager/releases/tag/v1.2.1
 [1.2.0]: https://github.com/veenone/xray-testcase-manager/releases/tag/v1.2.0
