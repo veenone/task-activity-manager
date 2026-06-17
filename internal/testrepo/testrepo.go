@@ -3340,6 +3340,21 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		); err != nil {
 			return fmt.Errorf("remove imported test steps: %w", err)
 		}
+	case entityBugCreate:
+		// entity_key is the temporary bug key; discarding removes the
+		// not-yet-created bug and its Test link.
+		if _, err := tx.Exec(
+			`DELETE FROM bug WHERE profile_id = ? AND jira_key = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("remove local bug: %w", err)
+		}
+		if _, err := tx.Exec(
+			`DELETE FROM test_bug WHERE profile_id = ? AND bug_key = ?`,
+			profileID, entityKey,
+		); err != nil {
+			return fmt.Errorf("remove local bug link: %w", err)
+		}
 	case entityFolderCreate:
 		// entity_key is the new folder path; discarding removes the
 		// locally-created (empty) folder.
@@ -3998,6 +4013,7 @@ const (
 	entityRequirementSet     = "requirement_set"
 	entityRequirementEdit    = "requirement_edit"
 	entityRequirementDelete  = "requirement_delete"
+	entityBugCreate          = "bug_create"
 )
 
 // preconditionFields whitelists which Precondition columns can be edited via
