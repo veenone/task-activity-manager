@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 19
+const schemaVersion = 20
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -245,6 +245,29 @@ CREATE TABLE IF NOT EXISTS duplicate_step_scan (
 	scanned_at  TEXT NOT NULL,
 	PRIMARY KEY (profile_id, test_key)
 );
+
+-- Defect issues (possibly cross-project) linked to Tests. Discovered via
+-- issuelinks on sync; also created local-first via CreateBugForTest.
+CREATE TABLE IF NOT EXISTS bug (
+	profile_id  TEXT NOT NULL,
+	jira_key    TEXT NOT NULL,
+	project_key TEXT NOT NULL DEFAULT '',
+	issue_type  TEXT NOT NULL DEFAULT '',
+	summary     TEXT NOT NULL DEFAULT '',
+	status      TEXT NOT NULL DEFAULT '',
+	priority    TEXT NOT NULL DEFAULT '',
+	updated_at  TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, jira_key)
+);
+
+-- Test <-> Bug links. link_id is Jira's issueLink id.
+CREATE TABLE IF NOT EXISTS test_bug (
+	profile_id TEXT NOT NULL,
+	test_key   TEXT NOT NULL,
+	bug_key    TEXT NOT NULL,
+	link_id    TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, test_key, bug_key)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -266,6 +289,8 @@ CREATE INDEX IF NOT EXISTS idx_test_container_test_key ON test_container_test(pr
 CREATE INDEX IF NOT EXISTS idx_sync_log_profile_time   ON sync_log(profile_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_duplicate_ignore_profile   ON duplicate_ignore(profile_id);
 CREATE INDEX IF NOT EXISTS idx_duplicate_step_scan_profile ON duplicate_step_scan(profile_id);
+CREATE INDEX IF NOT EXISTS idx_test_bug_test ON test_bug(profile_id, test_key);
+CREATE INDEX IF NOT EXISTS idx_test_bug_bug  ON test_bug(profile_id, bug_key);
 `
 
 // Store wraps the SQLite connection for one local database file.
