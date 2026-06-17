@@ -46,6 +46,9 @@ func TestCreateBugForTestQueuesAndDiscardRestores(t *testing.T) {
 	if bugs, _ := repo.GetTestBugs("p1", "QA-1"); len(bugs) != 0 {
 		t.Errorf("after discard GetTestBugs = %+v, want none", bugs)
 	}
+	if bugsWithTests, _ := repo.ListBugsWithTests("p1"); len(bugsWithTests) != 0 {
+		t.Errorf("after discard ListBugsWithTests = %+v, want none (placeholder bug row not removed)", bugsWithTests)
+	}
 }
 
 func TestRenameBugRepointsCacheAndLinks(t *testing.T) {

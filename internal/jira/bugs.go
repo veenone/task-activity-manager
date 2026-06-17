@@ -51,6 +51,9 @@ func (c *Client) ListBugs(ctx context.Context, testProjectKey string, testKeys [
 // Maps to POST /rest/api/2/issue with fields {project, issuetype:{name:"Bug"},
 // summary, description, priority, labels}. NOTE(xtm): verify the project's Bug
 // issuetype + required fields on a live instance.
+// NOTE(xtm): creation is hardcoded to issuetype "Bug"; projects that use
+// "Defect" instead (as discovered by ListBugs) will need live issue-type
+// resolution before this path is enabled.
 func (c *Client) CreateBug(ctx context.Context, projectKey, summary, description, priority string, labels []string) (string, error) {
 	_ = ctx
 	if isDemoURL(c.baseURL) {

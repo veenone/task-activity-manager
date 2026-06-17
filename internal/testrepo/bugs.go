@@ -67,7 +67,7 @@ func (r *Repository) ReplaceAllBugs(profileID string, bugs []Bug) error {
 	}
 	for _, b := range bugs {
 		if _, err := tx.Exec(
-			`INSERT INTO bug (profile_id, jira_key, project_key, issue_type, summary, status, priority, updated_at)
+			`INSERT OR REPLACE INTO bug (profile_id, jira_key, project_key, issue_type, summary, status, priority, updated_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			profileID, b.Key, b.ProjectKey, b.IssueType, b.Summary, b.Status, b.Priority, b.Updated,
 		); err != nil {
