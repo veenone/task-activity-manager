@@ -123,6 +123,9 @@ export {
   ScanDuplicateGroupSteps,
   ExcludeFromDuplicates,
   UnexcludeFromDuplicates,
+  CreateBugForTest,
+  ListBugsWithTests,
+  GetTestBugs,
 } from "../wailsjs/go/main/App";
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
@@ -679,6 +682,27 @@ export interface SankeyLink {
 export interface Sankey {
   nodes: SankeyNode[];
   links: SankeyLink[];
+}
+
+// BugWithTests mirrors testrepo.BugWithTests — a bug plus the Test keys it
+// affects, for the Bugs panel.
+export interface BugWithTests {
+  key: string;
+  projectKey: string;
+  summary: string;
+  status: string;
+  priority: string;
+  testKeys: string[];
+}
+
+// TestBug mirrors testrepo.TestBug — a bug linked to one Test, for the
+// test-detail section.
+export interface TestBug {
+  key: string;
+  projectKey: string;
+  summary: string;
+  status: string;
+  priority: string;
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

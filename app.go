@@ -914,6 +914,46 @@ func (a *App) RemoveRequirementSource(profileID, projectKey string) error {
 	return a.repo.RemoveRequirementSource(profileID, projectKey)
 }
 
+// --- Bug (defect) tracking ---
+
+// profileProjectKey resolves a profile's Jira project key for bindings that
+// need it without exposing the profile record to the caller.
+func (a *App) profileProjectKey(profileID string) string {
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return ""
+	}
+	return p.ProjectKey
+}
+
+// CreateBugForTest queues a new Bug issue linked to a failed Test, committed to
+// Jira on the next sync. Returns the placeholder key.
+func (a *App) CreateBugForTest(profileID, testKey, execKey, summary, description, priority string, labels []string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	return a.repo.CreateBugForTest(profileID, testKey, execKey, testrepo.BugDraft{
+		ProjectKey: a.profileProjectKey(profileID), Summary: summary,
+		Description: description, Priority: priority, Labels: labels,
+	})
+}
+
+// ListBugsWithTests returns every cached bug with the Tests it affects.
+func (a *App) ListBugsWithTests(profileID string) ([]testrepo.BugWithTests, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListBugsWithTests(profileID)
+}
+
+// GetTestBugs returns the bugs linked to a Test (for the detail section).
+func (a *App) GetTestBugs(profileID, testKey string) ([]testrepo.TestBug, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.GetTestBugs(profileID, testKey)
+}
+
 // --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---
 
 // EditTestField applies a local edit to a Test field and queues a pending

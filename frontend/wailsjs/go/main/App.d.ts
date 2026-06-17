@@ -41,6 +41,8 @@ export function CommitPendingChanges(arg1:string):Promise<syncer.CommitResult>;
 
 export function CommitPendingChangesByIDs(arg1:string,arg2:Array<number>):Promise<syncer.CommitResult>;
 
+export function CreateBugForTest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<string>):Promise<string>;
+
 export function CreateContainerAndAllocate(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<testrepo.CreateContainerResult>;
 
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<testrepo.Folder>;
@@ -119,6 +121,8 @@ export function GetSyncState(arg1:string):Promise<testrepo.SyncState>;
 
 export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;
 
+export function GetTestBugs(arg1:string,arg2:string):Promise<Array<testrepo.TestBug>>;
+
 export function GetTestContainers(arg1:string,arg2:string):Promise<Array<testrepo.ContainerMembership>>;
 
 export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.CustomFieldValue>>;
@@ -146,6 +150,8 @@ export function ImportTests(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.I
 export function ListAllPreconditions(arg1:string):Promise<Array<testrepo.Precondition>>;
 
 export function ListAuditEntries(arg1:string,arg2:number):Promise<Array<testrepo.AuditEntry>>;
+
+export function ListBugsWithTests(arg1:string):Promise<Array<testrepo.BugWithTests>>;
 
 export function ListComponents(arg1:string):Promise<Array<testrepo.Bucket>>;
 

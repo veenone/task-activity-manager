@@ -70,6 +70,10 @@ export function CommitPendingChangesByIDs(arg1, arg2) {
   return window['go']['main']['App']['CommitPendingChangesByIDs'](arg1, arg2);
 }
 
+export function CreateBugForTest(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['CreateBugForTest'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function CreateContainerAndAllocate(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateContainerAndAllocate'](arg1, arg2, arg3, arg4);
 }
@@ -226,6 +230,10 @@ export function GetTest(arg1, arg2) {
   return window['go']['main']['App']['GetTest'](arg1, arg2);
 }
 
+export function GetTestBugs(arg1, arg2) {
+  return window['go']['main']['App']['GetTestBugs'](arg1, arg2);
+}
+
 export function GetTestContainers(arg1, arg2) {
   return window['go']['main']['App']['GetTestContainers'](arg1, arg2);
 }
@@ -280,6 +288,10 @@ export function ListAllPreconditions(arg1) {
 
 export function ListAuditEntries(arg1, arg2) {
   return window['go']['main']['App']['ListAuditEntries'](arg1, arg2);
+}
+
+export function ListBugsWithTests(arg1) {
+  return window['go']['main']['App']['ListBugsWithTests'](arg1);
 }
 
 export function ListComponents(arg1) {

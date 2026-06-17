@@ -428,6 +428,52 @@ export namespace testrepo {
 	        this.count = source["count"];
 	    }
 	}
+	export class Bug {
+	    key: string;
+	    projectKey: string;
+	    issueType: string;
+	    summary: string;
+	    status: string;
+	    priority: string;
+	    updated: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Bug(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.projectKey = source["projectKey"];
+	        this.issueType = source["issueType"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.priority = source["priority"];
+	        this.updated = source["updated"];
+	    }
+	}
+	export class BugWithTests {
+	    key: string;
+	    projectKey: string;
+	    summary: string;
+	    status: string;
+	    priority: string;
+	    testKeys: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new BugWithTests(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.projectKey = source["projectKey"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.priority = source["priority"];
+	        this.testKeys = source["testKeys"];
+	    }
+	}
 	export class BulkEdit {
 	    operation: string;
 	    field: string;
@@ -1316,6 +1362,26 @@ export namespace testrepo {
 	        this.profileId = source["profileId"];
 	        this.lastSyncedAt = source["lastSyncedAt"];
 	        this.testCount = source["testCount"];
+	    }
+	}
+	export class TestBug {
+	    key: string;
+	    projectKey: string;
+	    summary: string;
+	    status: string;
+	    priority: string;
+
+	    static createFrom(source: any = {}) {
+	        return new TestBug(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.projectKey = source["projectKey"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.priority = source["priority"];
 	    }
 	}
 	export class TestCallLink {
