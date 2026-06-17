@@ -119,6 +119,11 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL, sinc
 		log.Printf("xtm: requirement sync failed (continuing): %v", err)
 	}
 
+	emitStage(onProgress, "Syncing bugs")
+	if err := e.syncBugs(ctx, profileID, projectKey, onProgress); err != nil {
+		log.Printf("xtm: bug sync failed (continuing): %v", err)
+	}
+
 	emitStage(onProgress, "Syncing custom fields")
 	if err := e.syncCustomFields(ctx, profileID, projectKey); err != nil {
 		return err
@@ -343,6 +348,34 @@ func (e *Engine) syncRequirements(ctx context.Context, profileID, projectKey str
 		}
 	}
 	return e.repo.ReplaceAllRequirementLinks(profileID, repoLinks)
+}
+
+// syncBugs discovers the defect issues linked to the profile's Tests and
+// reconciles the local cache. Best-effort: failures log and continue.
+func (e *Engine) syncBugs(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
+	testKeys, err := e.repo.AllTestKeys(profileID)
+	if err != nil {
+		return err
+	}
+	bugs, links, err := e.client.ListBugs(ctx, projectKey, testKeys, nil)
+	if err != nil {
+		return err
+	}
+	repoBugs := make([]testrepo.Bug, 0, len(bugs))
+	for _, b := range bugs {
+		repoBugs = append(repoBugs, testrepo.Bug{
+			Key: b.Key, ProjectKey: b.ProjectKey, IssueType: b.IssueType,
+			Summary: b.Summary, Status: b.Status, Priority: b.Priority, Updated: b.Updated,
+		})
+	}
+	if err := e.repo.ReplaceAllBugs(profileID, repoBugs); err != nil {
+		return err
+	}
+	repoLinks := make([]testrepo.BugLink, 0, len(links))
+	for _, l := range links {
+		repoLinks = append(repoLinks, testrepo.BugLink{TestKey: l.TestKey, BugKey: l.BugKey, LinkID: l.LinkID})
+	}
+	return e.repo.ReplaceAllBugLinks(profileID, repoLinks)
 }
 
 // syncCustomFields pulls the custom field definitions configured for the

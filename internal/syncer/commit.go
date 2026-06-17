@@ -35,11 +35,11 @@ type CreatedTest struct {
 // resolve — sync to pull in the remote change and either re-commit or
 // discard.
 type Conflict struct {
-	TestKey       string          `json:"testKey"`
-	TestSummary   string          `json:"testSummary"`
-	BaseVersion   string          `json:"baseVersion"`
-	RemoteVersion string          `json:"remoteVersion"`
-	RemoteDeleted bool            `json:"remoteDeleted"`
+	TestKey       string `json:"testKey"`
+	TestSummary   string `json:"testSummary"`
+	BaseVersion   string `json:"baseVersion"`
+	RemoteVersion string `json:"remoteVersion"`
+	RemoteDeleted bool   `json:"remoteDeleted"`
 	// Fields lists the genuinely overlapping edits (three-way) to resolve. Empty
 	// when RemoteDeleted is set.
 	Fields []ConflictField `json:"fields"`
@@ -174,6 +174,8 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 	requirementEditRows := make([]testrepo.PendingChange, 0)
 	// Requirement deletes, keyed by the requirement's own issue key.
 	requirementDeleteRows := make([]testrepo.PendingChange, 0)
+	// Bug creates, keyed by the temporary bug key.
+	bugCreateRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -213,6 +215,10 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "requirement_delete" {
 			requirementDeleteRows = append(requirementDeleteRows, c)
+			continue
+		}
+		if c.EntityType == "bug_create" {
+			bugCreateRows = append(bugCreateRows, c)
 			continue
 		}
 		if c.EntityType == "test_run" {
@@ -599,6 +605,7 @@ testLoop:
 	e.commitRequirements(ctx, profileID, requirementRows, &result)
 	e.commitRequirementEdits(ctx, profileID, requirementEditRows, &result)
 	e.commitRequirementDeletes(ctx, profileID, requirementDeleteRows, &result)
+	e.commitBugCreates(ctx, profileID, bugCreateRows, &result)
 
 	return result, nil
 }
@@ -722,6 +729,46 @@ func (e *Engine) commitRequirementDeletes(ctx context.Context, profileID string,
 			continue
 		}
 		result.Succeeded = append(result.Succeeded, c.EntityKey)
+	}
+}
+
+// commitBugCreates creates each queued Bug issue, repoints the placeholder key
+// to the real one, then links it to its Test. Reported under the test key.
+func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
+	for _, c := range rows {
+		var p struct {
+			ProjectKey  string   `json:"projectKey"`
+			Summary     string   `json:"summary"`
+			Description string   `json:"description"`
+			Priority    string   `json:"priority"`
+			Labels      []string `json:"labels"`
+			TestKey     string   `json:"testKey"`
+		}
+		if err := json.Unmarshal([]byte(c.AfterVal), &p); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed bug payload: " + err.Error()})
+			continue
+		}
+		realKey, err := e.client.CreateBug(ctx, p.ProjectKey, p.Summary, p.Description, p.Priority, p.Labels)
+		if err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: p.TestKey, Error: "create bug: " + sanitizeError(err.Error())})
+			continue
+		}
+		key := c.EntityKey
+		if realKey != "" && realKey != c.EntityKey {
+			if rErr := e.repo.RenameBug(profileID, c.EntityKey, realKey); rErr != nil {
+				_ = rErr // remote create already succeeded; a cache-rename hiccup must not fail the commit
+			}
+			key = realKey
+		}
+		if err := e.client.CreateBugLink(ctx, p.TestKey, key); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: p.TestKey, Error: "link bug: " + sanitizeError(err.Error())})
+			continue
+		}
+		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {
+			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "Jira created the bug but local cleanup failed: " + err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
 	}
 }
 
