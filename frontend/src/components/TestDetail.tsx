@@ -31,6 +31,7 @@ import {
   ReorderTestSteps,
   MoveTestToFolder,
   BrowserOpenURL,
+  GetTestBugs,
   errMsg,
 } from "../api";
 import type {
@@ -47,6 +48,7 @@ import type {
   Review,
   JiraStepInfo,
   TestMeta,
+  TestBug,
 } from "../api";
 
 import { usePrompt } from "./usePrompt";
@@ -102,6 +104,10 @@ export function TestDetail({
     const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
     if (base) BrowserOpenURL(`${base}/browse/${testKey}`);
   }
+  function openBugInJira(bugKey: string) {
+    const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
+    if (base) BrowserOpenURL(`${base}/browse/${bugKey}`);
+  }
 
   // Resizeable panel width (FR-11) — drag the left edge to widen for long
   // descriptions / steps; the width persists across sessions.
@@ -138,6 +144,7 @@ export function TestDetail({
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
   const [allPreconditions, setAllPreconditions] = useState<Precondition[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [bugs, setBugs] = useState<TestBug[]>([]);
   const [allRequirements, setAllRequirements] = useState<RequirementCoverage[]>(
     [],
   );
@@ -184,6 +191,7 @@ export function TestDetail({
     const justCommitted =
       prevKeyRef.current.startsWith("NEW-") && !testKey.startsWith("NEW-");
     prevKeyRef.current = testKey;
+    const skipBugs = testKey.startsWith("NEW-");
     Promise.all([
       GetTest(profileId, testKey),
       GetTestPreconditions(profileId, testKey),
@@ -192,8 +200,9 @@ export function TestDetail({
       GetTestReview(profileId, testKey),
       GetTestRequirements(profileId, testKey),
       ListRequirementsWithCoverage(profileId),
+      skipBugs ? Promise.resolve([]) : GetTestBugs(profileId, testKey),
     ])
-      .then(([t, pre, cons, allPre, rev, reqs, allReqs]) => {
+      .then(([t, pre, cons, allPre, rev, reqs, allReqs, testBugs]) => {
         if (cancelled) return;
         setTest(t);
         setSummary(t.summary);
@@ -206,6 +215,7 @@ export function TestDetail({
         setReview(rev);
         setRequirements(reqs ?? []);
         setAllRequirements(allReqs ?? []);
+        setBugs((testBugs as TestBug[]) ?? []);
         setReviewNote(rev?.note ?? "");
         // Transitions load alongside but can fail without blocking the
         // rest of the detail panel — workflow may not be set up yet, or
@@ -951,6 +961,34 @@ export function TestDetail({
                 label: `${r.key} — ${r.summary}`,
               }))}
           />
+
+          <h4>Bugs</h4>
+          {bugs.length === 0 ? (
+            <p className="muted">No linked bugs.</p>
+          ) : (
+            <ul className="pre-list bug-link-list">
+              {bugs.map((b) => (
+                <li key={b.key}>
+                  {canLinkToJira ? (
+                    <button
+                      className="mono bug-link-key"
+                      onClick={() => openBugInJira(b.key)}
+                      title={`Open ${b.key} in Jira (browser)`}
+                    >
+                      {b.key}
+                    </button>
+                  ) : (
+                    <span className="mono">{b.key}</span>
+                  )}
+                  <span className="muted req-link-project">{b.projectKey}</span>
+                  <span className="req-link-summary">{b.summary}</span>
+                  {b.status && (
+                    <span className="status-pill req-link-status">{b.status}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
 
           <h4>
             Description {isDirty("description") && <DirtyDot />}

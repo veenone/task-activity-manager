@@ -4111,3 +4111,15 @@ tr.row-checked:hover {
   display: flex;
   gap: 8px;
 }
+.bug-link-key {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent, #3884de);
+  cursor: pointer;
+  text-decoration: underline;
+  font: inherit;
+}
+.bug-link-key:hover {
+  color: var(--accent-strong, #2b6cb0);
+}
