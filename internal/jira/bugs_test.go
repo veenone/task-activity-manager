@@ -15,7 +15,7 @@ func TestDemoBugsLinkOnlyToFailedTests(t *testing.T) {
 		t.Fatalf("demoFailedTestNums returned %d, want >= 3", len(failed))
 	}
 
-	_, links := demoBugs("DEMO")
+	_, links := demoBugs("DEMO", nil)
 	for _, l := range links {
 		num, ok := testNumOf(l.TestKey, "DEMO")
 		if !ok {
@@ -28,7 +28,7 @@ func TestDemoBugsLinkOnlyToFailedTests(t *testing.T) {
 }
 
 func TestDemoBugsAreCrossProjectAndVaried(t *testing.T) {
-	bugs, links := demoBugs("DEMO")
+	bugs, links := demoBugs("DEMO", nil)
 	if len(bugs) < 10 {
 		t.Fatalf("demoBugs produced %d bugs, want >= 10", len(bugs))
 	}

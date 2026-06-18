@@ -36,7 +36,7 @@ type BugLink struct {
 func (c *Client) ListBugs(ctx context.Context, testProjectKey string, testKeys []string, issueType string, onProgress func(done, total int)) ([]Bug, []BugLink, error) {
 	_ = ctx
 	if isDemoURL(c.baseURL) {
-		bugs, links := demoBugs(testProjectKey)
+		bugs, links := demoBugs(testProjectKey, testKeys)
 		if onProgress != nil {
 			onProgress(len(bugs), len(bugs))
 		}
@@ -120,12 +120,28 @@ func demoFailedTestNums(limit int) []int {
 
 // demoBugs seeds defect issues across two non-test projects, each linked to a
 // demo Test that is actually marked FAILED, plus a test with two defects and a
-// defect spanning two tests — so the Bugs panel and the test-detail section show
-// realistic, cross-project data.
-func demoBugs(testProjectKey string) ([]Bug, []BugLink) {
+// defect spanning two tests. When scope is non-nil it is the set of in-scope
+// Test keys (the synced/ScopeJQL-narrowed tests); only bugs linked to those
+// Tests are returned. A nil scope means unfiltered (full seed); an empty,
+// non-nil scope means no in-scope tests, so nothing is returned.
+func demoBugs(testProjectKey string, scope []string) ([]Bug, []BugLink) {
 	if testProjectKey == "" {
 		testProjectKey = "DEMO"
 	}
+	var inScope map[string]bool
+	if scope != nil {
+		inScope = make(map[string]bool, len(scope))
+		for _, k := range scope {
+			inScope[k] = true
+		}
+	}
+	testInScope := func(testNum int) bool {
+		if inScope == nil {
+			return true
+		}
+		return inScope[fmt.Sprintf("%s-%d", testProjectKey, testNum)]
+	}
+
 	failed := demoFailedTestNums(10)
 	if len(failed) < 3 {
 		return []Bug{}, []BugLink{}
@@ -157,16 +173,27 @@ func demoBugs(testProjectKey string) ([]Bug, []BugLink) {
 		})
 	}
 
-	// One defect per failed test.
+	// One defect per failed, in-scope test.
 	for _, n := range failed {
-		link(n, addBug(n))
+		if testInScope(n) {
+			link(n, addBug(n))
+		}
 	}
-	// The first failed test carries a second defect (a test with multiple bugs).
-	link(failed[0], addBug(failed[0]))
-	// One defect spans two failed tests (a bug affecting more than one test).
-	spanKey := addBug(failed[1])
-	link(failed[1], spanKey)
-	link(failed[2], spanKey)
+	// The first failed test carries a second defect.
+	if testInScope(failed[0]) {
+		link(failed[0], addBug(failed[0]))
+	}
+	// One defect spans two failed tests; keep links only for in-scope tests, and
+	// only emit the bug if at least one endpoint is in scope.
+	if testInScope(failed[1]) || testInScope(failed[2]) {
+		spanKey := addBug(failed[1])
+		if testInScope(failed[1]) {
+			link(failed[1], spanKey)
+		}
+		if testInScope(failed[2]) {
+			link(failed[2], spanKey)
+		}
+	}
 
 	return bugs, links
 }
