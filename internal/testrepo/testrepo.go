@@ -61,10 +61,12 @@ type Precondition struct {
 // Kind is one of "testset" / "testplan" / "testexec" — the three share a shape
 // and differ only in how they relate to Tests.
 type Container struct {
-	Key     string `json:"key"`
-	Kind    string `json:"kind"`
-	Summary string `json:"summary"`
-	Status  string `json:"status"`
+	Key       string `json:"key"`
+	Kind      string `json:"kind"`
+	Summary   string `json:"summary"`
+	Status    string `json:"status"`
+	ParentKey string `json:"parentKey"`
+	IssueType string `json:"issueType"`
 }
 
 // ContainerLink is one Test's membership in a Container. RunStatus carries the
@@ -1066,19 +1068,21 @@ func (r *Repository) UpsertContainers(profileID string, containers []Container) 
 	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare(
-		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status)
-		 VALUES (?, ?, ?, ?, ?)
+		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status, parent_key, issue_type)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
-		   kind    = excluded.kind,
-		   summary = excluded.summary,
-		   status  = excluded.status`)
+		   kind       = excluded.kind,
+		   summary    = excluded.summary,
+		   status     = excluded.status,
+		   parent_key = excluded.parent_key,
+		   issue_type = excluded.issue_type`)
 	if err != nil {
 		return fmt.Errorf("prepare upsert container: %w", err)
 	}
 	defer stmt.Close()
 
 	for _, c := range containers {
-		if _, err := stmt.Exec(profileID, c.Key, c.Kind, c.Summary, c.Status); err != nil {
+		if _, err := stmt.Exec(profileID, c.Key, c.Kind, c.Summary, c.Status, c.ParentKey, c.IssueType); err != nil {
 			return fmt.Errorf("upsert container %s: %w", c.Key, err)
 		}
 	}
@@ -1420,7 +1424,7 @@ func (r *Repository) SeedSampleContainers(profileID, projectKey string) (SeedRes
 // ordered by key — used by the bulk-allocation picker (FR-3.4–3.6).
 func (r *Repository) ListContainers(profileID, kind string) ([]Container, error) {
 	rows, err := r.db.Query(
-		`SELECT jira_key, kind, summary, status FROM test_container
+		`SELECT jira_key, kind, summary, status, parent_key, issue_type FROM test_container
 		 WHERE profile_id = ? AND kind = ? ORDER BY jira_key`,
 		profileID, kind)
 	if err != nil {
@@ -1431,7 +1435,7 @@ func (r *Repository) ListContainers(profileID, kind string) ([]Container, error)
 	out := []Container{}
 	for rows.Next() {
 		var c Container
-		if err := rows.Scan(&c.Key, &c.Kind, &c.Summary, &c.Status); err != nil {
+		if err := rows.Scan(&c.Key, &c.Kind, &c.Summary, &c.Status, &c.ParentKey, &c.IssueType); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
