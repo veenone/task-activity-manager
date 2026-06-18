@@ -12,6 +12,8 @@ import type { RequirementCoverage, RequirementTest } from "../api";
 import { RequirementSourcesModal } from "./RequirementSourcesModal";
 import { TestDetail } from "./TestDetail";
 import { Pager } from "./Pager";
+import { SortControl } from "./SortControl";
+import { keyCompare, cmpStr, applyDir } from "../sort";
 
 interface Props {
   profileId: string;
@@ -27,6 +29,33 @@ const COVERAGE_LABEL: Record<string, string> = {
   UNCOVERED: "Uncovered",
 };
 
+const COVERAGE_RANK: Record<string, number> = {
+  FAILED: 0,
+  NOTRUN: 1,
+  PASSED: 2,
+  UNCOVERED: 3,
+};
+
+function cmpReq(
+  a: RequirementCoverage,
+  b: RequirementCoverage,
+  field: string,
+): number {
+  switch (field) {
+    case "coverage":
+      return (
+        (COVERAGE_RANK[a.coverage] ?? 9) - (COVERAGE_RANK[b.coverage] ?? 9) ||
+        keyCompare(a.key, b.key)
+      );
+    case "tests":
+      return a.testCount - b.testCount || keyCompare(a.key, b.key);
+    case "status":
+      return cmpStr(a.status, b.status) || keyCompare(a.key, b.key);
+    default:
+      return keyCompare(a.key, b.key);
+  }
+}
+
 // RequirementsView is the requirement coverage / traceability surface: a
 // filterable master list of requirements (each with a derived coverage status,
 // even when the requirement lives in a different project) on the left, and a
@@ -39,6 +68,8 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
   const [tests, setTests] = useState<RequirementTest[]>([]);
   const [filter, setFilter] = useState("");
   const [covFilter, setCovFilter] = useState("");
+  const [sortField, setSortField] = useState("key");
+  const [sortDesc, setSortDesc] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showSources, setShowSources] = useState(false);
@@ -108,21 +139,22 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
 
   const filtered = useMemo(() => {
     const f = filter.trim().toLowerCase();
-    return list.filter(
+    const base = list.filter(
       (r) =>
         (!covFilter || r.coverage === covFilter) &&
         (!f ||
           r.key.toLowerCase().includes(f) ||
           r.summary.toLowerCase().includes(f)),
     );
-  }, [list, filter, covFilter]);
+    return [...base].sort((a, b) => applyDir(cmpReq(a, b, sortField), sortDesc));
+  }, [list, filter, covFilter, sortField, sortDesc]);
 
   // Pagination of the (filtered) requirement list.
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(15);
   useEffect(() => {
     setPage(0);
-  }, [filter, covFilter]);
+  }, [filter, covFilter, sortField, sortDesc]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
   const pageItems = filtered.slice(
@@ -274,6 +306,20 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
             </button>
           ))}
         </div>
+        <SortControl
+          fields={[
+            { value: "key", label: "Key" },
+            { value: "coverage", label: "Coverage" },
+            { value: "tests", label: "Tests" },
+            { value: "status", label: "Status" },
+          ]}
+          field={sortField}
+          desc={sortDesc}
+          onChange={(f, d) => {
+            setSortField(f);
+            setSortDesc(d);
+          }}
+        />
         {loading ? (
           <p className="muted reqs-empty">Loading…</p>
         ) : filtered.length === 0 ? (

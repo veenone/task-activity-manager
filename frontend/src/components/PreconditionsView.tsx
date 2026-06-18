@@ -13,6 +13,8 @@ import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
 import { MarkdownField } from "./MarkdownField";
 import { Pager } from "./Pager";
+import { SortControl } from "./SortControl";
+import { keyCompare, cmpStr, applyDir } from "../sort";
 
 interface Props {
   profileId: string;
@@ -23,6 +25,21 @@ interface Props {
 // Xray Server/DC precondition types. The type drives how Xray interprets the
 // precondition definition; Manual is the default for hand-written steps.
 const PRECOND_TYPES = ["Manual", "Generic", "Cucumber"];
+
+function cmpPre(
+  a: PreconditionUsage,
+  b: PreconditionUsage,
+  field: string,
+): number {
+  switch (field) {
+    case "type":
+      return cmpStr(a.type, b.type) || keyCompare(a.key, b.key);
+    case "usage":
+      return a.testCount - b.testCount || keyCompare(a.key, b.key);
+    default:
+      return keyCompare(a.key, b.key);
+  }
+}
 
 // PreconditionsView is the dedicated management surface for Preconditions
 // (FR-13.4): a searchable master list on the left, and a detail pane on the
@@ -35,6 +52,8 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
   const [selected, setSelected] = useState("");
   const [tests, setTests] = useState<PreconditionTest[]>([]);
   const [filter, setFilter] = useState("");
+  const [sortField, setSortField] = useState("key");
+  const [sortDesc, setSortDesc] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -55,21 +74,23 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (p) =>
-        p.key.toLowerCase().includes(q) ||
-        p.summary.toLowerCase().includes(q) ||
-        p.type.toLowerCase().includes(q),
-    );
-  }, [list, filter]);
+    const base = !q
+      ? list
+      : list.filter(
+          (p) =>
+            p.key.toLowerCase().includes(q) ||
+            p.summary.toLowerCase().includes(q) ||
+            p.type.toLowerCase().includes(q),
+        );
+    return [...base].sort((a, b) => applyDir(cmpPre(a, b, sortField), sortDesc));
+  }, [list, filter, sortField, sortDesc]);
 
   // Pagination of the precondition master list.
   const [listPage, setListPage] = useState(0);
   const [listPageSize, setListPageSize] = useState(15);
   useEffect(() => {
     setListPage(0);
-  }, [filter]);
+  }, [filter, sortField, sortDesc]);
   const listTotalPages = Math.max(1, Math.ceil(filtered.length / listPageSize));
   const listSafePage = Math.min(listPage, listTotalPages - 1);
   const pageList = filtered.slice(
@@ -194,6 +215,19 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
             placeholder="Filter preconditions…"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
+          />
+          <SortControl
+            fields={[
+              { value: "key", label: "Key" },
+              { value: "type", label: "Type" },
+              { value: "usage", label: "Usage" },
+            ]}
+            field={sortField}
+            desc={sortDesc}
+            onChange={(f, d) => {
+              setSortField(f);
+              setSortDesc(d);
+            }}
           />
           <button
             className="btn btn-primary precond-new"

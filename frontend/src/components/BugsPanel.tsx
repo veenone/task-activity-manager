@@ -7,12 +7,27 @@ import {
 } from "../api";
 import type { BugWithTests, BugTest } from "../api";
 import { Pager } from "./Pager";
+import { SortControl } from "./SortControl";
+import { keyCompare, cmpStr, applyDir } from "../sort";
 
 interface Props {
   profileId: string;
   refreshKey: number;
   jiraUrl: string;
   onOpenTest: (testKey: string) => void;
+}
+
+function cmpBug(a: BugWithTests, b: BugWithTests, field: string): number {
+  switch (field) {
+    case "status":
+      return cmpStr(a.status, b.status) || keyCompare(a.key, b.key);
+    case "project":
+      return cmpStr(a.projectKey, b.projectKey) || keyCompare(a.key, b.key);
+    case "priority":
+      return cmpStr(a.priority, b.priority) || keyCompare(a.key, b.key);
+    default:
+      return keyCompare(a.key, b.key);
+  }
 }
 
 // BugsPanel is a master-detail view of the defects linked to the profile's
@@ -28,6 +43,8 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   const [tests, setTests] = useState<BugTest[]>([]);
   const [page, setPage] = useState(0); // 0-based
   const [pageSize, setPageSize] = useState(15);
+  const [sortField, setSortField] = useState("key");
+  const [sortDesc, setSortDesc] = useState(true);
 
   useEffect(() => {
     if (!profileId) return;
@@ -54,20 +71,22 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
 
   const shown = useMemo(() => {
     const f = filter.trim().toLowerCase();
-    if (!f) return bugs;
-    return bugs.filter(
-      (b) =>
-        b.key.toLowerCase().includes(f) ||
-        b.summary.toLowerCase().includes(f) ||
-        b.projectKey.toLowerCase().includes(f) ||
-        b.status.toLowerCase().includes(f),
-    );
-  }, [bugs, filter]);
+    const base = !f
+      ? bugs
+      : bugs.filter(
+          (b) =>
+            b.key.toLowerCase().includes(f) ||
+            b.summary.toLowerCase().includes(f) ||
+            b.projectKey.toLowerCase().includes(f) ||
+            b.status.toLowerCase().includes(f),
+        );
+    return [...base].sort((a, b) => applyDir(cmpBug(a, b, sortField), sortDesc));
+  }, [bugs, filter, sortField, sortDesc]);
 
   // Reset to the first page whenever the data source or the filter changes.
   useEffect(() => {
     setPage(0);
-  }, [profileId, refreshKey, filter]);
+  }, [profileId, refreshKey, filter, sortField, sortDesc]);
 
   // Keep a valid selection: default to the first shown bug, and re-point when
   // the current one is filtered out.
@@ -112,6 +131,20 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
           placeholder="Filter bugs by key, summary, project, status…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
+        />
+        <SortControl
+          fields={[
+            { value: "key", label: "Key" },
+            { value: "status", label: "Status" },
+            { value: "project", label: "Project" },
+            { value: "priority", label: "Priority" },
+          ]}
+          field={sortField}
+          desc={sortDesc}
+          onChange={(f, d) => {
+            setSortField(f);
+            setSortDesc(d);
+          }}
         />
         {shown.length === 0 ? (
           <p className="muted bugs-md-empty">
