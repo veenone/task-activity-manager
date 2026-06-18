@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 22
+const schemaVersion = 23
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -139,6 +139,8 @@ CREATE TABLE IF NOT EXISTS test_container (
 	kind       TEXT NOT NULL,
 	summary    TEXT NOT NULL DEFAULT '',
 	status     TEXT NOT NULL DEFAULT '',
+	parent_key TEXT NOT NULL DEFAULT '',
+	issue_type TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, jira_key)
 );
 
@@ -448,6 +450,19 @@ func applyMigrations(db *sql.DB) error {
 		} {
 			if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 				return fmt.Errorf("v22 add bug project columns: %w", err)
+			}
+		}
+	}
+	// v23: sub-task Test Execution support — parent_key (the parent issue key
+	// for a sub-task execution; empty for standalone) and issue_type (the Jira
+	// issuetype name, informational). Fresh installs get these from the CREATE
+	// above; these ALTERs catch pre-v23 databases.
+	if current < 23 {
+		for _, col := range []string{"parent_key", "issue_type"} {
+			if _, err := db.Exec(
+				fmt.Sprintf(`ALTER TABLE test_container ADD COLUMN %s TEXT NOT NULL DEFAULT ''`, col),
+			); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+				return fmt.Errorf("v23 add %s: %w", col, err)
 			}
 		}
 	}
