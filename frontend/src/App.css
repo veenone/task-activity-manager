@@ -4138,3 +4138,31 @@ tr.row-checked:hover {
 .board-bug {
   padding: 0 4px;
 }
+.containers-mode {
+  display: inline-flex;
+  gap: 0;
+  margin-bottom: 10px;
+  border: 1px solid var(--border, #2a3a4f);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.seg-btn {
+  background: none;
+  border: none;
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--text, inherit);
+  font-size: 13px;
+}
+.seg-btn-active {
+  background: var(--accent-soft, rgba(56, 132, 222, 0.18));
+  font-weight: 600;
+}
+.bugs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bugs-table td {
+  vertical-align: top;
+}

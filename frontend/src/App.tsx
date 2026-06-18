@@ -1138,6 +1138,11 @@ function App() {
             profileId={activeId}
             refreshKey={refreshKey}
             isDemo={isDemo}
+            jiraUrl={activeProfile?.jiraUrl ?? ""}
+            onOpenTest={(k) => {
+              setSelectedKey(k);
+              setView("browse");
+            }}
             onChanged={() => {
               setRefreshKey((k) => k + 1);
               reloadPending();

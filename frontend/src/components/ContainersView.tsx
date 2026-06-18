@@ -17,6 +17,7 @@ import {
 import type { Container, TestPlanBoard, Bucket } from "../api";
 import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
+import { BugsPanel } from "./BugsPanel";
 import { CreateBugModal } from "./CreateBugModal";
 import { usePrompt } from "./usePrompt";
 
@@ -56,6 +57,7 @@ export function ContainersView({
   const [containers, setContainers] = useState<Container[]>([]);
   const [selected, setSelected] = useState("");
   const [bugFor, setBugFor] = useState<{ testKey: string; summary: string } | null>(null);
+  const [mode, setMode] = useState<"containers" | "bugs">("containers");
   const [board, setBoard] = useState<TestPlanBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -314,6 +316,30 @@ export function ContainersView({
 
   return (
     <div className="board">
+      <div className="containers-mode">
+        <button
+          className={`seg-btn${mode === "containers" ? " seg-btn-active" : ""}`}
+          onClick={() => setMode("containers")}
+        >
+          Containers
+        </button>
+        <button
+          className={`seg-btn${mode === "bugs" ? " seg-btn-active" : ""}`}
+          onClick={() => setMode("bugs")}
+        >
+          Bugs
+        </button>
+      </div>
+
+      {mode === "bugs" ? (
+        <BugsPanel
+          profileId={profileId}
+          refreshKey={refreshKey}
+          jiraUrl={jiraUrl ?? ""}
+          onOpenTest={onOpenTest ?? (() => {})}
+        />
+      ) : (
+        <>
       <div className="board-head">
         <label className="board-picker">
           <span>Type</span>
@@ -684,6 +710,8 @@ export function ContainersView({
             </button>
           </span>
         </div>
+      )}
+        </>
       )}
 
       {showAdd && selectedContainer && (

@@ -552,6 +552,8 @@ function describeChange(c: PendingChange): {
         before: "",
         after: stepActionLike(c.afterVal, "summary"),
       };
+    case "bug_create":
+      return { field: "new bug", before: "", after: stepActionLike(c.afterVal, "summary") };
     case "test_review":
       return {
         field: "review",
