@@ -12,6 +12,7 @@ import {
   BulkSetTestRunStatus,
   ExportPytest,
   SyncContainers,
+  BrowserOpenURL,
   errMsg,
 } from "../api";
 import type { Container, TestPlanBoard, Bucket } from "../api";
@@ -58,6 +59,8 @@ export function ContainersView({
   const [kind, setKind] = useState("testplan");
   const [cFilter, setCFilter] = useState("");
   const [cStatus, setCStatus] = useState("");
+  // Execution-type filter (Test Execution kind only): "" = all, "standalone", "subtask".
+  const [cExecType, setCExecType] = useState("");
   const [cSortField, setCSortField] = useState("key");
   const [cSortDesc, setCSortDesc] = useState(false);
   const [rowSortField, setRowSortField] = useState("key");
@@ -126,6 +129,9 @@ export function ContainersView({
     const base = containers.filter(
       (c) =>
         (!cStatus || c.status === cStatus) &&
+        (kind !== "testexec" ||
+          !cExecType ||
+          (cExecType === "subtask" ? !!c.parentKey : !c.parentKey)) &&
         (!f ||
           c.key.toLowerCase().includes(f) ||
           (c.summary ?? "").toLowerCase().includes(f)),
@@ -144,7 +150,7 @@ export function ContainersView({
       }
       return applyDir(cmp, cSortDesc);
     });
-  }, [containers, cFilter, cStatus, cSortField, cSortDesc]);
+  }, [containers, cFilter, cStatus, cExecType, kind, cSortField, cSortDesc]);
 
   useEffect(() => {
     if (viewContainers.length === 0) return;
@@ -253,6 +259,14 @@ export function ContainersView({
     }
   }
 
+  const isDemoUrl = /^(demo$|demo:|mock:)/i.test((jiraUrl ?? "").trim());
+  function openParent(parentKey: string) {
+    const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
+    if (base && !isDemoUrl && !parentKey.startsWith("NEW-")) {
+      BrowserOpenURL(`${base}/browse/${parentKey}`);
+    }
+  }
+
   async function newContainer() {
     const name = await prompt({
       title: `New ${kindLabel}`,
@@ -323,6 +337,7 @@ export function ContainersView({
   useEffect(() => {
     setCFilter("");
     setCStatus("");
+    setCExecType("");
   }, [kind]);
 
   useEffect(() => {
@@ -573,6 +588,18 @@ export function ContainersView({
             </option>
           ))}
         </select>
+        {kind === "testexec" && (
+          <select
+            className="container-status-filter"
+            value={cExecType}
+            onChange={(e) => setCExecType(e.target.value)}
+            title="Filter by execution type"
+          >
+            <option value="">All executions</option>
+            <option value="standalone">Standalone</option>
+            <option value="subtask">Sub-task</option>
+          </select>
+        )}
         <SortControl
           fields={[
             { value: "key", label: "Key" },
@@ -606,6 +633,18 @@ export function ContainersView({
             <span className="mono container-card-key">
               {selectedContainer.key}
             </span>
+            {selectedContainer.parentKey && (
+              <button
+                className="mono container-parent-link"
+                onClick={() => openParent(selectedContainer.parentKey)}
+                title={`Open parent ${selectedContainer.parentKey} in Jira`}
+              >
+                ↳ {selectedContainer.parentKey}
+              </button>
+            )}
+            {selectedContainer.issueType && selectedContainer.parentKey && (
+              <span className="muted">{selectedContainer.issueType}</span>
+            )}
             {selectedContainer.status && (
               <span className="status-pill">{selectedContainer.status}</span>
             )}

@@ -308,6 +308,8 @@ export interface Container {
   kind: string;
   summary: string;
   status: string;
+  parentKey: string;  // parent issue key for a sub-task Test Execution; "" for standalone
+  issueType: string;  // Jira issuetype name (e.g. "Sub Test Execution"); informational
 }
 
 // AllocateResult mirrors testrepo.AllocateResult — the outcome of a bulk

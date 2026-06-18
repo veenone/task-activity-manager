@@ -564,6 +564,8 @@ export namespace testrepo {
 	    kind: string;
 	    summary: string;
 	    status: string;
+	    parentKey: string;
+	    issueType: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Container(source);
@@ -575,6 +577,8 @@ export namespace testrepo {
 	        this.kind = source["kind"];
 	        this.summary = source["summary"];
 	        this.status = source["status"];
+	        this.parentKey = source["parentKey"];
+	        this.issueType = source["issueType"];
 	    }
 	}
 	export class ContainerMembership {
