@@ -4123,3 +4123,18 @@ tr.row-checked:hover {
 .bug-link-key:hover {
   color: var(--accent-strong, #2b6cb0);
 }
+.bug-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.bug-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.board-bug {
+  padding: 0 4px;
+}

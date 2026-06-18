@@ -17,6 +17,7 @@ import {
 import type { Container, TestPlanBoard, Bucket } from "../api";
 import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
+import { CreateBugModal } from "./CreateBugModal";
 import { usePrompt } from "./usePrompt";
 
 interface Props {
@@ -26,6 +27,8 @@ interface Props {
   // Sample-data generation is a demo aid — only offered for demo profiles so a
   // user can't seed fake containers into a real project (FR-5).
   isDemo: boolean;
+  jiraUrl?: string;
+  onOpenTest?: (testKey: string) => void;
 }
 
 const KINDS: Array<{ value: string; label: string }> = [
@@ -46,10 +49,13 @@ export function ContainersView({
   refreshKey,
   onChanged,
   isDemo,
+  jiraUrl,
+  onOpenTest,
 }: Props) {
   const [kind, setKind] = useState("testplan");
   const [containers, setContainers] = useState<Container[]>([]);
   const [selected, setSelected] = useState("");
+  const [bugFor, setBugFor] = useState<{ testKey: string; summary: string } | null>(null);
   const [board, setBoard] = useState<TestPlanBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -607,6 +613,16 @@ export function ContainersView({
                     )}
                   </td>
                   <td className="board-remove-cell">
+                    {kind === "testexec" &&
+                      /^fail/i.test(r.runStatus || "") && (
+                        <button
+                          className="btn btn-ghost board-bug"
+                          title="Create a bug for this failed test"
+                          onClick={() => setBugFor({ testKey: r.testKey, summary: r.summary })}
+                        >
+                          🐞
+                        </button>
+                      )}
                     <button
                       className="btn btn-ghost board-remove"
                       onClick={() => removeTest(r.testKey)}
@@ -678,6 +694,20 @@ export function ContainersView({
           onCancel={() => setShowAdd(false)}
           onDone={() => {
             setShowAdd(false);
+            onChanged();
+          }}
+        />
+      )}
+
+      {bugFor && (
+        <CreateBugModal
+          profileId={profileId}
+          testKey={bugFor.testKey}
+          testSummary={bugFor.summary}
+          execKey={selected}
+          onClose={() => setBugFor(null)}
+          onCreated={() => {
+            setBugFor(null);
             onChanged();
           }}
         />
