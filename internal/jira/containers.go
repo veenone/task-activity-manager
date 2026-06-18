@@ -76,10 +76,6 @@ func (c *Client) ListContainers(ctx context.Context, projectKey string, onProgre
 	}
 	containers := []Container{}
 	all := []kindContainer{}
-	// TODO(xtm): also search the sub-task Test Execution issuetype and set
-	// Container.ParentKey from fields.parent.key + IssueType from the issuetype
-	// name, so sub-task executions sync like standalone ones. Verify the
-	// issuetype name and parent field on a live Xray Server 8.4.0 instance.
 	for _, kind := range []string{KindTestSet, KindTestPlan, KindTestExec} {
 		found, err := c.searchContainers(ctx, projectKey, kind)
 		if err != nil {
@@ -91,6 +87,21 @@ func (c *Client) ListContainers(ctx context.Context, projectKey string, onProgre
 		}
 		log.Printf("xtm: containers %s: %d found for %s", kind, len(found), projectKey)
 	}
+
+	// Sub-task Test Executions are a separate Jira issue type that hangs off a
+	// parent issue. They are still Kind=testexec and use the same testexec
+	// membership endpoint; the extra datum is the parent key. Searched on their
+	// own issue type so a project that lacks it (a 400, handled as "none") can't
+	// affect the standalone Test Execution pass above.
+	subExecs, err := c.searchContainersByIssueType(ctx, projectKey, KindTestExec, subTestExecIssueType)
+	if err != nil {
+		return nil, nil, fmt.Errorf("search sub-task test executions: %w", err)
+	}
+	containers = append(containers, subExecs...)
+	for _, ct := range subExecs {
+		all = append(all, kindContainer{kind: KindTestExec, key: ct.Key})
+	}
+	log.Printf("xtm: containers sub-testexec: %d found for %s", len(subExecs), projectKey)
 
 	// Pull each container's Test memberships. Best-effort per container so a
 	// single inaccessible container can't abort the whole sync.
@@ -114,14 +125,27 @@ func (c *Client) ListContainers(ctx context.Context, projectKey string, onProgre
 	return containers, links, nil
 }
 
-// searchContainers finds every container issue of one kind in a project via JQL,
-// paging until the reported total is reached. Returns key / summary / workflow
-// status for each.
+// subTestExecIssueType is the Jira issue type name for a sub-task Test Execution
+// in Xray Server/DC. JQL matches issue-type names case-insensitively, so this
+// also matches "sub test execution" etc. If an instance renames it, change this.
+const subTestExecIssueType = "Sub Test Execution"
+
+// searchContainers finds every container issue of one kind in a project, mapping
+// the kind to its standard Jira issue type name.
 func (c *Client) searchContainers(ctx context.Context, projectKey, kind string) ([]Container, error) {
 	issueType, err := containerIssueType(kind)
 	if err != nil {
 		return nil, err
 	}
+	return c.searchContainersByIssueType(ctx, projectKey, kind, issueType)
+}
+
+// searchContainersByIssueType finds container issues of an explicit Jira issue
+// type in a project via JQL, paging until the reported total is reached, and
+// tags each with the supplied Kind. It captures the issue-type name and, for
+// sub-task issues, the parent key — so sub-task Test Executions (issue type
+// distinct from "Test Execution", Kind still testexec) carry their parent.
+func (c *Client) searchContainersByIssueType(ctx context.Context, projectKey, kind, issueType string) ([]Container, error) {
 	jql := fmt.Sprintf(`project = "%s" AND issuetype = "%s" ORDER BY key ASC`, projectKey, issueType)
 
 	out := []Container{}
@@ -134,7 +158,7 @@ func (c *Client) searchContainers(ctx context.Context, projectKey, kind string) 
 		q.Set("jql", jql)
 		q.Set("startAt", strconv.Itoa(startAt))
 		q.Set("maxResults", "100")
-		q.Set("fields", "summary,status")
+		q.Set("fields", "summary,status,issuetype,parent")
 
 		var resp struct {
 			Total  int `json:"total"`
@@ -145,14 +169,20 @@ func (c *Client) searchContainers(ctx context.Context, projectKey, kind string) 
 					Status  *struct {
 						Name string `json:"name"`
 					} `json:"status"`
+					IssueType *struct {
+						Name string `json:"name"`
+					} `json:"issuetype"`
+					Parent *struct {
+						Key string `json:"key"`
+					} `json:"parent"`
 				} `json:"fields"`
 			} `json:"issues"`
 		}
 		if err := c.get(ctx, "/rest/api/2/search?"+q.Encode(), &resp); err != nil {
 			var he *HTTPError
 			if errors.As(err, &he) && he.Code == http.StatusBadRequest {
-				// This instance/project has no such container issue type —
-				// treat as none rather than aborting the sync.
+				// This instance/project has no such issue type — treat as none
+				// rather than aborting the sync.
 				log.Printf("xtm: %s search rejected (issue type %q absent?): %v", kind, issueType, err)
 				return out, nil
 			}
@@ -162,6 +192,12 @@ func (c *Client) searchContainers(ctx context.Context, projectKey, kind string) 
 			ct := Container{Key: iss.Key, Kind: kind, Summary: iss.Fields.Summary}
 			if iss.Fields.Status != nil {
 				ct.Status = iss.Fields.Status.Name
+			}
+			if iss.Fields.IssueType != nil {
+				ct.IssueType = iss.Fields.IssueType.Name
+			}
+			if iss.Fields.Parent != nil {
+				ct.ParentKey = iss.Fields.Parent.Key
 			}
 			out = append(out, ct)
 		}
