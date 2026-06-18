@@ -142,22 +142,22 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL, sinc
 // folder (FR-13.1). Membership comes from two sources: any Test keys embedded in
 // SyncRequirements pulls only the requirement coverage data — the per-view
 // partial sync behind the Requirements tab's refresh button (#7).
-func (e *Engine) SyncRequirements(ctx context.Context, profileID, projectKey string) error {
-	return e.syncRequirements(ctx, profileID, projectKey, func(Progress) {})
+func (e *Engine) SyncRequirements(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
+	return e.syncRequirements(ctx, profileID, projectKey, onProgress)
 }
 
 // SyncContainers pulls only the Test Sets / Plans / Executions — the per-view
 // partial sync behind the Containers tab's refresh button (#7).
-func (e *Engine) SyncContainers(ctx context.Context, profileID, projectKey string) error {
-	return e.syncContainers(ctx, profileID, projectKey, func(Progress) {})
+func (e *Engine) SyncContainers(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
+	return e.syncContainers(ctx, profileID, projectKey, onProgress)
 }
 
 // SyncBugs reconciles only the defect issues linked to the profile's tests — the
 // per-view partial sync behind the Bugs panel's refresh button, so refreshing
 // bugs doesn't trigger the preconditions / containers / requirements passes
 // (RND_P_4TFINT_05-214).
-func (e *Engine) SyncBugs(ctx context.Context, profileID, projectKey string) error {
-	return e.syncBugs(ctx, profileID, projectKey, func(Progress) {})
+func (e *Engine) SyncBugs(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
+	return e.syncBugs(ctx, profileID, projectKey, onProgress)
 }
 
 // the tree response (applied on every sync, free), and — on a full sync only —

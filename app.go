@@ -499,9 +499,12 @@ func (a *App) SyncProfile(profileID string) error {
 }
 
 // runPartialSync builds the Jira client + sync engine for a profile and runs a
-// single sub-phase (requirements / containers) — the per-view refresh actions
-// (#7). Unlike a full Sync it doesn't touch the watermark or sync history.
-func (a *App) runPartialSync(profileID string, fn func(*syncer.Engine, string) error) error {
+// single sub-phase (requirements / containers / bugs) — the per-view refresh
+// actions (#7). Unlike a full Sync it doesn't touch the watermark or sync
+// history, but it emits the same "sync:progress" events (an initial stage label,
+// the per-item counts the phase reports, and a terminal Done) so the shared
+// status bar reflects the partial sync just like a full one.
+func (a *App) runPartialSync(profileID, stage string, fn func(*syncer.Engine, string, func(syncer.Progress)) error) error {
 	if err := a.requireStore(); err != nil {
 		return err
 	}
@@ -514,20 +517,29 @@ func (a *App) runPartialSync(profileID string, fn func(*syncer.Engine, string) e
 		return fmt.Errorf("load credentials: %w", err)
 	}
 	engine := syncer.New(jira.NewClient(p.JiraURL, token), a.repo)
-	return fn(engine, p.ProjectKey)
+
+	onProgress := func(pr syncer.Progress) {
+		runtime.EventsEmit(a.ctx, "sync:progress", pr)
+	}
+	// Show the phase label immediately, before the first counted item.
+	onProgress(syncer.Progress{Stage: stage})
+	// Always clear the status bar when the phase ends, success or failure.
+	defer runtime.EventsEmit(a.ctx, "sync:progress", syncer.Progress{Done: true})
+
+	return fn(engine, p.ProjectKey, onProgress)
 }
 
 // SyncRequirements refreshes just the requirement coverage from Jira (#7).
 func (a *App) SyncRequirements(profileID string) error {
-	return a.runPartialSync(profileID, func(e *syncer.Engine, projectKey string) error {
-		return e.SyncRequirements(a.ctx, profileID, projectKey)
+	return a.runPartialSync(profileID, "Syncing requirements", func(e *syncer.Engine, projectKey string, onProgress func(syncer.Progress)) error {
+		return e.SyncRequirements(a.ctx, profileID, projectKey, onProgress)
 	})
 }
 
 // SyncContainers refreshes just the Test Sets / Plans / Executions from Jira (#7).
 func (a *App) SyncContainers(profileID string) error {
-	return a.runPartialSync(profileID, func(e *syncer.Engine, projectKey string) error {
-		return e.SyncContainers(a.ctx, profileID, projectKey)
+	return a.runPartialSync(profileID, "Syncing containers", func(e *syncer.Engine, projectKey string, onProgress func(syncer.Progress)) error {
+		return e.SyncContainers(a.ctx, profileID, projectKey, onProgress)
 	})
 }
 
@@ -535,8 +547,8 @@ func (a *App) SyncContainers(profileID string) error {
 // Jira, so the Bugs panel can refresh without triggering a full profile sync
 // (RND_P_4TFINT_05-214).
 func (a *App) SyncBugs(profileID string) error {
-	return a.runPartialSync(profileID, func(e *syncer.Engine, projectKey string) error {
-		return e.SyncBugs(a.ctx, profileID, projectKey)
+	return a.runPartialSync(profileID, "Syncing bugs", func(e *syncer.Engine, projectKey string, onProgress func(syncer.Progress)) error {
+		return e.SyncBugs(a.ctx, profileID, projectKey, onProgress)
 	})
 }
 
