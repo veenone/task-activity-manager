@@ -969,7 +969,7 @@ export function TestDetail({
             <ul className="pre-list bug-link-list">
               {bugs.map((b) => (
                 <li key={b.key}>
-                  {canLinkToJira ? (
+                  {canLinkToJira && !b.key.startsWith("NEW-") ? (
                     <button
                       className="mono bug-link-key"
                       onClick={() => openBugInJira(b.key)}
