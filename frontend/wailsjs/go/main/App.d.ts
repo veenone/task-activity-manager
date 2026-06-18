@@ -111,6 +111,10 @@ export function GetContainerBoard(arg1:string,arg2:string):Promise<testrepo.Test
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
+export function GetExecutionsForPlans(arg1:string,arg2:Array<string>):Promise<Array<testrepo.Container>>;
+
+export function GetProfileProjectKey(arg1:string):Promise<string>;
+
 export function GetRequirementTraceability(arg1:string,arg2:Array<string>):Promise<testrepo.Sankey>;
 
 export function GetSettings():Promise<settings.Settings>;

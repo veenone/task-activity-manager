@@ -118,6 +118,8 @@ export {
   ReorderTestSteps,
   GetStatistics,
   GetTraceabilitySankey,
+  GetExecutionsForPlans,
+  GetProfileProjectKey,
   GetRequirementTraceability,
   ScanDuplicates,
   ScanDuplicateGroupSteps,

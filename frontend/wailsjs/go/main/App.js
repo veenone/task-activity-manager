@@ -210,6 +210,14 @@ export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
 
+export function GetExecutionsForPlans(arg1, arg2) {
+  return window['go']['main']['App']['GetExecutionsForPlans'](arg1, arg2);
+}
+
+export function GetProfileProjectKey(arg1) {
+  return window['go']['main']['App']['GetProfileProjectKey'](arg1);
+}
+
 export function GetRequirementTraceability(arg1, arg2) {
   return window['go']['main']['App']['GetRequirementTraceability'](arg1, arg2);
 }

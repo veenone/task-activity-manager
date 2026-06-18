@@ -1669,6 +1669,26 @@ func (a *App) GetTraceabilitySankey(profileID string, planFilters, execFilters [
 	return a.repo.GetTraceabilitySankey(profileID, projectKey, planFilters, execFilters, crossProjectOnly)
 }
 
+// GetExecutionsForPlans returns the Test Executions sharing a Test with the
+// given Test Plans, to cascade the dashboard's Execution filter (#5a). Empty
+// planKeys returns all executions.
+func (a *App) GetExecutionsForPlans(profileID string, planKeys []string) ([]testrepo.Container, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ExecutionsForPlans(profileID, planKeys)
+}
+
+// GetProfileProjectKey returns the active profile's Jira project key, used by the
+// dashboard to flag cross-project bugs (#5b).
+func (a *App) GetProfileProjectKey(profileID string) (string, error) {
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return "", err
+	}
+	return p.ProjectKey, nil
+}
+
 // --- pytest helper (FR-7.2) ---
 
 // ExportPytest generates a Python test scaffold from a Test Set / Plan /
