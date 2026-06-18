@@ -424,6 +424,24 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 		})
 	}
 
+	// Sub-task Test Executions: a couple of executions that are Jira sub-tasks of
+	// a parent issue (a Story here), exercising the parent-linked execution path
+	// offline. They are still Kind=testexec and behave like standalone ones.
+	const subExecCount = 2
+	subExecKeys := make([]string, subExecCount)
+	for i := 0; i < subExecCount; i++ {
+		key := fmt.Sprintf("%s-STE-%d", projectKey, i+1)
+		subExecKeys[i] = key
+		containers = append(containers, Container{
+			Key:       key,
+			Kind:      KindTestExec,
+			Summary:   fmt.Sprintf("Sub-execution for story %d", i+1),
+			Status:    demoExecStatuses[i%len(demoExecStatuses)],
+			ParentKey: fmt.Sprintf("%s-S-%d", projectKey, i+1),
+			IssueType: "Sub Test Execution",
+		})
+	}
+
 	for i := 0; i < demoLinkedTests && i < demoTestCount; i++ {
 		testKey := fmt.Sprintf("%s-%d", projectKey, i+1)
 		feature := demoFeatures[i%len(demoFeatures)]
@@ -442,6 +460,14 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 				ContainerKey: crossExecKeys[(i/7)%len(crossExecKeys)],
 				TestKey:      testKey,
 				RunStatus:    demoRunStatuses[(i+2)%len(demoRunStatuses)],
+			})
+		}
+		// Every 5th linked test also runs in a sub-task execution.
+		if i%5 == 0 {
+			links = append(links, ContainerLink{
+				ContainerKey: subExecKeys[(i/5)%len(subExecKeys)],
+				TestKey:      testKey,
+				RunStatus:    demoRunStatuses[(i+1)%len(demoRunStatuses)],
 			})
 		}
 	}

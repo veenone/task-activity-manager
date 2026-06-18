@@ -26,10 +26,12 @@ const (
 // and differ only in how they relate to Tests, so one type with a Kind
 // discriminator avoids three near-identical structs.
 type Container struct {
-	Key     string
-	Kind    string
-	Summary string
-	Status  string
+	Key       string
+	Kind      string
+	Summary   string
+	Status    string
+	ParentKey string // parent issue key for a sub-task Test Execution; else ""
+	IssueType string // Jira issuetype name (e.g. "Sub Test Execution"); informational
 }
 
 // ContainerLink is one Test's membership in a Container. RunStatus carries the
@@ -74,6 +76,10 @@ func (c *Client) ListContainers(ctx context.Context, projectKey string, onProgre
 	}
 	containers := []Container{}
 	all := []kindContainer{}
+	// TODO(xtm): also search the sub-task Test Execution issuetype and set
+	// Container.ParentKey from fields.parent.key + IssueType from the issuetype
+	// name, so sub-task executions sync like standalone ones. Verify the
+	// issuetype name and parent field on a live Xray Server 8.4.0 instance.
 	for _, kind := range []string{KindTestSet, KindTestPlan, KindTestExec} {
 		found, err := c.searchContainers(ctx, projectKey, kind)
 		if err != nil {
