@@ -684,6 +684,7 @@ export function ContainersView({
         </div>
       )}
 
+      <div className="board-scroll">
       {board && containers.length > 0 && (
         <table className="board-table">
           <thead>
@@ -820,6 +821,7 @@ export function ContainersView({
           </tbody>
         </table>
       )}
+      </div>
 
       {board && allRows.length > 0 && (
         <div className="board-pager">
