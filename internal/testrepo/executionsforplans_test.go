@@ -1,5 +1,7 @@
 package testrepo
 
+// Seed helpers (newTestRepo, seedContainer, seedContainerTest) are defined in sankey_crossproject_test.go.
+
 import "testing"
 
 func TestExecutionsForPlans(t *testing.T) {
@@ -33,5 +35,14 @@ func TestExecutionsForPlans(t *testing.T) {
 	}
 	if len(all) != 2 {
 		t.Fatalf("want 2 executions, got %d", len(all))
+	}
+
+	// Both plans → both executions (union of their executions), ordered by key.
+	both, err := r.ExecutionsForPlans(p, []string{"DEMO-TP-1", "DEMO-TP-2"})
+	if err != nil {
+		t.Fatalf("both plans: %v", err)
+	}
+	if len(both) != 2 || both[0].Key != "DEMO-TE-1" || both[1].Key != "DEMO-TE-2" {
+		t.Fatalf("want [DEMO-TE-1 DEMO-TE-2], got %+v", both)
 	}
 }

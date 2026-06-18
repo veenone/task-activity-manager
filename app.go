@@ -1682,6 +1682,9 @@ func (a *App) GetExecutionsForPlans(profileID string, planKeys []string) ([]test
 // GetProfileProjectKey returns the active profile's Jira project key, used by the
 // dashboard to flag cross-project bugs (#5b).
 func (a *App) GetProfileProjectKey(profileID string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
 	p, err := a.profiles.Get(profileID)
 	if err != nil {
 		return "", err
