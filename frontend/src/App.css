@@ -4300,3 +4300,29 @@ tr.row-checked:hover {
 .board-sort-th:hover {
   text-decoration: underline;
 }
+.crossproject-bugs {
+  margin-top: 12px;
+  border-top: 1px solid var(--border, #2a2f3a);
+  padding-top: 10px;
+}
+.crossproject-bugs h5 {
+  margin: 0 0 6px;
+}
+.crossproject-bug-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.crossproject-bug-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.crossproject-bug-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

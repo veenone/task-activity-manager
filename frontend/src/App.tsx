@@ -1130,7 +1130,7 @@ function App() {
         </main>
       ) : view === "dashboard" ? (
         <main className="content content-dashboard">
-          <Dashboard profileId={activeId} refreshKey={refreshKey} onOpenDuplicates={() => setView("duplicates")} />
+          <Dashboard profileId={activeId} refreshKey={refreshKey} jiraUrl={activeProfile?.jiraUrl ?? ""} onOpenDuplicates={() => setView("duplicates")} />
         </main>
       ) : view === "plans" ? (
         <main className="content content-dashboard">

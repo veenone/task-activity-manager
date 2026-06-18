@@ -5,6 +5,10 @@ import {
   GetRequirementTraceability,
   ListRequirementsWithCoverage,
   ListContainers,
+  GetExecutionsForPlans,
+  GetProfileProjectKey,
+  ListBugsWithTests,
+  BrowserOpenURL,
   errMsg,
 } from "../api";
 import type {
@@ -13,6 +17,7 @@ import type {
   Sankey,
   Container,
   RequirementCoverage,
+  BugWithTests,
 } from "../api";
 import { SankeyChart } from "./SankeyChart";
 import { RequirementSankey } from "./RequirementSankey";
@@ -22,13 +27,19 @@ import { MultiSelect } from "./MultiSelect";
 interface Props {
   profileId: string;
   refreshKey: number;
+  jiraUrl?: string;
   onOpenDuplicates?: () => void;
 }
 
 // Dashboard renders the per-profile statistics view (FR-9), computed entirely
 // from the local store. It recomputes whenever the profile changes or a sync /
 // commit bumps refreshKey, so the numbers track the cache without a Jira call.
-export function Dashboard({ profileId, refreshKey, onOpenDuplicates }: Props) {
+export function Dashboard({
+  profileId,
+  refreshKey,
+  jiraUrl,
+  onOpenDuplicates,
+}: Props) {
   const [stats, setStats] = useState<Statistics | null>(null);
   const [sankey, setSankey] = useState<Sankey | null>(null);
   const [reqSankey, setReqSankey] = useState<Sankey | null>(null);
@@ -48,6 +59,8 @@ export function Dashboard({ profileId, refreshKey, onOpenDuplicates }: Props) {
   const [execSel, setExecSel] = useState<string[]>([]);
   const [crossProject, setCrossProject] = useState(false);
   const [sankeyErr, setSankeyErr] = useState("");
+  const [projectKey, setProjectKey] = useState("");
+  const [crossBugs, setCrossBugs] = useState<BugWithTests[]>([]);
 
   useEffect(() => {
     if (!profileId) return;
@@ -69,26 +82,76 @@ export function Dashboard({ profileId, refreshKey, onOpenDuplicates }: Props) {
     };
   }, [profileId, refreshKey, nonce]);
 
-  // Filter options: the project's Test Plans and Test Executions.
+  useEffect(() => {
+    if (!profileId) return;
+    let cancelled = false;
+    GetProfileProjectKey(profileId)
+      .then((k) => {
+        if (!cancelled) setProjectKey(k ?? "");
+      })
+      .catch(() => {
+        if (!cancelled) setProjectKey("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
+  // Test Plan options load with the profile.
   useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
     setPlanSel([]);
-    setExecSel([]);
-    Promise.all([
-      ListContainers(profileId, "testplan"),
-      ListContainers(profileId, "testexec"),
-    ])
-      .then(([tp, te]) => {
-        if (cancelled) return;
-        setPlans(tp ?? []);
-        setExecs(te ?? []);
+    ListContainers(profileId, "testplan")
+      .then((tp) => {
+        if (!cancelled) setPlans(tp ?? []);
       })
-      .catch((e) => console.error("list containers:", errMsg(e)));
+      .catch((e) => console.error("list plans:", errMsg(e)));
     return () => {
       cancelled = true;
     };
   }, [profileId, refreshKey, nonce]);
+
+  // Execution options cascade from the selected plans (#5a): when plans are
+  // chosen, only executions sharing a test with them are offered. Stale
+  // execSel entries are pruned so the Sankey filter stays valid.
+  useEffect(() => {
+    if (!profileId) return;
+    let cancelled = false;
+    GetExecutionsForPlans(profileId, planSel)
+      .then((te) => {
+        if (cancelled) return;
+        const opts = te ?? [];
+        setExecs(opts);
+        setExecSel((cur) => cur.filter((k) => opts.some((c) => c.key === k)));
+      })
+      .catch((e) => console.error("executions for plans:", errMsg(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, refreshKey, nonce, planSel]);
+
+  // Cross-project bugs (#5b): defects linked to this profile's tests but filed
+  // in a different Jira project. Only fetched when the cross-project toggle is on.
+  useEffect(() => {
+    if (!profileId || !crossProject) {
+      setCrossBugs([]);
+      return;
+    }
+    let cancelled = false;
+    ListBugsWithTests(profileId)
+      .then((bs) => {
+        if (cancelled) return;
+        const pk = projectKey.trim();
+        setCrossBugs(
+          (bs ?? []).filter((b) => pk && b.projectKey && b.projectKey !== pk),
+        );
+      })
+      .catch((e) => console.error("cross-project bugs:", errMsg(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, refreshKey, nonce, crossProject, projectKey]);
 
   // The Sankey re-fetches whenever the filters change (or the data refreshes).
   useEffect(() => {
@@ -145,6 +208,14 @@ export function Dashboard({ profileId, refreshKey, onOpenDuplicates }: Props) {
       cancelled = true;
     };
   }, [profileId, refreshKey, nonce]);
+
+  function openCrossBug(key: string) {
+    const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
+    const isDemo = /^(demo$|demo:|mock:)/i.test((jiraUrl ?? "").trim());
+    if (base && !isDemo && !key.startsWith("NEW-")) {
+      BrowserOpenURL(`${base}/browse/${key}`);
+    }
+  }
 
   if (loading && !stats) {
     return <div className="dashboard muted">Loading…</div>;
@@ -376,6 +447,39 @@ export function Dashboard({ profileId, refreshKey, onOpenDuplicates }: Props) {
                 setCrossProject(false);
               }}
             />
+          )}
+          {crossProject && (
+            <div className="crossproject-bugs">
+              <h5>
+                Cross-project bugs
+                <span className="stat-panel-sub">
+                  defects filed outside {projectKey || "this project"} but linked
+                  to its tests
+                </span>
+              </h5>
+              {crossBugs.length === 0 ? (
+                <p className="muted">No cross-project bugs linked.</p>
+              ) : (
+                <ul className="crossproject-bug-list">
+                  {crossBugs.map((b) => (
+                    <li key={b.key}>
+                      <button
+                        className="mono bug-link-key"
+                        onClick={() => openCrossBug(b.key)}
+                        title={`Open ${b.key} in Jira`}
+                      >
+                        {b.key}
+                      </button>
+                      <span className="muted">{b.projectKey}</span>
+                      {b.status && <span className="status-pill">{b.status}</span>}
+                      <span className="crossproject-bug-summary">
+                        {b.summary || "(no summary)"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
       )}
