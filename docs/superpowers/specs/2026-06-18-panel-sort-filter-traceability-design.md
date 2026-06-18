@@ -87,24 +87,31 @@ to all three kinds (selected via the existing `kind` toggle). When the active
 selection is filtered out, selection falls back to the first visible container
 (same fallback `ContainersView` already uses on load).
 
-### Item 4 — Scope bug sync to ScopeJQL (backend + test)
+### Item 4 — Scope bug sync to the synced (in-scope) tests (backend + test)
 
-Add `Repository.ScopedTestKeys(profileID string) ([]string, error)`:
+The defect is in the **demo client**: `demoBugs(testProjectKey)` ignores the
+`testKeys` argument entirely (`engine.go` passes them; `jira/bugs.go` line 45
+discards them with `_ = testKeys`), so bug sync returns every demo defect
+regardless of which Tests are actually synced/in scope — the reported "global"
+behavior.
 
-- Reads `profile.ScopeJQL` (via the existing profile-field accessor pattern used
-  by `ProfileBugIssueType`).
-- When `ScopeJQL` is empty, returns the same set as `AllTestKeys` (no behavior
-  change for unscoped profiles).
-- When set, returns only test keys whose locally-cached row satisfies the scope.
-  The store already filters the test pull by scope at sync time, but keys can
-  linger from a previously broader scope; `ScopedTestKeys` reconciles to the
-  current scope so bug sync never pulls bugs for out-of-scope tests.
+`profile.ScopeJQL` is a Jira query evaluated **server-side at test-sync time**,
+not something we can re-evaluate against SQLite. The local store therefore
+already holds only the Tests the scoped test sync pulled, so the in-scope set is
+exactly the cached Test keys (`AllTestKeys`). The fix is to make bug sync honor
+those keys instead of returning the whole project's defects:
 
-`syncBugs` switches from `AllTestKeys` to `ScopedTestKeys`. The real-Jira
-`ListBugs` path remains stubbed and `NOTE`-marked; demo mode is unaffected.
+- `ListBugs` (demo branch) passes `testKeys` into `demoBugs`, which emits bugs
+  and links only for Tests in that set; an empty set returns nothing.
+- `syncBugs` keeps passing the cached in-scope keys (`AllTestKeys`) — no change
+  there — but the result now actually narrows to them.
+- Real `ListBugs` path already receives `testKeys`; its existing `TODO(xtm)`
+  already specifies filtering linked issues to those Tests. Stays stubbed /
+  `NOTE`-marked.
 
-Test: a profile with a `ScopeJQL` that excludes some cached tests pulls bugs only
-for in-scope tests; an unscoped profile is unchanged.
+Test: demo `ListBugs` with a subset of `testKeys` returns only the bugs/links
+for those Tests; an empty subset returns none; the full set reproduces today's
+seed.
 
 ### Item 5a — Plan → Execution cascade (backend helper + frontend)
 
@@ -142,8 +149,9 @@ re-triggers the Sankey effect). The Requirement Sankey stays independent.
 
 ## Testing
 
-- Go unit tests: `ScopedTestKeys` (scoped vs unscoped), `ExecutionsForPlans`,
-  `projectKeyOf`, and demo-seed cross-project executions present.
+- Go unit tests: demo `ListBugs` honors `testKeys` (subset / empty / full),
+  `ExecutionsForPlans`, `projectKeyOf`, and demo-seed cross-project executions
+  present.
 - Frontend: `tsc` typecheck + `npm run build` (no frontend test runner). Manual
   demo-mode verification of each new control.
 
