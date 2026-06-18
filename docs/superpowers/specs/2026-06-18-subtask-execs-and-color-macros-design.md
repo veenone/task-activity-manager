@@ -57,8 +57,10 @@ COLUMN` for each (additive, so old DBs upgrade cleanly before any index runs).
 Carry the fields through the types and the read/write paths:
 
 - `jira.Container`: add `ParentKey string`, `IssueType string`.
-- `testrepo.Container` and `testrepo.ContainerMembership`: add `ParentKey` and
-  `IssueType` (json `parentKey`, `issueType`).
+- `testrepo.Container`: add `ParentKey` and `IssueType` (json `parentKey`,
+  `issueType`). `ContainerMembership` is left unchanged — nothing consumes a
+  parent on the per-test membership list, so adding fields there would be dead
+  weight (the parent badge reads `Container.parentKey`).
 - `ReplaceAllContainers` (insert), `ListContainers` (select), and
   `GetContainerBoard` (the selected container's header info) read/write the new
   columns. Container CRUD snapshots (`containercrud.go`) keep `parent_key` /
