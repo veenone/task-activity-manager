@@ -4158,20 +4158,34 @@ tr.row-checked:hover {
   background: var(--accent-soft, rgba(56, 132, 222, 0.18));
   font-weight: 600;
 }
-/* Bugs master-detail: filterable/paginated list + selected-bug detail pane. */
+/* In bugs mode the Containers root becomes a height-bounded flex column so the
+   bug list can own its own scroll (Pager pinned below), like the Requirements /
+   Preconditions views. Containers mode is unaffected. */
+.board--bugs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Bugs master-detail: filterable/paginated list + selected-bug detail pane.
+   The list items scroll; the filter and Pager stay fixed above / below. */
 .bugs-md {
+  flex: 1;
   display: grid;
   grid-template-columns: minmax(280px, 360px) 1fr;
   gap: 18px;
   width: 100%;
-  align-items: start;
+  min-height: 0;
 }
 .bugs-md-list {
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 .bugs-md-filter {
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .bugs-md-empty {
   padding: 14px 4px;
@@ -4180,6 +4194,9 @@ tr.row-checked:hover {
   list-style: none;
   margin: 0 0 8px;
   padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 .bugs-md-item {
   padding: 8px 10px;
@@ -4223,6 +4240,8 @@ tr.row-checked:hover {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px 18px;
+  overflow: auto;
+  min-height: 0;
 }
 .bugs-md-detail-head {
   display: flex;

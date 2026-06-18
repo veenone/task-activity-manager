@@ -319,7 +319,7 @@ export function ContainersView({
   );
 
   return (
-    <div className="board">
+    <div className={`board${mode === "bugs" ? " board--bugs" : ""}`}>
       <div className="containers-mode">
         <button
           className={`seg-btn${mode === "containers" ? " seg-btn-active" : ""}`}
