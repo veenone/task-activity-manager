@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 export interface SelectOption {
   value: string;
   label: string;
+  // Optional extra class on the option row, so callers can tint specific
+  // entries (e.g. sub-task Test Executions).
+  className?: string;
 }
 
 interface Props {
@@ -96,7 +99,7 @@ export function SearchableSelect({
               <li key={o.value}>
                 <button
                   type="button"
-                  className={`searchable-option${o.value === value ? " is-selected" : ""}`}
+                  className={`searchable-option${o.value === value ? " is-selected" : ""}${o.className ? " " + o.className : ""}`}
                   onClick={() => pick(o.value)}
                 >
                   {o.label}

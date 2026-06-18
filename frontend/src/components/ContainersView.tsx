@@ -17,6 +17,7 @@ import {
 } from "../api";
 import type { Container, TestPlanBoard, Bucket } from "../api";
 import { SortControl } from "./SortControl";
+import { SearchableSelect } from "./SearchableSelect";
 import { keyCompare, cmpStr, applyDir } from "../sort";
 import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
@@ -57,7 +58,6 @@ export function ContainersView({
   onOpenTest,
 }: Props) {
   const [kind, setKind] = useState("testplan");
-  const [cFilter, setCFilter] = useState("");
   const [cStatus, setCStatus] = useState("");
   // Execution-type filter (Test Execution kind only): "" = all, "standalone", "subtask".
   const [cExecType, setCExecType] = useState("");
@@ -125,16 +125,12 @@ export function ContainersView({
   }, [containers]);
 
   const viewContainers = useMemo(() => {
-    const f = cFilter.trim().toLowerCase();
     const base = containers.filter(
       (c) =>
         (!cStatus || c.status === cStatus) &&
         (kind !== "testexec" ||
           !cExecType ||
-          (cExecType === "subtask" ? !!c.parentKey : !c.parentKey)) &&
-        (!f ||
-          c.key.toLowerCase().includes(f) ||
-          (c.summary ?? "").toLowerCase().includes(f)),
+          (cExecType === "subtask" ? !!c.parentKey : !c.parentKey)),
     );
     return [...base].sort((a, b) => {
       let cmp: number;
@@ -150,7 +146,7 @@ export function ContainersView({
       }
       return applyDir(cmp, cSortDesc);
     });
-  }, [containers, cFilter, cStatus, cExecType, kind, cSortField, cSortDesc]);
+  }, [containers, cStatus, cExecType, kind, cSortField, cSortDesc]);
 
   useEffect(() => {
     if (viewContainers.length === 0) return;
@@ -335,7 +331,6 @@ export function ContainersView({
   }, [mode, selected, kind]);
 
   useEffect(() => {
-    setCFilter("");
     setCStatus("");
     setCExecType("");
   }, [kind]);
@@ -465,18 +460,20 @@ export function ContainersView({
           {loading ? (
             <span className="muted">Loading…</span>
           ) : (
-            <select
+            <SearchableSelect
               value={selected}
-              onChange={(e) => setSelected(e.target.value)}
+              onChange={setSelected}
               disabled={viewContainers.length === 0}
-            >
-              {viewContainers.length === 0 && <option value="">None</option>}
-              {viewContainers.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.key} — {c.summary}
-                </option>
-              ))}
-            </select>
+              title={`Pick a ${kindLabel} (type to filter)`}
+              placeholder={
+                viewContainers.length === 0 ? "None" : `Select a ${kindLabel}…`
+              }
+              options={viewContainers.map((c) => ({
+                value: c.key,
+                label: `${c.key} — ${c.summary}`,
+                className: c.parentKey ? "is-subtask" : undefined,
+              }))}
+            />
           )}
         </label>
         <div className="board-head-actions">
@@ -569,12 +566,6 @@ export function ContainersView({
       </div>
 
       <div className="container-filter-bar">
-        <input
-          className="search container-filter"
-          placeholder={`Filter ${kindLabel}s by key or name…`}
-          value={cFilter}
-          onChange={(e) => setCFilter(e.target.value)}
-        />
         <select
           className="container-status-filter"
           value={cStatus}
@@ -634,16 +625,20 @@ export function ContainersView({
               {selectedContainer.key}
             </span>
             {selectedContainer.parentKey && (
-              <button
-                className="mono container-parent-link"
-                onClick={() => openParent(selectedContainer.parentKey)}
-                title={`Open parent ${selectedContainer.parentKey} in Jira`}
-              >
-                ↳ {selectedContainer.parentKey}
-              </button>
-            )}
-            {selectedContainer.issueType && selectedContainer.parentKey && (
-              <span className="muted">{selectedContainer.issueType}</span>
+              <span className="container-parent">
+                <button
+                  className="mono container-parent-link"
+                  onClick={() => openParent(selectedContainer.parentKey)}
+                  title={`Open parent ${selectedContainer.parentKey} in Jira`}
+                >
+                  ↳ {selectedContainer.parentKey}
+                </button>
+                {selectedContainer.issueType && (
+                  <span className="container-parent-type">
+                    {selectedContainer.issueType}
+                  </span>
+                )}
+              </span>
             )}
             {selectedContainer.status && (
               <span className="status-pill">{selectedContainer.status}</span>

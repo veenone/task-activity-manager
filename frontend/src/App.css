@@ -4373,14 +4373,38 @@ tr.row-checked:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Sub-task parent annotation on the container card — a quiet secondary note,
+   not a loud badge. The at-a-glance differentiation lives in the dropdown tint. */
+.container-parent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
 .container-parent-link {
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
-  color: var(--accent);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
 }
 .container-parent-link:hover {
+  color: var(--accent);
   text-decoration: underline;
+}
+.container-parent-type {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+/* Sub-task Test Executions in the picker get a subtle accent tint + left bar so
+   they stand out from standalone executions at a glance. */
+.searchable-option.is-subtask {
+  border-left: 3px solid var(--accent);
+  padding-left: 6px;
+  background: rgba(124, 108, 255, 0.1);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.searchable-option.is-subtask.is-selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
