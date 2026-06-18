@@ -73,6 +73,7 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
   const [jiraUrl, setJiraUrl] = useState(profile?.jiraUrl ?? "");
   const [projectKey, setProjectKey] = useState(profile?.projectKey ?? "");
   const [scopeJql, setScopeJql] = useState(profile?.scopeJql ?? "");
+  const [bugIssueType, setBugIssueType] = useState(profile?.bugIssueType ?? "");
   const [token, setToken] = useState("");
   // Reuse a stored PAT from an existing profile (create only). "" = enter a new
   // token below.
@@ -133,6 +134,7 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           normalizeJiraUrl(jiraUrl),
           key,
           scopeJql.trim(),
+          bugIssueType.trim(),
           token.trim(),
         );
       } else if (reuseFrom !== "") {
@@ -141,6 +143,7 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           normalizeJiraUrl(jiraUrl),
           key,
           scopeJql.trim(),
+          bugIssueType.trim(),
           reuseFrom,
         );
       } else {
@@ -149,6 +152,7 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           normalizeJiraUrl(jiraUrl),
           key,
           scopeJql.trim(),
+          bugIssueType.trim(),
           token.trim(),
         );
       }
@@ -198,6 +202,15 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           value={scopeJql}
           onChange={(e) => setScopeJql(e.target.value)}
           placeholder="e.g. labels = smoke — narrows which tests sync"
+        />
+      </label>
+      <label>
+        Bug issue type
+        <input
+          value={bugIssueType}
+          onChange={(e) => setBugIssueType(e.target.value)}
+          placeholder="Bug — Jira issuetype used when filing a defect"
+          spellCheck={false}
         />
       </label>
       {!isEdit && others.length > 0 && (

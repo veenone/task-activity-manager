@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 20
+const schemaVersion = 21
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS profiles (
 	jira_url    TEXT NOT NULL,
 	project_key TEXT NOT NULL,
 	created_at  TEXT NOT NULL,
-	scope_jql   TEXT NOT NULL DEFAULT ''
+	scope_jql   TEXT NOT NULL DEFAULT '',
+	bug_issue_type TEXT NOT NULL DEFAULT 'Bug'
 );
 
 CREATE TABLE IF NOT EXISTS sync_state (
@@ -423,6 +424,16 @@ func applyMigrations(db *sql.DB) error {
 			`ALTER TABLE test_step ADD COLUMN called_test_key TEXT NOT NULL DEFAULT ''`,
 		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return fmt.Errorf("v19 add called_test_key: %w", err)
+		}
+	}
+	// v21: per-profile bug issue type (the Jira issuetype name used when filing a
+	// defect, default "Bug"). Fresh installs get it from the CREATE above; this
+	// ALTER catches pre-v21 databases.
+	if current < 21 {
+		if _, err := db.Exec(
+			`ALTER TABLE profiles ADD COLUMN bug_issue_type TEXT NOT NULL DEFAULT 'Bug'`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v21 add bug_issue_type: %w", err)
 		}
 	}
 	return nil

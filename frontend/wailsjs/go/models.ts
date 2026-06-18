@@ -173,6 +173,7 @@ export namespace profile {
 	    jiraUrl: string;
 	    projectKey: string;
 	    scopeJql: string;
+	    bugIssueType: string;
 	    // Go type: time
 	    createdAt: any;
 	
@@ -187,6 +188,7 @@ export namespace profile {
 	        this.jiraUrl = source["jiraUrl"];
 	        this.projectKey = source["projectKey"];
 	        this.scopeJql = source["scopeJql"];
+	        this.bugIssueType = source["bugIssueType"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	    }
 	

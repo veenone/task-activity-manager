@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,12 +24,13 @@ var ErrNotFound = errors.New("profile not found")
 // the OS credential manager (see CredentialStore) — never in this struct or the
 // database.
 type Profile struct {
-	ID         string    `json:"id"`
-	Name       string    `json:"name"`
-	JiraURL    string    `json:"jiraUrl"`
-	ProjectKey string    `json:"projectKey"`
-	ScopeJQL   string    `json:"scopeJql"`
-	CreatedAt  time.Time `json:"createdAt"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	JiraURL      string    `json:"jiraUrl"`
+	ProjectKey   string    `json:"projectKey"`
+	ScopeJQL     string    `json:"scopeJql"`
+	BugIssueType string    `json:"bugIssueType"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 // Manager is the profile CRUD service backed by the local store (FR-5.1).
@@ -44,7 +46,7 @@ func NewManager(s *store.Store) *Manager {
 // List returns all profiles, ordered by name.
 func (m *Manager) List() ([]Profile, error) {
 	rows, err := m.db.Query(
-		`SELECT id, name, jira_url, project_key, scope_jql, created_at FROM profiles ORDER BY name`)
+		`SELECT id, name, jira_url, project_key, scope_jql, bug_issue_type, created_at FROM profiles ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("list profiles: %w", err)
 	}
@@ -64,7 +66,7 @@ func (m *Manager) List() ([]Profile, error) {
 // Get returns one profile by id, or ErrNotFound.
 func (m *Manager) Get(id string) (Profile, error) {
 	row := m.db.QueryRow(
-		`SELECT id, name, jira_url, project_key, scope_jql, created_at FROM profiles WHERE id = ?`, id)
+		`SELECT id, name, jira_url, project_key, scope_jql, bug_issue_type, created_at FROM profiles WHERE id = ?`, id)
 	p, err := scanProfile(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Profile{}, ErrNotFound
@@ -74,32 +76,45 @@ func (m *Manager) Get(id string) (Profile, error) {
 
 // Create persists a new profile, generating its id and creation timestamp.
 // scopeJQL is an optional JQL fragment that narrows which Tests sync (FR-5.4).
-func (m *Manager) Create(name, jiraURL, projectKey, scopeJQL string) (Profile, error) {
+// bugIssueType is the Jira issuetype used when filing a defect; blank defaults
+// to "Bug".
+func (m *Manager) Create(name, jiraURL, projectKey, scopeJQL, bugIssueType string) (Profile, error) {
 	p := Profile{
-		ID:         uuid.NewString(),
-		Name:       name,
-		JiraURL:    jiraURL,
-		ProjectKey: projectKey,
-		ScopeJQL:   scopeJQL,
-		CreatedAt:  time.Now().UTC(),
+		ID:           uuid.NewString(),
+		Name:         name,
+		JiraURL:      jiraURL,
+		ProjectKey:   projectKey,
+		ScopeJQL:     scopeJQL,
+		BugIssueType: bugIssueTypeOrDefault(bugIssueType),
+		CreatedAt:    time.Now().UTC(),
 	}
 	_, err := m.db.Exec(
-		`INSERT INTO profiles (id, name, jira_url, project_key, scope_jql, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.JiraURL, p.ProjectKey, p.ScopeJQL, p.CreatedAt.Format(time.RFC3339))
+		`INSERT INTO profiles (id, name, jira_url, project_key, scope_jql, bug_issue_type, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.JiraURL, p.ProjectKey, p.ScopeJQL, p.BugIssueType, p.CreatedAt.Format(time.RFC3339))
 	if err != nil {
 		return Profile{}, fmt.Errorf("create profile: %w", err)
 	}
 	return p, nil
 }
 
-// Update changes a profile's editable fields — name, Jira URL, project key, and
-// JQL scope (FR-5) — e.g. to correct a wrong project key. Returns ErrNotFound
-// if the id doesn't exist. Credentials are managed separately.
-func (m *Manager) Update(id, name, jiraURL, projectKey, scopeJQL string) error {
+// bugIssueTypeOrDefault falls back to "Bug" when no issue type is configured, so
+// the field is never stored empty.
+func bugIssueTypeOrDefault(t string) string {
+	if s := strings.TrimSpace(t); s != "" {
+		return s
+	}
+	return "Bug"
+}
+
+// Update changes a profile's editable fields — name, Jira URL, project key, JQL
+// scope, and bug issue type (FR-5) — e.g. to correct a wrong project key.
+// Returns ErrNotFound if the id doesn't exist. Credentials are managed
+// separately. A blank bugIssueType defaults to "Bug".
+func (m *Manager) Update(id, name, jiraURL, projectKey, scopeJQL, bugIssueType string) error {
 	res, err := m.db.Exec(
-		`UPDATE profiles SET name = ?, jira_url = ?, project_key = ?, scope_jql = ? WHERE id = ?`,
-		name, jiraURL, projectKey, scopeJQL, id)
+		`UPDATE profiles SET name = ?, jira_url = ?, project_key = ?, scope_jql = ?, bug_issue_type = ? WHERE id = ?`,
+		name, jiraURL, projectKey, scopeJQL, bugIssueTypeOrDefault(bugIssueType), id)
 	if err != nil {
 		return fmt.Errorf("update profile: %w", err)
 	}
@@ -145,7 +160,7 @@ func scanProfile(s scanner) (Profile, error) {
 		p       Profile
 		created string
 	)
-	if err := s.Scan(&p.ID, &p.Name, &p.JiraURL, &p.ProjectKey, &p.ScopeJQL, &created); err != nil {
+	if err := s.Scan(&p.ID, &p.Name, &p.JiraURL, &p.ProjectKey, &p.ScopeJQL, &p.BugIssueType, &created); err != nil {
 		return Profile{}, err
 	}
 	p.CreatedAt, _ = time.Parse(time.RFC3339, created)

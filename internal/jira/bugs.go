@@ -24,15 +24,16 @@ type BugLink struct {
 }
 
 // ListBugs returns the defect issues linked to the given Tests, plus the links.
-// Demo URLs generate a deterministic cross-project set; the real path is empty
-// until verified on a live instance.
+// issueType is the profile's configured defect issuetype (default "Bug") used to
+// recognize which linked issues are defects. Demo URLs generate a deterministic
+// cross-project set; the real path is empty until verified on a live instance.
 //
 // TODO(xtm): real path — read each synced Test's issuelinks (already fetched
-// during the test sync) and keep links whose target issuetype is in
-// {"Bug","Defect"}; batch-fetch those issues by key via
+// during the test sync) and keep links whose target issuetype matches the
+// configured issueType; batch-fetch those issues by key via
 // /rest/api/2/search?jql=key in (...) so cross-project bugs resolve. Verify the
 // link direction and issuetype names on a live Xray Server 8.4.0 instance.
-func (c *Client) ListBugs(ctx context.Context, testProjectKey string, testKeys []string, onProgress func(done, total int)) ([]Bug, []BugLink, error) {
+func (c *Client) ListBugs(ctx context.Context, testProjectKey string, testKeys []string, issueType string, onProgress func(done, total int)) ([]Bug, []BugLink, error) {
 	_ = ctx
 	if isDemoURL(c.baseURL) {
 		bugs, links := demoBugs(testProjectKey)
@@ -42,23 +43,23 @@ func (c *Client) ListBugs(ctx context.Context, testProjectKey string, testKeys [
 		return bugs, links, nil
 	}
 	_ = testKeys
+	_ = issueType
 	return []Bug{}, []BugLink{}, nil
 }
 
-// CreateBug creates a Bug-type issue and returns its key. Demo URLs return a
-// synthetic key.
+// CreateBug creates a defect issue of the given issuetype (the profile's
+// configured bug issue type, default "Bug") and returns its key. Demo URLs
+// return a synthetic key.
 //
-// Maps to POST /rest/api/2/issue with fields {project, issuetype:{name:"Bug"},
-// summary, description, priority, labels}. NOTE(xtm): verify the project's Bug
+// Maps to POST /rest/api/2/issue with fields {project, issuetype:{name:issueType},
+// summary, description, priority, labels}. NOTE(xtm): verify the project's
 // issuetype + required fields on a live instance.
-// NOTE(xtm): creation is hardcoded to issuetype "Bug"; projects that use
-// "Defect" instead (as discovered by ListBugs) will need live issue-type
-// resolution before this path is enabled.
-func (c *Client) CreateBug(ctx context.Context, projectKey, summary, description, priority string, labels []string) (string, error) {
+func (c *Client) CreateBug(ctx context.Context, projectKey, issueType, summary, description, priority string, labels []string) (string, error) {
 	_ = ctx
 	if isDemoURL(c.baseURL) {
 		return fmt.Sprintf("%s-BUG-DEMO", projectKey), nil
 	}
+	_ = issueType
 	_ = summary
 	_ = description
 	_ = priority

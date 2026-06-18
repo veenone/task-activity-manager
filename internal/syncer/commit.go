@@ -738,6 +738,7 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 	for _, c := range rows {
 		var p struct {
 			ProjectKey  string   `json:"projectKey"`
+			IssueType   string   `json:"issueType"`
 			Summary     string   `json:"summary"`
 			Description string   `json:"description"`
 			Priority    string   `json:"priority"`
@@ -748,7 +749,7 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed bug payload: " + err.Error()})
 			continue
 		}
-		realKey, err := e.client.CreateBug(ctx, p.ProjectKey, p.Summary, p.Description, p.Priority, p.Labels)
+		realKey, err := e.client.CreateBug(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Labels)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: p.TestKey, Error: "create bug: " + sanitizeError(err.Error())})
 			continue

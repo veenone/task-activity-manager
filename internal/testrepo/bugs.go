@@ -1,6 +1,9 @@
 package testrepo
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Bug is a cached defect issue (possibly in another project) linked to Tests.
 type Bug struct {
@@ -42,6 +45,7 @@ type TestBug struct {
 // BugDraft is the payload for creating a new bug from a failed test.
 type BugDraft struct {
 	ProjectKey  string   `json:"projectKey"`
+	IssueType   string   `json:"issueType"`
 	Summary     string   `json:"summary"`
 	Description string   `json:"description"`
 	Priority    string   `json:"priority"`
@@ -52,6 +56,19 @@ type BugDraft struct {
 type bugLinkSnap struct {
 	Key    string `json:"key"`
 	LinkID string `json:"linkId"`
+}
+
+// ProfileBugIssueType returns the profile's configured defect issuetype,
+// defaulting to "Bug". It reads the profiles table directly (same store) so the
+// syncer can recognize the right defect type without depending on the profile
+// manager.
+func (r *Repository) ProfileBugIssueType(profileID string) string {
+	var t string
+	err := r.db.QueryRow(`SELECT bug_issue_type FROM profiles WHERE id = ?`, profileID).Scan(&t)
+	if err != nil || strings.TrimSpace(t) == "" {
+		return "Bug"
+	}
+	return t
 }
 
 // ReplaceAllBugs reconciles the cached bug issues for a profile (full replace on

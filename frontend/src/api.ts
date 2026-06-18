@@ -148,6 +148,7 @@ export interface Profile {
   jiraUrl: string;
   projectKey: string;
   scopeJql: string;
+  bugIssueType: string;
   createdAt: string;
 }
 

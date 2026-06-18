@@ -51,9 +51,9 @@ export function CreatePrecondition(arg1:string,arg2:string):Promise<string>;
 
 export function CreatePreconditionDetailed(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
-export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
+export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<profile.Profile>;
 
-export function CreateProfileReusingToken(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
+export function CreateProfileReusingToken(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<profile.Profile>;
 
 export function CreateSavedView(arg1:string,arg2:string,arg3:string):Promise<testrepo.SavedView>;
 
@@ -245,7 +245,7 @@ export function TransitionTest(arg1:string,arg2:string,arg3:string):Promise<void
 
 export function UnexcludeFromDuplicates(arg1:string,arg2:string):Promise<void>;
 
-export function UpdateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<profile.Profile>;
+export function UpdateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<profile.Profile>;
 
 export function UpdateProfileScope(arg1:string,arg2:string):Promise<void>;
 

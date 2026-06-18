@@ -357,7 +357,8 @@ func (e *Engine) syncBugs(ctx context.Context, profileID, projectKey string, onP
 	if err != nil {
 		return err
 	}
-	bugs, links, err := e.client.ListBugs(ctx, projectKey, testKeys, nil)
+	issueType := e.repo.ProfileBugIssueType(profileID)
+	bugs, links, err := e.client.ListBugs(ctx, projectKey, testKeys, issueType, nil)
 	if err != nil {
 		return err
 	}

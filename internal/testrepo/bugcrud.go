@@ -11,6 +11,7 @@ import (
 // needed to POST the Bug issue and link it to the test on commit.
 type bugCreatePayload struct {
 	ProjectKey  string   `json:"projectKey"`
+	IssueType   string   `json:"issueType"`
 	Summary     string   `json:"summary"`
 	Description string   `json:"description"`
 	Priority    string   `json:"priority"`
@@ -32,10 +33,14 @@ func (r *Repository) CreateBugForTest(profileID, testKey, execKey string, d BugD
 	if err != nil {
 		return "", err
 	}
+	issueType := d.IssueType
+	if issueType == "" {
+		issueType = "Bug"
+	}
 	if _, err := tx.Exec(
 		`INSERT INTO bug (profile_id, jira_key, project_key, issue_type, summary, status, priority, updated_at)
 		 VALUES (?, ?, ?, ?, ?, '(new)', ?, '')`,
-		profileID, tempKey, d.ProjectKey, "Bug", d.Summary, d.Priority,
+		profileID, tempKey, d.ProjectKey, issueType, d.Summary, d.Priority,
 	); err != nil {
 		return "", fmt.Errorf("insert local bug: %w", err)
 	}
@@ -47,7 +52,7 @@ func (r *Repository) CreateBugForTest(profileID, testKey, execKey string, d BugD
 	}
 
 	payload, _ := json.Marshal(bugCreatePayload{
-		ProjectKey: d.ProjectKey, Summary: d.Summary, Description: d.Description,
+		ProjectKey: d.ProjectKey, IssueType: issueType, Summary: d.Summary, Description: d.Description,
 		Priority: d.Priority, Labels: d.Labels, TestKey: testKey,
 	})
 	if err := upsertPendingChange(

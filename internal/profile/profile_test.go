@@ -21,7 +21,7 @@ func newManager(t *testing.T) *profile.Manager {
 func TestCreateProfileStoresScopeJQL(t *testing.T) {
 	m := newManager(t)
 
-	p, err := m.Create("QA", "https://jira.example.com", "QA", "labels = smoke")
+	p, err := m.Create("QA", "https://jira.example.com", "QA", "labels = smoke", "Defect")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -38,9 +38,37 @@ func TestCreateProfileStoresScopeJQL(t *testing.T) {
 	}
 }
 
+func TestBugIssueTypeDefaultsAndPersists(t *testing.T) {
+	m := newManager(t)
+
+	// A blank issue type defaults to "Bug".
+	def, err := m.Create("Prod", "https://jira.example.com", "PROJ", "", "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if def.BugIssueType != "Bug" {
+		t.Errorf("default BugIssueType = %q, want 'Bug'", def.BugIssueType)
+	}
+
+	// A configured issue type persists, and Update can change it.
+	got, err := m.Create("Stg", "https://jira.example.com", "STG", "", "Defect")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if reread, _ := m.Get(got.ID); reread.BugIssueType != "Defect" {
+		t.Errorf("persisted BugIssueType = %q, want 'Defect'", reread.BugIssueType)
+	}
+	if err := m.Update(got.ID, "Stg", "https://jira.example.com", "STG", "", "Incident"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if reread, _ := m.Get(got.ID); reread.BugIssueType != "Incident" {
+		t.Errorf("after update BugIssueType = %q, want 'Incident'", reread.BugIssueType)
+	}
+}
+
 func TestUpdateScopeChangesJQL(t *testing.T) {
 	m := newManager(t)
-	p, err := m.Create("QA", "https://jira.example.com", "QA", "")
+	p, err := m.Create("QA", "https://jira.example.com", "QA", "", "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
