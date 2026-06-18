@@ -1,4 +1,4 @@
-interface SortField {
+export interface SortField {
   value: string;
   label: string;
 }
@@ -30,6 +30,7 @@ export function SortControl({ fields, field, desc, onChange }: Props) {
         ))}
       </select>
       <button
+        type="button"
         className="btn sort-dir"
         onClick={() => onChange(field, !desc)}
         title={desc ? "Descending — click for ascending" : "Ascending — click for descending"}

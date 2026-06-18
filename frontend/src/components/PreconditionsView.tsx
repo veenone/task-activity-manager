@@ -35,7 +35,7 @@ function cmpPre(
     case "type":
       return cmpStr(a.type, b.type) || keyCompare(a.key, b.key);
     case "usage":
-      return a.testCount - b.testCount || keyCompare(a.key, b.key);
+      return (a.testCount ?? 0) - (b.testCount ?? 0) || keyCompare(a.key, b.key);
     default:
       return keyCompare(a.key, b.key);
   }

@@ -48,7 +48,7 @@ function cmpReq(
         keyCompare(a.key, b.key)
       );
     case "tests":
-      return a.testCount - b.testCount || keyCompare(a.key, b.key);
+      return (a.testCount ?? 0) - (b.testCount ?? 0) || keyCompare(a.key, b.key);
     case "status":
       return cmpStr(a.status, b.status) || keyCompare(a.key, b.key);
     default:
