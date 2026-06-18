@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ListContainers,
   GetContainerBoard,
@@ -15,6 +15,8 @@ import {
   errMsg,
 } from "../api";
 import type { Container, TestPlanBoard, Bucket } from "../api";
+import { SortControl } from "./SortControl";
+import { keyCompare, cmpStr, applyDir } from "../sort";
 import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
 import { BugsPanel } from "./BugsPanel";
@@ -54,6 +56,12 @@ export function ContainersView({
   onOpenTest,
 }: Props) {
   const [kind, setKind] = useState("testplan");
+  const [cFilter, setCFilter] = useState("");
+  const [cStatus, setCStatus] = useState("");
+  const [cSortField, setCSortField] = useState("key");
+  const [cSortDesc, setCSortDesc] = useState(false);
+  const [rowSortField, setRowSortField] = useState("key");
+  const [rowSortDesc, setRowSortDesc] = useState(false);
   const [containers, setContainers] = useState<Container[]>([]);
   const [selected, setSelected] = useState("");
   const [bugFor, setBugFor] = useState<{ testKey: string; summary: string } | null>(null);
@@ -106,6 +114,44 @@ export function ContainersView({
 
   const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
   const selectedContainer = containers.find((c) => c.key === selected) ?? null;
+
+  const statusOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of containers) if (c.status) s.add(c.status);
+    return [...s].sort();
+  }, [containers]);
+
+  const viewContainers = useMemo(() => {
+    const f = cFilter.trim().toLowerCase();
+    const base = containers.filter(
+      (c) =>
+        (!cStatus || c.status === cStatus) &&
+        (!f ||
+          c.key.toLowerCase().includes(f) ||
+          (c.summary ?? "").toLowerCase().includes(f)),
+    );
+    return [...base].sort((a, b) => {
+      let cmp: number;
+      switch (cSortField) {
+        case "summary":
+          cmp = cmpStr(a.summary, b.summary) || keyCompare(a.key, b.key);
+          break;
+        case "status":
+          cmp = cmpStr(a.status, b.status) || keyCompare(a.key, b.key);
+          break;
+        default:
+          cmp = keyCompare(a.key, b.key);
+      }
+      return applyDir(cmp, cSortDesc);
+    });
+  }, [containers, cFilter, cStatus, cSortField, cSortDesc]);
+
+  useEffect(() => {
+    if (viewContainers.length === 0) return;
+    if (!viewContainers.some((c) => c.key === selected)) {
+      setSelected(viewContainers[0].key);
+    }
+  }, [viewContainers, selected]);
 
   // commitInlineRename saves the detail card's editable name (an inline path to
   // the same rename CRUD as the Actions menu).
@@ -168,6 +214,19 @@ export function ContainersView({
       else next.add(testKey);
       return next;
     });
+  }
+
+  function toggleRowSort(field: string) {
+    if (rowSortField === field) {
+      setRowSortDesc((d) => !d);
+    } else {
+      setRowSortField(field);
+      setRowSortDesc(false);
+    }
+  }
+  function rowSortIndicator(field: string): string {
+    if (rowSortField !== field) return "";
+    return rowSortDesc ? " ↓" : " ↑";
   }
 
   // applyBulkRunStatus sets one result on every selected Test in the execution.
@@ -261,6 +320,11 @@ export function ContainersView({
   }, [mode, selected, kind]);
 
   useEffect(() => {
+    setCFilter("");
+    setCStatus("");
+  }, [kind]);
+
+  useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
     setLoading(true);
@@ -307,7 +371,28 @@ export function ContainersView({
   }, [profileId, selected, refreshKey]);
 
   // Client-side paging of the member table.
-  const allRows = board?.rows ?? [];
+  const allRows = useMemo(() => {
+    const rows = board?.rows ?? [];
+    return [...rows].sort((a, b) => {
+      let cmp: number;
+      switch (rowSortField) {
+        case "summary":
+          cmp = cmpStr(a.summary, b.summary) || keyCompare(a.testKey, b.testKey);
+          break;
+        case "status":
+          cmp = cmpStr(a.status, b.status) || keyCompare(a.testKey, b.testKey);
+          break;
+        case "result":
+          cmp =
+            cmpStr(a.runStatus, b.runStatus) ||
+            keyCompare(a.testKey, b.testKey);
+          break;
+        default:
+          cmp = keyCompare(a.testKey, b.testKey);
+      }
+      return applyDir(cmp, rowSortDesc);
+    });
+  }, [board, rowSortField, rowSortDesc]);
   const boardTotalPages = Math.max(
     1,
     Math.ceil(allRows.length / pageSize),
@@ -363,10 +448,10 @@ export function ContainersView({
             <select
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
-              disabled={containers.length === 0}
+              disabled={viewContainers.length === 0}
             >
-              {containers.length === 0 && <option value="">None</option>}
-              {containers.map((c) => (
+              {viewContainers.length === 0 && <option value="">None</option>}
+              {viewContainers.map((c) => (
                 <option key={c.key} value={c.key}>
                   {c.key} — {c.summary}
                 </option>
@@ -461,6 +546,44 @@ export function ContainersView({
             ]}
           />
         </div>
+      </div>
+
+      <div className="container-filter-bar">
+        <input
+          className="search container-filter"
+          placeholder={`Filter ${kindLabel}s by key or name…`}
+          value={cFilter}
+          onChange={(e) => setCFilter(e.target.value)}
+        />
+        <select
+          className="container-status-filter"
+          value={cStatus}
+          onChange={(e) => setCStatus(e.target.value)}
+          title="Filter by status"
+        >
+          <option value="">All statuses</option>
+          {statusOptions.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <SortControl
+          fields={[
+            { value: "key", label: "Key" },
+            { value: "summary", label: "Name" },
+            { value: "status", label: "Status" },
+          ]}
+          field={cSortField}
+          desc={cSortDesc}
+          onChange={(f, d) => {
+            setCSortField(f);
+            setCSortDesc(d);
+          }}
+        />
+        <span className="muted container-filter-count">
+          {viewContainers.length} of {containers.length}
+        </span>
       </div>
 
       {error && <div className="error-text">{error}</div>}
@@ -584,10 +707,34 @@ export function ContainersView({
                   />
                 </th>
               )}
-              <th>Test</th>
-              <th>Summary</th>
-              <th>Status</th>
-              <th>Execution</th>
+              <th
+                className="board-sort-th"
+                onClick={() => toggleRowSort("key")}
+                title="Sort by test key"
+              >
+                Test{rowSortIndicator("key")}
+              </th>
+              <th
+                className="board-sort-th"
+                onClick={() => toggleRowSort("summary")}
+                title="Sort by summary"
+              >
+                Summary{rowSortIndicator("summary")}
+              </th>
+              <th
+                className="board-sort-th"
+                onClick={() => toggleRowSort("status")}
+                title="Sort by status"
+              >
+                Status{rowSortIndicator("status")}
+              </th>
+              <th
+                className="board-sort-th"
+                onClick={() => toggleRowSort("result")}
+                title="Sort by run result"
+              >
+                Execution{rowSortIndicator("result")}
+              </th>
               <th aria-label="Remove" />
             </tr>
           </thead>

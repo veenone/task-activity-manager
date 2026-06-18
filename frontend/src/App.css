@@ -4278,3 +4278,25 @@ tr.row-checked:hover {
   padding: 2px 8px;
   line-height: 1;
 }
+.container-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.container-filter-bar .container-filter {
+  flex: 1 1 220px;
+  min-width: 160px;
+}
+.container-filter-count {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.board-sort-th {
+  cursor: pointer;
+  user-select: none;
+}
+.board-sort-th:hover {
+  text-decoration: underline;
+}
