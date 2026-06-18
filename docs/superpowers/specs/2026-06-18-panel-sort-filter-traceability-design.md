@@ -57,11 +57,15 @@ toggle button, emitting `(field, desc)`. Each panel sorts its in-memory list
 
 Sort fields per panel:
 
-| Panel | Fields | Default |
+| Panel | Fields (only those the DTO exposes) | Default |
 |-------|--------|---------|
-| Requirements | Key, Updated, Coverage | Key, desc |
-| Preconditions | Key, Updated, Usage count, Type | Key, desc |
-| Bugs | Key, Updated, Status, Project | Key, desc |
+| Requirements | Key, Coverage, Tests (count), Status | Key, desc |
+| Preconditions | Key, Type, Usage (count) | Key, desc |
+| Bugs | Key, Status, Project, Priority | Key, desc |
+
+(The projected DTOs — `RequirementCoverage`, `PreconditionUsage`,
+`BugWithTests` — carry no `updated` timestamp, so "Updated" is intentionally not
+offered here to avoid expanding the backend DTOs.)
 
 Existing filter boxes and pagination are untouched; sort applies to the filtered
 set so the page count reflects the active filter.
@@ -127,18 +131,28 @@ re-triggers the Sankey effect). The Requirement Sankey stays independent.
 
 ### Item 5b — Cross-project executions and bugs
 
-1. **Demo seed:** extend the demo generator so a couple of Test Executions live
-   in a *different* project key than the profile project but run this project's
-   tests, giving the `crossProject` toggle real data. Add a unit test for
-   `projectKeyOf` covering the real key shape (`RND_P_4TFINT_05-123` →
-   `RND_P_4TFINT_05`) and the demo shape (`DEMO-TE-1` → `DEMO`).
+Investigation correction: the demo generator **already** seeds two cross-project
+executions (`XRAYINT-TE-1/2`, `demo.go:411-447`) that run this project's tests,
+and `app.go:1659-1669` already threads the profile `projectKey` into
+`GetTraceabilitySankey`, so the executions path should work. The remaining work
+is therefore a regression test plus the genuinely-missing bug surfacing:
+
+1. **Regression test (executions):** a `GetTraceabilitySankey` test in
+   `internal/testrepo` asserting that with `crossProjectOnly=true` over seeded
+   data, only executions whose key prefix differs from the profile project
+   survive (and the in-project ones drop). Plus a `projectKeyOf` unit test for
+   the real key shape (`RND_P_4TFINT_05-123` → `RND_P_4TFINT_05`) and the demo
+   shape (`XRAYINT-TE-1` → `XRAYINT`). If the test reveals a threading/prefix
+   bug, fix it; if it passes, the executions path is confirmed working.
 2. **Cross-project bugs on the dashboard:** when `crossProject` is on, show a
    compact "cross-project bugs" list/count beside the Sankey, driven by the
    existing `ListBugsWithTests` data filtered to bugs whose `projectKey` differs
    from the profile project. Each entry is a hyperlink (same open-in-browser
    pattern already used on test detail). Bugs are **not** woven into the Sankey
    flow — they are not a run status and would break the balanced-flow invariant
-   (Plan→Exec→Status each sum to the same total).
+   (Plan→Exec→Status each sum to the same total). This needs the profile project
+   key on the client; add a tiny `GetProfileProjectKey(profileID)` binding (or
+   reuse the existing profile fetch the dashboard can call).
 
 ## Out of scope (YAGNI)
 
