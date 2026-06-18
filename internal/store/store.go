@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 21
+const schemaVersion = 22
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -41,7 +41,9 @@ CREATE TABLE IF NOT EXISTS profiles (
 	project_key TEXT NOT NULL,
 	created_at  TEXT NOT NULL,
 	scope_jql   TEXT NOT NULL DEFAULT '',
-	bug_issue_type TEXT NOT NULL DEFAULT 'Bug'
+	bug_issue_type TEXT NOT NULL DEFAULT 'Bug',
+	bug_project_mode TEXT NOT NULL DEFAULT 'test',
+	bug_project_key TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS sync_state (
@@ -434,6 +436,19 @@ func applyMigrations(db *sql.DB) error {
 			`ALTER TABLE profiles ADD COLUMN bug_issue_type TEXT NOT NULL DEFAULT 'Bug'`,
 		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return fmt.Errorf("v21 add bug_issue_type: %w", err)
+		}
+	}
+	// v22: per-profile bug project — which project a filed defect lands in
+	// (mode "test" / "execution" / "dedicated") and the dedicated key. Fresh
+	// installs get these from the CREATE above; these ALTERs catch pre-v22 DBs.
+	if current < 22 {
+		for _, stmt := range []string{
+			`ALTER TABLE profiles ADD COLUMN bug_project_mode TEXT NOT NULL DEFAULT 'test'`,
+			`ALTER TABLE profiles ADD COLUMN bug_project_key TEXT NOT NULL DEFAULT ''`,
+		} {
+			if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+				return fmt.Errorf("v22 add bug project columns: %w", err)
+			}
 		}
 	}
 	return nil

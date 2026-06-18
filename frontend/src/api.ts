@@ -150,6 +150,8 @@ export interface Profile {
   projectKey: string;
   scopeJql: string;
   bugIssueType: string;
+  bugProjectMode: string; // "test" | "execution" | "dedicated"
+  bugProjectKey: string;
   createdAt: string;
 }
 

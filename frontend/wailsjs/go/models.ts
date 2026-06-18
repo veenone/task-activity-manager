@@ -174,6 +174,8 @@ export namespace profile {
 	    projectKey: string;
 	    scopeJql: string;
 	    bugIssueType: string;
+	    bugProjectMode: string;
+	    bugProjectKey: string;
 	    // Go type: time
 	    createdAt: any;
 	
@@ -189,6 +191,8 @@ export namespace profile {
 	        this.projectKey = source["projectKey"];
 	        this.scopeJql = source["scopeJql"];
 	        this.bugIssueType = source["bugIssueType"];
+	        this.bugProjectMode = source["bugProjectMode"];
+	        this.bugProjectKey = source["bugProjectKey"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	    }
 	

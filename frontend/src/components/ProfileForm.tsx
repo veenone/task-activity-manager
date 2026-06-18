@@ -74,6 +74,12 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
   const [projectKey, setProjectKey] = useState(profile?.projectKey ?? "");
   const [scopeJql, setScopeJql] = useState(profile?.scopeJql ?? "");
   const [bugIssueType, setBugIssueType] = useState(profile?.bugIssueType ?? "");
+  const [bugProjectMode, setBugProjectMode] = useState(
+    profile?.bugProjectMode || "test",
+  );
+  const [bugProjectKey, setBugProjectKey] = useState(
+    profile?.bugProjectKey ?? "",
+  );
   const [token, setToken] = useState("");
   // Reuse a stored PAT from an existing profile (create only). "" = enter a new
   // token below.
@@ -126,6 +132,10 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
     setError("");
     try {
       const key = projectKey.trim().toUpperCase();
+      const bugProjKey =
+        bugProjectMode === "dedicated"
+          ? bugProjectKey.trim().toUpperCase()
+          : "";
       let p: Profile;
       if (isEdit) {
         p = await UpdateProfile(
@@ -135,6 +145,8 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           key,
           scopeJql.trim(),
           bugIssueType.trim(),
+          bugProjectMode,
+          bugProjKey,
           token.trim(),
         );
       } else if (reuseFrom !== "") {
@@ -144,6 +156,8 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           key,
           scopeJql.trim(),
           bugIssueType.trim(),
+          bugProjectMode,
+          bugProjKey,
           reuseFrom,
         );
       } else {
@@ -153,6 +167,8 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           key,
           scopeJql.trim(),
           bugIssueType.trim(),
+          bugProjectMode,
+          bugProjKey,
           token.trim(),
         );
       }
@@ -213,6 +229,28 @@ export function ProfileForm({ onCreated, onCancel, profile, profiles, extraActio
           spellCheck={false}
         />
       </label>
+      <label>
+        Bug project
+        <select
+          value={bugProjectMode}
+          onChange={(e) => setBugProjectMode(e.target.value)}
+        >
+          <option value="test">Same as test (the test's project)</option>
+          <option value="execution">Same as the Test Execution</option>
+          <option value="dedicated">Dedicated project…</option>
+        </select>
+      </label>
+      {bugProjectMode === "dedicated" && (
+        <label>
+          Dedicated bug project key
+          <input
+            value={bugProjectKey}
+            onChange={(e) => setBugProjectKey(e.target.value.toUpperCase())}
+            placeholder="e.g. DEFECTS — project where bugs are filed"
+            spellCheck={false}
+          />
+        </label>
+      )}
       {!isEdit && others.length > 0 && (
         <label>
           Personal Access Token

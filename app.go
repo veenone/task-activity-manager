@@ -237,11 +237,11 @@ func (a *App) ListProfiles() ([]profile.Profile, error) {
 // CreateProfile stores a new profile and saves its PAT to the OS credential
 // manager. The token is never written to the database. scopeJQL is an optional
 // JQL fragment that narrows which Tests sync (FR-5.4).
-func (a *App) CreateProfile(name, jiraURL, projectKey, scopeJQL, bugIssueType, token string) (profile.Profile, error) {
+func (a *App) CreateProfile(name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey, token string) (profile.Profile, error) {
 	if err := a.requireStore(); err != nil {
 		return profile.Profile{}, err
 	}
-	p, err := a.profiles.Create(name, jiraURL, projectKey, scopeJQL, bugIssueType)
+	p, err := a.profiles.Create(name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey)
 	if err != nil {
 		return profile.Profile{}, err
 	}
@@ -256,7 +256,7 @@ func (a *App) CreateProfile(name, jiraURL, projectKey, scopeJQL, bugIssueType, t
 // Access Token already stored for an existing profile (FR-5) — convenient when
 // several projects share one Jira instance. The token is copied within the OS
 // credential manager and never exposed to the frontend.
-func (a *App) CreateProfileReusingToken(name, jiraURL, projectKey, scopeJQL, bugIssueType, sourceProfileID string) (profile.Profile, error) {
+func (a *App) CreateProfileReusingToken(name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey, sourceProfileID string) (profile.Profile, error) {
 	if err := a.requireStore(); err != nil {
 		return profile.Profile{}, err
 	}
@@ -267,7 +267,7 @@ func (a *App) CreateProfileReusingToken(name, jiraURL, projectKey, scopeJQL, bug
 	if strings.TrimSpace(token) == "" {
 		return profile.Profile{}, fmt.Errorf("the selected profile has no stored token to reuse")
 	}
-	p, err := a.profiles.Create(name, jiraURL, projectKey, scopeJQL, bugIssueType)
+	p, err := a.profiles.Create(name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey)
 	if err != nil {
 		return profile.Profile{}, err
 	}
@@ -283,7 +283,7 @@ func (a *App) CreateProfileReusingToken(name, jiraURL, projectKey, scopeJQL, bug
 // belongs to the old project) is purged so the next sync pulls the correct
 // project cleanly, and the per-session status/priority caches are dropped. A
 // non-empty token replaces the stored PAT; an empty token leaves it unchanged.
-func (a *App) UpdateProfile(id, name, jiraURL, projectKey, scopeJQL, bugIssueType, token string) (profile.Profile, error) {
+func (a *App) UpdateProfile(id, name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey, token string) (profile.Profile, error) {
 	if err := a.requireStore(); err != nil {
 		return profile.Profile{}, err
 	}
@@ -291,7 +291,7 @@ func (a *App) UpdateProfile(id, name, jiraURL, projectKey, scopeJQL, bugIssueTyp
 	if err != nil {
 		return profile.Profile{}, err
 	}
-	if err := a.profiles.Update(id, name, jiraURL, projectKey, scopeJQL, bugIssueType); err != nil {
+	if err := a.profiles.Update(id, name, jiraURL, projectKey, scopeJQL, bugIssueType, bugProjectMode, bugProjectKey); err != nil {
 		return profile.Profile{}, err
 	}
 	if strings.TrimSpace(token) != "" {
@@ -323,11 +323,13 @@ func (a *App) UpdateProfileScope(id, scopeJQL string) error {
 // profileConfig is the shareable shape of a profile — everything except the
 // credential, which never leaves the OS credential manager (FR-5.5).
 type profileConfig struct {
-	Name         string `json:"name"`
-	JiraURL      string `json:"jiraUrl"`
-	ProjectKey   string `json:"projectKey"`
-	ScopeJQL     string `json:"scopeJql"`
-	BugIssueType string `json:"bugIssueType"`
+	Name           string `json:"name"`
+	JiraURL        string `json:"jiraUrl"`
+	ProjectKey     string `json:"projectKey"`
+	ScopeJQL       string `json:"scopeJql"`
+	BugIssueType   string `json:"bugIssueType"`
+	BugProjectMode string `json:"bugProjectMode"`
+	BugProjectKey  string `json:"bugProjectKey"`
 }
 
 // ExportProfile writes a profile's configuration (without its token) to a
@@ -342,7 +344,7 @@ func (a *App) ExportProfile(id string) (string, error) {
 	}
 	data, err := json.MarshalIndent(profileConfig{
 		Name: p.Name, JiraURL: p.JiraURL, ProjectKey: p.ProjectKey, ScopeJQL: p.ScopeJQL,
-		BugIssueType: p.BugIssueType,
+		BugIssueType: p.BugIssueType, BugProjectMode: p.BugProjectMode, BugProjectKey: p.BugProjectKey,
 	}, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("encode profile: %w", err)
@@ -393,7 +395,7 @@ func (a *App) ImportProfile() (profile.Profile, error) {
 	if strings.TrimSpace(cfg.Name) == "" || strings.TrimSpace(cfg.JiraURL) == "" || strings.TrimSpace(cfg.ProjectKey) == "" {
 		return profile.Profile{}, fmt.Errorf("profile file is missing name, URL or project key")
 	}
-	return a.profiles.Create(cfg.Name, cfg.JiraURL, cfg.ProjectKey, cfg.ScopeJQL, cfg.BugIssueType)
+	return a.profiles.Create(cfg.Name, cfg.JiraURL, cfg.ProjectKey, cfg.ScopeJQL, cfg.BugIssueType, cfg.BugProjectMode, cfg.BugProjectKey)
 }
 
 // UpdateProfileToken replaces a profile's stored PAT in the OS credential
@@ -930,9 +932,36 @@ func (a *App) CreateBugForTest(profileID, testKey, execKey, summary, description
 		return "", err
 	}
 	return a.repo.CreateBugForTest(profileID, testKey, execKey, testrepo.BugDraft{
-		ProjectKey: p.ProjectKey, IssueType: p.BugIssueType, Summary: summary,
+		ProjectKey: bugProjectKey(p, execKey), IssueType: p.BugIssueType, Summary: summary,
 		Description: description, Priority: priority, Labels: labels,
 	})
+}
+
+// bugProjectKey resolves which Jira project a filed defect lands in, from the
+// profile's bug-project mode: the test's project (default), the Test
+// Execution's project (parsed from execKey), or a dedicated key. Each falls
+// back to the profile project so a bug always has a project.
+func bugProjectKey(p profile.Profile, execKey string) string {
+	switch p.BugProjectMode {
+	case "execution":
+		if proj := projectOfKey(execKey); proj != "" {
+			return proj
+		}
+	case "dedicated":
+		if k := strings.TrimSpace(p.BugProjectKey); k != "" {
+			return k
+		}
+	}
+	return p.ProjectKey
+}
+
+// projectOfKey returns the Jira project key from an issue key ("PROJ-123" ->
+// "PROJ", "XRAYINT-TE-1" -> "XRAYINT"): the text before the first hyphen.
+func projectOfKey(key string) string {
+	if i := strings.IndexByte(key, '-'); i > 0 {
+		return key[:i]
+	}
+	return ""
 }
 
 // ListBugsWithTests returns every cached bug with the Tests it affects.
