@@ -9,6 +9,15 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 ## [1.5.0] - 2026-06-18
 
 ### Added
+- **Sub-task Test Executions.** Xray sub-task Test Executions (a Test Execution
+  that is a Jira sub-task of a parent issue) now sync from Jira and sit alongside
+  standalone executions: filter by Standalone or Sub-task, see the parent issue
+  on the container card (it opens in the browser), and pick from a type-to-filter
+  searchable dropdown that tints sub-task entries. (RND_P_4TFINT_05-216)
+- **Jira color in text.** Description and step text containing Jira color macros
+  (`{color:#hex}…{color}`) now renders in the proper color in the read view;
+  editing still shows the raw macro so it round-trips back to Jira unchanged.
+  (RND_P_4TFINT_05-217)
 - **Defect tracking.** Raise a bug straight from a failed test in a Test
   Execution, browse every bug linked to the profile's tests in a new Bugs panel,
   and see a test's linked bugs (including ones in other projects) as clickable
@@ -54,6 +63,9 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   order newest first. (RND_P_4TFINT_05-202, RND_P_4TFINT_05-205)
 - Bug sync now respects the profile's sync scope, pulling defects only for the
   in-scope tests instead of for every synced test. (RND_P_4TFINT_05-214)
+- Per-view syncs (the Containers, Requirements, and Bugs tabs) now show their
+  progress in the status bar with a stage label and item count, instead of
+  appearing to do nothing while they run. (RND_P_4TFINT_05-218)
 
 ## [1.4.0] - 2026-06-14
 
