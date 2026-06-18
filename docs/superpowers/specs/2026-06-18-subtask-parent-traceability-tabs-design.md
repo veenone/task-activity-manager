@@ -11,10 +11,12 @@ Two linked changes to the dashboard's traceability area:
 1. **A third Sankey** tracing sub-task Test Executions: **Parent issue → Test
    Execution → Run result** (3 layers), scoped to sub-task executions only
    (those with a parent). It carries a Parent multi-select filter.
-2. **A tabbed container** holding all three Sankeys — Requirement, Execution
-   (the existing Plan→Exec→Status flow), and the new Sub-task flow — so only one
-   shows at a time. The two existing Sankey panels are extracted from
-   `Dashboard` into a focused `TraceabilityTabs` component.
+2. **A dedicated Traceability view** holding all three Sankeys in tabs —
+   Requirement, Execution (the existing Plan→Exec→Status flow), and the new
+   Sub-task flow — so only one shows at a time. The two Sankeys move out of
+   `Dashboard` into a new top-level `TraceabilityTabs` view that gets its own
+   menu entry: a native **View → Traceability** item, a top-bar tab, and a
+   matching Outline "Supported Views" entry.
 
 ## Context (current behavior)
 
@@ -100,45 +102,66 @@ today's values (so the Plan tab is unchanged):
 The hardcoded column-head `<span>`s and empty-state copy in `SankeyChart` read
 from these props. `RequirementSankey` is untouched.
 
-## Feature C — Tabbed traceability container
+## Feature C — Dedicated Traceability view (tabs)
 
-Extract a new `frontend/src/components/TraceabilityTabs.tsx` that owns the
-traceability area. The two Sankey blocks have grown `Dashboard`; moving the
-state, effects, filters and JSX into a focused component keeps `Dashboard`
-readable. `TraceabilityTabs` receives what it needs as props and self-contains
-the rest:
+Create `frontend/src/components/TraceabilityTabs.tsx` as a **self-contained
+top-level view** that owns the whole traceability area (the two Sankeys move out
+of `Dashboard`, which keeps it focused on its stat tiles/bars/duplicates).
 
-- **Props:** `profileId`, `refreshKey`, `nonce`, `jiraUrl`, `projectKey`,
-  `hasCoverage` (`stats.byCoverage.length > 0`), `hasExecutions`
-  (`stats.testExecutions > 0`), and `reqOptions` (the requirement list for the
-  requirement filter).
-- **Owns:** the three Sankey datasets (`reqSankey`, `sankey`, `subSankey`), all
-  filter state (`reqSel`; `planSel`/`execSel`/`crossProject` + the cascaded
-  `execs` options and cross-project bug list; `parentSel` + the derived
-  `parents` list), and the effects that fetch each Sankey (moved verbatim from
-  `Dashboard`, plus a new effect for `GetSubTaskTraceability(profileId,
-  parentSel)`).
+- **Props:** `profileId`, `refreshKey`, `jiraUrl`. The component fetches
+  everything else itself.
+- **Owns and fetches:** the three Sankey datasets (`reqSankey` via
+  `GetRequirementTraceability`, `sankey` via `GetTraceabilitySankey`, `subSankey`
+  via the new `GetSubTaskTraceability`); the gating it needs (`GetStatistics` for
+  `byCoverage`/`testExecutions`, `GetProfileProjectKey` for the cross-project
+  filter and bug list, `ListRequirementsWithCoverage` for the requirement filter
+  options, `ListContainers(profileId, "testexec")` for both the cascaded
+  execution options and the distinct sub-task `parentKey`s); and all filter state
+  (`reqSel`; `planSel`/`execSel`/`crossProject` + cascaded `execs` + the
+  cross-project bug list; `parentSel`). The plan→exec cascade, cross-project bug
+  list, and requirement filter behave exactly as they do today — the logic moves
+  over from `Dashboard` unchanged, with one new effect for
+  `GetSubTaskTraceability(profileId, parentSel)`.
 - **Renders:** a tab bar with three always-visible tabs — **Requirement**,
-  **Execution** (default selected), **Sub-task** — and, below it, the active
-  tab's chart plus that tab's own filters:
+  **Execution** (default selected via `useState<"req"|"exec"|"subtask">("exec")`),
+  **Sub-task** — and, below it, the active tab's chart plus that tab's own
+  filters:
   - Requirement → `RequirementSankey` + the requirement `MultiSelect`.
   - Execution → `SankeyChart` (default columns) + the plan/exec `MultiSelect`s,
-    cross-project toggle, clear button, and the cross-project bug list (the
-    current behavior, moved as-is).
+    cross-project toggle, clear button, and the cross-project bug list.
   - Sub-task → `SankeyChart` with `columns={["Parent issues","Test
     Executions","Run Status"]}` and the parent-hint empty text, plus a Parent
     `MultiSelect` whose options are the distinct `parentKey`s of the synced
     sub-task executions.
 
-`Dashboard` imports `TraceabilityTabs` and renders it where the two
-`sankey-panel` blocks were, passing the props above; the sankey state, effects
-and JSX are removed from `Dashboard`.
+  Filter state persists across tab switches (it lives in the component, not per
+  tab mount). The tab bar reuses the existing segmented-button styling
+  (`seg-btn`, as in the Containers/Bugs toggle).
 
-Tab state is a local `useState<"req" | "exec" | "subtask">("exec")`. Each tab's
-filters keep their state across tab switches (the state lives in the component,
-not per-tab-mount). The tab bar reuses the existing segmented-button styling
-(e.g. the `seg-btn` pattern used by the Containers/Bugs toggle) so no new visual
-language is introduced.
+`Dashboard` loses the two `sankey-panel` blocks and all their state/effects (and
+the now-unused imports). The traceability `MultiSelect`s it imported move with it.
+
+## Feature D — Menu entry and navigation
+
+Add **Traceability** as a top-level view, distinct from Dashboard:
+
+- `frontend/src/App.tsx`:
+  - Add the view to the `view` union/state and render
+    `<main className="content content-dashboard"><TraceabilityTabs profileId={…}
+    refreshKey={…} jiraUrl={…} /></main>` for `view === "traceability"`.
+  - Add a top-bar `view-tab` button "Traceability" (placed after Dashboard).
+  - Add `"menu:view-traceability": () => setView("traceability")` to
+    `menuActions.current`.
+- `main.go` `appMenu`: add `view.AddText("Traceability", nil,
+  emit("menu:view-traceability"))` to the View submenu (after "Dashboard").
+
+No backend or binding change for the menu itself — it reuses the existing
+`menu:view-*` event pattern.
+
+**Outline docs** (the documentation "menu"): add a Traceability entry to the XTM
+**Supported Views** doc and mention the sub-task traceability Sankey + the new
+view in the **Feature List**. These doc edits happen at the end, after the code
+ships, and are not part of the Go/TS test surface.
 
 ## Out of scope (YAGNI)
 
@@ -159,7 +182,9 @@ language is introduced.
 
 ## Rollout
 
-One slice (the three features are interdependent — the tab container needs the
-new chart and the renderer params). Suggested commit order within it: backend +
-binding, then `SankeyChart` param props, then `TraceabilityTabs` extraction +
-wiring.
+One slice (the features are interdependent — the view needs the new chart and
+the renderer params). Suggested commit order within it: backend +
+binding; `SankeyChart` param props; `TraceabilityTabs` component (moving the
+sankey logic out of `Dashboard`); the `Traceability` view + menu wiring (App.tsx
+tab/menuActions + `main.go` View menu); then the Outline doc updates (Supported
+Views + Feature List) after the build is green.
