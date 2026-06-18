@@ -11,10 +11,12 @@ import (
 // containerDeleteSnapshot captures a Container plus its memberships so a
 // discarded delete can restore it.
 type containerDeleteSnapshot struct {
-	Kind    string   `json:"kind"`
-	Summary string   `json:"summary"`
-	Status  string   `json:"status"`
-	Members []string `json:"members"`
+	Kind      string   `json:"kind"`
+	Summary   string   `json:"summary"`
+	Status    string   `json:"status"`
+	ParentKey string   `json:"parentKey"`
+	IssueType string   `json:"issueType"`
+	Members   []string `json:"members"`
 }
 
 // EditContainer renames a Test Set / Plan / Execution (edits its summary) and
@@ -120,9 +122,9 @@ func (r *Repository) DeleteContainer(profileID, key string) error {
 
 	var snap containerDeleteSnapshot
 	err = tx.QueryRow(
-		`SELECT kind, summary, status FROM test_container WHERE profile_id = ? AND jira_key = ?`,
+		`SELECT kind, summary, status, parent_key, issue_type FROM test_container WHERE profile_id = ? AND jira_key = ?`,
 		profileID, key,
-	).Scan(&snap.Kind, &snap.Summary, &snap.Status)
+	).Scan(&snap.Kind, &snap.Summary, &snap.Status, &snap.ParentKey, &snap.IssueType)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("container %s not found", key)
 	}

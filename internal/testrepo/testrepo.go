@@ -1350,6 +1350,8 @@ func (r *Repository) SeedSampleContainers(profileID, projectKey string) (SeedRes
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	// parent_key / issue_type omitted on purpose: seeded containers are always
+	// standalone, so a re-seed must not clobber a synced sub-task's parent link.
 	containerStmt, err := tx.Prepare(
 		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status)
 		 VALUES (?, ?, ?, ?, ?)
@@ -3497,9 +3499,9 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 			return fmt.Errorf("decode container snapshot: %w", err)
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO test_container (profile_id, jira_key, kind, summary, status)
-			   VALUES (?, ?, ?, ?, ?)`,
-			profileID, entityKey, snap.Kind, snap.Summary, snap.Status,
+			`INSERT INTO test_container (profile_id, jira_key, kind, summary, status, parent_key, issue_type)
+			   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			profileID, entityKey, snap.Kind, snap.Summary, snap.Status, snap.ParentKey, snap.IssueType,
 		); err != nil {
 			return fmt.Errorf("restore container: %w", err)
 		}
