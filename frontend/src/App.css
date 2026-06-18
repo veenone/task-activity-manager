@@ -4183,9 +4183,24 @@ tr.row-checked:hover {
   flex-direction: column;
   min-height: 0;
 }
+.bugs-md-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex: 0 0 auto;
+}
+.bugs-md-title {
+  font-weight: 600;
+  font-size: 13px;
+}
 .bugs-md-filter {
   margin-bottom: 8px;
-  flex-shrink: 0;
+  /* The base .search class sets flex: 1, which would let this input grow
+     vertically in the column flex layout and balloon when the bug list is
+     present. Pin it so it keeps a fixed height regardless of the list. */
+  flex: 0 0 auto;
 }
 .bugs-md-empty {
   padding: 14px 4px;

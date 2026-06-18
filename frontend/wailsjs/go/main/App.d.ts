@@ -235,6 +235,8 @@ export function SetTestRunStatus(arg1:string,arg2:string,arg3:string,arg4:string
 
 export function SetTheme(arg1:string):Promise<void>;
 
+export function SyncBugs(arg1:string):Promise<void>;
+
 export function SyncContainers(arg1:string):Promise<void>;
 
 export function SyncProfile(arg1:string):Promise<void>;

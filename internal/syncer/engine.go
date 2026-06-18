@@ -152,6 +152,14 @@ func (e *Engine) SyncContainers(ctx context.Context, profileID, projectKey strin
 	return e.syncContainers(ctx, profileID, projectKey, func(Progress) {})
 }
 
+// SyncBugs reconciles only the defect issues linked to the profile's tests — the
+// per-view partial sync behind the Bugs panel's refresh button, so refreshing
+// bugs doesn't trigger the preconditions / containers / requirements passes
+// (RND_P_4TFINT_05-214).
+func (e *Engine) SyncBugs(ctx context.Context, profileID, projectKey string) error {
+	return e.syncBugs(ctx, profileID, projectKey, func(Progress) {})
+}
+
 // the tree response (applied on every sync, free), and — on a full sync only —
 // a per-folder walk for instances whose tree doesn't carry Test keys. It is
 // best-effort: every failure is logged and swallowed so a folder-API problem

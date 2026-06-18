@@ -531,6 +531,15 @@ func (a *App) SyncContainers(profileID string) error {
 	})
 }
 
+// SyncBugs refreshes just the defect issues linked to the profile's tests from
+// Jira, so the Bugs panel can refresh without triggering a full profile sync
+// (RND_P_4TFINT_05-214).
+func (a *App) SyncBugs(profileID string) error {
+	return a.runPartialSync(profileID, func(e *syncer.Engine, projectKey string) error {
+		return e.SyncBugs(a.ctx, profileID, projectKey)
+	})
+}
+
 // SyncTestCalls refreshes the "call test" relationships by re-pulling steps for
 // every test currently known to call another (RND_P_4TFINT_05-207), without a
 // full profile sync. It catches calls added, removed or retargeted on those

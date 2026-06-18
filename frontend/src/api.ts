@@ -26,6 +26,7 @@ export {
   SyncProfile,
   SyncRequirements,
   SyncContainers,
+  SyncBugs,
   SyncTestCalls,
   GetSyncState,
   ListSyncLog,

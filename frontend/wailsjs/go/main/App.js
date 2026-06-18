@@ -458,6 +458,10 @@ export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
 }
 
+export function SyncBugs(arg1) {
+  return window['go']['main']['App']['SyncBugs'](arg1);
+}
+
 export function SyncContainers(arg1) {
   return window['go']['main']['App']['SyncContainers'](arg1);
 }

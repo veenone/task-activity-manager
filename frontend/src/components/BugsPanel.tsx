@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ListBugsWithTests,
   ListTestsForBug,
+  SyncBugs,
   BrowserOpenURL,
   errMsg,
 } from "../api";
@@ -45,6 +46,26 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   const [pageSize, setPageSize] = useState(15);
   const [sortField, setSortField] = useState("key");
   const [sortDesc, setSortDesc] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  // Local refresh nonce: bumped after a bugs-only sync to re-pull the list
+  // without forcing a full profile refresh.
+  const [nonce, setNonce] = useState(0);
+
+  // syncBugs refreshes only the defect issues from Jira (partial sync), so the
+  // Bugs panel can update without re-running preconditions / containers /
+  // requirements (RND_P_4TFINT_05-214).
+  async function syncBugs() {
+    setSyncing(true);
+    setError("");
+    try {
+      await SyncBugs(profileId);
+      setNonce((n) => n + 1);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   useEffect(() => {
     if (!profileId) return;
@@ -59,7 +80,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     return () => {
       cancelled = true;
     };
-  }, [profileId, refreshKey]);
+  }, [profileId, refreshKey, nonce]);
 
   const isDemo = /^(demo$|demo:|mock:)/i.test((jiraUrl ?? "").trim());
   const canLink = !!jiraUrl && !isDemo;
@@ -125,6 +146,17 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   return (
     <div className="bugs-md">
       <div className="bugs-md-list">
+        <div className="bugs-md-head">
+          <span className="bugs-md-title">Bugs</span>
+          <button
+            className="btn"
+            onClick={syncBugs}
+            disabled={syncing}
+            title="Refresh just the linked bugs from Jira (partial sync)"
+          >
+            {syncing ? "Syncing…" : "Sync"}
+          </button>
+        </div>
         {error && <div className="error-text">{error}</div>}
         <input
           className="search bugs-md-filter"
