@@ -4262,3 +4262,19 @@ tr.row-checked:hover {
   font-weight: 600;
   margin: 0 0 14px;
 }
+.sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.sort-control-label {
+  font-size: 12px;
+}
+.sort-control .sort-field {
+  padding: 2px 6px;
+}
+.sort-control .sort-dir {
+  padding: 2px 8px;
+  line-height: 1;
+}
