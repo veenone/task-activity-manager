@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ListBugsWithTests, BrowserOpenURL, errMsg } from "../api";
 import type { BugWithTests } from "../api";
+import { Pager } from "./Pager";
 
 interface Props {
   profileId: string;
@@ -15,6 +16,8 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   const [bugs, setBugs] = useState<BugWithTests[]>([]);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
+  const [page, setPage] = useState(0); // 0-based
+  const [pageSize, setPageSize] = useState(15);
 
   useEffect(() => {
     if (!profileId) return;
@@ -50,6 +53,16 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     );
   }, [bugs, filter]);
 
+  // Reset to the first page whenever the data source or the filter changes, so
+  // a narrowed result set never leaves us stranded on an empty page.
+  useEffect(() => {
+    setPage(0);
+  }, [profileId, refreshKey, filter]);
+
+  const totalPages = Math.max(1, Math.ceil(shown.length / pageSize));
+  const safePage = Math.min(Math.max(0, page), totalPages - 1);
+  const paged = shown.slice(safePage * pageSize, safePage * pageSize + pageSize);
+
   return (
     <div className="bugs-panel">
       {error && <div className="error-text">{error}</div>}
@@ -78,7 +91,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
             </tr>
           </thead>
           <tbody>
-            {shown.map((b) => (
+            {paged.map((b) => (
               <tr key={b.key}>
                 <td>
                   {canLink && !b.key.startsWith("NEW-") ? (
@@ -107,6 +120,18 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
             ))}
           </tbody>
         </table>
+      )}
+      {shown.length > 0 && (
+        <Pager
+          page={safePage}
+          pageSize={pageSize}
+          total={shown.length}
+          onPage={setPage}
+          onPageSize={(n) => {
+            setPageSize(n);
+            setPage(0);
+          }}
+        />
       )}
     </div>
   );
