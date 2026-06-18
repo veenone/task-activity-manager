@@ -3,6 +3,7 @@ import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { BrowserOpenURL } from "../api";
+import { rehypeJiraColor } from "../jiraColor";
 
 // Markdown renders description / step text as GitHub-flavoured markdown.
 //
@@ -33,7 +34,11 @@ const components: Components = {
 export function Markdown({ children }: { children: string }) {
   return (
     <div className="md-body">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeJiraColor]}
+        components={components}
+      >
         {children}
       </ReactMarkdown>
     </div>

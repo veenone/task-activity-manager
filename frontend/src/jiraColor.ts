@@ -74,3 +74,54 @@ export function splitColorSegments(input: string): ColorSegment[] {
   }
   return out;
 }
+
+// Minimal hast node shapes (avoids a hard dependency on @types/hast).
+interface HastText {
+  type: "text";
+  value: string;
+}
+interface HastElement {
+  type: "element";
+  tagName: string;
+  properties?: Record<string, unknown>;
+  children: HastNode[];
+}
+type HastNode = HastText | HastElement | { type: string; children?: HastNode[] };
+
+function colorSpan(seg: ColorSegment): HastNode {
+  if (!seg.color) return { type: "text", value: seg.text } as HastText;
+  return {
+    type: "element",
+    tagName: "span",
+    // react-markdown parses this style string into a React style object.
+    properties: { style: `color:${seg.color}` },
+    children: [{ type: "text", value: seg.text } as HastText],
+  } as HastElement;
+}
+
+// rehype plugin: replace text nodes containing color macros with a mix of text
+// and styled <span> nodes. Builds element nodes programmatically (never enables
+// raw HTML), so no XSS surface is opened.
+export function rehypeJiraColor() {
+  return (tree: { children?: HastNode[] }) => {
+    const walk = (node: { children?: HastNode[] }) => {
+      if (!node.children) return;
+      const next: HastNode[] = [];
+      for (const child of node.children) {
+        if ((child as HastText).type === "text") {
+          const value = (child as HastText).value;
+          if (value.includes("{color")) {
+            for (const seg of splitColorSegments(value)) next.push(colorSpan(seg));
+          } else {
+            next.push(child);
+          }
+        } else {
+          walk(child as { children?: HastNode[] });
+          next.push(child);
+        }
+      }
+      node.children = next;
+    };
+    walk(tree);
+  };
+}
