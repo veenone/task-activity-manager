@@ -257,6 +257,10 @@ export function ContainersView({
   }
 
   useEffect(() => {
+    setBugFor(null);
+  }, [mode, selected, kind]);
+
+  useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
     setLoading(true);
@@ -644,6 +648,7 @@ export function ContainersView({
                         <button
                           className="btn btn-ghost board-bug"
                           title="Create a bug for this failed test"
+                          aria-label="Create bug for this failed test"
                           onClick={() => setBugFor({ testKey: r.testKey, summary: r.summary })}
                         >
                           🐞
