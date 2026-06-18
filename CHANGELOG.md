@@ -6,9 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version is single-sourced in `wails.json` (`info.productVersion`).
 
-## [1.5.0] - 2026-06-17
+## [1.5.0] - 2026-06-18
 
 ### Added
+- **Defect tracking.** Raise a bug straight from a failed test in a Test
+  Execution, browse every bug linked to the profile's tests in a new Bugs panel,
+  and see a test's linked bugs (including ones in other projects) as clickable
+  links on its detail panel. The defect project and issue type are configurable
+  per profile. (RND_P_4TFINT_05-212)
+- **Sort and filter controls.** The Requirements, Preconditions, and Bugs panels
+  gain a sort control (pick a field, toggle ascending or descending). The Test
+  Set / Plan / Execution picker can be filtered by keyword and status, and the
+  execution member table sorts by column. (RND_P_4TFINT_05-213)
+- **Cross-project traceability.** On the dashboard, the Execution filter narrows
+  to the executions of the selected Test Plans, cross-project executions are
+  surfaced by the cross-project filter, and a cross-project bugs list links
+  defects filed in other projects to this project's tests. (RND_P_4TFINT_05-215)
 - **Searchable pickers.** Adding a requirement or precondition (the bulk modals
   and the per-test "+ Link requirement" / "+ Add precondition" controls) and the
   dashboard traceability filters now have a type-to-filter search box, so long
@@ -39,6 +52,8 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
   before KEY-100) instead of as text, and the Browse grid defaults to newest
   first. The Preconditions and requirement lists, and the pickers they back,
   order newest first. (RND_P_4TFINT_05-202, RND_P_4TFINT_05-205)
+- Bug sync now respects the profile's sync scope, pulling defects only for the
+  in-scope tests instead of for every synced test. (RND_P_4TFINT_05-214)
 
 ## [1.4.0] - 2026-06-14
 
