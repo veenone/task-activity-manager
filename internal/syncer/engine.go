@@ -353,6 +353,9 @@ func (e *Engine) syncRequirements(ctx context.Context, profileID, projectKey str
 // syncBugs discovers the defect issues linked to the profile's Tests and
 // reconciles the local cache. Best-effort: failures log and continue.
 func (e *Engine) syncBugs(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
+	// testKeys is a non-nil slice (possibly empty). ListBugs/demoBugs treat nil
+	// as "no filter" and a non-nil empty slice as "nothing", so a profile with
+	// zero synced tests correctly yields no bugs rather than every defect.
 	testKeys, err := e.repo.AllTestKeys(profileID)
 	if err != nil {
 		return err

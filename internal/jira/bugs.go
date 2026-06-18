@@ -28,6 +28,11 @@ type BugLink struct {
 // recognize which linked issues are defects. Demo URLs generate a deterministic
 // cross-project set; the real path is empty until verified on a live instance.
 //
+// testKeys scopes the result: nil returns the full seed (unfiltered); a non-nil
+// empty slice returns nothing; a non-nil non-empty slice filters to only the
+// listed Test keys. This distinction matters only for the demo path; the real
+// path ignores testKeys until implemented.
+//
 // TODO(xtm): real path — read each synced Test's issuelinks (already fetched
 // during the test sync) and keep links whose target issuetype matches the
 // configured issueType; batch-fetch those issues by key via
