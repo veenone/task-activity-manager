@@ -148,10 +148,11 @@ export function ContainersView({
 
   useEffect(() => {
     if (viewContainers.length === 0) return;
-    if (!viewContainers.some((c) => c.key === selected)) {
-      setSelected(viewContainers[0].key);
-    }
-  }, [viewContainers, selected]);
+    setSelected((cur) => {
+      if (viewContainers.some((c) => c.key === cur)) return cur;
+      return viewContainers[0].key;
+    });
+  }, [viewContainers]);
 
   // commitInlineRename saves the detail card's editable name (an inline path to
   // the same rename CRUD as the Actions menu).
@@ -348,6 +349,10 @@ export function ContainersView({
       cancelled = true;
     };
   }, [profileId, kind, refreshKey]);
+
+  useEffect(() => {
+    setBoardPage(0);
+  }, [rowSortField, rowSortDesc]);
 
   useEffect(() => {
     if (!profileId || !selected) {
@@ -739,7 +744,7 @@ export function ContainersView({
             </tr>
           </thead>
           <tbody>
-            {board.rows.length === 0 ? (
+            {allRows.length === 0 ? (
               <tr>
                 <td colSpan={kind === "testexec" ? 6 : 5} className="muted">
                   This {kindLabel.toLowerCase()} has no tests yet — use “+ Add
