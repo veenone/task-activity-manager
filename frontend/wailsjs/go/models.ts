@@ -430,6 +430,24 @@ export namespace testrepo {
 	        this.count = source["count"];
 	    }
 	}
+	export class BugTest {
+	    key: string;
+	    summary: string;
+	    status: string;
+	    runStatus: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BugTest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.runStatus = source["runStatus"];
+	    }
+	}
 	export class BugWithTests {
 	    key: string;
 	    projectKey: string;

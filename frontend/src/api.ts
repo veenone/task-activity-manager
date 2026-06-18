@@ -126,6 +126,7 @@ export {
   CreateBugForTest,
   ListBugsWithTests,
   GetTestBugs,
+  ListTestsForBug,
 } from "../wailsjs/go/main/App";
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
@@ -704,6 +705,15 @@ export interface TestBug {
   summary: string;
   status: string;
   priority: string;
+}
+
+// BugTest mirrors testrepo.BugTest — a Test affected by a bug, with its
+// consolidated run status, for the bug detail pane.
+export interface BugTest {
+  key: string;
+  summary: string;
+  status: string;
+  runStatus: string;
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

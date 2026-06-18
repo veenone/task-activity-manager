@@ -354,6 +354,10 @@ export function ListTests(arg1, arg2) {
   return window['go']['main']['App']['ListTests'](arg1, arg2);
 }
 
+export function ListTestsForBug(arg1, arg2) {
+  return window['go']['main']['App']['ListTestsForBug'](arg1, arg2);
+}
+
 export function ListTestsForPrecondition(arg1, arg2) {
   return window['go']['main']['App']['ListTestsForPrecondition'](arg1, arg2);
 }

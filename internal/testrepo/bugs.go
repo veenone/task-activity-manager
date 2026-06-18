@@ -42,6 +42,15 @@ type TestBug struct {
 	Priority   string `json:"priority"`
 }
 
+// BugTest is a Test affected by a bug, with its consolidated run status — for
+// the bug detail pane.
+type BugTest struct {
+	Key       string `json:"key"`
+	Summary   string `json:"summary"`
+	Status    string `json:"status"`
+	RunStatus string `json:"runStatus"`
+}
+
 // BugDraft is the payload for creating a new bug from a failed test.
 type BugDraft struct {
 	ProjectKey  string   `json:"projectKey"`
@@ -137,6 +146,37 @@ func (r *Repository) GetTestBugs(profileID, testKey string) ([]TestBug, error) {
 			return nil, err
 		}
 		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// ListTestsForBug returns the Tests a bug affects, each with its consolidated
+// run status — for the bug detail pane. Mirrors ListTestsForRequirement.
+func (r *Repository) ListTestsForBug(profileID, bugKey string) ([]BugTest, error) {
+	rows, err := r.db.Query(
+		`SELECT t.jira_key, t.summary, t.status
+		 FROM test_bug l
+		 JOIN test_case t ON t.profile_id = l.profile_id AND t.jira_key = l.test_key
+		 WHERE l.profile_id = ? AND l.bug_key = ?
+		 ORDER BY t.jira_key`,
+		profileID, bugKey)
+	if err != nil {
+		return nil, fmt.Errorf("list bug tests: %w", err)
+	}
+	defer rows.Close()
+
+	runByTest, err := r.consolidatedRunByTest(profileID)
+	if err != nil {
+		return nil, err
+	}
+	out := []BugTest{}
+	for rows.Next() {
+		var bt BugTest
+		if err := rows.Scan(&bt.Key, &bt.Summary, &bt.Status); err != nil {
+			return nil, err
+		}
+		bt.RunStatus = runByTest[bt.Key]
+		out = append(out, bt)
 	}
 	return out, rows.Err()
 }

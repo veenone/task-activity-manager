@@ -951,6 +951,15 @@ func (a *App) GetTestBugs(profileID, testKey string) ([]testrepo.TestBug, error)
 	return a.repo.GetTestBugs(profileID, testKey)
 }
 
+// ListTestsForBug returns the Tests a bug affects, each with its consolidated
+// run status (for the bug detail pane).
+func (a *App) ListTestsForBug(profileID, bugKey string) ([]testrepo.BugTest, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListTestsForBug(profileID, bugKey)
+}
+
 // --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---
 
 // EditTestField applies a local edit to a Test field and queues a pending

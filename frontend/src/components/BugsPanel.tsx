@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ListBugsWithTests, BrowserOpenURL, errMsg } from "../api";
-import type { BugWithTests } from "../api";
+import {
+  ListBugsWithTests,
+  ListTestsForBug,
+  BrowserOpenURL,
+  errMsg,
+} from "../api";
+import type { BugWithTests, BugTest } from "../api";
 import { Pager } from "./Pager";
 
 interface Props {
@@ -10,12 +15,17 @@ interface Props {
   onOpenTest: (testKey: string) => void;
 }
 
-// BugsPanel lists every bug linked to the profile's tests, with the tests each
-// affects. Bug keys open in the browser; test keys open the test detail.
+// BugsPanel is a master-detail view of the defects linked to the profile's
+// tests: a filterable, paginated bug list on the left and, for the selected
+// bug, a detail pane on the right showing its full info plus the affected tests
+// enriched with their consolidated run status. Bug keys open in the browser;
+// test keys open the test detail.
 export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props) {
   const [bugs, setBugs] = useState<BugWithTests[]>([]);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
+  const [selected, setSelected] = useState("");
+  const [tests, setTests] = useState<BugTest[]>([]);
   const [page, setPage] = useState(0); // 0-based
   const [pageSize, setPageSize] = useState(15);
 
@@ -38,7 +48,8 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   const canLink = !!jiraUrl && !isDemo;
   function openBug(key: string) {
     const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
-    if (base && canLink && !key.startsWith("NEW-")) BrowserOpenURL(`${base}/browse/${key}`);
+    if (base && canLink && !key.startsWith("NEW-"))
+      BrowserOpenURL(`${base}/browse/${key}`);
   }
 
   const shown = useMemo(() => {
@@ -53,86 +64,175 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     );
   }, [bugs, filter]);
 
-  // Reset to the first page whenever the data source or the filter changes, so
-  // a narrowed result set never leaves us stranded on an empty page.
+  // Reset to the first page whenever the data source or the filter changes.
   useEffect(() => {
     setPage(0);
   }, [profileId, refreshKey, filter]);
 
+  // Keep a valid selection: default to the first shown bug, and re-point when
+  // the current one is filtered out.
+  useEffect(() => {
+    if (shown.length === 0) {
+      setSelected("");
+    } else if (!shown.some((b) => b.key === selected)) {
+      setSelected(shown[0].key);
+    }
+  }, [shown, selected]);
+
+  // Load the affected tests (with run status) for the selected bug.
+  useEffect(() => {
+    if (!profileId || !selected) {
+      setTests([]);
+      return;
+    }
+    let cancelled = false;
+    ListTestsForBug(profileId, selected)
+      .then((ts) => {
+        if (!cancelled) setTests(ts ?? []);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(errMsg(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, selected, refreshKey]);
+
   const totalPages = Math.max(1, Math.ceil(shown.length / pageSize));
   const safePage = Math.min(Math.max(0, page), totalPages - 1);
   const paged = shown.slice(safePage * pageSize, safePage * pageSize + pageSize);
+  const sel = bugs.find((b) => b.key === selected) ?? null;
 
   return (
-    <div className="bugs-panel">
-      {error && <div className="error-text">{error}</div>}
-      <input
-        className="search"
-        placeholder="Filter bugs by key, summary, project, status…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-      />
-      {shown.length === 0 ? (
-        <p className="muted">
-          {bugs.length === 0
-            ? "No bugs linked to this profile's tests. File one from a failed test in a Test Execution, or sync a demo profile."
-            : "No bugs match the filter."}
-        </p>
-      ) : (
-        <table className="board-table bugs-table">
-          <thead>
-            <tr>
-              <th>Bug</th>
-              <th>Project</th>
-              <th>Summary</th>
-              <th>Status</th>
-              <th>Priority</th>
-              <th>Affects</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((b) => (
-              <tr key={b.key}>
-                <td>
-                  {canLink && !b.key.startsWith("NEW-") ? (
-                    <button className="mono bug-link-key" onClick={() => openBug(b.key)} title={`Open ${b.key} in Jira`}>
-                      {b.key}
-                    </button>
-                  ) : (
-                    <span className="mono">{b.key}</span>
-                  )}
-                </td>
-                <td className="muted">{b.projectKey}</td>
-                <td>{b.summary}</td>
-                <td>{b.status && <span className="status-pill">{b.status}</span>}</td>
-                <td>{b.priority}</td>
-                <td>
-                  {b.testKeys.map((tk, i) => (
-                    <span key={tk}>
-                      {i > 0 && ", "}
-                      <button className="mono bug-link-key" onClick={() => onOpenTest(tk)} title={`Open ${tk}`}>
-                        {tk}
-                      </button>
-                    </span>
-                  ))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {shown.length > 0 && (
-        <Pager
-          page={safePage}
-          pageSize={pageSize}
-          total={shown.length}
-          onPage={setPage}
-          onPageSize={(n) => {
-            setPageSize(n);
-            setPage(0);
-          }}
+    <div className="bugs-md">
+      <div className="bugs-md-list">
+        {error && <div className="error-text">{error}</div>}
+        <input
+          className="search bugs-md-filter"
+          placeholder="Filter bugs by key, summary, project, status…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
         />
-      )}
+        {shown.length === 0 ? (
+          <p className="muted bugs-md-empty">
+            {bugs.length === 0
+              ? "No bugs linked to this profile's tests. File one from a failed test in a Test Execution, or sync a demo profile."
+              : "No bugs match the filter."}
+          </p>
+        ) : (
+          <>
+            <ul className="bugs-md-items">
+              {paged.map((b) => (
+                <li
+                  key={b.key}
+                  className={`bugs-md-item${b.key === selected ? " bugs-md-item-selected" : ""}`}
+                  onClick={() => setSelected(b.key)}
+                >
+                  <div className="bugs-md-item-top">
+                    <span className="mono bugs-md-key">{b.key}</span>
+                    <span className="muted">{b.projectKey}</span>
+                    {b.status && <span className="status-pill">{b.status}</span>}
+                  </div>
+                  <div className="bugs-md-item-summary">
+                    {b.summary || "(no summary)"}
+                  </div>
+                  <div className="bugs-md-item-meta muted">
+                    {b.priority} · {b.testKeys.length} test
+                    {b.testKeys.length === 1 ? "" : "s"}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <Pager
+              compact
+              page={safePage}
+              pageSize={pageSize}
+              total={shown.length}
+              onPage={setPage}
+              onPageSize={(n) => {
+                setPageSize(n);
+                setPage(0);
+              }}
+            />
+          </>
+        )}
+      </div>
+
+      <div className="bugs-md-detail">
+        {!sel ? (
+          <p className="muted">Select a bug to see its details.</p>
+        ) : (
+          <>
+            <div className="bugs-md-detail-head">
+              {canLink && !sel.key.startsWith("NEW-") ? (
+                <button
+                  className="mono bug-link-key bugs-md-detail-key"
+                  onClick={() => openBug(sel.key)}
+                  title={`Open ${sel.key} in Jira`}
+                >
+                  {sel.key}
+                </button>
+              ) : (
+                <span className="mono bugs-md-detail-key">{sel.key}</span>
+              )}
+              <span className="muted">{sel.projectKey}</span>
+              {sel.status && <span className="status-pill">{sel.status}</span>}
+              {sel.priority && (
+                <span className="muted bugs-md-detail-priority">
+                  {sel.priority}
+                </span>
+              )}
+            </div>
+            <h2 className="bugs-md-detail-summary">
+              {sel.summary || "(no summary)"}
+            </h2>
+
+            <h4>Affected tests ({tests.length})</h4>
+            {tests.length === 0 ? (
+              <p className="muted">No affected tests.</p>
+            ) : (
+              <table className="board-table">
+                <thead>
+                  <tr>
+                    <th>Test</th>
+                    <th>Summary</th>
+                    <th>Status</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tests.map((t) => (
+                    <tr key={t.key}>
+                      <td>
+                        <button
+                          className="mono bug-link-key"
+                          onClick={() => onOpenTest(t.key)}
+                          title={`Open ${t.key}`}
+                        >
+                          {t.key}
+                        </button>
+                      </td>
+                      <td>{t.summary}</td>
+                      <td>{t.status || "—"}</td>
+                      <td>
+                        {t.runStatus ? (
+                          <span
+                            className={`run-badge run-${t.runStatus.toLowerCase()}`}
+                          >
+                            {t.runStatus}
+                          </span>
+                        ) : (
+                          <span className="muted">not run</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

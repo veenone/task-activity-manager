@@ -6,6 +6,58 @@ import (
 	"xray-test-manager/internal/testrepo"
 )
 
+func TestListTestsForBugReturnsAffectedTestsWithRunStatus(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login"},
+		{Key: "QA-2", ID: "2", Summary: "Logout"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.ReplaceAllBugs("p1", []testrepo.Bug{
+		{Key: "BUGS-1", ProjectKey: "BUGS", IssueType: "Bug", Summary: "crash", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed bug: %v", err)
+	}
+	if err := repo.ReplaceAllBugLinks("p1", []testrepo.BugLink{
+		{TestKey: "QA-1", BugKey: "BUGS-1", LinkID: "1"},
+		{TestKey: "QA-2", BugKey: "BUGS-1", LinkID: "2"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TE-1", Kind: "testexec", Summary: "Cycle 1"},
+	}); err != nil {
+		t.Fatalf("seed exec: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TE-1", TestKey: "QA-1", RunStatus: "FAIL"},
+	}); err != nil {
+		t.Fatalf("seed runs: %v", err)
+	}
+
+	tests, err := repo.ListTestsForBug("p1", "BUGS-1")
+	if err != nil {
+		t.Fatalf("list tests for bug: %v", err)
+	}
+	if len(tests) != 2 {
+		t.Fatalf("affected tests = %d, want 2", len(tests))
+	}
+	byKey := map[string]testrepo.BugTest{}
+	for _, bt := range tests {
+		byKey[bt.Key] = bt
+	}
+	if byKey["QA-1"].RunStatus != "FAIL" {
+		t.Errorf("QA-1 run status = %q, want FAIL", byKey["QA-1"].RunStatus)
+	}
+	if byKey["QA-1"].Summary != "Login" {
+		t.Errorf("QA-1 summary = %q, want Login", byKey["QA-1"].Summary)
+	}
+	if byKey["QA-2"].RunStatus != "" {
+		t.Errorf("QA-2 run status = %q, want empty (not run)", byKey["QA-2"].RunStatus)
+	}
+}
+
 func TestCreateBugForTestQueuesAndDiscardRestores(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{{Key: "QA-1", ID: "1", Summary: "Login"}}); err != nil {

@@ -183,6 +183,8 @@ export function ListTestCallLinks(arg1:string):Promise<Array<testrepo.TestCallLi
 
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 
+export function ListTestsForBug(arg1:string,arg2:string):Promise<Array<testrepo.BugTest>>;
+
 export function ListTestsForPrecondition(arg1:string,arg2:string):Promise<Array<testrepo.PreconditionTest>>;
 
 export function ListTestsForRequirement(arg1:string,arg2:string):Promise<Array<testrepo.RequirementTest>>;
