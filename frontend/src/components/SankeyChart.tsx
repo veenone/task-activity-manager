@@ -7,6 +7,11 @@ interface Props {
   // than "no data synced yet" — the two look identical otherwise.
   filtered?: boolean;
   onClearFilter?: () => void;
+  // Column headers (layer 0/1/2). Defaults to the Plan/Execution/Status flow.
+  columns?: [string, string, string];
+  // Empty-state copy, so a reused chart (e.g. sub-task) reads correctly.
+  emptyHint?: string;
+  filteredHint?: string;
 }
 
 const NODE_W = 14;
@@ -54,7 +59,14 @@ interface PlacedLink {
 // It fills the container width (measured), grows vertically with min-height
 // nodes so even single-run executions stay visible, and scrolls when tall —
 // so hundreds of executions remain legible. Hovering a node traces its flow.
-export function SankeyChart({ data, filtered, onClearFilter }: Props) {
+export function SankeyChart({
+  data,
+  filtered,
+  onClearFilter,
+  columns,
+  emptyHint,
+  filteredHint,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -79,14 +91,20 @@ export function SankeyChart({ data, filtered, onClearFilter }: Props) {
   );
 
   const empty = !data || data.nodes.length === 0;
+  const cols = columns ?? ["Test Plans", "Test Executions", "Run Status"];
+  const emptyMsg =
+    emptyHint ??
+    "No execution data to trace yet — sync test executions to populate the traceability flow.";
+  const filteredMsg =
+    filteredHint ??
+    "No execution runs match the selected Test Plan / Execution. The chosen plan's tests may not be in any execution yet.";
 
   return (
     <div className="sankey-wrap" ref={ref}>
       {empty ? (
         filtered ? (
           <p className="muted sankey-empty">
-            No execution runs match the selected Test Plan / Execution. The
-            chosen plan&apos;s tests may not be in any execution yet.{" "}
+            {filteredMsg}{" "}
             {onClearFilter && (
               <button className="btn btn-ghost sankey-clear" onClick={onClearFilter}>
                 Clear filter
@@ -94,10 +112,7 @@ export function SankeyChart({ data, filtered, onClearFilter }: Props) {
             )}
           </p>
         ) : (
-          <p className="muted sankey-empty">
-            No execution data to trace yet — sync test executions to populate the
-            traceability flow.
-          </p>
+          <p className="muted sankey-empty">{emptyMsg}</p>
         )
       ) : !layout ? (
         <div className="sankey-loading muted">…</div>
@@ -108,13 +123,13 @@ export function SankeyChart({ data, filtered, onClearFilter }: Props) {
               className="sankey-col-head"
               style={{ left: 0, width: layout.planX - 4, textAlign: "right" }}
             >
-              Test Plans
+              {cols[0]}
             </span>
             <span className="sankey-col-head" style={{ left: layout.execX }}>
-              Test Executions
+              {cols[1]}
             </span>
             <span className="sankey-col-head" style={{ left: layout.statusX }}>
-              Run Status
+              {cols[2]}
             </span>
           </div>
 
