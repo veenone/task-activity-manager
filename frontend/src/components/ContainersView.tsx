@@ -624,22 +624,6 @@ export function ContainersView({
             <span className="mono container-card-key">
               {selectedContainer.key}
             </span>
-            {selectedContainer.parentKey && (
-              <span className="container-parent">
-                <button
-                  className="mono container-parent-link"
-                  onClick={() => openParent(selectedContainer.parentKey)}
-                  title={`Open parent ${selectedContainer.parentKey} in Jira`}
-                >
-                  ↳ {selectedContainer.parentKey}
-                </button>
-                {selectedContainer.issueType && (
-                  <span className="container-parent-type">
-                    {selectedContainer.issueType}
-                  </span>
-                )}
-              </span>
-            )}
             {selectedContainer.status && (
               <span className="status-pill">{selectedContainer.status}</span>
             )}
@@ -655,6 +639,23 @@ export function ContainersView({
               + Add tests
             </button>
           </div>
+
+          {selectedContainer.parentKey && (
+            <div className="container-parent">
+              <button
+                className="mono container-parent-link"
+                onClick={() => openParent(selectedContainer.parentKey)}
+                title={`Open parent ${selectedContainer.parentKey} in Jira`}
+              >
+                ↳ {selectedContainer.parentKey}
+              </button>
+              {selectedContainer.issueType && (
+                <span className="container-parent-type">
+                  {selectedContainer.issueType}
+                </span>
+              )}
+            </div>
+          )}
 
           {editingName ? (
             <input
