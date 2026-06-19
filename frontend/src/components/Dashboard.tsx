@@ -6,7 +6,6 @@ import { DuplicatesCard } from "./DuplicatesCard";
 interface Props {
   profileId: string;
   refreshKey: number;
-  jiraUrl?: string;
   onOpenDuplicates?: () => void;
 }
 
@@ -16,7 +15,6 @@ interface Props {
 export function Dashboard({
   profileId,
   refreshKey,
-  jiraUrl,
   onOpenDuplicates,
 }: Props) {
   const [stats, setStats] = useState<Statistics | null>(null);
