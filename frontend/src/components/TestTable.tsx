@@ -12,6 +12,7 @@ import {
 } from "../api";
 import { usePrompt } from "./usePrompt";
 import { formatDate } from "../dates";
+import { REVIEW_ENABLED } from "../features";
 import type {
   TestPage,
   TestQuery,
@@ -521,18 +522,20 @@ export function TestTable({
             <option key={s} value={s} />
           ))}
         </datalist>
-        <select
-          className="review-filter"
-          value={review}
-          onChange={(e) => setReview(e.target.value)}
-          title="Filter by review verdict"
-        >
-          <option value="">Any review</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="pending">Pending review</option>
-          <option value="unreviewed">Unreviewed</option>
-        </select>
+        {REVIEW_ENABLED && (
+          <select
+            className="review-filter"
+            value={review}
+            onChange={(e) => setReview(e.target.value)}
+            title="Filter by review verdict"
+          >
+            <option value="">Any review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="pending">Pending review</option>
+            <option value="unreviewed">Unreviewed</option>
+          </select>
+        )}
         <div className="saved-views">
           <select
             className="view-select"

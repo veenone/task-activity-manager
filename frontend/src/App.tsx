@@ -53,6 +53,7 @@ import { ContainerList } from "./components/ContainerList";
 import { ComponentList } from "./components/ComponentList";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkReviewModal } from "./components/BulkReviewModal";
+import { REVIEW_ENABLED } from "./features";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
 import { BulkAllocateModal } from "./components/BulkAllocateModal";
@@ -1079,12 +1080,14 @@ function App() {
           >
             Requirements…
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowBulkReview(true)}
-          >
-            Review…
-          </button>
+          {REVIEW_ENABLED && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowBulkReview(true)}
+            >
+              Review…
+            </button>
+          )}
           <button className="btn" onClick={() => setSelectedSet(new Set())}>
             Clear
           </button>
@@ -1488,7 +1491,7 @@ function App() {
         />
       )}
 
-      {showBulkReview && (
+      {REVIEW_ENABLED && showBulkReview && (
         <BulkReviewModal
           profileId={activeId}
           testKeys={[...selectedSet]}

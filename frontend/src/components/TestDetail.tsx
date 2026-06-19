@@ -58,6 +58,7 @@ import { SearchableSelect } from "./SearchableSelect";
 import { CloneStepsModal } from "./CloneStepsModal";
 import { PickTestModal } from "./PickTestModal";
 import { formatDateTime } from "../dates";
+import { REVIEW_ENABLED } from "../features";
 
 const REVIEWER_KEY = "xtm.reviewer";
 
@@ -758,6 +759,8 @@ export function TestDetail({
             <dd>{meta?.updatedBy || "—"}</dd>
           </dl>
 
+          {REVIEW_ENABLED && (
+            <>
           <h4>
             Review {isDirty("review") && <DirtyDot />}
           </h4>
@@ -816,6 +819,8 @@ export function TestDetail({
               )}
             </div>
           </div>
+            </>
+          )}
 
           {customFields.length > 0 && (
             <>
