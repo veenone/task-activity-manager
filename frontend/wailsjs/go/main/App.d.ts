@@ -121,6 +121,8 @@ export function GetSettings():Promise<settings.Settings>;
 
 export function GetStatistics(arg1:string):Promise<testrepo.Statistics>;
 
+export function GetSubTaskTraceability(arg1:string,arg2:Array<string>):Promise<testrepo.Sankey>;
+
 export function GetSyncState(arg1:string):Promise<testrepo.SyncState>;
 
 export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;

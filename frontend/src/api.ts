@@ -119,6 +119,7 @@ export {
   ReorderTestSteps,
   GetStatistics,
   GetTraceabilitySankey,
+  GetSubTaskTraceability,
   GetExecutionsForPlans,
   GetProfileProjectKey,
   GetRequirementTraceability,

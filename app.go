@@ -1690,6 +1690,16 @@ func (a *App) GetTraceabilitySankey(profileID string, planFilters, execFilters [
 	return a.repo.GetTraceabilitySankey(profileID, projectKey, planFilters, execFilters, crossProjectOnly)
 }
 
+// GetSubTaskTraceability returns the Parent -> Execution -> run-status flow over
+// sub-task Test Executions (FR-9). parentFilters narrows to chosen parent
+// issues; empty includes all.
+func (a *App) GetSubTaskTraceability(profileID string, parentFilters []string) (testrepo.Sankey, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.Sankey{}, err
+	}
+	return a.repo.GetSubTaskTraceability(profileID, parentFilters)
+}
+
 // GetExecutionsForPlans returns the Test Executions sharing a Test with the
 // given Test Plans, to cascade the dashboard's Execution filter (#5a). Empty
 // planKeys returns all executions.
