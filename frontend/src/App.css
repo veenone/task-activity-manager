@@ -4408,3 +4408,6 @@ tr.row-checked:hover {
 .searchable-option.is-subtask.is-selected {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
+.trace-tabs {
+  margin-bottom: 14px;
+}
