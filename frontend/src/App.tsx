@@ -60,6 +60,7 @@ import { BulkMoveModal } from "./components/BulkMoveModal";
 import { BulkPreconditionsModal } from "./components/BulkPreconditionsModal";
 import { BulkRequirementsModal } from "./components/BulkRequirementsModal";
 import { Dashboard } from "./components/Dashboard";
+import { TraceabilityTabs } from "./components/TraceabilityTabs";
 import { ContainersView } from "./components/ContainersView";
 import { PreconditionsView } from "./components/PreconditionsView";
 import { RequirementsView } from "./components/RequirementsView";
@@ -149,6 +150,7 @@ function App() {
     | "duplicates"
     | "testcalls"
     | "dashboard"
+    | "traceability"
     | "plans"
   >("browse");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -486,6 +488,7 @@ function App() {
     "menu:view-preconditions": () => setView("preconditions"),
     "menu:view-requirements": () => setView("requirements"),
     "menu:view-dashboard": () => setView("dashboard"),
+    "menu:view-traceability": () => setView("traceability"),
     "menu:view-plans": () => setView("plans"),
     "menu:view-duplicates": () => setView("duplicates"),
     "menu:view-testcalls": () => setView("testcalls"),
@@ -934,6 +937,12 @@ function App() {
             Dashboard
           </button>
           <button
+            className={`view-tab${view === "traceability" ? " view-tab-active" : ""}`}
+            onClick={() => setView("traceability")}
+          >
+            Traceability
+          </button>
+          <button
             className={`view-tab${view === "plans" ? " view-tab-active" : ""}`}
             onClick={() => setView("plans")}
           >
@@ -1131,6 +1140,14 @@ function App() {
       ) : view === "dashboard" ? (
         <main className="content content-dashboard">
           <Dashboard profileId={activeId} refreshKey={refreshKey} jiraUrl={activeProfile?.jiraUrl ?? ""} onOpenDuplicates={() => setView("duplicates")} />
+        </main>
+      ) : view === "traceability" ? (
+        <main className="content content-dashboard">
+          <TraceabilityTabs
+            profileId={activeId}
+            refreshKey={refreshKey}
+            jiraUrl={activeProfile?.jiraUrl ?? ""}
+          />
         </main>
       ) : view === "plans" ? (
         <main className="content content-containers">
