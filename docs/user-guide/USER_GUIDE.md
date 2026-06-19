@@ -19,24 +19,34 @@ you commit.
 
 ---
 
-## What's new in 1.3.0
+## What's new in 1.5.0
 
-- **Call-test steps** — a step can call another test (Xray test call) instead of
-  manual content. Add one with **+ Call test** in the Steps header. See
-  [Calling another test](#calling-another-test-test-calls).
-- **Test Calls view** — a new tab mapping which tests call which, with
-  broken/cyclic calls flagged and a "calls" badge in the grid. See
-  [Calling another test](#calling-another-test-test-calls).
-- **Multi-select Sankey filters** and a **Cross-project only** toggle on the
-  traceability diagrams. See [Dashboard & traceability](#12-dashboard--traceability).
-- **Per-view sync / refresh** on Requirements, Containers, and the Dashboard.
-  See [Syncing](#14-syncing).
-- **Open a covering test from Requirements** — click it to view its detail in a
-  slide-over. See [Requirements & coverage](#9-requirements--coverage).
-- **Fixes** — view tabs always on their own row; committing a new test with
-  reordered steps no longer errors.
+- **Defect tracking.** Raise a bug straight from a failed test in a Test
+  Execution, browse every bug linked to your tests in a new **Bugs** panel, and
+  see a test's linked bugs — including ones filed in other projects — on its
+  detail panel. See [Defect tracking](#12-defect-tracking).
+- **Sub-task Test Executions.** Xray sub-task Test Executions (an execution that
+  is a sub-task of a parent issue) now sync and sit alongside standalone ones —
+  filter by Standalone or Sub-task and open the parent issue from the container
+  card. See [Containers](#11-test-sets-plans--executions-containers).
+- **Traceability view.** The traceability Sankeys moved out of the Dashboard
+  into their own **Traceability** tab with three diagrams — Requirement,
+  Execution, and the new **Sub-task** (parent → execution → result). See
+  [Traceability](#14-traceability).
+- **Searchable, filterable lists.** Type-to-filter dropdowns and sort/filter
+  controls on the Requirements, Preconditions and Bugs panels and the container
+  picker (filter executions by Standalone / Sub-task too).
+- **Jira colour in text.** `{color:#hex}…{color}` macros in descriptions and
+  steps now render in colour; editing still shows the raw macro so it
+  round-trips back to Jira unchanged.
+- **Editing niceties.** Duplicate a step, clone a whole test, native spell-check
+  on test prose, and the test key in the detail header links to its Jira issue.
+- **Smarter sync.** Per-view syncs (Containers, Requirements, Bugs) now show
+  progress in the status bar; bug sync respects the profile scope.
 
-See [`CHANGELOG.md`](../../CHANGELOG.md) for the full history.
+Earlier releases added commit **conflict management** (three-way merge),
+**macOS** support, and the **Test Calls** view (1.3.0–1.4.0). See
+[`CHANGELOG.md`](../../CHANGELOG.md) for the full history.
 
 ---
 
@@ -54,12 +64,14 @@ See [`CHANGELOG.md`](../../CHANGELOG.md) for the full history.
 10. [Requirements & coverage](#9-requirements--coverage)
 11. [Finding duplicates](#10-finding-duplicates)
 12. [Test Sets, Plans & Executions (Containers)](#11-test-sets-plans--executions-containers)
-13. [Dashboard & traceability](#12-dashboard--traceability)
-14. [Committing changes to Jira](#13-committing-changes-to-jira)
-15. [Syncing](#14-syncing)
-16. [Settings & profile management](#15-settings--profile-management)
-17. [Diagnostics & troubleshooting](#16-diagnostics--troubleshooting)
-18. [Glossary](#glossary)
+13. [Defect tracking](#12-defect-tracking)
+14. [Dashboard](#13-dashboard)
+15. [Traceability](#14-traceability)
+16. [Committing changes to Jira](#15-committing-changes-to-jira)
+17. [Syncing](#16-syncing)
+18. [Settings & profile management](#17-settings--profile-management)
+19. [Diagnostics & troubleshooting](#18-diagnostics--troubleshooting)
+20. [Glossary](#glossary)
 
 ---
 
@@ -123,7 +135,7 @@ After connecting, the main window appears. It has four regions:
 1. **Top bar** — profile selector and menu (left), view tabs (center), and
    pending/New Test/More/Sync actions (right).
 2. **View tabs** — switch between Browse, Preconditions, Requirements,
-   Duplicates, Dashboard, and Containers.
+   Duplicates, Test Calls, Dashboard, Traceability, and Containers.
 3. **Work area** — the content of the selected view.
 4. **Status bar** — sync progress and the test count / last-sync time.
 
@@ -164,9 +176,8 @@ The grid lists tests with sortable columns. Above it sits the toolbar:
 
 - **Search** — matches key, summary, and description.
 - **Status filter** — filter by workflow status.
-- **Review filter** — Any / Approved / Rejected / Pending / Unreviewed.
 - **Saved views** — apply a saved filter; **Save view** stores the current
-  filter + status + review combination for reuse.
+  filter + status combination for reuse.
 - **Export** — write the *currently filtered* tests to CSV or XLSX.
 - **Columns** — show, hide, and reorder columns (the layout is remembered).
 
@@ -174,8 +185,8 @@ Pagination controls sit at the bottom: rows-per-page, first/prev/next/last, and
 a jump-to-page box. A dirty-dot marks rows with uncommitted edits.
 
 ![Figure 6: Test grid and toolbar](images/06-test-grid.png)
-*Figure 6 — The test grid with the search box, status/review filters, Saved
-views, Export, and Columns controls.*
+*Figure 6 — The test grid with the search box, status filter, Saved views,
+Export, and Columns controls.*
 
 To act on many tests at once, tick their checkboxes — or use **Select all
 matching this filter** to select every test the current filter returns, across
@@ -201,7 +212,9 @@ other fields. Click a field to edit it inline.*
 
 Test steps load when you first open a test (to keep sync fast). You can add,
 edit, reorder, and remove steps; each has Action, Data, and Expected Result, and
-all three fields support **markdown** (here and in the New Test panel).
+all three fields support **markdown** (here and in the New Test panel). Jira
+`{color:#hex}…{color}` macros render in colour in the read view, while editing
+shows the raw macro so it round-trips back to Jira unchanged.
 
 ![Figure 9: Test steps](images/09-test-steps.png)
 *Figure 9 — Editing the step table: action / data / expected result, with
@@ -252,11 +265,16 @@ The detail panel also shows the **preconditions** the test depends on and the
 ![Figure 11: Preconditions & requirements sections](images/11-detail-links.png)
 *Figure 11 — The preconditions and requirement-coverage sections of a test.*
 
-### Workflow transitions & review
+### Workflow transitions
 
-Move a test through its workflow with a transition control, and record a review
-verdict (Approved / Rejected / Pending) from the detail panel. Both are queued
-for commit like any other edit.
+Move a test through its workflow with a transition control from the detail
+panel; the transition is queued for commit like any other edit.
+
+### Linked bugs
+
+If a test has defects linked to it (including bugs filed in a different Jira
+project), they appear in a **Linked bugs** section on the detail panel as
+clickable keys that open in the browser. See [Defect tracking](#12-defect-tracking).
 
 ---
 
@@ -293,7 +311,6 @@ toolbar** appears above the grid:
 - **Move to folder…** — re-file into a Test Repository folder.
 - **Preconditions…** — link or unlink preconditions in bulk.
 - **Requirements…** — link or unlink requirement coverage in bulk.
-- **Review…** — apply a review verdict to all selected.
 
 ![Figure 14: Bulk toolbar](images/14-bulk-toolbar.png)
 *Figure 14 — The bulk toolbar after selecting several tests.*
@@ -379,7 +396,10 @@ rows highlighted — useful when deciding which copy to keep.
 ## 11. Test Sets, Plans & Executions (Containers)
 
 The **Containers** tab manages the three Xray container types. Pick a **kind**
-(Test Set / Test Plan / Test Execution) and a container to see its member tests.
+(Test Set / Test Plan / Test Execution), then choose a container from a
+**type-to-filter dropdown** that you can narrow by keyword, status, and — for
+executions — Standalone vs Sub-task. A **Bugs** toggle at the top of the tab
+switches to the defect view (see [Defect tracking](#12-defect-tracking)).
 
 ![Figure 22: Containers view](images/22-containers.png)
 *Figure 22 — The Containers view: kind selector, container list, and member
@@ -399,6 +419,13 @@ FAIL / TODO / ABORTED / EXECUTING), summarized by the bar above. In a Test
 Execution these are editable inline, and one result can be applied to many
 selected tests at once.*
 
+**Sub-task Test Executions.** Xray lets a Test Execution be a *sub-task* of a
+parent issue (often a Story). These sync and appear in the same execution list
+as standalone ones; the **Standalone / Sub-task** filter narrows to either kind,
+sub-task entries are tinted in the picker, and the selected execution's card
+shows a **↳ parent** link that opens the parent issue in the browser. They use
+all the same run-result and create-bug features.
+
 ### Generate a pytest scaffold
 
 From a Test Plan or Execution you can generate a **pytest** scaffold for its
@@ -409,41 +436,81 @@ tests — either plain `@pytest.mark.xray` functions or a `unittest`-style class
 
 ---
 
-## 12. Dashboard & traceability
+## 12. Defect tracking
 
-The **Dashboard** tab summarizes the cached project: totals, status and review
-breakdowns, coverage, and two **traceability Sankey** diagrams.
+When a test fails you can raise and track a defect (bug) for it without leaving
+the app. Defect tracking spans three places:
+
+- **Create a bug from a failed run.** In a Test Execution, a failed member row
+  shows a **🐞** action that opens a create-bug form (summary, description,
+  priority, labels). The bug is queued as a pending change, filed in Jira on the
+  next commit, and linked to the test.
+- **The Bugs panel.** The **Bugs** toggle at the top of the Containers tab lists
+  every defect linked to this profile's tests — a paginated master list on the
+  left and, for the selected bug, its details plus the affected tests (with their
+  run status) on the right. Bug keys open in the browser; test keys open the
+  test.
+- **Linked bugs on a test.** A test's detail panel shows its linked bugs,
+  including ones filed in a different project, as clickable keys.
+
+![Figure 37: Bugs panel](images/37-bugs-panel.png)
+*Figure 37 — The Bugs panel (Containers → Bugs): linked defects with the selected
+bug's details and the tests it affects.*
+
+Which Jira project a new bug lands in, and its issue type, are configurable per
+profile (the test project, the execution's project, or a dedicated defect
+project). Bug sync respects the profile's scope and shows progress in the status
+bar.
+
+---
+
+## 13. Dashboard
+
+The **Dashboard** tab summarizes the cached project from the local cache: total
+tests, pending changes, and breakdowns by status, priority, folder, label and
+component, plus execution coverage, requirement coverage, Test Set / Plan /
+Execution counts, a duplicates card, and a recently-updated trend. **Refresh**
+recomputes it from the cache without a sync. The traceability diagrams live in
+their own [Traceability](#14-traceability) tab.
 
 ![Figure 25: Dashboard](images/25-dashboard.png)
 *Figure 25 — The statistics dashboard with summary cards and breakdowns.*
 
-### Requirement traceability Sankey
+---
 
-This diagram flows **Requirement → Coverage → Test plan → Test result**. With
-**All requirements** selected, every requirement is its own node in the first
-column; the requirements filter is **multi-select** — tick one or several to
-narrow the flow. Hover any node to trace its threads.
+## 14. Traceability
 
-![Figure 26: Requirement traceability Sankey](images/26-requirement-sankey.png)
-*Figure 26 — Requirement traceability: requirement → coverage → Test plan → run
-result, with the requirement filter.*
+The **Traceability** tab holds three Sankey diagrams behind a tab bar; each keeps
+its own filters and only one shows at a time. Hover any node to trace its
+threads.
 
-### Execution traceability Sankey
+- **Execution** (default) — flows **Test Plan → Test Execution → run status**.
+  The plan and execution filters are multi-select (the execution list narrows to
+  the chosen plans), and a **Cross-project only** toggle keeps just the runs
+  whose Test Execution lives in a *different* Jira project than the current
+  profile; while it's on, a **cross-project bugs** list appears beside the
+  diagram.
+- **Requirement** — flows **Requirement → Coverage → Test plan → Test result**,
+  with a multi-select requirement filter.
+- **Sub-task** — flows **Parent issue → Test Execution → run result** over
+  sub-task Test Executions, with a **Parent** filter. Use it to see, per parent
+  issue, which sub-task executions ran its tests and how they turned out.
 
-A second diagram flows **Test Plan → Test Execution → run status**. The plan and
-execution filters are **multi-select**, and a **Cross-project only** toggle keeps
-just the runs whose Test Execution lives in a *different* Jira project than the
-current profile — useful when a plan in one project is executed on another
-project's board. (Those cross-project executions are pulled in during sync.)
+![Figure 27: Execution traceability](images/27-execution-sankey.png)
+*Figure 27 — The Execution tab: Test Plan → Test Execution → run status.*
 
-![Figure 27: Execution traceability Sankey](images/27-execution-sankey.png)
-*Figure 27 — Plan → Execution → status traceability.*
+![Figure 26: Requirement traceability](images/26-requirement-sankey.png)
+*Figure 26 — The Requirement tab: requirement → coverage → Test plan → result.*
+
+![Figure 38: Sub-task traceability](images/38-subtask-sankey.png)
+*Figure 38 — The Sub-task tab: parent issue → execution → run result, with the
+Parent filter.*
 
 ---
 
-## 13. Committing changes to Jira
+## 15. Committing changes to Jira
 
-All edits — field changes, steps, transitions, reviews, links, new entities,
+All edits — field changes, steps, transitions, links, bugs, new entities,
 deletions — are queued locally as **pending changes**. Nothing reaches Jira
 until you commit.
 
@@ -466,11 +533,11 @@ reported per test:
 
 ---
 
-## 14. Syncing
+## 16. Syncing
 
 **Sync** pulls the latest tests from Jira into the local cache. The status bar
-shows progress per phase (tests, folders, preconditions, containers, custom
-fields).
+shows progress per phase (tests, folders, preconditions, containers,
+requirements, bugs, custom fields).
 
 ![Figure 30: Sync in progress](images/30-sync-progress.png)
 *Figure 30 — A sync in progress, with the phase and item counts in the status
@@ -486,15 +553,19 @@ their own data:
 
 - **Requirements → Sync** — pulls only requirement coverage from Jira.
 - **Containers → Sync** — pulls only Test Sets / Plans / Executions.
+- **Containers → Bugs → Sync** — pulls only the defects linked to your tests.
 - **Dashboard → Refresh** — recomputes the dashboard from the local cache.
 - **Duplicates → Scan** — re-scans the cache for duplicates.
+
+These per-view syncs now show their progress in the status bar, the same as a
+full sync.
 
 ![Figure 31: Sync history](images/31-sync-history.png)
 *Figure 31 — The paginated sync history.*
 
 ---
 
-## 15. Settings & profile management
+## 17. Settings & profile management
 
 The **Profile** menu (top-left) manages the active profile:
 
@@ -516,7 +587,7 @@ Switch the **color theme** from **More → Theme: Light / Dark / System**.
 
 ---
 
-## 16. Diagnostics & troubleshooting
+## 18. Diagnostics & troubleshooting
 
 **More → Diagnostics** shows the database path, log path, schema version, and
 environment details — useful when reporting an issue.
@@ -529,7 +600,7 @@ environment details — useful when reporting an issue.
 | Blank window on launch | Install the Microsoft WebView2 runtime, relaunch. |
 | "Backend failed to start" | Note the DB/log path shown, check the log; try removing the database file and relaunching. |
 | Sync shows 0 tests | Check the project key and that the PAT has access; confirm the scope JQL isn't excluding everything. |
-| Edits not in Jira | They are local until you **Commit** (see §13). Check the pending badge. |
+| Edits not in Jira | They are local until you **Commit** (see §15). Check the pending badge. |
 | A commit reports **Conflict** | Sync, then override or keep-remote in the Pending Changes dialog. |
 | Token rejected | Rotate it with **Profile → Set token…**. |
 

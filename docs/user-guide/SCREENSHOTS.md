@@ -9,6 +9,14 @@ renders automatically.
 Figure 29 (commit conflict) is intentionally omitted — a conflict can't be
 staged on demo data, so the guide explains it in text instead.
 
+**Refresh for 1.5.0.** Re-shoot these because their UI changed: **06**
+(review filter removed), **08** (review section removed), **14** (the bulk
+**Review…** action removed), **22** (container picker is now a searchable
+dropdown with Standalone / Sub-task filter), **25** (the Dashboard no longer
+hosts the Sankeys — they moved to the new **Traceability** tab), and **26/27**
+(now on the Traceability tab, not the Dashboard). New shots to add: **37**
+(Bugs panel) and **38** (Sub-task traceability Sankey).
+
 ## How to capture
 
 1. **Run the app on a demo profile** so every screen has rich data and no Jira is
@@ -38,7 +46,7 @@ staged on demo data, so the guide explains it in text instead.
 | 3 | `03-main-window.png` | **Browse** tab after sync | Full window; a folder selected, grid populated. (Optionally annotate the 4 regions.) |
 | 4 | `04-topbar.png` | Any view | Tight crop of the **top bar** only |
 | 5 | `05-browse-sidebar.png` | Browse | Left sidebar with **Group by: Folder** and the folder tree; hover a folder to show its row actions |
-| 6 | `06-test-grid.png` | Browse | The grid + toolbar (search, status filter, review filter, Saved views, Export, Columns) |
+| 6 | `06-test-grid.png` | Browse | The grid + toolbar (search, status filter, Saved views, Export, Columns) |
 | 7 | `07-columns-panel.png` | Browse → **Columns** | The Columns panel open, showing toggles and reorder controls |
 | 8 | `08-test-detail.png` | Browse → click a test | Detail panel open on the **fields** section |
 | 9 | `09-test-steps.png` | Test detail → steps | The step table with a few steps visible |
@@ -58,8 +66,8 @@ staged on demo data, so the guide explains it in text instead.
 | 23 | `23-execution-runstatus.png` | Containers → kind **Test Execution** | A run-result dropdown open (or the bulk "set result" bar) |
 | 24 | `24-pytest.png` | Containers → Actions → **Generate pytest…** | The menu open, or the generated file/path confirmation |
 | 25 | `25-dashboard.png` | **Dashboard** tab | Summary cards + breakdowns near the top |
-| 26 | `26-requirement-sankey.png` | Dashboard → requirement traceability panel | The 4-column Sankey with the **All requirements** filter visible |
-| 27 | `27-execution-sankey.png` | Dashboard → execution traceability panel | The Plan → Execution → status Sankey |
+| 26 | `26-requirement-sankey.png` | **Traceability** tab → **Requirement** | The 4-column Sankey with the requirement filter visible |
+| 27 | `27-execution-sankey.png` | **Traceability** tab → **Execution** | The Plan → Execution → status Sankey |
 | 28 | `28-pending-changes.png` | Make an edit, then click the **N pending** badge | The Pending Changes dialog listing queued edits |
 | 30 | `30-sync-progress.png` | Click **Sync** | Capture mid-sync so the status bar shows a phase + counts |
 | 31 | `31-sync-history.png` | **More → Sync history** | The sync history list |
@@ -68,6 +76,8 @@ staged on demo data, so the guide explains it in text instead.
 | 34 | `34-diagnostics.png` | **More → Diagnostics** | The Diagnostics dialog |
 | 35 | `35-about.png` | **About** (native menu / More) | The About dialog showing the version |
 | 36 | `36-clone-steps.png` | Test detail → Steps → **Clone from…** | The clone-steps picker with a source test selected |
+| 37 | `37-bugs-panel.png` | **Containers** tab → **Bugs** toggle | The Bugs master list + a selected bug's detail and the tests it affects |
+| 38 | `38-subtask-sankey.png` | **Traceability** tab → **Sub-task** | The Parent → Execution → run-result Sankey with the Parent filter |
 
 To refresh a shot: run `wails dev`, open `http://localhost:34115/` in the
 `browse` tool, switch to the **Demo Project (DEMO)** profile, sync once, then
