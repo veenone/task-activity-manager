@@ -38,6 +38,7 @@ type Tab = "req" | "exec" | "subtask";
 export function TraceabilityTabs({ profileId, refreshKey, jiraUrl }: Props) {
   const [tab, setTab] = useState<Tab>("exec");
   const [stats, setStats] = useState<Statistics | null>(null);
+  const [statsErr, setStatsErr] = useState("");
 
   // Requirement traceability.
   const [reqSankey, setReqSankey] = useState<Sankey | null>(null);
@@ -65,12 +66,13 @@ export function TraceabilityTabs({ profileId, refreshKey, jiraUrl }: Props) {
   useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
+    setStatsErr("");
     GetStatistics(profileId)
       .then((s) => {
         if (!cancelled) setStats(s);
       })
-      .catch(() => {
-        if (!cancelled) setStats(null);
+      .catch((e) => {
+        if (!cancelled) setStatsErr(errMsg(e));
       });
     return () => {
       cancelled = true;
@@ -245,6 +247,9 @@ export function TraceabilityTabs({ profileId, refreshKey, jiraUrl }: Props) {
     }
   }
 
+  if (statsErr) {
+    return <div className="dashboard error-text">{statsErr}</div>;
+  }
   if (!stats) {
     return <div className="dashboard muted">Loading…</div>;
   }
