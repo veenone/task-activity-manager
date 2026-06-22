@@ -3,9 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ScanDuplicates,
   ScanDuplicateGroupSteps,
+  ScanAllDuplicateSteps,
   ExcludeFromDuplicates,
   EditTestField,
   GetTestSteps,
+  EventsOn,
   errMsg,
 } from "../api";
 import type {
@@ -14,6 +16,7 @@ import type {
   Folder,
   PendingChange,
   Step,
+  SyncProgress,
 } from "../api";
 import { TestDetail } from "./TestDetail";
 import { Pager } from "./Pager";
@@ -40,6 +43,13 @@ interface CompareMember {
   steps: Step[];
 }
 
+// One member's raw summary + description, for the side-by-side summary comparison.
+interface SummaryMember {
+  key: string;
+  summary: string;
+  description: string;
+}
+
 // normStep is the normalized comparison key for a single step (case / whitespace
 // insensitive), so the side-by-side view can highlight rows that actually differ.
 function normStep(s: Step | undefined): string {
@@ -62,6 +72,10 @@ export function DuplicatesView({
   const [filter, setFilter] = useState<Filter>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [scanningGroup, setScanningGroup] = useState<string>("");
+  const [scanning, setScanning] = useState(false); // plain "Scan" busy state
+  // Walk-all-groups step scan: running flag + live progress for the toolbar bar.
+  const [scanningSteps, setScanningSteps] = useState(false);
+  const [stepProgress, setStepProgress] = useState<SyncProgress | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(
     null,
@@ -79,6 +93,12 @@ export function DuplicatesView({
     members: CompareMember[];
   } | null>(null);
 
+  // Side-by-side raw-summary (+ description) comparison.
+  const [summaryCompare, setSummaryCompare] = useState<{
+    title: string;
+    members: SummaryMember[];
+  } | null>(null);
+
   const load = useCallback(() => {
     if (!profileId) return;
     ScanDuplicates(profileId)
@@ -89,6 +109,35 @@ export function DuplicatesView({
   useEffect(() => {
     load();
   }, [load, refreshKey]);
+
+  // While a scan-all-steps walk is running, mirror its "dup:scan-progress" events
+  // into the toolbar's local progress bar. The terminal done event clears it. This
+  // is a dedicated channel (not the global "sync:progress") so the walk does not
+  // touch the footer sync bar.
+  useEffect(() => {
+    if (!scanningSteps) return;
+    return EventsOn("dup:scan-progress", (p: SyncProgress) => {
+      if (p.done) setStepProgress(null);
+      else setStepProgress(p);
+    });
+  }, [scanningSteps]);
+
+  // Scan steps for ALL still-unscanned duplicate groups, with a progress bar.
+  async function scanAllSteps() {
+    if (!profileId) return;
+    setError("");
+    setScanningSteps(true);
+    setStepProgress(null);
+    try {
+      await ScanAllDuplicateSteps(profileId);
+      load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setScanningSteps(false);
+      setStepProgress(null);
+    }
+  }
 
   // Compare steps: record fingerprints (updates the verdict) AND open a
   // side-by-side view of every member's steps.
@@ -114,6 +163,18 @@ export function DuplicatesView({
     } finally {
       setScanningGroup("");
     }
+  }
+
+  // Compare summaries: open a side-by-side view of every member's raw summary
+  // (and description). Members share a NORMALIZED summary, so the raw values can
+  // still differ in case / whitespace / punctuation. No backend round trip.
+  function compareSummaries(g: DuplicateGroup) {
+    const members: SummaryMember[] = g.members.map((m) => ({
+      key: m.key,
+      summary: m.summary,
+      description: m.description ?? "",
+    }));
+    setSummaryCompare({ title: g.displaySummary, members });
   }
 
   async function exclude(key: string) {
@@ -173,14 +234,29 @@ export function DuplicatesView({
       <div className="dup-toolbar">
         <button
           className="btn btn-primary"
+          disabled={scanning || scanningSteps}
           onClick={() => {
             setPage(0);
+            setScanning(true);
             load();
+            // load() is fire-and-forget; clear the brief busy state next tick.
+            window.setTimeout(() => setScanning(false), 300);
           }}
         >
-          ⟳ Scan
+          {scanning ? "Scanning…" : "⟳ Scan"}
         </button>
-        {report?.scannedAt && (
+        <button
+          className="btn"
+          disabled={scanningSteps}
+          title="Fetch and compare steps for every still-unscanned group"
+          onClick={scanAllSteps}
+        >
+          {scanningSteps ? "Scanning steps…" : "Scan steps"}
+        </button>
+        {scanningSteps && stepProgress && !stepProgress.done && (
+          <DupScanBar progress={stepProgress} />
+        )}
+        {report?.scannedAt && !scanningSteps && (
           <span className="muted">
             steps last scanned {new Date(report.scannedAt).toLocaleString()}
           </span>
@@ -255,6 +331,15 @@ export function DuplicatesView({
                     <span className={`dup-pill p-${g.stepsVerdict}`}>
                       {VERDICT_LABEL[g.stepsVerdict]}
                     </span>
+                    <button
+                      className="btn dup-cmp"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        compareSummaries(g);
+                      }}
+                    >
+                      Compare summaries
+                    </button>
                     <button
                       className="btn dup-cmp"
                       onClick={(e) => {
@@ -392,6 +477,39 @@ export function DuplicatesView({
           onClose={() => setCompare(null)}
         />
       )}
+
+      {summaryCompare && (
+        <SummaryCompareModal
+          title={summaryCompare.title}
+          members={summaryCompare.members}
+          onClose={() => setSummaryCompare(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// DupScanBar renders the scan-steps walk progress in the toolbar, reusing the
+// shared syncbar styling so it matches the app's status-bar sync readout.
+function DupScanBar({ progress }: { progress: SyncProgress }) {
+  const hasCount = progress.total > 0;
+  const pct = hasCount
+    ? Math.round((progress.fetched / progress.total) * 100)
+    : 0;
+  const stage = progress.stage || "Scanning duplicate steps";
+  return (
+    <div className="syncbar">
+      {hasCount && (
+        <div className="syncbar-track">
+          <div className="syncbar-fill" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      <span className="muted">
+        {stage}
+        {hasCount
+          ? `: ${progress.fetched.toLocaleString()} / ${progress.total.toLocaleString()}`
+          : "…"}
+      </span>
     </div>
   );
 }
@@ -481,6 +599,96 @@ function StepCompareModal({
               </tbody>
             </table>
           )}
+        </div>
+
+        <div className="pending-actions">
+          <span className="muted dup-compare-legend">
+            Highlighted rows differ between tests.
+          </span>
+          <button className="btn btn-primary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// SummaryCompareModal shows the raw summary (and description) of every
+// duplicate-group member side by side, one column per test. Members share a
+// NORMALIZED summary, so the raw values can still differ in case / whitespace /
+// punctuation; rows whose raw values are not all equal are highlighted.
+function SummaryCompareModal({
+  title,
+  members,
+  onClose,
+}: {
+  title: string;
+  members: SummaryMember[];
+  onClose: () => void;
+}) {
+  // Show the description row only if at least one member has a description.
+  const hasDescription = members.some((m) => (m.description || "").trim() !== "");
+  const rows: { label: string; value: (m: SummaryMember) => string }[] = [
+    { label: "summary", value: (m) => m.summary },
+  ];
+  if (hasDescription) {
+    rows.push({ label: "description", value: (m) => m.description });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal dup-compare-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="pending-head">
+          <h2>Compare summaries — "{title}"</h2>
+          <button className="btn btn-ghost" onClick={onClose} title="Close">
+            ✕
+          </button>
+        </div>
+
+        <div className="dup-compare-wrap">
+          <p className="muted dup-compare-ref">
+            Grouped by normalized summary: "{title}". Members can still differ in
+            case, whitespace, or punctuation.
+          </p>
+          <table className="dup-compare-table">
+            <thead>
+              <tr>
+                <th className="dup-compare-idx">field</th>
+                {members.map((m) => (
+                  <th key={m.key} className="mono">
+                    {m.key}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const values = members.map((m) => row.value(m));
+                const differs = new Set(values).size > 1;
+                return (
+                  <tr
+                    key={row.label}
+                    className={differs ? "dup-compare-diff" : undefined}
+                  >
+                    <td className="dup-compare-idx">{row.label}</td>
+                    {values.map((v, j) => (
+                      <td key={members[j].key}>
+                        {v && v.trim() !== "" ? (
+                          <div className="dup-compare-step">{v}</div>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
         <div className="pending-actions">

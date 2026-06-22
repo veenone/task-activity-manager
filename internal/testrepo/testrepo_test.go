@@ -307,6 +307,41 @@ func TestBulkAssociatePreconditionsAddsAndRemoves(t *testing.T) {
 	}
 }
 
+func TestBulkReplacePreconditions(t *testing.T) {
+	repo := seedTestWithPreconditions(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-2", ID: "2", Summary: "b"},
+	}); err != nil {
+		t.Fatalf("seed test 2: %v", err)
+	}
+	// Both tests start covering {QA-P-1, QA-P-2}.
+	if err := repo.ReplaceAllTestPreconditions("p1", map[string][]string{
+		"QA-1": {"QA-P-1", "QA-P-2"},
+		"QA-2": {"QA-P-1", "QA-P-2"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+
+	res, err := repo.BulkReplacePreconditions("p1", []string{"QA-1", "QA-2"}, []string{"QA-P-1"}, []string{"QA-P-3"})
+	if err != nil {
+		t.Fatalf("bulk replace: %v", err)
+	}
+	if len(res.Succeeded) != 2 || len(res.Failed) != 0 {
+		t.Fatalf("result = %+v, want 2 succeeded / 0 failed", res)
+	}
+
+	for _, key := range []string{"QA-1", "QA-2"} {
+		linked, _ := repo.ListTestPreconditions("p1", key)
+		got := map[string]bool{}
+		for _, p := range linked {
+			got[p.Key] = true
+		}
+		if len(got) != 2 || !got["QA-P-2"] || !got["QA-P-3"] {
+			t.Errorf("%s linked = %+v, want exactly {QA-P-2, QA-P-3}", key, linked)
+		}
+	}
+}
+
 func TestEditPreconditionFieldQueuesPreconditionEdit(t *testing.T) {
 	repo := seedTestWithPreconditions(t)
 
@@ -799,6 +834,68 @@ func TestGetContainerBoardForExecutionUsesDirectRunStatus(t *testing.T) {
 	}
 }
 
+func TestGetContainerBoardIncludesExternalMembers(t *testing.T) {
+	repo := newRepo(t)
+	// QA-1 is a normal member cached in test_case; XRAYINT-1 is a member that
+	// lives in another project and so has no test_case row (only an external_test
+	// cache row from the sync's missing-keys pass).
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-1", ID: "1", Summary: "Login", Status: "Approved"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	if err := repo.UpsertContainers("p1", []testrepo.Container{
+		{Key: "QA-TE-1", Kind: "testexec", Summary: "Cycle 1", Status: "Done"},
+	}); err != nil {
+		t.Fatalf("seed container: %v", err)
+	}
+	if err := repo.ReplaceAllContainerLinks("p1", []testrepo.ContainerLink{
+		{ContainerKey: "QA-TE-1", TestKey: "QA-1", RunStatus: "PASS"},
+		{ContainerKey: "QA-TE-1", TestKey: "XRAYINT-1", RunStatus: "FAIL"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+	if err := repo.ReplaceExternalTests("p1", []testrepo.ExternalTest{
+		{Key: "XRAYINT-1", Summary: "Integration login", Status: "In Progress", ProjectKey: "XRAYINT"},
+	}); err != nil {
+		t.Fatalf("seed external: %v", err)
+	}
+
+	board, err := repo.GetContainerBoard("p1", "QA-TE-1")
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if len(board.Rows) != 2 {
+		t.Fatalf("rows = %d, want 2 (QA-1 + XRAYINT-1)", len(board.Rows))
+	}
+	var ext testrepo.TestPlanBoardRow
+	var found bool
+	for _, r := range board.Rows {
+		if r.TestKey == "XRAYINT-1" {
+			ext = r
+			found = true
+		}
+		if r.TestKey == "QA-1" && r.IsExternal {
+			t.Errorf("QA-1 is a local test_case member, should not be marked external")
+		}
+	}
+	if !found {
+		t.Fatalf("external member XRAYINT-1 missing from board rows %+v", board.Rows)
+	}
+	if !ext.IsExternal {
+		t.Errorf("XRAYINT-1 IsExternal = false, want true")
+	}
+	if ext.Summary != "Integration login" {
+		t.Errorf("XRAYINT-1 Summary = %q, want the cached external summary", ext.Summary)
+	}
+	if ext.Status != "In Progress" {
+		t.Errorf("XRAYINT-1 Status = %q, want the cached external status", ext.Status)
+	}
+	if ext.RunStatus != "FAIL" {
+		t.Errorf("XRAYINT-1 RunStatus = %q, want FAIL (its direct membership run status)", ext.RunStatus)
+	}
+}
+
 func TestGetContainerBoardRejectsUnknownKey(t *testing.T) {
 	repo := seedPlanBoard(t)
 
@@ -836,7 +933,7 @@ func TestSeedSampleContainersPopulatesAllThreeKinds(t *testing.T) {
 		t.Errorf("containers not created: sets=%d plans=%d execs=%d", len(sets), len(plans), len(execs))
 	}
 
-	stats, _ := repo.GetStatistics("p1")
+	stats, _ := repo.GetStatistics("p1", "", "", "")
 	if stats.ExecutedTests == 0 {
 		t.Errorf("expected seeded execution runs; ExecutedTests=0")
 	}
@@ -2156,7 +2253,7 @@ func TestGetStatisticsCountsByStatusAndPriority(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	stats, err := repo.GetStatistics("p1")
+	stats, err := repo.GetStatistics("p1", "", "", "")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
@@ -2178,7 +2275,7 @@ func TestGetStatisticsTalliesLabelsAcrossTests(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	stats, err := repo.GetStatistics("p1")
+	stats, err := repo.GetStatistics("p1", "", "", "")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
@@ -2194,7 +2291,7 @@ func TestGetStatisticsIncludesPendingCount(t *testing.T) {
 		t.Fatalf("edit: %v", err)
 	}
 
-	stats, err := repo.GetStatistics("p1")
+	stats, err := repo.GetStatistics("p1", "", "", "")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
@@ -2226,7 +2323,7 @@ func TestGetStatisticsCountsContainersAndCoverage(t *testing.T) {
 		t.Fatalf("seed links: %v", err)
 	}
 
-	stats, err := repo.GetStatistics("p1")
+	stats, err := repo.GetStatistics("p1", "", "", "")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
@@ -2261,7 +2358,7 @@ func TestGetStatisticsRollsUpExecutionCoverage(t *testing.T) {
 		t.Fatalf("seed links: %v", err)
 	}
 
-	stats, err := repo.GetStatistics("p1")
+	stats, err := repo.GetStatistics("p1", "", "", "")
 	if err != nil {
 		t.Fatalf("stats: %v", err)
 	}
@@ -2291,9 +2388,99 @@ func TestGetStatisticsIgnoresNonExecutionMembershipsForCoverage(t *testing.T) {
 		t.Fatalf("seed links: %v", err)
 	}
 
-	stats, _ := repo.GetStatistics("p1")
+	stats, _ := repo.GetStatistics("p1", "", "", "")
 	if stats.ExecutedTests != 0 {
 		t.Errorf("ExecutedTests = %d, want 0 (a Test Set is not an execution)", stats.ExecutedTests)
+	}
+}
+
+// bucketCount returns the count for a label in a bucket slice, or 0 if absent.
+func bucketCount(buckets []testrepo.Bucket, label string) int {
+	for _, b := range buckets {
+		if b.Label == label {
+			return b.Count
+		}
+	}
+	return 0
+}
+
+func TestGetStatisticsFolderComponentStatusFilters(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		// Folder /Auth (and a descendant), components + statuses spread across.
+		{Key: "QA-1", ID: "1", Status: "Open", Priority: "High",
+			FolderID: "/Auth", Components: []string{"Login"}, Labels: []string{"smoke"}},
+		{Key: "QA-2", ID: "2", Status: "Done", Priority: "Low",
+			FolderID: "/Auth/Login", Components: []string{"Login", "API"}, Labels: []string{"smoke"}},
+		// Folder /Billing.
+		{Key: "QA-3", ID: "3", Status: "Open", Priority: "High",
+			FolderID: "/Billing", Components: []string{"API"}, Labels: []string{"api"}},
+		{Key: "QA-4", ID: "4", Status: "Open", Priority: "Low",
+			FolderID: "/Billing", Components: []string{"Reports"}, Labels: []string{"api"}},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	// Unfiltered: the full set.
+	all, err := repo.GetStatistics("p1", "", "", "")
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if all.Total != 4 {
+		t.Fatalf("unfiltered Total = %d, want 4", all.Total)
+	}
+
+	// Folder filter: /Auth must include its descendant /Auth/Login (prefix
+	// match, mirroring ListTests), so QA-1 and QA-2 only.
+	folder, err := repo.GetStatistics("p1", "/Auth", "", "")
+	if err != nil {
+		t.Fatalf("folder stats: %v", err)
+	}
+	if folder.Total != 2 {
+		t.Errorf("folder Total = %d, want 2 (QA-1, QA-2)", folder.Total)
+	}
+	if got := bucketCount(folder.ByStatus, "Open"); got != 1 {
+		t.Errorf("folder Open status count = %d, want 1", got)
+	}
+	if got := bucketCount(folder.ByComponent, "Login"); got != 2 {
+		t.Errorf("folder Login component count = %d, want 2", got)
+	}
+	if got := bucketCount(folder.ByComponent, "Reports"); got != 0 {
+		t.Errorf("folder Reports component count = %d, want 0 (Billing excluded)", got)
+	}
+
+	// Component filter: "Login" must match a whole component name, not a prefix
+	// (QA-1, QA-2 carry Login; QA-3/QA-4 do not).
+	comp, err := repo.GetStatistics("p1", "", "Login", "")
+	if err != nil {
+		t.Fatalf("component stats: %v", err)
+	}
+	if comp.Total != 2 {
+		t.Errorf("component Total = %d, want 2 (QA-1, QA-2)", comp.Total)
+	}
+	if got := bucketCount(comp.ByFolder, "Billing"); got != 0 {
+		t.Errorf("component byFolder Billing = %d, want 0", got)
+	}
+
+	// Status filter: exact match.
+	status, err := repo.GetStatistics("p1", "", "", "Open")
+	if err != nil {
+		t.Fatalf("status stats: %v", err)
+	}
+	if status.Total != 3 {
+		t.Errorf("status Total = %d, want 3 (QA-1, QA-3, QA-4)", status.Total)
+	}
+	if len(status.ByStatus) != 1 || status.ByStatus[0].Label != "Open" {
+		t.Errorf("status byStatus = %+v, want only Open", status.ByStatus)
+	}
+
+	// Combined: folder + status narrows further (QA-1 only).
+	combo, err := repo.GetStatistics("p1", "/Auth", "", "Open")
+	if err != nil {
+		t.Fatalf("combo stats: %v", err)
+	}
+	if combo.Total != 1 {
+		t.Errorf("combo Total = %d, want 1 (QA-1)", combo.Total)
 	}
 }
 

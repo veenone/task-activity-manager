@@ -33,6 +33,9 @@ type TestCase struct {
 	Components  []string `json:"components"`
 	Updated     string   `json:"updated"`
 	FolderID    string   `json:"folderId"`
+	// ExecType is the Xray Test Type (a.k.a. execution type): Manual /
+	// Automated / Generic / Cucumber. Empty when unknown / not yet synced.
+	ExecType string `json:"execType"`
 }
 
 // Folder is one node in the Xray Test Repository tree (FR-13.1). The ID is
@@ -67,6 +70,21 @@ type Container struct {
 	Status    string `json:"status"`
 	ParentKey string `json:"parentKey"`
 	IssueType string `json:"issueType"`
+	// Environments are the Xray Test Environments assigned to a Test Execution
+	// (empty for Test Sets / Plans, which have no such field).
+	Environments []string `json:"environments"`
+	// FixVersions are the standard Jira Fix Version(s) on a Test Execution
+	// (empty for Test Sets / Plans). Read-only display values pulled from Jira;
+	// never edited locally, so they are overwritten on every sync.
+	FixVersions []string `json:"fixVersions"`
+}
+
+// ContainerQuery filters a ListContainersQuery call. Kind is required (one of
+// "testset" / "testplan" / "testexec"); Environment, when set, keeps only
+// containers whose environments array contains that value (membership test).
+type ContainerQuery struct {
+	Kind        string `json:"kind"`
+	Environment string `json:"environment"` // empty = any environment
 }
 
 // ContainerLink is one Test's membership in a Container. RunStatus carries the
@@ -96,6 +114,10 @@ type TestPlanBoardRow struct {
 	Summary   string `json:"summary"`
 	Status    string `json:"status"`
 	RunStatus string `json:"runStatus"`
+	// IsExternal is true when this member Test has no local test_case row (it
+	// lives in a different Jira project than the profile's) and its summary /
+	// status come from the external_test cache instead.
+	IsExternal bool `json:"isExternal"`
 }
 
 // TestPlanBoard is the read-only board for one Test Plan (FR-13.7) — its member
@@ -159,6 +181,7 @@ type Query struct {
 	FolderID     string `json:"folderId"`     // empty = any folder
 	ContainerKey string `json:"containerKey"` // empty = any container (FR-11.6)
 	Component    string `json:"component"`    // empty = any component (group-by component)
+	ExecType     string `json:"execType"`     // empty = any execution type (Manual/Automated/Generic/Cucumber)
 	Review       string `json:"review"`       // "approved"|"rejected"|"pending"|"unreviewed"|"" = any
 	SortBy       string `json:"sortBy"`
 	Desc         bool   `json:"desc"`
@@ -238,6 +261,7 @@ var editableFields = map[string]string{
 	"description": "description",
 	"priority":    "priority",
 	"labels":      "labels",
+	"exec_type":   "exec_type",
 }
 
 // columnForField returns the test_case column corresponding to a field
@@ -290,11 +314,18 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 	// local value instead of overwriting from the incoming sync.
 	stmt, err := tx.Prepare(
 		`INSERT INTO test_case
-		   (profile_id, jira_key, jira_id, summary, description, status, priority, labels, updated_at, folder_id, components)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		   (profile_id, jira_key, jira_id, summary, description, status, priority, labels, updated_at, folder_id, components, exec_type)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
 		   jira_id     = excluded.jira_id,
 		   components  = excluded.components,
+		   exec_type   = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'test_case'
+		         AND pending_change.entity_key  = excluded.jira_key
+		         AND pending_change.field       = 'exec_type'
+		     ) THEN test_case.exec_type ELSE excluded.exec_type END,
 		   summary     = CASE WHEN EXISTS (
 		       SELECT 1 FROM pending_change
 		       WHERE pending_change.profile_id  = excluded.profile_id
@@ -347,7 +378,7 @@ func (r *Repository) UpsertTests(profileID string, tests []TestCase) error {
 		if _, err := stmt.Exec(
 			profileID, t.Key, t.ID, t.Summary, t.Description,
 			t.Status, t.Priority, strings.Join(t.Labels, " "),
-			t.Updated, t.FolderID, encodeComponents(t.Components),
+			t.Updated, t.FolderID, encodeComponents(t.Components), t.ExecType,
 		); err != nil {
 			return fmt.Errorf("upsert %s: %w", t.Key, err)
 		}
@@ -782,6 +813,28 @@ func (r *Repository) BulkAssociatePreconditions(profileID string, testKeys, prec
 	return result, nil
 }
 
+// BulkReplacePreconditions swaps Preconditions across a batch of Tests: for each
+// Test it removes toRemove and adds toAdd in one apply, computing the new set as
+// (current minus toRemove) plus toAdd and queuing it via SetTestPreconditions
+// (FR-13.6). A Test already in the desired state is reported as succeeded.
+func (r *Repository) BulkReplacePreconditions(profileID string, testKeys, toRemove, toAdd []string) (BulkEditResult, error) {
+	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
+	for _, testKey := range testKeys {
+		current, err := r.preconditionKeys(profileID, testKey)
+		if err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
+			continue
+		}
+		newSet := applyReplaceDelta(current, toRemove, toAdd)
+		if err := r.SetTestPreconditions(profileID, testKey, newSet); err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: testKey, Error: err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, testKey)
+	}
+	return result, nil
+}
+
 // preconditionKeys returns the Precondition keys currently linked to a Test.
 func (r *Repository) preconditionKeys(profileID, testKey string) ([]string, error) {
 	rows, err := r.db.Query(
@@ -856,6 +909,27 @@ func applyPreconditionDelta(current, delta []string, add bool) []string {
 		} else {
 			delete(set, k)
 		}
+	}
+	out := make([]string, 0, len(set))
+	for k := range set {
+		out = append(out, k)
+	}
+	return uniqueSorted(out)
+}
+
+// applyReplaceDelta returns the sorted set produced by removing toRemove from
+// current and then adding toAdd. Removal happens first so a key present in both
+// lists ends up added. Shared by the bulk precondition / requirement swap paths.
+func applyReplaceDelta(current, toRemove, toAdd []string) []string {
+	set := make(map[string]struct{}, len(current))
+	for _, k := range current {
+		set[k] = struct{}{}
+	}
+	for _, k := range toRemove {
+		delete(set, k)
+	}
+	for _, k := range toAdd {
+		set[k] = struct{}{}
 	}
 	out := make([]string, 0, len(set))
 	for k := range set {
@@ -1067,22 +1141,35 @@ func (r *Repository) UpsertContainers(profileID string, containers []Container) 
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	// environments is preserved when a pending container_env edit exists, so a
+	// sync can't clobber an uncommitted local edit (mirrors the per-field guard
+	// in UpsertTests).
+	// fix_versions is a plain synced field (read-only, never locally edited), so
+	// it is overwritten unconditionally on conflict (unlike environments, which
+	// is preserved when a pending container_env edit exists).
 	stmt, err := tx.Prepare(
-		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status, parent_key, issue_type)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status, parent_key, issue_type, environments, fix_versions)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
-		   kind       = excluded.kind,
-		   summary    = excluded.summary,
-		   status     = excluded.status,
-		   parent_key = excluded.parent_key,
-		   issue_type = excluded.issue_type`)
+		   kind         = excluded.kind,
+		   summary      = excluded.summary,
+		   status       = excluded.status,
+		   parent_key   = excluded.parent_key,
+		   issue_type   = excluded.issue_type,
+		   fix_versions = excluded.fix_versions,
+		   environments = CASE WHEN EXISTS (
+		       SELECT 1 FROM pending_change
+		       WHERE pending_change.profile_id  = excluded.profile_id
+		         AND pending_change.entity_type = 'container_env'
+		         AND pending_change.entity_key  = excluded.jira_key
+		     ) THEN test_container.environments ELSE excluded.environments END`)
 	if err != nil {
 		return fmt.Errorf("prepare upsert container: %w", err)
 	}
 	defer stmt.Close()
 
 	for _, c := range containers {
-		if _, err := stmt.Exec(profileID, c.Key, c.Kind, c.Summary, c.Status, c.ParentKey, c.IssueType); err != nil {
+		if _, err := stmt.Exec(profileID, c.Key, c.Kind, c.Summary, c.Status, c.ParentKey, c.IssueType, encodeEnvironments(c.Environments), encodeFixVersions(c.FixVersions)); err != nil {
 			return fmt.Errorf("upsert container %s: %w", c.Key, err)
 		}
 	}
@@ -1122,6 +1209,86 @@ func (r *Repository) ReplaceAllContainerLinks(profileID string, links []Containe
 	for _, l := range links {
 		if _, err := stmt.Exec(profileID, l.ContainerKey, l.TestKey, l.RunStatus); err != nil {
 			return fmt.Errorf("link %s -> %s: %w", l.ContainerKey, l.TestKey, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// ExternalTest is the cached basics of a member Test that lives in a different
+// Jira project than the profile's, so it is never returned by the project-scoped
+// bulk test pull and has no test_case row. The container board reads these so
+// such members still render with a summary / status instead of bare keys.
+type ExternalTest struct {
+	Key        string `json:"key"`
+	Summary    string `json:"summary"`
+	Status     string `json:"status"`
+	ProjectKey string `json:"projectKey"`
+}
+
+// ContainerMemberKeysMissingTests returns the distinct container-member Test
+// keys that have no matching row in test_case — i.e. members living in another
+// project (the bulk pull only fetches the profile's project). The sync caches
+// the basics of these via ReplaceExternalTests so the board can show them.
+func (r *Repository) ContainerMemberKeysMissingTests(profileID string) ([]string, error) {
+	rows, err := r.db.Query(
+		`SELECT DISTINCT l.test_key
+		 FROM test_container_test l
+		 LEFT JOIN test_case t
+		   ON t.profile_id = l.profile_id AND t.jira_key = l.test_key
+		 WHERE l.profile_id = ? AND t.jira_key IS NULL
+		 ORDER BY l.test_key`,
+		profileID)
+	if err != nil {
+		return nil, fmt.Errorf("find missing member tests: %w", err)
+	}
+	defer rows.Close()
+
+	out := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		out = append(out, key)
+	}
+	return out, rows.Err()
+}
+
+// ReplaceExternalTests wipes a profile's external_test cache and rewrites it
+// from the provided list, so external members removed upstream disappear on
+// resync (mirrors ReplaceAllContainerLinks). An empty list clears the cache.
+func (r *Repository) ReplaceExternalTests(profileID string, tests []ExternalTest) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
+		`DELETE FROM external_test WHERE profile_id = ?`, profileID,
+	); err != nil {
+		return fmt.Errorf("clear external tests: %w", err)
+	}
+
+	if len(tests) == 0 {
+		return tx.Commit()
+	}
+
+	stmt, err := tx.Prepare(
+		`INSERT INTO external_test (profile_id, jira_key, summary, status, project_key)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
+		   summary     = excluded.summary,
+		   status      = excluded.status,
+		   project_key = excluded.project_key`)
+	if err != nil {
+		return fmt.Errorf("prepare insert external test: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, et := range tests {
+		if _, err := stmt.Exec(profileID, et.Key, et.Summary, et.Status, et.ProjectKey); err != nil {
+			return fmt.Errorf("cache external test %s: %w", et.Key, err)
 		}
 	}
 	return tx.Commit()
@@ -1176,29 +1343,40 @@ func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlan
 	}
 
 	// Member Tests, plus this container's direct run status (meaningful for a
-	// Test Execution).
+	// Test Execution). LEFT JOIN both the local test_case cache and the
+	// external_test cache (cross-project members live only in the latter) and
+	// COALESCE so a member with neither still shows by key. is_external flags the
+	// members that have no local test_case row.
 	memberRows, err := r.db.Query(
-		`SELECT t.jira_key, t.summary, t.status, l.run_status
+		`SELECT l.test_key,
+		        COALESCE(t.summary, x.summary, '') AS summary,
+		        COALESCE(t.status,  x.status,  '') AS status,
+		        (t.jira_key IS NULL)               AS is_external,
+		        l.run_status
 		 FROM test_container_test l
-		 JOIN test_case t
-		   ON t.profile_id = l.profile_id AND t.jira_key = l.test_key
+		 LEFT JOIN test_case     t ON t.profile_id = l.profile_id AND t.jira_key = l.test_key
+		 LEFT JOIN external_test x ON x.profile_id = l.profile_id AND x.jira_key = l.test_key
 		 WHERE l.profile_id = ? AND l.container_key = ?
-		 ORDER BY t.jira_key`,
+		 ORDER BY l.test_key`,
 		profileID, containerKey)
 	if err != nil {
 		return board, fmt.Errorf("read container members: %w", err)
 	}
 	defer memberRows.Close()
 
-	type member struct{ summary, status, directRun string }
+	type member struct {
+		summary, status, directRun string
+		isExternal                 bool
+	}
 	members := map[string]member{}
 	memberOrder := []string{}
 	for memberRows.Next() {
 		var key, summary, status, directRun string
-		if err := memberRows.Scan(&key, &summary, &status, &directRun); err != nil {
+		var isExternal bool
+		if err := memberRows.Scan(&key, &summary, &status, &isExternal, &directRun); err != nil {
 			return board, err
 		}
-		members[key] = member{summary: summary, status: status, directRun: directRun}
+		members[key] = member{summary: summary, status: status, directRun: directRun, isExternal: isExternal}
 		memberOrder = append(memberOrder, key)
 	}
 	if err := memberRows.Err(); err != nil {
@@ -1246,10 +1424,11 @@ func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlan
 			runStatus = consolidateRunStatus(runsByTest[key])
 		}
 		board.Rows = append(board.Rows, TestPlanBoardRow{
-			TestKey:   key,
-			Summary:   m.summary,
-			Status:    m.status,
-			RunStatus: runStatus,
+			TestKey:    key,
+			Summary:    m.summary,
+			Status:     m.status,
+			RunStatus:  runStatus,
+			IsExternal: m.isExternal,
 		})
 		runCounts[blankAs(runStatus, "(not run)")]++
 	}
@@ -1425,10 +1604,24 @@ func (r *Repository) SeedSampleContainers(profileID, projectKey string) (SeedRes
 // ListContainers returns the cached Containers of a given kind for a profile,
 // ordered by key — used by the bulk-allocation picker (FR-3.4–3.6).
 func (r *Repository) ListContainers(profileID, kind string) ([]Container, error) {
-	rows, err := r.db.Query(
-		`SELECT jira_key, kind, summary, status, parent_key, issue_type FROM test_container
-		 WHERE profile_id = ? AND kind = ? ORDER BY jira_key`,
-		profileID, kind)
+	return r.ListContainersQuery(profileID, ContainerQuery{Kind: kind})
+}
+
+// ListContainersQuery lists the containers of one kind, optionally filtered by a
+// Test Environment (membership test over the JSON environments array). The
+// filter matches the JSON-quoted token so "Prod" does not collide with
+// "Production" (see environmentFilterPattern).
+func (r *Repository) ListContainersQuery(profileID string, q ContainerQuery) ([]Container, error) {
+	sqlStr := `SELECT jira_key, kind, summary, status, parent_key, issue_type, environments, fix_versions
+		 FROM test_container WHERE profile_id = ? AND kind = ?`
+	args := []any{profileID, q.Kind}
+	if q.Environment != "" {
+		sqlStr += ` AND environments LIKE ?`
+		args = append(args, environmentFilterPattern(q.Environment))
+	}
+	sqlStr += ` ORDER BY jira_key`
+
+	rows, err := r.db.Query(sqlStr, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list containers: %w", err)
 	}
@@ -1437,9 +1630,12 @@ func (r *Repository) ListContainers(profileID, kind string) ([]Container, error)
 	out := []Container{}
 	for rows.Next() {
 		var c Container
-		if err := rows.Scan(&c.Key, &c.Kind, &c.Summary, &c.Status, &c.ParentKey, &c.IssueType); err != nil {
+		var environments, fixVersions string
+		if err := rows.Scan(&c.Key, &c.Kind, &c.Summary, &c.Status, &c.ParentKey, &c.IssueType, &environments, &fixVersions); err != nil {
 			return nil, err
 		}
+		c.Environments = decodeEnvironments(environments)
+		c.FixVersions = decodeFixVersions(fixVersions)
 		out = append(out, c)
 	}
 	return out, rows.Err()
@@ -1920,6 +2116,11 @@ func buildTestFilter(profileID string, q Query) (string, []any) {
 		where = append(where, "components LIKE ?")
 		args = append(args, componentFilterPattern(q.Component))
 	}
+	if q.ExecType != "" {
+		// Filter by Xray Test Type (execution type) - exact match.
+		where = append(where, "exec_type = ?")
+		args = append(args, q.ExecType)
+	}
 	if q.Review != "" {
 		// Filter by review verdict. "unreviewed" means no review row with a
 		// non-empty verdict; any other value matches that verdict exactly.
@@ -2033,7 +2234,7 @@ func (r *Repository) ListTests(profileID string, q Query) (Page, error) {
 	}
 
 	listSQL := fmt.Sprintf(
-		`SELECT jira_key, jira_id, summary, description, status, priority, labels, components, updated_at, folder_id
+		`SELECT jira_key, jira_id, summary, description, status, priority, labels, components, updated_at, folder_id, exec_type
 		 FROM test_case %s ORDER BY %s LIMIT ? OFFSET ?`,
 		whereSQL, orderSQL)
 
@@ -2161,7 +2362,7 @@ func (r *Repository) ListTestStatuses(profileID string) ([]string, error) {
 // GetTest returns one Test by its Jira key, or ErrNotFound.
 func (r *Repository) GetTest(profileID, key string) (TestCase, error) {
 	row := r.db.QueryRow(
-		`SELECT jira_key, jira_id, summary, description, status, priority, labels, components, updated_at, folder_id
+		`SELECT jira_key, jira_id, summary, description, status, priority, labels, components, updated_at, folder_id, exec_type
 		 FROM test_case WHERE profile_id = ? AND jira_key = ?`, profileID, key)
 	t, err := scanTest(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -2213,12 +2414,42 @@ func (r *Repository) GetSyncState(profileID string) (SyncState, error) {
 	return s, nil
 }
 
+// statsFilter builds the WHERE clause + args that scope the dashboard rollup to
+// an optional folder / component / status subset. Empty values impose no
+// constraint, so the zero-filter case reproduces the original full-profile
+// behaviour. The folder and component matches mirror ListTests/buildTestFilter
+// exactly: a folder matches itself plus any descendant ("/Auth" also covers
+// "/Auth/Login"), and a component matches a whole name within the newline-
+// bounded encoded string (never a prefix of a longer name). Status is exact.
+func statsFilter(profileID, folder, component, status string) (string, []any) {
+	where := []string{"profile_id = ?"}
+	args := []any{profileID}
+	if folder != "" {
+		where = append(where, "(folder_id = ? OR folder_id LIKE ?)")
+		args = append(args, folder, folder+"/%")
+	}
+	if component != "" {
+		where = append(where, "components LIKE ?")
+		args = append(args, componentFilterPattern(component))
+	}
+	if status != "" {
+		where = append(where, "status = ?")
+		args = append(args, status)
+	}
+	return "WHERE " + strings.Join(where, " AND "), args
+}
+
 // GetStatistics computes the dashboard rollup for a profile (FR-9) in a single
 // table scan plus one count query — fast enough to recompute on demand even at
 // 50k Tests. Status / priority distributions are returned in full; labels and
 // folders are capped to the top buckets; the trend is the most recent months
 // keyed by the Test's last-updated month.
-func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
+//
+// The optional folder / component / status arguments narrow every aggregate to
+// the matching subset of Tests (empty = no constraint). The container, execution
+// and requirement panels are scoped to memberships whose Test is in the subset,
+// so the whole dashboard recomputes for the filtered view.
+func (r *Repository) GetStatistics(profileID, folder, component, status string) (Statistics, error) {
 	stats := Statistics{
 		ByStatus:     []Bucket{},
 		ByPriority:   []Bucket{},
@@ -2230,9 +2461,12 @@ func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
 		ByCoverage:   []Bucket{},
 	}
 
+	whereSQL, args := statsFilter(profileID, folder, component, status)
+	filtered := folder != "" || component != "" || status != ""
+
 	rows, err := r.db.Query(
 		`SELECT status, priority, labels, folder_id, components, updated_at
-		 FROM test_case WHERE profile_id = ?`, profileID)
+		 FROM test_case `+whereSQL, args...)
 	if err != nil {
 		return stats, fmt.Errorf("read tests for stats: %w", err)
 	}
@@ -2275,19 +2509,33 @@ func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
 	stats.ByComponent = topBuckets(componentCounts, 12)
 	stats.UpdatedTrend = recentMonths(trendCounts, 12)
 
-	if err := r.db.QueryRow(
-		`SELECT COUNT(*) FROM pending_change WHERE profile_id = ?`, profileID,
-	).Scan(&stats.PendingChanges); err != nil {
+	// scope is an extra predicate (with its own args) that restricts a query's
+	// test_key / entity_key column to the filtered subset of Tests. When no
+	// filter is active it is empty, so the queries below stay identical to the
+	// original full-profile behaviour.
+	scope, scopeArgs := "", []any(nil)
+	if filtered {
+		scope = "test_case " + whereSQL
+		scopeArgs = args
+	}
+
+	pendSQL := `SELECT COUNT(*) FROM pending_change WHERE profile_id = ?`
+	pendArgs := []any{profileID}
+	if filtered {
+		pendSQL += ` AND entity_type = 'test_case' AND entity_key IN (SELECT jira_key FROM ` + scope + `)`
+		pendArgs = append(pendArgs, scopeArgs...)
+	}
+	if err := r.db.QueryRow(pendSQL, pendArgs...).Scan(&stats.PendingChanges); err != nil {
 		return stats, fmt.Errorf("count pending for stats: %w", err)
 	}
 
-	if err := r.addExecutionCoverage(profileID, &stats); err != nil {
+	if err := r.addExecutionCoverage(profileID, &stats, scope, scopeArgs); err != nil {
 		return stats, err
 	}
-	if err := r.addContainerStats(profileID, &stats); err != nil {
+	if err := r.addContainerStats(profileID, &stats, scope, scopeArgs); err != nil {
 		return stats, err
 	}
-	if err := r.addRequirementCoverage(profileID, &stats); err != nil {
+	if err := r.addRequirementCoverage(profileID, &stats, scope, scopeArgs); err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -2296,13 +2544,29 @@ func (r *Repository) GetStatistics(profileID string) (Statistics, error) {
 // addRequirementCoverage tallies requirements by their derived coverage status
 // for the dashboard panel, in the same canonical order as the coverage view
 // (worst-first). Buckets with no requirements are omitted.
-func (r *Repository) addRequirementCoverage(profileID string, stats *Statistics) error {
+func (r *Repository) addRequirementCoverage(profileID string, stats *Statistics, scope string, scopeArgs []any) error {
 	reqs, err := r.ListRequirementsWithCoverage(profileID)
 	if err != nil {
 		return err
 	}
+
+	// When a dashboard filter is active, keep only requirements that are covered
+	// by at least one Test in the subset, so the requirement-coverage panel
+	// tracks the filtered view too. A requirement whose covering Tests all fall
+	// outside the subset drops out.
+	var inSubset map[string]bool
+	if scope != "" {
+		inSubset, err = r.subsetKeyToReqSet(profileID, scope, scopeArgs)
+		if err != nil {
+			return err
+		}
+	}
+
 	counts := map[string]int{}
 	for _, req := range reqs {
+		if inSubset != nil && !inSubset[req.Key] {
+			continue
+		}
 		counts[req.Coverage]++
 	}
 	order := []string{CoverageFailed, CoverageNotRun, CoveragePassed, CoverageUncovered}
@@ -2314,13 +2578,52 @@ func (r *Repository) addRequirementCoverage(profileID string, stats *Statistics)
 	return nil
 }
 
+// subsetKeyToReqSet returns the set of requirement keys covered by at least one
+// Test in the filtered subset (scope is "test_case <whereSQL>"), so the
+// requirement-coverage panel can be narrowed to the active dashboard filter.
+func (r *Repository) subsetKeyToReqSet(profileID, scope string, scopeArgs []any) (map[string]bool, error) {
+	args := append([]any{profileID}, scopeArgs...)
+	rows, err := r.db.Query(
+		`SELECT DISTINCT l.requirement_key
+		 FROM test_requirement l
+		 WHERE l.profile_id = ?
+		   AND l.test_key IN (SELECT jira_key FROM `+scope+`)`,
+		args...)
+	if err != nil {
+		return nil, fmt.Errorf("scope requirement coverage: %w", err)
+	}
+	defer rows.Close()
+	set := map[string]bool{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		set[k] = true
+	}
+	return set, rows.Err()
+}
+
 // addContainerStats fills the Test Set / Plan / Execution counts and the
 // set / plan coverage — how many distinct Tests belong to at least one set or
 // plan (FR-9.4).
-func (r *Repository) addContainerStats(profileID string, stats *Statistics) error {
-	kindRows, err := r.db.Query(
-		`SELECT kind, COUNT(*) FROM test_container WHERE profile_id = ? GROUP BY kind`,
-		profileID)
+func (r *Repository) addContainerStats(profileID string, stats *Statistics, scope string, scopeArgs []any) error {
+	// Unfiltered: count every container of each kind. Filtered: count only the
+	// containers that hold at least one Test in the subset, so the tiles track
+	// the filtered view (a Set with no matching Test drops out).
+	kindSQL := `SELECT kind, COUNT(*) FROM test_container WHERE profile_id = ? GROUP BY kind`
+	kindArgs := []any{profileID}
+	if scope != "" {
+		kindSQL = `SELECT c.kind, COUNT(DISTINCT c.jira_key)
+			 FROM test_container c
+			 JOIN test_container_test l
+			   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+			 WHERE c.profile_id = ?
+			   AND l.test_key IN (SELECT jira_key FROM ` + scope + `)
+			 GROUP BY c.kind`
+		kindArgs = append(kindArgs, scopeArgs...)
+	}
+	kindRows, err := r.db.Query(kindSQL, kindArgs...)
 	if err != nil {
 		return fmt.Errorf("count containers: %w", err)
 	}
@@ -2344,14 +2647,15 @@ func (r *Repository) addContainerStats(profileID string, stats *Statistics) erro
 		return err
 	}
 
-	covRows, err := r.db.Query(
+	covSQL, covArgs := scopeClause(
 		`SELECT c.kind, COUNT(DISTINCT l.test_key)
 		 FROM test_container_test l
 		 JOIN test_container c
 		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
-		 WHERE l.profile_id = ?
-		 GROUP BY c.kind`,
-		profileID)
+		 WHERE l.profile_id = ?`,
+		[]any{profileID}, scope, scopeArgs)
+	covSQL += ` GROUP BY c.kind`
+	covRows, err := r.db.Query(covSQL, covArgs...)
 	if err != nil {
 		return fmt.Errorf("count container coverage: %w", err)
 	}
@@ -2372,19 +2676,31 @@ func (r *Repository) addContainerStats(profileID string, stats *Statistics) erro
 	return covRows.Err()
 }
 
+// scopeClause appends a "l.test_key IN (SELECT jira_key FROM <scope>)" predicate
+// (with its args) when a dashboard filter is active, restricting a membership
+// query to runs whose Test is in the filtered subset. With an empty scope it
+// returns the query and args unchanged.
+func scopeClause(sql string, args []any, scope string, scopeArgs []any) (string, []any) {
+	if scope == "" {
+		return sql, args
+	}
+	return sql + " AND l.test_key IN (SELECT jira_key FROM " + scope + ")", append(args, scopeArgs...)
+}
+
 // addExecutionCoverage rolls up Test Run statuses across all Test Execution
 // memberships (FR-9.3): the run-status distribution plus the count of distinct
 // Tests that appear in at least one execution. Each Test-in-execution is one
 // data point, so a Test in two executions counts twice in the distribution but
 // once in ExecutedTests.
-func (r *Repository) addExecutionCoverage(profileID string, stats *Statistics) error {
-	rows, err := r.db.Query(
+func (r *Repository) addExecutionCoverage(profileID string, stats *Statistics, scope string, scopeArgs []any) error {
+	sql, args := scopeClause(
 		`SELECT l.run_status, l.test_key
 		 FROM test_container_test l
 		 JOIN test_container c
 		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
 		 WHERE l.profile_id = ? AND c.kind = ?`,
-		profileID, "testexec")
+		[]any{profileID, "testexec"}, scope, scopeArgs)
+	rows, err := r.db.Query(sql, args...)
 	if err != nil {
 		return fmt.Errorf("read execution coverage: %w", err)
 	}
@@ -4022,6 +4338,7 @@ const (
 	entityContainerAdd       = "test_container_add"
 	entityContainerEdit      = "container_edit"
 	entityContainerDelete    = "container_delete"
+	entityContainerEnv       = "container_env"
 	entityPreconditionSet    = "precondition_set"
 	entityPreconditionEdit   = "precondition_edit"
 	entityPreconditionAdd    = "precondition_add"
@@ -4157,7 +4474,7 @@ func scanTest(s scanner) (TestCase, error) {
 	)
 	if err := s.Scan(
 		&t.Key, &t.ID, &t.Summary, &t.Description,
-		&t.Status, &t.Priority, &labels, &components, &t.Updated, &t.FolderID,
+		&t.Status, &t.Priority, &labels, &components, &t.Updated, &t.FolderID, &t.ExecType,
 	); err != nil {
 		return TestCase{}, err
 	}

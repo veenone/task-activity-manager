@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
-import { GetStatistics, errMsg } from "../api";
+import {
+  GetStatistics,
+  ListFolders,
+  ListComponents,
+  ListStatuses,
+  ExportDashboard,
+  errMsg,
+} from "../api";
 import type { Statistics, Bucket } from "../api";
+import { testrepo } from "../../wailsjs/go/models";
 import { DuplicatesCard } from "./DuplicatesCard";
 
 interface Props {
@@ -12,6 +20,8 @@ interface Props {
 // Dashboard renders the per-profile statistics view (FR-9), computed entirely
 // from the local store. It recomputes whenever the profile changes or a sync /
 // commit bumps refreshKey, so the numbers track the cache without a Jira call.
+// Optional Folder / Component / Status filters narrow every panel to the
+// matching subset of Tests (RND_P_4TFINT_05-228).
 export function Dashboard({
   profileId,
   refreshKey,
@@ -22,13 +32,53 @@ export function Dashboard({
   const [loading, setLoading] = useState(true);
   // Local refresh: recompute the dashboard from the cache without a full sync (#7).
   const [nonce, setNonce] = useState(0);
+  // XLSX export state (RND_P_4TFINT_05): mirror TraceabilityTabs' notice pattern.
+  const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState("");
+  const [exportErr, setExportErr] = useState("");
+
+  // Filter selections + their option lists, loaded from existing bindings.
+  const [folder, setFolder] = useState("");
+  const [component, setComponent] = useState("");
+  const [status, setStatus] = useState("");
+  const [folderOptions, setFolderOptions] = useState<testrepo.Folder[]>([]);
+  const [componentOptions, setComponentOptions] = useState<Bucket[]>([]);
+  const [statusOptions, setStatusOptions] = useState<string[]>([]);
+  const hasFilter = folder !== "" || component !== "" || status !== "";
+
+  // Reset selections when the profile changes, then load the option lists.
+  useEffect(() => {
+    setFolder("");
+    setComponent("");
+    setStatus("");
+    if (!profileId) return;
+    let cancelled = false;
+    ListFolders(profileId)
+      .then((f) => {
+        if (!cancelled) setFolderOptions(f ?? []);
+      })
+      .catch((e) => console.error("list folders:", errMsg(e)));
+    ListComponents(profileId)
+      .then((c) => {
+        if (!cancelled) setComponentOptions(c ?? []);
+      })
+      .catch((e) => console.error("list components:", errMsg(e)));
+    ListStatuses(profileId)
+      .then((s) => {
+        if (!cancelled) setStatusOptions(s ?? []);
+      })
+      .catch((e) => console.error("list statuses:", errMsg(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
 
   useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
     setLoading(true);
     setError("");
-    GetStatistics(profileId)
+    GetStatistics(profileId, folder, component, status)
       .then((s) => {
         if (!cancelled) setStats(s);
       })
@@ -41,7 +91,23 @@ export function Dashboard({
     return () => {
       cancelled = true;
     };
-  }, [profileId, refreshKey, nonce]);
+  }, [profileId, refreshKey, nonce, folder, component, status]);
+
+  // Export the dashboard to XLSX honouring the current folder/component/status
+  // filters, so the workbook matches the on-screen scope.
+  async function exportDashboard() {
+    setExporting(true);
+    setExportErr("");
+    setExportNotice("");
+    try {
+      const path = await ExportDashboard(profileId, folder, component, status);
+      if (path) setExportNotice(`Saved to ${path}`);
+    } catch (e) {
+      setExportErr(errMsg(e));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   if (loading && !stats) {
     return <div className="dashboard muted">Loading…</div>;
@@ -53,11 +119,71 @@ export function Dashboard({
     return null;
   }
 
+  const filterBar = (
+    <div className="dashboard-filters">
+      <select
+        className="dashboard-filter"
+        value={folder}
+        onChange={(e) => setFolder(e.target.value)}
+        title="Limit the dashboard to a Test Repository folder (and its subfolders)"
+      >
+        <option value="">All folders</option>
+        {folderOptions.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.id}
+          </option>
+        ))}
+      </select>
+      <select
+        className="dashboard-filter"
+        value={component}
+        onChange={(e) => setComponent(e.target.value)}
+        title="Limit the dashboard to a component"
+      >
+        <option value="">All components</option>
+        {componentOptions.map((c) => (
+          <option key={c.label} value={c.label}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+      <select
+        className="dashboard-filter"
+        value={status}
+        onChange={(e) => setStatus(e.target.value)}
+        title="Limit the dashboard to a status"
+      >
+        <option value="">All statuses</option>
+        {statusOptions.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      {hasFilter && (
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            setFolder("");
+            setComponent("");
+            setStatus("");
+          }}
+          title="Clear all dashboard filters"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+
   if (stats.total === 0) {
     return (
       <div className="dashboard">
+        {filterBar}
         <p className="muted">
-          No tests cached yet. Run a sync to populate the dashboard.
+          {hasFilter
+            ? "No tests match the selected filters."
+            : "No tests cached yet. Run a sync to populate the dashboard."}
         </p>
       </div>
     );
@@ -66,14 +192,27 @@ export function Dashboard({
   return (
     <div className="dashboard">
       <div className="dashboard-head">
-        <button
-          className="btn"
-          onClick={() => setNonce((n) => n + 1)}
-          title="Recompute the dashboard from the local cache"
-        >
-          ↻ Refresh
-        </button>
+        {filterBar}
+        <div className="dashboard-head-actions">
+          <button
+            className="btn"
+            onClick={exportDashboard}
+            disabled={exporting}
+            title="Export the dashboard (Summary + breakdowns) to XLSX, honouring the current filters"
+          >
+            {exporting ? "Exporting…" : "Export XLSX"}
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => setNonce((n) => n + 1)}
+            title="Recompute the dashboard from the local cache"
+          >
+            ↻ Refresh
+          </button>
+        </div>
       </div>
+      {exportErr && <p className="error-text">{exportErr}</p>}
+      {exportNotice && <p className="muted">{exportNotice}</p>}
       <DuplicatesCard
         profileId={profileId}
         refreshKey={refreshKey}
@@ -110,7 +249,8 @@ export function Dashboard({
         />
       </div>
 
-      {(stats.testSets > 0 ||
+      <div className="stat-grid">
+        {(stats.testSets > 0 ||
         stats.testPlans > 0 ||
         stats.testExecutions > 0) && (
         <div className="stat-panel">
@@ -162,7 +302,10 @@ export function Dashboard({
         />
       )}
 
-      <TrendPanel buckets={stats.updatedTrend} />
+        <div className="dashboard-trend-span">
+          <TrendPanel buckets={stats.updatedTrend} />
+        </div>
+      </div>
 
       <p className="muted dashboard-note">
         Computed from the local cache (FR-9.5). Execution coverage and Test

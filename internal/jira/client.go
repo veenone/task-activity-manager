@@ -36,6 +36,22 @@ type Client struct {
 	testTypeID   string
 	testTypeName string
 	testTypeErr  error
+
+	// customFieldMu guards customFieldIDs, the per-instance cache of resolved
+	// custom field ids keyed by field name (see resolveCustomFieldID), so a sync
+	// or commit resolves a given field (e.g. "Test Type") from /rest/api/2/field
+	// at most once.
+	customFieldMu  sync.Mutex
+	customFieldIDs map[string]string
+	// customFieldTypes caches the coarse schema type of every custom field on
+	// the instance, keyed by field id (see customFieldType), filled from one
+	// /rest/api/2/field fetch so a commit pushing several custom field edits
+	// resolves each field's type without re-fetching.
+	customFieldTypes map[string]string
+	// customFieldTypesLoaded records that the one-shot /rest/api/2/field type
+	// fetch has run, so an unknown id (absent from customFieldTypes) does not
+	// trigger a redundant re-fetch.
+	customFieldTypesLoaded bool
 }
 
 // User is the subset of /rest/api/2/myself the app needs to confirm a connection.

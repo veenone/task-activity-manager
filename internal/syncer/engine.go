@@ -109,19 +109,24 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL, sinc
 		log.Printf("xtm: precondition sync failed (continuing): %v", err)
 	}
 
-	emitStage(onProgress, "Syncing containers")
-	if err := e.syncContainers(ctx, profileID, projectKey, onProgress); err != nil {
-		log.Printf("xtm: container sync failed (continuing): %v", err)
-	}
-
 	emitStage(onProgress, "Syncing requirements")
 	if err := e.syncRequirements(ctx, profileID, projectKey, onProgress); err != nil {
 		log.Printf("xtm: requirement sync failed (continuing): %v", err)
 	}
 
+	// Bugs sync BEFORE containers: the normal bug harvest wipes-and-replaces the
+	// bug / test_bug caches (ReplaceAllBugs/ReplaceAllBugLinks), while the
+	// container pass then ADDITIVELY merges bugs reached through cross-project
+	// member Tests (UpsertBugs/UpsertBugLinks). Running bugs first guarantees the
+	// container harvest is not clobbered by the wipe (#219).
 	emitStage(onProgress, "Syncing bugs")
 	if err := e.syncBugs(ctx, profileID, projectKey, onProgress); err != nil {
 		log.Printf("xtm: bug sync failed (continuing): %v", err)
+	}
+
+	emitStage(onProgress, "Syncing containers")
+	if err := e.syncContainers(ctx, profileID, projectKey, onProgress); err != nil {
+		log.Printf("xtm: container sync failed (continuing): %v", err)
 	}
 
 	emitStage(onProgress, "Syncing custom fields")
@@ -289,12 +294,14 @@ func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey strin
 	repoContainers := make([]testrepo.Container, len(containers))
 	for i, c := range containers {
 		repoContainers[i] = testrepo.Container{
-			Key:       c.Key,
-			Kind:      c.Kind,
-			Summary:   c.Summary,
-			Status:    c.Status,
-			ParentKey: c.ParentKey,
-			IssueType: c.IssueType,
+			Key:          c.Key,
+			Kind:         c.Kind,
+			Summary:      c.Summary,
+			Status:       c.Status,
+			ParentKey:    c.ParentKey,
+			IssueType:    c.IssueType,
+			Environments: c.Environments,
+			FixVersions:  c.FixVersions,
 		}
 	}
 	if err := e.repo.UpsertContainers(profileID, repoContainers); err != nil {
@@ -308,7 +315,92 @@ func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey strin
 			RunStatus:    l.RunStatus,
 		}
 	}
-	return e.repo.ReplaceAllContainerLinks(profileID, repoLinks)
+	if err := e.repo.ReplaceAllContainerLinks(profileID, repoLinks); err != nil {
+		return err
+	}
+
+	// Cache the basics of member Tests that live in another project (so have no
+	// test_case row), so the board can render them instead of dropping them
+	// (#219). Best-effort: on any error, log and continue — members still show by
+	// key, just without a cached summary / status.
+	missing, err := e.repo.ContainerMemberKeysMissingTests(profileID)
+	if err != nil {
+		log.Printf("xtm: find external member tests: %v", err)
+		return nil
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	basics, err := e.client.ListTestsBasic(ctx, missing)
+	if err != nil {
+		log.Printf("xtm: fetch external member basics: %v", err)
+		return nil
+	}
+	externals := make([]testrepo.ExternalTest, len(basics))
+	for i, b := range basics {
+		externals[i] = testrepo.ExternalTest{
+			Key:        b.Key,
+			Summary:    b.Summary,
+			Status:     b.Status,
+			ProjectKey: b.ProjectKey,
+		}
+	}
+	if err := e.repo.ReplaceExternalTests(profileID, externals); err != nil {
+		log.Printf("xtm: cache external member tests: %v", err)
+	}
+
+	// Harvest bugs reached THROUGH these cross-project member Tests. The normal
+	// syncBugs pass walks only the profile's own test_case keys, so a bug linked
+	// solely to a foreign member (the reported case: bug + execution in project A,
+	// member Test in project B) is never collected. Keep only links whose target
+	// issue type matches the profile's configured defect type, and merge them
+	// ADDITIVELY (UpsertBugs/UpsertBugLinks) so the bugs syncBugs already wrote are
+	// not clobbered (#219). Best-effort: log and swallow.
+	e.harvestExternalBugs(profileID, basics)
+	return nil
+}
+
+// harvestExternalBugs upserts the defect issues (and their Test links) reached
+// through cross-project member Tests, additively, so they are not clobbered by
+// the wipe-and-replace normal bug sync (which already ran). Only links whose
+// target issue type matches the profile's configured bug issue type are kept.
+func (e *Engine) harvestExternalBugs(profileID string, basics []jira.TestBasic) {
+	bugType := strings.ToLower(strings.TrimSpace(e.repo.ProfileBugIssueType(profileID)))
+	if bugType == "" {
+		bugType = "bug"
+	}
+	bugByKey := map[string]testrepo.Bug{}
+	links := []testrepo.BugLink{}
+	for _, b := range basics {
+		for _, ln := range b.IssueLinks {
+			if strings.ToLower(strings.TrimSpace(ln.IssueType)) != bugType {
+				continue
+			}
+			bugByKey[ln.Key] = testrepo.Bug{
+				Key:        ln.Key,
+				ProjectKey: ln.ProjectKey,
+				IssueType:  ln.IssueType,
+				Summary:    ln.Summary,
+				Status:     ln.Status,
+				Priority:   ln.Priority,
+			}
+			links = append(links, testrepo.BugLink{TestKey: b.Key, BugKey: ln.Key, LinkID: ln.LinkID})
+		}
+	}
+	if len(links) == 0 {
+		return
+	}
+	bugs := make([]testrepo.Bug, 0, len(bugByKey))
+	for _, b := range bugByKey {
+		bugs = append(bugs, b)
+	}
+	if err := e.repo.UpsertBugs(profileID, bugs); err != nil {
+		log.Printf("xtm: upsert cross-project bugs: %v", err)
+		return
+	}
+	if err := e.repo.UpsertBugLinks(profileID, links); err != nil {
+		log.Printf("xtm: upsert cross-project bug links: %v", err)
+	}
 }
 
 // syncRequirements refreshes requirement issues and their Test coverage links
@@ -426,6 +518,7 @@ func toRepoTests(in []jira.Test) []testrepo.TestCase {
 			Components:  t.Components,
 			Updated:     t.Updated,
 			FolderID:    t.FolderID,
+			ExecType:    t.ExecType,
 		}
 	}
 	return out

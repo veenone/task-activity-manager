@@ -694,6 +694,17 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
 }
+/* Let a grid item span the full width of the stat-grid (used for the monthly
+   trend, which reads better wide) and prevent its content from overflowing. */
+.dashboard-trend-span {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+}
+.dashboard-trend-span > * {
+  flex: 1;
+  min-width: 0;
+}
 .stat-panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -910,6 +921,12 @@
   white-space: nowrap;
   cursor: pointer;
 }
+.sankey-hint {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 640px;
+}
 
 /* MultiSelect: checkbox dropdown for the Sankey filters. */
 .multiselect {
@@ -950,6 +967,13 @@
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   padding: 6px;
+}
+/* Detail-panel pickers open within the 440px detail (it has overflow:hidden);
+   anchor left so the panel is not clipped at the detail's left border. */
+.pre-add .multiselect-panel {
+  left: 0;
+  right: auto;
+  max-width: 100%;
 }
 .multiselect-clear {
   font-size: 11px;
@@ -1198,6 +1222,124 @@ i.sankey-node-l2 {
 }
 .kind-testexec {
   background: #b45309;
+}
+/* "ext" tag on a board member Test that lives in a different Jira project. */
+.ext-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #fff;
+  background: #64748b;
+  vertical-align: middle;
+}
+.container-environments {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.container-env-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.container-env-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+/* Related defects for the selected container (an execution's bugs, incl.
+   cross-project member bugs). */
+.container-bugs {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0 2px;
+}
+.container-bugs-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.container-bugs-count {
+  color: var(--text-strong);
+}
+.container-bugs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.container-bug {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.container-bug-key {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+}
+.container-bug-key:hover {
+  text-decoration: underline;
+}
+.container-bug-summary {
+  color: var(--text-strong);
+}
+.container-bug-status {
+  font-size: 10px;
+}
+.env-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #1d4ed8;
+  color: #fff;
+}
+/* Fix version(s) are read-only display chips; a distinct (slate) color marks
+   them apart from the editable blue environment chips. */
+.fix-version-chip {
+  background: #475569;
+}
+.env-chip-remove {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+}
+.env-chip-remove:hover {
+  color: #fff;
+}
+.container-env-add {
+  font-size: 12px;
+  padding: 2px 6px;
+  width: 140px;
 }
 .container-card-key {
   font-size: 13px;
@@ -2068,6 +2210,23 @@ tr.row-selected {
 }
 .pre-add {
   margin-bottom: 12px;
+}
+/* Precondition picker row: multi-pick add + a separate "New" create button. */
+.pre-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pre-add-new {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+/* "Add N" confirm button at the foot of the multi-pick panel. */
+.multiadd-confirm {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 12px;
 }
 .pre-summary-edit {
   flex: 1;
@@ -3198,6 +3357,33 @@ tr.row-checked:hover {
   font-size: 11px;
 }
 
+/* Swap (Replace) mode: two scrollable checkbox lists of candidate items. */
+.bulk-swap-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+}
+.bulk-swap-list li {
+  padding: 2px;
+}
+.bulk-swap-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.bulk-swap-list input[type="checkbox"] {
+  margin: 0;
+}
+
 .link-btn {
   background: none;
   border: none;
@@ -3720,6 +3906,7 @@ tr.row-checked:hover {
   margin-right: 5px;
 }
 .dup-compare-legend { flex: 1; text-align: left; }
+.dup-compare-ref { margin: 0 0 8px; font-size: 12px; }
 
 /* Requirement filter input must not stretch to fill the column height (#1). */
 .reqs-filter { flex: 0 0 auto; }
@@ -3766,8 +3953,35 @@ tr.row-checked:hover {
 /* Dashboard per-view refresh (#7). */
 .dashboard-head {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+/* Group the dashboard action buttons together on the right, mirroring the
+   board / duplicate toolbars (RND_P_4TFINT_05). */
+.dashboard-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Dashboard folder / component / status filters (RND_P_4TFINT_05-228). */
+.dashboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.dashboard-filter {
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  max-width: 220px;
 }
 
 /* "Call test" steps (#2). */
@@ -3791,8 +4005,17 @@ tr.row-checked:hover {
 
 /* Test Calls view (#2 follow-up) — caller -> called relationships. */
 .testcalls {
-  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+/* Scrollable content region below the flush toolbar + tiles (mirrors .dup-list). */
+.testcalls-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding: 16px 20px;
 }
 .testcalls-head {
   display: flex;
@@ -4266,6 +4489,11 @@ tr.row-checked:hover {
   justify-content: space-between;
   gap: 8px;
 }
+.bugs-md-check {
+  margin: 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
 .bugs-md-key {
   font-size: 12px;
   font-weight: 600;
@@ -4339,6 +4567,14 @@ tr.row-checked:hover {
 .container-filter-count {
   font-size: 12px;
   white-space: nowrap;
+}
+.container-env-batch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.container-env-batch .container-env-add {
+  width: 150px;
 }
 .board-sort-th {
   cursor: pointer;

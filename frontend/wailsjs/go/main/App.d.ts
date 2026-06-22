@@ -19,9 +19,15 @@ export function BulkAssociatePreconditions(arg1:string,arg2:Array<string>,arg3:A
 
 export function BulkAssociateRequirements(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:boolean):Promise<testrepo.BulkEditResult>;
 
+export function BulkEditContainers(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
+
 export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
 export function BulkMoveToFolder(arg1:string,arg2:Array<string>,arg3:string):Promise<testrepo.BulkEditResult>;
+
+export function BulkReplacePreconditions(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:Array<string>):Promise<testrepo.BulkEditResult>;
+
+export function BulkReplaceRequirements(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:Array<string>):Promise<testrepo.BulkEditResult>;
 
 export function BulkReviewTests(arg1:string,arg2:Array<string>,arg3:string,arg4:string,arg5:string):Promise<testrepo.BulkEditResult>;
 
@@ -93,6 +99,8 @@ export function EditTestStepField(arg1:string,arg2:string,arg3:string,arg4:strin
 
 export function ExcludeFromDuplicates(arg1:string,arg2:string):Promise<void>;
 
+export function ExportDashboard(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+
 export function ExportDiagnostics():Promise<string>;
 
 export function ExportImportTemplate():Promise<string>;
@@ -104,6 +112,8 @@ export function ExportPytest(arg1:string,arg2:string,arg3:string):Promise<string
 export function ExportRequirementAudit(arg1:string):Promise<string>;
 
 export function ExportTests(arg1:string,arg2:testrepo.Query):Promise<string>;
+
+export function ExportTraceability(arg1:string,arg2:string,arg3:Array<string>,arg4:Array<string>,arg5:boolean,arg6:Array<string>,arg7:Array<string>):Promise<string>;
 
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
 
@@ -119,9 +129,9 @@ export function GetRequirementTraceability(arg1:string,arg2:Array<string>):Promi
 
 export function GetSettings():Promise<settings.Settings>;
 
-export function GetStatistics(arg1:string):Promise<testrepo.Statistics>;
+export function GetStatistics(arg1:string,arg2:string,arg3:string,arg4:string):Promise<testrepo.Statistics>;
 
-export function GetSubTaskTraceability(arg1:string,arg2:Array<string>):Promise<testrepo.Sankey>;
+export function GetSubTaskTraceability(arg1:string,arg2:Array<string>,arg3:boolean):Promise<testrepo.Sankey>;
 
 export function GetSyncState(arg1:string):Promise<testrepo.SyncState>;
 
@@ -156,6 +166,8 @@ export function ImportTests(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.I
 export function ListAllPreconditions(arg1:string):Promise<Array<testrepo.Precondition>>;
 
 export function ListAuditEntries(arg1:string,arg2:number):Promise<Array<testrepo.AuditEntry>>;
+
+export function ListBugsForContainer(arg1:string,arg2:string):Promise<Array<testrepo.Bug>>;
 
 export function ListBugsWithTests(arg1:string):Promise<Array<testrepo.BugWithTests>>;
 
@@ -217,11 +229,15 @@ export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Pro
 
 export function RunStatuses():Promise<Array<string>>;
 
+export function ScanAllDuplicateSteps(arg1:string):Promise<number>;
+
 export function ScanDuplicateGroupSteps(arg1:string,arg2:string):Promise<testrepo.DuplicateGroup>;
 
 export function ScanDuplicates(arg1:string):Promise<testrepo.DuplicateReport>;
 
 export function SeedSampleContainers(arg1:string):Promise<testrepo.SeedResult>;
+
+export function SetContainerEnvironments(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SetDefaultProfile(arg1:string):Promise<void>;
 

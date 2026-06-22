@@ -290,6 +290,38 @@ func demoKeyIndex(testKey string) int {
 	return n - 1
 }
 
+// demoCallGraph maps a caller's numeric key suffix to the callee's numeric
+// suffix for the seeded demo call graph. Both keys share the caller's project
+// prefix. Numbers are well within demoTestCount and avoid the duplicate-cluster
+// indices (0..3, i.e. numbers 1..4). 6 and 8 both call 7 (shared callee); 9
+// calls 10 (separate pair).
+var demoCallGraph = map[int]int{
+	6: 7,
+	8: 7,
+	9: 10,
+}
+
+// demoCalledSibling returns the called Test key for a caller in the demo call
+// graph, or "" if the given key is not a seeded caller. The returned key reuses
+// the caller's project prefix so the call stays within the same project, and
+// the lookup is deterministic (same input -> same output), which is what makes
+// a SyncTestCalls re-pull stable.
+func demoCalledSibling(testKey string) string {
+	dash := strings.LastIndex(testKey, "-")
+	if dash < 0 {
+		return ""
+	}
+	num, err := strconv.Atoi(testKey[dash+1:])
+	if err != nil {
+		return ""
+	}
+	callee, ok := demoCallGraph[num]
+	if !ok {
+		return ""
+	}
+	return testKey[:dash+1] + strconv.Itoa(callee)
+}
+
 // demoStepsForKey returns a deterministic three-step skeleton for any test
 // in demo mode (FR-2.5). The steps are generic on purpose — they exercise
 // the panel layout, not Jira fidelity. Real Xray returns whatever the
@@ -314,6 +346,32 @@ func demoStepsForKey(testKey string) []Step {
 		return []Step{
 			{ID: "dup-b-4", Index: 1, Action: "Open the cart from the menu", Data: "", Expected: "Cart page loads"},
 			{ID: "dup-b-4b", Index: 2, Action: "Proceed to payment", Data: "visa", Expected: "Payment screen opens"},
+		}
+	}
+
+	// Deterministic demo call graph so the Test Calls view is non-empty in
+	// demo mode and a SyncTestCalls re-pull is stable (FR-2.5). A few
+	// non-duplicate tests (numbers 6, 8, 9) get a "call test" step pointing at
+	// a SIBLING test in the SAME project. The called key reuses the caller's
+	// project prefix, so this works for any demo project key (DEMO-6 -> DEMO-7,
+	// QA-6 -> QA-7, ...). Numbers 6 and 8 both call 7 (a shared callee with two
+	// callers); 9 calls 10 (a separate caller/callee pair). This must stay
+	// deterministic: SyncTestCalls re-pulls via demoStepsForKey, and identical
+	// output on re-pull is exactly what keeps the graph from being wiped.
+	if callee := demoCalledSibling(testKey); callee != "" {
+		return []Step{
+			{
+				ID:       testKey + "-s1",
+				Index:    1,
+				Action:   "Set up the preconditions described in the test description.",
+				Expected: "All preconditions are met and the system is in a known state.",
+			},
+			{
+				ID:            testKey + "-call",
+				Index:         2,
+				Action:        "Call test " + callee,
+				CalledTestKey: callee,
+			},
 		}
 	}
 
@@ -352,6 +410,35 @@ var demoRunStatuses = []string{
 	"TODO", "TODO", "TODO",
 	"EXECUTING",
 	"ABORTED",
+}
+
+// demoEnvironments returns a deterministic, non-empty subset of the environment
+// pool for the i-th execution, cycling subsets so different executions show
+// different environment chips.
+func demoEnvironments(i int) []string {
+	// Six deterministic subsets cycled by index; each is non-empty so every demo
+	// execution shows at least one chip, and the filter has something to narrow.
+	subsets := [][]string{
+		{"Staging"},
+		{"Prod"},
+		{"Staging", "Chrome"},
+		{"Prod", "Android"},
+		{"Chrome"},
+		{"Staging", "Prod", "Chrome", "Android"},
+	}
+	return subsets[i%len(subsets)]
+}
+
+// demoFixVersions returns a deterministic Jira Fix Version(s) set for the i-th
+// execution, cycling a few small subsets so the read-only chips show offline.
+// Test Sets / Plans are left empty (they carry no Fix Version field here).
+func demoFixVersions(i int) []string {
+	subsets := [][]string{
+		{"1.5.0"},
+		{"1.6.0"},
+		{"1.5.0", "1.6.0"},
+	}
+	return subsets[i%len(subsets)]
 }
 
 // demoLinkedTests caps how many of the low-numbered demo Tests get container
@@ -401,10 +488,12 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 		key := fmt.Sprintf("%s-TE-%d", projectKey, i+1)
 		execKeys[i] = key
 		containers = append(containers, Container{
-			Key:     key,
-			Kind:    KindTestExec,
-			Summary: fmt.Sprintf("Cycle %d execution", i+1),
-			Status:  demoExecStatuses[i%len(demoExecStatuses)],
+			Key:          key,
+			Kind:         KindTestExec,
+			Summary:      fmt.Sprintf("Cycle %d execution", i+1),
+			Status:       demoExecStatuses[i%len(demoExecStatuses)],
+			Environments: demoEnvironments(i),
+			FixVersions:  demoFixVersions(i),
 		})
 	}
 
@@ -413,14 +502,38 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 	// case the traceability Sankey's "cross-project only" filter surfaces. In live
 	// mode these come from Xray's per-test executions lookup; here they're seeded
 	// so the feature is exercisable offline.
-	const crossProject = "XRAYINT"
+	const crossProject = demoCrossProjectKey
 	crossExecKeys := []string{crossProject + "-TE-1", crossProject + "-TE-2"}
 	for i, key := range crossExecKeys {
 		containers = append(containers, Container{
-			Key:     key,
-			Kind:    KindTestExec,
-			Summary: fmt.Sprintf("%s integration cycle %d", crossProject, i+1),
-			Status:  demoExecStatuses[i%len(demoExecStatuses)],
+			Key:          key,
+			Kind:         KindTestExec,
+			Summary:      fmt.Sprintf("%s integration cycle %d", crossProject, i+1),
+			Status:       demoExecStatuses[i%len(demoExecStatuses)],
+			Environments: demoEnvironments(execCount + i),
+			FixVersions:  demoFixVersions(execCount + i),
+		})
+	}
+
+	// Cross-project member execution (#219): a Test Execution that lives in this
+	// project but whose member Tests live in the XRAYINT project. Those member
+	// Tests are NOT in this project's test_case set, so they only render on the
+	// board via the external_test cache (populated by the sync's missing-keys pass
+	// calling ListTestsBasic, which returns basics for XRAYINT-* keys below).
+	xprojExecKey := fmt.Sprintf("%s-TE-XPROJ", projectKey)
+	containers = append(containers, Container{
+		Key:          xprojExecKey,
+		Kind:         KindTestExec,
+		Summary:      "Cross-project integration cycle",
+		Status:       demoExecStatuses[0],
+		Environments: demoEnvironments(0),
+		FixVersions:  demoFixVersions(0),
+	})
+	for i := 1; i <= demoExternalMembers; i++ {
+		links = append(links, ContainerLink{
+			ContainerKey: xprojExecKey,
+			TestKey:      fmt.Sprintf("%s-%d", crossProject, i),
+			RunStatus:    demoRunStatuses[i%len(demoRunStatuses)],
 		})
 	}
 
@@ -433,12 +546,14 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 		key := fmt.Sprintf("%s-STE-%d", projectKey, i+1)
 		subExecKeys[i] = key
 		containers = append(containers, Container{
-			Key:       key,
-			Kind:      KindTestExec,
-			Summary:   fmt.Sprintf("Sub-execution for story %d", i+1),
-			Status:    demoExecStatuses[i%len(demoExecStatuses)],
-			ParentKey: fmt.Sprintf("%s-S-%d", projectKey, i+1),
-			IssueType: "Sub Test Execution",
+			Key:          key,
+			Kind:         KindTestExec,
+			Summary:      fmt.Sprintf("Sub-execution for story %d", i+1),
+			Status:       demoExecStatuses[i%len(demoExecStatuses)],
+			ParentKey:    fmt.Sprintf("%s-S-%d", projectKey, i+1),
+			IssueType:    "Sub Test Execution",
+			Environments: demoEnvironments(execCount + len(crossExecKeys) + i),
+			FixVersions:  demoFixVersions(execCount + len(crossExecKeys) + i),
 		})
 	}
 
@@ -530,6 +645,71 @@ func demoPreconditionsAndLinks(projectKey string) ([]Precondition, map[string][]
 // demoTestForKey returns the deterministic demo Test for a "PROJ-N" key, so the
 // remote-fetch (GetTestFields) has something to return offline. Unparseable keys
 // yield the first demo Test.
+// demoExternalMembers is how many XRAYINT-* member Tests the demo cross-project
+// execution carries — enough to exercise the external-member board path offline.
+const demoExternalMembers = 4
+
+// demoCrossProjectKey is the project the demo cross-project member Tests live in
+// (distinct from the profile's project), used by both the container seed and the
+// ListTestsBasic demo path so they agree on the foreign member keys.
+const demoCrossProjectKey = "XRAYINT"
+
+// demoCrossProjectBug is the demo defect reached only through a cross-project
+// member Test of the demo *-TE-XPROJ execution (#219). It lives in a defect
+// project (distinct from the foreign member's project) and is linked to no
+// in-project Test, so it never appears via the normal syncBugs path and is
+// surfaced for the execution only because the harvest walks the foreign member's
+// issue links. This is exactly the reported case the harvest fixes.
+var demoCrossProjectBug = Bug{
+	Key:        "BUGS-219",
+	ProjectKey: demoBugProject,
+	IssueType:  "Bug",
+	Summary:    "Cross-project integration login fails",
+	Status:     "Open",
+	Priority:   "High",
+}
+
+// demoExternalStatuses cycles workflow statuses for the seeded external member
+// Tests so the board shows a mix.
+var demoExternalStatuses = []string{"Approved", "In Progress", "Draft", "Done"}
+
+// demoTestBasicForKey returns the deterministic basics for a Test key, used by
+// the ListTestsBasic demo path so the sync can cache cross-project (XRAYINT-*)
+// execution members offline. The project key is parsed from the issue key.
+func demoTestBasicForKey(key string) TestBasic {
+	projectKey, idx := "DEMO", 0
+	if i := strings.LastIndex(key, "-"); i > 0 {
+		projectKey = key[:i]
+		if n, err := strconv.Atoi(key[i+1:]); err == nil && n > 0 {
+			idx = n - 1
+		}
+	}
+	feature := demoFeatures[idx%len(demoFeatures)]
+	condition := demoConditions[(idx/len(demoFeatures))%len(demoConditions)]
+	tb := TestBasic{
+		Key:        key,
+		Summary:    fmt.Sprintf("%s %s", feature, condition),
+		Status:     demoExternalStatuses[idx%len(demoExternalStatuses)],
+		ProjectKey: projectKey,
+	}
+	// The first XRAYINT-* cross-project member carries a bug link, so the
+	// container bug harvest is exercised offline: the linked defect lives in the
+	// BUGS defect project (see demoCrossProjectBug) and reaches an execution only
+	// through this foreign member (#219).
+	if projectKey == demoCrossProjectKey && idx == 0 {
+		tb.IssueLinks = []BugLinkRef{{
+			Key:        demoCrossProjectBug.Key,
+			IssueType:  demoCrossProjectBug.IssueType,
+			LinkID:     "xbl-1",
+			ProjectKey: demoCrossProjectBug.ProjectKey,
+			Summary:    demoCrossProjectBug.Summary,
+			Status:     demoCrossProjectBug.Status,
+			Priority:   demoCrossProjectBug.Priority,
+		}}
+	}
+	return tb
+}
+
 func demoTestForKey(key string) Test {
 	projectKey, idx := "DEMO", 0
 	if i := strings.LastIndex(key, "-"); i > 0 {
@@ -592,7 +772,21 @@ func makeDemoTest(projectKey string, i int) Test {
 		Components:  demoComponentsForIndex(i),
 		Updated:     updated,
 		FolderID:    demoFolderForFeature(feature),
+		ExecType:    demoExecTypeForIndex(i),
 	}
+}
+
+// demoExecTypes covers all four execution-type filter options so demo data
+// exercises each one. Independent of the Test Type custom field value set.
+var demoExecTypes = []string{"Manual", "Automated", "Generic", "Cucumber"}
+
+// demoExecTypeForIndex assigns a deterministic Xray Test Type (execution type)
+// to a demo test by index, so repeated syncs are stable. It cycles through
+// demoExecTypes, covering all four frontend filter options so demo data
+// exercises each one (including "Automated", which is not in the Test Type
+// custom field value set).
+func demoExecTypeForIndex(i int) string {
+	return demoExecTypes[i%len(demoExecTypes)]
 }
 
 // demoComponentNames is the demo Jira components vocabulary (the multi-valued

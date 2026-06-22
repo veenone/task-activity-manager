@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 23
+const schemaVersion = 27
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS test_case (
 	updated_at  TEXT NOT NULL DEFAULT '',
 	folder_id   TEXT NOT NULL DEFAULT '',
 	components  TEXT NOT NULL DEFAULT '',
+	exec_type   TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, jira_key)
 );
 
@@ -141,6 +142,8 @@ CREATE TABLE IF NOT EXISTS test_container (
 	status     TEXT NOT NULL DEFAULT '',
 	parent_key TEXT NOT NULL DEFAULT '',
 	issue_type TEXT NOT NULL DEFAULT '',
+	environments TEXT NOT NULL DEFAULT '',
+	fix_versions TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, jira_key)
 );
 
@@ -272,6 +275,20 @@ CREATE TABLE IF NOT EXISTS test_bug (
 	bug_key    TEXT NOT NULL,
 	link_id    TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, test_key, bug_key)
+);
+
+-- Cache of the basics of external member Tests: Tests that belong to a Test
+-- Execution (or other container) but live in a different Jira project than the
+-- profile's, so the bulk test pull (which fetches only the profile's project)
+-- never caches them in test_case. The container board LEFT JOINs this so such
+-- members still render with a summary/status instead of being dropped.
+CREATE TABLE IF NOT EXISTS external_test (
+	profile_id  TEXT NOT NULL,
+	jira_key    TEXT NOT NULL,
+	summary     TEXT NOT NULL DEFAULT '',
+	status      TEXT NOT NULL DEFAULT '',
+	project_key TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, jira_key)
 );
 `
 
@@ -464,6 +481,43 @@ func applyMigrations(db *sql.DB) error {
 			); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 				return fmt.Errorf("v23 add %s: %w", col, err)
 			}
+		}
+	}
+	// v24: add exec_type to test_case for the Xray Test Type (a.k.a. execution
+	// type: Manual / Automated / Generic / Cucumber). Fresh installs get it from
+	// the CREATE above; this ALTER catches pre-v24 databases. The "duplicate
+	// column" error is tolerated so the migration is idempotent.
+	if current < 24 {
+		if _, err := db.Exec(
+			`ALTER TABLE test_case ADD COLUMN exec_type TEXT NOT NULL DEFAULT ''`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v24 add exec_type: %w", err)
+		}
+	}
+	// v25: add environments to test_container for the Xray Test Environments
+	// field on Test Executions (a JSON array of environment names). Fresh
+	// installs get it from the CREATE above; this ALTER catches pre-v25
+	// databases. The "duplicate column" error is tolerated so the migration is
+	// idempotent.
+	if current < 25 {
+		if _, err := db.Exec(
+			`ALTER TABLE test_container ADD COLUMN environments TEXT NOT NULL DEFAULT ''`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v25 add environments: %w", err)
+		}
+	}
+	// v26: external_test cache for cross-project execution members (additive,
+	// covered by CREATE TABLE IF NOT EXISTS, no ALTER needed).
+	// v27: add fix_versions to test_container for the standard Jira Fix Version(s)
+	// field on Test Executions (a JSON array of version names), shown read-only.
+	// Fresh installs get it from the CREATE above; this ALTER catches pre-v27
+	// databases. The "duplicate column" error is tolerated so the migration is
+	// idempotent.
+	if current < 27 {
+		if _, err := db.Exec(
+			`ALTER TABLE test_container ADD COLUMN fix_versions TEXT NOT NULL DEFAULT ''`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v27 add fix_versions: %w", err)
 		}
 	}
 	return nil

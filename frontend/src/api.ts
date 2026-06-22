@@ -41,6 +41,7 @@ export {
   CreatePrecondition,
   CreatePreconditionDetailed,
   BulkAssociatePreconditions,
+  BulkReplacePreconditions,
   ListPreconditionsWithUsage,
   ListTestsForPrecondition,
   DeletePrecondition,
@@ -49,6 +50,7 @@ export {
   GetTestRequirements,
   SetTestRequirements,
   BulkAssociateRequirements,
+  BulkReplaceRequirements,
   EditRequirementField,
   DeleteRequirement,
   ListRequirementSources,
@@ -63,6 +65,8 @@ export {
   CreateContainerAndAllocate,
   EditContainer,
   DeleteContainer,
+  SetContainerEnvironments,
+  BulkEditContainers,
   SeedSampleContainers,
   CleanSampleData,
   GetContainerBoard,
@@ -81,6 +85,8 @@ export {
   ExportTests,
   ExportImportTemplate,
   ExportRequirementAudit,
+  ExportTraceability,
+  ExportDashboard,
   CreateSavedView,
   ListSavedViews,
   DeleteSavedView,
@@ -125,10 +131,12 @@ export {
   GetRequirementTraceability,
   ScanDuplicates,
   ScanDuplicateGroupSteps,
+  ScanAllDuplicateSteps,
   ExcludeFromDuplicates,
   UnexcludeFromDuplicates,
   CreateBugForTest,
   ListBugsWithTests,
+  ListBugsForContainer,
   GetTestBugs,
   ListTestsForBug,
 } from "../wailsjs/go/main/App";
@@ -184,6 +192,7 @@ export interface TestCase {
   components: string[];
   updated: string;
   folderId: string;
+  execType: string;
 }
 
 export interface TestPage {
@@ -197,6 +206,7 @@ export interface TestQuery {
   folderId: string;
   containerKey: string;
   component: string;
+  execType: string;
   review: string;
   sortBy: string;
   desc: boolean;
@@ -311,6 +321,8 @@ export interface Container {
   status: string;
   parentKey: string;  // parent issue key for a sub-task Test Execution; "" for standalone
   issueType: string;  // Jira issuetype name (e.g. "Sub Test Execution"); informational
+  environments: string[]; // Xray Test Environments (Test Executions only; empty otherwise)
+  fixVersions: string[]; // Jira Fix Version(s), read-only (Test Executions only; empty otherwise)
 }
 
 // AllocateResult mirrors testrepo.AllocateResult — the outcome of a bulk
@@ -350,6 +362,10 @@ export interface TestPlanBoardRow {
   summary: string;
   status: string;
   runStatus: string;
+  // isExternal is true when the member Test lives in a different Jira project
+  // (no local test_case row) and its summary/status come from the external_test
+  // cache.
+  isExternal: boolean;
 }
 
 // TestPlanBoard mirrors testrepo.TestPlanBoard — a Test Plan's member Tests
@@ -595,6 +611,7 @@ export interface Statistics {
 export interface DuplicateMember {
   key: string;
   summary: string;
+  description: string;
   status: string;
   folderId: string;
 }
@@ -692,6 +709,19 @@ export interface SankeyLink {
 export interface Sankey {
   nodes: SankeyNode[];
   links: SankeyLink[];
+}
+
+// Bug mirrors testrepo.Bug - a cached defect issue (possibly cross-project)
+// linked to Tests. Returned by ListBugsForContainer for an execution's related
+// defects.
+export interface Bug {
+  key: string;
+  projectKey: string;
+  issueType: string;
+  summary: string;
+  status: string;
+  priority: string;
+  updated: string;
 }
 
 // BugWithTests mirrors testrepo.BugWithTests — a bug plus the Test keys it

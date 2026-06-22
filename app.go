@@ -567,7 +567,17 @@ func (a *App) SyncTestCalls(profileID string) error {
 	if err != nil {
 		return err
 	}
-	if len(callers) == 0 {
+	// Drop uncommitted local callers up front: their steps never came from Jira,
+	// so re-pulling would fail or wipe them. Filtering here also makes the
+	// progress Total reflect the work actually done.
+	refresh := make([]string, 0, len(callers))
+	for _, key := range callers {
+		if isLocalTestKey(key) {
+			continue
+		}
+		refresh = append(refresh, key)
+	}
+	if len(refresh) == 0 {
 		return nil
 	}
 	p, err := a.profiles.Get(profileID)
@@ -580,11 +590,19 @@ func (a *App) SyncTestCalls(profileID string) error {
 	}
 	client := jira.NewClient(p.JiraURL, token)
 
+	// Per-caller progress on a dedicated channel (not the global "sync:progress")
+	// so the Test Calls view shows its own bar without touching the footer sync
+	// bar. A deferred terminal event clears the bar however the loop exits.
+	n := len(refresh)
+	defer runtime.EventsEmit(a.ctx, "testcalls:progress", syncer.Progress{Done: true})
+
 	var firstErr error
-	for _, key := range callers {
-		if isLocalTestKey(key) {
-			continue // uncommitted local test — its steps never came from Jira
-		}
+	for i, key := range refresh {
+		runtime.EventsEmit(a.ctx, "testcalls:progress", syncer.Progress{
+			Stage:   "Refreshing test calls",
+			Fetched: i + 1,
+			Total:   n,
+		})
 		remote, err := client.GetTestSteps(a.ctx, key)
 		if err != nil {
 			if firstErr == nil {
@@ -791,6 +809,16 @@ func (a *App) BulkAssociatePreconditions(profileID string, testKeys, precondKeys
 	return a.repo.BulkAssociatePreconditions(profileID, testKeys, precondKeys, add)
 }
 
+// BulkReplacePreconditions swaps Preconditions across a batch of Tests: per Test
+// it removes toRemove and adds toAdd in one apply (FR-13.6).
+func (a *App) BulkReplacePreconditions(profileID string, testKeys, toRemove, toAdd []string) (testrepo.BulkEditResult, error) {
+	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkReplacePreconditions(profileID, testKeys, toRemove, toAdd)
+}
+
 // --- Precondition management view (FR-13.4) ---
 
 // ListPreconditionsWithUsage returns every cached Precondition with the count
@@ -891,6 +919,16 @@ func (a *App) BulkAssociateRequirements(profileID string, testKeys, requirementK
 		return empty, err
 	}
 	return a.repo.BulkAssociateRequirements(profileID, testKeys, requirementKeys, add)
+}
+
+// BulkReplaceRequirements swaps requirement links across a batch of Tests: per
+// Test it removes toRemove and adds toAdd in one apply.
+func (a *App) BulkReplaceRequirements(profileID string, testKeys, toRemove, toAdd []string) (testrepo.BulkEditResult, error) {
+	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkReplaceRequirements(profileID, testKeys, toRemove, toAdd)
 }
 
 // EditRequirementField applies a local edit to a requirement field (summary)
@@ -1008,6 +1046,16 @@ func (a *App) ListTestsForBug(profileID, bugKey string) ([]testrepo.BugTest, err
 		return nil, err
 	}
 	return a.repo.ListTestsForBug(profileID, bugKey)
+}
+
+// ListBugsForContainer returns the bugs reached through any member Test of a
+// container (an execution's related defects), including bugs reached only via a
+// cross-project member Test (#219).
+func (a *App) ListBugsForContainer(profileID, containerKey string) ([]testrepo.Bug, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListBugsForContainer(profileID, containerKey)
 }
 
 // --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---
@@ -1692,12 +1740,14 @@ func (a *App) GetTraceabilitySankey(profileID string, planFilters, execFilters [
 
 // GetSubTaskTraceability returns the Parent -> Execution -> run-status flow over
 // sub-task Test Executions (FR-9). parentFilters narrows to chosen parent
-// issues; empty includes all.
-func (a *App) GetSubTaskTraceability(profileID string, parentFilters []string) (testrepo.Sankey, error) {
+// issues; empty includes all. crossProject controls whether members that live
+// only in another project (cached in external_test, absent from test_case) are
+// drawn (true) or excluded (false); the UI defaults it on.
+func (a *App) GetSubTaskTraceability(profileID string, parentFilters []string, crossProject bool) (testrepo.Sankey, error) {
 	if err := a.requireStore(); err != nil {
 		return testrepo.Sankey{}, err
 	}
-	return a.repo.GetSubTaskTraceability(profileID, parentFilters)
+	return a.repo.GetSubTaskTraceability(profileID, parentFilters, crossProject)
 }
 
 // GetExecutionsForPlans returns the Test Executions sharing a Test with the
@@ -1844,6 +1894,30 @@ func (a *App) DeleteContainer(profileID, key string) error {
 	return a.repo.DeleteContainer(profileID, key)
 }
 
+// SetContainerEnvironments replaces a Test Execution's Test Environments and
+// queues the change for commit (RND_P_4TFINT_05-229). The set is pushed to Jira
+// as a custom-field update on commit.
+func (a *App) SetContainerEnvironments(profileID, containerKey string, envs []string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.SetContainerEnvironments(profileID, containerKey, envs)
+}
+
+// BulkEditContainers applies a Test Environments operation (set_env / add_env /
+// remove_env) across a batch of containers, queuing a pending change per
+// container (RND_P_4TFINT_05-229).
+func (a *App) BulkEditContainers(profileID string, containerKeys []string, op testrepo.BulkEdit) (testrepo.BulkEditResult, error) {
+	empty := testrepo.BulkEditResult{
+		Succeeded: []string{},
+		Failed:    []testrepo.BulkFailure{},
+	}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkEditContainers(profileID, containerKeys, op)
+}
+
 // CreateContainerAndAllocate creates a new Test Set / Plan / Execution locally
 // and allocates the given Tests to it (FR-3.4–3.6). The Container is created in
 // Jira on commit; until then it carries a temporary key. The project comes
@@ -1864,12 +1938,14 @@ func (a *App) CreateContainerAndAllocate(profileID, kind, summary string, testKe
 
 // GetStatistics returns the dashboard rollup for a profile, computed entirely
 // from the local store (FR-9.5) — status / priority / label / folder
-// distributions, a last-updated trend, and the pending-change count.
-func (a *App) GetStatistics(profileID string) (testrepo.Statistics, error) {
+// distributions, a last-updated trend, and the pending-change count. The
+// optional folder / component / status arguments narrow every panel to the
+// matching subset of Tests (empty string = no constraint).
+func (a *App) GetStatistics(profileID, folder, component, status string) (testrepo.Statistics, error) {
 	if err := a.requireStore(); err != nil {
 		return testrepo.Statistics{}, err
 	}
-	return a.repo.GetStatistics(profileID)
+	return a.repo.GetStatistics(profileID, folder, component, status)
 }
 
 // --- Duplicate management (FR — duplicate management) ---
@@ -1907,6 +1983,34 @@ func (a *App) ScanDuplicateGroupSteps(profileID, normalizedSummary string) (test
 		}
 	}
 	return a.repo.ScanDuplicateGroup(profileID, normalizedSummary)
+}
+
+// ScanAllDuplicateSteps walks every duplicate group whose steps verdict is still
+// unscanned, records each member's step fingerprint, and sets the group verdict,
+// emitting "dup:scan-progress" so the Duplicates toolbar can show a progress bar.
+// It uses its own event channel (not the global "sync:progress") so the walk does
+// not show in the footer sync bar or reset global sync state. It returns the number
+// of groups scanned. Per-group errors are swallowed so one bad group does not abort
+// the run.
+func (a *App) ScanAllDuplicateSteps(profileID string) (int, error) {
+	if err := a.requireStore(); err != nil {
+		return 0, err
+	}
+	defer runtime.EventsEmit(a.ctx, "dup:scan-progress", syncer.Progress{Done: true})
+	return a.repo.ScanAllDuplicateSteps(profileID,
+		// Force a fresh pull so each member's verdict reflects current Jira step
+		// content, exactly like ScanDuplicateGroupSteps. Steps load lazily, so a
+		// never-opened member has an empty cache that would otherwise fingerprint
+		// to "" and wrongly read as identical.
+		func(key string) ([]testrepo.Step, error) { return a.GetTestSteps(profileID, key, true) },
+		func(done, total int) {
+			runtime.EventsEmit(a.ctx, "dup:scan-progress", syncer.Progress{
+				Stage:   "Scanning duplicate steps",
+				Fetched: done,
+				Total:   total,
+			})
+		},
+	)
 }
 
 // ExcludeFromDuplicates permanently ignores a Test in duplicate scans (local).
@@ -2137,6 +2241,71 @@ func (a *App) ExportRequirementAudit(profileID string) (string, error) {
 		format = "xlsx"
 	}
 	data, err := a.repo.ExportRequirementAudit(profileID, format)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("write export: %w", err)
+	}
+	return path, nil
+}
+
+// ExportTraceability exports the active Traceability tab (kind "requirement",
+// "execution", or "subtask") to an XLSX with a Flow sheet (the Sankey edge list
+// with resolved labels) and a Table sheet (flat one-row-per-thread records),
+// respecting that tab's current filters (RND_P_4TFINT_05-221). crossProject is
+// threaded to the execution producer; the sub-task producer ignores it until
+// Task 12 wires cross-project sub-tasks. Returns the saved path, or "" if
+// cancelled.
+func (a *App) ExportTraceability(profileID, kind string, planFilters, execFilters []string, crossProject bool, reqFilters, parentFilters []string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	projectKey, err := a.GetProfileProjectKey(profileID)
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export traceability",
+		DefaultFilename: "traceability-" + kind + ".xlsx",
+		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil
+	}
+	data, err := a.repo.ExportTraceabilitySheets(profileID, projectKey, kind, planFilters, execFilters, reqFilters, parentFilters, crossProject)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("write export: %w", err)
+	}
+	return path, nil
+}
+
+// ExportDashboard exports the statistics Dashboard to an XLSX with a Summary
+// sheet and one sheet per breakdown distribution, respecting the current
+// folder/component/status filters (RND_P_4TFINT_05). Returns the saved path, or
+// "" if cancelled.
+func (a *App) ExportDashboard(profileID, folder, component, status string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export dashboard",
+		DefaultFilename: "dashboard.xlsx",
+		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil
+	}
+	data, err := a.repo.ExportDashboardSheets(profileID, folder, component, status)
 	if err != nil {
 		return "", err
 	}

@@ -434,6 +434,30 @@ export namespace testrepo {
 	        this.count = source["count"];
 	    }
 	}
+	export class Bug {
+	    key: string;
+	    projectKey: string;
+	    issueType: string;
+	    summary: string;
+	    status: string;
+	    priority: string;
+	    updated: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Bug(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.projectKey = source["projectKey"];
+	        this.issueType = source["issueType"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.priority = source["priority"];
+	        this.updated = source["updated"];
+	    }
+	}
 	export class BugTest {
 	    key: string;
 	    summary: string;
@@ -566,7 +590,9 @@ export namespace testrepo {
 	    status: string;
 	    parentKey: string;
 	    issueType: string;
-	
+	    environments: string[];
+	    fixVersions: string[];
+
 	    static createFrom(source: any = {}) {
 	        return new Container(source);
 	    }
@@ -579,6 +605,8 @@ export namespace testrepo {
 	        this.status = source["status"];
 	        this.parentKey = source["parentKey"];
 	        this.issueType = source["issueType"];
+	        this.environments = source["environments"];
+	        this.fixVersions = source["fixVersions"];
 	    }
 	}
 	export class ContainerMembership {
@@ -650,6 +678,7 @@ export namespace testrepo {
 	export class DuplicateMember {
 	    key: string;
 	    summary: string;
+	    description: string;
 	    status: string;
 	    folderId: string;
 	
@@ -661,6 +690,7 @@ export namespace testrepo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
 	        this.summary = source["summary"];
+	        this.description = source["description"];
 	        this.status = source["status"];
 	        this.folderId = source["folderId"];
 	    }
@@ -869,6 +899,7 @@ export namespace testrepo {
 	    components: string[];
 	    updated: string;
 	    folderId: string;
+	    execType: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TestCase(source);
@@ -886,6 +917,7 @@ export namespace testrepo {
 	        this.components = source["components"];
 	        this.updated = source["updated"];
 	        this.folderId = source["folderId"];
+	        this.execType = source["execType"];
 	    }
 	}
 	export class Page {
@@ -1006,6 +1038,7 @@ export namespace testrepo {
 	    folderId: string;
 	    containerKey: string;
 	    component: string;
+	    execType: string;
 	    review: string;
 	    sortBy: string;
 	    desc: boolean;
@@ -1023,6 +1056,7 @@ export namespace testrepo {
 	        this.folderId = source["folderId"];
 	        this.containerKey = source["containerKey"];
 	        this.component = source["component"];
+	        this.execType = source["execType"];
 	        this.review = source["review"];
 	        this.sortBy = source["sortBy"];
 	        this.desc = source["desc"];
@@ -1460,6 +1494,7 @@ export namespace testrepo {
 	    summary: string;
 	    status: string;
 	    runStatus: string;
+	    isExternal: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new TestPlanBoardRow(source);
@@ -1471,6 +1506,7 @@ export namespace testrepo {
 	        this.summary = source["summary"];
 	        this.status = source["status"];
 	        this.runStatus = source["runStatus"];
+	        this.isExternal = source["isExternal"];
 	    }
 	}
 	export class TestPlanBoard {

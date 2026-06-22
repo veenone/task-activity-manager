@@ -9,10 +9,11 @@ import (
 
 // DuplicateMember is one Test inside a duplicate group.
 type DuplicateMember struct {
-	Key      string `json:"key"`
-	Summary  string `json:"summary"`
-	Status   string `json:"status"`
-	FolderID string `json:"folderId"`
+	Key         string `json:"key"`
+	Summary     string `json:"summary"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	FolderID    string `json:"folderId"`
 }
 
 // DuplicateGroup is a set of Tests (>=2) sharing a normalized summary, with a
@@ -142,14 +143,14 @@ func (r *Repository) stepScans(profileID string) (map[string]string, string, err
 
 // dupCandidate is a non-ignored Test loaded for grouping.
 type dupCandidate struct {
-	key, summary, status, folder string
+	key, summary, description, status, folder string
 }
 
 // loadCandidates returns every non-ignored Test for a profile, optionally only
 // those whose normalized summary equals `onlyNorm` (empty = all).
 func (r *Repository) loadCandidates(profileID, onlyNorm string) ([]dupCandidate, error) {
 	rows, err := r.db.Query(
-		`SELECT jira_key, summary, status, folder_id FROM test_case
+		`SELECT jira_key, summary, description, status, folder_id FROM test_case
 		 WHERE profile_id = ?
 		   AND jira_key NOT IN (SELECT test_key FROM duplicate_ignore WHERE profile_id = ?)`,
 		profileID, profileID,
@@ -161,7 +162,7 @@ func (r *Repository) loadCandidates(profileID, onlyNorm string) ([]dupCandidate,
 	out := []dupCandidate{}
 	for rows.Next() {
 		var c dupCandidate
-		if err := rows.Scan(&c.key, &c.summary, &c.status, &c.folder); err != nil {
+		if err := rows.Scan(&c.key, &c.summary, &c.description, &c.status, &c.folder); err != nil {
 			return nil, err
 		}
 		if onlyNorm == "" || normalizeText(c.summary) == onlyNorm {
@@ -219,7 +220,7 @@ func buildGroup(norm string, members []dupCandidate, fps map[string]string) Dupl
 		Members:           make([]DuplicateMember, len(members)),
 	}
 	for i, m := range members {
-		g.Members[i] = DuplicateMember{Key: m.key, Summary: m.summary, Status: m.status, FolderID: m.folder}
+		g.Members[i] = DuplicateMember{Key: m.key, Summary: m.summary, Description: m.description, Status: m.status, FolderID: m.folder}
 	}
 	return g
 }
@@ -281,6 +282,80 @@ func (r *Repository) ScanDuplicateGroup(profileID, normalizedSummary string) (Du
 		return DuplicateGroup{}, err
 	}
 	return buildGroup(normalizedSummary, cands, fps), nil
+}
+
+// ScanAllDuplicateSteps walks every duplicate group whose steps verdict is still
+// unscanned, fetches each member's steps via fetch, and records the fingerprint
+// so the group gains an identical/differ verdict. fetch force-pulls fresh steps
+// (matching the per-group scan) because steps load lazily: a member that was
+// never opened has an empty local cache, which would otherwise fingerprint to ""
+// and wrongly report the group as identical. progress(done, total) is invoked
+// after each scanned group (total is the count of unscanned groups). It returns
+// the number of groups scanned. A member whose fetch fails is skipped best-effort
+// (like the per-group action), and per-group errors are swallowed so one bad
+// group does not abort the whole run.
+func (r *Repository) ScanAllDuplicateSteps(profileID string, fetch func(key string) ([]Step, error), progress func(done, total int)) (int, error) {
+	// Load every candidate once and group in memory; loadCandidates per group
+	// would re-query the whole candidate set for each group (N+1).
+	cands, err := r.loadCandidates(profileID, "")
+	if err != nil {
+		return 0, err
+	}
+	groups := groupCandidates(cands)
+	fps, _, err := r.stepScans(profileID)
+	if err != nil {
+		return 0, err
+	}
+
+	// Filter to groups that still need a step scan, in deterministic order.
+	norms := make([]string, 0, len(groups))
+	for n := range groups {
+		norms = append(norms, n)
+	}
+	sort.Strings(norms)
+	todo := make([]string, 0, len(norms))
+	for _, n := range norms {
+		// groupCandidates already drops groups with <2 members.
+		if verdictFor(groups[n], fps) == stepVerdictUnscanned {
+			todo = append(todo, n)
+		}
+	}
+
+	total := len(todo)
+	scanned := 0
+	for _, n := range todo {
+		if err := r.scanGroupSteps(profileID, n, fetch); err != nil {
+			// Best-effort: skip groups we can't scan; they stay unscanned.
+			continue
+		}
+		scanned++
+		if progress != nil {
+			progress(scanned, total)
+		}
+	}
+	return scanned, nil
+}
+
+// scanGroupSteps fetches and records the step fingerprint of every member of one
+// group. fetch force-pulls fresh steps (the App layer wires it to
+// GetTestSteps(..., true)); a member whose fetch fails is skipped best-effort so
+// one unreachable Test does not abort the group.
+func (r *Repository) scanGroupSteps(profileID, normalizedSummary string, fetch func(key string) ([]Step, error)) error {
+	keys, err := r.DuplicateGroupMemberKeys(profileID, normalizedSummary)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		steps, err := fetch(key)
+		if err != nil {
+			// Best-effort: skip members we can't fetch; they stay unscanned.
+			continue
+		}
+		if err := r.RecordStepScan(profileID, key, steps); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DuplicateGroupMemberKeys returns the non-ignored member keys of a group.

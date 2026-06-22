@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -181,7 +182,8 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 			c.EntityType == "test_membership_remove" ||
 			c.EntityType == "test_container_add" ||
 			c.EntityType == "container_edit" ||
-			c.EntityType == "container_delete" {
+			c.EntityType == "container_delete" ||
+			c.EntityType == "container_env" {
 			membershipRows = append(membershipRows, c)
 			continue
 		}
@@ -399,8 +401,34 @@ testLoop:
 				updates[c.Field] = c.AfterVal
 			}
 			fields := jira.FieldsForJira(updates)
+			// exec_type (Xray Test Type) is a custom field whose id varies per
+			// instance, so FieldsForJira leaves it out: resolve the field id here
+			// and inject {"value": ...}. Best-effort - if the field can't be
+			// resolved, log and push the rest of the update rather than fail
+			// the whole commit.
+			if execType, ok := updates["exec_type"]; ok {
+				fieldID, value, resolved, ferr := e.client.ExecTypeFieldValue(ctx, execType)
+				if ferr != nil {
+					log.Printf("xtm: resolve Test Type field for %s failed, committing without exec_type: %v", testKey, ferr)
+				} else if resolved {
+					fields[fieldID] = value
+				} else {
+					log.Printf("xtm: no Test Type custom field on this instance, committing %s without exec_type", testKey)
+				}
+			}
+			// Generic custom field edits (FR-2.6) share this PUT. The journaled
+			// edit carries only the field id and a string value (no type hint), so
+			// resolve the field's schema type here and shape the value the same way
+			// exec_type does above. Best-effort - if the type cannot be resolved
+			// the raw string is sent (CustomFieldValue defaults to it).
 			for fieldID, value := range customFields {
-				fields[fieldID] = value
+				id, shaped, ferr := e.client.CustomFieldValue(ctx, fieldID, value)
+				if ferr != nil {
+					log.Printf("xtm: resolve custom field %s type for %s failed, committing raw string: %v", fieldID, testKey, ferr)
+					fields[fieldID] = value
+					continue
+				}
+				fields[id] = shaped
 			}
 			if err := e.client.UpdateIssue(ctx, testKey, fields); err != nil {
 				result.Failed = append(result.Failed, FailedCommit{
@@ -1183,6 +1211,8 @@ func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows [
 			key, err = c.EntityKey, e.client.UpdateIssue(ctx, c.EntityKey, jira.FieldsForJira(map[string]string{"summary": c.AfterVal}))
 		case "container_delete":
 			key, err = e.commitContainerDelete(ctx, c)
+		case "container_env":
+			key, err = e.commitContainerEnv(ctx, c)
 		default:
 			key, err = e.commitMembershipAdd(ctx, c)
 		}
@@ -1244,6 +1274,22 @@ func (e *Engine) commitContainerDelete(ctx context.Context, c testrepo.PendingCh
 	}
 	if err := e.client.DeleteContainer(ctx, snap.Kind, c.EntityKey); err != nil {
 		return c.EntityKey, fmt.Errorf("delete container %s: %s", c.EntityKey, sanitizeError(err.Error()))
+	}
+	return c.EntityKey, nil
+}
+
+// commitContainerEnv pushes a container_env pending change (the new Test
+// Environments set for a Test Execution) as a custom-field update on the
+// execution issue. The after value is the JSON array of environment names. The
+// real Xray field write is behind the demo short-circuit (TODO(xtm)); demo
+// returns success so the pending change clears on a demo commit.
+func (e *Engine) commitContainerEnv(ctx context.Context, c testrepo.PendingChange) (string, error) {
+	var envs []string
+	if err := json.Unmarshal([]byte(c.AfterVal), &envs); err != nil {
+		return c.EntityKey, fmt.Errorf("malformed environments payload: %s", err)
+	}
+	if err := e.client.SetContainerEnvironments(ctx, c.EntityKey, envs); err != nil {
+		return c.EntityKey, fmt.Errorf("set environments on %s: %s", c.EntityKey, sanitizeError(err.Error()))
 	}
 	return c.EntityKey, nil
 }
