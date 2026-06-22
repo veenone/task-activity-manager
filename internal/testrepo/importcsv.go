@@ -74,15 +74,14 @@ func ParseImportPreview(records [][]string) (ImportPreview, error) {
 	return ImportPreview{Headers: records[0], RowCount: len(records) - 1}, nil
 }
 
-// ImportTests validates a CSV import against a column mapping and, unless
-// dryRun, creates a local pending Test for each valid row (FR-10.2 / 10.4 /
-// 10.5 / 10.6). Each created Test gets a temporary "NEW-N" key until commit
-// assigns the real one. Invalid rows are reported and skipped, not fatal.
-func (r *Repository) ImportTests(profileID string, records [][]string, mapping ImportMapping, dryRun bool) (ImportResult, error) {
-	result := ImportResult{Errors: []ImportError{}}
-
+// groupImportRows maps spreadsheet rows to Test payloads using a column mapping
+// (FR-10.4 / 10.7): a row with a Summary starts a Test; following rows with an
+// empty Summary but step content extend the previous Test's steps. Returns the
+// grouped Tests plus any per-row errors and the skipped count. Shared by
+// ImportTests and gap analysis so both group identically.
+func groupImportRows(records [][]string, mapping ImportMapping) (tests []testCreatePayload, errs []ImportError, skipped int, err error) {
 	if len(records) < 2 {
-		return result, fmt.Errorf("the file has no data rows")
+		return nil, nil, 0, fmt.Errorf("the file has no data rows")
 	}
 	header := records[0]
 	col := func(name string) int {
@@ -98,7 +97,7 @@ func (r *Repository) ImportTests(profileID string, records [][]string, mapping I
 	}
 	summaryIdx := col(mapping.Summary)
 	if summaryIdx < 0 {
-		return result, fmt.Errorf("the Summary field must be mapped to a column")
+		return nil, nil, 0, fmt.Errorf("the Summary field must be mapped to a column")
 	}
 	descIdx := col(mapping.Description)
 	prioIdx := col(mapping.Priority)
@@ -116,10 +115,8 @@ func (r *Repository) ImportTests(profileID string, records [][]string, mapping I
 		return strings.TrimSpace(row[idx])
 	}
 
-	// First pass: group rows into Tests. A row with a Summary starts a Test;
-	// a row with an empty Summary but step content extends the previous Test's
-	// steps (FR-10.7).
-	tests := []testCreatePayload{}
+	tests = []testCreatePayload{}
+	errs = []ImportError{}
 	curIdx := -1
 	for i := 1; i < len(records); i++ {
 		rowNum := i + 1
@@ -146,20 +143,33 @@ func (r *Repository) ImportTests(profileID string, records [][]string, mapping I
 			}
 			continue
 		}
-		// Empty summary.
 		if hasStep {
 			if curIdx < 0 {
-				result.Errors = append(result.Errors, ImportError{Row: rowNum, Message: "step row before any test summary"})
-				result.Skipped++
+				errs = append(errs, ImportError{Row: rowNum, Message: "step row before any test summary"})
+				skipped++
 				continue
 			}
 			tests[curIdx].Steps = append(tests[curIdx].Steps, step)
 			continue
 		}
-		result.Errors = append(result.Errors, ImportError{Row: rowNum, Message: "row has neither a summary nor step content"})
-		result.Skipped++
+		errs = append(errs, ImportError{Row: rowNum, Message: "row has neither a summary nor step content"})
+		skipped++
 	}
+	return tests, errs, skipped, nil
+}
 
+// ImportTests validates a CSV import against a column mapping and, unless
+// dryRun, creates a local pending Test for each valid row (FR-10.2 / 10.4 /
+// 10.5 / 10.6). Each created Test gets a temporary "NEW-N" key until commit
+// assigns the real one. Invalid rows are reported and skipped, not fatal.
+func (r *Repository) ImportTests(profileID string, records [][]string, mapping ImportMapping, dryRun bool) (ImportResult, error) {
+	result := ImportResult{Errors: []ImportError{}}
+	tests, errs, skipped, err := groupImportRows(records, mapping)
+	if err != nil {
+		return result, err
+	}
+	result.Errors = errs
+	result.Skipped = skipped
 	result.Created = len(tests)
 	if dryRun {
 		return result, nil
@@ -170,7 +180,6 @@ func (r *Repository) ImportTests(profileID string, records [][]string, mapping I
 		return result, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-
 	for _, p := range tests {
 		if err := insertImportedTest(tx, profileID, p); err != nil {
 			return result, err
@@ -306,7 +315,18 @@ func ParseRecords(data []byte, isXlsx bool) ([][]string, error) {
 	if isXlsx {
 		return parseXLSX(data)
 	}
-	return readCSV(string(data))
+	return readCSV(string(stripUTF8BOM(data)))
+}
+
+// utf8BOMBytes is the UTF-8 byte-order mark (EF BB BF) that Excel and Windows
+// editors prepend to saved CSVs. Left in place it fuses onto the first header
+// cell, so column auto-mapping no longer recognizes "Summary".
+var utf8BOMBytes = []byte{0xEF, 0xBB, 0xBF}
+
+// stripUTF8BOM removes a leading UTF-8 BOM so the first column header (commonly
+// Summary) maps cleanly and gap analysis can proceed.
+func stripUTF8BOM(data []byte) []byte {
+	return bytes.TrimPrefix(data, utf8BOMBytes)
 }
 
 // readCSV parses CSV content leniently (variable field counts allowed).
@@ -351,4 +371,24 @@ func ImportTemplateCSV() string {
 		"Login with valid credentials,Verify a user can log in,High,smoke api,\"Authentication, Frontend\",/Authentication/Login,,,\n" +
 		"Login flow with steps,Multi-step example,Medium,smoke,Frontend,/Authentication/Login,Open the login page,,Login form is shown\n" +
 		",,,,,,Enter credentials and submit,user / pass,User is logged in\n"
+}
+
+// SummaryTemplateCSV returns a minimal template with only the Summary column —
+// for gap analysis "summary only" comparison. When a gap from such a file is
+// added as a test, the other fields are filled with defaults (Priority,
+// Description) by CreateTestsFromGaps.
+func SummaryTemplateCSV() string {
+	return "Summary\n" +
+		"Login with valid credentials\n" +
+		"Logout clears the session\n" +
+		"Password reset email is sent\n"
+}
+
+// SummaryFolderTemplateCSV returns a Summary + Folder template — for gap
+// analysis where folder locations are compared alongside summaries.
+func SummaryFolderTemplateCSV() string {
+	return "Summary,Folder\n" +
+		"Login with valid credentials,/Authentication/Login\n" +
+		"Logout clears the session,/Authentication/Login\n" +
+		"Password reset email is sent,/Authentication/Recovery\n"
 }

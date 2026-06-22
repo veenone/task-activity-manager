@@ -84,9 +84,14 @@ export {
   CloneTest,
   ExportTests,
   ExportImportTemplate,
+  ExportSummaryTemplate,
+  ExportSummaryFolderTemplate,
   ExportRequirementAudit,
   ExportTraceability,
   ExportDashboard,
+  AnalyzeGap,
+  CreateTestsFromGaps,
+  ExportGapReport,
   CreateSavedView,
   ListSavedViews,
   DeleteSavedView,
@@ -141,6 +146,38 @@ export {
   ListTestsForBug,
 } from "../wailsjs/go/main/App";
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
+
+// GapTest mirrors testrepo.GapTest — one comparable test row.
+export interface GapTest {
+  summary: string;
+  description: string;
+  priority: string;
+  labels: string[];
+  components: string[];
+  folder: string;
+}
+
+// FolderMismatch mirrors testrepo.FolderMismatch — a summary-matched test whose
+// folder differs between reference and target.
+export interface FolderMismatch {
+  summary: string;
+  referenceFolder: string;
+  targetFolder: string;
+}
+
+// GapResult mirrors testrepo.GapResult — a comparison outcome.
+export interface GapResult {
+  referenceSource: string; // "project" | "file"
+  referenceCount: number;
+  targetCount: number;
+  matched: number;
+  missingFromReference: GapTest[];
+  missingFromTarget: GapTest[];
+  threeWay: boolean;
+  projectCount: number;
+  missingFromProject: GapTest[];
+  folderMismatches: FolderMismatch[];
+}
 
 export interface HealthInfo {
   ok: boolean;
