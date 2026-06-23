@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useViewState } from "../lib/viewState";
 import {
   ListBugsWithTests,
@@ -6,9 +6,11 @@ import {
   SyncBugs,
   CreateContainerAndAllocate,
   BrowserOpenURL,
+  GetTestRunHistory,
   errMsg,
 } from "../api";
-import type { BugWithTests, BugTest } from "../api";
+import type { BugWithTests, BugTest, TestRunEntry } from "../api";
+import { formatDateTime } from "../dates";
 import { Pager } from "./Pager";
 import { SortControl } from "./SortControl";
 import { usePrompt } from "./usePrompt";
@@ -61,6 +63,14 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   // without forcing a full profile refresh.
   const [nonce, setNonce] = useState(0);
 
+  // Ephemeral expand state for the affected-tests table. Not session-persisted
+  // because it's a transient drill-down, not a view preference.
+  const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
+  // Cache for per-test run history fetched on first expand (keyed by test key).
+  const [runHistoryCache, setRunHistoryCache] = useState<Map<string, TestRunEntry[]>>(new Map());
+  // Set of test keys whose run history is currently loading.
+  const [runHistoryLoading, setRunHistoryLoading] = useState<Set<string>>(new Set());
+
   // syncBugs refreshes only the defect issues from Jira (partial sync), so the
   // Bugs panel can update without re-running preconditions / containers /
   // requirements (RND_P_4TFINT_05-214).
@@ -76,6 +86,34 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     } finally {
       setSyncing(false);
     }
+  }
+
+  // Toggle the run-history expand for a test row. Fetches history on first
+  // expand if not already cached.
+  function toggleTestExpand(testKey: string) {
+    setExpandedTests((prev) => {
+      const next = new Set(prev);
+      if (next.has(testKey)) {
+        next.delete(testKey);
+      } else {
+        next.add(testKey);
+        // Fetch history only if not already cached.
+        if (!runHistoryCache.has(testKey)) {
+          setRunHistoryLoading((l) => { const nl = new Set(l); nl.add(testKey); return nl; });
+          GetTestRunHistory(profileId, testKey)
+            .then((entries) => {
+              setRunHistoryCache((m) => new Map(m).set(testKey, entries ?? []));
+            })
+            .catch(() => {
+              setRunHistoryCache((m) => new Map(m).set(testKey, []));
+            })
+            .finally(() => {
+              setRunHistoryLoading((l) => { const nl = new Set(l); nl.delete(testKey); return nl; });
+            });
+        }
+      }
+      return next;
+    });
   }
 
   // Toggle a bug's checkbox without disturbing the detail-pane selection.
@@ -196,6 +234,12 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
       setSelected(shown[0].key);
     }
   }, [shown, selected]);
+
+  // Clear the per-test expand state whenever the user switches to a different
+  // bug, so stale expansions from the previous selection don't carry over.
+  useEffect(() => {
+    setExpandedTests(new Set());
+  }, [selected]);
 
   // Load the affected tests (with run status) for the selected bug.
   useEffect(() => {
@@ -372,39 +416,149 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
               <table className="board-table">
                 <thead>
                   <tr>
+                    <th style={{ width: "1.5rem" }} />
                     <th>Test</th>
+                    <th>Project</th>
                     <th>Summary</th>
                     <th>Status</th>
                     <th>Result</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tests.map((t) => (
-                    <tr key={t.key}>
-                      <td>
-                        <button
-                          className="mono bug-link-key"
-                          onClick={() => onOpenTest(t.key)}
-                          title={`Open ${t.key}`}
-                        >
-                          {t.key}
-                        </button>
-                      </td>
-                      <td>{t.summary}</td>
-                      <td>{t.status || "—"}</td>
-                      <td>
-                        {t.runStatus ? (
-                          <span
-                            className={`run-badge run-${t.runStatus.toLowerCase()}`}
-                          >
-                            {t.runStatus}
-                          </span>
-                        ) : (
-                          <span className="muted">not run</span>
+                  {tests.map((t) => {
+                    const isExpanded = expandedTests.has(t.key);
+                    const isLoading = runHistoryLoading.has(t.key);
+                    const history = runHistoryCache.get(t.key);
+                    return (
+                      <Fragment key={t.key}>
+                        <tr>
+                          <td>
+                            <button
+                              className="btn-icon"
+                              title={isExpanded ? "Collapse run history" : "Expand run history"}
+                              onClick={() => toggleTestExpand(t.key)}
+                              style={{ fontSize: "0.75rem", padding: "0 0.25rem" }}
+                            >
+                              {isExpanded ? "▾" : "▸"}
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              className="mono bug-link-key"
+                              onClick={() => onOpenTest(t.key)}
+                              title={`Open ${t.key}`}
+                            >
+                              {t.key}
+                            </button>
+                          </td>
+                          <td className="muted">{t.project || "—"}</td>
+                          <td>{t.summary}</td>
+                          <td>{t.status || "—"}</td>
+                          <td>
+                            {t.runStatus ? (
+                              <span
+                                className={`run-badge run-${t.runStatus.toLowerCase()}`}
+                              >
+                                {t.runStatus}
+                              </span>
+                            ) : (
+                              <span className="muted">not run</span>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={6} style={{ padding: "0.25rem 0.5rem 0.5rem 2rem", background: "var(--bg-subtle, #f8f8f8)" }}>
+                              {isLoading ? (
+                                <span className="muted">Loading run history…</span>
+                              ) : !history || history.length === 0 ? (
+                                <span className="muted">No run history for this test.</span>
+                              ) : (
+                                <table className="board-table" style={{ fontSize: "0.85em" }}>
+                                  <thead>
+                                    <tr>
+                                      <th>Execution</th>
+                                      <th>Result</th>
+                                      <th>Fix Version(s)</th>
+                                      <th>Plan(s)</th>
+                                      <th>Environment</th>
+                                      <th>Date</th>
+                                      <th>By</th>
+                                      <th>Defects</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {history.map((r, i) => (
+                                      <tr key={`${r.execKey}-${i}`}>
+                                        <td>
+                                          {canLink && r.execKey && !r.execKey.startsWith("NEW-") ? (
+                                            <button
+                                              className="mono bug-link-key"
+                                              onClick={() => {
+                                                const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
+                                                BrowserOpenURL(`${base}/browse/${r.execKey}`);
+                                              }}
+                                              title={r.execSummary || `Open ${r.execKey} in Jira`}
+                                            >
+                                              {r.execKey}
+                                            </button>
+                                          ) : (
+                                            <span className="mono" title={r.execSummary}>{r.execKey}</span>
+                                          )}
+                                          {r.execSummary && (
+                                            <span className="muted" style={{ display: "block", fontSize: "0.9em" }}>{r.execSummary}</span>
+                                          )}
+                                        </td>
+                                        <td>
+                                          {r.runStatus ? (
+                                            <span className={`run-badge run-${r.runStatus.toLowerCase()}`}>{r.runStatus}</span>
+                                          ) : (
+                                            <span className="muted">—</span>
+                                          )}
+                                        </td>
+                                        <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">—</span>}</td>
+                                        <td>{r.planKeys?.length ? r.planKeys.join(", ") : <span className="muted">—</span>}</td>
+                                        <td>{r.environment || <span className="muted">—</span>}</td>
+                                        <td className="muted">{formatDateTime(r.finishedAt || r.startedAt)}</td>
+                                        <td>{r.executedBy || <span className="muted">—</span>}</td>
+                                        <td>
+                                          {r.defects?.length ? (
+                                            <span>
+                                              {r.defects.map((d, di) => (
+                                                <span key={d}>
+                                                  {di > 0 && ", "}
+                                                  {canLink && !d.startsWith("NEW-") ? (
+                                                    <button
+                                                      className="mono bug-link-key"
+                                                      onClick={() => {
+                                                        const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
+                                                        BrowserOpenURL(`${base}/browse/${d}`);
+                                                      }}
+                                                      title={`Open ${d} in Jira`}
+                                                    >
+                                                      {d}
+                                                    </button>
+                                                  ) : (
+                                                    <span className="mono">{d}</span>
+                                                  )}
+                                                </span>
+                                              ))}
+                                            </span>
+                                          ) : (
+                                            <span className="muted">—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

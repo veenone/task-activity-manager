@@ -789,6 +789,7 @@ export interface TestBug {
 // consolidated run status, for the bug detail pane.
 export interface BugTest {
   key: string;
+  project: string;
   summary: string;
   status: string;
   runStatus: string;
