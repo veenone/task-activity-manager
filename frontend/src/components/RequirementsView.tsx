@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   ListRequirementsWithCoverage,
   ListTestsForRequirement,
@@ -67,12 +68,12 @@ function cmpReq(
 // changes or a sync/commit bumps refreshKey.
 export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
   const [list, setList] = useState<RequirementCoverage[]>([]);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useViewState(profileId, "requirements", "selected", "");
   const [tests, setTests] = useState<RequirementTest[]>([]);
-  const [filter, setFilter] = useState("");
-  const [covFilter, setCovFilter] = useState("");
-  const [sortField, setSortField] = useState("key");
-  const [sortDesc, setSortDesc] = useState(true);
+  const [filter, setFilter] = useViewState(profileId, "requirements", "filter", "");
+  const [covFilter, setCovFilter] = useViewState(profileId, "requirements", "covFilter", "");
+  const [sortField, setSortField] = useViewState(profileId, "requirements", "sortField", "key");
+  const [sortDesc, setSortDesc] = useViewState(profileId, "requirements", "sortDesc", true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showSources, setShowSources] = useState(false);
@@ -83,7 +84,7 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
   const [notice, setNotice] = useState("");
   const { confirm, confirmUI } = useConfirm();
   // A covering test opened in a slide-over detail panel (#5).
-  const [detailKey, setDetailKey] = useState("");
+  const [detailKey, setDetailKey] = useViewState(profileId, "requirements", "detailKey", "");
   const [detailVersion, setDetailVersion] = useState(0);
 
   useEffect(() => {
@@ -155,8 +156,8 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
   }, [list, filter, covFilter, sortField, sortDesc]);
 
   // Pagination of the (filtered) requirement list.
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useViewState(profileId, "requirements", "page", 0);
+  const [pageSize, setPageSize] = useViewState(profileId, "requirements", "pageSize", 15);
   useEffect(() => {
     setPage(0);
   }, [filter, covFilter, sortField, sortDesc]);
@@ -168,8 +169,8 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
   );
 
   // Pagination of the covering-tests table in the detail pane.
-  const [testsPage, setTestsPage] = useState(0);
-  const [testsPageSize, setTestsPageSize] = useState(15);
+  const [testsPage, setTestsPage] = useViewState(profileId, "requirements", "testsPage", 0);
+  const [testsPageSize, setTestsPageSize] = useViewState(profileId, "requirements", "testsPageSize", 15);
   useEffect(() => {
     setTestsPage(0);
   }, [selected]);
