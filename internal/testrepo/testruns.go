@@ -1,5 +1,162 @@
 package testrepo
 
+import "strings"
+
+// RunRollup summarizes run results for a Test Plan or Test Set across the
+// executions that ran its member tests.
+type RunRollup struct {
+	Passed    int `json:"passed"`
+	Failed    int `json:"failed"`
+	NotRun    int `json:"notRun"`
+	Executing int `json:"executing"`
+	Aborted   int `json:"aborted"`
+	Blocked   int `json:"blocked"`
+	Total     int `json:"total"`
+	ExecCount int `json:"execCount"`
+}
+
+// ExecMemberRun is one member test of an execution with its run details.
+type ExecMemberRun struct {
+	TestKey     string `json:"testKey"`
+	Summary     string `json:"summary"`
+	Status      string `json:"status"`
+	RunStatus   string `json:"runStatus"`
+	StartedAt   string `json:"startedAt"`
+	FinishedAt  string `json:"finishedAt"`
+	ExecutedBy  string `json:"executedBy"`
+	Environment string `json:"environment"`
+}
+
+// GetRunRollup returns a run-status rollup for the member tests of a Test Plan
+// or Test Set. Each member's consolidated run status across all executions
+// (worst-wins, reusing consolidateRunStatus) is bucketed into the result.
+// Total is the number of member tests; ExecCount is the number of distinct
+// Test Executions that share at least one member test with this container.
+func (r *Repository) GetRunRollup(profileID, containerKey string) (RunRollup, error) {
+	var roll RunRollup
+
+	// Collect the direct member keys for this container.
+	memberRows, err := r.db.Query(
+		`SELECT test_key FROM test_container_test
+		 WHERE profile_id = ? AND container_key = ?`,
+		profileID, containerKey)
+	if err != nil {
+		return roll, err
+	}
+	defer memberRows.Close()
+	members := map[string]bool{}
+	for memberRows.Next() {
+		var k string
+		if err := memberRows.Scan(&k); err != nil {
+			return roll, err
+		}
+		members[k] = true
+	}
+	if err := memberRows.Err(); err != nil {
+		return roll, err
+	}
+	roll.Total = len(members)
+	if roll.Total == 0 {
+		return roll, nil
+	}
+
+	// Gather run statuses across all executions for each member, and count
+	// distinct executions that share at least one member.
+	runsByTest := map[string][]string{}
+	execsSeen := map[string]bool{}
+
+	execRows, err := r.db.Query(
+		`SELECT l.test_key, l.run_status, l.container_key
+		 FROM test_container_test l
+		 JOIN test_container c
+		   ON c.profile_id = l.profile_id AND c.jira_key = l.container_key
+		 WHERE l.profile_id = ? AND c.kind = 'testexec'`,
+		profileID)
+	if err != nil {
+		return roll, err
+	}
+	defer execRows.Close()
+	for execRows.Next() {
+		var testKey, runStatus, execKey string
+		if err := execRows.Scan(&testKey, &runStatus, &execKey); err != nil {
+			return roll, err
+		}
+		if members[testKey] {
+			runsByTest[testKey] = append(runsByTest[testKey], runStatus)
+			execsSeen[execKey] = true
+		}
+	}
+	if err := execRows.Err(); err != nil {
+		return roll, err
+	}
+	roll.ExecCount = len(execsSeen)
+
+	// Bucket each member's consolidated run status.
+	for k := range members {
+		status := consolidateRunStatus(runsByTest[k])
+		switch strings.ToUpper(status) {
+		case "PASS", "PASSED":
+			roll.Passed++
+		case "FAIL", "FAILED":
+			roll.Failed++
+		case "EXECUTING":
+			roll.Executing++
+		case "ABORTED":
+			roll.Aborted++
+		case "BLOCKED":
+			roll.Blocked++
+		default:
+			// "", "TODO", or any unrecognised status counts as not run.
+			roll.NotRun++
+		}
+	}
+	return roll, nil
+}
+
+// GetExecutionMembersWithRuns returns the member tests of a Test Execution
+// enriched with run details from the test_run table. Summary and status are
+// resolved from the local test_case cache, falling back to the external_test
+// cache for cross-project members. RunStatus prefers the test_run row, falling
+// back to the test_container_test membership run_status.
+func (r *Repository) GetExecutionMembersWithRuns(profileID, execKey string) ([]ExecMemberRun, error) {
+	rows, err := r.db.Query(
+		`SELECT l.test_key,
+		        COALESCE(t.summary, x.summary, '') AS summary,
+		        COALESCE(t.status,  x.status,  '') AS status,
+		        COALESCE(tr.run_status, l.run_status, '') AS run_status,
+		        COALESCE(tr.started_at,   '') AS started_at,
+		        COALESCE(tr.finished_at,  '') AS finished_at,
+		        COALESCE(tr.executed_by,  '') AS executed_by,
+		        COALESCE(tr.environment,  '') AS environment
+		 FROM test_container_test l
+		 LEFT JOIN test_case     t  ON t.profile_id  = l.profile_id AND t.jira_key = l.test_key
+		 LEFT JOIN external_test x  ON x.profile_id  = l.profile_id AND x.jira_key = l.test_key
+		 LEFT JOIN test_run      tr ON tr.profile_id = l.profile_id
+		                           AND tr.exec_key   = l.container_key
+		                           AND tr.test_key   = l.test_key
+		 WHERE l.profile_id = ? AND l.container_key = ?
+		 ORDER BY l.test_key`,
+		profileID, execKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ExecMemberRun
+	for rows.Next() {
+		var m ExecMemberRun
+		if err := rows.Scan(
+			&m.TestKey, &m.Summary, &m.Status,
+			&m.RunStatus, &m.StartedAt, &m.FinishedAt,
+			&m.ExecutedBy, &m.Environment,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 // TestRunEntry is one execution-run of a test, with the execution's context.
 type TestRunEntry struct {
 	ExecKey     string   `json:"execKey"`
