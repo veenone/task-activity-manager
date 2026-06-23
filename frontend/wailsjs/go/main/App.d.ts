@@ -131,11 +131,15 @@ export function GetContainerBoard(arg1:string,arg2:string):Promise<testrepo.Test
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
+export function GetExecutionMembersWithRuns(arg1:string,arg2:string):Promise<Array<testrepo.ExecMemberRun>>;
+
 export function GetExecutionsForPlans(arg1:string,arg2:Array<string>):Promise<Array<testrepo.Container>>;
 
 export function GetProfileProjectKey(arg1:string):Promise<string>;
 
 export function GetRequirementTraceability(arg1:string,arg2:Array<string>):Promise<testrepo.Sankey>;
+
+export function GetRunRollup(arg1:string,arg2:string):Promise<testrepo.RunRollup>;
 
 export function GetSettings():Promise<settings.Settings>;
 
@@ -160,6 +164,8 @@ export function GetTestPreconditions(arg1:string,arg2:string):Promise<Array<test
 export function GetTestRequirements(arg1:string,arg2:string):Promise<Array<testrepo.Requirement>>;
 
 export function GetTestReview(arg1:string,arg2:string):Promise<testrepo.Review>;
+
+export function GetTestRunHistory(arg1:string,arg2:string):Promise<Array<testrepo.TestRunEntry>>;
 
 export function GetTestSteps(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.Step>>;
 

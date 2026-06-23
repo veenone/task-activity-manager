@@ -592,7 +592,7 @@ export namespace testrepo {
 	    issueType: string;
 	    environments: string[];
 	    fixVersions: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Container(source);
 	    }
@@ -775,6 +775,32 @@ export namespace testrepo {
 		    }
 		    return a;
 		}
+	}
+	export class ExecMemberRun {
+	    testKey: string;
+	    summary: string;
+	    status: string;
+	    runStatus: string;
+	    startedAt: string;
+	    finishedAt: string;
+	    executedBy: string;
+	    environment: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExecMemberRun(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.runStatus = source["runStatus"];
+	        this.startedAt = source["startedAt"];
+	        this.finishedAt = source["finishedAt"];
+	        this.executedBy = source["executedBy"];
+	        this.environment = source["environment"];
+	    }
 	}
 	export class Folder {
 	    id: string;
@@ -1249,6 +1275,32 @@ export namespace testrepo {
 	        this.reviewedAt = source["reviewedAt"];
 	    }
 	}
+	export class RunRollup {
+	    passed: number;
+	    failed: number;
+	    notRun: number;
+	    executing: number;
+	    aborted: number;
+	    blocked: number;
+	    total: number;
+	    execCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunRollup(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.passed = source["passed"];
+	        this.failed = source["failed"];
+	        this.notRun = source["notRun"];
+	        this.executing = source["executing"];
+	        this.aborted = source["aborted"];
+	        this.blocked = source["blocked"];
+	        this.total = source["total"];
+	        this.execCount = source["execCount"];
+	    }
+	}
 	export class SankeyLink {
 	    source: string;
 	    target: string;
@@ -1631,6 +1683,37 @@ export namespace testrepo {
 		    }
 		    return a;
 		}
+	}
+	
+	export class TestRunEntry {
+	    execKey: string;
+	    execSummary: string;
+	    planKeys: string[];
+	    environment: string;
+	    fixVersions: string[];
+	    runStatus: string;
+	    startedAt: string;
+	    finishedAt: string;
+	    executedBy: string;
+	    defects: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TestRunEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.execKey = source["execKey"];
+	        this.execSummary = source["execSummary"];
+	        this.planKeys = source["planKeys"];
+	        this.environment = source["environment"];
+	        this.fixVersions = source["fixVersions"];
+	        this.runStatus = source["runStatus"];
+	        this.startedAt = source["startedAt"];
+	        this.finishedAt = source["finishedAt"];
+	        this.executedBy = source["executedBy"];
+	        this.defects = source["defects"];
+	    }
 	}
 
 }

@@ -1058,6 +1058,32 @@ func (a *App) ListBugsForContainer(profileID, containerKey string) ([]testrepo.B
 	return a.repo.ListBugsForContainer(profileID, containerKey)
 }
 
+// --- Test run history & rollups ---
+
+// GetTestRunHistory returns a test's run history across executions.
+func (a *App) GetTestRunHistory(profileID, testKey string) ([]testrepo.TestRunEntry, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.GetTestRunHistory(profileID, testKey)
+}
+
+// GetRunRollup returns the run-result roll-up for a Test Plan or Test Set.
+func (a *App) GetRunRollup(profileID, containerKey string) (testrepo.RunRollup, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.RunRollup{}, err
+	}
+	return a.repo.GetRunRollup(profileID, containerKey)
+}
+
+// GetExecutionMembersWithRuns returns an execution's member tests with run details.
+func (a *App) GetExecutionMembersWithRuns(profileID, execKey string) ([]testrepo.ExecMemberRun, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.GetExecutionMembersWithRuns(profileID, execKey)
+}
+
 // --- Local editing & change tracking (FR-2 / FR-1.5 / FR-12.6) ---
 
 // EditTestField applies a local edit to a Test field and queues a pending

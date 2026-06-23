@@ -194,6 +194,10 @@ export function ExcludeFromDuplicates(arg1, arg2) {
   return window['go']['main']['App']['ExcludeFromDuplicates'](arg1, arg2);
 }
 
+export function ExportDashboard(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ExportDashboard'](arg1, arg2, arg3, arg4);
+}
+
 export function ExportDiagnostics() {
   return window['go']['main']['App']['ExportDiagnostics']();
 }
@@ -208,10 +212,6 @@ export function ExportImportTemplate() {
 
 export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
-}
-
-export function ExportDashboard(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['ExportDashboard'](arg1, arg2, arg3, arg4);
 }
 
 export function ExportPytest(arg1, arg2, arg3) {
@@ -250,6 +250,10 @@ export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
 
+export function GetExecutionMembersWithRuns(arg1, arg2) {
+  return window['go']['main']['App']['GetExecutionMembersWithRuns'](arg1, arg2);
+}
+
 export function GetExecutionsForPlans(arg1, arg2) {
   return window['go']['main']['App']['GetExecutionsForPlans'](arg1, arg2);
 }
@@ -260,6 +264,10 @@ export function GetProfileProjectKey(arg1) {
 
 export function GetRequirementTraceability(arg1, arg2) {
   return window['go']['main']['App']['GetRequirementTraceability'](arg1, arg2);
+}
+
+export function GetRunRollup(arg1, arg2) {
+  return window['go']['main']['App']['GetRunRollup'](arg1, arg2);
 }
 
 export function GetSettings() {
@@ -308,6 +316,10 @@ export function GetTestRequirements(arg1, arg2) {
 
 export function GetTestReview(arg1, arg2) {
   return window['go']['main']['App']['GetTestReview'](arg1, arg2);
+}
+
+export function GetTestRunHistory(arg1, arg2) {
+  return window['go']['main']['App']['GetTestRunHistory'](arg1, arg2);
 }
 
 export function GetTestSteps(arg1, arg2, arg3) {
