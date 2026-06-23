@@ -42,10 +42,11 @@ type TestBug struct {
 	Priority   string `json:"priority"`
 }
 
-// BugTest is a Test affected by a bug, with its consolidated run status — for
-// the bug detail pane.
+// BugTest is a Test affected by a bug, with its project and consolidated run
+// status, for the bug detail pane.
 type BugTest struct {
 	Key       string `json:"key"`
+	Project   string `json:"project"`
 	Summary   string `json:"summary"`
 	Status    string `json:"status"`
 	RunStatus string `json:"runStatus"`
@@ -160,6 +161,7 @@ func (r *Repository) GetTestBugs(profileID, testKey string) ([]TestBug, error) {
 func (r *Repository) ListTestsForBug(profileID, bugKey string) ([]BugTest, error) {
 	rows, err := r.db.Query(
 		`SELECT l.test_key,
+		        COALESCE(x.project_key, '') AS ext_project,
 		        COALESCE(t.summary, x.summary, '') AS summary,
 		        COALESCE(t.status,  x.status,  '') AS status
 		 FROM test_bug l
@@ -180,8 +182,17 @@ func (r *Repository) ListTestsForBug(profileID, bugKey string) ([]BugTest, error
 	out := []BugTest{}
 	for rows.Next() {
 		var bt BugTest
-		if err := rows.Scan(&bt.Key, &bt.Summary, &bt.Status); err != nil {
+		var extProject string
+		if err := rows.Scan(&bt.Key, &extProject, &bt.Summary, &bt.Status); err != nil {
 			return nil, err
+		}
+		// Cross-project tests carry their project key in the external_test cache.
+		// Local tests have no external_test row, so derive the project from the
+		// issue key prefix (everything before the last '-').
+		if extProject != "" {
+			bt.Project = extProject
+		} else if i := strings.LastIndex(bt.Key, "-"); i > 0 {
+			bt.Project = bt.Key[:i]
 		}
 		bt.RunStatus = runByTest[bt.Key]
 		out = append(out, bt)

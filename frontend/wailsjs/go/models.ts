@@ -460,6 +460,7 @@ export namespace testrepo {
 	}
 	export class BugTest {
 	    key: string;
+	    project: string;
 	    summary: string;
 	    status: string;
 	    runStatus: string;
@@ -471,6 +472,7 @@ export namespace testrepo {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
+	        this.project = source["project"];
 	        this.summary = source["summary"];
 	        this.status = source["status"];
 	        this.runStatus = source["runStatus"];
