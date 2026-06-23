@@ -54,6 +54,7 @@ import { ComponentList } from "./components/ComponentList";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkReviewModal } from "./components/BulkReviewModal";
 import { REVIEW_ENABLED } from "./features";
+import { clearViewState } from "./lib/viewState";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
 import { BulkAllocateModal } from "./components/BulkAllocateModal";
@@ -112,6 +113,7 @@ function App() {
   // call, so a concurrent sync can't be started while the tail is still going.
   const [syncing, setSyncing] = useState(false);
   const syncRunningRef = useRef(false);
+  const prevProfileRef = useRef<string>("");
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<string>("");
@@ -316,7 +318,12 @@ function App() {
   }, [loadProfileData, refreshKey]);
 
   // Clear folder + container + component + row selection when the profile changes.
+  // Also drop the previous profile's view session state so it isn't inherited.
   useEffect(() => {
+    if (prevProfileRef.current && prevProfileRef.current !== activeId) {
+      clearViewState(prevProfileRef.current);
+    }
+    prevProfileRef.current = activeId;
     setSelectedFolder("");
     setSelectedContainer("");
     setSelectedComponent("");
