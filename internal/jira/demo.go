@@ -410,6 +410,7 @@ var demoRunStatuses = []string{
 	"TODO", "TODO", "TODO",
 	"EXECUTING",
 	"ABORTED",
+	"BLOCKED",
 }
 
 // demoEnvironments returns a deterministic, non-empty subset of the environment
