@@ -17,7 +17,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 27
+const schemaVersion = 28
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -290,6 +290,30 @@ CREATE TABLE IF NOT EXISTS external_test (
 	project_key TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, jira_key)
 );
+
+-- Per-execution run details for each Test: status, timing, executor,
+-- environment, and defect keys as returned by the Xray Test Run REST API.
+CREATE TABLE IF NOT EXISTS test_run (
+	profile_id  TEXT NOT NULL,
+	exec_key    TEXT NOT NULL,
+	test_key    TEXT NOT NULL,
+	run_status  TEXT DEFAULT '',
+	started_at  TEXT DEFAULT '',
+	finished_at TEXT DEFAULT '',
+	executed_by TEXT DEFAULT '',
+	environment TEXT DEFAULT '',
+	defects     TEXT DEFAULT '',
+	PRIMARY KEY (profile_id, exec_key, test_key)
+);
+
+-- Explicit link from a Test Execution to the Test Plan(s) it belongs to.
+-- Mirrors the Xray association returned by the Test Execution detail endpoint.
+CREATE TABLE IF NOT EXISTS exec_plan (
+	profile_id TEXT NOT NULL,
+	exec_key   TEXT NOT NULL,
+	plan_key   TEXT NOT NULL,
+	PRIMARY KEY (profile_id, exec_key, plan_key)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -518,6 +542,36 @@ func applyMigrations(db *sql.DB) error {
 			`ALTER TABLE test_container ADD COLUMN fix_versions TEXT NOT NULL DEFAULT ''`,
 		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return fmt.Errorf("v27 add fix_versions: %w", err)
+		}
+	}
+	// v28: test_run stores per-execution run details for each Test (status,
+	// timing, executor, environment, defects). exec_plan records the explicit
+	// link from a Test Execution to its Test Plan(s). Both are additive new
+	// tables; CREATE TABLE IF NOT EXISTS makes the migration idempotent.
+	if current < 28 {
+		for _, q := range []string{
+			`CREATE TABLE IF NOT EXISTS test_run (
+				profile_id  TEXT NOT NULL,
+				exec_key    TEXT NOT NULL,
+				test_key    TEXT NOT NULL,
+				run_status  TEXT DEFAULT '',
+				started_at  TEXT DEFAULT '',
+				finished_at TEXT DEFAULT '',
+				executed_by TEXT DEFAULT '',
+				environment TEXT DEFAULT '',
+				defects     TEXT DEFAULT '',
+				PRIMARY KEY (profile_id, exec_key, test_key)
+			)`,
+			`CREATE TABLE IF NOT EXISTS exec_plan (
+				profile_id TEXT NOT NULL,
+				exec_key   TEXT NOT NULL,
+				plan_key   TEXT NOT NULL,
+				PRIMARY KEY (profile_id, exec_key, plan_key)
+			)`,
+		} {
+			if _, err := db.Exec(q); err != nil && !strings.Contains(err.Error(), "already exists") {
+				return fmt.Errorf("v28 create test_run/exec_plan: %w", err)
+			}
 		}
 	}
 	return nil

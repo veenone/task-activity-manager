@@ -6,6 +6,52 @@ import (
 	"xray-test-manager/internal/testrepo"
 )
 
+func TestListTestsForBugHasProject(t *testing.T) {
+	repo := newRepo(t)
+	// Seed a local test (project derived from key prefix before last dash).
+	if err := repo.UpsertTests("p1", []testrepo.TestCase{
+		{Key: "QA-10", ID: "10", Summary: "Local test"},
+	}); err != nil {
+		t.Fatalf("seed tests: %v", err)
+	}
+	// Seed a cross-project external test (project comes from external_test.project_key).
+	if err := repo.ReplaceExternalTests("p1", []testrepo.ExternalTest{
+		{Key: "XRAY-20", Summary: "External test", Status: "Open", ProjectKey: "XRAY"},
+	}); err != nil {
+		t.Fatalf("seed external test: %v", err)
+	}
+	if err := repo.ReplaceAllBugs("p1", []testrepo.Bug{
+		{Key: "BUGS-1", ProjectKey: "BUGS", IssueType: "Bug", Summary: "crash", Status: "Open"},
+	}); err != nil {
+		t.Fatalf("seed bug: %v", err)
+	}
+	if err := repo.ReplaceAllBugLinks("p1", []testrepo.BugLink{
+		{TestKey: "QA-10", BugKey: "BUGS-1", LinkID: "1"},
+		{TestKey: "XRAY-20", BugKey: "BUGS-1", LinkID: "2"},
+	}); err != nil {
+		t.Fatalf("seed links: %v", err)
+	}
+
+	tests, err := repo.ListTestsForBug("p1", "BUGS-1")
+	if err != nil || len(tests) == 0 {
+		t.Fatalf("need affected tests, err=%v n=%d", err, len(tests))
+	}
+
+	byKey := map[string]testrepo.BugTest{}
+	for _, bt := range tests {
+		byKey[bt.Key] = bt
+	}
+
+	// Local test: project is the key prefix before the last dash.
+	if byKey["QA-10"].Project != "QA" {
+		t.Errorf("local test QA-10 Project = %q, want QA", byKey["QA-10"].Project)
+	}
+	// Cross-project test: project comes from external_test.project_key.
+	if byKey["XRAY-20"].Project != "XRAY" {
+		t.Errorf("cross-project test XRAY-20 Project = %q, want XRAY", byKey["XRAY-20"].Project)
+	}
+}
+
 func TestListTestsForBugReturnsAffectedTestsWithRunStatus(t *testing.T) {
 	repo := newRepo(t)
 	if err := repo.UpsertTests("p1", []testrepo.TestCase{

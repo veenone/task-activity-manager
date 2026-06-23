@@ -144,6 +144,9 @@ export {
   ListBugsForContainer,
   GetTestBugs,
   ListTestsForBug,
+  GetTestRunHistory,
+  GetRunRollup,
+  GetExecutionMembersWithRuns,
 } from "../wailsjs/go/main/App";
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
@@ -786,9 +789,51 @@ export interface TestBug {
 // consolidated run status, for the bug detail pane.
 export interface BugTest {
   key: string;
+  project: string;
   summary: string;
   status: string;
   runStatus: string;
+}
+
+// TestRunEntry mirrors testrepo.TestRunEntry — one execution-run of a test,
+// with the execution's context (plan keys, fix versions, defects, run detail).
+export interface TestRunEntry {
+  execKey: string;
+  execSummary: string;
+  planKeys: string[];
+  environment: string;
+  fixVersions: string[];
+  runStatus: string;
+  startedAt: string;
+  finishedAt: string;
+  executedBy: string;
+  defects: string[];
+}
+
+// RunRollup mirrors testrepo.RunRollup — run-result roll-up for a Test Plan or
+// Test Set across the executions that ran its member tests.
+export interface RunRollup {
+  passed: number;
+  failed: number;
+  notRun: number;
+  executing: number;
+  aborted: number;
+  blocked: number;
+  total: number;
+  execCount: number;
+}
+
+// ExecMemberRun mirrors testrepo.ExecMemberRun — one member test of an
+// execution enriched with run details.
+export interface ExecMemberRun {
+  testKey: string;
+  summary: string;
+  status: string;
+  runStatus: string;
+  startedAt: string;
+  finishedAt: string;
+  executedBy: string;
+  environment: string;
 }
 
 // errMsg renders any thrown value (unknown in strict mode) as a string.

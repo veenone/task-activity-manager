@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   GetStatistics,
   GetTraceabilitySankey,
@@ -37,7 +38,7 @@ type Tab = "req" | "exec" | "subtask";
 // parent -> execution -> status) behind a tab bar, each with its own filters.
 // Computed entirely from the local store; recomputes on refreshKey.
 export function TraceabilityTabs({ profileId, refreshKey, jiraUrl }: Props) {
-  const [tab, setTab] = useState<Tab>("exec");
+  const [tab, setTab] = useViewState<Tab>(profileId, "traceability", "tab", "exec");
   const [stats, setStats] = useState<Statistics | null>(null);
   const [statsErr, setStatsErr] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -47,7 +48,7 @@ export function TraceabilityTabs({ profileId, refreshKey, jiraUrl }: Props) {
   // Requirement traceability.
   const [reqSankey, setReqSankey] = useState<Sankey | null>(null);
   const [reqSankeyErr, setReqSankeyErr] = useState("");
-  const [reqSel, setReqSel] = useState<string[]>([]);
+  const [reqSel, setReqSel] = useViewState<string[]>(profileId, "traceability", "reqSel", []);
   const [reqOptions, setReqOptions] = useState<RequirementCoverage[]>([]);
 
   // Plan/Execution traceability + cross-project bugs.
@@ -55,9 +56,9 @@ export function TraceabilityTabs({ profileId, refreshKey, jiraUrl }: Props) {
   const [sankeyErr, setSankeyErr] = useState("");
   const [plans, setPlans] = useState<Container[]>([]);
   const [execs, setExecs] = useState<Container[]>([]);
-  const [planSel, setPlanSel] = useState<string[]>([]);
-  const [execSel, setExecSel] = useState<string[]>([]);
-  const [crossProject, setCrossProject] = useState(false);
+  const [planSel, setPlanSel] = useViewState<string[]>(profileId, "traceability", "planSel", []);
+  const [execSel, setExecSel] = useViewState<string[]>(profileId, "traceability", "execSel", []);
+  const [crossProject, setCrossProject] = useViewState(profileId, "traceability", "crossProject", false);
   const [projectKey, setProjectKey] = useState("");
   const [crossBugs, setCrossBugs] = useState<BugWithTests[]>([]);
 
@@ -65,11 +66,11 @@ export function TraceabilityTabs({ profileId, refreshKey, jiraUrl }: Props) {
   const [subSankey, setSubSankey] = useState<Sankey | null>(null);
   const [subSankeyErr, setSubSankeyErr] = useState("");
   const [parents, setParents] = useState<string[]>([]);
-  const [parentSel, setParentSel] = useState<string[]>([]);
+  const [parentSel, setParentSel] = useViewState<string[]>(profileId, "traceability", "parentSel", []);
   // Include cross-project members: when on, sub-task executions whose member
   // Tests live in another project (cached locally) are drawn in the flow.
   // Distinct from the Execution tab's "Cross-project only" filter above.
-  const [crossMembers, setCrossMembers] = useState(true);
+  const [crossMembers, setCrossMembers] = useViewState(profileId, "traceability", "crossMembers", true);
 
   useEffect(() => {
     if (!profileId) return;

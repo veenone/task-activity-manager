@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version is single-sourced in `wails.json` (`info.productVersion`).
 
+## [1.7.0a] - 2026-06-23 (alpha)
+
+Alpha build of the 1.7.0 work, for internal validation.
+
+### Added
+- **Per-view sessions.** Each view keeps its selection, filters, search,
+  pagination, and sub-tab when you switch tabs and come back; state resets on
+  app restart and profile change. (RND_P_4TFINT_05-238)
+- **Test run information.** Xray test runs (result, date, who, environment, plan,
+  fix versions, defects) are pulled during container sync and surfaced as a Run
+  history section on a test, run columns on Test Executions, and a run roll-up on
+  Test Plans / Sets.
+- **Bug affected-tests breakdown.** The Bugs detail gains a Project column and an
+  expandable per-test run breakdown (fix version / execution / plan / environment
+  / date / tester / defects). (RND_P_4TFINT_05-240)
+- **Read-only test detail.** A read-only mode for the test detail panel; from a
+  bug's affected tests (and the Containers Test Execution list) a test opens
+  read-only in a side panel beside the detail, and the test-key navigation now
+  preserves the view's state. (RND_P_4TFINT_05-239, -245)
+- **Add affected tests to an existing Test Execution** from the Bugs view.
+  (RND_P_4TFINT_05-242)
+
+### Notes
+- Live Xray test-run shapes are marked `NOTE(xtm)` for verification against a real
+  Xray Server / DC 8.4.0 instance; demo mode is fully populated.
+
 ## [1.6.0] - 2026-06-22
 
 ### Added

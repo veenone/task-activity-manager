@@ -1,0 +1,268 @@
+package jira
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"strings"
+)
+
+// TestRun is one test's run record within a Test Execution as returned by the
+// Xray Test Run REST endpoint. It carries the run status, timing, the executor
+// identity, the environment label (if set), and any defect keys linked to the run.
+type TestRun struct {
+	TestKey     string
+	Status      string
+	StartedAt   string
+	FinishedAt  string
+	ExecutedBy  string
+	Environment string
+	Defects     []string
+}
+
+// GetTestRuns returns the test runs recorded for one Test Execution. Demo mode
+// synthesizes runs deterministically from the execution key; the live path
+// calls the Xray raven REST API.
+//
+// NOTE(xtm): the live endpoint and response shape are assumed to be
+// GET /rest/raven/2.0/api/testruns?testExecIssueKey=<execKey>, returning an
+// array of run objects. Verify field names (startedOn vs startedAt, etc.) and
+// pagination behaviour against a live Xray Server/DC 8.4.0 instance before
+// removing the TODO marker.
+func (c *Client) GetTestRuns(ctx context.Context, execKey string) ([]TestRun, error) {
+	if isDemoURL(c.baseURL) {
+		return demoTestRuns(execKey), nil
+	}
+	q := url.Values{}
+	q.Set("testExecIssueKey", execKey)
+	body, err := c.getBytes(ctx, "/rest/raven/2.0/api/testruns?"+q.Encode())
+	if err != nil {
+		return nil, err
+	}
+	return parseTestRuns(body)
+}
+
+// ExecPlans returns the Test Plan keys that a Test Execution is associated
+// with. Demo mode derives the association deterministically from the execution
+// key; the live path calls the Xray raven REST API.
+//
+// NOTE(xtm): Xray Server/DC does not expose a dedicated "plans for exec"
+// endpoint. The most reliable approach on a live instance is to read the Test
+// Plan custom field on the Test Execution issue via the Jira issue REST API
+// (GET /rest/api/2/issue/<execKey>?fields=<testPlanFieldId>), where
+// testPlanFieldId must be resolved per instance. Verify against a live Xray
+// Server/DC 8.4.0 instance before removing the TODO marker.
+func (c *Client) ExecPlans(ctx context.Context, execKey string) ([]string, error) {
+	if isDemoURL(c.baseURL) {
+		return demoExecPlans(execKey), nil
+	}
+	// TODO(xtm): resolve the Test Plan custom field id and read it from the
+	// exec issue. Return nil for now so the sync path degrades gracefully.
+	return nil, nil
+}
+
+// parseTestRuns decodes the JSON body of the Xray test-runs response into
+// TestRun values. It tolerates null, empty, or missing fields to handle
+// shape variation across Xray Server/DC versions.
+func parseTestRuns(body []byte) ([]TestRun, error) {
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed == "" || trimmed == "null" || trimmed == "[]" {
+		return []TestRun{}, nil
+	}
+
+	// Xray may return different field names across versions.
+	type rawRun struct {
+		TestKey     string   `json:"testKey"`
+		Status      string   `json:"status"`
+		StartedOn   string   `json:"startedOn"`
+		StartedAt   string   `json:"startedAt"`
+		FinishedOn  string   `json:"finishedOn"`
+		FinishedAt  string   `json:"finishedAt"`
+		ExecutedBy  string   `json:"executedBy"`
+		Environment string   `json:"testEnvironment"`
+		Defects     []string `json:"defects"`
+	}
+	var raw []rawRun
+	if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
+		return nil, fmt.Errorf("parse test runs: %w", err)
+	}
+	out := make([]TestRun, 0, len(raw))
+	for _, r := range raw {
+		if r.TestKey == "" {
+			continue
+		}
+		// Prefer startedOn over startedAt for forward compat.
+		started := r.StartedOn
+		if started == "" {
+			started = r.StartedAt
+		}
+		finished := r.FinishedOn
+		if finished == "" {
+			finished = r.FinishedAt
+		}
+		defects := r.Defects
+		if defects == nil {
+			defects = []string{}
+		}
+		out = append(out, TestRun{
+			TestKey:     r.TestKey,
+			Status:      strings.ToUpper(strings.TrimSpace(r.Status)),
+			StartedAt:   started,
+			FinishedAt:  finished,
+			ExecutedBy:  r.ExecutedBy,
+			Environment: r.Environment,
+			Defects:     defects,
+		})
+	}
+	return out, nil
+}
+
+// demoExecCount and demoExecPlanCount mirror the exec/plan counts in
+// demoContainersAndLinks so the demo run seed stays in sync with the
+// container seed.
+const (
+	demoExecCount = 8
+	demoPlanCount = 5
+)
+
+// demoExecKeyIndex parses the 1-based exec number from a "<project>-TE-<n>"
+// key, or -1 if the key does not match the pattern.
+func demoExecKeyIndex(execKey string) int {
+	// Accept keys in the form "<proj>-TE-<n>" only; other exec key forms
+	// (cross-project, sub-task) yield no runs in the demo.
+	parts := strings.Split(execKey, "-TE-")
+	if len(parts) != 2 {
+		return -1
+	}
+	n := 0
+	for _, ch := range parts[1] {
+		if ch < '0' || ch > '9' {
+			return -1
+		}
+		n = n*10 + int(ch-'0')
+	}
+	if n < 1 || n > demoExecCount {
+		return -1
+	}
+	return n - 1 // convert to 0-based index
+}
+
+// demoExecProjectKey extracts the project key from a "<project>-TE-<n>" exec
+// key (the part before the first "-TE-").
+func demoExecProjectKey(execKey string) string {
+	if i := strings.Index(execKey, "-TE-"); i > 0 {
+		return execKey[:i]
+	}
+	return "DEMO"
+}
+
+// demoExecExecutors is the pool of demo executor names assigned to runs
+// deterministically, one per test within an execution, cycling through the
+// pool.
+var demoExecExecutors = []string{
+	"alice", "bob", "carol", "dave", "eve",
+}
+
+// demoRunEnvironments maps each demo execution index to a single environment
+// label consistent with the Container.Environments seeded by demoEnvironments.
+// Each exec's runs all show the same environment (the first env in the exec's
+// multi-env chip), which is enough for the run-history panel.
+func demoRunEnvironment(execIdx int) string {
+	// Mirrors the first element of demoEnvironments(execIdx).
+	sets := []string{"Staging", "Prod", "Staging", "Prod", "Chrome", "Staging"}
+	return sets[execIdx%len(sets)]
+}
+
+// demoRunDate returns a deterministic ISO-8601 date string for a run derived
+// from the execution index and position within the exec (no time.Now(), no
+// rand). The base date is 2026-05-01; position offsets advance the day by 1.
+func demoRunDate(execIdx, pos int) string {
+	// Days from the base date 2026-05-01. execIdx shifts the month; pos shifts
+	// the day within each exec. The hour is derived from pos so start and
+	// finish differ.
+	day := 1 + (pos % 28)
+	month := 5 + (execIdx % 8)
+	if month > 12 {
+		month = month - 12
+	}
+	hour := 8 + (pos % 8)
+	return fmt.Sprintf("2026-%02d-%02dT%02d:00:00Z", month, day, hour)
+}
+
+// demoTestRuns returns a deterministic slice of TestRun values for a demo
+// Test Execution, seeded from the demoContainersAndLinks membership for that
+// execution. Each run's status matches the demoRunStatuses cycle; FAIL runs
+// carry a defect key drawn from the demo bug pool so the cross-table story is
+// coherent (FAILed tests have defects).
+func demoTestRuns(execKey string) []TestRun {
+	execIdx := demoExecKeyIndex(execKey)
+	if execIdx < 0 {
+		// Key does not match the demo pattern (e.g. cross-project or sub-task
+		// exec): return no runs rather than synthesising noise.
+		return []TestRun{}
+	}
+	projectKey := demoExecProjectKey(execKey)
+	env := demoRunEnvironment(execIdx)
+
+	// Collect the test indices that belong to this exec (mirrors the
+	// demoContainersAndLinks loop: test i belongs to exec i%execCount).
+	var runs []TestRun
+	pos := 0
+	for i := execIdx; i < demoLinkedTests && i < demoTestCount; i += demoExecCount {
+		testNum := i + 1 // 1-based key suffix
+		testKey := fmt.Sprintf("%s-%d", projectKey, testNum)
+		status := demoRunStatuses[i%len(demoRunStatuses)]
+
+		started := demoRunDate(execIdx, pos)
+		finished := demoRunDate(execIdx, pos+1)
+		executor := demoExecExecutors[pos%len(demoExecExecutors)]
+
+		var defects []string
+		if status == "FAIL" {
+			// Derive a demo bug key consistent with demoBugs: bugs live in
+			// the BUGS or SUP project, numbered from 100. Use the test index
+			// modulo the total demo-bug count (12 summaries seeded).
+			bugProject := demoBugProject
+			if testNum%2 == 0 {
+				bugProject = demoBugProject2
+			}
+			defects = []string{fmt.Sprintf("%s-%d", bugProject, 100+(testNum%12))}
+		} else {
+			defects = []string{}
+		}
+
+		runs = append(runs, TestRun{
+			TestKey:     testKey,
+			Status:      status,
+			StartedAt:   started,
+			FinishedAt:  finished,
+			ExecutedBy:  executor,
+			Environment: env,
+			Defects:     defects,
+		})
+		pos++
+	}
+	return runs
+}
+
+// demoExecPlans returns the Test Plan key(s) associated with a demo Test
+// Execution. Each execution is linked to two consecutive plans (wrapping
+// around the plan pool) so the exec-plan link table has realistic data without
+// every exec touching every plan.
+func demoExecPlans(execKey string) []string {
+	execIdx := demoExecKeyIndex(execKey)
+	if execIdx < 0 {
+		return []string{}
+	}
+	projectKey := demoExecProjectKey(execKey)
+	// Two consecutive plan indices, wrapping around the pool.
+	p1 := execIdx % demoPlanCount
+	p2 := (execIdx + 1) % demoPlanCount
+	plan1 := fmt.Sprintf("%s-TP-%d", projectKey, p1+1)
+	plan2 := fmt.Sprintf("%s-TP-%d", projectKey, p2+1)
+	if plan1 == plan2 {
+		return []string{plan1}
+	}
+	return []string{plan1, plan2}
+}

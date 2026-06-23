@@ -1439,7 +1439,8 @@ func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlan
 // runStatusPriority ranks Test Run results so a Test appearing in several
 // executions consolidates to its worst (most attention-worthy) outcome.
 var runStatusPriority = map[string]int{
-	"FAIL":      5,
+	"FAIL":      6,
+	"BLOCKED":   5,
 	"ABORTED":   4,
 	"EXECUTING": 3,
 	"TODO":      2,

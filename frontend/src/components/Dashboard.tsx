@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   GetStatistics,
   ListFolders,
@@ -38,19 +39,17 @@ export function Dashboard({
   const [exportErr, setExportErr] = useState("");
 
   // Filter selections + their option lists, loaded from existing bindings.
-  const [folder, setFolder] = useState("");
-  const [component, setComponent] = useState("");
-  const [status, setStatus] = useState("");
+  const [folder, setFolder] = useViewState(profileId, "dashboard", "folder", "");
+  const [component, setComponent] = useViewState(profileId, "dashboard", "component", "");
+  const [status, setStatus] = useViewState(profileId, "dashboard", "status", "");
   const [folderOptions, setFolderOptions] = useState<testrepo.Folder[]>([]);
   const [componentOptions, setComponentOptions] = useState<Bucket[]>([]);
   const [statusOptions, setStatusOptions] = useState<string[]>([]);
   const hasFilter = folder !== "" || component !== "" || status !== "";
 
-  // Reset selections when the profile changes, then load the option lists.
+  // Load option lists when the profile changes. Selections are preserved via
+  // useViewState (keyed by profileId) so no explicit reset is needed here.
   useEffect(() => {
-    setFolder("");
-    setComponent("");
-    setStatus("");
     if (!profileId) return;
     let cancelled = false;
     ListFolders(profileId)

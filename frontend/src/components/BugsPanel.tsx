@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   ListBugsWithTests,
   ListTestsForBug,
   SyncBugs,
   CreateContainerAndAllocate,
+  ListContainers,
+  AllocateTests,
   BrowserOpenURL,
+  GetTestRunHistory,
   errMsg,
 } from "../api";
-import type { BugWithTests, BugTest } from "../api";
+import type { BugWithTests, BugTest, TestRunEntry, Container } from "../api";
+import { formatDateTime } from "../dates";
 import { Pager } from "./Pager";
 import { SortControl } from "./SortControl";
+import { TestDetail } from "./TestDetail";
 import { usePrompt } from "./usePrompt";
 import { keyCompare, cmpStr, applyDir } from "../sort";
 
@@ -40,25 +46,47 @@ function cmpBug(a: BugWithTests, b: BugWithTests, field: string): number {
 // test keys open the test detail.
 export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props) {
   const [bugs, setBugs] = useState<BugWithTests[]>([]);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useViewState(profileId, "bugs", "filter", "");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useViewState(profileId, "bugs", "selected", "");
   const [tests, setTests] = useState<BugTest[]>([]);
   // Checked bugs for the bulk "Create Test Execution" action. This is kept
   // independent of `selected` (the detail-pane row): ticking a checkbox must
   // not change which bug is shown in the detail pane, and vice versa.
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
-  const [page, setPage] = useState(0); // 0-based
-  const [pageSize, setPageSize] = useState(15);
-  const [sortField, setSortField] = useState("key");
-  const [sortDesc, setSortDesc] = useState(true);
+  // State for "Add tests to existing execution" modal.
+  const [addToExecOpen, setAddToExecOpen] = useState(false);
+  const [addToExecLoading, setAddToExecLoading] = useState(false);
+  const [addToExecExecs, setAddToExecExecs] = useState<Container[]>([]);
+  const [addToExecTarget, setAddToExecTarget] = useState("");
+  const [addToExecFilter, setAddToExecFilter] = useState("");
+  const [addToExecWorking, setAddToExecWorking] = useState(false);
+  const [addToExecError, setAddToExecError] = useState("");
+  const [page, setPage] = useViewState(profileId, "bugs", "page", 0); // 0-based
+  const [pageSize, setPageSize] = useViewState(profileId, "bugs", "pageSize", 15);
+  const [sortField, setSortField] = useViewState(profileId, "bugs", "sortField", "key");
+  const [sortDesc, setSortDesc] = useViewState(profileId, "bugs", "sortDesc", true);
   const [syncing, setSyncing] = useState(false);
   const { prompt, promptUI } = usePrompt();
   // Local refresh nonce: bumped after a bugs-only sync to re-pull the list
   // without forcing a full profile refresh.
   const [nonce, setNonce] = useState(0);
+
+  // In-view read-only test detail sidebar: detailKey is session-persisted so
+  // returning to the Bugs view restores the open detail; detailVersion is
+  // ephemeral (bumped to force a re-fetch on re-open).
+  const [detailKey, setDetailKey] = useViewState<string | null>(profileId, "bugs", "detailKey", null);
+  const [detailVersion, setDetailVersion] = useState(0);
+
+  // Ephemeral expand state for the affected-tests table. Not session-persisted
+  // because it's a transient drill-down, not a view preference.
+  const [expandedTests, setExpandedTests] = useState<Set<string>>(new Set());
+  // Cache for per-test run history fetched on first expand (keyed by test key).
+  const [runHistoryCache, setRunHistoryCache] = useState<Map<string, TestRunEntry[]>>(new Map());
+  // Set of test keys whose run history is currently loading.
+  const [runHistoryLoading, setRunHistoryLoading] = useState<Set<string>>(new Set());
 
   // syncBugs refreshes only the defect issues from Jira (partial sync), so the
   // Bugs panel can update without re-running preconditions / containers /
@@ -75,6 +103,34 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     } finally {
       setSyncing(false);
     }
+  }
+
+  // Toggle the run-history expand for a test row. Fetches history on first
+  // expand if not already cached.
+  function toggleTestExpand(testKey: string) {
+    setExpandedTests((prev) => {
+      const next = new Set(prev);
+      if (next.has(testKey)) {
+        next.delete(testKey);
+      } else {
+        next.add(testKey);
+        // Fetch history only if not already cached.
+        if (!runHistoryCache.has(testKey)) {
+          setRunHistoryLoading((l) => { const nl = new Set(l); nl.add(testKey); return nl; });
+          GetTestRunHistory(profileId, testKey)
+            .then((entries) => {
+              setRunHistoryCache((m) => new Map(m).set(testKey, entries ?? []));
+            })
+            .catch(() => {
+              setRunHistoryCache((m) => new Map(m).set(testKey, []));
+            })
+            .finally(() => {
+              setRunHistoryLoading((l) => { const nl = new Set(l); nl.delete(testKey); return nl; });
+            });
+        }
+      }
+      return next;
+    });
   }
 
   // Toggle a bug's checkbox without disturbing the detail-pane selection.
@@ -144,6 +200,50 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     }
   }
 
+  // Open the "Add tests to existing execution" modal: load the list of Test
+  // Executions then show the picker.
+  async function openAddToExec() {
+    if (unionTestKeys.length === 0) return;
+    setAddToExecOpen(true);
+    setAddToExecError("");
+    setAddToExecFilter("");
+    setAddToExecTarget("");
+    setAddToExecExecs([]);
+    setAddToExecLoading(true);
+    try {
+      const cs = await ListContainers(profileId, "testexec");
+      const list = cs ?? [];
+      setAddToExecExecs(list);
+      if (list.length > 0) setAddToExecTarget(list[0].key);
+    } catch (e) {
+      setAddToExecError(errMsg(e));
+    } finally {
+      setAddToExecLoading(false);
+    }
+  }
+
+  // Confirm: allocate the union test keys to the chosen execution.
+  async function confirmAddToExec() {
+    if (!addToExecTarget || unionTestKeys.length === 0) return;
+    setAddToExecWorking(true);
+    setAddToExecError("");
+    try {
+      const r = await AllocateTests(profileId, addToExecTarget, unionTestKeys);
+      const added = r.added.length;
+      const already = r.alreadyMembers.length;
+      setAddToExecOpen(false);
+      setNotice(
+        `Added ${added} test${added === 1 ? "" : "s"} to ${addToExecTarget}` +
+          (already > 0 ? ` (${already} already present).` : "."),
+      );
+      setChecked(new Set());
+    } catch (e) {
+      setAddToExecError(errMsg(e));
+    } finally {
+      setAddToExecWorking(false);
+    }
+  }
+
   useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
@@ -196,6 +296,12 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     }
   }, [shown, selected]);
 
+  // Clear the per-test expand state whenever the user switches to a different
+  // bug, so stale expansions from the previous selection don't carry over.
+  useEffect(() => {
+    setExpandedTests(new Set());
+  }, [selected]);
+
   // Load the affected tests (with run status) for the selected bug.
   useEffect(() => {
     if (!profileId || !selected) {
@@ -221,7 +327,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   const sel = bugs.find((b) => b.key === selected) ?? null;
 
   return (
-    <div className="bugs-md">
+    <div className={`bugs-md${detailKey ? " bugs-md-with-detail" : ""}`}>
       {promptUI}
       <div className="bugs-md-list">
         <div className="bugs-md-head">
@@ -247,6 +353,24 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
               : `Create Test Execution${
                   unionTestKeys.length > 0 ? ` (${unionTestKeys.length})` : ""
                 }`}
+          </button>
+          <button
+            className="btn"
+            onClick={openAddToExec}
+            disabled={unionTestKeys.length === 0}
+            title={
+              checked.size === 0
+                ? "Tick one or more bugs to add their linked tests to an existing Test Execution"
+                : unionTestKeys.length === 0
+                  ? "The checked bugs have no linked tests"
+                  : `Add the ${unionTestKeys.length} test${
+                      unionTestKeys.length === 1 ? "" : "s"
+                    } linked to the ${checked.size} checked bug${
+                      checked.size === 1 ? "" : "s"
+                    } to an existing Test Execution`
+            }
+          >
+            {`Add to execution${unionTestKeys.length > 0 ? ` (${unionTestKeys.length})` : ""}`}
           </button>
           <button
             className="btn"
@@ -371,45 +495,298 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
               <table className="board-table">
                 <thead>
                   <tr>
+                    <th style={{ width: "1.5rem" }} />
                     <th>Test</th>
+                    <th style={{ width: "1.5rem" }} />
+                    <th>Project</th>
                     <th>Summary</th>
                     <th>Status</th>
                     <th>Result</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {tests.map((t) => (
-                    <tr key={t.key}>
-                      <td>
-                        <button
-                          className="mono bug-link-key"
-                          onClick={() => onOpenTest(t.key)}
-                          title={`Open ${t.key}`}
-                        >
-                          {t.key}
-                        </button>
-                      </td>
-                      <td>{t.summary}</td>
-                      <td>{t.status || "—"}</td>
-                      <td>
-                        {t.runStatus ? (
-                          <span
-                            className={`run-badge run-${t.runStatus.toLowerCase()}`}
-                          >
-                            {t.runStatus}
-                          </span>
-                        ) : (
-                          <span className="muted">not run</span>
+                  {tests.map((t) => {
+                    const isExpanded = expandedTests.has(t.key);
+                    const isLoading = runHistoryLoading.has(t.key);
+                    const history = runHistoryCache.get(t.key);
+                    return (
+                      <Fragment key={t.key}>
+                        <tr>
+                          <td>
+                            <button
+                              className="btn-icon"
+                              title={isExpanded ? "Collapse run history" : "Expand run history"}
+                              onClick={() => toggleTestExpand(t.key)}
+                              style={{ fontSize: "0.75rem", padding: "0 0.25rem" }}
+                            >
+                              {isExpanded ? "▾" : "▸"}
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              className="mono bug-link-key"
+                              onClick={() => onOpenTest(t.key)}
+                              title={`Open ${t.key} in Browse`}
+                            >
+                              {t.key}
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              className="btn-icon"
+                              title={`Open ${t.key} detail here`}
+                              onClick={() => {
+                                setDetailKey(t.key);
+                                setDetailVersion((v) => v + 1);
+                              }}
+                              style={{ fontSize: "0.75rem", padding: "0 0.25rem" }}
+                            >
+                              ↗
+                            </button>
+                          </td>
+                          <td className="muted">{t.project || "—"}</td>
+                          <td>{t.summary}</td>
+                          <td>{t.status || "—"}</td>
+                          <td>
+                            {t.runStatus ? (
+                              <span
+                                className={`run-badge run-${t.runStatus.toLowerCase()}`}
+                              >
+                                {t.runStatus}
+                              </span>
+                            ) : (
+                              <span className="muted">not run</span>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={7} style={{ padding: "0.25rem 0.5rem 0.5rem 2rem", background: "var(--bg-subtle, #f8f8f8)" }}>
+                              {isLoading ? (
+                                <span className="muted">Loading run history…</span>
+                              ) : !history || history.length === 0 ? (
+                                <span className="muted">No run history for this test.</span>
+                              ) : (
+                                <table className="board-table" style={{ fontSize: "0.85em" }}>
+                                  <thead>
+                                    <tr>
+                                      <th>Execution</th>
+                                      <th>Result</th>
+                                      <th>Fix Version(s)</th>
+                                      <th>Plan(s)</th>
+                                      <th>Environment</th>
+                                      <th>Date</th>
+                                      <th>By</th>
+                                      <th>Defects</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {history.map((r, i) => (
+                                      <tr key={`${r.execKey}-${i}`}>
+                                        <td>
+                                          {canLink && r.execKey && !r.execKey.startsWith("NEW-") ? (
+                                            <button
+                                              className="mono bug-link-key"
+                                              onClick={() => {
+                                                const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
+                                                BrowserOpenURL(`${base}/browse/${r.execKey}`);
+                                              }}
+                                              title={r.execSummary || `Open ${r.execKey} in Jira`}
+                                            >
+                                              {r.execKey}
+                                            </button>
+                                          ) : (
+                                            <span className="mono" title={r.execSummary}>{r.execKey}</span>
+                                          )}
+                                          {r.execSummary && (
+                                            <span className="muted" style={{ display: "block", fontSize: "0.9em" }}>{r.execSummary}</span>
+                                          )}
+                                        </td>
+                                        <td>
+                                          {r.runStatus ? (
+                                            <span className={`run-badge run-${r.runStatus.toLowerCase()}`}>{r.runStatus}</span>
+                                          ) : (
+                                            <span className="muted">—</span>
+                                          )}
+                                        </td>
+                                        <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">—</span>}</td>
+                                        <td>{r.planKeys?.length ? r.planKeys.join(", ") : <span className="muted">—</span>}</td>
+                                        <td>{r.environment || <span className="muted">—</span>}</td>
+                                        <td className="muted">{formatDateTime(r.finishedAt || r.startedAt)}</td>
+                                        <td>{r.executedBy || <span className="muted">—</span>}</td>
+                                        <td>
+                                          {r.defects?.length ? (
+                                            <span>
+                                              {r.defects.map((d, di) => (
+                                                <span key={d}>
+                                                  {di > 0 && ", "}
+                                                  {canLink && !d.startsWith("NEW-") ? (
+                                                    <button
+                                                      className="mono bug-link-key"
+                                                      onClick={() => {
+                                                        const base = (jiraUrl ?? "").trim().replace(/\/+$/, "");
+                                                        BrowserOpenURL(`${base}/browse/${d}`);
+                                                      }}
+                                                      title={`Open ${d} in Jira`}
+                                                    >
+                                                      {d}
+                                                    </button>
+                                                  ) : (
+                                                    <span className="mono">{d}</span>
+                                                  )}
+                                                </span>
+                                              ))}
+                                            </span>
+                                          ) : (
+                                            <span className="muted">—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
           </>
         )}
       </div>
+
+      {detailKey && (
+        <TestDetail
+          profileId={profileId}
+          testKey={detailKey}
+          version={detailVersion}
+          pendingForTest={[]}
+          folders={[]}
+          jiraUrl={jiraUrl}
+          readOnly
+          onClose={() => setDetailKey(null)}
+          onEdited={() => {}}
+        />
+      )}
+
+      {addToExecOpen && (
+        <div className="modal-overlay" onClick={() => !addToExecWorking && setAddToExecOpen(false)}>
+          <div className="modal bulk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="pending-head">
+              <h2>
+                Add to Test Execution ({unionTestKeys.length}{" "}
+                {unionTestKeys.length === 1 ? "test" : "tests"})
+              </h2>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setAddToExecOpen(false)}
+                disabled={addToExecWorking}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="bulk-body">
+              {addToExecLoading ? (
+                <p className="muted">Loading Test Executions…</p>
+              ) : addToExecExecs.length === 0 && !addToExecError ? (
+                <p className="muted">
+                  No Test Executions found. Sync containers first, or create a
+                  new execution with "Create Test Execution".
+                </p>
+              ) : (
+                <>
+                  <label className="bulk-row">
+                    <span>Filter</span>
+                    <input
+                      className="search"
+                      placeholder="Filter by key or summary…"
+                      value={addToExecFilter}
+                      onChange={(e) => {
+                        setAddToExecFilter(e.target.value);
+                        // Reset target to first match when filter changes.
+                        const f = e.target.value.trim().toLowerCase();
+                        const filtered = !f
+                          ? addToExecExecs
+                          : addToExecExecs.filter(
+                              (c) =>
+                                c.key.toLowerCase().includes(f) ||
+                                c.summary.toLowerCase().includes(f),
+                            );
+                        setAddToExecTarget(filtered.length > 0 ? filtered[0].key : "");
+                      }}
+                    />
+                  </label>
+                  {(() => {
+                    const f = addToExecFilter.trim().toLowerCase();
+                    const filtered = !f
+                      ? addToExecExecs
+                      : addToExecExecs.filter(
+                          (c) =>
+                            c.key.toLowerCase().includes(f) ||
+                            c.summary.toLowerCase().includes(f),
+                        );
+                    return (
+                      <label className="bulk-row">
+                        <span>Execution</span>
+                        {filtered.length === 0 ? (
+                          <span className="muted">No executions match the filter.</span>
+                        ) : (
+                          <select
+                            value={addToExecTarget}
+                            onChange={(e) => setAddToExecTarget(e.target.value)}
+                          >
+                            {filtered.map((c) => (
+                              <option key={c.key} value={c.key}>
+                                {c.key} — {c.summary}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
+                    );
+                  })()}
+                  <p className="muted bulk-preview">
+                    The {unionTestKeys.length} affected test
+                    {unionTestKeys.length === 1 ? "" : "s"} from the checked
+                    bugs will be added to the chosen execution. Tests already in
+                    it are skipped. Changes are queued locally; commit them from
+                    the Pending list.
+                  </p>
+                </>
+              )}
+              {addToExecError && (
+                <div className="error-text">{addToExecError}</div>
+              )}
+            </div>
+            <div className="pending-actions">
+              <button
+                className="btn"
+                onClick={() => setAddToExecOpen(false)}
+                disabled={addToExecWorking}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={confirmAddToExec}
+                disabled={
+                  addToExecWorking ||
+                  addToExecLoading ||
+                  !addToExecTarget ||
+                  unionTestKeys.length === 0
+                }
+              >
+                {addToExecWorking ? "Working…" : "Add to Execution"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

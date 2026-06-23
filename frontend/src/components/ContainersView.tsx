@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   ListContainers,
   GetContainerBoard,
@@ -16,9 +17,11 @@ import {
   ExportPytest,
   SyncContainers,
   BrowserOpenURL,
+  GetExecutionMembersWithRuns,
+  GetRunRollup,
   errMsg,
 } from "../api";
-import type { Container, TestPlanBoard, Bucket, Bug } from "../api";
+import type { Container, TestPlanBoard, Bucket, Bug, ExecMemberRun, RunRollup } from "../api";
 import { SortControl } from "./SortControl";
 import { SearchableSelect } from "./SearchableSelect";
 import { keyCompare, cmpStr, applyDir } from "../sort";
@@ -26,6 +29,7 @@ import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
 import { BugsPanel } from "./BugsPanel";
 import { CreateBugModal } from "./CreateBugModal";
+import { TestDetail } from "./TestDetail";
 import { usePrompt } from "./usePrompt";
 import { useConfirm } from "./useConfirm";
 import { useNotice } from "./useNotice";
@@ -62,15 +66,15 @@ export function ContainersView({
   jiraUrl,
   onOpenTest,
 }: Props) {
-  const [kind, setKind] = useState("testplan");
-  const [cStatus, setCStatus] = useState("");
+  const [kind, setKind] = useViewState(profileId, "containers", "kind", "testplan");
+  const [cStatus, setCStatus] = useViewState(profileId, "containers", "cStatus", "");
   // Execution-type filter (Test Execution kind only): "" = all, "standalone", "subtask".
-  const [cExecType, setCExecType] = useState("");
+  const [cExecType, setCExecType] = useViewState(profileId, "containers", "cExecType", "");
   // Environment filter (Test Execution kind only): "" = any; otherwise keep only
   // executions whose environments array contains the value (mirrors
   // ContainerQuery.Environment server-side, applied client-side here since the
   // environments are already loaded on each container).
-  const [cEnv, setCEnv] = useState("");
+  const [cEnv, setCEnv] = useViewState(profileId, "containers", "cEnv", "");
   // Inline environment editor (selected execution): a draft of a new env name.
   const [envDraft, setEnvDraft] = useState("");
   // Batch environment editor (all currently-filtered executions): chosen
@@ -78,14 +82,14 @@ export function ContainersView({
   const [batchEnvOp, setBatchEnvOp] = useState<"add_env" | "remove_env" | "set_env">("add_env");
   const [batchEnvName, setBatchEnvName] = useState("");
   const [batchEnvBusy, setBatchEnvBusy] = useState(false);
-  const [cSortField, setCSortField] = useState("key");
-  const [cSortDesc, setCSortDesc] = useState(false);
+  const [cSortField, setCSortField] = useViewState(profileId, "containers", "cSortField", "key");
+  const [cSortDesc, setCSortDesc] = useViewState(profileId, "containers", "cSortDesc", false);
   const [rowSortField, setRowSortField] = useState("key");
   const [rowSortDesc, setRowSortDesc] = useState(false);
   const [containers, setContainers] = useState<Container[]>([]);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useViewState(profileId, "containers", "selected", "");
   const [bugFor, setBugFor] = useState<{ testKey: string; summary: string } | null>(null);
-  const [mode, setMode] = useState<"containers" | "bugs">("containers");
+  const [mode, setMode] = useViewState<"containers" | "bugs">(profileId, "containers", "mode", "containers");
   const [board, setBoard] = useState<TestPlanBoard | null>(null);
   // Related defects reached through the selected container's member Tests
   // (including bugs reached only via a cross-project member, #219).
@@ -102,9 +106,20 @@ export function ContainersView({
   const [nameDraft, setNameDraft] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [boardPage, setBoardPage] = useState(0);
+  // Run details for the selected Test Execution's member rows (keyed by testKey).
+  const [memberRuns, setMemberRuns] = useState<Map<string, ExecMemberRun>>(new Map());
+  // Run roll-up for the selected Test Plan / Test Set.
+  const [rollup, setRollup] = useState<RunRollup | null>(null);
   const { prompt, promptUI } = usePrompt();
   const { confirm, confirmUI } = useConfirm();
   const { notice, noticeUI } = useNotice();
+
+  // In-view read-only test detail sidebar for Test Execution member rows:
+  // detailKey is session-persisted so the panel restores on returning to this
+  // view; detailVersion is ephemeral and bumped on each open to force a
+  // re-fetch even when reopening the same test.
+  const [detailKey, setDetailKey] = useViewState<string | null>(profileId, "containers", "detailKey", null);
+  const [detailVersion, setDetailVersion] = useState(0);
 
   // Member tables can be long (an Execution may hold hundreds of tests), so the
   // board is paged client-side. The page size is user-selectable; default 15.
@@ -530,6 +545,50 @@ export function ContainersView({
     };
   }, [profileId, selected, refreshKey]);
 
+  // Fetch run details for the selected Test Execution's member tests. The map
+  // is keyed by testKey so the table can look up context per row without
+  // replacing the board data that drives the editable run-result control.
+  useEffect(() => {
+    if (!profileId || !selected || kind !== "testexec") {
+      setMemberRuns(new Map());
+      return;
+    }
+    let cancelled = false;
+    GetExecutionMembersWithRuns(profileId, selected)
+      .then((runs) => {
+        if (cancelled) return;
+        const m = new Map<string, ExecMemberRun>();
+        for (const r of runs ?? []) m.set(r.testKey, r);
+        setMemberRuns(m);
+      })
+      .catch(() => {
+        if (!cancelled) setMemberRuns(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, selected, kind, refreshKey]);
+
+  // Fetch the run roll-up for the selected Test Plan / Test Set. Not used for
+  // Test Executions (they show per-row run detail instead).
+  useEffect(() => {
+    if (!profileId || !selected || kind === "testexec") {
+      setRollup(null);
+      return;
+    }
+    let cancelled = false;
+    GetRunRollup(profileId, selected)
+      .then((r) => {
+        if (!cancelled) setRollup(r ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setRollup(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, selected, kind, refreshKey]);
+
   // Client-side paging of the member table.
   const allRows = useMemo(() => {
     const rows = board?.rows ?? [];
@@ -564,7 +623,8 @@ export function ContainersView({
   );
 
   return (
-    <div className={`board${mode === "bugs" ? " board--bugs" : ""}`}>
+    <div className={`board${mode === "bugs" ? " board--bugs" : ""}${detailKey && kind === "testexec" && mode !== "bugs" ? " board--with-exec-detail" : ""}`}>
+      <div className="board-exec-body">
       <div className="containers-mode">
         <button
           className={`seg-btn${mode === "containers" ? " seg-btn-active" : ""}`}
@@ -944,6 +1004,35 @@ export function ContainersView({
             </div>
           )}
 
+          {/* Roll-up summary bar across all executions, for plans and sets. */}
+          {kind !== "testexec" && rollup && rollup.total > 0 && (
+            <div className="container-rollup">
+              <span className="container-rollup-label">
+                Run roll-up across {rollup.execCount} execution{rollup.execCount === 1 ? "" : "s"}
+              </span>
+              <div className="board-counts">
+                {rollup.passed > 0 && (
+                  <RunBadge status="PASS" count={rollup.passed} />
+                )}
+                {rollup.failed > 0 && (
+                  <RunBadge status="FAIL" count={rollup.failed} />
+                )}
+                {rollup.executing > 0 && (
+                  <RunBadge status="EXECUTING" count={rollup.executing} />
+                )}
+                {rollup.aborted > 0 && (
+                  <RunBadge status="ABORTED" count={rollup.aborted} />
+                )}
+                {rollup.blocked > 0 && (
+                  <RunBadge status="BLOCKED" count={rollup.blocked} />
+                )}
+                {rollup.notRun > 0 && (
+                  <RunBadge status="(not run)" count={rollup.notRun} />
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Related defects reached through this container's member Tests -
               shown for executions, or for any container that has linked bugs.
               Surfaces a bug that reaches this execution only via a cross-project
@@ -1072,15 +1161,18 @@ export function ContainersView({
               >
                 Execution{rowSortIndicator("result")}
               </th>
+              {kind === "testexec" && <th title="Run date (finished or started)">Date</th>}
+              {kind === "testexec" && <th title="Executed by">By</th>}
+              {kind === "testexec" && <th title="Environment">Environment</th>}
               <th aria-label="Remove" />
             </tr>
           </thead>
           <tbody>
             {allRows.length === 0 ? (
               <tr>
-                <td colSpan={kind === "testexec" ? 6 : 5} className="muted">
-                  This {kindLabel.toLowerCase()} has no tests yet — use “+ Add
-                  tests”.
+                <td colSpan={kind === "testexec" ? 9 : 5} className="muted">
+                  This {kindLabel.toLowerCase()} has no tests yet — use "+ Add
+                  tests".
                 </td>
               </tr>
             ) : (
@@ -1107,6 +1199,19 @@ export function ContainersView({
                       >
                         ext
                       </span>
+                    )}
+                    {kind === "testexec" && (
+                      <button
+                        className="btn-icon"
+                        title={`Open ${r.testKey} detail here`}
+                        onClick={() => {
+                          setDetailKey(r.testKey);
+                          setDetailVersion((v) => v + 1);
+                        }}
+                        style={{ fontSize: "0.75rem", padding: "0 0.25rem", marginLeft: "0.25rem" }}
+                      >
+                        ↗
+                      </button>
                     )}
                   </td>
                   <td>{r.summary}</td>
@@ -1136,6 +1241,9 @@ export function ContainersView({
                       <span className="muted">not run</span>
                     )}
                   </td>
+                  {kind === "testexec" && (
+                    <ExecRunCells run={memberRuns.get(r.testKey)} />
+                  )}
                   <td className="board-remove-cell">
                     {kind === "testexec" &&
                       /^fail/i.test(r.runStatus || "") && (
@@ -1244,7 +1352,56 @@ export function ContainersView({
       {promptUI}
       {confirmUI}
       {noticeUI}
+      </div>
+
+      {detailKey && kind === "testexec" && mode !== "bugs" && (
+        <TestDetail
+          profileId={profileId}
+          testKey={detailKey}
+          version={detailVersion}
+          pendingForTest={[]}
+          folders={[]}
+          jiraUrl={jiraUrl ?? ""}
+          readOnly
+          onClose={() => setDetailKey(null)}
+          onEdited={() => {}}
+        />
+      )}
     </div>
+  );
+}
+
+// ExecRunCells renders the three read-only run-context cells (Date, By,
+// Environment) for one member row in a Test Execution. Rendered as a fragment
+// so the cells sit inline in the <tr> alongside the editable result cell.
+function ExecRunCells({ run }: { run: ExecMemberRun | undefined }) {
+  const dateStr = run?.finishedAt || run?.startedAt || "";
+  return (
+    <>
+      <td className="muted board-run-date">
+        {dateStr ? formatRunDate(dateStr) : "—"}
+      </td>
+      <td className="muted board-run-by">
+        {run?.executedBy || "—"}
+      </td>
+      <td className="muted board-run-env">
+        {run?.environment || "—"}
+      </td>
+    </>
+  );
+}
+
+// formatRunDate formats an ISO date/time string to a compact local date+time
+// string (YYYY-MM-DD HH:MM), matching the pattern used elsewhere in the app
+// (e.g. TestDetail run-history rows). Returns "" for empty/invalid input.
+function formatRunDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
   );
 }
 

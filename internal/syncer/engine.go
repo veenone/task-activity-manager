@@ -3,6 +3,7 @@ package syncer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -357,6 +358,58 @@ func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey strin
 	// ADDITIVELY (UpsertBugs/UpsertBugLinks) so the bugs syncBugs already wrote are
 	// not clobbered (#219). Best-effort: log and swallow.
 	e.harvestExternalBugs(profileID, basics)
+
+	// Fetch test runs and exec-plan associations for every Test Execution. This
+	// is best-effort: a failed fetch for one execution is logged and skipped so a
+	// single bad execution cannot abort the whole container sync.
+	for _, c := range containers {
+		if c.Kind != jira.KindTestExec {
+			continue
+		}
+		execKey := c.Key
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		runs, err := e.client.GetTestRuns(ctx, execKey)
+		if err != nil {
+			log.Printf("xtm: get test runs for %s: %v (skipping)", execKey, err)
+		} else {
+			rows := make([]testrepo.TestRunRow, 0, len(runs))
+			for _, tr := range runs {
+				defectsJSON := "[]"
+				if len(tr.Defects) > 0 {
+					b, jerr := json.Marshal(tr.Defects)
+					if jerr == nil {
+						defectsJSON = string(b)
+					}
+				}
+				rows = append(rows, testrepo.TestRunRow{
+					ExecKey:     execKey,
+					TestKey:     tr.TestKey,
+					RunStatus:   tr.Status,
+					StartedAt:   tr.StartedAt,
+					FinishedAt:  tr.FinishedAt,
+					ExecutedBy:  tr.ExecutedBy,
+					Environment: tr.Environment,
+					Defects:     defectsJSON,
+				})
+			}
+			if err := e.repo.ReplaceRunsForExec(profileID, execKey, rows); err != nil {
+				log.Printf("xtm: store test runs for %s: %v (skipping)", execKey, err)
+			}
+		}
+
+		plans, err := e.client.ExecPlans(ctx, execKey)
+		if err != nil {
+			log.Printf("xtm: get exec plans for %s: %v (skipping)", execKey, err)
+		} else if len(plans) > 0 {
+			if err := e.repo.ReplaceExecPlans(profileID, execKey, plans); err != nil {
+				log.Printf("xtm: store exec plans for %s: %v (skipping)", execKey, err)
+			}
+		}
+	}
+
 	return nil
 }
 

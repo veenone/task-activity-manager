@@ -32,6 +32,7 @@ import {
   MoveTestToFolder,
   BrowserOpenURL,
   GetTestBugs,
+  GetTestRunHistory,
   errMsg,
 } from "../api";
 import type {
@@ -49,6 +50,7 @@ import type {
   JiraStepInfo,
   TestMeta,
   TestBug,
+  TestRunEntry,
 } from "../api";
 
 import { usePrompt } from "./usePrompt";
@@ -77,6 +79,10 @@ interface Props {
   // Optional: omitted where the panel is a read-only slide-over, which hides
   // the Clone action.
   onCloned?: (tempKey: string) => void;
+  // When true, all editing controls are hidden and every mutating handler
+  // short-circuits. Read display (fields, steps, preconditions, requirements,
+  // custom fields, bugs, run history) remains fully functional.
+  readOnly?: boolean;
 }
 
 type EditableField =
@@ -99,6 +105,7 @@ export function TestDetail({
   onClose,
   onEdited,
   onCloned,
+  readOnly,
 }: Props) {
   const { prompt, promptUI } = usePrompt();
   const { confirm, confirmUI } = useConfirm();
@@ -178,6 +185,9 @@ export function TestDetail({
   // panel is empty but Jira actually has steps (a load/shape problem), so the
   // user doesn't add a blank step that Xray rejects.
   const [jiraStepInfo, setJiraStepInfo] = useState<JiraStepInfo | null>(null);
+  const [runHistory, setRunHistory] = useState<TestRunEntry[] | null>(null);
+  const [runHistoryLoading, setRunHistoryLoading] = useState(false);
+  const [runHistoryError, setRunHistoryError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState("");
@@ -285,6 +295,22 @@ export function TestDetail({
             if (!cancelled) setMeta(m);
           })
           .catch((e) => console.error("test meta:", errMsg(e)));
+        // Run history loads lazily from the local store — one row per
+        // execution run that included this test. Clear on key/version change
+        // so a refreshed test reloads the latest runs.
+        setRunHistory(null);
+        setRunHistoryLoading(true);
+        setRunHistoryError("");
+        GetTestRunHistory(profileId, testKey)
+          .then((rh) => {
+            if (!cancelled) setRunHistory(rh ?? []);
+          })
+          .catch((e) => {
+            if (!cancelled) setRunHistoryError(errMsg(e));
+          })
+          .finally(() => {
+            if (!cancelled) setRunHistoryLoading(false);
+          });
       })
       .catch((e) => {
         if (!cancelled) setError(errMsg(e));
@@ -298,6 +324,7 @@ export function TestDetail({
   }, [profileId, testKey, version]);
 
   async function saveField(field: EditableField, value: string) {
+    if (readOnly) return;
     if (!test) return;
 
     let backendValue: string;
@@ -378,6 +405,7 @@ export function TestDetail({
   // deallocateContainer removes this test from a Test Set / Plan / Execution
   // (FR-3.4–3.6) and refreshes the membership list.
   async function deallocateContainer(containerKey: string) {
+    if (readOnly) return;
     if (
       !(await confirm({
         title: "Remove from container",
@@ -400,6 +428,7 @@ export function TestDetail({
   // moveToFolder relocates the test in the Test Repository (FR-13.3). The new
   // folder is reflected locally so the next diff works, then queued for commit.
   async function moveToFolder(folderId: string) {
+    if (readOnly) return;
     if (!test || folderId === test.folderId) return;
     setSaveError("");
     try {
@@ -414,6 +443,7 @@ export function TestDetail({
   // applyRequirements replaces the test's covered-requirement set and refreshes
   // the displayed list. The link changes commit as Jira issue links.
   async function applyRequirements(nextKeys: string[]) {
+    if (readOnly) return;
     setSaveError("");
     try {
       await SetTestRequirements(profileId, testKey, nextKeys);
@@ -430,6 +460,7 @@ export function TestDetail({
   // applyRequirements once, so it coalesces into one pending change
   // (RND_P_4TFINT_05-224).
   function addRequirements(keys: string[]) {
+    if (readOnly) return;
     const linked = new Set(requirements.map((r) => r.key));
     const additions = keys.filter((k) => k && !linked.has(k));
     if (additions.length === 0) return;
@@ -437,6 +468,7 @@ export function TestDetail({
   }
 
   async function removeRequirement(key: string) {
+    if (readOnly) return;
     if (
       !(await confirm({
         title: "Unlink requirement",
@@ -451,6 +483,7 @@ export function TestDetail({
   // applyPreconditions replaces the test's precondition set, then refreshes the
   // displayed list from the store (FR-13.5). Add/remove both route here.
   async function applyPreconditions(nextKeys: string[]) {
+    if (readOnly) return;
     setSaveError("");
     try {
       await SetTestPreconditions(profileId, testKey, nextKeys);
@@ -463,6 +496,7 @@ export function TestDetail({
   }
 
   async function removePrecondition(key: string) {
+    if (readOnly) return;
     if (
       !(await confirm({
         title: "Unlink precondition",
@@ -481,6 +515,7 @@ export function TestDetail({
   // applyPreconditions once, so it coalesces into one pending change
   // (RND_P_4TFINT_05-224).
   function addPreconditions(keys: string[]) {
+    if (readOnly) return;
     const linked = new Set(preconditions.map((p) => p.key));
     const additions = keys.filter((k) => k && !linked.has(k));
     if (additions.length === 0) return;
@@ -491,6 +526,7 @@ export function TestDetail({
   // and links it to this test. It gets a temporary key until commit creates
   // the issue in Jira.
   async function createAndAssociatePrecondition() {
+    if (readOnly) return;
     const summary = await prompt({
       title: "New precondition",
       placeholder: "Precondition summary",
@@ -512,6 +548,7 @@ export function TestDetail({
   // it with a temporary id; the user fills the fields in place (each blur
   // folds into the queued create) and it lands in Jira on commit.
   async function addStep() {
+    if (readOnly) return;
     setSaveError("");
     try {
       const s = await AddTestStep(profileId, testKey, "", "", "");
@@ -525,6 +562,7 @@ export function TestDetail({
   // cloneThisTest drafts a new local test copying this one's fields and steps
   // (RND_P_4TFINT_05-206), then opens the fresh draft in the detail panel.
   async function cloneThisTest() {
+    if (readOnly) return;
     setCloning(true);
     setSaveError("");
     try {
@@ -541,6 +579,7 @@ export function TestDetail({
   // clones its action/data/expected. The copy is a new queued step the user can
   // reorder; it lands in Jira on commit like any added step.
   async function duplicateStep(step: Step) {
+    if (readOnly) return;
     setSaveError("");
     try {
       const s = step.calledTestKey
@@ -557,6 +596,7 @@ export function TestDetail({
   // (FR-2.5). The reorder is a single test-level pending change; on failure we
   // roll the local list back so the UI matches what was actually saved.
   async function moveStep(index: number, dir: "up" | "down") {
+    if (readOnly) return;
     const target = dir === "up" ? index - 1 : index + 1;
     if (target < 0 || target >= steps.length) return;
     const previous = steps;
@@ -581,6 +621,7 @@ export function TestDetail({
   // the local write, we re-query for the transitions available from the new
   // status so the next pick reflects the post-transition workflow position.
   async function applyTransition(targetStatus: string) {
+    if (readOnly) return;
     if (!test || !targetStatus) return;
     setSaveError("");
     try {
@@ -610,6 +651,7 @@ export function TestDetail({
   // setVerdict records (or clears) a review verdict (test review). The reviewer
   // name is remembered across tests via localStorage.
   async function setVerdict(verdict: string) {
+    if (readOnly) return;
     const who = reviewer.trim();
     localStorage.setItem(REVIEWER_KEY, who);
     setSaveError("");
@@ -657,7 +699,7 @@ export function TestDetail({
           )}
         </div>
         <div className="detail-head-actions">
-          {onCloned && !testKey.startsWith("NEW-") && (
+          {!readOnly && onCloned && !testKey.startsWith("NEW-") && (
             <button
               className="btn btn-ghost detail-clone"
               onClick={cloneThisTest}
@@ -696,13 +738,17 @@ export function TestDetail({
           <div className="field-label">
             Summary {isDirty("summary") && <DirtyDot />}
           </div>
-          <input
-            className="detail-input"
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            onBlur={() => saveField("summary", summary)}
-            spellCheck
-          />
+          {readOnly ? (
+            <p className="detail-input detail-input-static">{summary}</p>
+          ) : (
+            <input
+              className="detail-input"
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              onBlur={() => saveField("summary", summary)}
+              spellCheck
+            />
+          )}
 
           <dl className="detail-fields">
             <dt>
@@ -711,7 +757,7 @@ export function TestDetail({
             <dd>
               <div className="status-row">
                 <span className="status-pill">{test.status || "—"}</span>
-                {transitions.length > 0 && (
+                {!readOnly && transitions.length > 0 && (
                   <select
                     className="transition-select"
                     value=""
@@ -734,46 +780,58 @@ export function TestDetail({
               Priority {isDirty("priority") && <DirtyDot />}
             </dt>
             <dd>
-              <input
-                className="detail-input detail-input-inline"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                onBlur={() => saveField("priority", priority)}
-              />
+              {readOnly ? (
+                <span>{priority || "—"}</span>
+              ) : (
+                <input
+                  className="detail-input detail-input-inline"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  onBlur={() => saveField("priority", priority)}
+                />
+              )}
             </dd>
 
             <dt>
               Labels {isDirty("labels") && <DirtyDot />}
             </dt>
             <dd>
-              <input
-                className="detail-input detail-input-inline"
-                value={labels}
-                onChange={(e) => setLabels(e.target.value)}
-                onBlur={() => saveField("labels", labels)}
-                placeholder="space-separated"
-              />
+              {readOnly ? (
+                <span>{labels || "—"}</span>
+              ) : (
+                <input
+                  className="detail-input detail-input-inline"
+                  value={labels}
+                  onChange={(e) => setLabels(e.target.value)}
+                  onBlur={() => saveField("labels", labels)}
+                  placeholder="space-separated"
+                />
+              )}
             </dd>
 
             <dt>
               Execution type {isDirty("exec_type") && <DirtyDot />}
             </dt>
             <dd>
-              <select
-                className="detail-input detail-input-inline"
-                value={execType}
-                onChange={(e) => {
-                  setExecType(e.target.value);
-                  saveField("exec_type", e.target.value);
-                }}
-              >
-                <option value="">—</option>
-                {EXEC_TYPE_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
+              {readOnly ? (
+                <span>{execType || "—"}</span>
+              ) : (
+                <select
+                  className="detail-input detail-input-inline"
+                  value={execType}
+                  onChange={(e) => {
+                    setExecType(e.target.value);
+                    saveField("exec_type", e.target.value);
+                  }}
+                >
+                  <option value="">—</option>
+                  {EXEC_TYPE_OPTIONS.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              )}
             </dd>
 
             {folders.length > 0 && (
@@ -782,18 +840,22 @@ export function TestDetail({
                   Folder {isDirty("folder") && <DirtyDot />}
                 </dt>
                 <dd>
-                  <select
-                    className="detail-input detail-input-inline"
-                    value={test.folderId}
-                    onChange={(e) => moveToFolder(e.target.value)}
-                  >
-                    <option value="">(repository root)</option>
-                    {folders.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.id}
-                      </option>
-                    ))}
-                  </select>
+                  {readOnly ? (
+                    <span>{test.folderId || "(repository root)"}</span>
+                  ) : (
+                    <select
+                      className="detail-input detail-input-inline"
+                      value={test.folderId}
+                      onChange={(e) => moveToFolder(e.target.value)}
+                    >
+                      <option value="">(repository root)</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.id}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </dd>
               </>
             )}
@@ -832,44 +894,48 @@ export function TestDetail({
                 </span>
               )}
             </div>
-            <input
-              className="detail-input detail-input-inline review-reviewer"
-              value={reviewer}
-              onChange={(e) => setReviewer(e.target.value)}
-              placeholder="Reviewer name"
-            />
-            <input
-              className="detail-input detail-input-inline review-note"
-              value={reviewNote}
-              onChange={(e) => setReviewNote(e.target.value)}
-              placeholder="Review note (optional)"
-            />
-            <div className="review-actions">
-              <button
-                className="btn review-approve"
-                onClick={() => setVerdict("approved")}
-              >
-                Approve
-              </button>
-              <button
-                className="btn review-reject"
-                onClick={() => setVerdict("rejected")}
-              >
-                Reject
-              </button>
-              <button className="btn" onClick={() => setVerdict("pending")}>
-                Pending
-              </button>
-              {review?.verdict && (
-                <button
-                  className="btn btn-ghost review-clear"
-                  onClick={() => setVerdict("")}
-                  title="Clear the review"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+            {!readOnly && (
+              <>
+                <input
+                  className="detail-input detail-input-inline review-reviewer"
+                  value={reviewer}
+                  onChange={(e) => setReviewer(e.target.value)}
+                  placeholder="Reviewer name"
+                />
+                <input
+                  className="detail-input detail-input-inline review-note"
+                  value={reviewNote}
+                  onChange={(e) => setReviewNote(e.target.value)}
+                  placeholder="Review note (optional)"
+                />
+                <div className="review-actions">
+                  <button
+                    className="btn review-approve"
+                    onClick={() => setVerdict("approved")}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    className="btn review-reject"
+                    onClick={() => setVerdict("rejected")}
+                  >
+                    Reject
+                  </button>
+                  <button className="btn" onClick={() => setVerdict("pending")}>
+                    Pending
+                  </button>
+                  {review?.verdict && (
+                    <button
+                      className="btn btn-ghost review-clear"
+                      onClick={() => setVerdict("")}
+                      title="Clear the review"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
             </>
           )}
@@ -885,6 +951,7 @@ export function TestDetail({
                     testKey={testKey}
                     field={f}
                     pendingForTest={pendingForTest}
+                    readOnly={readOnly}
                     onLocalChange={(value) =>
                       setCustomFields((prev) =>
                         prev.map((p) =>
@@ -911,41 +978,44 @@ export function TestDetail({
                   key={p.key}
                   profileId={profileId}
                   precondition={p}
+                  readOnly={readOnly}
                   onRemove={removePrecondition}
                   onEdited={onEdited}
                 />
               ))}
             </ul>
           )}
-          <div className="pre-add pre-add-row">
-            <MultiAddSelect
-              placeholder="+ Add precondition…"
-              onAdd={addPreconditions}
-              options={allPreconditions
-                .filter((p) => !preconditions.some((lp) => lp.key === p.key))
-                .map((p) => ({
-                  value: p.key,
-                  label: `${p.key} — ${p.summary}`,
-                }))}
-            />
-            <button
-              type="button"
-              className="btn btn-ghost pre-add-new"
-              onClick={createAndAssociatePrecondition}
-              title="Create a brand-new precondition and link it"
-            >
-              ＋ New
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost pre-add-new"
-              onClick={() => setSwapKind("precondition")}
-              disabled={preconditions.length === 0 && allPreconditions.length === 0}
-              title="Swap preconditions: remove some and add others in one apply"
-            >
-              ⇄ Swap
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="pre-add pre-add-row">
+              <MultiAddSelect
+                placeholder="+ Add precondition…"
+                onAdd={addPreconditions}
+                options={allPreconditions
+                  .filter((p) => !preconditions.some((lp) => lp.key === p.key))
+                  .map((p) => ({
+                    value: p.key,
+                    label: `${p.key} — ${p.summary}`,
+                  }))}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost pre-add-new"
+                onClick={createAndAssociatePrecondition}
+                title="Create a brand-new precondition and link it"
+              >
+                ＋ New
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost pre-add-new"
+                onClick={() => setSwapKind("precondition")}
+                disabled={preconditions.length === 0 && allPreconditions.length === 0}
+                title="Swap preconditions: remove some and add others in one apply"
+              >
+                ⇄ Swap
+              </button>
+            </div>
+          )}
 
           {(() => {
             const sets = containers.filter((c) => c.kind === "testset");
@@ -965,6 +1035,7 @@ export function TestDetail({
                   <ContainerSection
                     title="Test Sets"
                     items={sets}
+                    readOnly={readOnly}
                     onRemove={deallocateContainer}
                   />
                 )}
@@ -972,6 +1043,7 @@ export function TestDetail({
                   <ContainerSection
                     title="Test Plans"
                     items={plans}
+                    readOnly={readOnly}
                     onRemove={deallocateContainer}
                   />
                 )}
@@ -980,6 +1052,7 @@ export function TestDetail({
                     title="Test Executions"
                     items={execs}
                     showRunStatus
+                    readOnly={readOnly}
                     onRemove={deallocateContainer}
                   />
                 )}
@@ -1004,38 +1077,42 @@ export function TestDetail({
                       {rq.status}
                     </span>
                   )}
-                  <button
-                    className="btn btn-ghost pre-remove"
-                    onClick={() => removeRequirement(rq.key)}
-                    title="Unlink this requirement"
-                  >
-                    ✕
-                  </button>
+                  {!readOnly && (
+                    <button
+                      className="btn btn-ghost pre-remove"
+                      onClick={() => removeRequirement(rq.key)}
+                      title="Unlink this requirement"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           )}
-          <div className="pre-add pre-add-row">
-            <MultiAddSelect
-              placeholder="+ Link requirement…"
-              onAdd={addRequirements}
-              options={allRequirements
-                .filter((r) => !requirements.some((lr) => lr.key === r.key))
-                .map((r) => ({
-                  value: r.key,
-                  label: `${r.key} — ${r.summary}`,
-                }))}
-            />
-            <button
-              type="button"
-              className="btn btn-ghost pre-add-new"
-              onClick={() => setSwapKind("requirement")}
-              disabled={requirements.length === 0 && allRequirements.length === 0}
-              title="Swap requirements: unlink some and link others in one apply"
-            >
-              ⇄ Swap
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="pre-add pre-add-row">
+              <MultiAddSelect
+                placeholder="+ Link requirement…"
+                onAdd={addRequirements}
+                options={allRequirements
+                  .filter((r) => !requirements.some((lr) => lr.key === r.key))
+                  .map((r) => ({
+                    value: r.key,
+                    label: `${r.key} — ${r.summary}`,
+                  }))}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost pre-add-new"
+                onClick={() => setSwapKind("requirement")}
+                disabled={requirements.length === 0 && allRequirements.length === 0}
+                title="Swap requirements: unlink some and link others in one apply"
+              >
+                ⇄ Swap
+              </button>
+            </div>
+          )}
 
           <h4>Bugs</h4>
           {bugs.length === 0 ? (
@@ -1065,17 +1142,107 @@ export function TestDetail({
             </ul>
           )}
 
+          <h4>Run history</h4>
+          {runHistoryError && (
+            <div className="error-text">{runHistoryError}</div>
+          )}
+          {!runHistoryError && runHistoryLoading && (
+            <p className="muted">Loading…</p>
+          )}
+          {!runHistoryError && !runHistoryLoading && runHistory !== null && (
+            runHistory.length === 0 ? (
+              <p className="muted">No run history.</p>
+            ) : (
+              <table className="run-history-table">
+                <thead>
+                  <tr>
+                    <th>Execution</th>
+                    <th>Result</th>
+                    <th>Date</th>
+                    <th>By</th>
+                    <th>Environment</th>
+                    <th>Plan(s)</th>
+                    <th>Fix Version(s)</th>
+                    <th>Defects</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runHistory.map((r, i) => (
+                    <tr key={`${r.execKey}-${i}`}>
+                      <td>
+                        {canLinkToJira && r.execKey && !r.execKey.startsWith("NEW-") ? (
+                          <button
+                            className="mono bug-link-key"
+                            onClick={() => openBugInJira(r.execKey)}
+                            title={r.execSummary || `Open ${r.execKey} in Jira`}
+                          >
+                            {r.execKey}
+                          </button>
+                        ) : (
+                          <span className="mono" title={r.execSummary}>{r.execKey}</span>
+                        )}
+                        {r.execSummary && (
+                          <span className="muted run-history-exec-summary">{r.execSummary}</span>
+                        )}
+                      </td>
+                      <td>
+                        {r.runStatus ? <RunStatusBadge status={r.runStatus} /> : <span className="muted">—</span>}
+                      </td>
+                      <td className="muted run-history-date">
+                        {formatDateTime(r.finishedAt || r.startedAt)}
+                      </td>
+                      <td>{r.executedBy || <span className="muted">—</span>}</td>
+                      <td>{r.environment || <span className="muted">—</span>}</td>
+                      <td>{r.planKeys?.length ? r.planKeys.join(", ") : <span className="muted">—</span>}</td>
+                      <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">—</span>}</td>
+                      <td>
+                        {r.defects?.length ? (
+                          <span className="run-history-defects">
+                            {r.defects.map((d, di) => (
+                              <span key={d}>
+                                {di > 0 && ", "}
+                                {canLinkToJira && !d.startsWith("NEW-") ? (
+                                  <button
+                                    className="mono bug-link-key"
+                                    onClick={() => openBugInJira(d)}
+                                    title={`Open ${d} in Jira`}
+                                  >
+                                    {d}
+                                  </button>
+                                ) : (
+                                  <span className="mono">{d}</span>
+                                )}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
+
           <h4>
             Description {isDirty("description") && <DirtyDot />}
           </h4>
-          <MarkdownField
-            className="detail-desc-edit"
-            value={description}
-            onChange={setDescription}
-            onCommit={() => saveField("description", description)}
-            rows={8}
-            placeholder="No description. Click to add — markdown supported."
-          />
+          {readOnly ? (
+            <p className="detail-input detail-input-static detail-desc-static">
+              {description || <span className="muted">No description.</span>}
+            </p>
+          ) : (
+            <MarkdownField
+              className="detail-desc-edit"
+              value={description}
+              onChange={setDescription}
+              onCommit={() => saveField("description", description)}
+              rows={8}
+              placeholder="No description. Click to add — markdown supported."
+            />
+          )}
 
           <h4 className="steps-head">
             Steps
@@ -1092,14 +1259,16 @@ export function TestDetail({
             >
               {stepsLoading ? "Loading…" : "Refresh"}
             </button>
-            <button
-              className="link-btn steps-clone"
-              onClick={() => setShowCloneSteps(true)}
-              disabled={stepsLoading}
-              title="Append a copy of another test's steps to this one"
-            >
-              Clone from…
-            </button>
+            {!readOnly && (
+              <button
+                className="link-btn steps-clone"
+                onClick={() => setShowCloneSteps(true)}
+                disabled={stepsLoading}
+                title="Append a copy of another test's steps to this one"
+              >
+                Clone from…
+              </button>
+            )}
           </h4>
           {stepsError && <div className="error-text">{stepsError}</div>}
           {!stepsError &&
@@ -1139,6 +1308,7 @@ export function TestDetail({
                   pendingForTest={pendingForTest}
                   isFirst={i === 0}
                   isLast={i === steps.length - 1}
+                  readOnly={readOnly}
                   confirm={confirm}
                   onMove={(dir) => moveStep(i, dir)}
                   onDuplicate={() => duplicateStep(s)}
@@ -1157,7 +1327,7 @@ export function TestDetail({
               ))}
             </ol>
           )}
-          {!stepsError && !stepsLoading && (
+          {!readOnly && !stepsError && !stepsLoading && (
             <div className="steps-add-row">
               <button className="link-btn steps-add" onClick={addStep}>
                 + Add step
@@ -1172,13 +1342,15 @@ export function TestDetail({
             </div>
           )}
 
-          <p className="muted detail-note">
-            Edits are saved locally and queued in <b>Pending</b> until you
-            commit them to Jira. Reordering steps lands in a later update.
-          </p>
+          {!readOnly && (
+            <p className="muted detail-note">
+              Edits are saved locally and queued in <b>Pending</b> until you
+              commit them to Jira. Reordering steps lands in a later update.
+            </p>
+          )}
         </div>
       )}
-      {showCallPicker && (
+      {!readOnly && showCallPicker && (
         <PickTestModal
           profileId={profileId}
           heading={`Call a test from ${testKey}`}
@@ -1193,7 +1365,7 @@ export function TestDetail({
         />
       )}
 
-      {showCloneSteps && (
+      {!readOnly && showCloneSteps && (
         <CloneStepsModal
           profileId={profileId}
           targetLabel={testKey}
@@ -1212,7 +1384,7 @@ export function TestDetail({
           }}
         />
       )}
-      {swapKind === "precondition" && (
+      {!readOnly && swapKind === "precondition" && (
         <SwapModal
           title="Swap preconditions"
           current={preconditions.map((p) => ({
@@ -1229,7 +1401,7 @@ export function TestDetail({
           }}
         />
       )}
-      {swapKind === "requirement" && (
+      {!readOnly && swapKind === "requirement" && (
         <SwapModal
           title="Swap requirements"
           current={requirements.map((rq) => ({
@@ -1387,6 +1559,7 @@ interface StepRowProps {
   pendingForTest: PendingChange[];
   isFirst: boolean;
   isLast: boolean;
+  readOnly?: boolean;
   confirm: (opts: {
     title: string;
     message?: string;
@@ -1410,6 +1583,7 @@ function StepRow({
   pendingForTest,
   isFirst,
   isLast,
+  readOnly,
   confirm,
   onMove,
   onDuplicate,
@@ -1431,6 +1605,7 @@ function StepRow({
   );
 
   async function deleteStep() {
+    if (readOnly) return;
     const ok = await confirm({
       title: isNew ? "Discard step" : "Delete step",
       message: isNew
@@ -1458,6 +1633,7 @@ function StepRow({
     );
 
   async function save(field: StepField, value: string) {
+    if (readOnly) return;
     let backendValue: string;
     switch (field) {
       case "action":
@@ -1491,38 +1667,42 @@ function StepRow({
             ⮡ Calls <span className="mono">{step.calledTestKey}</span>
             {isNew && <span className="step-new-badge">new</span>}
           </span>
-          <div className="step-move">
-            <button
-              className="btn btn-ghost step-move-btn"
-              onClick={() => onMove("up")}
-              disabled={isFirst}
-              title="Move step up"
-            >
-              ▲
-            </button>
-            <button
-              className="btn btn-ghost step-move-btn"
-              onClick={() => onMove("down")}
-              disabled={isLast}
-              title="Move step down"
-            >
-              ▼
-            </button>
-          </div>
-          <button
-            className="btn btn-ghost step-duplicate"
-            onClick={onDuplicate}
-            title="Duplicate this call"
-          >
-            ⧉
-          </button>
-          <button
-            className="btn btn-ghost step-delete"
-            onClick={deleteStep}
-            title={isNew ? "Discard this call" : "Delete this call"}
-          >
-            ✕
-          </button>
+          {!readOnly && (
+            <>
+              <div className="step-move">
+                <button
+                  className="btn btn-ghost step-move-btn"
+                  onClick={() => onMove("up")}
+                  disabled={isFirst}
+                  title="Move step up"
+                >
+                  ▲
+                </button>
+                <button
+                  className="btn btn-ghost step-move-btn"
+                  onClick={() => onMove("down")}
+                  disabled={isLast}
+                  title="Move step down"
+                >
+                  ▼
+                </button>
+              </div>
+              <button
+                className="btn btn-ghost step-duplicate"
+                onClick={onDuplicate}
+                title="Duplicate this call"
+              >
+                ⧉
+              </button>
+              <button
+                className="btn btn-ghost step-delete"
+                onClick={deleteStep}
+                title={isNew ? "Discard this call" : "Delete this call"}
+              >
+                ✕
+              </button>
+            </>
+          )}
         </div>
         {saveError && <div className="error-text step-save-error">{saveError}</div>}
       </li>
@@ -1532,74 +1712,90 @@ function StepRow({
   return (
     <li>
       <div className="step-head">
-        <MarkdownField
-          className="step-edit step-edit-action"
-          value={action}
-          onChange={setAction}
-          onCommit={() => save("action", action)}
-          rows={2}
-          placeholder="(action)"
-        />
+        {readOnly ? (
+          <p className="step-edit step-edit-action step-field-static">{action}</p>
+        ) : (
+          <MarkdownField
+            className="step-edit step-edit-action"
+            value={action}
+            onChange={setAction}
+            onCommit={() => save("action", action)}
+            rows={2}
+            placeholder="(action)"
+          />
+        )}
         {isNew && <span className="step-new-badge">new</span>}
-        <div className="step-move">
-          <button
-            className="btn btn-ghost step-move-btn"
-            onClick={() => onMove("up")}
-            disabled={isFirst}
-            title="Move step up"
-          >
-            ▲
-          </button>
-          <button
-            className="btn btn-ghost step-move-btn"
-            onClick={() => onMove("down")}
-            disabled={isLast}
-            title="Move step down"
-          >
-            ▼
-          </button>
-        </div>
-        <button
-          className="btn btn-ghost step-duplicate"
-          onClick={onDuplicate}
-          title="Duplicate this step"
-        >
-          ⧉
-        </button>
-        <button
-          className="btn btn-ghost step-delete"
-          onClick={deleteStep}
-          title={isNew ? "Discard this new step" : "Delete this step"}
-        >
-          ✕
-        </button>
+        {!readOnly && (
+          <>
+            <div className="step-move">
+              <button
+                className="btn btn-ghost step-move-btn"
+                onClick={() => onMove("up")}
+                disabled={isFirst}
+                title="Move step up"
+              >
+                ▲
+              </button>
+              <button
+                className="btn btn-ghost step-move-btn"
+                onClick={() => onMove("down")}
+                disabled={isLast}
+                title="Move step down"
+              >
+                ▼
+              </button>
+            </div>
+            <button
+              className="btn btn-ghost step-duplicate"
+              onClick={onDuplicate}
+              title="Duplicate this step"
+            >
+              ⧉
+            </button>
+            <button
+              className="btn btn-ghost step-delete"
+              onClick={deleteStep}
+              title={isNew ? "Discard this new step" : "Delete this step"}
+            >
+              ✕
+            </button>
+          </>
+        )}
       </div>
       {isDirty("action") && <DirtyDot />}
       <div className="step-row">
         <span className="step-label">
           Data {isDirty("data") && <DirtyDot />}
         </span>
-        <MarkdownField
-          className="step-edit"
-          value={data}
-          onChange={setData}
-          onCommit={() => save("data", data)}
-          multiline={false}
-          placeholder="(optional)"
-        />
+        {readOnly ? (
+          <p className="step-edit step-field-static">{data}</p>
+        ) : (
+          <MarkdownField
+            className="step-edit"
+            value={data}
+            onChange={setData}
+            onCommit={() => save("data", data)}
+            multiline={false}
+            placeholder="(optional)"
+          />
+        )}
       </div>
       <div className="step-row">
         <span className="step-label">
           Expected {isDirty("expected") && <DirtyDot />}
         </span>
-        <MarkdownField
-          className="step-edit"
-          value={expected}
-          onChange={setExpected}
-          onCommit={() => save("expected", expected)}
-          rows={2}
-          placeholder="(expected result)"
-        />
+        {readOnly ? (
+          <p className="step-edit step-field-static">{expected}</p>
+        ) : (
+          <MarkdownField
+            className="step-edit"
+            value={expected}
+            onChange={setExpected}
+            onCommit={() => save("expected", expected)}
+            rows={2}
+            placeholder="(expected result)"
+          />
+        )}
       </div>
       {saveError && <div className="error-text step-save-error">{saveError}</div>}
     </li>
@@ -1614,6 +1810,7 @@ function CustomFieldRow({
   testKey,
   field,
   pendingForTest,
+  readOnly,
   onLocalChange,
   onEdited,
 }: {
@@ -1621,6 +1818,7 @@ function CustomFieldRow({
   testKey: string;
   field: CustomFieldValue;
   pendingForTest: PendingChange[];
+  readOnly?: boolean;
   onLocalChange: (value: string) => void;
   onEdited: () => void;
 }) {
@@ -1633,6 +1831,7 @@ function CustomFieldRow({
   );
 
   async function save() {
+    if (readOnly) return;
     if (value === field.value) return;
     setSaveError("");
     try {
@@ -1651,12 +1850,16 @@ function CustomFieldRow({
         {field.name} {isDirty && <DirtyDot />}
       </dt>
       <dd>
-        <input
-          className="detail-input detail-input-inline"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onBlur={save}
-        />
+        {readOnly ? (
+          <span>{value || "—"}</span>
+        ) : (
+          <input
+            className="detail-input detail-input-inline"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onBlur={save}
+          />
+        )}
         {saveError && <div className="error-text">{saveError}</div>}
       </dd>
     </>
@@ -1670,11 +1873,13 @@ function CustomFieldRow({
 function PreconditionRow({
   profileId,
   precondition,
+  readOnly,
   onRemove,
   onEdited,
 }: {
   profileId: string;
   precondition: Precondition;
+  readOnly?: boolean;
   onRemove: (key: string) => void;
   onEdited: () => void;
 }) {
@@ -1682,6 +1887,7 @@ function PreconditionRow({
   const [saveError, setSaveError] = useState("");
 
   async function save() {
+    if (readOnly) return;
     if (summary === precondition.summary) return;
     setSaveError("");
     try {
@@ -1696,19 +1902,25 @@ function PreconditionRow({
   return (
     <li>
       <span className="mono">{precondition.key}</span>
-      <input
-        className="pre-summary-edit"
-        value={summary}
-        onChange={(e) => setSummary(e.target.value)}
-        onBlur={save}
-      />
-      <button
-        className="btn btn-ghost pre-remove"
-        onClick={() => onRemove(precondition.key)}
-        title="Remove this precondition"
-      >
-        ✕
-      </button>
+      {readOnly ? (
+        <span className="pre-summary-static">{summary}</span>
+      ) : (
+        <input
+          className="pre-summary-edit"
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          onBlur={save}
+        />
+      )}
+      {!readOnly && (
+        <button
+          className="btn btn-ghost pre-remove"
+          onClick={() => onRemove(precondition.key)}
+          title="Remove this precondition"
+        >
+          ✕
+        </button>
+      )}
       {saveError && <span className="error-text">{saveError}</span>}
     </li>
   );
@@ -1720,11 +1932,13 @@ function ContainerSection({
   title,
   items,
   showRunStatus,
+  readOnly,
   onRemove,
 }: {
   title: string;
   items: ContainerMembership[];
   showRunStatus?: boolean;
+  readOnly?: boolean;
   onRemove: (containerKey: string) => void;
 }) {
   return (
@@ -1740,13 +1954,15 @@ function ContainerSection({
               {showRunStatus && c.runStatus && (
                 <RunStatusBadge status={c.runStatus} />
               )}
-              <button
-                className="btn btn-ghost pre-remove"
-                onClick={() => onRemove(c.key)}
-                title="Remove this test from the container"
-              >
-                ✕
-              </button>
+              {!readOnly && (
+                <button
+                  className="btn btn-ghost pre-remove"
+                  onClick={() => onRemove(c.key)}
+                  title="Remove this test from the container"
+                >
+                  ✕
+                </button>
+              )}
             </li>
           ))}
         </ul>
