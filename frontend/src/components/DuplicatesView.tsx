@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useViewState } from "../lib/viewState";
 
 import {
   ScanDuplicates,
@@ -69,14 +70,14 @@ export function DuplicatesView({
 }: Props) {
   const [report, setReport] = useState<DuplicateReport | null>(null);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useViewState<Filter>(profileId, "duplicates", "filter", "all");
+  const [expanded, setExpanded] = useViewState<Set<string>>(profileId, "duplicates", "expanded", new Set());
   const [scanningGroup, setScanningGroup] = useState<string>("");
   const [scanning, setScanning] = useState(false); // plain "Scan" busy state
   // Walk-all-groups step scan: running flag + live progress for the toolbar bar.
   const [scanningSteps, setScanningSteps] = useState(false);
   const [stepProgress, setStepProgress] = useState<SyncProgress | null>(null);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useViewState<string | null>(profileId, "duplicates", "selectedKey", null);
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(
     null,
   );
@@ -84,8 +85,8 @@ export function DuplicatesView({
   const cancelEditRef = useRef(false);
 
   // Pagination of the (filtered) group list.
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useViewState(profileId, "duplicates", "page", 0);
+  const [pageSize, setPageSize] = useViewState(profileId, "duplicates", "pageSize", 15);
 
   // Side-by-side step comparison (#4).
   const [compare, setCompare] = useState<{
