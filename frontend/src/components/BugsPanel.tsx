@@ -5,11 +5,13 @@ import {
   ListTestsForBug,
   SyncBugs,
   CreateContainerAndAllocate,
+  ListContainers,
+  AllocateTests,
   BrowserOpenURL,
   GetTestRunHistory,
   errMsg,
 } from "../api";
-import type { BugWithTests, BugTest, TestRunEntry } from "../api";
+import type { BugWithTests, BugTest, TestRunEntry, Container } from "../api";
 import { formatDateTime } from "../dates";
 import { Pager } from "./Pager";
 import { SortControl } from "./SortControl";
@@ -54,6 +56,14 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   // not change which bug is shown in the detail pane, and vice versa.
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
+  // State for "Add tests to existing execution" modal.
+  const [addToExecOpen, setAddToExecOpen] = useState(false);
+  const [addToExecLoading, setAddToExecLoading] = useState(false);
+  const [addToExecExecs, setAddToExecExecs] = useState<Container[]>([]);
+  const [addToExecTarget, setAddToExecTarget] = useState("");
+  const [addToExecFilter, setAddToExecFilter] = useState("");
+  const [addToExecWorking, setAddToExecWorking] = useState(false);
+  const [addToExecError, setAddToExecError] = useState("");
   const [page, setPage] = useViewState(profileId, "bugs", "page", 0); // 0-based
   const [pageSize, setPageSize] = useViewState(profileId, "bugs", "pageSize", 15);
   const [sortField, setSortField] = useViewState(profileId, "bugs", "sortField", "key");
@@ -190,6 +200,50 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     }
   }
 
+  // Open the "Add tests to existing execution" modal: load the list of Test
+  // Executions then show the picker.
+  async function openAddToExec() {
+    if (unionTestKeys.length === 0) return;
+    setAddToExecOpen(true);
+    setAddToExecError("");
+    setAddToExecFilter("");
+    setAddToExecTarget("");
+    setAddToExecExecs([]);
+    setAddToExecLoading(true);
+    try {
+      const cs = await ListContainers(profileId, "testexec");
+      const list = cs ?? [];
+      setAddToExecExecs(list);
+      if (list.length > 0) setAddToExecTarget(list[0].key);
+    } catch (e) {
+      setAddToExecError(errMsg(e));
+    } finally {
+      setAddToExecLoading(false);
+    }
+  }
+
+  // Confirm: allocate the union test keys to the chosen execution.
+  async function confirmAddToExec() {
+    if (!addToExecTarget || unionTestKeys.length === 0) return;
+    setAddToExecWorking(true);
+    setAddToExecError("");
+    try {
+      const r = await AllocateTests(profileId, addToExecTarget, unionTestKeys);
+      const added = r.added.length;
+      const already = r.alreadyMembers.length;
+      setAddToExecOpen(false);
+      setNotice(
+        `Added ${added} test${added === 1 ? "" : "s"} to ${addToExecTarget}` +
+          (already > 0 ? ` (${already} already present).` : "."),
+      );
+      setChecked(new Set());
+    } catch (e) {
+      setAddToExecError(errMsg(e));
+    } finally {
+      setAddToExecWorking(false);
+    }
+  }
+
   useEffect(() => {
     if (!profileId) return;
     let cancelled = false;
@@ -299,6 +353,24 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
               : `Create Test Execution${
                   unionTestKeys.length > 0 ? ` (${unionTestKeys.length})` : ""
                 }`}
+          </button>
+          <button
+            className="btn"
+            onClick={openAddToExec}
+            disabled={unionTestKeys.length === 0}
+            title={
+              checked.size === 0
+                ? "Tick one or more bugs to add their linked tests to an existing Test Execution"
+                : unionTestKeys.length === 0
+                  ? "The checked bugs have no linked tests"
+                  : `Add the ${unionTestKeys.length} test${
+                      unionTestKeys.length === 1 ? "" : "s"
+                    } linked to the ${checked.size} checked bug${
+                      checked.size === 1 ? "" : "s"
+                    } to an existing Test Execution`
+            }
+          >
+            {`Add to execution${unionTestKeys.length > 0 ? ` (${unionTestKeys.length})` : ""}`}
           </button>
           <button
             className="btn"
@@ -599,6 +671,121 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
           onClose={() => setDetailKey(null)}
           onEdited={() => {}}
         />
+      )}
+
+      {addToExecOpen && (
+        <div className="modal-overlay" onClick={() => !addToExecWorking && setAddToExecOpen(false)}>
+          <div className="modal bulk-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="pending-head">
+              <h2>
+                Add to Test Execution ({unionTestKeys.length}{" "}
+                {unionTestKeys.length === 1 ? "test" : "tests"})
+              </h2>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setAddToExecOpen(false)}
+                disabled={addToExecWorking}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="bulk-body">
+              {addToExecLoading ? (
+                <p className="muted">Loading Test Executions…</p>
+              ) : addToExecExecs.length === 0 && !addToExecError ? (
+                <p className="muted">
+                  No Test Executions found. Sync containers first, or create a
+                  new execution with "Create Test Execution".
+                </p>
+              ) : (
+                <>
+                  <label className="bulk-row">
+                    <span>Filter</span>
+                    <input
+                      className="search"
+                      placeholder="Filter by key or summary…"
+                      value={addToExecFilter}
+                      onChange={(e) => {
+                        setAddToExecFilter(e.target.value);
+                        // Reset target to first match when filter changes.
+                        const f = e.target.value.trim().toLowerCase();
+                        const filtered = !f
+                          ? addToExecExecs
+                          : addToExecExecs.filter(
+                              (c) =>
+                                c.key.toLowerCase().includes(f) ||
+                                c.summary.toLowerCase().includes(f),
+                            );
+                        setAddToExecTarget(filtered.length > 0 ? filtered[0].key : "");
+                      }}
+                    />
+                  </label>
+                  {(() => {
+                    const f = addToExecFilter.trim().toLowerCase();
+                    const filtered = !f
+                      ? addToExecExecs
+                      : addToExecExecs.filter(
+                          (c) =>
+                            c.key.toLowerCase().includes(f) ||
+                            c.summary.toLowerCase().includes(f),
+                        );
+                    return (
+                      <label className="bulk-row">
+                        <span>Execution</span>
+                        {filtered.length === 0 ? (
+                          <span className="muted">No executions match the filter.</span>
+                        ) : (
+                          <select
+                            value={addToExecTarget}
+                            onChange={(e) => setAddToExecTarget(e.target.value)}
+                          >
+                            {filtered.map((c) => (
+                              <option key={c.key} value={c.key}>
+                                {c.key} — {c.summary}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
+                    );
+                  })()}
+                  <p className="muted bulk-preview">
+                    The {unionTestKeys.length} affected test
+                    {unionTestKeys.length === 1 ? "" : "s"} from the checked
+                    bugs will be added to the chosen execution. Tests already in
+                    it are skipped. Changes are queued locally; commit them from
+                    the Pending list.
+                  </p>
+                </>
+              )}
+              {addToExecError && (
+                <div className="error-text">{addToExecError}</div>
+              )}
+            </div>
+            <div className="pending-actions">
+              <button
+                className="btn"
+                onClick={() => setAddToExecOpen(false)}
+                disabled={addToExecWorking}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={confirmAddToExec}
+                disabled={
+                  addToExecWorking ||
+                  addToExecLoading ||
+                  !addToExecTarget ||
+                  unionTestKeys.length === 0
+                }
+              >
+                {addToExecWorking ? "Working…" : "Add to Execution"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
