@@ -273,7 +273,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   const sel = bugs.find((b) => b.key === selected) ?? null;
 
   return (
-    <div className="bugs-md">
+    <div className={`bugs-md${detailKey ? " bugs-md-with-detail" : ""}`}>
       {promptUI}
       <div className="bugs-md-list">
         <div className="bugs-md-head">

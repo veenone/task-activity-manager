@@ -4433,6 +4433,15 @@ tr.row-checked:hover {
   width: 100%;
   min-height: 0;
 }
+/* When the in-view read-only test detail is open, add a third column on the
+   right (sized to the detail panel's own width) so the test detail sits beside
+   the center bug detail instead of wrapping below it. */
+.bugs-md-with-detail {
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) auto;
+}
+.bugs-md-with-detail .detail {
+  position: relative;
+}
 .bugs-md-list {
   display: flex;
   flex-direction: column;
