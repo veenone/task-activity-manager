@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   ListTests,
   ListMatchingKeys,
@@ -218,18 +219,18 @@ export function TestTable({
   onToggleSelectPage,
   onSelectAllMatching,
 }: Props) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useViewState(profileId, "browse", "search", "");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [execType, setExecType] = useState("");
+  const [status, setStatus] = useViewState(profileId, "browse", "status", "");
+  const [execType, setExecType] = useViewState(profileId, "browse", "execType", "");
   const [review, setReview] = useState("");
-  const [sortBy, setSortBy] = useState<SortCol>("key");
+  const [sortBy, setSortBy] = useViewState<SortCol>(profileId, "browse", "sortBy", "key");
   // Default to newest-first by issue number (RND_P_4TFINT_05-202). The key sort
   // is numeric on the trailing number, so this lists the highest issue keys
   // first; saved views restore their own direction.
-  const [desc, setDesc] = useState(true);
-  const [offset, setOffset] = useState(0);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [desc, setDesc] = useViewState(profileId, "browse", "desc", true);
+  const [offset, setOffset] = useViewState(profileId, "browse", "offset", 0);
+  const [pageSize, setPageSize] = useViewState(profileId, "browse", "pageSize", DEFAULT_PAGE_SIZE);
   const [pageInput, setPageInput] = useState("");
 
   const [page, setPage] = useState<TestPage>({ tests: [], total: 0 });
