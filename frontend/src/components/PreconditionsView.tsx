@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   ListPreconditionsWithUsage,
   ListTestsForPrecondition,
@@ -50,11 +51,11 @@ function cmpPre(
 // profile changes or a sync / commit bumps refreshKey.
 export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
   const [list, setList] = useState<PreconditionUsage[]>([]);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useViewState(profileId, "preconditions", "selected", "");
   const [tests, setTests] = useState<PreconditionTest[]>([]);
-  const [filter, setFilter] = useState("");
-  const [sortField, setSortField] = useState("key");
-  const [sortDesc, setSortDesc] = useState(true);
+  const [filter, setFilter] = useViewState(profileId, "preconditions", "filter", "");
+  const [sortField, setSortField] = useViewState(profileId, "preconditions", "sortField", "key");
+  const [sortDesc, setSortDesc] = useViewState(profileId, "preconditions", "sortDesc", true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -88,8 +89,8 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
   }, [list, filter, sortField, sortDesc]);
 
   // Pagination of the precondition master list.
-  const [listPage, setListPage] = useState(0);
-  const [listPageSize, setListPageSize] = useState(15);
+  const [listPage, setListPage] = useViewState(profileId, "preconditions", "listPage", 0);
+  const [listPageSize, setListPageSize] = useViewState(profileId, "preconditions", "listPageSize", 15);
   useEffect(() => {
     setListPage(0);
   }, [filter, sortField, sortDesc]);
@@ -129,8 +130,8 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
   }, [profileId, refreshKey]);
 
   // Pagination of the "Used by" tests list.
-  const [testsPage, setTestsPage] = useState(0);
-  const [testsPageSize, setTestsPageSize] = useState(15);
+  const [testsPage, setTestsPage] = useViewState(profileId, "preconditions", "testsPage", 0);
+  const [testsPageSize, setTestsPageSize] = useViewState(profileId, "preconditions", "testsPageSize", 15);
   useEffect(() => {
     setTestsPage(0);
   }, [selected]);
