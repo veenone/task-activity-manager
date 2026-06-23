@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   AnalyzeGap,
   CreateTestsFromGaps,
@@ -122,10 +123,10 @@ function GapList({
 // three-way diff against the project and folder-mismatch reporting. Gaps are
 // shown side by side, addable as new tests, and exportable as a CSV/Excel report.
 export function GapAnalysisView({ profileId, onChanged }: Props) {
-  const [refSource, setRefSource] = useState<"project" | "file">("project");
-  const [templateKind, setTemplateKind] = useState<TemplateKind>("full");
-  const [compareBy, setCompareBy] = useState<"summary" | "summaryFolder">("summary");
-  const [threeWay, setThreeWay] = useState(false);
+  const [refSource, setRefSource] = useViewState<"project" | "file">(profileId, "gapanalysis", "refSource", "project");
+  const [templateKind, setTemplateKind] = useViewState<TemplateKind>(profileId, "gapanalysis", "templateKind", "full");
+  const [compareBy, setCompareBy] = useViewState<"summary" | "summaryFolder">(profileId, "gapanalysis", "compareBy", "summary");
+  const [threeWay, setThreeWay] = useViewState(profileId, "gapanalysis", "threeWay", false);
   const [refFile, setRefFile] = useState<Picked | null>(null);
   const [targetFile, setTargetFile] = useState<Picked | null>(null);
   const [result, setResult] = useState<GapResult | null>(null);
