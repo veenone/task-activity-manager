@@ -4423,6 +4423,24 @@ tr.row-checked:hover {
   min-height: 0;
 }
 
+/* When the in-view read-only test detail is open for a Test Execution member,
+   switch the board to a row so the detail panel sits to the right of the
+   board content column, mirroring the bugs-md-with-detail pattern. */
+.board--with-exec-detail {
+  flex-direction: row;
+  align-items: stretch;
+}
+.board--with-exec-detail .board-exec-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.board--with-exec-detail .detail {
+  position: relative;
+}
+
 /* Bugs master-detail: filterable/paginated list + selected-bug detail pane.
    The list items scroll; the filter and Pager stay fixed above / below. */
 .bugs-md {

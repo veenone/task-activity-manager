@@ -29,6 +29,7 @@ import { Menu } from "./Menu";
 import { AddTestsModal } from "./AddTestsModal";
 import { BugsPanel } from "./BugsPanel";
 import { CreateBugModal } from "./CreateBugModal";
+import { TestDetail } from "./TestDetail";
 import { usePrompt } from "./usePrompt";
 import { useConfirm } from "./useConfirm";
 import { useNotice } from "./useNotice";
@@ -112,6 +113,13 @@ export function ContainersView({
   const { prompt, promptUI } = usePrompt();
   const { confirm, confirmUI } = useConfirm();
   const { notice, noticeUI } = useNotice();
+
+  // In-view read-only test detail sidebar for Test Execution member rows:
+  // detailKey is session-persisted so the panel restores on returning to this
+  // view; detailVersion is ephemeral and bumped on each open to force a
+  // re-fetch even when reopening the same test.
+  const [detailKey, setDetailKey] = useViewState<string | null>(profileId, "containers", "detailKey", null);
+  const [detailVersion, setDetailVersion] = useState(0);
 
   // Member tables can be long (an Execution may hold hundreds of tests), so the
   // board is paged client-side. The page size is user-selectable; default 15.
@@ -615,7 +623,8 @@ export function ContainersView({
   );
 
   return (
-    <div className={`board${mode === "bugs" ? " board--bugs" : ""}`}>
+    <div className={`board${mode === "bugs" ? " board--bugs" : ""}${detailKey && kind === "testexec" && mode !== "bugs" ? " board--with-exec-detail" : ""}`}>
+      <div className="board-exec-body">
       <div className="containers-mode">
         <button
           className={`seg-btn${mode === "containers" ? " seg-btn-active" : ""}`}
@@ -1191,6 +1200,19 @@ export function ContainersView({
                         ext
                       </span>
                     )}
+                    {kind === "testexec" && (
+                      <button
+                        className="btn-icon"
+                        title={`Open ${r.testKey} detail here`}
+                        onClick={() => {
+                          setDetailKey(r.testKey);
+                          setDetailVersion((v) => v + 1);
+                        }}
+                        style={{ fontSize: "0.75rem", padding: "0 0.25rem", marginLeft: "0.25rem" }}
+                      >
+                        ↗
+                      </button>
+                    )}
                   </td>
                   <td>{r.summary}</td>
                   <td>{r.status || "—"}</td>
@@ -1330,6 +1352,21 @@ export function ContainersView({
       {promptUI}
       {confirmUI}
       {noticeUI}
+      </div>
+
+      {detailKey && kind === "testexec" && mode !== "bugs" && (
+        <TestDetail
+          profileId={profileId}
+          testKey={detailKey}
+          version={detailVersion}
+          pendingForTest={[]}
+          folders={[]}
+          jiraUrl={jiraUrl ?? ""}
+          readOnly
+          onClose={() => setDetailKey(null)}
+          onEdited={() => {}}
+        />
+      )}
     </div>
   );
 }
