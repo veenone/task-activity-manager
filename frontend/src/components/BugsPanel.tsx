@@ -13,6 +13,7 @@ import type { BugWithTests, BugTest, TestRunEntry } from "../api";
 import { formatDateTime } from "../dates";
 import { Pager } from "./Pager";
 import { SortControl } from "./SortControl";
+import { TestDetail } from "./TestDetail";
 import { usePrompt } from "./usePrompt";
 import { keyCompare, cmpStr, applyDir } from "../sort";
 
@@ -62,6 +63,12 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   // Local refresh nonce: bumped after a bugs-only sync to re-pull the list
   // without forcing a full profile refresh.
   const [nonce, setNonce] = useState(0);
+
+  // In-view read-only test detail sidebar: detailKey is session-persisted so
+  // returning to the Bugs view restores the open detail; detailVersion is
+  // ephemeral (bumped to force a re-fetch on re-open).
+  const [detailKey, setDetailKey] = useViewState<string | null>(profileId, "bugs", "detailKey", null);
+  const [detailVersion, setDetailVersion] = useState(0);
 
   // Ephemeral expand state for the affected-tests table. Not session-persisted
   // because it's a transient drill-down, not a view preference.
@@ -418,6 +425,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
                   <tr>
                     <th style={{ width: "1.5rem" }} />
                     <th>Test</th>
+                    <th style={{ width: "1.5rem" }} />
                     <th>Project</th>
                     <th>Summary</th>
                     <th>Status</th>
@@ -446,9 +454,22 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
                             <button
                               className="mono bug-link-key"
                               onClick={() => onOpenTest(t.key)}
-                              title={`Open ${t.key}`}
+                              title={`Open ${t.key} in Browse`}
                             >
                               {t.key}
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              className="btn-icon"
+                              title={`Open ${t.key} detail here`}
+                              onClick={() => {
+                                setDetailKey(t.key);
+                                setDetailVersion((v) => v + 1);
+                              }}
+                              style={{ fontSize: "0.75rem", padding: "0 0.25rem" }}
+                            >
+                              ↗
                             </button>
                           </td>
                           <td className="muted">{t.project || "—"}</td>
@@ -468,7 +489,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={6} style={{ padding: "0.25rem 0.5rem 0.5rem 2rem", background: "var(--bg-subtle, #f8f8f8)" }}>
+                            <td colSpan={7} style={{ padding: "0.25rem 0.5rem 0.5rem 2rem", background: "var(--bg-subtle, #f8f8f8)" }}>
                               {isLoading ? (
                                 <span className="muted">Loading run history…</span>
                               ) : !history || history.length === 0 ? (
@@ -565,6 +586,20 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
           </>
         )}
       </div>
+
+      {detailKey && (
+        <TestDetail
+          profileId={profileId}
+          testKey={detailKey}
+          version={detailVersion}
+          pendingForTest={[]}
+          folders={[]}
+          jiraUrl={jiraUrl}
+          readOnly
+          onClose={() => setDetailKey(null)}
+          onEdited={() => {}}
+        />
+      )}
     </div>
   );
 }
