@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   ListContainers,
   GetContainerBoard,
@@ -62,15 +63,15 @@ export function ContainersView({
   jiraUrl,
   onOpenTest,
 }: Props) {
-  const [kind, setKind] = useState("testplan");
-  const [cStatus, setCStatus] = useState("");
+  const [kind, setKind] = useViewState(profileId, "containers", "kind", "testplan");
+  const [cStatus, setCStatus] = useViewState(profileId, "containers", "cStatus", "");
   // Execution-type filter (Test Execution kind only): "" = all, "standalone", "subtask".
-  const [cExecType, setCExecType] = useState("");
+  const [cExecType, setCExecType] = useViewState(profileId, "containers", "cExecType", "");
   // Environment filter (Test Execution kind only): "" = any; otherwise keep only
   // executions whose environments array contains the value (mirrors
   // ContainerQuery.Environment server-side, applied client-side here since the
   // environments are already loaded on each container).
-  const [cEnv, setCEnv] = useState("");
+  const [cEnv, setCEnv] = useViewState(profileId, "containers", "cEnv", "");
   // Inline environment editor (selected execution): a draft of a new env name.
   const [envDraft, setEnvDraft] = useState("");
   // Batch environment editor (all currently-filtered executions): chosen
@@ -78,14 +79,14 @@ export function ContainersView({
   const [batchEnvOp, setBatchEnvOp] = useState<"add_env" | "remove_env" | "set_env">("add_env");
   const [batchEnvName, setBatchEnvName] = useState("");
   const [batchEnvBusy, setBatchEnvBusy] = useState(false);
-  const [cSortField, setCSortField] = useState("key");
-  const [cSortDesc, setCSortDesc] = useState(false);
+  const [cSortField, setCSortField] = useViewState(profileId, "containers", "cSortField", "key");
+  const [cSortDesc, setCSortDesc] = useViewState(profileId, "containers", "cSortDesc", false);
   const [rowSortField, setRowSortField] = useState("key");
   const [rowSortDesc, setRowSortDesc] = useState(false);
   const [containers, setContainers] = useState<Container[]>([]);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useViewState(profileId, "containers", "selected", "");
   const [bugFor, setBugFor] = useState<{ testKey: string; summary: string } | null>(null);
-  const [mode, setMode] = useState<"containers" | "bugs">("containers");
+  const [mode, setMode] = useViewState<"containers" | "bugs">(profileId, "containers", "mode", "containers");
   const [board, setBoard] = useState<TestPlanBoard | null>(null);
   // Related defects reached through the selected container's member Tests
   // (including bugs reached only via a cross-project member, #219).

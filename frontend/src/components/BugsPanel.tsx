@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import {
   ListBugsWithTests,
   ListTestsForBug,
@@ -40,20 +41,20 @@ function cmpBug(a: BugWithTests, b: BugWithTests, field: string): number {
 // test keys open the test detail.
 export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props) {
   const [bugs, setBugs] = useState<BugWithTests[]>([]);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useViewState(profileId, "bugs", "filter", "");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useViewState(profileId, "bugs", "selected", "");
   const [tests, setTests] = useState<BugTest[]>([]);
   // Checked bugs for the bulk "Create Test Execution" action. This is kept
   // independent of `selected` (the detail-pane row): ticking a checkbox must
   // not change which bug is shown in the detail pane, and vice versa.
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
-  const [page, setPage] = useState(0); // 0-based
-  const [pageSize, setPageSize] = useState(15);
-  const [sortField, setSortField] = useState("key");
-  const [sortDesc, setSortDesc] = useState(true);
+  const [page, setPage] = useViewState(profileId, "bugs", "page", 0); // 0-based
+  const [pageSize, setPageSize] = useViewState(profileId, "bugs", "pageSize", 15);
+  const [sortField, setSortField] = useViewState(profileId, "bugs", "sortField", "key");
+  const [sortDesc, setSortDesc] = useViewState(profileId, "bugs", "sortDesc", true);
   const [syncing, setSyncing] = useState(false);
   const { prompt, promptUI } = usePrompt();
   // Local refresh nonce: bumped after a bugs-only sync to re-pull the list
