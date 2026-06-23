@@ -911,3 +911,46 @@ git commit -m "feat(frontend): in-view read-only test detail and session-preserv
 - Phase C covers T3: project (C1) + expandable breakdown reusing run history (C2).
 - Phase D covers T4: readOnly mode (D1) + session-preserving nav and in-view read-only sidebar (D2).
 - Type consistency: `TestRun` (jira) → `TestRunRow` (store) → `TestRunEntry` (repo/UI); `RunRollup`, `ExecMemberRun`, `BugTest.Project` used consistently across tasks.
+
+---
+
+# Phase E — Follow-up from new Jira issues (post-review)
+
+After the Phase A-D work, a Jira sweep of component **Xray-test-management** found new requests. Three are already delivered by Phase A-D and need no work: **RND_P_4TFINT_05-238** (tab session persistence -> Phase A), **-239** (read-only side panel from a bug's affected test -> Phase D), **-240** (fix version / tester / test plan on the affected-tests table -> Phase C). Two more are in-domain and added below. Three are unrelated macOS platform bugs, listed under "Out of scope" for a separate effort.
+
+### Task E1: Read-only test detail side panel in the Containers Test Execution view (RND_P_4TFINT_05-245)
+
+Mirror the Phase-D bug sidebar in the Containers Test Execution member list: clicking (or an open-detail icon on) a member test opens the read-only `TestDetail` to the right of the board, instead of only showing run columns.
+
+**Files:**
+- Modify: `frontend/src/components/ContainersView.tsx`
+- Modify: `frontend/src/App.css`
+
+- [ ] **Step 1: Open-detail action + session state.** When `kind === "testexec"`, add a small open-detail icon button to each member row (beside the test key). Add `const [detailKey, setDetailKey] = useViewState<string | null>(profileId, "containers", "detailKey", null);` and a plain `detailVersion`. Clicking sets `detailKey` and bumps `detailVersion`. (ContainersView already imports `useViewState`.)
+
+- [ ] **Step 2: Mount the read-only sidebar.** Import `TestDetail`. At the end of the container board layout, render `{detailKey && <TestDetail profileId={profileId} testKey={detailKey} version={detailVersion} pendingForTest={[]} folders={[]} jiraUrl={jiraUrl} readOnly onClose={() => setDetailKey(null)} onEdited={() => {}} />}` (omit `onCloned`). Thread `jiraUrl` from `App.tsx` if ContainersView does not already receive it.
+
+- [ ] **Step 3: Right-side layout.** Add a CSS class that, when the detail is open, lays the board container and the `.detail` aside side by side (mirror `.bugs-md-with-detail`: a grid/flex row with the board taking `1fr` and `.detail` sized `auto` on the right). Apply it conditionally on the board wrapper when `detailKey` is set.
+
+- [ ] **Step 4:** `cd frontend && npm run build` passes. Commit `feat(frontend): read-only test detail side panel in the Containers execution view (RND_P_4TFINT_05-245)`.
+
+### Task E2: Add tests to an existing Test Execution (RND_P_4TFINT_05-242)
+
+Today a user can create a NEW Test Execution from selected bugs. This adds the ability to allocate the affected tests (or selected bugs' tests) to an EXISTING Test Execution.
+
+**Files:**
+- Modify: `frontend/src/components/BugsPanel.tsx` (the action + a picker modal)
+- Possibly Modify: `app.go` / `internal/testrepo` only if no suitable allocate binding exists
+
+- [ ] **Step 1: Confirm the binding.** Check `frontend/src/api.ts` / `app.go` for an existing allocate method (e.g. `AllocateTests(profileID, containerKey, testKeys)` used by the bulk "Allocate" action and the create-execution-from-bugs flow). Reuse it; only add a new binding if none fits.
+
+- [ ] **Step 2: Action + picker.** In `BugsPanel.tsx`, next to the existing "Create Test Execution" (from selected bugs) action, add **"Add tests to execution..."**. It opens a modal listing existing Test Executions (reuse the container picker / `ListContainers(profileID, "testexec")`), with a type-to-filter search. On confirm, call the allocate binding with the chosen execution key and the affected tests of the selected bug(s) (or the checked bugs' tests), then refresh.
+
+- [ ] **Step 3:** `cd frontend && npm run build` passes (and `go test ./...` if a backend method was added). Commit `feat(frontend): add affected tests to an existing test execution (RND_P_4TFINT_05-242)`.
+
+### Out of scope (separate macOS platform effort, NOT in this plan)
+
+These are unrelated platform bugs; they need their own plan and verification on a Mac, not this feature branch:
+- **RND_P_4TFINT_05-241** macOS copy/paste and right-click context menu not working in text inputs (Apple Silicon / Tahoe 26.3).
+- **RND_P_4TFINT_05-243** macOS connection test fails with TLS `x509: certificate signed by unknown authority`.
+- **RND_P_4TFINT_05-244** macOS PAT field missing a show/hide visibility toggle.
