@@ -17,9 +17,11 @@ import {
   ExportPytest,
   SyncContainers,
   BrowserOpenURL,
+  GetExecutionMembersWithRuns,
+  GetRunRollup,
   errMsg,
 } from "../api";
-import type { Container, TestPlanBoard, Bucket, Bug } from "../api";
+import type { Container, TestPlanBoard, Bucket, Bug, ExecMemberRun, RunRollup } from "../api";
 import { SortControl } from "./SortControl";
 import { SearchableSelect } from "./SearchableSelect";
 import { keyCompare, cmpStr, applyDir } from "../sort";
@@ -103,6 +105,10 @@ export function ContainersView({
   const [nameDraft, setNameDraft] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [boardPage, setBoardPage] = useState(0);
+  // Run details for the selected Test Execution's member rows (keyed by testKey).
+  const [memberRuns, setMemberRuns] = useState<Map<string, ExecMemberRun>>(new Map());
+  // Run roll-up for the selected Test Plan / Test Set.
+  const [rollup, setRollup] = useState<RunRollup | null>(null);
   const { prompt, promptUI } = usePrompt();
   const { confirm, confirmUI } = useConfirm();
   const { notice, noticeUI } = useNotice();
@@ -531,6 +537,50 @@ export function ContainersView({
     };
   }, [profileId, selected, refreshKey]);
 
+  // Fetch run details for the selected Test Execution's member tests. The map
+  // is keyed by testKey so the table can look up context per row without
+  // replacing the board data that drives the editable run-result control.
+  useEffect(() => {
+    if (!profileId || !selected || kind !== "testexec") {
+      setMemberRuns(new Map());
+      return;
+    }
+    let cancelled = false;
+    GetExecutionMembersWithRuns(profileId, selected)
+      .then((runs) => {
+        if (cancelled) return;
+        const m = new Map<string, ExecMemberRun>();
+        for (const r of runs ?? []) m.set(r.testKey, r);
+        setMemberRuns(m);
+      })
+      .catch(() => {
+        if (!cancelled) setMemberRuns(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, selected, kind, refreshKey]);
+
+  // Fetch the run roll-up for the selected Test Plan / Test Set. Not used for
+  // Test Executions (they show per-row run detail instead).
+  useEffect(() => {
+    if (!profileId || !selected || kind === "testexec") {
+      setRollup(null);
+      return;
+    }
+    let cancelled = false;
+    GetRunRollup(profileId, selected)
+      .then((r) => {
+        if (!cancelled) setRollup(r ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setRollup(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, selected, kind, refreshKey]);
+
   // Client-side paging of the member table.
   const allRows = useMemo(() => {
     const rows = board?.rows ?? [];
@@ -945,6 +995,35 @@ export function ContainersView({
             </div>
           )}
 
+          {/* Roll-up summary bar across all executions, for plans and sets. */}
+          {kind !== "testexec" && rollup && rollup.total > 0 && (
+            <div className="container-rollup">
+              <span className="container-rollup-label">
+                Run roll-up across {rollup.execCount} execution{rollup.execCount === 1 ? "" : "s"}
+              </span>
+              <div className="board-counts">
+                {rollup.passed > 0 && (
+                  <RunBadge status="PASS" count={rollup.passed} />
+                )}
+                {rollup.failed > 0 && (
+                  <RunBadge status="FAIL" count={rollup.failed} />
+                )}
+                {rollup.executing > 0 && (
+                  <RunBadge status="EXECUTING" count={rollup.executing} />
+                )}
+                {rollup.aborted > 0 && (
+                  <RunBadge status="ABORTED" count={rollup.aborted} />
+                )}
+                {rollup.blocked > 0 && (
+                  <RunBadge status="BLOCKED" count={rollup.blocked} />
+                )}
+                {rollup.notRun > 0 && (
+                  <RunBadge status="(not run)" count={rollup.notRun} />
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Related defects reached through this container's member Tests -
               shown for executions, or for any container that has linked bugs.
               Surfaces a bug that reaches this execution only via a cross-project
@@ -1073,15 +1152,18 @@ export function ContainersView({
               >
                 Execution{rowSortIndicator("result")}
               </th>
+              {kind === "testexec" && <th title="Run date (finished or started)">Date</th>}
+              {kind === "testexec" && <th title="Executed by">By</th>}
+              {kind === "testexec" && <th title="Environment">Environment</th>}
               <th aria-label="Remove" />
             </tr>
           </thead>
           <tbody>
             {allRows.length === 0 ? (
               <tr>
-                <td colSpan={kind === "testexec" ? 6 : 5} className="muted">
-                  This {kindLabel.toLowerCase()} has no tests yet — use “+ Add
-                  tests”.
+                <td colSpan={kind === "testexec" ? 9 : 5} className="muted">
+                  This {kindLabel.toLowerCase()} has no tests yet — use "+ Add
+                  tests".
                 </td>
               </tr>
             ) : (
@@ -1137,6 +1219,9 @@ export function ContainersView({
                       <span className="muted">not run</span>
                     )}
                   </td>
+                  {kind === "testexec" && (
+                    <ExecRunCells run={memberRuns.get(r.testKey)} />
+                  )}
                   <td className="board-remove-cell">
                     {kind === "testexec" &&
                       /^fail/i.test(r.runStatus || "") && (
@@ -1246,6 +1331,40 @@ export function ContainersView({
       {confirmUI}
       {noticeUI}
     </div>
+  );
+}
+
+// ExecRunCells renders the three read-only run-context cells (Date, By,
+// Environment) for one member row in a Test Execution. Rendered as a fragment
+// so the cells sit inline in the <tr> alongside the editable result cell.
+function ExecRunCells({ run }: { run: ExecMemberRun | undefined }) {
+  const dateStr = run?.finishedAt || run?.startedAt || "";
+  return (
+    <>
+      <td className="muted board-run-date">
+        {dateStr ? formatRunDate(dateStr) : "—"}
+      </td>
+      <td className="muted board-run-by">
+        {run?.executedBy || "—"}
+      </td>
+      <td className="muted board-run-env">
+        {run?.environment || "—"}
+      </td>
+    </>
+  );
+}
+
+// formatRunDate formats an ISO date/time string to a compact local date+time
+// string (YYYY-MM-DD HH:MM), matching the pattern used elsewhere in the app
+// (e.g. TestDetail run-history rows). Returns "" for empty/invalid input.
+function formatRunDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
   );
 }
 
