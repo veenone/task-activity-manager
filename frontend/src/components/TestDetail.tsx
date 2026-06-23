@@ -32,6 +32,7 @@ import {
   MoveTestToFolder,
   BrowserOpenURL,
   GetTestBugs,
+  GetTestRunHistory,
   errMsg,
 } from "../api";
 import type {
@@ -49,6 +50,7 @@ import type {
   JiraStepInfo,
   TestMeta,
   TestBug,
+  TestRunEntry,
 } from "../api";
 
 import { usePrompt } from "./usePrompt";
@@ -178,6 +180,9 @@ export function TestDetail({
   // panel is empty but Jira actually has steps (a load/shape problem), so the
   // user doesn't add a blank step that Xray rejects.
   const [jiraStepInfo, setJiraStepInfo] = useState<JiraStepInfo | null>(null);
+  const [runHistory, setRunHistory] = useState<TestRunEntry[] | null>(null);
+  const [runHistoryLoading, setRunHistoryLoading] = useState(false);
+  const [runHistoryError, setRunHistoryError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState("");
@@ -285,6 +290,22 @@ export function TestDetail({
             if (!cancelled) setMeta(m);
           })
           .catch((e) => console.error("test meta:", errMsg(e)));
+        // Run history loads lazily from the local store — one row per
+        // execution run that included this test. Clear on key/version change
+        // so a refreshed test reloads the latest runs.
+        setRunHistory(null);
+        setRunHistoryLoading(true);
+        setRunHistoryError("");
+        GetTestRunHistory(profileId, testKey)
+          .then((rh) => {
+            if (!cancelled) setRunHistory(rh ?? []);
+          })
+          .catch((e) => {
+            if (!cancelled) setRunHistoryError(errMsg(e));
+          })
+          .finally(() => {
+            if (!cancelled) setRunHistoryLoading(false);
+          });
       })
       .catch((e) => {
         if (!cancelled) setError(errMsg(e));
@@ -1063,6 +1084,90 @@ export function TestDetail({
                 </li>
               ))}
             </ul>
+          )}
+
+          <h4>Run history</h4>
+          {runHistoryError && (
+            <div className="error-text">{runHistoryError}</div>
+          )}
+          {!runHistoryError && runHistoryLoading && (
+            <p className="muted">Loading…</p>
+          )}
+          {!runHistoryError && !runHistoryLoading && runHistory !== null && (
+            runHistory.length === 0 ? (
+              <p className="muted">No run history.</p>
+            ) : (
+              <table className="run-history-table">
+                <thead>
+                  <tr>
+                    <th>Execution</th>
+                    <th>Result</th>
+                    <th>Date</th>
+                    <th>By</th>
+                    <th>Environment</th>
+                    <th>Plan(s)</th>
+                    <th>Fix Version(s)</th>
+                    <th>Defects</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runHistory.map((r, i) => (
+                    <tr key={`${r.execKey}-${i}`}>
+                      <td>
+                        {canLinkToJira && r.execKey && !r.execKey.startsWith("NEW-") ? (
+                          <button
+                            className="mono bug-link-key"
+                            onClick={() => openBugInJira(r.execKey)}
+                            title={r.execSummary || `Open ${r.execKey} in Jira`}
+                          >
+                            {r.execKey}
+                          </button>
+                        ) : (
+                          <span className="mono" title={r.execSummary}>{r.execKey}</span>
+                        )}
+                        {r.execSummary && (
+                          <span className="muted run-history-exec-summary">{r.execSummary}</span>
+                        )}
+                      </td>
+                      <td>
+                        {r.runStatus ? <RunStatusBadge status={r.runStatus} /> : <span className="muted">—</span>}
+                      </td>
+                      <td className="muted run-history-date">
+                        {formatDateTime(r.finishedAt || r.startedAt)}
+                      </td>
+                      <td>{r.executedBy || <span className="muted">—</span>}</td>
+                      <td>{r.environment || <span className="muted">—</span>}</td>
+                      <td>{r.planKeys?.length ? r.planKeys.join(", ") : <span className="muted">—</span>}</td>
+                      <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">—</span>}</td>
+                      <td>
+                        {r.defects?.length ? (
+                          <span className="run-history-defects">
+                            {r.defects.map((d, di) => (
+                              <span key={d}>
+                                {di > 0 && ", "}
+                                {canLinkToJira && !d.startsWith("NEW-") ? (
+                                  <button
+                                    className="mono bug-link-key"
+                                    onClick={() => openBugInJira(d)}
+                                    title={`Open ${d} in Jira`}
+                                  >
+                                    {d}
+                                  </button>
+                                ) : (
+                                  <span className="mono">{d}</span>
+                                )}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           )}
 
           <h4>
