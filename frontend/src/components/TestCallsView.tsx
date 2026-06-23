@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../lib/viewState";
 import { ListTestCallLinks, SyncTestCalls, EventsOn, errMsg } from "../api";
 import type { TestCallLink, SyncProgress } from "../api";
 import { TestDetail } from "./TestDetail";
@@ -78,10 +79,10 @@ export function TestCallsView({ profileId, refreshKey, onChanged }: Props) {
   const [links, setLinks] = useState<TestCallLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [detailKey, setDetailKey] = useState("");
+  const [detailKey, setDetailKey] = useViewState(profileId, "testcalls", "detailKey", "");
   const [detailVersion, setDetailVersion] = useState(0);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useViewState(profileId, "testcalls", "page", 0);
+  const [pageSize, setPageSize] = useViewState(profileId, "testcalls", "pageSize", 25);
   // Caller keys whose callee list is collapsed (default: all expanded).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState(false);
