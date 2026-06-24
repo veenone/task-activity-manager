@@ -591,13 +591,12 @@
   color: #374151;
 }
 
-/* Editable run-result select (Test Execution board) — neutral, theme-aware,
-   with a status-coloured left accent. */
+/* Editable run-result select (Test Execution board) — full-colour highlight
+   matching the run-badge palette so statuses are easy to scan at a glance. */
 .run-select {
   font-size: 11px;
   font-weight: 600;
-  border: 1px solid var(--border-strong);
-  border-left-width: 3px;
+  border: 1px solid transparent;
   border-radius: 4px;
   padding: 2px 6px;
   cursor: pointer;
@@ -605,22 +604,65 @@
   color: var(--text);
 }
 .run-select.run-pass {
-  border-left-color: #22c55e;
+  background: #d1fae5;
+  color: #047857;
+  border-color: #6ee7b7;
 }
 .run-select.run-fail {
-  border-left-color: #ef4444;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
 }
 .run-select.run-todo {
-  border-left-color: #6366f1;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
 }
 .run-select.run-executing {
-  border-left-color: #f59e0b;
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fcd34d;
 }
 .run-select.run-aborted {
-  border-left-color: #a855f7;
+  background: #f3e8ff;
+  color: #7e22ce;
+  border-color: #d8b4fe;
 }
 .run-select.run-blocked {
-  border-left-color: #6b7280;
+  background: #e5e7eb;
+  color: #374151;
+  border-color: #9ca3af;
+}
+/* Dark theme: lift the pastel fills slightly to remain readable on dark surfaces. */
+:root[data-theme="dark"] .run-select.run-pass {
+  background: #064e3b;
+  color: #6ee7b7;
+  border-color: #065f46;
+}
+:root[data-theme="dark"] .run-select.run-fail {
+  background: #7f1d1d;
+  color: #fca5a5;
+  border-color: #991b1b;
+}
+:root[data-theme="dark"] .run-select.run-todo {
+  background: #1e1b4b;
+  color: #a5b4fc;
+  border-color: #3730a3;
+}
+:root[data-theme="dark"] .run-select.run-executing {
+  background: #451a03;
+  color: #fcd34d;
+  border-color: #78350f;
+}
+:root[data-theme="dark"] .run-select.run-aborted {
+  background: #3b0764;
+  color: #d8b4fe;
+  border-color: #6b21a8;
+}
+:root[data-theme="dark"] .run-select.run-blocked {
+  background: #1f2937;
+  color: #d1d5db;
+  border-color: #374151;
 }
 
 /* View tabs (Browse / Dashboard) */
@@ -4468,6 +4510,7 @@ tr.row-checked:hover {
   gap: 18px;
   width: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 /* When the in-view read-only test detail is open, add a third column on the
    right (sized to the detail panel's own width) so the test detail sits beside
@@ -4482,6 +4525,7 @@ tr.row-checked:hover {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 .bugs-md-head {
   display: flex;
@@ -4513,6 +4557,22 @@ tr.row-checked:hover {
   overflow-y: auto;
   min-height: 0;
 }
+/* Visible scrollbar on macOS (overlay scrollbars are hidden by default there).
+   Subtle styling that works in both light and dark themes. */
+.bugs-md-items::-webkit-scrollbar {
+  width: 6px;
+}
+.bugs-md-items::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: 3px;
+}
+.bugs-md-items::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+.bugs-md-items::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
 .bugs-md-item {
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -4538,6 +4598,16 @@ tr.row-checked:hover {
   margin: 0;
   flex: 0 0 auto;
   cursor: pointer;
+}
+.bugs-md-select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+  user-select: none;
 }
 .bugs-md-key {
   font-size: 12px;
