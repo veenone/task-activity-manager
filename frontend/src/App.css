@@ -591,6 +591,18 @@
   color: #374151;
 }
 
+/* Run history plan-group sub-header row (Bugs panel nested breakdown). */
+.run-plan-group-header td {
+  background: var(--surface-2, #f1f5f9);
+  font-size: 0.82em;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-top: 1px solid var(--border-subtle);
+}
+:root[data-theme="dark"] .run-plan-group-header td {
+  background: var(--surface-2, #1e2535);
+}
+
 /* Editable run-result select (Test Execution board) — full-colour highlight
    matching the run-badge palette so statuses are easy to scan at a glance. */
 .run-select {
@@ -4060,6 +4072,21 @@ tr.row-checked:hover {
 .pager-compact .board-pager-range { flex: none; text-align: left; }
 .pager-compact .board-pager-nav { justify-content: flex-start; flex-wrap: wrap; }
 
+/* Make enabled pager nav buttons visually distinct from disabled ones.
+   Without this the Prev/Go/Next buttons look identically grey in narrow panels. */
+.board-pager-nav .btn:not(:disabled) {
+  border-color: var(--accent, #2563eb);
+  color: var(--accent, #2563eb);
+  cursor: pointer;
+}
+.board-pager-nav .btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent, #2563eb) 10%, var(--surface));
+}
+.board-pager-nav .btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* Dashboard per-view refresh (#7). */
 .dashboard-head {
   display: flex;
@@ -4597,15 +4624,20 @@ tr.row-checked:hover {
 }
 .bugs-md-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   margin-bottom: 8px;
   flex: 0 0 auto;
 }
 .bugs-md-title {
   font-weight: 600;
   font-size: 13px;
+}
+.bugs-md-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .bugs-md-filter {
   margin-bottom: 8px;
