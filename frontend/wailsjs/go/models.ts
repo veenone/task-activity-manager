@@ -1774,6 +1774,8 @@ export namespace testrepo {
 	    finishedAt: string;
 	    executedBy: string;
 	    defects: string[];
+	    createdAt: string;
+	    updatedAt: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TestRunEntry(source);
@@ -1791,6 +1793,8 @@ export namespace testrepo {
 	        this.finishedAt = source["finishedAt"];
 	        this.executedBy = source["executedBy"];
 	        this.defects = source["defects"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
 	    }
 	}
 
