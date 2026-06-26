@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The version is single-sourced in `wails.json` (`info.productVersion`).
 
+## [1.7.0] - 2026-06-26
+
+Stable **1.7.0** release. Rolls up the `1.7.0a` through `1.7.0a-5` alpha iterations (full per-iteration history in the sections below) into one release: a dedicated **Bugs management view** (detail card, affected-test run-history breakdown with sub-task and cross-project executions, markdown detail fields, Excel export), **collapsible-outline and timestamped Excel exports** across the app, **collapsible Traceability export**, and **pill-based filters** with tighter Bugs / Preconditions / Containers layouts. Highlights of the final iteration on top of `1.7.0a-4`:
+
+### Added
+- **Select all bugs across pages.** The Bugs list has a second select-all control that checks every bug matching the current filter across all pages, not just the visible one — so the whole filtered set can be exported in one action.
+- **Collapsible Traceability export.** The Traceability XLSX "Table" sheet is now a collapsible outline tree that stacks each thread by node (e.g. Test Plan > Test Execution > Test > Run status), de-duplicating shared parents and using Excel row grouping (+/− controls), matching the bug export. The Flow (Sankey edge list) sheet is unchanged.
+
+### Changed
+- **Styled bug Excel export.** The exported workbook is now banded by tier — bug, test, and execution rows each have their own fill — with cell borders and word-wrapped long-text columns (Details / Description / Defect Analysis / Correction Details) for readability.
+- **Timestamped export filenames.** Every export's default filename is prefixed with a `YYYYMMDDHHMM_` timestamp (e.g. `202606261430_dashboard.xlsx`), so saved exports sort chronologically and a second export never silently overwrites an earlier one.
+- **Pill-based filters.** The Bugs test-linkage filter (All / With tests / Without tests), the Preconditions usage filter (All / With tests / Without tests), and the Containers status filter (All statuses + one per status) are now labelled pills with live counts, matching the Requirements coverage filter, instead of dropdowns.
+- **Tighter Bugs and Preconditions layout.** In the Bugs list the filter pills and sort control share one row, the Export button (now "Export…") sits beside Sync, and the pager places the page nav next to the rows-per-page selector. In the Preconditions list the filter pills moved to their own line below the sort / New row, so the New button no longer stretches.
+
+### Fixed
+- **Bug Excel export collapse controls.** The workbook now declares its outline depth, so Excel reliably renders the Bug > Test > Execution row-group collapse (+/−) controls; previously the grouping data was present but some Excel builds showed the report flat.
+- Bug list (and the Containers Test Execution / Plan / Set member lists) now scroll with the pager pinned, instead of the list growing unbounded with a hidden scrollbar.
+- Bug card status pills no longer overlap the card (wider list, wrapping layout).
+
+## [1.7.0a-4] - 2026-06-25 (alpha)
+
+Fourth alpha iteration of the 1.7.0 work: Bugs-view improvements, plus sub-task and cross-project execution sync fixes from live testing.
+
+### Added
+- **Bug detail panel.** Selecting a bug now shows a structured detail card above the affected tests: key, status, summary, a two-column facts grid (Type / Project / Priority / Updated / Reporter / Severity / Affects), and the bug **Description** (collapsible, collapsed by default), **Defect Origin**, **Defect Analysis**, and **Correction Details** (fetched lazily on selection).
+- **Dynamic right sidebar.** The bug-view side panel is a placeholder for a test, a Test Plan, or a Test Execution: the affected-test open icon shows the test; the run-history **Plan** and **Execution** links open that container's detail (summary, run-status histogram, members) in the sidebar. The panel is width-resizable and all three share one persisted width.
+- **Bug list test-linkage filter.** Filter bugs by All / With tests / Without tests, with a per-card cue (a test-count badge, or a "no tests" chip).
+- **Sub-task executions in the run-history breakdown.** A test's run history and the bug breakdown now distinguish **Sub Test Executions** from standalone ones with a "Sub-task" badge and a link to the parent issue.
+- **Cross-project execution discovery.** Executions that live in another project (notably sub-task executions, which inherit their parent issue's project) are now discovered per test and cached, both during a full sync and lazily when a test's run history is opened, so their runs appear in the breakdown.
+- **Export bugs to Excel.** An "Export to Excel" action in the Bugs toolbar exports the checked bugs (or the open bug) to a single-sheet **collapsible outline** workbook that stacks **Bug > Test > Test Execution** using Excel row grouping (the +/- controls), so a bug collapses to hide its tests and a test collapses to hide its executions. Each level carries its own detail.
+- **Markdown in detail views.** The bug **Description**, **Defect Analysis**, and **Correction Details**, and the container / Test Execution **Description** in the detail sidebar, now render as GitHub-flavoured markdown.
+
+### Changed
+- **Bug sync fetches ALL bugs in the project.** Previously only bugs linked to a synced test were found; the sync now also runs a project-wide `project = <bugProject> AND issuetype = <type>` search and merges it with the test-link harvest, so unlinked project bugs appear too.
+- **Sub-task Test Execution issue type is discovered from the instance** (it defaults to "Sub Test Execution" but can be renamed / localised), instead of a hardcoded name that silently missed renamed types.
+- **The Bugs-view sync also refreshes affected-test run data.** Clicking Sync in the Bugs view now refreshes the run/execution data for every bug-affected test (including newly discovered cross-project and sub-task executions), so the run-history breakdown updates without needing a full project sync.
+
+### Fixed
+- **"Latest result" now matches the run history.** The affected-tests "Latest result" reads the most recent run from the run table (the same source as the breakdown), falling back to the consolidated membership status, instead of a worst-wins value that could disagree with the runs shown.
+- **Run-history breakdown columns.** The run-date column is renamed **Run Date** (to distinguish it from the execution timestamps) and **every column is now sortable**. The **Created / Updated / Resolved** columns show the Test Execution issue's own timestamps (created, updated, resolution date), fetched from the execution detail and cached on the container - the per-run Xray endpoint does not return them, so they were previously blank.
+- **Defect Analysis is collapsible** in the bug detail card (collapsed by default), matching the Description field, so a long analysis no longer pushes the affected tests down.
+
 ## [1.7.0a-2] - 2026-06-25 (alpha)
 
 Second alpha iteration of the 1.7.0 work: live-testing fixes and follow-on features on top of `1.7.0a`.

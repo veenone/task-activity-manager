@@ -369,7 +369,7 @@ func (a *App) ExportProfile(id string) (string, error) {
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export profile",
-		DefaultFilename: sanitizeFilename(p.Name) + "-profile.json",
+		DefaultFilename: exportFilename(sanitizeFilename(p.Name) + "-profile.json"),
 		Filters:         []runtime.FileFilter{{DisplayName: "JSON", Pattern: "*.json"}},
 	})
 	if err != nil {
@@ -441,6 +441,15 @@ func sanitizeFilename(name string) string {
 		return "profile"
 	}
 	return out
+}
+
+// exportFilename prefixes a default export filename with a local YYYYMMDDHHMM
+// timestamp, e.g. "202606261430_dashboard.xlsx". This keeps saved exports
+// sorted chronologically and stops a second export silently overwriting an
+// earlier one. The original title and extension are preserved (the files are
+// genuine XLSX/CSV, so their extension is kept accurate).
+func exportFilename(name string) string {
+	return time.Now().Format("200601021504") + "_" + name
 }
 
 // tlsOptions derives jira.Option values from a profile's TLS settings. When
@@ -610,13 +619,50 @@ func (a *App) SyncContainers(profileID string) error {
 	})
 }
 
-// SyncBugs refreshes just the defect issues linked to the profile's tests from
-// Jira, so the Bugs panel can refresh without triggering a full profile sync
-// (RND_P_4TFINT_05-214).
+// SyncBugs reconciles defect issues linked to the profile's tests (partial
+// sync behind the Bugs panel's refresh button). It also refreshes the
+// run/execution data for all bug-affected tests so the run-history breakdown
+// updates without a full re-sync. The run-data pass is best-effort: an error
+// there does not fail the bug sync.
 func (a *App) SyncBugs(profileID string) error {
 	return a.runPartialSync(profileID, "Syncing bugs", func(e *syncer.Engine, projectKey string, onProgress func(syncer.Progress)) error {
-		return e.SyncBugs(a.ctx, profileID, projectKey, onProgress)
+		if err := e.SyncBugs(a.ctx, profileID, projectKey, onProgress); err != nil {
+			return err
+		}
+		// Best-effort: refresh run data for bug-affected tests. A failure here
+		// is logged internally by SyncBugRunData and does not fail the sync.
+		if runErr := e.SyncBugRunData(a.ctx, profileID, onProgress); runErr != nil {
+			log.Printf("xtm: SyncBugs: run-data refresh: %v (continuing)", runErr)
+		}
+		return nil
 	})
+}
+
+// GetBugDetail fetches the extended fields for a defect issue: description,
+// Defect Origin, Defect Analysis, and Correction Details. These are not cached
+// locally (the bug table only holds summary/status/priority); they are fetched
+// lazily on detail-panel open, mirroring GetTestMeta / GetTestCustomFields.
+//
+// Returns an empty BugDetail without a network call when bugKey looks like a
+// locally-created (not-yet-committed) issue.
+func (a *App) GetBugDetail(profileID, bugKey string) (jira.BugDetail, error) {
+	if err := a.requireStore(); err != nil {
+		return jira.BugDetail{}, err
+	}
+	// Local / not-yet-committed bug keys carry a "NEW-" prefix and have no Jira
+	// issue yet.
+	if strings.HasPrefix(bugKey, "NEW-") {
+		return jira.BugDetail{}, nil
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return jira.BugDetail{}, err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return jira.BugDetail{}, fmt.Errorf("load credentials: %w", err)
+	}
+	return jira.NewClient(p.JiraURL, token, tlsOptions(p)...).GetBugDetail(a.ctx, bugKey)
 }
 
 // SyncTestCalls refreshes the "call test" relationships by re-pulling steps for
@@ -1134,12 +1180,138 @@ func (a *App) ListBugsForContainer(profileID, containerKey string) ([]testrepo.B
 
 // --- Test run history & rollups ---
 
-// GetTestRunHistory returns a test's run history across executions.
+// GetTestRunHistory returns a test's run history across executions. Before
+// reading from the local store it triggers a best-effort cross-project
+// execution discovery for real (non-local) test keys so that executions in
+// other projects, which the project-scoped sync misses, appear in the history
+// without requiring a full re-sync.
 func (a *App) GetTestRunHistory(profileID, testKey string) ([]testrepo.TestRunEntry, error) {
 	if err := a.requireStore(); err != nil {
 		return nil, err
 	}
+	if !isLocalTestKey(testKey) {
+		a.refreshCrossProjectExecsForTest(profileID, testKey)
+	}
 	return a.repo.GetTestRunHistory(profileID, testKey)
+}
+
+// refreshCrossProjectExecsForTest performs a lightweight per-test cross-project
+// execution discovery: it looks up every Test Execution that testKey belongs to
+// (in any project) and additively merges newly found containers, links, and runs
+// into the local store. This is called lazily when GetTestRunHistory is invoked
+// so that cross-project sub-task executions (which the project-scoped sync
+// misses) appear in the run history without requiring a full re-sync.
+//
+// Errors are logged and ignored -- this is best-effort; the caller returns
+// whatever the local store already has.
+func (a *App) refreshCrossProjectExecsForTest(profileID, testKey string) {
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		log.Printf("xtm: refreshCrossProjectExecsForTest: load profile: %v", err)
+		return
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		log.Printf("xtm: refreshCrossProjectExecsForTest: load credentials: %v", err)
+		return
+	}
+	cl := jira.NewClient(p.JiraURL, token, tlsOptions(p)...)
+	ctx := context.Background()
+	containers, links, err := cl.TestExecutionsForTest(ctx, testKey)
+	if err != nil {
+		log.Printf("xtm: refreshCrossProjectExecsForTest: %s: %v", testKey, err)
+		return
+	}
+	if len(containers) == 0 {
+		return
+	}
+	// Defensive: containers and links must be parallel slices (same length,
+	// same index). TestExecutionsForTest guarantees this, but guard here to
+	// prevent an out-of-bounds panic if that contract is ever relaxed.
+	if len(containers) != len(links) {
+		log.Printf("xtm: refreshCrossProjectExecsForTest: %s: container/link length mismatch (%d vs %d), skipping",
+			testKey, len(containers), len(links))
+		return
+	}
+	// Check which containers are already in the local store so we do not
+	// overwrite links that the project-scoped sync already wrote correctly.
+	knownKeys, err := a.repo.AllContainerKeys(profileID)
+	if err != nil {
+		log.Printf("xtm: refreshCrossProjectExecsForTest: list known keys: %v", err)
+		return
+	}
+
+	var newContainers []testrepo.Container
+	var newLinks []testrepo.ContainerLink
+	for i, c := range containers {
+		if knownKeys[c.Key] {
+			continue
+		}
+		newContainers = append(newContainers, testrepo.Container{
+			Key:           c.Key,
+			Kind:          c.Kind,
+			Summary:       c.Summary,
+			Status:        c.Status,
+			ParentKey:     c.ParentKey,
+			ParentSummary: c.ParentSummary,
+			IssueType:     c.IssueType,
+			Environments:  c.Environments,
+			FixVersions:   c.FixVersions,
+			Created:       c.Created,
+			Updated:       c.Updated,
+			Resolved:      c.Resolved,
+			Description:   c.Description,
+		})
+		newLinks = append(newLinks, testrepo.ContainerLink{
+			ContainerKey: links[i].ContainerKey,
+			TestKey:      links[i].TestKey,
+			RunStatus:    links[i].RunStatus,
+		})
+	}
+	if len(newContainers) == 0 {
+		return
+	}
+	if err := a.repo.UpsertContainers(profileID, newContainers); err != nil {
+		log.Printf("xtm: refreshCrossProjectExecsForTest: upsert containers: %v", err)
+		return
+	}
+	if err := a.repo.UpsertContainerLinks(profileID, newLinks); err != nil {
+		log.Printf("xtm: refreshCrossProjectExecsForTest: upsert links: %v", err)
+		return
+	}
+	for _, ct := range newContainers {
+		runs, rErr := cl.GetTestRuns(ctx, ct.Key)
+		if rErr != nil {
+			log.Printf("xtm: refreshCrossProjectExecsForTest: get runs for %s: %v", ct.Key, rErr)
+			continue
+		}
+		rows := make([]testrepo.TestRunRow, 0, len(runs))
+		for _, tr := range runs {
+			defectsJSON := "[]"
+			if len(tr.Defects) > 0 {
+				if b, jerr := json.Marshal(tr.Defects); jerr == nil {
+					defectsJSON = string(b)
+				}
+			}
+			env := tr.Environment
+			if env == "" && len(ct.Environments) > 0 {
+				env = strings.Join(ct.Environments, ", ")
+			}
+			rows = append(rows, testrepo.TestRunRow{
+				ExecKey:     ct.Key,
+				TestKey:     tr.TestKey,
+				RunStatus:   tr.Status,
+				StartedAt:   tr.StartedAt,
+				FinishedAt:  tr.FinishedAt,
+				ExecutedBy:  tr.ExecutedBy,
+				Environment: env,
+				Defects:     defectsJSON,
+				CreatedAt:   tr.CreatedAt,
+				UpdatedAt:   tr.UpdatedAt,
+			})
+		}
+		_ = a.repo.ReplaceRunsForExec(profileID, ct.Key, rows)
+	}
 }
 
 // GetRunRollup returns the run-result roll-up for a Test Plan or Test Set.
@@ -1901,7 +2073,7 @@ func (a *App) ExportPytest(profileID, containerKey, style string) (string, error
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save Python scaffold",
-		DefaultFilename: "test_" + sanitizeFilename(containerKey) + suffix + ".py",
+		DefaultFilename: exportFilename("test_" + sanitizeFilename(containerKey) + suffix + ".py"),
 		Filters:         []runtime.FileFilter{{DisplayName: "Python", Pattern: "*.py"}},
 	})
 	if err != nil {
@@ -2431,7 +2603,7 @@ func (a *App) ExportGapReport(result testrepo.GapResult, format string) (string,
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export gap analysis report",
-		DefaultFilename: defaultName,
+		DefaultFilename: exportFilename(defaultName),
 		Filters:         filters,
 	})
 	if err != nil {
@@ -2454,19 +2626,19 @@ func (a *App) ExportGapReport(result testrepo.GapResult, format string) (string,
 	return path, nil
 }
 
-// ExportTests writes the Tests matching a query to a user-chosen CSV or XLSX
-// file (FR-10.8). The format follows the saved file's extension. Returns the
-// saved path, or "" if cancelled.
+// ExportTests writes the Tests matching a query to a user-chosen XLSX or CSV
+// file (FR-10.8). XLSX is the default; the format follows the saved file's
+// extension. Returns the saved path, or "" if cancelled.
 func (a *App) ExportTests(profileID string, q testrepo.Query) (string, error) {
 	if err := a.requireStore(); err != nil {
 		return "", err
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export tests",
-		DefaultFilename: "tests-export.csv",
+		DefaultFilename: exportFilename("tests-export.xlsx"),
 		Filters: []runtime.FileFilter{
-			{DisplayName: "CSV", Pattern: "*.csv"},
 			{DisplayName: "Excel", Pattern: "*.xlsx"},
+			{DisplayName: "CSV", Pattern: "*.csv"},
 		},
 	})
 	if err != nil {
@@ -2475,9 +2647,9 @@ func (a *App) ExportTests(profileID string, q testrepo.Query) (string, error) {
 	if path == "" {
 		return "", nil
 	}
-	format := "csv"
-	if strings.HasSuffix(strings.ToLower(path), ".xlsx") {
-		format = "xlsx"
+	format := "xlsx"
+	if strings.HasSuffix(strings.ToLower(path), ".csv") {
+		format = "csv"
 	}
 	data, err := a.repo.ExportTests(profileID, q, format)
 	if err != nil {
@@ -2490,18 +2662,18 @@ func (a *App) ExportTests(profileID string, q testrepo.Query) (string, error) {
 }
 
 // ExportRequirementAudit writes the requirement coverage / sign-off audit to a
-// user-chosen CSV or XLSX file. The format follows the saved file's extension.
-// Returns the saved path, or "" if cancelled.
+// user-chosen XLSX or CSV file. XLSX is the default; the format follows the
+// saved file's extension. Returns the saved path, or "" if cancelled.
 func (a *App) ExportRequirementAudit(profileID string) (string, error) {
 	if err := a.requireStore(); err != nil {
 		return "", err
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export requirement audit",
-		DefaultFilename: "requirement-audit.csv",
+		DefaultFilename: exportFilename("requirement-audit.xlsx"),
 		Filters: []runtime.FileFilter{
-			{DisplayName: "CSV", Pattern: "*.csv"},
 			{DisplayName: "Excel", Pattern: "*.xlsx"},
+			{DisplayName: "CSV", Pattern: "*.csv"},
 		},
 	})
 	if err != nil {
@@ -2510,13 +2682,109 @@ func (a *App) ExportRequirementAudit(profileID string) (string, error) {
 	if path == "" {
 		return "", nil
 	}
-	format := "csv"
-	if strings.HasSuffix(strings.ToLower(path), ".xlsx") {
-		format = "xlsx"
+	format := "xlsx"
+	if strings.HasSuffix(strings.ToLower(path), ".csv") {
+		format = "csv"
 	}
 	data, err := a.repo.ExportRequirementAudit(profileID, format)
 	if err != nil {
 		return "", err
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("write export: %w", err)
+	}
+	return path, nil
+}
+
+// ExportBugsWithRunHistory exports the selected bugs with their affected-test
+// run history to an XLSX file chosen by the user. Returns the saved path, or
+// "" (no error) when the user cancels the save dialog. Best-effort on the
+// live GetBugDetail per bug: if the fetch fails, the live-only fields are left
+// blank and the cached fields are still exported.
+func (a *App) ExportBugsWithRunHistory(profileID string, bugKeys []string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	if len(bugKeys) == 0 {
+		return "", fmt.Errorf("no bug keys provided")
+	}
+
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export bugs",
+		DefaultFilename: exportFilename("bugs-run-history.xlsx"),
+		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil
+	}
+
+	// Load profile and credentials for the live detail fetch.
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return "", err
+	}
+	token, err := a.creds.Load(profileID)
+	if err != nil {
+		return "", fmt.Errorf("load credentials: %w", err)
+	}
+	cl := jira.NewClient(p.JiraURL, token, tlsOptions(p)...)
+
+	exports := make([]testrepo.BugExport, 0, len(bugKeys))
+	for _, key := range bugKeys {
+		bug, err := a.repo.GetBug(profileID, key)
+		if err != nil {
+			log.Printf("xtm: ExportBugsWithRunHistory: get bug %s: %v (skipping)", key, err)
+			continue
+		}
+		ex := testrepo.BugExport{
+			Key:        bug.Key,
+			ProjectKey: bug.ProjectKey,
+			IssueType:  bug.IssueType,
+			Status:     bug.Status,
+			Priority:   bug.Priority,
+			Summary:    bug.Summary,
+		}
+
+		// Best-effort live fetch for extended fields.
+		if detail, dErr := cl.GetBugDetail(a.ctx, key); dErr != nil {
+			log.Printf("xtm: ExportBugsWithRunHistory: GetBugDetail %s: %v (leaving detail fields blank)", key, dErr)
+		} else {
+			ex.Description = detail.Description
+			ex.DefectOrigin = detail.DefectOrigin
+			ex.DefectAnalysis = detail.DefectAnalysis
+			ex.CorrectionDetails = detail.CorrectionDetails
+			ex.Reporter = detail.Reporter
+			ex.Severity = detail.Severity
+		}
+
+		// A failure here drops only the affected-test rows: the bug still appears
+		// in the "Bugs" sheet (with its cached fields and a zero affected count)
+		// rather than vanishing from the export entirely.
+		affectedTests, tErr := a.repo.ListTestsForBug(profileID, key)
+		if tErr != nil {
+			log.Printf("xtm: ExportBugsWithRunHistory: list affected tests %s: %v (bug exported without test rows)", key, tErr)
+			affectedTests = nil
+		}
+		ex.AffectedTests = affectedTests
+
+		ex.RunHistory = make(map[string][]testrepo.TestRunEntry, len(affectedTests))
+		for _, bt := range affectedTests {
+			hist, hErr := a.repo.GetTestRunHistory(profileID, bt.Key)
+			if hErr != nil {
+				log.Printf("xtm: ExportBugsWithRunHistory: run history %s/%s: %v (skipping)", key, bt.Key, hErr)
+				continue
+			}
+			ex.RunHistory[bt.Key] = hist
+		}
+		exports = append(exports, ex)
+	}
+
+	data, err := a.repo.BuildBugExportWorkbook(exports)
+	if err != nil {
+		return "", fmt.Errorf("build workbook: %w", err)
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write export: %w", err)
@@ -2541,7 +2809,7 @@ func (a *App) ExportTraceability(profileID, kind string, planFilters, execFilter
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export traceability",
-		DefaultFilename: "traceability-" + kind + ".xlsx",
+		DefaultFilename: exportFilename("traceability-" + kind + ".xlsx"),
 		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
 	})
 	if err != nil {
@@ -2570,7 +2838,7 @@ func (a *App) ExportDashboard(profileID, folder, component, status string) (stri
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Export dashboard",
-		DefaultFilename: "dashboard.xlsx",
+		DefaultFilename: exportFilename("dashboard.xlsx"),
 		Filters:         []runtime.FileFilter{{DisplayName: "Excel", Pattern: "*.xlsx"}},
 	})
 	if err != nil {
@@ -2594,7 +2862,7 @@ func (a *App) ExportDashboard(profileID, folder, component, status string) (stri
 func (a *App) ExportImportTemplate() (string, error) {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save import template",
-		DefaultFilename: "test-import-template.csv",
+		DefaultFilename: exportFilename("test-import-template.csv"),
 		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
 	})
 	if err != nil {
@@ -2615,7 +2883,7 @@ func (a *App) ExportImportTemplate() (string, error) {
 func (a *App) ExportSummaryTemplate() (string, error) {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save summary-only template",
-		DefaultFilename: "gap-summary-template.csv",
+		DefaultFilename: exportFilename("gap-summary-template.csv"),
 		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
 	})
 	if err != nil {
@@ -2635,7 +2903,7 @@ func (a *App) ExportSummaryTemplate() (string, error) {
 func (a *App) ExportSummaryFolderTemplate() (string, error) {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save summary + folder template",
-		DefaultFilename: "gap-summary-folder-template.csv",
+		DefaultFilename: exportFilename("gap-summary-folder-template.csv"),
 		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
 	})
 	if err != nil {

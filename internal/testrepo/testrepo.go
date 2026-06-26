@@ -82,6 +82,16 @@ type Container struct {
 	// (empty for Test Sets / Plans). Read-only display values pulled from Jira;
 	// never edited locally, so they are overwritten on every sync.
 	FixVersions []string `json:"fixVersions"`
+	// Created, Updated, and Resolved are the ISO-8601 timestamps from the Test
+	// Execution issue (Jira created/updated/resolutiondate fields). Empty for
+	// non-execution containers or when not yet fetched. Read-only; overwritten
+	// on every sync.
+	Created  string `json:"created"`
+	Updated  string `json:"updated"`
+	Resolved string `json:"resolved"`
+	// Description is the Jira issue description (markdown/wiki text), fetched
+	// for all container kinds and cached in the local store.
+	Description string `json:"description"`
 }
 
 // ContainerQuery filters a ListContainersQuery call. Kind is required (one of
@@ -129,10 +139,13 @@ type TestPlanBoardRow struct {
 // Tests with consolidated execution status, plus a run-status histogram for the
 // header.
 type TestPlanBoard struct {
-	Key       string             `json:"key"`
-	Summary   string             `json:"summary"`
-	Rows      []TestPlanBoardRow `json:"rows"`
-	RunCounts []Bucket           `json:"runCounts"`
+	Key     string `json:"key"`
+	Summary string `json:"summary"`
+	// Description is the Jira issue description of the container (markdown/wiki
+	// text), passed through for display in the detail sidebar.
+	Description string             `json:"description"`
+	Rows        []TestPlanBoardRow `json:"rows"`
+	RunCounts   []Bucket           `json:"runCounts"`
 }
 
 // Step is one cached Xray Test Step (FR-2.5). XrayID is Xray's per-step
@@ -1155,8 +1168,8 @@ func (r *Repository) UpsertContainers(profileID string, containers []Container) 
 	// it is overwritten unconditionally on conflict (unlike environments, which
 	// is preserved when a pending container_env edit exists).
 	stmt, err := tx.Prepare(
-		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status, parent_key, issue_type, parent_summary, environments, fix_versions)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO test_container (profile_id, jira_key, kind, summary, status, parent_key, issue_type, parent_summary, environments, fix_versions, created, updated, resolved, description)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
 		   kind           = excluded.kind,
 		   summary        = excluded.summary,
@@ -1165,6 +1178,10 @@ func (r *Repository) UpsertContainers(profileID string, containers []Container) 
 		   issue_type     = excluded.issue_type,
 		   parent_summary = excluded.parent_summary,
 		   fix_versions   = excluded.fix_versions,
+		   created        = excluded.created,
+		   updated        = excluded.updated,
+		   resolved       = excluded.resolved,
+		   description    = excluded.description,
 		   environments   = CASE WHEN EXISTS (
 		       SELECT 1 FROM pending_change
 		       WHERE pending_change.profile_id  = excluded.profile_id
@@ -1177,7 +1194,7 @@ func (r *Repository) UpsertContainers(profileID string, containers []Container) 
 	defer stmt.Close()
 
 	for _, c := range containers {
-		if _, err := stmt.Exec(profileID, c.Key, c.Kind, c.Summary, c.Status, c.ParentKey, c.IssueType, c.ParentSummary, encodeEnvironments(c.Environments), encodeFixVersions(c.FixVersions)); err != nil {
+		if _, err := stmt.Exec(profileID, c.Key, c.Kind, c.Summary, c.Status, c.ParentKey, c.IssueType, c.ParentSummary, encodeEnvironments(c.Environments), encodeFixVersions(c.FixVersions), c.Created, c.Updated, c.Resolved, c.Description); err != nil {
 			return fmt.Errorf("upsert container %s: %w", c.Key, err)
 		}
 	}
@@ -1217,6 +1234,38 @@ func (r *Repository) ReplaceAllContainerLinks(profileID string, links []Containe
 	for _, l := range links {
 		if _, err := stmt.Exec(profileID, l.ContainerKey, l.TestKey, l.RunStatus); err != nil {
 			return fmt.Errorf("link %s -> %s: %w", l.ContainerKey, l.TestKey, err)
+		}
+	}
+	return tx.Commit()
+}
+
+// UpsertContainerLinks inserts Test-to-Container memberships WITHOUT wiping
+// existing ones. This is the additive counterpart to ReplaceAllContainerLinks
+// and mirrors the UpsertBugLinks pattern: it is used by the cross-project
+// execution discovery pass to merge newly found executions alongside the
+// project links that ReplaceAllContainerLinks already wrote.
+//
+// INSERT OR IGNORE de-dupes by the primary key (profile_id, container_key,
+// test_key), so calling with duplicate rows is safe and idempotent.
+func (r *Repository) UpsertContainerLinks(profileID string, links []ContainerLink) error {
+	if len(links) == 0 {
+		return nil
+	}
+	tx, err := r.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.Prepare(
+		`INSERT OR IGNORE INTO test_container_test (profile_id, container_key, test_key, run_status)
+		 VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("prepare upsert container link: %w", err)
+	}
+	defer stmt.Close()
+	for _, l := range links {
+		if _, err := stmt.Exec(profileID, l.ContainerKey, l.TestKey, l.RunStatus); err != nil {
+			return fmt.Errorf("upsert container link %s->%s: %w", l.ContainerKey, l.TestKey, err)
 		}
 	}
 	return tx.Commit()
@@ -1339,16 +1388,18 @@ func (r *Repository) GetContainerBoard(profileID, containerKey string) (TestPlan
 	board := TestPlanBoard{Key: containerKey, Rows: []TestPlanBoardRow{}, RunCounts: []Bucket{}}
 
 	var kind string
+	var description string
 	err := r.db.QueryRow(
-		`SELECT kind, summary FROM test_container WHERE profile_id = ? AND jira_key = ?`,
+		`SELECT kind, summary, description FROM test_container WHERE profile_id = ? AND jira_key = ?`,
 		profileID, containerKey,
-	).Scan(&kind, &board.Summary)
+	).Scan(&kind, &board.Summary, &description)
 	if errors.Is(err, sql.ErrNoRows) {
 		return board, fmt.Errorf("container %s not found", containerKey)
 	}
 	if err != nil {
 		return board, fmt.Errorf("read container: %w", err)
 	}
+	board.Description = description
 
 	// Member Tests, plus this container's direct run status (meaningful for a
 	// Test Execution). LEFT JOIN both the local test_case cache and the
@@ -2306,6 +2357,26 @@ func (r *Repository) AllTestKeys(profileID string) ([]string, error) {
 			return nil, err
 		}
 		out = append(out, k)
+	}
+	return out, rows.Err()
+}
+
+// AllContainerKeys returns every cached container key for a profile.
+// Used by the cross-project execution discovery pass to identify already-known
+// executions so newly discovered ones can be deduped.
+func (r *Repository) AllContainerKeys(profileID string) (map[string]bool, error) {
+	rows, err := r.db.Query(`SELECT jira_key FROM test_container WHERE profile_id = ?`, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("list container keys: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		out[k] = true
 	}
 	return out, rows.Err()
 }
@@ -4477,10 +4548,10 @@ type scanner interface {
 
 func scanTest(s scanner) (TestCase, error) {
 	var (
-		t            TestCase
-		labels       string
-		components   string
-		fixVersions  string
+		t           TestCase
+		labels      string
+		components  string
+		fixVersions string
 	)
 	if err := s.Scan(
 		&t.Key, &t.ID, &t.Summary, &t.Description,

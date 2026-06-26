@@ -46,6 +46,40 @@ func emitStage(onProgress func(Progress), stage string) {
 	}
 }
 
+// mapRunRows converts a slice of jira.TestRun records (fetched from Xray) into
+// testrepo.TestRunRow values ready for storage. execKey is the owning
+// execution's Jira key. envFallback is joined and used when a run has no
+// Environment value of its own (the Xray testexec/test endpoint omits per-run
+// environments; they are set on the execution as a whole).
+func mapRunRows(runs []jira.TestRun, execKey string, envFallback []string) []testrepo.TestRunRow {
+	rows := make([]testrepo.TestRunRow, 0, len(runs))
+	for _, tr := range runs {
+		defectsJSON := "[]"
+		if len(tr.Defects) > 0 {
+			if b, jerr := json.Marshal(tr.Defects); jerr == nil {
+				defectsJSON = string(b)
+			}
+		}
+		env := tr.Environment
+		if env == "" && len(envFallback) > 0 {
+			env = strings.Join(envFallback, ", ")
+		}
+		rows = append(rows, testrepo.TestRunRow{
+			ExecKey:     execKey,
+			TestKey:     tr.TestKey,
+			RunStatus:   tr.Status,
+			StartedAt:   tr.StartedAt,
+			FinishedAt:  tr.FinishedAt,
+			ExecutedBy:  tr.ExecutedBy,
+			Environment: env,
+			Defects:     defectsJSON,
+			CreatedAt:   tr.CreatedAt,
+			UpdatedAt:   tr.UpdatedAt,
+		})
+	}
+	return rows
+}
+
 // Engine runs a pull sync for one profile.
 type Engine struct {
 	client *jira.Client
@@ -164,6 +198,112 @@ func (e *Engine) SyncContainers(ctx context.Context, profileID, projectKey strin
 // (RND_P_4TFINT_05-214).
 func (e *Engine) SyncBugs(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
 	return e.syncBugs(ctx, profileID, projectKey, onProgress)
+}
+
+// SyncBugRunData refreshes the run/execution data for every test that has at
+// least one bug linked to it in the local store. It calls
+// TestExecutionsForTest per affected test, additively upserts any newly
+// discovered executions and their container links, then replaces the run rows
+// for EVERY execution that test belongs to (not only newly discovered ones) so
+// the run-history breakdown reflects up-to-date results.
+//
+// Errors per test or per execution are logged and skipped (best-effort).
+// The pass respects ctx cancellation between test iterations.
+// In demo mode, per-item throttle sleeps are skipped.
+func (e *Engine) SyncBugRunData(ctx context.Context, profileID string, onProgress func(Progress)) error {
+	emitStage(onProgress, "Refreshing affected-test runs")
+	testKeys, err := e.repo.BugAffectedTestKeys(profileID)
+	if err != nil {
+		return fmt.Errorf("bug affected test keys: %w", err)
+	}
+	isDemo := e.client.IsDemo()
+	for i, testKey := range testKeys {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		containers, links, err := e.client.TestExecutionsForTest(ctx, testKey)
+		if err != nil {
+			log.Printf("xtm: SyncBugRunData: %s: TestExecutionsForTest: %v (skipping)", testKey, err)
+			if !isDemo {
+				time.Sleep(throttle)
+			}
+			continue
+		}
+		if len(containers) != len(links) {
+			log.Printf("xtm: SyncBugRunData: %s: container/link length mismatch (%d vs %d), skipping",
+				testKey, len(containers), len(links))
+			continue
+		}
+
+		// Upsert ALL executions returned by the API additively (new ones get
+		// proper container rows; existing ones are no-ops due to INSERT OR
+		// IGNORE semantics). TestExecutionsForTest returns every execution that
+		// contains testKey across all projects, so this set covers both new and
+		// pre-existing executions.
+		repoContainers := make([]testrepo.Container, 0, len(containers))
+		repoLinks := make([]testrepo.ContainerLink, 0, len(links))
+		for idx, c := range containers {
+			repoContainers = append(repoContainers, testrepo.Container{
+				Key:           c.Key,
+				Kind:          c.Kind,
+				Summary:       c.Summary,
+				Status:        c.Status,
+				ParentKey:     c.ParentKey,
+				ParentSummary: c.ParentSummary,
+				IssueType:     c.IssueType,
+				Environments:  c.Environments,
+				FixVersions:   c.FixVersions,
+				Created:       c.Created,
+				Updated:       c.Updated,
+				Resolved:      c.Resolved,
+				Description:   c.Description,
+			})
+			repoLinks = append(repoLinks, testrepo.ContainerLink{
+				ContainerKey: links[idx].ContainerKey,
+				TestKey:      links[idx].TestKey,
+				RunStatus:    links[idx].RunStatus,
+			})
+		}
+		if uErr := e.repo.UpsertContainers(profileID, repoContainers); uErr != nil {
+			log.Printf("xtm: SyncBugRunData: %s: upsert containers: %v (skipping runs)", testKey, uErr)
+			if !isDemo {
+				time.Sleep(throttle)
+			}
+			continue
+		}
+		if lErr := e.repo.UpsertContainerLinks(profileID, repoLinks); lErr != nil {
+			log.Printf("xtm: SyncBugRunData: %s: upsert links: %v (skipping runs)", testKey, lErr)
+			if !isDemo {
+				time.Sleep(throttle)
+			}
+			continue
+		}
+
+		// Refresh run rows for each execution returned by the API.
+		for _, ct := range repoContainers {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			runs, rErr := e.client.GetTestRuns(ctx, ct.Key)
+			if rErr != nil {
+				log.Printf("xtm: SyncBugRunData: %s: get runs for %s: %v (skipping)", testKey, ct.Key, rErr)
+			} else {
+				if sErr := e.repo.ReplaceRunsForExec(profileID, ct.Key, mapRunRows(runs, ct.Key, ct.Environments)); sErr != nil {
+					log.Printf("xtm: SyncBugRunData: %s: replace runs for %s: %v (skipping)", testKey, ct.Key, sErr)
+				}
+			}
+			if !isDemo {
+				time.Sleep(throttle)
+			}
+		}
+		if onProgress != nil {
+			onProgress(Progress{Stage: "Refreshing affected-test runs", Fetched: i + 1, Total: len(testKeys)})
+		}
+		if !isDemo {
+			time.Sleep(throttle)
+		}
+	}
+	return nil
 }
 
 // the tree response (applied on every sync, free), and — on a full sync only —
@@ -304,6 +444,10 @@ func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey strin
 			IssueType:     c.IssueType,
 			Environments:  c.Environments,
 			FixVersions:   c.FixVersions,
+			Created:       c.Created,
+			Updated:       c.Updated,
+			Resolved:      c.Resolved,
+			Description:   c.Description,
 		}
 	}
 	if err := e.repo.UpsertContainers(profileID, repoContainers); err != nil {
@@ -376,37 +520,9 @@ func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey strin
 		if err != nil {
 			log.Printf("xtm: get test runs for %s: %v (skipping)", execKey, err)
 		} else {
-			rows := make([]testrepo.TestRunRow, 0, len(runs))
-			for _, tr := range runs {
-				defectsJSON := "[]"
-				if len(tr.Defects) > 0 {
-					b, jerr := json.Marshal(tr.Defects)
-					if jerr == nil {
-						defectsJSON = string(b)
-					}
-				}
-				// The Xray Server/DC testexec/test endpoint does not return a
-				// per-run environment; the environment is set on the Test
-				// Execution as a whole. Fall back to the execution's environments
-				// so the run history shows where each run executed.
-				env := tr.Environment
-				if env == "" && len(c.Environments) > 0 {
-					env = strings.Join(c.Environments, ", ")
-				}
-				rows = append(rows, testrepo.TestRunRow{
-					ExecKey:     execKey,
-					TestKey:     tr.TestKey,
-					RunStatus:   tr.Status,
-					StartedAt:   tr.StartedAt,
-					FinishedAt:  tr.FinishedAt,
-					ExecutedBy:  tr.ExecutedBy,
-					Environment: env,
-					Defects:     defectsJSON,
-					CreatedAt:   tr.CreatedAt,
-					UpdatedAt:   tr.UpdatedAt,
-				})
-			}
-			if err := e.repo.ReplaceRunsForExec(profileID, execKey, rows); err != nil {
+			// The Xray Server/DC testexec/test endpoint does not return a
+			// per-run environment; fall back to the execution's environments.
+			if err := e.repo.ReplaceRunsForExec(profileID, execKey, mapRunRows(runs, execKey, c.Environments)); err != nil {
 				log.Printf("xtm: store test runs for %s: %v (skipping)", execKey, err)
 			}
 		}
@@ -421,7 +537,118 @@ func (e *Engine) syncContainers(ctx context.Context, profileID, projectKey strin
 		}
 	}
 
+	emitStage(onProgress, "Discovering cross-project executions")
+	knownKeys, knownErr := e.repo.AllContainerKeys(profileID)
+	if knownErr != nil {
+		log.Printf("xtm: cross-project discovery: read container keys: %v (skipping)", knownErr)
+		return nil
+	}
+	e.discoverCrossProjectExecs(ctx, profileID, knownKeys, onProgress)
 	return nil
+}
+
+// discoverCrossProjectExecs performs a per-test cross-project execution
+// discovery pass after the main container sync. For each test key in the
+// profile, it calls jira.Client.TestExecutionsForTest to find Test Executions
+// in any project (not only the profile project) that include that test. Newly
+// found containers and links are written additively via UpsertContainerLinks
+// so they do not overwrite the project-scoped links that syncContainers already
+// wrote.
+//
+// Errors per test are logged and skipped; a failure on one test does not abort
+// the rest. This is intentionally best-effort: the caller (syncContainers) logs
+// a notice if we cannot read the initial key list, but otherwise continues.
+//
+// In demo mode, time.Sleep is skipped so the full 5000-test pass completes
+// without a 750-second delay.
+func (e *Engine) discoverCrossProjectExecs(ctx context.Context, profileID string, knownExecKeys map[string]bool, onProgress func(Progress)) {
+	testKeys, err := e.repo.AllTestKeys(profileID)
+	if err != nil {
+		log.Printf("xtm: cross-project discovery: list test keys: %v (skipping)", err)
+		return
+	}
+	isDemo := e.client.IsDemo()
+
+	for _, testKey := range testKeys {
+		if ctx.Err() != nil {
+			return
+		}
+		containers, links, err := e.client.TestExecutionsForTest(ctx, testKey)
+		if err != nil {
+			log.Printf("xtm: cross-project discovery: %s: %v (skipping)", testKey, err)
+			if !isDemo {
+				time.Sleep(throttle)
+			}
+			continue
+		}
+
+		// Defensive: containers and links must be parallel slices (same length,
+		// same index). TestExecutionsForTest guarantees this, but guard here
+		// to prevent an out-of-bounds panic if that contract is ever relaxed.
+		if len(containers) != len(links) {
+			log.Printf("xtm: cross-project discovery: %s: container/link length mismatch (%d vs %d), skipping",
+				testKey, len(containers), len(links))
+			continue
+		}
+
+		// Filter to executions not already known from the project sync so we
+		// do not re-insert rows that ReplaceAllContainerLinks already covered.
+		var newContainers []testrepo.Container
+		var newLinks []testrepo.ContainerLink
+		for i, c := range containers {
+			if knownExecKeys[c.Key] {
+				continue
+			}
+			newContainers = append(newContainers, testrepo.Container{
+				Key:           c.Key,
+				Kind:          c.Kind,
+				Summary:       c.Summary,
+				Status:        c.Status,
+				ParentKey:     c.ParentKey,
+				ParentSummary: c.ParentSummary,
+				IssueType:     c.IssueType,
+				Environments:  c.Environments,
+				FixVersions:   c.FixVersions,
+				Created:       c.Created,
+				Updated:       c.Updated,
+				Resolved:      c.Resolved,
+				Description:   c.Description,
+			})
+			newLinks = append(newLinks, testrepo.ContainerLink{
+				ContainerKey: links[i].ContainerKey,
+				TestKey:      links[i].TestKey,
+				RunStatus:    links[i].RunStatus,
+			})
+		}
+
+		if len(newContainers) > 0 {
+			// Upsert the container rows first so the foreign-key side is satisfied.
+			if uErr := e.repo.UpsertContainers(profileID, newContainers); uErr != nil {
+				log.Printf("xtm: cross-project discovery: %s: upsert containers: %v (skipping)", testKey, uErr)
+			} else if lErr := e.repo.UpsertContainerLinks(profileID, newLinks); lErr != nil {
+				log.Printf("xtm: cross-project discovery: %s: upsert links: %v (skipping)", testKey, lErr)
+			} else {
+				// Also fetch and store runs for each newly discovered execution.
+				for _, ct := range newContainers {
+					if ctx.Err() != nil {
+						return
+					}
+					runs, rErr := e.client.GetTestRuns(ctx, ct.Key)
+					if rErr != nil {
+						log.Printf("xtm: cross-project discovery: %s: get runs for %s: %v (skipping)", testKey, ct.Key, rErr)
+					} else {
+						_ = e.repo.ReplaceRunsForExec(profileID, ct.Key, mapRunRows(runs, ct.Key, ct.Environments))
+					}
+					if !isDemo {
+						time.Sleep(throttle)
+					}
+				}
+			}
+		}
+		if !isDemo {
+			time.Sleep(throttle)
+		}
+	}
 }
 
 // harvestExternalBugs upserts the defect issues (and their Test links) reached
@@ -516,8 +743,24 @@ func (e *Engine) syncRequirements(ctx context.Context, profileID, projectKey str
 	return e.repo.ReplaceAllRequirementLinks(profileID, repoLinks)
 }
 
-// syncBugs discovers the defect issues linked to the profile's Tests and
-// reconciles the local cache. Best-effort: failures log and continue.
+// syncBugs discovers the defect issues for the profile and reconciles the local
+// cache. It runs two complementary passes and merges the results:
+//
+//  1. A project-wide search (ListProjectBugs) that returns ALL bugs in the
+//     configured bug project, regardless of whether they are linked to any
+//     synced Test. This fills the Bugs panel with every defect the team has
+//     filed, not just those reachable from synced Tests.
+//
+//  2. The test-link harvest (ListBugs) that reaches bugs through the synced
+//     Tests' issuelinks. This is the only source of BugLink records (which
+//     Test each bug is linked to) and also captures cross-project bugs that
+//     may not live in the configured bug project.
+//
+// The two bug sets are merged (deduped by key); the project-wide record wins
+// when both sources carry the same key because it includes the Updated field.
+// The final merged bugs and the harvest links are stored via ReplaceAllBugs /
+// ReplaceAllBugLinks. If the project-wide search fails it is logged and the
+// sync continues with the link-harvest bugs only.
 func (e *Engine) syncBugs(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) error {
 	// testKeys is a non-nil slice (possibly empty). ListBugs/demoBugs treat nil
 	// as "no filter" and a non-nil empty slice as "nothing", so a profile with
@@ -527,12 +770,45 @@ func (e *Engine) syncBugs(ctx context.Context, profileID, projectKey string, onP
 		return err
 	}
 	issueType := e.repo.ProfileBugIssueType(profileID)
-	bugs, links, err := e.client.ListBugs(ctx, projectKey, testKeys, issueType, nil)
+
+	// Resolve which project to search for all bugs. When the profile is set to
+	// "dedicated" mode with a non-empty key, search that project; otherwise use
+	// the test project (the default).
+	bugProject := projectKey
+	if e.repo.ProfileBugProjectMode(profileID) == "dedicated" {
+		if k := e.repo.ProfileBugProjectKey(profileID); k != "" {
+			bugProject = k
+		}
+	}
+
+	// Pass 1: project-wide bug search (best-effort).
+	projectBugs, projectBugErr := e.client.ListProjectBugs(ctx, bugProject, issueType)
+	if projectBugErr != nil {
+		log.Printf("xtm: project-wide bug search failed (continuing with link harvest only): %v", projectBugErr)
+		projectBugs = nil
+	}
+
+	// Pass 2: link-harvest (authoritative source for BugLink records).
+	harvestBugs, links, err := e.client.ListBugs(ctx, projectKey, testKeys, issueType, nil)
 	if err != nil {
 		return err
 	}
-	repoBugs := make([]testrepo.Bug, 0, len(bugs))
-	for _, b := range bugs {
+
+	// Merge: project-wide bugs seed the map (they have the Updated field);
+	// harvest bugs are added for any key not yet present (e.g. cross-project
+	// bugs linked to tests that are not in the bug project).
+	merged := make(map[string]jira.Bug, len(projectBugs)+len(harvestBugs))
+	for _, b := range projectBugs {
+		merged[b.Key] = b
+	}
+	for _, b := range harvestBugs {
+		if _, exists := merged[b.Key]; !exists {
+			merged[b.Key] = b
+		}
+	}
+
+	repoBugs := make([]testrepo.Bug, 0, len(merged))
+	for _, b := range merged {
 		repoBugs = append(repoBugs, testrepo.Bug{
 			Key: b.Key, ProjectKey: b.ProjectKey, IssueType: b.IssueType,
 			Summary: b.Summary, Status: b.Status, Priority: b.Priority, Updated: b.Updated,

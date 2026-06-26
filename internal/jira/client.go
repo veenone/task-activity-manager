@@ -39,6 +39,13 @@ type Client struct {
 	testTypeName string
 	testTypeErr  error
 
+	// subTaskTEOnce lazily resolves and caches the issue type name(s) used for
+	// sub-task Test Executions on this instance. Their name varies (default "Sub
+	// Test Execution", but instances may rename / localise it), so they are
+	// discovered from the instance issue type list rather than hardcoded.
+	subTaskTEOnce  sync.Once
+	subTaskTENames []string
+
 	// customFieldMu guards customFieldIDs, the per-instance cache of resolved
 	// custom field ids keyed by field name (see resolveCustomFieldID), so a sync
 	// or commit resolves a given field (e.g. "Test Type") from /rest/api/2/field
@@ -161,6 +168,9 @@ func NewClient(baseURL, token string, opts ...Option) *Client {
 		http:    buildHTTPClient(cfg),
 	}
 }
+
+// IsDemo reports whether this client is in demo mode (no Jira network calls).
+func (c *Client) IsDemo() bool { return isDemoURL(c.baseURL) }
 
 // TestConnection verifies the base URL and token by fetching the current user
 // (FR-8.4). It returns the authenticated user on success. Demo URLs

@@ -210,6 +210,10 @@ export function ExcludeFromDuplicates(arg1, arg2) {
   return window['go']['main']['App']['ExcludeFromDuplicates'](arg1, arg2);
 }
 
+export function ExportBugsWithRunHistory(arg1, arg2) {
+  return window['go']['main']['App']['ExportBugsWithRunHistory'](arg1, arg2);
+}
+
 export function ExportDashboard(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ExportDashboard'](arg1, arg2, arg3, arg4);
 }
@@ -252,6 +256,10 @@ export function ExportTests(arg1, arg2) {
 
 export function ExportTraceability(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['ExportTraceability'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function GetBugDetail(arg1, arg2) {
+  return window['go']['main']['App']['GetBugDetail'](arg1, arg2);
 }
 
 export function GetBulkTransitionOptions(arg1, arg2) {

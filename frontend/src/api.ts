@@ -92,6 +92,7 @@ export {
   ExportDashboard,
   AnalyzeGap,
   CreateTestsFromGaps,
+  ExportBugsWithRunHistory,
   ExportGapReport,
   CreateSavedView,
   ListSavedViews,
@@ -141,6 +142,7 @@ export {
   ExcludeFromDuplicates,
   UnexcludeFromDuplicates,
   CreateBugForTest,
+  GetBugDetail,
   ListBugsWithTests,
   ListBugsForContainer,
   GetTestBugs,
@@ -373,6 +375,7 @@ export interface Container {
   issueType: string;  // Jira issuetype name (e.g. "Sub Test Execution"); informational
   environments: string[]; // Xray Test Environments (Test Executions only; empty otherwise)
   fixVersions: string[]; // Jira Fix Version(s), read-only (Test Executions only; empty otherwise)
+  description: string;  // Jira issue description (plain text)
 }
 
 // AllocateResult mirrors testrepo.AllocateResult — the outcome of a bulk
@@ -423,6 +426,7 @@ export interface TestPlanBoardRow {
 export interface TestPlanBoard {
   key: string;
   summary: string;
+  description: string;
   rows: TestPlanBoardRow[];
   runCounts: Bucket[];
 }
@@ -761,6 +765,17 @@ export interface Sankey {
   links: SankeyLink[];
 }
 
+// BugDetail mirrors jira.BugDetail - the extended fields for a defect issue
+// fetched lazily on detail-panel open (description + three custom fields).
+export interface BugDetail {
+  description: string;
+  defectOrigin: string;
+  defectAnalysis: string;
+  correctionDetails: string;
+  reporter: string;
+  severity: string;
+}
+
 // Bug mirrors testrepo.Bug - a cached defect issue (possibly cross-project)
 // linked to Tests. Returned by ListBugsForContainer for an execution's related
 // defects.
@@ -779,9 +794,13 @@ export interface Bug {
 export interface BugWithTests {
   key: string;
   projectKey: string;
+  // issueType is the Jira issue type of the bug (e.g. "Bug", "Defect").
+  issueType: string;
   summary: string;
   status: string;
   priority: string;
+  // updated is the Jira last-updated timestamp for the bug issue.
+  updated: string;
   testKeys: string[];
 }
 
@@ -822,6 +841,18 @@ export interface TestRunEntry {
   defects: string[];
   createdAt: string;
   updatedAt: string;
+  // execIssueType is the execution's Jira issue type ("Test Execution" or "Sub
+  // Test Execution"); execParentKey / execParentSummary identify a sub-task
+  // execution's parent issue (empty for standalone executions).
+  execIssueType: string;
+  execParentKey: string;
+  execParentSummary: string;
+  // execCreated, execUpdated, execResolved are the Test Execution issue's
+  // created, updated, and resolution timestamps (ISO-8601, empty when unknown
+  // or unresolved).
+  execCreated: string;
+  execUpdated: string;
+  execResolved: string;
 }
 
 // RunRollup mirrors testrepo.RunRollup — run-result roll-up for a Test Plan or

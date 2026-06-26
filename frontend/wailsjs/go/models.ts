@@ -1,5 +1,27 @@
 export namespace jira {
 	
+	export class BugDetail {
+	    description: string;
+	    defectOrigin: string;
+	    defectAnalysis: string;
+	    correctionDetails: string;
+	    reporter: string;
+	    severity: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BugDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.description = source["description"];
+	        this.defectOrigin = source["defectOrigin"];
+	        this.defectAnalysis = source["defectAnalysis"];
+	        this.correctionDetails = source["correctionDetails"];
+	        this.reporter = source["reporter"];
+	        this.severity = source["severity"];
+	    }
+	}
 	export class TestMeta {
 	    created: string;
 	    creator: string;
@@ -485,9 +507,11 @@ export namespace testrepo {
 	export class BugWithTests {
 	    key: string;
 	    projectKey: string;
+	    issueType: string;
 	    summary: string;
 	    status: string;
 	    priority: string;
+	    updated: string;
 	    testKeys: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -498,9 +522,11 @@ export namespace testrepo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
 	        this.projectKey = source["projectKey"];
+	        this.issueType = source["issueType"];
 	        this.summary = source["summary"];
 	        this.status = source["status"];
 	        this.priority = source["priority"];
+	        this.updated = source["updated"];
 	        this.testKeys = source["testKeys"];
 	    }
 	}
@@ -599,11 +625,15 @@ export namespace testrepo {
 	    issueType: string;
 	    environments: string[];
 	    fixVersions: string[];
-
+	    created: string;
+	    updated: string;
+	    resolved: string;
+	    description: string;
+	
 	    static createFrom(source: any = {}) {
 	        return new Container(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
@@ -615,6 +645,10 @@ export namespace testrepo {
 	        this.issueType = source["issueType"];
 	        this.environments = source["environments"];
 	        this.fixVersions = source["fixVersions"];
+	        this.created = source["created"];
+	        this.updated = source["updated"];
+	        this.resolved = source["resolved"];
+	        this.description = source["description"];
 	    }
 	}
 	export class ContainerMembership {
@@ -1810,6 +1844,7 @@ export namespace testrepo {
 	export class TestPlanBoard {
 	    key: string;
 	    summary: string;
+	    description: string;
 	    rows: TestPlanBoardRow[];
 	    runCounts: Bucket[];
 	
@@ -1821,6 +1856,7 @@ export namespace testrepo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
 	        this.summary = source["summary"];
+	        this.description = source["description"];
 	        this.rows = this.convertValues(source["rows"], TestPlanBoardRow);
 	        this.runCounts = this.convertValues(source["runCounts"], Bucket);
 	    }
@@ -1857,6 +1893,12 @@ export namespace testrepo {
 	    defects: string[];
 	    createdAt: string;
 	    updatedAt: string;
+	    execIssueType: string;
+	    execParentKey: string;
+	    execParentSummary: string;
+	    execCreated: string;
+	    execUpdated: string;
+	    execResolved: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TestRunEntry(source);
@@ -1876,6 +1918,12 @@ export namespace testrepo {
 	        this.defects = source["defects"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
+	        this.execIssueType = source["execIssueType"];
+	        this.execParentKey = source["execParentKey"];
+	        this.execParentSummary = source["execParentSummary"];
+	        this.execCreated = source["execCreated"];
+	        this.execUpdated = source["execUpdated"];
+	        this.execResolved = source["execResolved"];
 	    }
 	}
 

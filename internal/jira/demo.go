@@ -413,6 +413,27 @@ var demoRunStatuses = []string{
 	"BLOCKED",
 }
 
+// demoExecTimestamps returns deterministic ISO-8601 created, updated, and
+// resolved timestamps for the i-th demo Test Execution. The dates are fixed
+// (not derived from time.Now) so demo mode is fully deterministic across
+// calls. Resolved is non-empty only for executions whose seeded status is
+// "Done" (every third execution starting at index 1), matching the pattern in
+// demoExecStatuses. All other executions get an empty resolved string.
+func demoExecTimestamps(idx int) (created, updated, resolved string) {
+	// Base date: 2026-01-01. Each exec is spaced 7 days apart for created, and
+	// 14 days apart for updated, so the history breakdown shows distinct dates.
+	base := 1735689600 // 2026-01-01T00:00:00Z in Unix seconds (fixed)
+	_ = base           // actual formatting uses the offset arithmetic below
+	day := idx * 7
+	created = fmt.Sprintf("2026-01-%02dT09:00:00Z", 1+day%28)
+	updated = fmt.Sprintf("2026-01-%02dT17:00:00Z", 1+(day+14)%28)
+	// demoExecStatuses cycles ["In Progress", "Done", "Open"]; "Done" is at i%3==1.
+	if idx%3 == 1 {
+		resolved = fmt.Sprintf("2026-01-%02dT18:00:00Z", 1+(day+14)%28)
+	}
+	return created, updated, resolved
+}
+
 // demoEnvironments returns a deterministic, non-empty subset of the environment
 // pool for the i-th execution, cycling subsets so different executions show
 // different environment chips.
@@ -440,6 +461,13 @@ func demoFixVersions(i int) []string {
 		{"1.5.0", "1.6.0"},
 	}
 	return subsets[i%len(subsets)]
+}
+
+// demoExecDescription returns a deterministic Markdown description for a demo
+// Test Execution identified by key. The text uses headings and bullet points so
+// the frontend markdown renderer has content to display.
+func demoExecDescription(key string) string {
+	return fmt.Sprintf("## %s\n\n**Scope:** Regression suite for this cycle.\n\n- Covers authentication, checkout, and API rate-limit paths\n- Environment: see execution header\n- Linked to release milestone via Fix Versions", key)
 }
 
 // demoLinkedTests caps how many of the low-numbered demo Tests get container
@@ -488,6 +516,7 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 	for i := 0; i < execCount; i++ {
 		key := fmt.Sprintf("%s-TE-%d", projectKey, i+1)
 		execKeys[i] = key
+		created, updated, resolved := demoExecTimestamps(i)
 		containers = append(containers, Container{
 			Key:          key,
 			Kind:         KindTestExec,
@@ -495,6 +524,10 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 			Status:       demoExecStatuses[i%len(demoExecStatuses)],
 			Environments: demoEnvironments(i),
 			FixVersions:  demoFixVersions(i),
+			Created:      created,
+			Updated:      updated,
+			Resolved:     resolved,
+			Description:  demoExecDescription(key),
 		})
 	}
 
@@ -506,6 +539,7 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 	const crossProject = demoCrossProjectKey
 	crossExecKeys := []string{crossProject + "-TE-1", crossProject + "-TE-2"}
 	for i, key := range crossExecKeys {
+		created, updated, resolved := demoExecTimestamps(execCount + i)
 		containers = append(containers, Container{
 			Key:          key,
 			Kind:         KindTestExec,
@@ -513,6 +547,10 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 			Status:       demoExecStatuses[i%len(demoExecStatuses)],
 			Environments: demoEnvironments(execCount + i),
 			FixVersions:  demoFixVersions(execCount + i),
+			Created:      created,
+			Updated:      updated,
+			Resolved:     resolved,
+			Description:  demoExecDescription(key),
 		})
 	}
 
@@ -522,6 +560,7 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 	// board via the external_test cache (populated by the sync's missing-keys pass
 	// calling ListTestsBasic, which returns basics for XRAYINT-* keys below).
 	xprojExecKey := fmt.Sprintf("%s-TE-XPROJ", projectKey)
+	xprojCreated, xprojUpdated, xprojResolved := demoExecTimestamps(execCount + len(crossExecKeys))
 	containers = append(containers, Container{
 		Key:          xprojExecKey,
 		Kind:         KindTestExec,
@@ -529,6 +568,10 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 		Status:       demoExecStatuses[0],
 		Environments: demoEnvironments(0),
 		FixVersions:  demoFixVersions(0),
+		Created:      xprojCreated,
+		Updated:      xprojUpdated,
+		Resolved:     xprojResolved,
+		Description:  demoExecDescription(xprojExecKey),
 	})
 	for i := 1; i <= demoExternalMembers; i++ {
 		links = append(links, ContainerLink{
@@ -543,19 +586,25 @@ func demoContainersAndLinks(projectKey string) ([]Container, []ContainerLink, er
 	// offline. They are still Kind=testexec and behave like standalone ones.
 	const subExecCount = 2
 	subExecKeys := make([]string, subExecCount)
+	subExecOffset := execCount + len(crossExecKeys) + 1 // +1 for the xproj exec
 	for i := 0; i < subExecCount; i++ {
 		key := fmt.Sprintf("%s-STE-%d", projectKey, i+1)
 		subExecKeys[i] = key
+		created, updated, resolved := demoExecTimestamps(subExecOffset + i)
 		containers = append(containers, Container{
-			Key:          key,
-			Kind:         KindTestExec,
-			Summary:      fmt.Sprintf("Sub-execution for story %d", i+1),
-			Status:       demoExecStatuses[i%len(demoExecStatuses)],
+			Key:           key,
+			Kind:          KindTestExec,
+			Summary:       fmt.Sprintf("Sub-execution for story %d", i+1),
+			Status:        demoExecStatuses[i%len(demoExecStatuses)],
 			ParentKey:     fmt.Sprintf("%s-S-%d", projectKey, i+1),
 			ParentSummary: fmt.Sprintf("Story %d", i+1),
-			IssueType:    "Sub Test Execution",
-			Environments: demoEnvironments(execCount + len(crossExecKeys) + i),
-			FixVersions:  demoFixVersions(execCount + len(crossExecKeys) + i),
+			IssueType:     "Sub Test Execution",
+			Environments:  demoEnvironments(subExecOffset + i),
+			FixVersions:   demoFixVersions(subExecOffset + i),
+			Created:       created,
+			Updated:       updated,
+			Resolved:      resolved,
+			Description:   demoExecDescription(key),
 		})
 	}
 
@@ -655,6 +704,71 @@ const demoExternalMembers = 4
 // (distinct from the profile's project), used by both the container seed and the
 // ListTestsBasic demo path so they agree on the foreign member keys.
 const demoCrossProjectKey = "XRAYINT"
+
+// demoCrossProjectSubExecKey is the key of the cross-project sub-task Test
+// Execution seeded for the per-test discovery path. It lives in the
+// demoCrossProjectKey (XRAYINT) project, which is a different project from the
+// profile's test project (e.g. DEMO). This execution is NOT returned by
+// demoContainersAndLinks("DEMO") -- it is discoverable only via
+// TestExecutionsForTest, matching the live scenario where a sub-task exec in
+// another project runs this project's tests but is invisible to the project-
+// scoped container search.
+//
+// Member rule: DEMO test at index i (0-based) is a member when i%11 == 0.
+// This is distinct from the 5th (sub-task) and 7th (cross-project TE) rules
+// already in demoContainersAndLinks so the three populations do not collide,
+// keeping test counts deterministic and easy to verify.
+const demoCrossProjectSubExecKey = demoCrossProjectKey + "-STE-1"
+
+// demoCrossProjectSubExecMember reports whether the DEMO test at 0-based
+// index i is a member of the cross-project sub-task execution.
+func demoCrossProjectSubExecMember(i int) bool { return i%11 == 0 }
+
+// demoCrossProjectSubExec is the Container descriptor for the cross-project
+// sub-task Test Execution seeded by the per-test discovery path. It is a
+// Kind=testexec sub-task (IssueType "Sub Test Execution") whose parent is a
+// story in the XRAYINT project, and which runs some of the profile project's
+// tests.
+func demoCrossProjectSubExec() Container {
+	// Use a fixed index (20) so the timestamps are stable across calls.
+	created, updated, resolved := demoExecTimestamps(20)
+	return Container{
+		Key:           demoCrossProjectSubExecKey,
+		Kind:          KindTestExec,
+		Summary:       "Cross-project sub-execution",
+		Status:        "In Progress",
+		ParentKey:     demoCrossProjectKey + "-S-1",
+		ParentSummary: "Cross-project story 1",
+		IssueType:     "Sub Test Execution",
+		Environments:  []string{"Staging"},
+		FixVersions:   []string{"1.5.0"},
+		Created:       created,
+		Updated:       updated,
+		Resolved:      resolved,
+		Description:   demoExecDescription(demoCrossProjectSubExecKey),
+	}
+}
+
+// demoTestExecutionsForTest returns the Containers and ContainerLinks that
+// TestExecutionsForTest should return for a given test key in demo mode.
+// Only tests that match the demoCrossProjectSubExecMember rule (i%11 == 0)
+// are members of the cross-project sub-task execution; all others return empty.
+//
+// The project key is inferred from the test key prefix so the rule works for
+// any demo project (DEMO-11, QA-11, etc.).
+func demoTestExecutionsForTest(testKey string) ([]Container, []ContainerLink) {
+	idx := demoKeyIndex(testKey)
+	if idx < 0 || !demoCrossProjectSubExecMember(idx) {
+		return []Container{}, []ContainerLink{}
+	}
+	exec := demoCrossProjectSubExec()
+	link := ContainerLink{
+		ContainerKey: demoCrossProjectSubExecKey,
+		TestKey:      testKey,
+		RunStatus:    demoRunStatuses[(idx+3)%len(demoRunStatuses)],
+	}
+	return []Container{exec}, []ContainerLink{link}
+}
 
 // demoCrossProjectBug is the demo defect reached only through a cross-project
 // member Test of the demo *-TE-XPROJ execution (#219). It lives in a defect
