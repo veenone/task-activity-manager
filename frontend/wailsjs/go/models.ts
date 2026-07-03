@@ -1,5 +1,57 @@
 export namespace jira {
 	
+	export class BugFieldOption {
+	    id: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BugFieldOption(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.value = source["value"];
+	    }
+	}
+	export class BugCreateField {
+	    id: string;
+	    name: string;
+	    required: boolean;
+	    type: string;
+	    allowedValues: BugFieldOption[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BugCreateField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.required = source["required"];
+	        this.type = source["type"];
+	        this.allowedValues = this.convertValues(source["allowedValues"], BugFieldOption);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class BugDetail {
 	    description: string;
 	    defectOrigin: string;
@@ -22,6 +74,7 @@ export namespace jira {
 	        this.severity = source["severity"];
 	    }
 	}
+	
 	export class TestMeta {
 	    created: string;
 	    creator: string;
@@ -248,6 +301,7 @@ export namespace settings {
 	export class Settings {
 	    defaultProfileId: string;
 	    theme: string;
+	    requirementLinkType: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -257,6 +311,7 @@ export namespace settings {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.defaultProfileId = source["defaultProfileId"];
 	        this.theme = source["theme"];
+	        this.requirementLinkType = source["requirementLinkType"];
 	    }
 	}
 
@@ -1289,6 +1344,7 @@ export namespace testrepo {
 	    summary: string;
 	    type: string;
 	    description: string;
+	    condition: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Precondition(source);
@@ -1300,6 +1356,7 @@ export namespace testrepo {
 	        this.summary = source["summary"];
 	        this.type = source["type"];
 	        this.description = source["description"];
+	        this.condition = source["condition"];
 	    }
 	}
 	export class PreconditionTest {
@@ -1323,6 +1380,7 @@ export namespace testrepo {
 	    summary: string;
 	    type: string;
 	    description: string;
+	    condition: string;
 	    testCount: number;
 	
 	    static createFrom(source: any = {}) {
@@ -1335,6 +1393,7 @@ export namespace testrepo {
 	        this.summary = source["summary"];
 	        this.type = source["type"];
 	        this.description = source["description"];
+	        this.condition = source["condition"];
 	        this.testCount = source["testCount"];
 	    }
 	}
@@ -1370,6 +1429,24 @@ export namespace testrepo {
 	        this.offset = source["offset"];
 	    }
 	}
+	export class ReqReqLink {
+	    fromKey: string;
+	    toKey: string;
+	    linkType: string;
+	    linkId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReqReqLink(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fromKey = source["fromKey"];
+	        this.toKey = source["toKey"];
+	        this.linkType = source["linkType"];
+	        this.linkId = source["linkId"];
+	    }
+	}
 	export class Requirement {
 	    key: string;
 	    projectKey: string;
@@ -1377,6 +1454,12 @@ export namespace testrepo {
 	    summary: string;
 	    status: string;
 	    updated: string;
+	    priority: string;
+	    components: string;
+	    fixVersions: string;
+	    sprint: string;
+	    description: string;
+	    epicKey: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Requirement(source);
@@ -1390,6 +1473,12 @@ export namespace testrepo {
 	        this.summary = source["summary"];
 	        this.status = source["status"];
 	        this.updated = source["updated"];
+	        this.priority = source["priority"];
+	        this.components = source["components"];
+	        this.fixVersions = source["fixVersions"];
+	        this.sprint = source["sprint"];
+	        this.description = source["description"];
+	        this.epicKey = source["epicKey"];
 	    }
 	}
 	export class RequirementCoverage {
@@ -1400,6 +1489,12 @@ export namespace testrepo {
 	    status: string;
 	    testCount: number;
 	    coverage: string;
+	    priority: string;
+	    components: string;
+	    fixVersions: string;
+	    sprint: string;
+	    description: string;
+	    epicKey: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new RequirementCoverage(source);
@@ -1414,8 +1509,105 @@ export namespace testrepo {
 	        this.status = source["status"];
 	        this.testCount = source["testCount"];
 	        this.coverage = source["coverage"];
+	        this.priority = source["priority"];
+	        this.components = source["components"];
+	        this.fixVersions = source["fixVersions"];
+	        this.sprint = source["sprint"];
+	        this.description = source["description"];
+	        this.epicKey = source["epicKey"];
 	    }
 	}
+	export class RequirementImportRow {
+	    summary: string;
+	    description: string;
+	    priority: string;
+	    components: string;
+	    fixVersions: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequirementImportRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.summary = source["summary"];
+	        this.description = source["description"];
+	        this.priority = source["priority"];
+	        this.components = source["components"];
+	        this.fixVersions = source["fixVersions"];
+	        this.status = source["status"];
+	    }
+	}
+	export class RequirementImportPreview {
+	    rows: RequirementImportRow[];
+	    newCount: number;
+	    existingCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequirementImportPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rows = this.convertValues(source["rows"], RequirementImportRow);
+	        this.newCount = source["newCount"];
+	        this.existingCount = source["existingCount"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RequirementImportResult {
+	    created: number;
+	    skippedExisting: number;
+	    errors: ImportError[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RequirementImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.created = source["created"];
+	        this.skippedExisting = source["skippedExisting"];
+	        this.errors = this.convertValues(source["errors"], ImportError);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class RequirementSource {
 	    projectKey: string;
 	    issueTypes: string;
@@ -1615,6 +1807,7 @@ export namespace testrepo {
 	    updatedTrend: Bucket[];
 	    byRunStatus: Bucket[];
 	    byCoverage: Bucket[];
+	    byRequirement: Bucket[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Statistics(source);
@@ -1638,6 +1831,7 @@ export namespace testrepo {
 	        this.updatedTrend = this.convertValues(source["updatedTrend"], Bucket);
 	        this.byRunStatus = this.convertValues(source["byRunStatus"], Bucket);
 	        this.byCoverage = this.convertValues(source["byCoverage"], Bucket);
+	        this.byRequirement = this.convertValues(source["byRequirement"], Bucket);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
