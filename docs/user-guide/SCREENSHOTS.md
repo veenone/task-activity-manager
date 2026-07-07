@@ -17,6 +17,21 @@ hosts the Sankeys — they moved to the new **Traceability** tab), and **26/27**
 (now on the Traceability tab, not the Dashboard). New shots to add: **37**
 (Bugs panel) and **38** (Sub-task traceability Sankey).
 
+**Refresh for 1.6.0.** Re-shoot these because their UI changed: **06** (Browse
+now has an **Execution Type** column and filter), **18** (the Requirements detail
+gains **+ Add tests**), **20/21** (Duplicates adds **Compare summaries**), **25**
+(the Dashboard gains folder / component / status filters and **Export XLSX**),
+and **27** (the Traceability toolbar gains **Export XLSX** and the **include
+cross-project members** toggle). New shots to add: **39** (Gap Analysis setup),
+**40** (Gap Analysis results), and **41** (Test Environments and Fix Version(s)
+on a Test Execution).
+
+**New for 1.7.0a.** Add: **42** (Run history on a test), **43** (execution run
+columns: date / tester / environment), **44** (Plan / Set run roll-up), **45**
+(bug affected-tests breakdown), **46** (read-only test detail in the Bugs view),
+**47** (add tests to an existing execution), **48** (PAT show/hide toggle), and
+**49** (TLS / certificate settings).
+
 ## How to capture
 
 1. **Run the app on a demo profile** so every screen has rich data and no Jira is
@@ -78,8 +93,29 @@ hosts the Sankeys — they moved to the new **Traceability** tab), and **26/27**
 | 36 | `36-clone-steps.png` | Test detail → Steps → **Clone from…** | The clone-steps picker with a source test selected |
 | 37 | `37-bugs-panel.png` | **Containers** tab → **Bugs** toggle | The Bugs master list + a selected bug's detail and the tests it affects |
 | 38 | `38-subtask-sankey.png` | **Traceability** tab → **Sub-task** | The Parent → Execution → run-result Sankey with the Parent filter |
-| 39 | `39-gap-analysis.png` | **Gap Analysis** tab | Reference = **Upload file**, so both **Choose file** buttons show; crop the setup card (`.gap-setup`) |
+| 39 | `39-gap-analysis.png` | **Gap Analysis** tab | The setup form: Reference (project / file), Target file, Compare by, Three-way, and Download template |
+| 40 | `40-gap-analysis-result.png` | Gap Analysis → fill a target → **Run** | The result: missing-from-reference and missing-from-target lists with select-and-**Add tests** and **Export report** |
+| 41 | `41-execution-environments.png` | **Containers** → kind **Test Execution**, select an execution | The execution detail showing editable **Test Environments** chips and read-only **Fix Version(s)** |
+| 42 | `42-run-history.png` | Browse → open a test → **Run history** section | The Run history table: execution, result, date, tester, environment, plan, fix versions, defects |
+| 43 | `43-execution-runs.png` | **Containers** → kind **Test Execution**, select one | Member table showing the run **Date / By / Environment** columns beside the editable result |
+| 44 | `44-plan-rollup.png` | **Containers** → kind **Test Plan**, select a plan | The run roll-up bar above the board (passed / failed / not-run / executing / aborted / blocked) |
+| 45 | `45-bug-breakdown.png` | **Containers → Bugs**, select a bug, expand an affected test | The affected-tests table with the **Project** column and an expanded per-test run breakdown |
+| 46 | `46-bug-test-detail.png` | Bugs → affected test → open-detail (↗) icon | The read-only test detail open as a side panel to the right of the bug detail |
+| 47 | `47-add-to-execution.png` | Bugs → check one or more bugs → **Add to execution…** | The picker modal listing existing Test Executions with a search box |
+| 48 | `48-pat-toggle.png` | **Profile → New profile…** (or Edit) | The Personal Access Token field with its show/hide (eye) toggle |
+| 49 | `49-tls-settings.png` | Profile form → expand **Advanced: TLS / certificate settings** | The CA certificate (PEM) textarea and the allow-untrusted checkbox |
+| 50 | `50-junit-new-exec.png` | **Containers** → kind **Test Execution** → **New exec from JUnit XML** | The dialog: execution summary, **Create missing tests** checkbox, and the file picker |
+| 52 | `52-exec-fixversion-filter.png` | **Containers** → kind **Test Execution**, select one | The member table with the per-test **Fix Version** column and full-colour run-status results |
+| 53 | `53-requirement-test-detail.png` | **Requirements** → pick a requirement with covering tests → click a covering test | The covering test's read-only detail open as a right-side panel |
 | 54 | `54-profile-locked-sync.png` | Any view → click **Sync**, capture mid-sync | Tight crop of the **top bar** with the profile selector greyed out and the Sync button reading "Syncing…" |
+
+**Refresh for 1.7.0a (post-alpha).** Re-shoot these because their UI changed:
+**26** (Requirement Sankey now has the **Test** column — 5 layers), **38**
+(Sub-task Sankey parents show **key — summary**), and **45** (the bug affected-test
+breakdown is now **grouped by Test Plan** with **Created / Updated** columns).
+Figure 51 (the JUnit import **preview** into an existing execution) is omitted —
+it needs a real JUnit file through a native file dialog, so the guide describes it
+in text instead.
 
 To refresh a shot: run `wails dev`, open `http://localhost:34115/` in the
 `browse` tool, switch to the **Demo Project (DEMO)** profile, sync once, then
