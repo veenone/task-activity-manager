@@ -6,6 +6,10 @@ export function AddCalledTestStep(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddCalledTestStep'](arg1, arg2, arg3);
 }
 
+export function AddConnection(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13) {
+  return window['go']['main']['App']['AddConnection'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
+}
+
 export function AddTestComment(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddTestComment'](arg1, arg2, arg3);
 }
@@ -114,6 +118,10 @@ export function CommitPendingChangesByIDs(arg1, arg2) {
   return window['go']['main']['App']['CommitPendingChangesByIDs'](arg1, arg2);
 }
 
+export function ComputeBridgeGap(arg1, arg2) {
+  return window['go']['main']['App']['ComputeBridgeGap'](arg1, arg2);
+}
+
 export function CreateBugForTest(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['CreateBugForTest'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
@@ -142,12 +150,12 @@ export function CreatePreconditionDetailed(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreatePreconditionDetailed'](arg1, arg2, arg3, arg4);
 }
 
-export function CreateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
-  return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+export function CreateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
-export function CreateProfileReusingToken(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
-  return window['go']['main']['App']['CreateProfileReusingToken'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+export function CreateProfileReusingToken(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['CreateProfileReusingToken'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 
 export function CreateRequirement(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
@@ -180,6 +188,10 @@ export function DeleteCanonicalRequirement(arg1, arg2) {
 
 export function DeleteChangeRequest(arg1, arg2) {
   return window['go']['main']['App']['DeleteChangeRequest'](arg1, arg2);
+}
+
+export function DeleteConnection(arg1) {
+  return window['go']['main']['App']['DeleteConnection'](arg1);
 }
 
 export function DeleteContainer(arg1, arg2) {
@@ -318,6 +330,10 @@ export function ExportTraceability(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['ExportTraceability'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
+export function GetBridgeMapping(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetBridgeMapping'](arg1, arg2, arg3);
+}
+
 export function GetBugCreateFields(arg1) {
   return window['go']['main']['App']['GetBugCreateFields'](arg1);
 }
@@ -336,6 +352,10 @@ export function GetCRAdoption(arg1, arg2) {
 
 export function GetCRImpact(arg1, arg2) {
   return window['go']['main']['App']['GetCRImpact'](arg1, arg2);
+}
+
+export function GetCapabilities(arg1) {
+  return window['go']['main']['App']['GetCapabilities'](arg1);
 }
 
 export function GetContainerBoard(arg1, arg2) {
@@ -510,6 +530,10 @@ export function ListComponents(arg1) {
   return window['go']['main']['App']['ListComponents'](arg1);
 }
 
+export function ListConnections(arg1) {
+  return window['go']['main']['App']['ListConnections'](arg1);
+}
+
 export function ListContainers(arg1, arg2) {
   return window['go']['main']['App']['ListContainers'](arg1, arg2);
 }
@@ -618,6 +642,10 @@ export function PreviewImport(arg1, arg2) {
   return window['go']['main']['App']['PreviewImport'](arg1, arg2);
 }
 
+export function PublishToTarget(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PublishToTarget'](arg1, arg2, arg3);
+}
+
 export function ReadLog(arg1) {
   return window['go']['main']['App']['ReadLog'](arg1);
 }
@@ -660,6 +688,10 @@ export function ResolveConflictOverride(arg1, arg2, arg3) {
 
 export function RunStatuses() {
   return window['go']['main']['App']['RunStatuses']();
+}
+
+export function SaveBridgeMapping(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SaveBridgeMapping'](arg1, arg2, arg3, arg4);
 }
 
 export function ScanAllDuplicateSteps(arg1) {
@@ -790,8 +822,8 @@ export function SyncTests(arg1) {
   return window['go']['main']['App']['SyncTests'](arg1);
 }
 
-export function TestConnection(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['TestConnection'](arg1, arg2, arg3, arg4);
+export function TestConnection(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['TestConnection'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function TestProfileConnection(arg1, arg2, arg3, arg4) {
@@ -814,8 +846,12 @@ export function UpdateChangeRequest(arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
   return window['go']['main']['App']['UpdateChangeRequest'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
-export function UpdateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
-  return window['go']['main']['App']['UpdateProfile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+export function UpdateConnection(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13) {
+  return window['go']['main']['App']['UpdateConnection'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
+}
+
+export function UpdateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) {
+  return window['go']['main']['App']['UpdateProfile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
 }
 
 export function UpdateProfileScope(arg1, arg2) {

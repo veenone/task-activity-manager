@@ -1,3 +1,219 @@
+export namespace backend {
+	
+	export class Capabilities {
+	    name: string;
+	    idStyle: string;
+	    supportsJqlScope: boolean;
+	    stepModel: string;
+	    supportsTestTypes: boolean;
+	    supportsFolders: boolean;
+	    supportsPreconditionObjects: boolean;
+	    supportsRequirementObjects: boolean;
+	    supportsIssueLinkTypes: boolean;
+	    supportsEnvironments: boolean;
+	    supportsContainers: boolean;
+	    containerKinds: string[];
+	    supportsTestRuns: boolean;
+	    statusModel: string;
+	    supportsWorkflowTransitions: boolean;
+	    supportsBugCreation: boolean;
+	    supportsBugLinks: boolean;
+	    supportsTags: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Capabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.idStyle = source["idStyle"];
+	        this.supportsJqlScope = source["supportsJqlScope"];
+	        this.stepModel = source["stepModel"];
+	        this.supportsTestTypes = source["supportsTestTypes"];
+	        this.supportsFolders = source["supportsFolders"];
+	        this.supportsPreconditionObjects = source["supportsPreconditionObjects"];
+	        this.supportsRequirementObjects = source["supportsRequirementObjects"];
+	        this.supportsIssueLinkTypes = source["supportsIssueLinkTypes"];
+	        this.supportsEnvironments = source["supportsEnvironments"];
+	        this.supportsContainers = source["supportsContainers"];
+	        this.containerKinds = source["containerKinds"];
+	        this.supportsTestRuns = source["supportsTestRuns"];
+	        this.statusModel = source["statusModel"];
+	        this.supportsWorkflowTransitions = source["supportsWorkflowTransitions"];
+	        this.supportsBugCreation = source["supportsBugCreation"];
+	        this.supportsBugLinks = source["supportsBugLinks"];
+	        this.supportsTags = source["supportsTags"];
+	    }
+	}
+
+}
+
+export namespace bridge {
+	
+	export class Gap {
+	    feature: string;
+	    severity: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Gap(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.feature = source["feature"];
+	        this.severity = source["severity"];
+	        this.message = source["message"];
+	    }
+	}
+	export class Mapping {
+	    statusMap: Record<string, string>;
+	    stepMode: string;
+	    fieldMap: Record<string, string>;
+	    unmappedPolicy: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Mapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.statusMap = source["statusMap"];
+	        this.stepMode = source["stepMode"];
+	        this.fieldMap = source["fieldMap"];
+	        this.unmappedPolicy = source["unmappedPolicy"];
+	    }
+	}
+	export class PublishFailure {
+	    localKey: string;
+	    error: string;
+	    targetKey?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new PublishFailure(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.localKey = source["localKey"];
+	        this.error = source["error"];
+	        this.targetKey = source["targetKey"];
+	    }
+	}
+	export class PublishedTest {
+	    localKey: string;
+	    targetKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PublishedTest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.localKey = source["localKey"];
+	        this.targetKey = source["targetKey"];
+	    }
+	}
+	export class PublishResult {
+	    created: PublishedTest[];
+	    alreadyPublished: string[];
+	    failed: PublishFailure[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PublishResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.created = this.convertValues(source["created"], PublishedTest);
+	        this.alreadyPublished = source["alreadyPublished"];
+	        this.failed = this.convertValues(source["failed"], PublishFailure);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace connection {
+	
+	export class Connection {
+	    id: string;
+	    workspaceId: string;
+	    name: string;
+	    backend: string;
+	    url: string;
+	    projectKey: string;
+	    scopeJql: string;
+	    bugIssueType: string;
+	    bugProjectMode: string;
+	    bugProjectKey: string;
+	    caCert: string;
+	    allowUntrustedTls: boolean;
+	    role: string;
+	    // Go type: time
+	    createdAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Connection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.workspaceId = source["workspaceId"];
+	        this.name = source["name"];
+	        this.backend = source["backend"];
+	        this.url = source["url"];
+	        this.projectKey = source["projectKey"];
+	        this.scopeJql = source["scopeJql"];
+	        this.bugIssueType = source["bugIssueType"];
+	        this.bugProjectMode = source["bugProjectMode"];
+	        this.bugProjectKey = source["bugProjectKey"];
+	        this.caCert = source["caCert"];
+	        this.allowUntrustedTls = source["allowUntrustedTls"];
+	        this.role = source["role"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace coverage {
 	
 	export class CRDecision {
@@ -867,6 +1083,7 @@ export namespace profile {
 	    bugProjectKey: string;
 	    caCert: string;
 	    allowUntrustedTls: boolean;
+	    backend: string;
 	    // Go type: time
 	    createdAt: any;
 	
@@ -886,6 +1103,7 @@ export namespace profile {
 	        this.bugProjectKey = source["bugProjectKey"];
 	        this.caCert = source["caCert"];
 	        this.allowUntrustedTls = source["allowUntrustedTls"];
+	        this.backend = source["backend"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	    }
 	
@@ -935,6 +1153,22 @@ export namespace settings {
 
 export namespace syncer {
 	
+	export class SkippedCommit {
+	    entityKey: string;
+	    entityType: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SkippedCommit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entityKey = source["entityKey"];
+	        this.entityType = source["entityType"];
+	        this.reason = source["reason"];
+	    }
+	}
 	export class CreatedTest {
 	    tempKey: string;
 	    key: string;
@@ -1034,6 +1268,7 @@ export namespace syncer {
 	    conflicted: Conflict[];
 	    failed: FailedCommit[];
 	    created: CreatedTest[];
+	    skipped: SkippedCommit[];
 	
 	    static createFrom(source: any = {}) {
 	        return new CommitResult(source);
@@ -1045,6 +1280,7 @@ export namespace syncer {
 	        this.conflicted = this.convertValues(source["conflicted"], Conflict);
 	        this.failed = this.convertValues(source["failed"], FailedCommit);
 	        this.created = this.convertValues(source["created"], CreatedTest);
+	        this.skipped = this.convertValues(source["skipped"], SkippedCommit);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1065,6 +1301,7 @@ export namespace syncer {
 		    return a;
 		}
 	}
+	
 	
 	
 	

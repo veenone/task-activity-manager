@@ -12,12 +12,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 41
+const schemaVersion = 44
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -45,7 +46,8 @@ CREATE TABLE IF NOT EXISTS profiles (
 	bug_project_mode TEXT NOT NULL DEFAULT 'test',
 	bug_project_key TEXT NOT NULL DEFAULT '',
 	ca_cert TEXT NOT NULL DEFAULT '',
-	allow_untrusted_tls INTEGER NOT NULL DEFAULT 0
+	allow_untrusted_tls INTEGER NOT NULL DEFAULT 0,
+	backend TEXT NOT NULL DEFAULT 'xray'
 );
 
 CREATE TABLE IF NOT EXISTS sync_state (
@@ -506,6 +508,66 @@ CREATE TABLE IF NOT EXISTS coverage_project (
 	sort_order  INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (profile_id, project_key)
 );
+
+-- ── Neutral identity map (schema v40) ────────────────────────────────────────
+-- Maps a local entity id to its per-backend external key so one local dataset can
+-- map to multiple backends (Xray now, Kiwi later). Backfilled 1:1 from the entity
+-- tables with local_id == external_key == jira_key and connection == 'xray', so it
+-- is additive and behaviour-preserving: nothing consumes it yet (the commit path
+-- is rewired in a later phase). version_token carries the backend's opaque version
+-- (for Xray: the entity's "updated" timestamp); base_version and last_pulled_at are
+-- reserved for later phases.
+CREATE TABLE IF NOT EXISTS external_ref (
+	profile_id     TEXT NOT NULL,
+	entity_type    TEXT NOT NULL,   -- 'test' | 'precondition' | 'container' | 'bug' | 'requirement'
+	local_id       TEXT NOT NULL,   -- neutral local id (== jira_key for backfilled data)
+	connection     TEXT NOT NULL,   -- 'xray' for all current data
+	external_key   TEXT NOT NULL,   -- the backend's id/key (== jira_key for xray)
+	version_token  TEXT NOT NULL DEFAULT '',  -- opaque per-connection version (Xray: the entity's updated timestamp)
+	base_version   TEXT NOT NULL DEFAULT '',  -- reserved for later phases
+	last_pulled_at TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, entity_type, local_id, connection)
+);
+
+-- ── Connection table (schema v43, Phase 6 bridge task B1) ───────────────────
+-- The first step toward multi-connection workspaces: a workspace (today, a
+-- profiles row) will eventually hold more than one backend connection. For
+-- now every workspace has exactly one connection, backfilled 1:1 from its
+-- profile (id == workspace_id == the profile's id) and kept in sync by
+-- profile.Manager's Create/Update/Delete. profiles remains the read source of
+-- truth — nothing reads from this table yet (a later phase rewires reads onto
+-- it), so adding it is purely additive and behaviour-preserving.
+CREATE TABLE IF NOT EXISTS connection (
+	id                  TEXT PRIMARY KEY,
+	workspace_id        TEXT NOT NULL,
+	name                TEXT NOT NULL,
+	backend             TEXT NOT NULL DEFAULT 'xray',
+	url                 TEXT NOT NULL DEFAULT '',
+	project_key         TEXT NOT NULL DEFAULT '',
+	scope_jql           TEXT NOT NULL DEFAULT '',
+	bug_issue_type      TEXT NOT NULL DEFAULT 'Bug',
+	bug_project_mode    TEXT NOT NULL DEFAULT 'test',
+	bug_project_key     TEXT NOT NULL DEFAULT '',
+	ca_cert             TEXT NOT NULL DEFAULT '',
+	allow_untrusted_tls INTEGER NOT NULL DEFAULT 0,
+	role                TEXT NOT NULL DEFAULT 'both',
+	created_at          TEXT NOT NULL DEFAULT ''
+);
+
+-- ── Bridge mapping table (schema v44, Phase 6 bridge task B4) ───────────────
+-- One row per (workspace, source connection, target connection) holding the
+-- user's reversible status/step/field mapping for publishing a dataset from
+-- source to target (the bridge publish engine, B5, is a later task). Nothing
+-- reads from this table yet outside internal/bridge; additive and
+-- behaviour-preserving for the existing single-connection flow.
+CREATE TABLE IF NOT EXISTS bridge_mapping (
+	workspace_id          TEXT NOT NULL,
+	source_connection_id  TEXT NOT NULL,
+	target_connection_id  TEXT NOT NULL,
+	mapping_json          TEXT NOT NULL DEFAULT '',
+	updated_at            TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (workspace_id, source_connection_id, target_connection_id)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -543,6 +605,8 @@ CREATE INDEX IF NOT EXISTS idx_cr_decision_cr        ON cr_member_decision(profi
 CREATE INDEX IF NOT EXISTS idx_cr_decision_req       ON cr_member_decision(profile_id, requirement_key);
 CREATE INDEX IF NOT EXISTS idx_cov_group_version     ON coverage_param_group(profile_id, version_id);
 CREATE INDEX IF NOT EXISTS idx_coverage_project ON coverage_project(profile_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_external_ref_extkey ON external_ref(profile_id, connection, entity_type, external_key);
+CREATE INDEX IF NOT EXISTS idx_connection_workspace ON connection(workspace_id);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -1067,6 +1131,108 @@ func applyMigrations(db *sql.DB) error {
 			return err
 		}
 	}
+	// v41: backfill the neutral-identity table external_ref 1:1 from the existing
+	// entity tables. Each entity row gets exactly one 'xray' row with
+	// local_id == external_key == jira_key and version_token from the entity's
+	// "updated" column ('' for precondition, which has none). INSERT OR IGNORE
+	// against the (profile_id, entity_type, local_id, connection) primary key makes
+	// the backfill idempotent and O(rows), so re-running (or running on the large
+	// real DB) is a safe no-op. The table itself is created by baseSchema before
+	// this runs; nothing consumes external_ref yet, so this is behaviour-preserving.
+	// Gated < 41 (not < 40): main reached v40 via the run-defects/remarks feature,
+	// so a DB already at 40 must still run this backfill.
+	if current < 41 {
+		for _, q := range []string{
+			`INSERT OR IGNORE INTO external_ref
+			   (profile_id, entity_type, local_id, connection, external_key, version_token, base_version, last_pulled_at)
+			 SELECT profile_id, 'test', jira_key, 'xray', jira_key, updated_at, '', '' FROM test_case`,
+			`INSERT OR IGNORE INTO external_ref
+			   (profile_id, entity_type, local_id, connection, external_key, version_token, base_version, last_pulled_at)
+			 SELECT profile_id, 'precondition', jira_key, 'xray', jira_key, '', '', '' FROM precondition`,
+			`INSERT OR IGNORE INTO external_ref
+			   (profile_id, entity_type, local_id, connection, external_key, version_token, base_version, last_pulled_at)
+			 SELECT profile_id, 'container', jira_key, 'xray', jira_key, updated, '', '' FROM test_container`,
+			`INSERT OR IGNORE INTO external_ref
+			   (profile_id, entity_type, local_id, connection, external_key, version_token, base_version, last_pulled_at)
+			 SELECT profile_id, 'bug', jira_key, 'xray', jira_key, updated_at, '', '' FROM bug`,
+			`INSERT OR IGNORE INTO external_ref
+			   (profile_id, entity_type, local_id, connection, external_key, version_token, base_version, last_pulled_at)
+			 SELECT profile_id, 'requirement', jira_key, 'xray', jira_key, updated_at, '', '' FROM requirement`,
+		} {
+			if _, err := db.Exec(q); err != nil {
+				return fmt.Errorf("v41 backfill external_ref: %w", err)
+			}
+		}
+	}
+	// v42: profiles.backend selects which system a profile connects to ("xray"
+	// default | "kiwi") so app.go's backend factory can route real (non-demo)
+	// Kiwi connections. Fresh installs get it from the CREATE above; this ALTER
+	// catches pre-v42 databases. Additive; existing rows default to 'xray'.
+	if current < 42 {
+		if _, err := db.Exec(
+			`ALTER TABLE profiles ADD COLUMN backend TEXT NOT NULL DEFAULT 'xray'`,
+		); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("v42 add profiles.backend: %w", err)
+		}
+	}
+	// v43: the connection table (Phase 6 bridge task B1) — one row per backend a
+	// workspace talks to. Fresh installs get the table from baseSchema; this
+	// CREATE catches pre-v43 databases. The backfill then gives every existing
+	// profile exactly one 'both'-role connection with id == the profile's id
+	// (deterministic 1:1, so later profile.Manager writes address it directly)
+	// and every backend field copied across. INSERT OR IGNORE on the primary key
+	// makes the backfill idempotent and O(rows), so re-running it (including
+	// against the large real DB) is a safe no-op. profiles remains the read
+	// source of truth — nothing consumes the connection table yet.
+	if current < 43 {
+		if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS connection (
+			id                  TEXT PRIMARY KEY,
+			workspace_id        TEXT NOT NULL,
+			name                TEXT NOT NULL,
+			backend             TEXT NOT NULL DEFAULT 'xray',
+			url                 TEXT NOT NULL DEFAULT '',
+			project_key         TEXT NOT NULL DEFAULT '',
+			scope_jql           TEXT NOT NULL DEFAULT '',
+			bug_issue_type      TEXT NOT NULL DEFAULT 'Bug',
+			bug_project_mode    TEXT NOT NULL DEFAULT 'test',
+			bug_project_key     TEXT NOT NULL DEFAULT '',
+			ca_cert             TEXT NOT NULL DEFAULT '',
+			allow_untrusted_tls INTEGER NOT NULL DEFAULT 0,
+			role                TEXT NOT NULL DEFAULT 'both',
+			created_at          TEXT NOT NULL DEFAULT ''
+		)`); err != nil && !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("v43 create connection: %w", err)
+		}
+		if _, err := db.Exec(
+			`INSERT OR IGNORE INTO connection
+			   (id, workspace_id, name, backend, url, project_key, scope_jql,
+			    bug_issue_type, bug_project_mode, bug_project_key, ca_cert,
+			    allow_untrusted_tls, role, created_at)
+			 SELECT id, id, name, backend, jira_url, project_key, scope_jql,
+			        bug_issue_type, bug_project_mode, bug_project_key, ca_cert,
+			        allow_untrusted_tls, 'both', created_at
+			 FROM profiles`,
+		); err != nil {
+			return fmt.Errorf("v43 backfill connection: %w", err)
+		}
+	}
+	// v44: the bridge_mapping table (Phase 6 bridge task B4) — one row per
+	// (workspace, source connection, target connection) holding the reversible
+	// status/step/field mapping used by the publish engine (B5). Fresh installs
+	// get the table from baseSchema; this CREATE catches pre-v44 databases. No
+	// backfill: this is a brand new feature with nothing to migrate from.
+	if current < 44 {
+		if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS bridge_mapping (
+			workspace_id          TEXT NOT NULL,
+			source_connection_id  TEXT NOT NULL,
+			target_connection_id  TEXT NOT NULL,
+			mapping_json          TEXT NOT NULL DEFAULT '',
+			updated_at            TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (workspace_id, source_connection_id, target_connection_id)
+		)`); err != nil && !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("v44 create bridge_mapping: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -1092,3 +1258,53 @@ func (s *Store) DB() *sql.DB { return s.db }
 
 // Close releases the database connection.
 func (s *Store) Close() error { return s.db.Close() }
+
+// ExternalRef returns the external key recorded in the neutral identity table
+// (external_ref, schema v40/v41) for a local entity in one backend
+// connection: (workspaceID, entityType, localID, connection). ok is false
+// when no such row exists — e.g. a hub test that has not been published to
+// that connection yet. Phase 6 bridge task B5: the publish engine calls this
+// first for every hub test so a re-run skips anything already published
+// (resumable, and the same mechanism that lets one local_id carry an
+// external_ref for more than one connection at once — dual-publish).
+func (s *Store) ExternalRef(workspaceID, entityType, localID, connection string) (externalKey string, ok bool, err error) {
+	err = s.db.QueryRow(
+		`SELECT external_key FROM external_ref
+		 WHERE profile_id = ? AND entity_type = ? AND local_id = ? AND connection = ?`,
+		workspaceID, entityType, localID, connection,
+	).Scan(&externalKey)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("get external ref: %w", err)
+	}
+	return externalKey, true, nil
+}
+
+// PutExternalRef upserts the external_ref row identifying a local entity in
+// one backend connection, on the table's (profile_id, entity_type, local_id,
+// connection) primary key. Phase 6 bridge task B5: the publish engine calls
+// this right after successfully creating an entity in a target connection, so
+// the new external key (and the target's version token for it, when known —
+// "" is fine, mirroring the precondition backfill's empty version_token) is
+// recorded and the entity is no longer eligible to be republished by a later
+// run. It is also the general accessor a future pull/commit rewiring
+// (deferred bridge task B2/B3) can reuse for the source connection.
+func (s *Store) PutExternalRef(workspaceID, entityType, localID, connection, externalKey, versionToken string) error {
+	_, err := s.db.Exec(
+		`INSERT INTO external_ref
+		   (profile_id, entity_type, local_id, connection, external_key, version_token, base_version, last_pulled_at)
+		 VALUES (?, ?, ?, ?, ?, ?, '', ?)
+		 ON CONFLICT(profile_id, entity_type, local_id, connection) DO UPDATE SET
+		   external_key = excluded.external_key,
+		   version_token = excluded.version_token,
+		   last_pulled_at = excluded.last_pulled_at`,
+		workspaceID, entityType, localID, connection, externalKey, versionToken,
+		time.Now().UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return fmt.Errorf("put external ref: %w", err)
+	}
+	return nil
+}

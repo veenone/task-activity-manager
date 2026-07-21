@@ -7,9 +7,8 @@ import (
 	"log"
 	"sort"
 	"strings"
-	"time"
 
-	"xray-test-manager/internal/jira"
+	"xray-test-manager/internal/backend"
 	"xray-test-manager/internal/testrepo"
 )
 
@@ -18,11 +17,40 @@ import (
 // Created maps each newly-created Test's temporary "NEW-N" key to the real Jira
 // key it was assigned, so the UI can re-point an open detail view (FR-1).
 type CommitResult struct {
-	Succeeded  []string       `json:"succeeded"`
-	Conflicted []Conflict     `json:"conflicted"`
-	Failed     []FailedCommit `json:"failed"`
-	Created    []CreatedTest  `json:"created"`
+	Succeeded  []string        `json:"succeeded"`
+	Conflicted []Conflict      `json:"conflicted"`
+	Failed     []FailedCommit  `json:"failed"`
+	Created    []CreatedTest   `json:"created"`
+	Skipped    []SkippedCommit `json:"skipped"`
 }
+
+// SkippedCommit is one pending row the current backend cannot commit because
+// the operation is unsupported by its capabilities (e.g. Test Repository
+// folders or precondition objects on a Kiwi backend). The row is NOT pushed and
+// NOT cleared — it stays pending, like a conflict, so the user can discard it;
+// nothing is silently dropped. Xray reports all capabilities on, so it never
+// populates this list (additive/back-compatible JSON field).
+type SkippedCommit struct {
+	EntityKey  string `json:"entityKey"`
+	EntityType string `json:"entityType"`
+	Reason     string `json:"reason"`
+}
+
+// Skip reasons for capability-gated buckets. These are surfaced verbatim in
+// SkippedCommit.Reason.
+const (
+	skipReasonFolders       = "backend does not support Test Repository folders"
+	skipReasonPreconditions = "backend does not support precondition objects"
+	skipReasonRequirements  = "backend does not support requirement writes"
+	skipReasonReviews       = "backend does not support test reviews"
+	skipReasonContainerEdit = "backend does not support container rename"
+	skipReasonContainerEnv  = "backend does not support test-execution environments"
+	skipReasonBugCreate     = "backend does not support bug creation"
+	skipReasonComments      = "backend does not support issue comments"
+	skipReasonExecType      = "backend does not support the Test Type (exec_type) field"
+	skipReasonRunDefects    = "backend does not support run-level defect links"
+	skipReasonRunComments   = "backend does not support run-level comments"
+)
 
 // CreatedTest records that a locally-created Test (TempKey, "NEW-N") was created
 // in Jira under Key during this commit (FR-1).
@@ -93,7 +121,14 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		Conflicted: []Conflict{},
 		Failed:     []FailedCommit{},
 		Created:    []CreatedTest{},
+		Skipped:    []SkippedCommit{},
 	}
+
+	// caps drives every capability gate below. For Xray all capabilities are on,
+	// so each `if caps.X { ... } else { skip }` gate takes the original branch and
+	// the commit path is unchanged. For a Kiwi backend the unsupported buckets are
+	// skipped (reported, kept pending) and status/steps route to field updates.
+	caps := e.backend.Capabilities()
 
 	changes, err := e.repo.ListPendingChanges(profileID)
 	if err != nil {
@@ -105,12 +140,16 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 	// references a temporary precondition key is rewritten to the real key
 	// before the per-Test pass reads it; re-read on success to pick up the
 	// rewritten association rows.
-	if e.commitPreconditionCreates(ctx, profileID, projectKey, changes, &result) {
-		changes, err = e.repo.ListPendingChanges(profileID)
-		if err != nil {
-			return result, err
+	if caps.SupportsPreconditionObjects {
+		if e.commitPreconditionCreates(ctx, profileID, projectKey, changes, &result) {
+			changes, err = e.repo.ListPendingChanges(profileID)
+			if err != nil {
+				return result, err
+			}
+			changes = filterChangesByID(changes, only)
 		}
-		changes = filterChangesByID(changes, only)
+	} else {
+		e.skipRowsOfType(changes, "precondition_add", skipReasonPreconditions, &result)
 	}
 
 	// Create new Containers (Test Sets / Plans / Executions) next, for the same
@@ -265,12 +304,18 @@ testLoop:
 	for _, testKey := range order {
 		testChanges := byTest[testKey]
 
+		// skippedIDs holds this Test's pending rows that were capability-skipped
+		// (folder move / precondition association on a backend that lacks them):
+		// they are recorded in result.Skipped and excluded from the final
+		// CommitPendingChanges so they stay pending. Empty for Xray (all caps on).
+		skippedIDs := make(map[int64]bool)
+
 		// Conflict pre-check (FR-1.4) with per-field auto-merge: when the remote
 		// `updated` has advanced past our base, fetch the current remote values
 		// and classify each change. Non-overlapping edits (and edits someone else
 		// already made) merge silently; only genuinely overlapping fields hold the
 		// Test back for the user to resolve.
-		remoteUpdated, err := e.client.GetIssueUpdated(ctx, testKey)
+		remoteVer, err := e.backend.RemoteVersion(ctx, "test", testKey)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: testKey,
@@ -278,9 +323,9 @@ testLoop:
 			})
 			continue
 		}
-		if remoteUpdated != "" {
+		if remoteVer != "" {
 			oldest := oldestBaseVersion(testChanges)
-			if oldest != "" && isRemoteAhead(remoteUpdated, oldest) {
+			if oldest != "" && e.backend.RemoteAhead(backend.VersionToken(oldest), remoteVer) {
 				scan, derr := e.detectConflicts(ctx, testKey, testChanges)
 				if derr != nil {
 					result.Failed = append(result.Failed, FailedCommit{
@@ -293,7 +338,7 @@ testLoop:
 					result.Conflicted = append(result.Conflicted, Conflict{
 						TestKey:       testKey,
 						BaseVersion:   oldest,
-						RemoteVersion: remoteUpdated,
+						RemoteVersion: string(remoteVer),
 						RemoteDeleted: true,
 					})
 					continue
@@ -310,7 +355,7 @@ testLoop:
 						TestKey:       testKey,
 						TestSummary:   scan.testSummary,
 						BaseVersion:   oldest,
-						RemoteVersion: remoteUpdated,
+						RemoteVersion: string(remoteVer),
 						Fields:        scan.conflicts,
 					})
 					continue
@@ -320,7 +365,7 @@ testLoop:
 				if len(testChanges) == 0 {
 					continue
 				}
-				if rErr := e.repo.RebaseTestConflict(profileID, testKey, remoteUpdated); rErr != nil {
+				if rErr := e.repo.RebaseTestConflict(profileID, testKey, string(remoteVer)); rErr != nil {
 					result.Failed = append(result.Failed, FailedCommit{
 						TestKey: testKey,
 						Error:   "rebase after auto-merge failed: " + rErr.Error(),
@@ -421,23 +466,42 @@ testLoop:
 		// their raw Jira id (FR-2.6).
 		if len(fieldChanges) > 0 || len(customFields) > 0 {
 			updates := make(map[string]string, len(fieldChanges))
-			for _, c := range fieldChanges {
+			var execTypeRow *testrepo.PendingChange
+			for i := range fieldChanges {
+				c := fieldChanges[i]
 				updates[c.Field] = c.AfterVal
+				if c.Field == "exec_type" {
+					execTypeRow = &fieldChanges[i]
+				}
 			}
-			fields := jira.FieldsForJira(updates)
+			fields := e.backend.FieldsForJira(updates)
 			// exec_type (Xray Test Type) is a custom field whose id varies per
 			// instance, so FieldsForJira leaves it out: resolve the field id here
 			// and inject {"value": ...}. Best-effort - if the field can't be
 			// resolved, log and push the rest of the update rather than fail
 			// the whole commit.
 			if execType, ok := updates["exec_type"]; ok {
-				fieldID, value, resolved, ferr := e.client.ExecTypeFieldValue(ctx, execType)
+				fieldID, value, resolved, ferr := e.backend.ExecTypeFieldValue(ctx, execType)
 				if ferr != nil {
 					log.Printf("xtm: resolve Test Type field for %s failed, committing without exec_type: %v", testKey, ferr)
 				} else if resolved {
 					fields[fieldID] = value
 				} else {
+					// The backend has no exec-type field to resolve into (no Test
+					// Type custom field on this instance, or a backend that has no
+					// exec-type concept at all, like Kiwi). Applying the rest of the
+					// update but silently clearing this row would drop the edit on
+					// the floor, so record it as skipped and keep it pending instead
+					// — like folder/precondition rows on a capability-less backend.
 					log.Printf("xtm: no Test Type custom field on this instance, committing %s without exec_type", testKey)
+					if execTypeRow != nil {
+						result.Skipped = append(result.Skipped, SkippedCommit{
+							EntityKey:  testKey,
+							EntityType: execTypeRow.EntityType,
+							Reason:     skipReasonExecType,
+						})
+						skippedIDs[execTypeRow.ID] = true
+					}
 				}
 			}
 			// Body fields (cucumber_scenario, cucumber_type, generic_definition) are
@@ -453,11 +517,11 @@ testLoop:
 				)
 				switch field {
 				case "cucumber_scenario":
-					fid, fv, resolved, ferr = e.client.CucumberScenarioFieldValue(ctx, val)
+					fid, fv, resolved, ferr = e.backend.CucumberScenarioFieldValue(ctx, val)
 				case "cucumber_type":
-					fid, fv, resolved, ferr = e.client.CucumberTypeFieldValue(ctx, val)
+					fid, fv, resolved, ferr = e.backend.CucumberTypeFieldValue(ctx, val)
 				case "generic_definition":
-					fid, fv, resolved, ferr = e.client.GenericDefinitionFieldValue(ctx, val)
+					fid, fv, resolved, ferr = e.backend.GenericDefinitionFieldValue(ctx, val)
 				default:
 					continue
 				}
@@ -473,7 +537,7 @@ testLoop:
 			// exec_type does above. Best-effort - if the type cannot be resolved
 			// the raw string is sent (CustomFieldValue defaults to it).
 			for fieldID, value := range customFields {
-				id, shaped, ferr := e.client.CustomFieldValue(ctx, fieldID, value)
+				id, shaped, ferr := e.backend.CustomFieldValue(ctx, fieldID, value)
 				if ferr != nil {
 					log.Printf("xtm: resolve custom field %s type for %s failed, committing raw string: %v", fieldID, testKey, ferr)
 					fields[fieldID] = value
@@ -481,7 +545,7 @@ testLoop:
 				}
 				fields[id] = shaped
 			}
-			if err := e.client.UpdateIssue(ctx, testKey, fields); err != nil {
+			if err := e.backend.UpdateIssue(ctx, testKey, fields); err != nil {
 				result.Failed = append(result.Failed, FailedCommit{
 					TestKey: testKey,
 					Error:   sanitizeError(err.Error()),
@@ -490,21 +554,45 @@ testLoop:
 			}
 		}
 
-		// POST workflow transition if a status change is pending.
+		// Apply a pending status change. Xray (SupportsWorkflowTransitions) POSTs a
+		// workflow transition, exactly as before. A settable-status backend (Kiwi)
+		// has no workflow graph, so the status is written as a plain field update —
+		// FieldsForJira maps "status" to the backend's status field (case_status)
+		// and UpdateIssue applies it. Both paths use the same statusChange row, so
+		// base-version/conflict handling above is preserved identically.
 		if statusChange != nil {
-			if err := e.applyTransition(ctx, testKey, statusChange); err != nil {
-				result.Failed = append(result.Failed, FailedCommit{
-					TestKey: testKey,
-					Error:   err.Error(),
-				})
-				continue
+			if caps.SupportsWorkflowTransitions {
+				if err := e.applyTransition(ctx, testKey, statusChange); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   err.Error(),
+					})
+					continue
+				}
+			} else {
+				fields := e.backend.FieldsForJira(map[string]string{"status": statusChange.AfterVal})
+				if err := e.backend.UpdateIssue(ctx, testKey, fields); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   "set status: " + sanitizeError(err.Error()),
+					})
+					continue
+				}
 			}
 		}
 
 		// Test Repository move (FR-13.3). The pending change stores the target
 		// folder *path*; the Xray move endpoint needs the native folder id, so
-		// resolve it from the synced tree first.
-		if folderChange != nil {
+		// resolve it from the synced tree first. Backends without folders (Kiwi)
+		// skip the move and keep the row pending.
+		if folderChange != nil && !caps.SupportsFolders {
+			result.Skipped = append(result.Skipped, SkippedCommit{
+				EntityKey:  testKey,
+				EntityType: folderChange.EntityType,
+				Reason:     skipReasonFolders,
+			})
+			skippedIDs[folderChange.ID] = true
+		} else if folderChange != nil {
 			xrayFolderID, ferr := e.repo.FolderXrayID(profileID, folderChange.AfterVal)
 			if ferr != nil {
 				result.Failed = append(result.Failed, FailedCommit{
@@ -513,7 +601,7 @@ testLoop:
 				})
 				continue
 			}
-			if err := e.client.MoveTestToFolder(ctx, projectKey, testKey, xrayFolderID); err != nil {
+			if err := e.backend.MoveTestToFolder(ctx, projectKey, testKey, xrayFolderID); err != nil {
 				result.Failed = append(result.Failed, FailedCommit{
 					TestKey: testKey,
 					Error:   "move to folder: " + sanitizeError(err.Error()),
@@ -523,8 +611,16 @@ testLoop:
 		}
 
 		// Associate / disassociate Preconditions (FR-13.5 / 13.6) by diffing
-		// the before / after sets into add and remove lists.
-		if preconditionChange != nil {
+		// the before / after sets into add and remove lists. Backends without
+		// precondition objects (Kiwi) skip this and keep the row pending.
+		if preconditionChange != nil && !caps.SupportsPreconditionObjects {
+			result.Skipped = append(result.Skipped, SkippedCommit{
+				EntityKey:  testKey,
+				EntityType: preconditionChange.EntityType,
+				Reason:     skipReasonPreconditions,
+			})
+			skippedIDs[preconditionChange.ID] = true
+		} else if preconditionChange != nil {
 			add, remove, perr := diffPreconditionSets(preconditionChange.BeforeVal, preconditionChange.AfterVal)
 			if perr != nil {
 				result.Failed = append(result.Failed, FailedCommit{
@@ -533,7 +629,7 @@ testLoop:
 				})
 				continue
 			}
-			if err := e.client.UpdateTestPreconditions(ctx, testKey, add, remove); err != nil {
+			if err := e.backend.UpdateTestPreconditions(ctx, testKey, add, remove); err != nil {
 				result.Failed = append(result.Failed, FailedCommit{
 					TestKey: testKey,
 					Error:   "preconditions: " + sanitizeError(err.Error()),
@@ -542,155 +638,306 @@ testLoop:
 			}
 		}
 
-		for _, xrayID := range stepDeletes {
-			if err := e.client.DeleteTestStep(ctx, testKey, xrayID); err != nil {
-				result.Failed = append(result.Failed, FailedCommit{
-					TestKey: testKey,
-					Error:   fmt.Sprintf("delete step %s: %s", xrayID, sanitizeError(err.Error())),
-				})
-				continue testLoop
-			}
-		}
-
-		// PUT each step that has pending edits, batching the step's changes
-		// into one body. The first step to fail aborts further step PUTs
-		// for this Test — the user resolves and retries.
-		for xrayID, changes := range stepChanges {
-			fields := make(map[string]string, len(changes))
-			for _, c := range changes {
-				fields[c.Field] = c.AfterVal
-			}
-			if err := e.client.UpdateTestStep(ctx, testKey, xrayID, fields); err != nil {
-				result.Failed = append(result.Failed, FailedCommit{
-					TestKey: testKey,
-					Error:   fmt.Sprintf("update step %s: %s", xrayID, sanitizeError(err.Error())),
-				})
-				continue testLoop
-			}
-		}
-
-		// POST new steps last, in index order — Xray appends each created
-		// step to the end of the list, so creating them ascending preserves
-		// the order the user arranged. On success we rename the local "new-N"
-		// placeholder to the real id Xray returned.
-		sort.SliceStable(stepAdds, func(i, j int) bool {
-			return stepAdds[i].Index < stepAdds[j].Index
-		})
-		// idMap translates a newly-created step's temporary "new-N" id to the
-		// real id Xray assigned, so a reorder queued against the temp id can
-		// still target the right remote step.
-		idMap := make(map[string]string, len(stepAdds))
-		for _, s := range stepAdds {
-			newID, err := e.createStep(ctx, profileID, testKey, s)
-			if err != nil {
-				result.Failed = append(result.Failed, FailedCommit{
-					TestKey: testKey,
-					Error:   fmt.Sprintf("add step: %s", sanitizeError(err.Error())),
-				})
-				continue testLoop
-			}
-			if newID != "" {
-				idMap[s.XrayID] = newID
-			}
-			if err := e.repo.RenameTestStepID(profileID, testKey, s.XrayID, newID); err != nil {
-				// The remote create already succeeded; a cache-rename hiccup
-				// must not fail the commit. The stale placeholder reconciles
-				// on the next steps refresh.
-				continue
-			}
-		}
-
-		// Apply the new step order last, once every step has its real id.
-		// PUT each step to its target 1-based position in order; steps deleted
-		// in this same commit are skipped, and temp ids are mapped to real
-		// ones.
-		if orderChange != nil {
-			deleted := make(map[string]struct{}, len(stepDeletes))
-			for _, id := range stepDeletes {
-				deleted[id] = struct{}{}
-			}
-			var order []string
-			if err := json.Unmarshal([]byte(orderChange.AfterVal), &order); err != nil {
-				result.Failed = append(result.Failed, FailedCommit{
-					TestKey: testKey,
-					Error:   fmt.Sprintf("malformed step order payload: %s", err),
-				})
-				continue testLoop
-			}
-			// Xray's step PUT 400s unless the body carries the step's content
-			// fields, so look up each step's cached action/data/expected to send
-			// with the reorder. By now the cache holds the real ids (new steps
-			// were renamed above), keyed the same way the order list is after
-			// idMap mapping.
-			stepContent := map[string]testrepo.Step{}
-			if cs, err := e.repo.ListTestSteps(profileID, testKey); err == nil {
-				for _, s := range cs {
-					stepContent[s.XrayID] = s
-				}
-			}
-			pos := 0
-			for _, id := range order {
-				if _, gone := deleted[id]; gone {
-					continue
-				}
-				if real, ok := idMap[id]; ok {
-					id = real
-				}
-				pos++
-				sc := stepContent[id]
-				if err := e.client.MoveTestStep(ctx, testKey, id, pos, sc.Action, sc.Data, sc.Expected); err != nil {
+		// Steps. Xray applies per-step CRUD (delete/update/add/reorder). A backend
+		// whose steps are a single inline-text field (Kiwi, StepModel "inline-text")
+		// has no step objects, so ALL queued step changes for this Test collapse
+		// into ONE text field update: the resulting neutral step list — already
+		// materialised in the local cache by the step edits — is flattened back to
+		// text, the inverse of the read-path flattenSteps. Per-step CRUD is
+		// ErrUnsupported there and is never called. Xray keeps the branch below
+		// verbatim.
+		if caps.StepModel == "inline-text" {
+			if len(stepDeletes) > 0 || len(stepChanges) > 0 || len(stepAdds) > 0 || orderChange != nil {
+				text, terr := e.flattenStepsToText(profileID, testKey)
+				if terr != nil {
 					result.Failed = append(result.Failed, FailedCommit{
 						TestKey: testKey,
-						Error:   fmt.Sprintf("reorder step %s: %s", id, sanitizeError(err.Error())),
+						Error:   "flatten steps: " + sanitizeError(terr.Error()),
+					})
+					continue
+				}
+				fields := e.backend.FieldsForJira(map[string]string{"description": text})
+				if err := e.backend.UpdateIssue(ctx, testKey, fields); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   "update steps text: " + sanitizeError(err.Error()),
+					})
+					continue
+				}
+			}
+		} else {
+			for _, xrayID := range stepDeletes {
+				if err := e.backend.DeleteTestStep(ctx, testKey, xrayID); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("delete step %s: %s", xrayID, sanitizeError(err.Error())),
 					})
 					continue testLoop
 				}
 			}
-		}
 
-		ids := make([]int64, len(testChanges))
-		for i, c := range testChanges {
-			ids[i] = c.ID
-		}
-		if err := e.repo.CommitPendingChanges(profileID, ids); err != nil {
-			result.Failed = append(result.Failed, FailedCommit{
-				TestKey: testKey,
-				Error:   "Jira accepted update but local cleanup failed: " + err.Error(),
+			// PUT each step that has pending edits, batching the step's changes
+			// into one body. The first step to fail aborts further step PUTs
+			// for this Test — the user resolves and retries.
+			for xrayID, changes := range stepChanges {
+				fields := make(map[string]string, len(changes))
+				for _, c := range changes {
+					fields[c.Field] = c.AfterVal
+				}
+				if err := e.backend.UpdateTestStep(ctx, testKey, xrayID, fields); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("update step %s: %s", xrayID, sanitizeError(err.Error())),
+					})
+					continue testLoop
+				}
+			}
+
+			// POST new steps last, in index order — Xray appends each created
+			// step to the end of the list, so creating them ascending preserves
+			// the order the user arranged. On success we rename the local "new-N"
+			// placeholder to the real id Xray returned.
+			sort.SliceStable(stepAdds, func(i, j int) bool {
+				return stepAdds[i].Index < stepAdds[j].Index
 			})
-			continue
-		}
-		result.Succeeded = append(result.Succeeded, testKey)
+			// idMap translates a newly-created step's temporary "new-N" id to the
+			// real id Xray assigned, so a reorder queued against the temp id can
+			// still target the right remote step.
+			idMap := make(map[string]string, len(stepAdds))
+			for _, s := range stepAdds {
+				newID, err := e.createStep(ctx, profileID, testKey, s)
+				if err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("add step: %s", sanitizeError(err.Error())),
+					})
+					continue testLoop
+				}
+				if newID != "" {
+					idMap[s.XrayID] = newID
+				}
+				if err := e.repo.RenameTestStepID(profileID, testKey, s.XrayID, newID); err != nil {
+					// The remote create already succeeded; a cache-rename hiccup
+					// must not fail the commit. The stale placeholder reconciles
+					// on the next steps refresh.
+					continue
+				}
+			}
 
-		// Selective commit: our PUT just advanced this Test's remote `updated`,
-		// so any of its OTHER pending edits (not in this commit) would now look
-		// stale and conflict on their next commit. Re-base them onto the fresh
-		// remote version so a per-item commit doesn't poison the Test's
-		// remaining items. (Full commits push everything at once, so there's
-		// nothing left to re-base.)
-		if only != nil {
-			if upd, uerr := e.client.GetIssueUpdated(ctx, testKey); uerr == nil && upd != "" {
-				_ = e.repo.RebaseTestConflict(profileID, testKey, upd)
+			// Apply the new step order last, once every step has its real id.
+			// PUT each step to its target 1-based position in order; steps deleted
+			// in this same commit are skipped, and temp ids are mapped to real
+			// ones.
+			if orderChange != nil {
+				deleted := make(map[string]struct{}, len(stepDeletes))
+				for _, id := range stepDeletes {
+					deleted[id] = struct{}{}
+				}
+				var order []string
+				if err := json.Unmarshal([]byte(orderChange.AfterVal), &order); err != nil {
+					result.Failed = append(result.Failed, FailedCommit{
+						TestKey: testKey,
+						Error:   fmt.Sprintf("malformed step order payload: %s", err),
+					})
+					continue testLoop
+				}
+				// Xray's step PUT 400s unless the body carries the step's content
+				// fields, so look up each step's cached action/data/expected to send
+				// with the reorder. By now the cache holds the real ids (new steps
+				// were renamed above), keyed the same way the order list is after
+				// idMap mapping.
+				stepContent := map[string]testrepo.Step{}
+				if cs, err := e.repo.ListTestSteps(profileID, testKey); err == nil {
+					for _, s := range cs {
+						stepContent[s.XrayID] = s
+					}
+				}
+				pos := 0
+				for _, id := range order {
+					if _, gone := deleted[id]; gone {
+						continue
+					}
+					if real, ok := idMap[id]; ok {
+						id = real
+					}
+					pos++
+					sc := stepContent[id]
+					if err := e.backend.MoveTestStep(ctx, testKey, id, pos, sc.Action, sc.Data, sc.Expected); err != nil {
+						result.Failed = append(result.Failed, FailedCommit{
+							TestKey: testKey,
+							Error:   fmt.Sprintf("reorder step %s: %s", id, sanitizeError(err.Error())),
+						})
+						continue testLoop
+					}
+				}
+			}
+
+		}
+
+		// Clear every committed pending row for this Test. Capability-skipped rows
+		// (folder / precondition on a backend that lacks them) are excluded so they
+		// stay pending — like a conflict, nothing is silently dropped. For Xray
+		// skippedIDs is empty, so this is the original "clear all rows" behavior and
+		// Succeeded/rebase always run.
+		ids := make([]int64, 0, len(testChanges))
+		for _, c := range testChanges {
+			if skippedIDs[c.ID] {
+				continue
+			}
+			ids = append(ids, c.ID)
+		}
+		if len(ids) > 0 {
+			if err := e.repo.CommitPendingChanges(profileID, ids); err != nil {
+				result.Failed = append(result.Failed, FailedCommit{
+					TestKey: testKey,
+					Error:   "Jira accepted update but local cleanup failed: " + err.Error(),
+				})
+				continue
+			}
+			result.Succeeded = append(result.Succeeded, testKey)
+
+			// Selective commit: our PUT just advanced this Test's remote `updated`,
+			// so any of its OTHER pending edits (not in this commit) would now look
+			// stale and conflict on their next commit. Re-base them onto the fresh
+			// remote version so a per-item commit doesn't poison the Test's
+			// remaining items. (Full commits push everything at once, so there's
+			// nothing left to re-base.)
+			if only != nil {
+				if upd, uerr := e.backend.RemoteVersion(ctx, "test", testKey); uerr == nil && upd != "" {
+					_ = e.repo.RebaseTestConflict(profileID, testKey, string(upd))
+				}
 			}
 		}
 	}
 
-	e.commitMemberships(ctx, profileID, membershipRows, &result)
-	e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
-	e.commitPreconditionDeletes(ctx, profileID, preconditionDeleteRows, &result)
-	e.commitFolders(ctx, profileID, projectKey, folderRows, &result)
-	e.commitReviews(ctx, profileID, reviewRows, &result)
-	e.commitComments(ctx, profileID, commentRows, &result)
+	// Capability-gated bucket dispatch. Each `if caps.X { run } else { skip }` gate
+	// is a no-op for Xray (all capabilities on) — it takes the run branch exactly
+	// as before. A Kiwi backend skips the buckets its model can't express; those
+	// rows are reported in result.Skipped and stay pending. Containers and runs
+	// are supported on both backends and run unconditionally (container rename is
+	// gated inside commitMemberships). Comments post as issue comments, so they
+	// need the same issue-backed write surface as reviews.
+	e.commitMemberships(ctx, profileID, membershipRows, caps, &result)
+	if caps.SupportsPreconditionObjects {
+		e.commitPreconditionEdits(ctx, profileID, preconditionEditRows, &result)
+		e.commitPreconditionDeletes(ctx, profileID, preconditionDeleteRows, &result)
+	} else {
+		e.skipRows(preconditionEditRows, skipReasonPreconditions, &result)
+		e.skipRows(preconditionDeleteRows, skipReasonPreconditions, &result)
+	}
+	if caps.SupportsFolders {
+		e.commitFolders(ctx, profileID, projectKey, folderRows, &result)
+	} else {
+		e.skipRows(folderRows, skipReasonFolders, &result)
+	}
+	if issueBackedWrites(caps) {
+		e.commitReviews(ctx, profileID, reviewRows, &result)
+	} else {
+		e.skipRows(reviewRows, skipReasonReviews, &result)
+	}
+	if issueBackedWrites(caps) {
+		e.commitComments(ctx, profileID, commentRows, &result)
+	} else {
+		e.skipRows(commentRows, skipReasonComments, &result)
+	}
 	e.commitRuns(ctx, profileID, runRows, &result)
-	e.commitRunDefects(ctx, profileID, runDefectRows, &result)
-	e.commitRunComments(ctx, profileID, runCommentRows, &result)
-	e.commitRequirements(ctx, profileID, requirementRows, &result)
-	e.commitRequirementEdits(ctx, profileID, requirementEditRows, &result)
-	e.commitRequirementDeletes(ctx, profileID, requirementDeleteRows, &result)
-	e.commitBugCreates(ctx, profileID, bugCreateRows, &result)
-	e.commitRequirementCreates(ctx, profileID, requirementCreateRows, &result)
-	e.commitReqReqLinks(ctx, profileID, reqReqLinkRows, &result)
+	// Run-level defect links + remarks are Xray raven-specific (RND_P_4TFINT_05-296),
+	// gated behind issueBackedWrites like reviews/comments: Xray runs them, a
+	// settable-status backend (Kiwi) skips them.
+	if issueBackedWrites(caps) {
+		e.commitRunDefects(ctx, profileID, runDefectRows, &result)
+		e.commitRunComments(ctx, profileID, runCommentRows, &result)
+	} else {
+		e.skipRows(runDefectRows, skipReasonRunDefects, &result)
+		e.skipRows(runCommentRows, skipReasonRunComments, &result)
+	}
+	if requirementWritesSupported(caps) {
+		e.commitRequirements(ctx, profileID, requirementRows, &result)
+		e.commitRequirementEdits(ctx, profileID, requirementEditRows, &result)
+		e.commitRequirementDeletes(ctx, profileID, requirementDeleteRows, &result)
+		e.commitRequirementCreates(ctx, profileID, requirementCreateRows, &result)
+		e.commitReqReqLinks(ctx, profileID, reqReqLinkRows, &result)
+	} else {
+		e.skipRows(requirementRows, skipReasonRequirements, &result)
+		e.skipRows(requirementEditRows, skipReasonRequirements, &result)
+		e.skipRows(requirementDeleteRows, skipReasonRequirements, &result)
+		e.skipRows(requirementCreateRows, skipReasonRequirements, &result)
+		e.skipRows(reqReqLinkRows, skipReasonRequirements, &result)
+	}
+	if caps.SupportsBugCreation {
+		e.commitBugCreates(ctx, profileID, bugCreateRows, &result)
+	} else {
+		e.skipRows(bugCreateRows, skipReasonBugCreate, &result)
+	}
 
 	return result, nil
+}
+
+// issueBackedWrites reports whether the backend stores entities as issues that
+// accept generic issue writes routed through UpdateIssue / issue comments —
+// workflow-transitioned Jira issues (Xray). It gates buckets that have no
+// dedicated capability flag but only work against an issue-shaped backend:
+// test reviews (posted as issue comments) and container rename (UpdateIssue on
+// a container key). A settable-status backend (Kiwi) returns false, so those
+// buckets are skipped. Xray returns true and every such bucket runs unchanged.
+func issueBackedWrites(caps backend.Capabilities) bool {
+	return caps.SupportsWorkflowTransitions
+}
+
+// requirementWritesSupported reports whether requirement create/edit/delete/link
+// writes can be committed. This needs BOTH a requirement object model AND an
+// issue-backed write surface (requirements are created/deleted as Jira issues
+// and linked via issue links). Kiwi's requirements plugin is read-only — it can
+// report SupportsRequirementObjects for the read/coverage path but has no create
+// RPC — so requirement WRITES are treated as unsupported there. Xray has both and
+// runs the buckets unchanged.
+func requirementWritesSupported(caps backend.Capabilities) bool {
+	return caps.SupportsRequirementObjects && issueBackedWrites(caps)
+}
+
+// skipRows records each pending row as capability-skipped (reported, kept
+// pending). Used when a bucket's capability is off so the rows are neither
+// pushed nor cleared.
+func (e *Engine) skipRows(rows []testrepo.PendingChange, reason string, result *CommitResult) {
+	for _, c := range rows {
+		result.Skipped = append(result.Skipped, SkippedCommit{
+			EntityKey:  c.EntityKey,
+			EntityType: c.EntityType,
+			Reason:     reason,
+		})
+	}
+}
+
+// skipRowsOfType records only the rows of the given entity type as skipped.
+// Used for buckets whose rows are still interleaved in the full change list
+// (e.g. precondition_add before the create pass).
+func (e *Engine) skipRowsOfType(changes []testrepo.PendingChange, entityType, reason string, result *CommitResult) {
+	for _, c := range changes {
+		if c.EntityType == entityType {
+			result.Skipped = append(result.Skipped, SkippedCommit{
+				EntityKey:  c.EntityKey,
+				EntityType: c.EntityType,
+				Reason:     reason,
+			})
+		}
+	}
+}
+
+// flattenStepsToText collapses a Test's cached neutral step list into a single
+// text blob for a backend whose step model is one inline-text field (Kiwi). It
+// is the inverse of the read-path flattenSteps: for the common single-step case
+// the text is exactly that step's Action, so a read→edit→write round-trips
+// losslessly; multiple steps are joined with a blank-line separator.
+func (e *Engine) flattenStepsToText(profileID, testKey string) (string, error) {
+	steps, err := e.repo.ListTestSteps(profileID, testKey)
+	if err != nil {
+		return "", err
+	}
+	parts := make([]string, 0, len(steps))
+	for _, s := range steps {
+		parts = append(parts, s.Action)
+	}
+	return strings.Join(parts, "\n\n"), nil
 }
 
 // commitRuns pushes Test-run result updates to Xray. Each pending row is keyed
@@ -702,7 +949,7 @@ func (e *Engine) commitRuns(ctx context.Context, profileID string, rows []testre
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed run-status key"})
 			continue
 		}
-		if err := e.client.SetTestRunStatus(ctx, execKey, testKey, c.AfterVal); err != nil {
+		if err := e.backend.SetTestRunStatus(ctx, execKey, testKey, c.AfterVal); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "set run status: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -765,14 +1012,14 @@ func (e *Engine) commitRunDefects(ctx context.Context, profileID string, rows []
 
 		opErr := ""
 		for _, k := range removed {
-			if err := e.client.RemoveTestRunDefect(ctx, execKey, testKey, k); err != nil {
+			if err := e.backend.RemoveTestRunDefect(ctx, execKey, testKey, k); err != nil {
 				opErr = "remove run defect: " + sanitizeError(err.Error())
 				break
 			}
 		}
 		if opErr == "" {
 			for _, k := range added {
-				if err := e.client.AddTestRunDefect(ctx, execKey, testKey, k); err != nil {
+				if err := e.backend.AddTestRunDefect(ctx, execKey, testKey, k); err != nil {
 					opErr = "add run defect: " + sanitizeError(err.Error())
 					break
 				}
@@ -817,7 +1064,7 @@ func (e *Engine) commitRunComments(ctx context.Context, profileID string, rows [
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed run-comment key"})
 			continue
 		}
-		if err := e.client.SetTestRunComment(ctx, execKey, testKey, c.AfterVal); err != nil {
+		if err := e.backend.SetTestRunComment(ctx, execKey, testKey, c.AfterVal); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "set run comment: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -868,7 +1115,7 @@ func (e *Engine) commitRequirements(ctx context.Context, profileID string, rows 
 			}
 		}
 
-		if err := e.client.UpdateTestRequirements(ctx, testKey, add, removeLinkIDs); err != nil {
+		if err := e.backend.UpdateTestRequirements(ctx, testKey, add, removeLinkIDs); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: testKey, Error: "update requirement links: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -901,7 +1148,7 @@ func (e *Engine) commitRequirementEdits(ctx context.Context, profileID string, r
 			updates[c.Field] = c.AfterVal
 			ids[i] = c.ID
 		}
-		if err := e.client.UpdateIssue(ctx, key, jira.FieldsForJira(updates)); err != nil {
+		if err := e.backend.UpdateIssue(ctx, key, e.backend.FieldsForJira(updates)); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: key, Error: "update requirement: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -918,7 +1165,7 @@ func (e *Engine) commitRequirementEdits(ctx context.Context, profileID string, r
 // confirms the delete so a failure leaves it pending for retry.
 func (e *Engine) commitRequirementDeletes(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
 	for _, c := range rows {
-		if err := e.client.DeleteRequirement(ctx, c.EntityKey); err != nil {
+		if err := e.backend.DeleteRequirement(ctx, c.EntityKey); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "delete requirement: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -948,7 +1195,7 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed bug payload: " + err.Error()})
 			continue
 		}
-		realKey, err := e.client.CreateBug(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Labels, p.Fields)
+		realKey, err := e.backend.CreateBug(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Labels, p.Fields)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: p.TestKey, Error: "create bug: " + sanitizeError(err.Error())})
 			continue
@@ -960,7 +1207,7 @@ func (e *Engine) commitBugCreates(ctx context.Context, profileID string, rows []
 			}
 			key = realKey
 		}
-		if err := e.client.CreateBugLink(ctx, p.TestKey, key); err != nil {
+		if err := e.backend.CreateBugLink(ctx, p.TestKey, key); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: p.TestKey, Error: "link bug: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -989,7 +1236,7 @@ func (e *Engine) commitRequirementCreates(ctx context.Context, profileID string,
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed requirement payload: " + err.Error()})
 			continue
 		}
-		realKey, err := e.client.CreateRequirement(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Components, p.FixVersions)
+		realKey, err := e.backend.CreateRequirement(ctx, p.ProjectKey, p.IssueType, p.Summary, p.Description, p.Priority, p.Components, p.FixVersions)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "create requirement: " + sanitizeError(err.Error())})
 			continue
@@ -1021,7 +1268,7 @@ func splitRunEntityKey(entityKey string) (execKey, testKey string, ok bool) {
 // commitComments posts each queued free-text comment on its Test (FR-4.4).
 func (e *Engine) commitComments(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
 	for _, c := range rows {
-		if err := e.client.AddComment(ctx, c.EntityKey, c.AfterVal); err != nil {
+		if err := e.backend.AddComment(ctx, c.EntityKey, c.AfterVal); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "post comment: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -1046,7 +1293,7 @@ func (e *Engine) commitReviews(ctx context.Context, profileID string, rows []tes
 			continue
 		}
 		body := reviewComment(rv.Verdict, rv.Reviewer, rv.Note)
-		if err := e.client.AddComment(ctx, c.EntityKey, body); err != nil {
+		if err := e.backend.AddComment(ctx, c.EntityKey, body); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "post review: " + sanitizeError(err.Error())})
 			continue
 		}
@@ -1077,6 +1324,7 @@ func reviewComment(verdict, reviewer, note string) string {
 // commitTestCreates creates imported Tests (FR-10), renaming each local "NEW-N"
 // placeholder to the real key Jira assigned. Reported under the created key.
 func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey string, rows []testrepo.PendingChange, result *CommitResult) {
+	caps := e.backend.Capabilities()
 	for _, c := range rows {
 		var p struct {
 			Summary     string `json:"summary"`
@@ -1104,7 +1352,7 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 				components = append(components, s)
 			}
 		}
-		realKey, err := e.client.CreateTest(ctx, projectKey, p.Summary, p.Description, p.Priority, labels, components)
+		realKey, err := e.backend.CreateTest(ctx, projectKey, p.Summary, p.Description, p.Priority, labels, components)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "create test: " + sanitizeError(err.Error())})
 			continue
@@ -1135,15 +1383,37 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 				stepSrc = append(stepSrc, testrepo.Step{Action: s.Action, Data: s.Data, Expected: s.Expected})
 			}
 		}
+		// A backend whose steps are a single inline-text field (Kiwi,
+		// StepModel "inline-text") has no step objects to POST individually —
+		// per-step CreateTestStep is ErrUnsupported there. Instead, the new
+		// Test's resulting steps are flattened into the same text blob the
+		// edit path uses (see the StepModel routing in commitChanges) and
+		// applied with ONE UpdateIssue; CreateTest already seeded the text
+		// from the create description, so an empty stepSrc needs no extra
+		// call. Xray keeps the per-step createStep loop below verbatim.
 		stepErr := ""
-		for _, s := range stepSrc {
-			newID, sErr := e.createStep(ctx, profileID, key, s)
-			if sErr != nil {
-				stepErr = sanitizeError(sErr.Error())
-				break
+		if caps.StepModel == "inline-text" {
+			if len(stepSrc) > 0 {
+				text, terr := e.flattenStepsToText(profileID, key)
+				if terr != nil {
+					stepErr = sanitizeError(terr.Error())
+				} else {
+					fields := e.backend.FieldsForJira(map[string]string{"description": text})
+					if err := e.backend.UpdateIssue(ctx, key, fields); err != nil {
+						stepErr = sanitizeError(err.Error())
+					}
+				}
 			}
-			if newID != "" && s.XrayID != "" {
-				_ = e.repo.RenameTestStepID(profileID, key, s.XrayID, newID)
+		} else {
+			for _, s := range stepSrc {
+				newID, sErr := e.createStep(ctx, profileID, key, s)
+				if sErr != nil {
+					stepErr = sanitizeError(sErr.Error())
+					break
+				}
+				if newID != "" && s.XrayID != "" {
+					_ = e.repo.RenameTestStepID(profileID, key, s.XrayID, newID)
+				}
 			}
 		}
 		if stepErr != "" {
@@ -1179,9 +1449,9 @@ func (e *Engine) createStep(ctx context.Context, profileID, testKey string, s te
 		if tc, err := e.repo.GetTest(profileID, s.CalledTestKey); err == nil {
 			calledID = tc.ID
 		}
-		return e.client.CreateCalledTestStep(ctx, testKey, s.CalledTestKey, calledID)
+		return e.backend.CreateCalledTestStep(ctx, testKey, s.CalledTestKey, calledID)
 	}
-	return e.client.CreateTestStep(ctx, testKey, s.Action, s.Data, s.Expected)
+	return e.backend.CreateTestStep(ctx, testKey, s.Action, s.Data, s.Expected)
 }
 
 // stepPendingRowIDs returns the ids of step-level pending changes for a Test —
@@ -1225,7 +1495,7 @@ func (e *Engine) commitFolders(ctx context.Context, profileID, projectKey string
 				result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed folder payload: " + jErr.Error()})
 				continue
 			}
-			err = e.client.CreateFolder(ctx, projectKey, p.ParentPath, p.Name)
+			err = e.backend.CreateFolder(ctx, projectKey, p.ParentPath, p.Name)
 		case "folder_rename":
 			var p struct {
 				Path string `json:"path"`
@@ -1235,9 +1505,9 @@ func (e *Engine) commitFolders(ctx context.Context, profileID, projectKey string
 				result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "malformed folder payload: " + jErr.Error()})
 				continue
 			}
-			err = e.client.RenameFolder(ctx, projectKey, c.EntityKey, p.Name)
+			err = e.backend.RenameFolder(ctx, projectKey, c.EntityKey, p.Name)
 		case "folder_delete":
-			err = e.client.DeleteFolder(ctx, projectKey, c.EntityKey)
+			err = e.backend.DeleteFolder(ctx, projectKey, c.EntityKey)
 		}
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "folder: " + sanitizeError(err.Error())})
@@ -1278,7 +1548,7 @@ func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, proje
 		if pk == "" {
 			pk = projectKey
 		}
-		realKey, err := e.client.CreatePrecondition(ctx, pk, payload.Summary, payload.Type, payload.Description)
+		realKey, err := e.backend.CreatePrecondition(ctx, pk, payload.Summary, payload.Type, payload.Description)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,
@@ -1331,7 +1601,7 @@ func (e *Engine) commitPreconditionEdits(ctx context.Context, profileID string, 
 			updates[c.Field] = c.AfterVal
 			ids[i] = c.ID
 		}
-		if err := e.client.UpdateIssue(ctx, key, jira.FieldsForJira(updates)); err != nil {
+		if err := e.backend.UpdateIssue(ctx, key, e.backend.FieldsForJira(updates)); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: key,
 				Error:   "update precondition: " + sanitizeError(err.Error()),
@@ -1354,7 +1624,7 @@ func (e *Engine) commitPreconditionEdits(ctx context.Context, profileID string, 
 // the delete so a failure leaves it pending for retry.
 func (e *Engine) commitPreconditionDeletes(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
 	for _, c := range rows {
-		if err := e.client.DeletePrecondition(ctx, c.EntityKey); err != nil {
+		if err := e.backend.DeletePrecondition(ctx, c.EntityKey); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,
 				Error:   "delete precondition: " + sanitizeError(err.Error()),
@@ -1406,8 +1676,37 @@ func (e *Engine) commitContainerCreates(ctx context.Context, profileID string, c
 // test_container_add row first creates the Container, then populates it. Each
 // is reported under the Container key. These are additive, so no conflict
 // pre-check is applied.
-func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows []testrepo.PendingChange, result *CommitResult) {
+func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows []testrepo.PendingChange, caps backend.Capabilities, result *CommitResult) {
 	for _, c := range rows {
+		// container_edit (rename) writes through UpdateIssue on the CONTAINER key.
+		// That is only valid where containers are Jira issues (Xray). A backend
+		// with a separate container namespace (Kiwi) would misread the container
+		// key as a TestCase pk, so skip the rename and keep the row pending. Xray
+		// keeps the UpdateIssue path unchanged.
+		if c.EntityType == "container_edit" && !issueBackedWrites(caps) {
+			result.Skipped = append(result.Skipped, SkippedCommit{
+				EntityKey:  c.EntityKey,
+				EntityType: c.EntityType,
+				Reason:     skipReasonContainerEdit,
+			})
+			continue
+		}
+		// container_env writes the Test Environments set on a Test Execution as
+		// a custom-field update on the execution ISSUE (SetContainerEnvironments).
+		// That is only meaningful where executions are Jira issues (Xray); Kiwi's
+		// SetContainerEnvironments returns backend.ErrUnsupported, which would
+		// hard-Fail the row. Gate it on issueBackedWrites (same gate as
+		// run-defects/run-comments) so an unsupported backend Skips and keeps the
+		// row pending instead of failing. Xray (issueBackedWrites=true) is
+		// unaffected and still calls SetContainerEnvironments below.
+		if c.EntityType == "container_env" && !issueBackedWrites(caps) {
+			result.Skipped = append(result.Skipped, SkippedCommit{
+				EntityKey:  c.EntityKey,
+				EntityType: c.EntityType,
+				Reason:     skipReasonContainerEnv,
+			})
+			continue
+		}
 		var key string
 		var err error
 		switch c.EntityType {
@@ -1416,7 +1715,7 @@ func (e *Engine) commitMemberships(ctx context.Context, profileID string, rows [
 		case "test_membership_remove":
 			key, err = e.commitMembershipRemove(ctx, c)
 		case "container_edit":
-			key, err = c.EntityKey, e.client.UpdateIssue(ctx, c.EntityKey, jira.FieldsForJira(map[string]string{"summary": c.AfterVal}))
+			key, err = c.EntityKey, e.backend.UpdateIssue(ctx, c.EntityKey, e.backend.FieldsForJira(map[string]string{"summary": c.AfterVal}))
 		case "container_delete":
 			key, err = e.commitContainerDelete(ctx, c)
 		case "container_env":
@@ -1449,7 +1748,7 @@ func (e *Engine) commitMembershipAdd(ctx context.Context, c testrepo.PendingChan
 	if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
 		return c.EntityKey, fmt.Errorf("malformed membership payload: %s", err)
 	}
-	if err := e.client.AddTestsToContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
+	if err := e.backend.AddTestsToContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
 		return c.EntityKey, fmt.Errorf("allocate to %s: %s", c.EntityKey, sanitizeError(err.Error()))
 	}
 	return c.EntityKey, nil
@@ -1465,7 +1764,7 @@ func (e *Engine) commitMembershipRemove(ctx context.Context, c testrepo.PendingC
 	if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
 		return c.EntityKey, fmt.Errorf("malformed membership payload: %s", err)
 	}
-	if err := e.client.RemoveTestsFromContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
+	if err := e.backend.RemoveTestsFromContainer(ctx, payload.Kind, c.EntityKey, payload.Members); err != nil {
 		return c.EntityKey, fmt.Errorf("deallocate from %s: %s", c.EntityKey, sanitizeError(err.Error()))
 	}
 	return c.EntityKey, nil
@@ -1480,7 +1779,7 @@ func (e *Engine) commitContainerDelete(ctx context.Context, c testrepo.PendingCh
 	if err := json.Unmarshal([]byte(c.BeforeVal), &snap); err != nil {
 		return c.EntityKey, fmt.Errorf("malformed container snapshot: %s", err)
 	}
-	if err := e.client.DeleteContainer(ctx, snap.Kind, c.EntityKey); err != nil {
+	if err := e.backend.DeleteContainer(ctx, snap.Kind, c.EntityKey); err != nil {
 		return c.EntityKey, fmt.Errorf("delete container %s: %s", c.EntityKey, sanitizeError(err.Error()))
 	}
 	return c.EntityKey, nil
@@ -1496,7 +1795,7 @@ func (e *Engine) commitContainerEnv(ctx context.Context, c testrepo.PendingChang
 	if err := json.Unmarshal([]byte(c.AfterVal), &envs); err != nil {
 		return c.EntityKey, fmt.Errorf("malformed environments payload: %s", err)
 	}
-	if err := e.client.SetContainerEnvironments(ctx, c.EntityKey, envs); err != nil {
+	if err := e.backend.SetContainerEnvironments(ctx, c.EntityKey, envs); err != nil {
 		return c.EntityKey, fmt.Errorf("set environments on %s: %s", c.EntityKey, sanitizeError(err.Error()))
 	}
 	return c.EntityKey, nil
@@ -1515,7 +1814,7 @@ func (e *Engine) commitContainerCreate(ctx context.Context, profileID string, c 
 	if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
 		return c.EntityKey, fmt.Errorf("malformed container payload: %s", err)
 	}
-	realKey, err := e.client.CreateContainer(ctx, payload.ProjectKey, payload.Kind, payload.Summary)
+	realKey, err := e.backend.CreateContainer(ctx, payload.ProjectKey, payload.Kind, payload.Summary)
 	if err != nil {
 		return c.EntityKey, fmt.Errorf("create container: %s", sanitizeError(err.Error()))
 	}
@@ -1528,7 +1827,7 @@ func (e *Engine) commitContainerCreate(ctx context.Context, profileID string, c 
 		}
 		target = realKey
 	}
-	if err := e.client.AddTestsToContainer(ctx, payload.Kind, target, payload.Members); err != nil {
+	if err := e.backend.AddTestsToContainer(ctx, payload.Kind, target, payload.Members); err != nil {
 		return target, fmt.Errorf("allocate to %s: %s", target, sanitizeError(err.Error()))
 	}
 	return target, nil
@@ -1612,7 +1911,7 @@ func parseStepKey(s string) (testKey, xrayID string, ok bool) {
 // it. The current Jira status is the pending change's BeforeVal — that's
 // what Jira holds until our commit lands.
 func (e *Engine) applyTransition(ctx context.Context, testKey string, change *testrepo.PendingChange) error {
-	transitions, err := e.client.GetTransitions(ctx, testKey, change.BeforeVal)
+	transitions, err := e.backend.GetTransitions(ctx, testKey, change.BeforeVal)
 	if err != nil {
 		return fmt.Errorf("fetch transitions: %s", sanitizeError(err.Error()))
 	}
@@ -1629,7 +1928,7 @@ func (e *Engine) applyTransition(ctx context.Context, testKey string, change *te
 			change.AfterVal, change.BeforeVal,
 		)
 	}
-	if err := e.client.PostTransition(ctx, testKey, transitionID); err != nil {
+	if err := e.backend.PostTransition(ctx, testKey, transitionID); err != nil {
 		return fmt.Errorf("post transition: %s", sanitizeError(err.Error()))
 	}
 	return nil
@@ -1668,37 +1967,6 @@ func oldestBaseVersion(changes []testrepo.PendingChange) string {
 		}
 	}
 	return oldest
-}
-
-// isRemoteAhead returns true if remote's timestamp is strictly later than
-// base's. Both arguments are timestamps as Jira returns them — typically
-// "yyyy-MM-ddTHH:mm:ss.SSS-HHMM" but RFC 3339 variants are also accepted.
-// On parse failure the function is permissive (returns false) so a malformed
-// remote string can't manufacture a phantom conflict.
-func isRemoteAhead(remote, base string) bool {
-	rt, ok1 := parseJiraTime(remote)
-	bt, ok2 := parseJiraTime(base)
-	if !ok1 || !ok2 {
-		return false
-	}
-	return rt.After(bt)
-}
-
-var jiraTimeFormats = []string{
-	"2006-01-02T15:04:05.000-0700",
-	"2006-01-02T15:04:05-0700",
-	"2006-01-02T15:04:05.000Z07:00",
-	time.RFC3339Nano,
-	time.RFC3339,
-}
-
-func parseJiraTime(s string) (time.Time, bool) {
-	for _, f := range jiraTimeFormats {
-		if t, err := time.Parse(f, s); err == nil {
-			return t, true
-		}
-	}
-	return time.Time{}, false
 }
 
 // sanitizeError trims long Jira error responses so the UI shows a short,
@@ -1756,7 +2024,7 @@ func (e *Engine) commitReqReqLinks(ctx context.Context, profileID string, rows [
 				add = append(add, k)
 			}
 		}
-		if err := e.client.UpdateRequirementLinks(ctx, fromKey, add, removeLinkIDs); err != nil {
+		if err := e.backend.UpdateRequirementLinks(ctx, fromKey, add, removeLinkIDs); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: fromKey, Error: "update req links: " + sanitizeError(err.Error())})
 			continue
 		}

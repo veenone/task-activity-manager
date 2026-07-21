@@ -49,6 +49,8 @@ import type {
 } from "./api";
 import { ProfileForm } from "./components/ProfileForm";
 import { ProfilesModal } from "./components/ProfilesModal";
+import { ConnectionsModal } from "./components/ConnectionsModal";
+import { BridgeWizard } from "./components/BridgeWizard";
 import { TestTable } from "./components/TestTable";
 import { TestDetail } from "./components/TestDetail";
 import { NewTestPanel } from "./components/NewTestPanel";
@@ -57,7 +59,7 @@ import { ContainerList } from "./components/ContainerList";
 import { ComponentList } from "./components/ComponentList";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkReviewModal } from "./components/BulkReviewModal";
-import { REVIEW_ENABLED } from "./features";
+import { REVIEW_ENABLED, invalidateCapabilities, useCapabilities } from "./features";
 import { clearViewState } from "./lib/viewState";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
@@ -108,6 +110,11 @@ function App() {
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showProfiles, setShowProfiles] = useState(false);
+  // Connections manager for the active workspace (P6.3 B6a) — add/edit/delete
+  // the connections (e.g. a Kiwi target) a workspace talks to, beyond its
+  // primary one. The prerequisite UI for the bridge wizard (B6b).
+  const [showConnections, setShowConnections] = useState(false);
+  const [showBridge, setShowBridge] = useState(false);
   // When set, the profile modal opens in edit mode for this profile (FR-5).
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
 
@@ -682,8 +689,13 @@ function App() {
   // handleCreated handles both a newly-created profile and an edited one: it
   // replaces the existing entry when the id is already known, otherwise appends.
   // After an edit, the cached data may have been cleared (project/URL change),
-  // so the views are refreshed.
+  // so the views are refreshed. Also drops any cached capabilities for this
+  // id -- an edit may have flipped the profile's Backend (Xray<->Kiwi), and
+  // without this the UI would keep gating on the old backend's capabilities
+  // until an app restart (useCapabilities is keyed on profileId, which is
+  // unchanged across an edit).
   function handleCreated(p: Profile) {
+    invalidateCapabilities(p.id);
     setProfiles((prev) =>
       prev.some((x) => x.id === p.id)
         ? prev.map((x) => (x.id === p.id ? p : x))
@@ -924,6 +936,10 @@ function App() {
   const activeProfile = profiles.find((p) => p.id === activeId);
   const isDemo = isDemoUrl(activeProfile?.jiraUrl);
   const demoVar = demoVariant(activeProfile?.jiraUrl);
+  // Gates the Xray-shaped UI below to what the active profile's backend
+  // actually supports (Kiwi, etc.) — defaultCapabilities (all true) while
+  // loading, so an Xray profile is never affected (P6.2a).
+  const caps = useCapabilities(activeId);
 
   // A sync is in flight when the main Sync is running (syncing) OR any partial
   // per-view refresh is emitting progress. Both a full pull and a partial sync
@@ -1013,13 +1029,33 @@ function App() {
               </option>
             ))}
           </select>
-          <button
-            className="topbar-btn"
-            onClick={() => setShowProfiles(true)}
-            title="Manage profiles — add, edit, set default, export, delete"
-          >
-            ⚙ Manage
-          </button>
+          <Menu
+            label="⚙ Manage"
+            title="Manage profiles and connections"
+            items={[
+              {
+                key: "profiles",
+                label: "Manage Profiles…",
+                onClick: () => setShowProfiles(true),
+                title: "Manage profiles — add, edit, set default, export, delete",
+              },
+              {
+                key: "connections",
+                label: "Connections…",
+                onClick: () => setShowConnections(true),
+                title:
+                  "Manage this workspace's connections — add a target " +
+                  "(e.g. Kiwi) beside its primary connection",
+              },
+              {
+                key: "bridge",
+                label: "Bridge…",
+                onClick: () => setShowBridge(true),
+                title:
+                  "Publish/migrate this workspace's tests from one connection to another",
+              },
+            ]}
+          />
         </div>
 
         <nav className="view-tabs topbar-zone topbar-center">
@@ -1029,18 +1065,22 @@ function App() {
           >
             Browse
           </button>
-          <button
-            className={`view-tab${view === "preconditions" ? " view-tab-active" : ""}`}
-            onClick={() => setView("preconditions")}
-          >
-            Preconditions
-          </button>
-          <button
-            className={`view-tab${view === "requirements" ? " view-tab-active" : ""}`}
-            onClick={() => setView("requirements")}
-          >
-            Requirements
-          </button>
+          {caps.supportsPreconditionObjects && (
+            <button
+              className={`view-tab${view === "preconditions" ? " view-tab-active" : ""}`}
+              onClick={() => setView("preconditions")}
+            >
+              Preconditions
+            </button>
+          )}
+          {caps.supportsRequirementObjects && (
+            <button
+              className={`view-tab${view === "requirements" ? " view-tab-active" : ""}`}
+              onClick={() => setView("requirements")}
+            >
+              Requirements
+            </button>
+          )}
           <button
             className={`view-tab${view === "duplicates" ? " view-tab-active" : ""}`}
             onClick={() => setView("duplicates")}
@@ -1193,19 +1233,21 @@ function App() {
           >
             Bulk edit…
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowBulkTransition(true)}
-          >
-            Bulk transition…
-          </button>
+          {caps.supportsWorkflowTransitions && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowBulkTransition(true)}
+            >
+              Bulk transition…
+            </button>
+          )}
           <button
             className="btn btn-primary"
             onClick={() => setShowBulkAllocate(true)}
           >
             Allocate…
           </button>
-          {folders.length > 0 && (
+          {caps.supportsFolders && folders.length > 0 && (
             <button
               className="btn btn-primary"
               onClick={() => setShowBulkMove(true)}
@@ -1213,18 +1255,22 @@ function App() {
               Move to folder…
             </button>
           )}
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowBulkPreconditions(true)}
-          >
-            Preconditions…
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowBulkRequirements(true)}
-          >
-            Requirements…
-          </button>
+          {caps.supportsPreconditionObjects && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowBulkPreconditions(true)}
+            >
+              Preconditions…
+            </button>
+          )}
+          {caps.supportsRequirementObjects && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowBulkRequirements(true)}
+            >
+              Requirements…
+            </button>
+          )}
           {REVIEW_ENABLED && (
             <button
               className="btn btn-primary"
@@ -1239,7 +1285,7 @@ function App() {
         </div>
       )}
 
-      {view === "preconditions" ? (
+      {view === "preconditions" && caps.supportsPreconditionObjects ? (
         <main className="content content-preconditions">
           <PreconditionsView
             profileId={activeId}
@@ -1250,7 +1296,7 @@ function App() {
             }}
           />
         </main>
-      ) : view === "requirements" ? (
+      ) : view === "requirements" && caps.supportsRequirementObjects ? (
         <main className="content content-requirements">
           <RequirementsView
             profileId={activeId}
@@ -1355,7 +1401,9 @@ function App() {
                 setSelectedKey(null);
               }}
             >
-              <option value="folder">Group by: Folder</option>
+              {caps.supportsFolders && (
+                <option value="folder">Group by: Folder</option>
+              )}
               <option value="testset">Group by: Test Set</option>
               <option value="testplan">Group by: Test Plan</option>
               <option value="component">Group by: Component</option>
@@ -1371,7 +1419,13 @@ function App() {
                 }}
               />
             ) : groupBy === "folder" ? (
-              folders.length > 0 ? (
+              !caps.supportsFolders ? (
+                <div className="browse-sidebar-empty">
+                  <p className="muted">
+                    Folders are not supported by this backend.
+                  </p>
+                </div>
+              ) : folders.length > 0 ? (
                 <FolderTree
                   folders={folders}
                   selected={selectedFolder}
@@ -1495,6 +1549,24 @@ function App() {
           onImport={importProfile}
           onSaved={handleCreated}
           onDelete={deleteProfile}
+        />
+      )}
+
+      {showConnections && activeId && (
+        <ConnectionsModal
+          activeId={activeId}
+          onClose={() => setShowConnections(false)}
+        />
+      )}
+
+      {showBridge && activeId && (
+        <BridgeWizard
+          activeId={activeId}
+          onClose={() => setShowBridge(false)}
+          onOpenConnections={() => {
+            setShowBridge(false);
+            setShowConnections(true);
+          }}
         />
       )}
 

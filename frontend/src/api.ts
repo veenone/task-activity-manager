@@ -14,6 +14,7 @@ export {
   SetTheme,
   SetRequirementLinkType,
   ListRequirementLinkTypes,
+  GetCapabilities,
   SetShowCoverage,
   ListProfiles,
   CreateProfile,
@@ -27,6 +28,14 @@ export {
   DeleteProfile,
   TestConnection,
   TestProfileConnection,
+  ListConnections,
+  AddConnection,
+  UpdateConnection,
+  DeleteConnection,
+  ComputeBridgeGap,
+  GetBridgeMapping,
+  SaveBridgeMapping,
+  PublishToTarget,
   SyncProfile,
   SyncRequirements,
   SyncContainers,
@@ -427,6 +436,34 @@ export interface Settings {
   showCoverage: boolean; // reveal the opt-in, hidden-by-default Coverage tab
 }
 
+// Capabilities mirrors backend.Capabilities — what the active profile's
+// backend supports. Xray reports the full/permissive set today (see
+// xray.Adapter.Capabilities); this is used to gate backend-specific UI once a
+// non-Xray backend exists. Field names/casing match the generated
+// wailsjs/go/models.ts backend.Capabilities shape (camelCase, driven by the
+// json tags on the Go struct), matching the hand-defined-interface convention
+// used by the other domain types in this file.
+export interface Capabilities {
+  name: string;
+  idStyle: string;
+  supportsJqlScope: boolean;
+  stepModel: string;
+  supportsTestTypes: boolean;
+  supportsFolders: boolean;
+  supportsPreconditionObjects: boolean;
+  supportsRequirementObjects: boolean;
+  supportsIssueLinkTypes: boolean;
+  supportsEnvironments: boolean;
+  supportsContainers: boolean;
+  containerKinds: string[];
+  supportsTestRuns: boolean;
+  statusModel: string;
+  supportsWorkflowTransitions: boolean;
+  supportsBugCreation: boolean;
+  supportsBugLinks: boolean;
+  supportsTags: boolean;
+}
+
 export interface Profile {
   id: string;
   name: string;
@@ -438,7 +475,83 @@ export interface Profile {
   bugProjectKey: string;
   caCert: string;
   allowUntrustedTls: boolean;
+  // backend selects which system this profile connects to: "xray" (default,
+  // Jira Data Center + Xray Server/DC) or "kiwi" (Kiwi TCMS). Settable from
+  // the profile form's backend selector (P6.1b).
+  backend: string;
   createdAt: string;
+}
+
+// Connection mirrors connection.Connection — one backend a workspace talks
+// to (P6.3 bridge plumbing). A single-connection workspace's connection has
+// id == workspaceId and role "both"; the bridge (B5/B6, not yet built) adds
+// a second connection with role "source" or "target".
+export interface Connection {
+  id: string;
+  workspaceId: string;
+  name: string;
+  backend: string; // "xray" | "kiwi"
+  url: string;
+  projectKey: string;
+  scopeJql: string;
+  bugIssueType: string;
+  bugProjectMode: string; // "test" | "execution" | "dedicated"
+  bugProjectKey: string;
+  caCert: string;
+  allowUntrustedTls: boolean;
+  role: string; // "source" | "target" | "both"
+  createdAt: string;
+}
+
+// BridgeGap mirrors bridge.Gap — one way the target connection's backend
+// can't fully represent something the source connection's backend supports,
+// returned by ComputeBridgeGap (Phase 6 bridge task B4). Feature is a stable
+// machine key; Severity is "blocking" | "lossy" | "info".
+export interface BridgeGap {
+  feature: string;
+  severity: string;
+  message: string;
+}
+
+// BridgeMapping mirrors bridge.Mapping — the reversible status/step/field
+// mapping used when publishing from a source connection to a target
+// connection. Returned by GetBridgeMapping (the saved mapping, or a
+// bridge.DefaultMapping when none is saved) and persisted by
+// SaveBridgeMapping. The publish engine that applies it (B5) and the mapping
+// editor UI (B6) are later tasks — B4 only computes/persists this shape.
+export interface BridgeMapping {
+  statusMap: Record<string, string>;
+  stepMode: string; // "flatten" | "passthrough"
+  fieldMap: Record<string, string>;
+  unmappedPolicy: string; // "drop" | "keepInHub"
+}
+
+// BridgePublishResult mirrors bridge.PublishResult — the outcome of
+// PublishToTarget (Phase 6 bridge task B5): every hub test newly created in
+// the target this run, every one skipped because it was already published
+// (resumability), and every one whose publish attempt failed. Containers/
+// preconditions/requirements/links are not published by this call (B5b).
+export interface BridgePublishResult {
+  created: BridgePublishedTest[];
+  alreadyPublished: string[];
+  failed: BridgePublishFailure[];
+}
+
+export interface BridgePublishedTest {
+  localKey: string;
+  targetKey: string;
+}
+
+export interface BridgePublishFailure {
+  localKey: string;
+  error: string;
+  // targetKey is set when CreateTest succeeded but a downstream step/status
+  // write failed: the target test WAS created (with this key) and its
+  // external_ref IS recorded, so a future PublishTests run will SKIP it
+  // (resumability) rather than retry the failed steps/status. Empty means
+  // CreateTest itself failed — nothing was created, and a retry will
+  // correctly re-attempt CreateTest for this test.
+  targetKey?: string;
 }
 
 // Diagnostics mirrors app.Diagnostics — the environment + state summary shown
@@ -1316,11 +1429,21 @@ export function errMsg(e: unknown): string {
 
 // isDemoUrl reports whether a profile's Jira URL selects demo mode: "demo", a
 // "demo:" / "mock:" prefix, or a "demo-" variant like "demo-pkcs" that picks a
-// built-in dataset. The single source of truth for the frontend — keep in sync
-// with isDemoURL in the Go backend (internal/jira/demo.go) and the validation in
-// ProfileForm.tsx.
+// built-in dataset. Also matches "kiwi-demo" (and its "kiwi-demo:"/"kiwi-demo-"
+// variants) — the offline Kiwi demo (internal/backend/kiwi/demo.go), so the
+// DEMO chip shows for a kiwi-demo profile too. The single source of truth for
+// the frontend — keep in sync with isDemoURL in the Go backend
+// (internal/jira/demo.go) and the validation in ProfileForm.tsx.
 export function isDemoUrl(url?: string): boolean {
-  return /^(demo|demo[-:].*|mock:.*)$/i.test((url ?? "").trim());
+  return /^(demo|demo[-:].*|mock:.*|kiwi-demo|kiwi-demo[-:].*)$/i.test((url ?? "").trim());
+}
+
+// isKiwiDemoUrl reports whether a profile's Jira URL selects the offline Kiwi
+// demo specifically (as opposed to the Xray demo). Kept separate from
+// demoVariant, whose return type is pinned to the Xray-demo theme names
+// ("pkcs" | "euicc" | "") consumed by CoverageMap/CoverageView.
+export function isKiwiDemoUrl(url?: string): boolean {
+  return /^(kiwi-demo|kiwi-demo[-:].*)$/i.test((url ?? "").trim());
 }
 
 // demoVariant returns the named demo dataset variant embedded in a profile's
