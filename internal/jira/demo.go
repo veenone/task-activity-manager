@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -786,6 +787,47 @@ func demoCategoryIndexForFeature(theme demoTheme, feature string) int {
 		}
 	}
 	return -1
+}
+
+// demoContainerKeyInfix maps a Container kind to the key infix used by
+// demoCreatedContainerKey. Distinct from the infixes demoContainersAndLinks
+// uses for its generated containers (TS/TP/TE) so a key minted for a
+// created container can never collide with a generated demo container key.
+func demoContainerKeyInfix(kind string) string {
+	switch kind {
+	case KindTestSet:
+		return "CVTS"
+	case KindTestPlan:
+		return "CVTP"
+	case KindTestExec:
+		return "CVTE"
+	}
+	return "CVXX"
+}
+
+// demoCreatedContainerCounter hands out a fresh number to every demo
+// CreateContainer call, process-wide. The demo client is stateless (no
+// persistence across calls), so the only way to guarantee a distinct key per
+// call (rather than per summary) is a counter: two containers created with
+// the same summary (an ordinary, unvalidated action from the board create
+// flow) must still get different keys, or the second RenameContainer would
+// collide with the first on test_container's (profile_id, jira_key) primary
+// key.
+var demoCreatedContainerCounter atomic.Int64
+
+// demoCreatedContainerKey mints a fresh demo container key for a newly
+// created Test Set / Plan / Execution, unique to this call. It does not
+// depend on summary (or anything else about the call) beyond project and
+// kind: uniqueness comes from demoCreatedContainerCounter, not from hashing
+// the input, so two calls with an identical summary still get distinct
+// keys. If projectKey is empty it defaults to "DEMO", matching
+// demoContainersAndLinks.
+func demoCreatedContainerKey(projectKey, kind, _ string) string {
+	if projectKey == "" {
+		projectKey = "DEMO"
+	}
+	n := demoCreatedContainerCounter.Add(1)
+	return fmt.Sprintf("%s-%s-%d", projectKey, demoContainerKeyInfix(kind), n)
 }
 
 // demoPreconditionsAndLinks returns the demo precondition master list plus
