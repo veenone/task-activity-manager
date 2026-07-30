@@ -4,9 +4,12 @@ package settings
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
+	"sync"
 
 	"xray-test-manager/internal/store"
 )
@@ -16,6 +19,7 @@ const (
 	keyTheme               = "theme"
 	keyRequirementLinkType = "requirement_link_type"
 	keyShowCoverage        = "show_coverage"
+	keySpellcheckIgnore    = "spellcheck_ignore_words"
 )
 
 // Settings holds the global application preferences.
@@ -31,6 +35,11 @@ type Settings struct {
 // Manager reads and writes global settings.
 type Manager struct {
 	db *sql.DB
+	// ignoreMu serializes the read-modify-write of the spellcheck ignore list,
+	// which Wails can invoke concurrently (each bound call runs in its own
+	// goroutine). Without it, two quick Add/Remove calls could each read the
+	// same list and the second write would drop the first's change.
+	ignoreMu sync.Mutex
 }
 
 // NewManager returns a settings manager backed by the given store.
@@ -92,6 +101,80 @@ func (m *Manager) SetTheme(theme string) error {
 // setting, reverting to auto-resolve on the next commit.
 func (m *Manager) SetRequirementLinkType(name string) error {
 	return m.setValue(keyRequirementLinkType, name)
+}
+
+// GetIgnoreWords returns the user's persisted spellcheck ignore list
+// (lowercased words), empty when none are set.
+func (m *Manager) GetIgnoreWords() ([]string, error) {
+	raw, err := m.value(keySpellcheckIgnore)
+	if err != nil {
+		return nil, err
+	}
+	if raw == "" {
+		return nil, nil
+	}
+	var words []string
+	if err := json.Unmarshal([]byte(raw), &words); err != nil {
+		return nil, fmt.Errorf("parse ignore words: %w", err)
+	}
+	return words, nil
+}
+
+// AddIgnoreWord adds a word (lowercased, trimmed) to the ignore list. No-op for
+// blank input or a word already present. The read-modify-write is serialized by
+// ignoreMu so concurrent calls cannot lose an update.
+func (m *Manager) AddIgnoreWord(word string) error {
+	word = strings.ToLower(strings.TrimSpace(word))
+	if word == "" {
+		return nil
+	}
+	m.ignoreMu.Lock()
+	defer m.ignoreMu.Unlock()
+	words, err := m.GetIgnoreWords()
+	if err != nil {
+		return err
+	}
+	for _, w := range words {
+		if w == word {
+			return nil
+		}
+	}
+	words = append(words, word)
+	return m.saveIgnoreWords(words)
+}
+
+// RemoveIgnoreWord drops a word (lowercased, trimmed) from the ignore list.
+// No-op for blank input or a word not present. Serialized by ignoreMu.
+func (m *Manager) RemoveIgnoreWord(word string) error {
+	word = strings.ToLower(strings.TrimSpace(word))
+	if word == "" {
+		return nil
+	}
+	m.ignoreMu.Lock()
+	defer m.ignoreMu.Unlock()
+	words, err := m.GetIgnoreWords()
+	if err != nil {
+		return err
+	}
+	kept := make([]string, 0, len(words))
+	for _, w := range words {
+		if w != word {
+			kept = append(kept, w)
+		}
+	}
+	if len(kept) == len(words) {
+		return nil
+	}
+	return m.saveIgnoreWords(kept)
+}
+
+// saveIgnoreWords persists the ignore list as JSON. Callers hold ignoreMu.
+func (m *Manager) saveIgnoreWords(words []string) error {
+	b, err := json.Marshal(words)
+	if err != nil {
+		return fmt.Errorf("encode ignore words: %w", err)
+	}
+	return m.setValue(keySpellcheckIgnore, string(b))
 }
 
 func (m *Manager) value(key string) (string, error) {

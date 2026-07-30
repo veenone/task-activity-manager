@@ -76,6 +76,7 @@ import { CoverageView } from "./components/CoverageView";
 import { DuplicatesView } from "./components/DuplicatesView";
 import { GapAnalysisView } from "./components/GapAnalysisView";
 import { TestCallsView } from "./components/TestCallsView";
+import MisspellingsView from "./components/MisspellingsView";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { SyncHistoryModal } from "./components/SyncHistoryModal";
 import { ImportTestsModal } from "./components/ImportTestsModal";
@@ -176,6 +177,7 @@ function App() {
     | "traceability"
     | "plans"
     | "coverage"
+    | "misspellings"
   >("browse");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showSyncHistory, setShowSyncHistory] = useState(false);
@@ -262,6 +264,15 @@ function App() {
       } else {
         setProgress(p);
       }
+    });
+  }, []);
+
+  // The Spellcheck scan reports on its own channel, but its bar shares the
+  // bottom status bar so it looks like every other sync. It never touches the
+  // syncing state, so the Sync button stays enabled during a scan.
+  useEffect(() => {
+    return EventsOn("spellcheck:progress", (p: SyncProgress) => {
+      setProgress(p.done ? null : p);
     });
   }, []);
 
@@ -1125,6 +1136,12 @@ function App() {
               Coverage
             </button>
           )}
+          <button
+            className={`view-tab${view === "misspellings" ? " view-tab-active" : ""}`}
+            onClick={() => setView("misspellings")}
+          >
+            Spellcheck
+          </button>
         </nav>
 
         <div className="topbar-zone topbar-right">
@@ -1377,6 +1394,17 @@ function App() {
             refreshKey={refreshKey}
             isDemo={isDemo}
             demoVariant={demoVar}
+            onChanged={() => {
+              setRefreshKey((k) => k + 1);
+              reloadPending();
+            }}
+          />
+        </main>
+      ) : view === "misspellings" ? (
+        <main className="content">
+          <MisspellingsView
+            profileId={activeId}
+            refreshKey={refreshKey}
             onChanged={() => {
               setRefreshKey((k) => k + 1);
               reloadPending();

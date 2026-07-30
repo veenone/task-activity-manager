@@ -4254,6 +4254,356 @@ tr.row-checked:hover {
 }
 
 /* Duplicate management view (FR — duplicate management). */
+/* Misspellings (spellcheck) view: a scan toolbar over a scrollable results
+   table, with a right-side detail drawer for the selected finding. Fills the
+   content area (flex: 1) so the toolbar and table stretch full width. */
+.misspellings-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+}
+.msp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.msp-toolbar-spacer {
+  flex: 1;
+}
+.msp-count {
+  font-size: 12px;
+}
+.msp-error {
+  margin: 8px 14px 0;
+}
+/* Results (left) beside the detail drawer (right). */
+.msp-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.msp-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+}
+.msp-empty {
+  max-width: 640px;
+  padding: 20px 4px;
+}
+.msp-empty p {
+  margin: 0;
+  line-height: 1.5;
+}
+.msp-table {
+  width: 100%;
+}
+.msp-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.msp-table th.sortable:hover {
+  color: var(--text);
+}
+.msp-table tbody tr {
+  cursor: pointer;
+}
+.msp-table tbody tr:hover {
+  background: var(--row-hover);
+}
+.msp-table tbody tr.selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.msp-table td.typo-word {
+  font-weight: 600;
+  color: var(--danger-text);
+  white-space: nowrap;
+}
+.msp-table td.typo-snippet {
+  color: var(--text-muted);
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.typo-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.typo-actions {
+  white-space: nowrap;
+}
+/* Suggestions render as clickable pill badges tinted with the accent. */
+.suggestion-chip {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 1px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+}
+.suggestion-chip:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+/* The Ignore action reads as a real (outlined) button, not flat text. */
+.msp-ignore-btn {
+  font-size: 12px;
+  padding: 3px 12px;
+}
+
+/* Right-side detail drawer for the selected finding. */
+.msp-drawer {
+  flex: 0 0 380px;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+.msp-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.msp-drawer-title {
+  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msp-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.msp-drawer-word .typo-word {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--danger-text);
+}
+.msp-drawer-suggests {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.msp-drawer-actions {
+  margin: 2px 0;
+}
+.msp-drawer-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.msp-no-suggests {
+  margin: 0;
+}
+/* Custom replacement: input + Replace button. */
+.msp-replace {
+  display: flex;
+  gap: 6px;
+}
+.msp-replace .detail-input {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.msp-context-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 10px;
+}
+/* Yellow highlight of the flagged word inside the drawer context. */
+.typo-hl {
+  background: #fde047;
+  color: #1f2933;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+/* Green highlight of the replacement in the before/after preview. */
+.typo-hl-after {
+  background: #86efac;
+  color: #14532d;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* Checkbox column in the results table. */
+.msp-check-col {
+  width: 32px;
+  text-align: center;
+  cursor: default;
+}
+.msp-check-col input {
+  cursor: pointer;
+}
+
+/* Bulk-action bar shown when one or more words are selected. */
+.msp-bulk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.msp-bulk-count {
+  font-size: 12px;
+  font-weight: 600;
+}
+.msp-bulk-suggests {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.msp-bulk-replace {
+  display: flex;
+  gap: 6px;
+}
+.msp-bulk-replace .detail-input {
+  margin-bottom: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  max-width: 180px;
+}
+.msp-bulk-spacer {
+  flex: 1;
+}
+
+/* Before/after preview of a manual replacement in the drawer. */
+.msp-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.msp-preview-row {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.msp-preview-tag {
+  flex: 0 0 42px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+.msp-preview-text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* Spellcheck ignore-list modal: add at top, filter to narrow, remove via a
+   compact wrapping grid of chips that stays usable with many words. */
+.pending-modal.ignore-modal {
+  width: min(560px, 92vw);
+}
+.ignore-add {
+  display: flex;
+  gap: 8px;
+}
+.ignore-add .detail-input {
+  flex: 1;
+  margin-bottom: 0;
+}
+.ignore-manage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.ignore-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ignore-filter {
+  flex: 1;
+  max-width: 220px;
+  margin-bottom: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.ignore-empty {
+  margin: 6px 0 0;
+}
+.ignore-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.ignore-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.ignore-chip-x {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 999px;
+}
+.ignore-chip-x:hover {
+  color: var(--danger-text);
+  background: var(--row-hover);
+}
+
 .dup-view { display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative; }
 .dup-toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .dup-error { margin: 8px 14px 0; }

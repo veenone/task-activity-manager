@@ -226,6 +226,11 @@ export {
   GetVersionDistribution,
   GetCRAdoption,
   GetCRImpact,
+  ListMisspellings,
+  ApplyCorrection,
+  AddIgnoreWord,
+  GetIgnoreWords,
+  RemoveIgnoreWord,
 } from "../wailsjs/go/main/App";
 export { ChangeTestType } from "../wailsjs/go/main/App";
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
