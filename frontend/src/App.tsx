@@ -212,18 +212,47 @@ function App() {
     window.addEventListener("mouseup", onUp);
   }
 
-  // First: check whether the backend started up cleanly.
+  // First: check whether the backend started up cleanly. Startup can take a
+  // moment (e.g. a slow first-run migration), during which Health() reports
+  // ok:false with an EMPTY error because the service layer isn't wired yet.
+  // Treat that (and a Health() call that throws because the runtime isn't
+  // ready) as "still starting" and retry, so a slow start doesn't render a
+  // false "Backend failed to start". A non-empty error, or ok:true, is
+  // definitive and stops the polling.
   useEffect(() => {
-    Health()
-      .then(setHealth)
-      .catch((e) =>
-        setHealth({
-          ok: false,
-          error: `Health check itself failed: ${errMsg(e)}`,
-          dbPath: "",
-          logPath: "",
-        }),
-      );
+    let cancelled = false;
+    let tries = 0;
+    const maxTries = 40; // ~10s at 250ms
+    const check = () => {
+      Health()
+        .then((h) => {
+          if (cancelled) return;
+          if (!h.ok && !h.error && tries < maxTries) {
+            tries++;
+            setTimeout(check, 250);
+            return;
+          }
+          setHealth(h);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          if (tries < maxTries) {
+            tries++;
+            setTimeout(check, 250);
+            return;
+          }
+          setHealth({
+            ok: false,
+            error: `Health check itself failed: ${errMsg(e)}`,
+            dbPath: "",
+            logPath: "",
+          });
+        });
+    };
+    check();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load profiles once the backend reports healthy.
@@ -483,7 +512,7 @@ function App() {
       await notice({
         title: "Commit in progress",
         message:
-          "A commit is in progress. Please wait for it to finish before syncing.",
+          "A commit is still running. Please wait for it to finish before syncing.",
         tone: "info",
       });
       return;
@@ -518,7 +547,7 @@ function App() {
       await notice({
         title: "Commit in progress",
         message:
-          "A commit is in progress. Please wait for it to finish before syncing.",
+          "A commit is still running. Please wait for it to finish before syncing.",
         tone: "info",
       });
       return;
@@ -527,8 +556,8 @@ function App() {
       !(await confirm({
         title: "Full resync",
         message:
-          "Full resync re-pulls every test and re-maps Test Repository folders. " +
-          "This can take a while on large projects. Continue?",
+          "A full resync re-pulls every test and re-maps Test Repository folders. " +
+          "It can take a while on large projects. Continue?",
         confirmLabel: "Continue",
         danger: false,
       }))
@@ -547,7 +576,7 @@ function App() {
       await notice({
         title: "Commit in progress",
         message:
-          "A commit is in progress. Please wait for it to finish before syncing.",
+          "A commit is still running. Please wait for it to finish before syncing.",
         tone: "info",
       });
       return;
@@ -798,7 +827,7 @@ function App() {
       await notice({
         title: "Sync in progress",
         message:
-          "A sync is in progress. Please wait for it to finish before committing.",
+          "A sync is still running. Please wait for it to finish before committing.",
         tone: "info",
       });
       return;
@@ -832,7 +861,7 @@ function App() {
       await notice({
         title: "Sync in progress",
         message:
-          "A sync is in progress. Please wait for it to finish before committing.",
+          "A sync is still running. Please wait for it to finish before committing.",
         tone: "info",
       });
       return;
@@ -982,8 +1011,8 @@ function App() {
             </p>
           )}
           <p className="muted">
-            Try removing the database file and relaunching, or check the log
-            for a more detailed error.
+            Try removing the database file and relaunching. If that doesn't
+            help, check the log for more detail.
           </p>
         </div>
       </div>
@@ -1020,7 +1049,7 @@ function App() {
             disabled={syncActive}
             title={
               syncActive
-                ? "Profile switching is disabled while a sync is in progress"
+                ? "You can't switch profiles while a sync is running"
                 : "Switch active profile"
             }
             onChange={(e) => {
@@ -1048,22 +1077,22 @@ function App() {
                 key: "profiles",
                 label: "Manage Profiles…",
                 onClick: () => setShowProfiles(true),
-                title: "Manage profiles — add, edit, set default, export, delete",
+                title: "Manage profiles: add, edit, set default, export, or delete",
               },
               {
                 key: "connections",
                 label: "Connections…",
                 onClick: () => setShowConnections(true),
                 title:
-                  "Manage this workspace's connections — add a target " +
-                  "(e.g. Kiwi) beside its primary connection",
+                  "Manage this workspace's connections. Add a target " +
+                  "(e.g. Kiwi) alongside its primary connection.",
               },
               {
                 key: "bridge",
                 label: "Bridge…",
                 onClick: () => setShowBridge(true),
                 title:
-                  "Publish/migrate this workspace's tests from one connection to another",
+                  "Publish or migrate this workspace's tests from one connection to another",
               },
             ]}
           />
@@ -1186,8 +1215,8 @@ function App() {
                 label: "Full resync (re-pull folders)",
                 onClick: runFullSync,
                 title:
-                  "Force a full re-sync, ignoring the incremental watermark — " +
-                  "re-maps Test Repository folder membership",
+                  "Force a full re-sync, ignoring the incremental watermark. " +
+                  "This re-maps Test Repository folder membership.",
               },
               {
                 key: "history",

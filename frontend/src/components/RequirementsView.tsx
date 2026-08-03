@@ -99,6 +99,9 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
   const { confirm, confirmUI } = useConfirm();
   // Collapsible description in the detail pane -- collapsed by default, resets on selection change.
   const [descOpen, setDescOpen] = useState(false);
+  // Collapsible detail block (priority, components, fix versions, sprint,
+  // description) -- expanded by default; collapse to give the tests list room.
+  const [detailsOpen, setDetailsOpen] = useState(true);
   // A covering test opened in a slide-over detail panel (#5).
   const [detailKey, setDetailKey] = useViewState(profileId, "requirements", "detailKey", "");
   const [detailVersion, setDetailVersion] = useState(0);
@@ -154,6 +157,7 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
   useEffect(() => {
     setEditing(false);
     setDescOpen(false);
+    setDetailsOpen(true);
   }, [selected]);
 
   useEffect(() => {
@@ -338,7 +342,7 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
     <div className={`reqs${detailKey ? " reqs-with-detail" : ""}`}>
       <div className="reqs-list">
         <div className="reqs-list-head">
-          {/* Primary row: filter (fills space) + Sync, Sources, Create — mirrors .precond-list-head */}
+          {/* View controls: filter (fills space) + partial Sync + Sort */}
           <div className="reqs-head-row">
             <input
               className="precond-search"
@@ -350,34 +354,40 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
               className="btn"
               onClick={syncRequirements}
               disabled={syncing}
-              title="Refresh just the requirements from Jira (partial sync)"
+              title="Refresh just the requirements from Jira, without syncing everything else"
             >
               {syncing ? "Syncing…" : "Sync"}
             </button>
+            <SortControl
+              fields={[
+                { value: "key", label: "Key" },
+                { value: "coverage", label: "Coverage" },
+                { value: "tests", label: "Tests" },
+                { value: "status", label: "Status" },
+              ]}
+              field={sortField}
+              desc={sortDesc}
+              onChange={(f, d) => {
+                setSortField(f);
+                setSortDesc(d);
+              }}
+            />
+          </div>
+          {/* Data actions: sources, create, import, export */}
+          <div className="reqs-list-toolbar">
             <button
               className="btn reqs-sources-btn"
               onClick={() => setShowSources(true)}
-              title="Configure which projects requirements are pulled from"
+              title="Choose which projects to pull requirements from"
             >
               Sources…
             </button>
             <button
               className="btn btn-primary"
               onClick={() => setShowCreateReq(true)}
-              title="Create a new requirement locally (pushed to Jira on commit)"
+              title="Create a new requirement here. It's pushed to Jira when you commit"
             >
               + Create
-            </button>
-          </div>
-          {/* Secondary row: audit + import actions */}
-          <div className="reqs-list-toolbar">
-            <button
-              className="btn"
-              onClick={exportAudit}
-              disabled={busy || list.length === 0}
-              title="Export the coverage / sign-off audit (CSV or XLSX)"
-            >
-              Export audit…
             </button>
             <button
               className="btn"
@@ -385,6 +395,14 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
               title="Import requirements from a CSV or XLSX file"
             >
               Import…
+            </button>
+            <button
+              className="btn"
+              onClick={exportAudit}
+              disabled={busy || list.length === 0}
+              title="Export the coverage and sign-off audit as CSV or XLSX"
+            >
+              Export audit…
             </button>
           </div>
           {notice && <p className="reqs-notice muted">{notice}</p>}
@@ -401,26 +419,12 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
             </button>
           ))}
         </div>
-        <SortControl
-          fields={[
-            { value: "key", label: "Key" },
-            { value: "coverage", label: "Coverage" },
-            { value: "tests", label: "Tests" },
-            { value: "status", label: "Status" },
-          ]}
-          field={sortField}
-          desc={sortDesc}
-          onChange={(f, d) => {
-            setSortField(f);
-            setSortDesc(d);
-          }}
-        />
         {loading ? (
           <p className="muted reqs-empty">Loading…</p>
         ) : filtered.length === 0 ? (
           <p className="muted reqs-empty">
             {list.length === 0
-              ? "No requirements cached. Add a requirement source and sync, or sync a demo profile."
+              ? "No requirements yet. Add a requirement source and sync, or try a demo profile."
               : "No requirements match the filter."}
           </p>
         ) : (
@@ -606,14 +610,26 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
                 </div>
               </div>
             ) : (
-              <h2 className="reqs-detail-summary">
-                {sel.summary || "(no summary)"}
-              </h2>
+              <div className="reqs-detail-summary-row">
+                <button
+                  type="button"
+                  className="collapse-caret"
+                  onClick={() => setDetailsOpen((o) => !o)}
+                  aria-expanded={detailsOpen}
+                  title={detailsOpen ? "Hide details" : "Show details"}
+                >
+                  {detailsOpen ? "▾" : "▸"}
+                </button>
+                <h2 className="reqs-detail-summary">
+                  {sel.summary || "(no summary)"}
+                </h2>
+              </div>
             )}
 
             {/* Read-only metadata grid + collapsible description: hidden in edit mode
-                because the edit form shows these fields inline. */}
-            {!editing && (
+                because the edit form shows these fields inline, and collapsible
+                via the summary caret to give the tests list more room. */}
+            {!editing && detailsOpen && (
               <>
                 <dl className="detail-meta">
                   {sel.priority && (
@@ -674,7 +690,7 @@ export function RequirementsView({ profileId, refreshKey, onChanged }: Props) {
               </button>
             </div>
             {reqLinks.length === 0 ? (
-              <p className="muted">This requirement has no outbound "requires" links.</p>
+              <p className="muted">This requirement doesn't require any other requirements yet.</p>
             ) : (
               <ul className="precond-list">
                 {reqLinks.map((l) => (

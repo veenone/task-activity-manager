@@ -21,9 +21,11 @@ import {
   BrowserOpenURL,
   GetExecutionMembersWithRuns,
   GetRunRollup,
+  GetRunRollupBreakdown,
   errMsg,
 } from "../api";
-import type { Container, TestPlanBoard, Bucket, Bug, ExecMemberRun, RunRollup } from "../api";
+import type { Container, TestPlanBoard, Bucket, Bug, ExecMemberRun, RunRollup, RollupMember } from "../api";
+import { RollupBreakdownModal } from "./RollupBreakdownModal";
 import { SortControl } from "./SortControl";
 import { SearchableSelect } from "./SearchableSelect";
 import { keyCompare, cmpStr, applyDir } from "../sort";
@@ -141,6 +143,21 @@ export function ContainersView({
   const [memberRunFilter, setMemberRunFilter] = useState("");
   // Run roll-up for the selected Test Plan / Test Set.
   const [rollup, setRollup] = useState<RunRollup | null>(null);
+  // Clickable roll-up breakdown: which bucket's modal is open, and the member
+  // detail (lazily fetched on first badge click, cached per selected container).
+  const [breakdownStatus, setBreakdownStatus] = useState<string | null>(null);
+  const [breakdown, setBreakdown] = useState<RollupMember[] | null>(null);
+  const [breakdownFor, setBreakdownFor] = useState("");
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  // Collapse the selected container's detail (parent, environments, fix
+  // versions, name, run bar) to a single header line to give the member table
+  // more room. Persisted per profile so the choice sticks across selections.
+  const [cardCollapsed, setCardCollapsed] = useViewState(
+    profileId,
+    "containers",
+    "cardCollapsed",
+    false,
+  );
   const { prompt, promptUI } = usePrompt();
   const { confirm, confirmUI } = useConfirm();
   const { notice, noticeUI } = useNotice();
@@ -345,7 +362,7 @@ export function ContainersView({
       batchEnvOp === "set_env" &&
       !window.confirm(
         `Set environments to "${name || "(none)"}" on ${keys.length} execution${keys.length === 1 ? "" : "s"}? ` +
-          "This replaces their current environments.",
+          "This will replace their current environments.",
       )
     )
       return;
@@ -390,8 +407,8 @@ export function ContainersView({
       !(await confirm({
         title: "Clean sample data",
         message:
-          "Remove all sample Test Sets / Plans / Executions created by 'Regenerate sample data'? " +
-          "Real synced containers are not affected.",
+          "Remove all sample Test Sets, Plans, and Executions created by 'Regenerate sample data'? " +
+          "Your real synced containers won't be affected.",
         confirmLabel: "Delete",
         danger: true,
       }))
@@ -525,7 +542,7 @@ export function ContainersView({
     if (
       !(await confirm({
         title: `Delete ${kindLabel}`,
-        message: `Delete this ${kindLabel}? Its test memberships are removed (committed on sync).`,
+        message: `Delete this ${kindLabel}? Its test memberships are removed too (committed on sync).`,
         confirmLabel: "Delete",
         danger: true,
       }))
@@ -685,6 +702,32 @@ export function ContainersView({
     };
   }, [profileId, selected, kind, refreshKey]);
 
+  // Reset the cached breakdown when the selected container changes, so a stale
+  // one is never shown for a different plan/set.
+  useEffect(() => {
+    setBreakdown(null);
+    setBreakdownFor("");
+    setBreakdownStatus(null);
+  }, [selected]);
+
+  // openBreakdown opens the informational modal for one roll-up bucket, fetching
+  // the member breakdown for the selected container on first use.
+  async function openBreakdown(status: string) {
+    if (!selected) return;
+    setBreakdownStatus(status);
+    if (breakdownFor === selected && breakdown) return;
+    setBreakdownLoading(true);
+    try {
+      const rows = await GetRunRollupBreakdown(profileId, selected);
+      setBreakdown(rows ?? []);
+      setBreakdownFor(selected);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setBreakdownLoading(false);
+    }
+  }
+
   // Client-side paging of the member table.
   const allRows = useMemo(() => {
     let rows = board?.rows ?? [];
@@ -744,7 +787,7 @@ export function ContainersView({
   );
 
   return (
-    <div className={`board${mode === "bugs" ? " board--bugs" : ""}${detailKey && kind === "testexec" && mode !== "bugs" ? " board--with-exec-detail" : ""}`}>
+    <div className={`board${mode === "bugs" ? " board--bugs" : ""}${detailKey && mode !== "bugs" ? " board--with-exec-detail" : ""}`}>
       <div className="board-exec-body">
       <div className="containers-mode">
         <button
@@ -771,12 +814,17 @@ export function ContainersView({
       ) : (
         <>
       <div className="board-head">
-        <label className="board-picker">
+        <label className="board-picker board-picker--secondary">
           <span>Type</span>
           <select
             className="app-select container-type-select"
             value={kind}
-            onChange={(e) => setKind(e.target.value)}
+            onChange={(e) => {
+              // Switching type changes the member set, so close any open test
+              // detail (it belongs to the previous type's selection).
+              setKind(e.target.value);
+              setDetailKey(null);
+            }}
           >
             {KINDS.map((k) => (
               <option key={k.value} value={k.value}>
@@ -785,7 +833,49 @@ export function ContainersView({
             ))}
           </select>
         </label>
-        <label className="board-picker">
+        {/* Status filter: a compact dropdown between Type and the item picker
+            (replaces the old pill row to save horizontal space). It reads as the
+            tertiary control — recessed until a status is applied, when it adopts
+            the accent so an active filter is obvious at a glance. */}
+        <label className="board-picker board-picker--tertiary">
+          <span>Status</span>
+          <select
+            className={`app-select container-filter-select${
+              cStatus ? " is-filtering" : ""
+            }`}
+            value={cStatus}
+            onChange={(e) => setCStatus(e.target.value)}
+            title="Filter containers by status"
+          >
+            <option value="">All statuses ({statusCounts.get("") ?? 0})</option>
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s} ({statusCounts.get(s) ?? 0})
+              </option>
+            ))}
+          </select>
+        </label>
+        {labelOptions.length > 0 && (
+          <label className="board-picker board-picker--tertiary">
+            <span>Label</span>
+            <select
+              className={`app-select container-filter-select${
+                cLabel ? " is-filtering" : ""
+              }`}
+              value={cLabel}
+              onChange={(e) => setCLabel(e.target.value)}
+              title="Filter containers by label"
+            >
+              <option value="">All labels</option>
+              {labelOptions.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="board-picker board-picker--primary">
           <span>{kindLabel}</span>
           {loading ? (
             <span className="muted">Loading…</span>
@@ -801,34 +891,12 @@ export function ContainersView({
               }
               options={viewContainers.map((c) => ({
                 value: c.key,
-                label: `${c.key} — ${c.summary}`,
+                label: `${c.key} · ${c.summary}`,
                 className: c.parentKey ? "is-subtask" : undefined,
               }))}
             />
           )}
         </label>
-
-        {/* Status filter pills share the picker row (RND_P_4TFINT_05: keep the
-            filter surface compact) rather than sitting on their own line. */}
-        <div className="filter-pill-row board-head-pills">
-          <button
-            className={`filter-pill${cStatus === "" ? " filter-pill-active" : ""}`}
-            onClick={() => setCStatus("")}
-            title="Show all statuses"
-          >
-            All statuses {statusCounts.get("") ?? 0}
-          </button>
-          {statusOptions.map((s) => (
-            <button
-              key={s}
-              className={`filter-pill${cStatus === s ? " filter-pill-active" : ""}`}
-              onClick={() => setCStatus(cStatus === s ? "" : s)}
-              title={`Filter to status: ${s}`}
-            >
-              {s} {statusCounts.get(s) ?? 0}
-            </button>
-          ))}
-        </div>
 
         <div className="board-head-actions">
           <button
@@ -859,7 +927,7 @@ export function ContainersView({
               onClick={() => setShowJUnitNewExec(true)}
               title="Create a new Test Execution from a JUnit XML report"
             >
-              New exec from JUnit XML
+              Import JUnit
             </button>
           )}
           <Menu
@@ -956,20 +1024,75 @@ export function ContainersView({
             ))}
           </select>
         )}
-        {labelOptions.length > 0 && (
-          <select
-            className="container-status-filter app-select"
-            value={cLabel}
-            onChange={(e) => setCLabel(e.target.value)}
-            title="Filter by label"
-          >
-            <option value="">All labels</option>
-            {labelOptions.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
+        {/* Consolidated-results summary for the selected Test Plan / Set, shown
+            inline on the filter row (moved here from the detail card; the label
+            filter it replaced now sits beside the Status filter above). */}
+        {kind !== "testexec" && rollup && rollup.total > 0 && (
+          <div className="container-rollup">
+            <span
+              className="container-rollup-label"
+              title={
+                `Each test in this ${kindLabel} gets one combined result across the ` +
+                `${rollup.execCount} Test Execution${rollup.execCount === 1 ? "" : "s"} that ran it. ` +
+                `The worst result wins, so any FAIL makes the test FAIL overall. These badges count ` +
+                `tests by that combined result; "(not run)" means no execution has recorded a result yet. ` +
+                `Click a badge to see which tests are behind it.`
+              }
+            >
+              Consolidated results across {rollup.execCount} execution{rollup.execCount === 1 ? "" : "s"}
+              <span className="rollup-info" aria-hidden="true">ⓘ</span>
+            </span>
+            <div className="board-counts">
+              {rollup.passed > 0 && (
+                <RunBadge
+                  status="PASS"
+                  count={rollup.passed}
+                  onPick={() => openBreakdown("PASS")}
+                  pickHint="See the tests behind this result"
+                />
+              )}
+              {rollup.failed > 0 && (
+                <RunBadge
+                  status="FAIL"
+                  count={rollup.failed}
+                  onPick={() => openBreakdown("FAIL")}
+                  pickHint="See the tests behind this result"
+                />
+              )}
+              {rollup.executing > 0 && (
+                <RunBadge
+                  status="EXECUTING"
+                  count={rollup.executing}
+                  onPick={() => openBreakdown("EXECUTING")}
+                  pickHint="See the tests behind this result"
+                />
+              )}
+              {rollup.aborted > 0 && (
+                <RunBadge
+                  status="ABORTED"
+                  count={rollup.aborted}
+                  onPick={() => openBreakdown("ABORTED")}
+                  pickHint="See the tests behind this result"
+                />
+              )}
+              {rollup.blocked > 0 && (
+                <RunBadge
+                  status="BLOCKED"
+                  count={rollup.blocked}
+                  onPick={() => openBreakdown("BLOCKED")}
+                  pickHint="See the tests behind this result"
+                />
+              )}
+              {rollup.notRun > 0 && (
+                <RunBadge
+                  status="(not run)"
+                  count={rollup.notRun}
+                  onPick={() => openBreakdown("(not run)")}
+                  pickHint="See the tests behind this result"
+                />
+              )}
+            </div>
+          </div>
         )}
         <span className="muted container-filter-count">
           {viewContainers.length} of {containers.length}
@@ -1073,13 +1196,23 @@ export function ContainersView({
 
       {!loading && containers.length === 0 && (
         <p className="muted">
-          No {kindLabel}s yet. Create one, run a sync, or generate sample data.
+          You don't have any {kindLabel}s yet. Create one, run a sync, or
+          generate sample data.
         </p>
       )}
 
       {selectedContainer && (
         <div className="container-card">
           <div className="container-card-top">
+            <button
+              type="button"
+              className="collapse-caret"
+              onClick={() => setCardCollapsed(!cardCollapsed)}
+              aria-expanded={!cardCollapsed}
+              title={cardCollapsed ? "Show details" : "Hide details"}
+            >
+              {cardCollapsed ? "▸" : "▾"}
+            </button>
             <span className={`kind-badge kind-${kind}`}>{kindLabel}</span>
             <span className="mono container-card-key">
               {selectedContainer.key}
@@ -1109,6 +1242,8 @@ export function ContainersView({
             )}
           </div>
 
+          {!cardCollapsed && (
+            <>
           {selectedContainer.parentKey && (
             <div className="container-parent">
               <button
@@ -1181,7 +1316,7 @@ export function ContainersView({
                       className={`env-chip fix-version-chip${memberFvFilter === fv ? " fix-version-chip--active" : ""}`}
                       title={
                         memberFvFilter === fv
-                          ? `Showing only members with fix version ${fv} — click to clear`
+                          ? `Showing only members with fix version ${fv} (click to clear)`
                           : `Filter member table to fix version ${fv}`
                       }
                       onClick={() =>
@@ -1240,34 +1375,7 @@ export function ContainersView({
               </div>
             </div>
           )}
-
-          {/* Roll-up summary bar across all executions, for plans and sets. */}
-          {kind !== "testexec" && rollup && rollup.total > 0 && (
-            <div className="container-rollup">
-              <span className="container-rollup-label">
-                Run roll-up across {rollup.execCount} execution{rollup.execCount === 1 ? "" : "s"}
-              </span>
-              <div className="board-counts">
-                {rollup.passed > 0 && (
-                  <RunBadge status="PASS" count={rollup.passed} />
-                )}
-                {rollup.failed > 0 && (
-                  <RunBadge status="FAIL" count={rollup.failed} />
-                )}
-                {rollup.executing > 0 && (
-                  <RunBadge status="EXECUTING" count={rollup.executing} />
-                )}
-                {rollup.aborted > 0 && (
-                  <RunBadge status="ABORTED" count={rollup.aborted} />
-                )}
-                {rollup.blocked > 0 && (
-                  <RunBadge status="BLOCKED" count={rollup.blocked} />
-                )}
-                {rollup.notRun > 0 && (
-                  <RunBadge status="(not run)" count={rollup.notRun} />
-                )}
-              </div>
-            </div>
+            </>
           )}
 
           {/* Related defects reached through this container's member Tests -
@@ -1426,8 +1534,8 @@ export function ContainersView({
             {allRows.length === 0 ? (
               <tr>
                 <td colSpan={kind === "testexec" ? 12 : 5} className="muted">
-                  This {kindLabel.toLowerCase()} has no tests yet — use "+ Add
-                  tests".
+                  This {kindLabel.toLowerCase()} doesn't have any tests yet.
+                  Use "+ Add tests" to add some.
                 </td>
               </tr>
             ) : (
@@ -1455,19 +1563,17 @@ export function ContainersView({
                         ext
                       </span>
                     )}
-                    {kind === "testexec" && (
-                      <button
-                        className="btn-icon"
-                        title={`Open ${r.testKey} detail here`}
-                        onClick={() => {
-                          setDetailKey(r.testKey);
-                          setDetailVersion((v) => v + 1);
-                        }}
-                        style={{ fontSize: "0.75rem", padding: "0 0.25rem", marginLeft: "0.25rem" }}
-                      >
-                        ↗
-                      </button>
-                    )}
+                    <button
+                      className="btn-icon"
+                      title={`Open ${r.testKey} detail here`}
+                      onClick={() => {
+                        setDetailKey(r.testKey);
+                        setDetailVersion((v) => v + 1);
+                      }}
+                      style={{ fontSize: "0.75rem", padding: "0 0.25rem", marginLeft: "0.25rem" }}
+                    >
+                      ↗
+                    </button>
                   </td>
                   <td>{r.summary}</td>
                   <td>{r.status || "—"}</td>
@@ -1479,7 +1585,7 @@ export function ContainersView({
                         onChange={(e) => setRunStatus(r.testKey, e.target.value)}
                         title="Set this test's result in this execution"
                       >
-                        {!r.runStatus && <option value="">— set result —</option>}
+                        {!r.runStatus && <option value="">Set result…</option>}
                         {RUN_STATUSES.map((s) => (
                           <option key={s} value={s}>
                             {s}
@@ -1647,7 +1753,7 @@ export function ContainersView({
             notice({
               title: "JUnit import applied",
               message:
-                `${succeeded} result${succeeded !== 1 ? "s" : ""} queued; commit from the Pending list.` +
+                `${succeeded} result${succeeded !== 1 ? "s" : ""} queued. Commit them from the Pending list.` +
                 (failed > 0 ? ` (${failed} failed)` : ""),
             });
           }}
@@ -1669,9 +1775,20 @@ export function ContainersView({
                 (result.failed && result.failed.length > 0
                   ? ` (${result.failed.length} failed)`
                   : "") +
-                " — queued; commit from the Pending list.",
+                ". Queued, commit it from the Pending list.",
             });
           }}
+        />
+      )}
+
+      {breakdownStatus !== null && (
+        <RollupBreakdownModal
+          kindLabel={kindLabel}
+          containerKey={selected}
+          status={breakdownStatus}
+          members={breakdown ?? []}
+          loading={breakdownLoading}
+          onClose={() => setBreakdownStatus(null)}
         />
       )}
 
@@ -1680,7 +1797,7 @@ export function ContainersView({
       {noticeUI}
       </div>
 
-      {detailKey && kind === "testexec" && mode !== "bugs" && (
+      {detailKey && mode !== "bugs" && (
         <TestDetail
           profileId={profileId}
           testKey={detailKey}
@@ -1917,11 +2034,14 @@ function RunBadge({
   count,
   active,
   onPick,
+  pickHint,
 }: {
   status: string;
   count: number;
   active?: boolean;
   onPick?: () => void;
+  // Overrides the click tooltip. Defaults to the member-table filter wording.
+  pickHint?: string;
 }) {
   const base =
     status === "(not run)" ? "run-badge" : `run-badge run-${status.toLowerCase()}`;
@@ -1932,7 +2052,7 @@ function RunBadge({
       className={cls}
       role={onPick ? "button" : undefined}
       onClick={onPick}
-      title={onPick ? `Filter the list to ${label}` : undefined}
+      title={onPick ? (pickHint ?? `Filter the list to ${label}`) : undefined}
     >
       {label} {count}
     </span>

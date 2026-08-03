@@ -13,6 +13,7 @@ import type { PreconditionUsage, PreconditionTest } from "../api";
 import { Menu } from "./Menu";
 import { useConfirm } from "./useConfirm";
 import { AddTestsModal } from "./AddTestsModal";
+import { TestDetail } from "./TestDetail";
 import { Markdown } from "./Markdown";
 import { MarkdownField } from "./MarkdownField";
 import { Pager } from "./Pager";
@@ -62,6 +63,10 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  // A test opened from the "Used by" list, docked as an inline detail beside the
+  // precondition detail (mirrors the requirement / browse views, #4).
+  const [detailKey, setDetailKey] = useViewState(profileId, "preconditions", "detailKey", "");
+  const [detailVersion, setDetailVersion] = useState(0);
   const { confirm, confirmUI } = useConfirm();
 
   // editing toggles the detail pane between read-only display and an explicit
@@ -83,6 +88,9 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
   // Collapsible read-only fields -- collapsed by default, reset on selection change.
   const [condOpen, setCondOpen] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
+  // Collapse the read-only detail fields (summary, type, condition, description)
+  // to a header line, like the requirement detail. Expanded by default.
+  const [detailsOpen, setDetailsOpen] = useState(true);
   useEffect(() => {
     setEditing(false);
     setSummaryDraft(selectedPre?.summary ?? "");
@@ -91,6 +99,7 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
     setTypeDraft(selectedPre?.type || "Manual");
     setCondOpen(false);
     setDescOpen(false);
+    setDetailsOpen(true);
   }, [selectedPre]);
 
   // Per-bucket counts for the usage pill filter, computed from the text-filtered
@@ -274,7 +283,7 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
   }
 
   return (
-    <div className="precond-view">
+    <div className={`precond-view${detailKey ? " precond-with-detail" : ""}`}>
       <aside className="precond-list">
         <div className="precond-list-head">
           <input
@@ -327,7 +336,7 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
           <p className="muted precond-empty">Loading…</p>
         ) : list.length === 0 ? (
           <p className="muted precond-empty">
-            No preconditions yet. Create one, or run a sync to pull them from
+            No preconditions yet. Create one, or sync to pull them from
             Jira.
           </p>
         ) : filtered.length === 0 ? (
@@ -387,6 +396,17 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
           <>
             <div className="precond-detail-head">
               <div className="precond-detail-id">
+                {!editing && (
+                  <button
+                    type="button"
+                    className="collapse-caret"
+                    onClick={() => setDetailsOpen((o) => !o)}
+                    aria-expanded={detailsOpen}
+                    title={detailsOpen ? "Hide details" : "Show details"}
+                  >
+                    {detailsOpen ? "▾" : "▸"}
+                  </button>
+                )}
                 <span className="mono precond-detail-key">{selectedPre.key}</span>
                 {isLocal && (
                   <span className="pending-badge" title="Not yet created in Jira">
@@ -496,7 +516,7 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
                   />
                 </div>
               </>
-            ) : (
+            ) : detailsOpen ? (
               <>
                 <div className="precond-field">
                   <span>Summary</span>
@@ -564,7 +584,7 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
                   </div>
                 )}
               </>
-            )}
+            ) : null}
 
             <div className="precond-tests-head">
               <h4>
@@ -596,8 +616,21 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
                   </thead>
                   <tbody>
                     {pageTests.map((t) => (
-                      <tr key={t.key}>
-                        <td className="mono">{t.key}</td>
+                      <tr
+                        key={t.key}
+                        className={
+                          t.key === detailKey ? "precond-test-row-active" : ""
+                        }
+                      >
+                        <td>
+                          <button
+                            className="link-btn mono"
+                            onClick={() => setDetailKey(t.key)}
+                            title="Open test detail"
+                          >
+                            {t.key}
+                          </button>
+                        </td>
                         <td>{t.summary}</td>
                         <td>{t.status || "—"}</td>
                         <td className="board-remove-cell">
@@ -630,6 +663,21 @@ export function PreconditionsView({ profileId, refreshKey, onChanged }: Props) {
           </>
         )}
       </section>
+
+      {detailKey && (
+        <TestDetail
+          profileId={profileId}
+          testKey={detailKey}
+          version={detailVersion}
+          pendingForTest={[]}
+          folders={[]}
+          onClose={() => setDetailKey("")}
+          onEdited={() => {
+            setDetailVersion((v) => v + 1);
+            onChanged();
+          }}
+        />
+      )}
 
       {showCreate && (
         <CreatePreconditionModal
@@ -755,7 +803,7 @@ function CreatePreconditionModal({
               onChange={setCondition}
               onCommit={() => {}}
               rows={3}
-              placeholder="e.g. Given the user is authenticated — markdown supported."
+              placeholder="e.g. Given the user is authenticated. Markdown supported."
             />
           </div>
           <div className="precond-field">
@@ -766,7 +814,7 @@ function CreatePreconditionModal({
               onChange={setDescription}
               onCommit={() => {}}
               rows={3}
-              placeholder="Optional — markdown supported."
+              placeholder="Optional. Markdown supported."
             />
           </div>
           {error && <div className="error-text">{error}</div>}

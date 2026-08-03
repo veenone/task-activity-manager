@@ -13,6 +13,7 @@
   --text-muted: #6b7280;
   --accent: #3b5bdb;
   --accent-hover: #2f49b3;
+  --accent-soft: rgba(59, 91, 219, 0.13);
   --row-hover: #eef0f3;
   --danger-text: #c0392b;
   /* semantic warn (separate from --accent/--danger) for non-destructive but
@@ -36,6 +37,7 @@
   --text-muted: #94a3b8;
   --accent: #5b78f0;
   --accent-hover: #748df5;
+  --accent-soft: rgba(91, 120, 240, 0.20);
   --row-hover: #222d3c;
   --danger-text: #f0a0a0;
   --warn-text: #e0b062;
@@ -1046,18 +1048,184 @@
 .board-picker select {
   min-width: 280px;
 }
-/* The Type picker only holds three short options, so it needs far less width
-   than the container picker beside it. Narrowing it frees room for the status
-   pills that now share this row. */
-.board-picker select.container-type-select {
+/* The Type and Status pickers hold a few short options each, so they need far
+   less width than the item picker beside them. */
+.board-picker select.container-filter-select {
   min-width: 0;
   width: auto;
 }
-/* Status pills sit inline on the picker row: drop the standalone-row margin so
-   they align with the pickers instead of adding vertical space. */
-.board-head-pills {
+/* Fixed width so switching Type (Test Set / Plan / Execution) never resizes the
+   control and shifts the pickers or the action buttons after it. min-width: 0
+   is required to defeat the .board-picker select default of 280px; without it
+   the width below is ignored and the control renders at the full 280px. Sized
+   to fit the longest option ("Test Execution"). */
+.board-picker select.container-type-select {
+  min-width: 0;
+  width: 150px;
+}
+
+/* Picker-row importance ramp. The three container pickers carry a deliberate
+   visual hierarchy built only from existing tokens — no new colours or radii:
+   the item picker (primary) is the selection you make, Type (secondary) sets
+   context, and the Status filter (tertiary) recedes until it is applied. The
+   ramp is expressed through label weight and frame weight; the accent is
+   reserved for the one meaningful moment — an active status filter. */
+.board-picker--primary > span {
+  color: var(--text);
+  font-weight: 650;
+}
+.board-picker--secondary > span {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.board-picker--tertiary > span {
+  color: var(--accent);
+  font-weight: 600;
+}
+/* Frame weight: primary keeps the strong border (default), secondary lightens
+   to --border, tertiary lightens further and sits on a recessed surface. */
+.board-picker--secondary select.container-type-select {
+  border-color: var(--border);
+}
+/* The Status and Label filters are accent-coloured so they read clearly as
+   interactive filters rather than recessed fields, and group as "the filters"
+   beside the neutral Type/item pickers. Idle: an accent outline on the plain
+   surface. Applied: an accent-soft fill with accent text, so a constrained
+   view is unmistakable at a glance (mirroring the pills they replaced). */
+.board-picker--tertiary select.container-filter-select {
+  border-color: var(--accent);
+  background: var(--surface);
+  color: var(--text);
+}
+.board-picker--tertiary select.container-filter-select.is-filtering {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* The consolidated-results summary sits inline on the filter row: label and
+   result badges on one line, wrapping only when the row runs out of width. */
+.container-rollup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.container-rollup-label {
+  font-size: 12px;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+/* Small "explain this" affordance next to the consolidated-results label; the
+   full explanation lives in the label's tooltip. */
+.rollup-info {
+  margin-left: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: help;
+}
+
+/* Roll-up breakdown modal: the informational view opened by clicking a roll-up
+   badge. A member list, each row expanded with the per-execution results that
+   produced its consolidated status. */
+.rollup-breakdown-modal {
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+}
+.rollup-breakdown-body {
+  padding: 4px 18px 8px;
+  overflow-y: auto;
+}
+.rollup-breakdown-hint {
+  margin: 6px 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.rollup-breakdown-list {
+  list-style: none;
   margin: 0;
   padding: 0;
+}
+.rollup-breakdown-item {
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.rollup-breakdown-item:first-child {
+  border-top: 0;
+}
+/* The test row is a full-width toggle that expands the per-execution detail. */
+.rollup-breakdown-test {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rollup-breakdown-caret {
+  flex-shrink: 0;
+  width: 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.rollup-breakdown-key {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+.rollup-breakdown-test:hover .rollup-breakdown-key {
+  color: var(--accent);
+}
+.rollup-breakdown-runcount {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.rollup-breakdown-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+}
+.rollup-breakdown-runs {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rollup-breakdown-run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.rollup-breakdown-exec-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+.rollup-breakdown-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 18px 14px;
+  border-top: 1px solid var(--border-subtle);
 }
 .board-counts {
   display: flex;
@@ -1401,6 +1569,28 @@ i.sankey-node-l2 {
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
+}
+/* Caret that collapses a detail block (container card, requirement detail) to
+   just its header line, giving the list/table below more room. */
+.collapse-caret {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-right: -2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.collapse-caret:hover {
+  color: var(--accent);
+}
+/* Summary line with a leading collapse caret in the requirement / bug detail. */
+.reqs-detail-summary-row,
+.bugs-md-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .kind-badge {
   font-size: 10px;
@@ -2973,11 +3163,24 @@ tr.row-selected {
 .precond-view {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(240px, 320px) 1fr;
+  /* Match the requirements list column so the compact pager wraps identically. */
+  grid-template-columns: minmax(280px, 360px) 1fr;
   gap: 18px;
   width: 100%;
   max-width: none;
   min-height: 0; /* let the columns own their own scroll */
+}
+/* When a test from the "Used by" list is open, add a third auto-width column so
+   the test detail docks beside the precondition detail instead of overlaying it
+   (mirrors .reqs-with-detail). */
+.precond-with-detail {
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) auto;
+}
+.precond-with-detail .detail {
+  position: relative;
+}
+.precond-test-row-active > td {
+  background: var(--row-hover);
 }
 /* Card layout mirroring the Requirements list: no wrapping panel — each item
    is a standalone rounded card floating on the content background. */
@@ -5009,6 +5212,15 @@ tr.row-checked:hover {
   color: var(--text);
   font-size: 12px;
 }
+/* Icon-only Prev / Next: a compact square button showing just the chevron, so
+   the pager nav stays narrow (shared by every pager across the app). */
+.pager-arrow {
+  min-width: 30px;
+  padding: 4px 8px;
+  font-size: 15px;
+  line-height: 1;
+  text-align: center;
+}
 
 /* Requirement Sankey filter dropdown (#3). */
 .sankey-filter { display: flex; align-items: center; gap: 6px; font-size: 12px; }
@@ -5022,15 +5234,34 @@ tr.row-checked:hover {
 }
 
 /* Compact pager for narrow side panels (requirement / precondition lists, #2). */
+/* Compact pager for narrow side panels (requirement / precondition lists): a
+   wrapping row that keeps the rows-per-page selector on the same line as the
+   Prev / Go / Next controls, with the range summary wrapping onto its own line
+   below. Mirrors the bugs-panel pager so the two read the same. */
 .pager-compact {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  /* Left-align (override the base .board-pager centering) so the controls read
+     the same in a narrow list column and in a wide panel like Gap Analysis,
+     instead of floating in the middle of the wider container. */
+  justify-content: flex-start;
+  gap: 6px 10px;
   flex: 0 0 auto;
 }
-.pager-compact .board-pagesize { justify-content: flex-start; }
-.pager-compact .board-pager-range { flex: none; text-align: left; }
-.pager-compact .board-pager-nav { justify-content: flex-start; flex-wrap: wrap; }
+.pager-compact .board-pagesize {
+  justify-content: flex-start;
+}
+.pager-compact .board-pager-nav {
+  order: 2;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.pager-compact .board-pager-range {
+  order: 3;
+  flex: 1 1 100%;
+  text-align: left;
+}
 
 /* Make enabled pager nav buttons visually distinct from disabled ones.
    Without this the Prev/Go/Next buttons look identically grey in narrow panels. */
@@ -5106,6 +5337,17 @@ tr.row-checked:hover {
   flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+/* Row wrapper so the list and the inline TestDetail dock side by side (like the
+   Browse test-case view) instead of the detail opening as a full-screen
+   overlay. The list takes the remaining width; the .detail panel docks right. */
+.testcalls-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.testcalls-main > .testcalls-body {
+  min-width: 0;
 }
 /* Scrollable content region below the flush toolbar + tiles. Flex column so the
    list scrolls between the controls header and the pinned pager footer. */
@@ -5236,24 +5478,6 @@ tr.row-checked:hover {
 .testcalls-badge-cycle {
   background: #fee2e2;
   color: #b91c1c;
-}
-
-/* Generic right slide-over for a TestDetail opened from a list view. */
-.detail-slideover {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  justify-content: flex-end;
-}
-.detail-slideover > div {
-  height: 100vh;
-  display: flex;
-}
-.detail-slideover .detail {
-  height: 100vh;
-  max-height: 100vh;
 }
 
 /* Grid cue: a test that calls another test in its steps (#2). */
@@ -6360,14 +6584,17 @@ tr.row-checked:hover {
 
 .gap-cols {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) — not plain 1fr — so a long summary / folder path in one
+     panel can't blow its track out and starve the other. Both columns stay
+     equal and the item text ellipsizes within them. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
 @media (max-width: 880px) {
   .gap-cols { grid-template-columns: 1fr; }
 }
-.gap-panel { display: flex; flex-direction: column; min-height: 0; }
+.gap-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .gap-panel-head {
   display: flex;
   align-items: center;
@@ -6444,13 +6671,28 @@ tr.row-checked:hover {
    long Test Execution summaries cannot push the action buttons to the next
    line. The multiselect-summary inside already carries text-overflow:ellipsis,
    so bounding the wrapper is sufficient to trigger truncation. */
+/* Fixed-width item picker: it neither grows nor tracks the selected text, so a
+   long container name simply ellipsizes without shifting the action buttons.
+   The open panel below sizes to its own content so long names stay readable. */
 .container-exec-filter {
-  max-width: 260px;
-  min-width: 0;
-  flex-shrink: 1;
+  width: 160px;
+  flex-shrink: 0;
 }
+/* Match the plain .app-select box of the Type / Status pickers (border radius,
+   padding, font size) so the item picker reads as one of the same set rather
+   than a differently-styled control. */
 .container-exec-filter .multiselect-btn {
+  width: 100%;
+  max-width: none;
   overflow: hidden;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+.container-exec-filter .multiselect-panel {
+  width: max-content;
+  min-width: 160px;
+  max-width: 460px;
 }
 
 /* -274: collapsible related-bugs section inside the container detail card.

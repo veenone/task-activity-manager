@@ -196,7 +196,7 @@ export function TestCallsView({ profileId, refreshKey, onChanged }: Props) {
           className="btn btn-primary"
           onClick={syncCalls}
           disabled={syncing}
-          title="Re-pull steps for the known caller tests to refresh the call graph (no full sync)"
+          title="Re-pull steps for the known caller tests to refresh the call graph, without running a full sync"
         >
           {syncing ? "Syncing…" : "↻ Sync"}
         </button>
@@ -210,7 +210,7 @@ export function TestCallsView({ profileId, refreshKey, onChanged }: Props) {
         )}
         <span style={{ flex: 1 }} />
         <span className="muted">
-          Which tests call other tests (Xray test calls) in their steps.
+          Shows which tests call other tests (Xray test calls) within their steps.
         </span>
       </div>
 
@@ -235,12 +235,13 @@ export function TestCallsView({ profileId, refreshKey, onChanged }: Props) {
         </div>
       </div>
 
+      <div className="testcalls-main">
       <div className="testcalls-body">
         {links.length === 0 ? (
         <p className="muted testcalls-empty">
           No call-test relationships yet. Open a test, add a{" "}
-          <b>+ Call test</b> step in its detail panel, and the caller → called
-          links appear here.
+          <b>+ Call test</b> step in its detail panel, and the caller-to-called
+          links show up here.
         </p>
       ) : (
         <>
@@ -350,23 +351,20 @@ export function TestCallsView({ profileId, refreshKey, onChanged }: Props) {
       </div>
 
       {detailKey && (
-        <div className="detail-slideover" onClick={() => setDetailKey("")}>
-          <div onClick={(e) => e.stopPropagation()}>
-            <TestDetail
-              profileId={profileId}
-              testKey={detailKey}
-              version={detailVersion}
-              pendingForTest={[]}
-              folders={[]}
-              onClose={() => setDetailKey("")}
-              onEdited={() => {
-                setDetailVersion((v) => v + 1);
-                onChanged?.();
-              }}
-            />
-          </div>
-        </div>
+        <TestDetail
+          profileId={profileId}
+          testKey={detailKey}
+          version={detailVersion}
+          pendingForTest={[]}
+          folders={[]}
+          onClose={() => setDetailKey("")}
+          onEdited={() => {
+            setDetailVersion((v) => v + 1);
+            onChanged?.();
+          }}
+        />
       )}
+      </div>
     </div>
   );
 }

@@ -89,6 +89,9 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
   const [descOpen, setDescOpen] = useState(false);
   // Collapsible defect analysis in the detail card -- collapsed by default.
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  // Collapse the bug metadata + extra fields to a header line, like the
+  // requirement detail. Expanded by default.
+  const [detailsOpen, setDetailsOpen] = useState(true);
 
   // In-view right sidebar: persists the open test key across sessions (test detail
   // only; plan/exec panels are ephemeral and reset to null on navigation).
@@ -445,6 +448,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
     setExpandedTests(new Set());
     setDescOpen(false);
     setAnalysisOpen(false);
+    setDetailsOpen(true);
   }, [selected]);
 
   // Load the affected tests (with run status) for the selected bug.
@@ -583,7 +587,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
               className="btn"
               onClick={syncBugs}
               disabled={syncing}
-              title="Refresh just the linked bugs from Jira (partial sync)"
+              title="Refresh just the linked bugs from Jira, without syncing everything else"
             >
               {syncing ? "Syncing…" : "Sync"}
             </button>
@@ -651,7 +655,7 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
         {shown.length === 0 ? (
           <p className="muted bugs-md-empty">
             {bugs.length === 0
-              ? "No bugs linked to this profile's tests. File one from a failed test in a Test Execution, or sync a demo profile."
+              ? "No bugs linked to this profile's tests yet. File one from a failed test in a Test Execution, or try a demo profile."
               : "No bugs match the filter."}
           </p>
         ) : (
@@ -766,9 +770,22 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
                 )}
                 {sel.status && <span className="status-pill">{sel.status}</span>}
               </div>
-              <h2 className="bugs-md-detail-summary">
-                {sel.summary || "(no summary)"}
-              </h2>
+              <div className="bugs-md-summary-row">
+                <button
+                  type="button"
+                  className="collapse-caret"
+                  onClick={() => setDetailsOpen((o) => !o)}
+                  aria-expanded={detailsOpen}
+                  title={detailsOpen ? "Hide details" : "Show details"}
+                >
+                  {detailsOpen ? "▾" : "▸"}
+                </button>
+                <h2 className="bugs-md-detail-summary">
+                  {sel.summary || "(no summary)"}
+                </h2>
+              </div>
+              {detailsOpen && (
+                <>
               <dl className="detail-fields bugs-md-detail-fields bugs-md-detail-fields-2col">
                 {sel.issueType && (
                   <>
@@ -857,6 +874,8 @@ export function BugsPanel({ profileId, refreshKey, jiraUrl, onOpenTest }: Props)
                     </div>
                   )}
                 </div>
+              )}
+              </>
               )}
             </div>
 
