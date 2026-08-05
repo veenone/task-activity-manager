@@ -1114,6 +1114,88 @@ export namespace main {
 		}
 	}
 	
+	export class CrossProjectPreconditionPage {
+	    preconditions: testrepo.Precondition[];
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CrossProjectPreconditionPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.preconditions = this.convertValues(source["preconditions"], testrepo.Precondition);
+	        this.total = source["total"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CrossProjectTest {
+	    key: string;
+	    summary: string;
+	    status: string;
+	    projectKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CrossProjectTest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.projectKey = source["projectKey"];
+	    }
+	}
+	export class CrossProjectTestPage {
+	    tests: CrossProjectTest[];
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CrossProjectTestPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tests = this.convertValues(source["tests"], CrossProjectTest);
+	        this.total = source["total"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Diagnostics {
 	    version: string;
 	    dbPath: string;
@@ -1185,6 +1267,7 @@ export namespace profile {
 	    jiraUrl: string;
 	    projectKey: string;
 	    scopeJql: string;
+	    crossProjectSources: string;
 	    bugIssueType: string;
 	    bugProjectMode: string;
 	    bugProjectKey: string;
@@ -1205,6 +1288,7 @@ export namespace profile {
 	        this.jiraUrl = source["jiraUrl"];
 	        this.projectKey = source["projectKey"];
 	        this.scopeJql = source["scopeJql"];
+	        this.crossProjectSources = source["crossProjectSources"];
 	        this.bugIssueType = source["bugIssueType"];
 	        this.bugProjectMode = source["bugProjectMode"];
 	        this.bugProjectKey = source["bugProjectKey"];

@@ -94,6 +94,10 @@ export function BulkTransitionTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkTransitionTests'](arg1, arg2, arg3);
 }
 
+export function CacheExternalPreconditions(arg1, arg2) {
+  return window['go']['main']['App']['CacheExternalPreconditions'](arg1, arg2);
+}
+
 export function ChangeTestType(arg1, arg2, arg3) {
   return window['go']['main']['App']['ChangeTestType'](arg1, arg2, arg3);
 }
@@ -404,6 +408,10 @@ export function GetIgnoreWords() {
 
 export function GetParamModel(arg1, arg2) {
   return window['go']['main']['App']['GetParamModel'](arg1, arg2);
+}
+
+export function GetProfileCrossProjectSources(arg1) {
+  return window['go']['main']['App']['GetProfileCrossProjectSources'](arg1);
 }
 
 export function GetProfileProjectKey(arg1) {
@@ -742,6 +750,14 @@ export function ScanDuplicates(arg1) {
   return window['go']['main']['App']['ScanDuplicates'](arg1);
 }
 
+export function SearchPreconditionsCrossProject(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SearchPreconditionsCrossProject'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function SearchTestsCrossProject(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SearchTestsCrossProject'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function SeedDemoCoverageExample(arg1) {
   return window['go']['main']['App']['SeedDemoCoverageExample'](arg1);
 }
@@ -780,6 +796,10 @@ export function SetDefaultProfile(arg1) {
 
 export function SetMemberVersion(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SetMemberVersion'](arg1, arg2, arg3, arg4);
+}
+
+export function SetProfileCrossProjectSources(arg1, arg2) {
+  return window['go']['main']['App']['SetProfileCrossProjectSources'](arg1, arg2);
 }
 
 export function SetRequirementLinkType(arg1) {

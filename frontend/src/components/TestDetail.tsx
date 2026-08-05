@@ -9,6 +9,8 @@ import {
   SetTestPreconditions,
   EditPreconditionField,
   CreatePrecondition,
+  CacheExternalPreconditions,
+  GetProfileCrossProjectSources,
   GetTestContainers,
   DeallocateTests,
   GetTestTransitions,
@@ -63,6 +65,7 @@ import { MarkdownField } from "./MarkdownField";
 import { MultiAddSelect } from "./MultiAddSelect";
 import { CloneStepsModal } from "./CloneStepsModal";
 import { PickTestModal } from "./PickTestModal";
+import { PickPreconditionModal } from "./PickPreconditionModal";
 import { formatDateTime } from "../dates";
 import { REVIEW_ENABLED, useCapabilities } from "../features";
 
@@ -145,6 +148,22 @@ export function TestDetail({
     localStorage.setItem("xtm.detailWidth", String(width));
   }, [width]);
 
+  // Load the profile's cross-project source projects once, to gate the
+  // "Other project" link buttons (RND_P_4TFINT_05-322).
+  useEffect(() => {
+    let cancelled = false;
+    GetProfileCrossProjectSources(profileId)
+      .then((s) => {
+        if (!cancelled) setCrossProjectSources(s ?? "");
+      })
+      .catch(() => {
+        if (!cancelled) setCrossProjectSources("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
   function startResize(e: React.MouseEvent) {
     e.preventDefault();
     const startX = e.clientX;
@@ -169,6 +188,8 @@ export function TestDetail({
   const [meta, setMeta] = useState<TestMeta | null>(null);
   const [preconditions, setPreconditions] = useState<Precondition[]>([]);
   const [allPreconditions, setAllPreconditions] = useState<Precondition[]>([]);
+  // Cross-project precondition picker open state (RND_P_4TFINT_05-322).
+  const [showCrossPrecond, setShowCrossPrecond] = useState(false);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [bugs, setBugs] = useState<TestBug[]>([]);
   const [allRequirements, setAllRequirements] = useState<RequirementCoverage[]>(
@@ -194,6 +215,17 @@ export function TestDetail({
   const [stepsError, setStepsError] = useState("");
   const [showCloneSteps, setShowCloneSteps] = useState(false);
   const [showCallPicker, setShowCallPicker] = useState(false);
+  // Cross-project link affordances (RND_P_4TFINT_05-322): the profile's
+  // configured source projects gate the "Other project" buttons; separate
+  // modal flags open the pickers in cross-project-only mode.
+  const [crossProjectSources, setCrossProjectSources] = useState("");
+  const crossProjectSourceList = crossProjectSources
+    .split(/[\s,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const crossProjectEnabled = crossProjectSourceList.length > 0;
+  const [showCrossCall, setShowCrossCall] = useState(false);
+  const [showCrossClone, setShowCrossClone] = useState(false);
   const [cloning, setCloning] = useState(false);
   // What Jira itself reports about this Test's steps — used to warn when the
   // panel is empty but Jira actually has steps (a load/shape problem), so the
@@ -628,6 +660,29 @@ export function TestDetail({
     const additions = keys.filter((k) => k && !linked.has(k));
     if (additions.length === 0) return;
     applyPreconditions([...linked, ...additions]);
+  }
+
+  // addCrossProjectPreconditions links one or more preconditions from another
+  // project (RND_P_4TFINT_05-322). It first caches the foreign preconditions
+  // locally so they display with their summaries, then links their keys.
+  async function addCrossProjectPreconditions(pcs: Precondition[]) {
+    if (readOnly) return;
+    setShowCrossPrecond(false);
+    const linked = new Set(preconditions.map((p) => p.key));
+    const additions = pcs.filter((p) => p.key && !linked.has(p.key));
+    if (additions.length === 0) return;
+    setSaveError("");
+    try {
+      await CacheExternalPreconditions(profileId, additions);
+      const all = await ListAllPreconditions(profileId);
+      setAllPreconditions(all ?? []);
+      await applyPreconditions([
+        ...preconditions.map((p) => p.key),
+        ...additions.map((p) => p.key),
+      ]);
+    } catch (e) {
+      setSaveError(`Link precondition failed: ${errMsg(e)}`);
+    }
   }
 
   // createAndAssociatePrecondition creates a brand-new Precondition (FR-13.5)
@@ -1160,6 +1215,16 @@ export function TestDetail({
                   >
                     ＋ New
                   </button>
+                  {crossProjectEnabled && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost pre-add-new"
+                      onClick={() => setShowCrossPrecond(true)}
+                      title="Link a precondition from another project"
+                    >
+                      ↗ Other project
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="btn btn-ghost pre-add-new"
@@ -1516,6 +1581,16 @@ export function TestDetail({
                 Clone from…
               </button>
             )}
+            {!readOnly && caps.stepModel === "objects" && crossProjectEnabled && (
+              <button
+                className="link-btn steps-clone"
+                onClick={() => setShowCrossClone(true)}
+                disabled={stepsLoading}
+                title="Clone steps from a test in another project"
+              >
+                ↗ Other project
+              </button>
+            )}
           </h4>
           {stepsError && <div className="error-text">{stepsError}</div>}
           {caps.stepModel === "objects" ? (
@@ -1589,6 +1664,15 @@ export function TestDetail({
                   >
                     + Call test
                   </button>
+                  {crossProjectEnabled && (
+                    <button
+                      className="link-btn steps-add"
+                      onClick={() => setShowCrossCall(true)}
+                      title="Call a test from another project"
+                    >
+                      ↗ Other project
+                    </button>
+                  )}
                 </div>
               )}
             </>
@@ -1638,6 +1722,55 @@ export function TestDetail({
             setShowCallPicker(false);
             onEdited();
           }}
+        />
+      )}
+
+      {!readOnly && showCrossCall && (
+        <PickTestModal
+          profileId={profileId}
+          heading={`Call a test from another project`}
+          excludeKey={testKey}
+          crossProjectOnly
+          sourceProjects={crossProjectSourceList}
+          onCancel={() => setShowCrossCall(false)}
+          onPick={async (calledKey) => {
+            const s = await AddCalledTestStep(profileId, testKey, calledKey);
+            setSteps((prev) => [...prev, s]);
+            setShowCrossCall(false);
+            onEdited();
+          }}
+        />
+      )}
+
+      {!readOnly && showCrossClone && (
+        <CloneStepsModal
+          profileId={profileId}
+          targetLabel={testKey}
+          excludeKey={testKey}
+          crossProjectOnly
+          sourceProjects={crossProjectSourceList}
+          onCancel={() => setShowCrossClone(false)}
+          onConfirm={async (sourceKey, stepIds) => {
+            const newSteps = await CloneTestSteps(
+              profileId,
+              testKey,
+              sourceKey,
+              stepIds,
+            );
+            setSteps(newSteps ?? []);
+            setShowCrossClone(false);
+            onEdited();
+          }}
+        />
+      )}
+
+      {!readOnly && showCrossPrecond && (
+        <PickPreconditionModal
+          profileId={profileId}
+          excludeKeys={preconditions.map((p) => p.key)}
+          sourceProjects={crossProjectSourceList}
+          onCancel={() => setShowCrossPrecond(false)}
+          onPick={addCrossProjectPreconditions}
         />
       )}
 

@@ -22,6 +22,7 @@ export {
   UpdateProfile,
   SyncProfileFull,
   UpdateProfileScope,
+  SetProfileCrossProjectSources,
   ExportProfile,
   ImportProfile,
   UpdateProfileToken,
@@ -155,6 +156,10 @@ export {
   GetSubTaskTraceability,
   GetExecutionsForPlans,
   GetProfileProjectKey,
+  SearchTestsCrossProject,
+  SearchPreconditionsCrossProject,
+  CacheExternalPreconditions,
+  GetProfileCrossProjectSources,
   GetRequirementTraceability,
   ScanDuplicates,
   ScanDuplicateGroupSteps,
@@ -246,6 +251,26 @@ export interface TypeConversion {
   newType: string;
   prefilled: boolean;
   canPrefill: boolean;
+}
+
+// CrossProjectTest is a cross-project Test search result for the link pickers
+// (RND_P_4TFINT_05-322).
+export interface CrossProjectTest {
+  key: string;
+  summary: string;
+  status: string;
+  projectKey: string;
+}
+
+// One page of cross-project browse/search results, plus the total match count.
+export interface CrossProjectTestPage {
+  tests: CrossProjectTest[];
+  total: number;
+}
+
+export interface CrossProjectPreconditionPage {
+  preconditions: Precondition[];
+  total: number;
 }
 
 // Coverage module data shapes (mirror internal/coverage/*.go JSON tags).
@@ -519,6 +544,10 @@ export interface Profile {
   jiraUrl: string;
   projectKey: string;
   scopeJql: string;
+  // crossProjectSources is a comma-separated list of source project keys this
+  // profile may link preconditions, test calls, and cloned steps from
+  // (RND_P_4TFINT_05-322). Empty disables cross-project linking.
+  crossProjectSources: string;
   bugIssueType: string;
   bugProjectMode: string; // "test" | "execution" | "dedicated"
   bugProjectKey: string;

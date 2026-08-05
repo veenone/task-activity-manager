@@ -2454,6 +2454,192 @@ func (a *App) GetProfileProjectKey(profileID string) (string, error) {
 	return p.ProjectKey, nil
 }
 
+// CrossProjectTest is a lightweight cross-project Test search result for the
+// link pickers (RND_P_4TFINT_05-322).
+type CrossProjectTest struct {
+	Key        string `json:"key"`
+	Summary    string `json:"summary"`
+	Status     string `json:"status"`
+	ProjectKey string `json:"projectKey"`
+}
+
+// crossProjectPageSize is the default page size for a cross-project
+// browse/search; crossProjectMaxPageSize caps a caller-requested page size.
+const (
+	crossProjectPageSize    = 50
+	crossProjectMaxPageSize = 200
+)
+
+// clampCrossProjectLimit normalizes a requested page size to a sane range.
+func clampCrossProjectLimit(limit int) int {
+	if limit <= 0 {
+		return crossProjectPageSize
+	}
+	if limit > crossProjectMaxPageSize {
+		return crossProjectMaxPageSize
+	}
+	return limit
+}
+
+// CrossProjectTestPage is one page of cross-project Test results plus the total
+// match count, so the picker can paginate (RND_P_4TFINT_05-322).
+type CrossProjectTestPage struct {
+	Tests []CrossProjectTest `json:"tests"`
+	Total int                `json:"total"`
+}
+
+// CrossProjectPreconditionPage is one page of cross-project Precondition
+// results plus the total match count.
+type CrossProjectPreconditionPage struct {
+	Preconditions []testrepo.Precondition `json:"preconditions"`
+	Total         int                     `json:"total"`
+}
+
+// parseCrossProjectSources splits a profile's comma/whitespace-separated source
+// project keys into a clean list.
+func parseCrossProjectSources(s string) []string {
+	fields := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t' || r == '\n' || r == ';'
+	})
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		if f = strings.TrimSpace(f); f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// scopeCrossProjectSources returns the configured source projects, narrowed to a
+// single project when `project` names one of them (the picker's project-sidebar
+// selection, RND_P_4TFINT_05-322). A blank or unknown project returns all
+// configured sources.
+func scopeCrossProjectSources(configured, project string) []string {
+	sources := parseCrossProjectSources(configured)
+	if project = strings.TrimSpace(project); project != "" {
+		for _, s := range sources {
+			if strings.EqualFold(s, project) {
+				return []string{s}
+			}
+		}
+	}
+	return sources
+}
+
+// SetProfileCrossProjectSources sets a profile's cross-project source project
+// keys (comma-separated), the projects it may link preconditions, test calls,
+// and cloned steps from (RND_P_4TFINT_05-322).
+func (a *App) SetProfileCrossProjectSources(profileID, sources string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.profiles.UpdateCrossProjectSources(profileID, sources)
+}
+
+// GetProfileCrossProjectSources returns a profile's comma-separated
+// cross-project source project keys, so the UI can gate the cross-project link
+// pickers (RND_P_4TFINT_05-322). Empty means cross-project linking is off.
+func (a *App) GetProfileCrossProjectSources(profileID string) (string, error) {
+	if err := a.requireStore(); err != nil {
+		return "", err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return "", err
+	}
+	return p.CrossProjectSources, nil
+}
+
+// SearchTestsCrossProject searches Tests in the profile's configured source
+// projects by free text (key or summary), so the test-call and clone-steps
+// pickers can reach tests in those projects (RND_P_4TFINT_05-322). Live backend
+// call; returns up to 50 matches. No configured sources or an empty query
+// yields no results.
+func (a *App) SearchTestsCrossProject(profileID, query, project string, offset, limit int) (CrossProjectTestPage, error) {
+	if err := a.requireStore(); err != nil {
+		return CrossProjectTestPage{}, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return CrossProjectTestPage{}, err
+	}
+	sources := scopeCrossProjectSources(p.CrossProjectSources, project)
+	if len(sources) == 0 {
+		return CrossProjectTestPage{Tests: []CrossProjectTest{}}, nil
+	}
+	b, err := a.backendFor(profileID)
+	if err != nil {
+		return CrossProjectTestPage{}, err
+	}
+	rows, total, err := b.SearchTestsAcrossProjects(a.ctx, sources, query, offset, clampCrossProjectLimit(limit))
+	if err != nil {
+		return CrossProjectTestPage{}, err
+	}
+	out := make([]CrossProjectTest, 0, len(rows))
+	for _, t := range rows {
+		out = append(out, CrossProjectTest{
+			Key:        t.Key,
+			Summary:    t.Summary,
+			Status:     t.Status,
+			ProjectKey: t.ProjectKey,
+		})
+	}
+	return CrossProjectTestPage{Tests: out, Total: total}, nil
+}
+
+// CacheExternalPreconditions upserts cross-project preconditions chosen in a
+// picker into the local cache, so a linked precondition from another project
+// still displays with its summary even though the pull sync only fetches the
+// profile's own project (RND_P_4TFINT_05-322). The precondition table has no
+// project column, so a foreign precondition sits alongside local ones; sync is
+// additive and never deletes it.
+func (a *App) CacheExternalPreconditions(profileID string, preconditions []testrepo.Precondition) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if len(preconditions) == 0 {
+		return nil
+	}
+	return a.repo.UpsertPreconditions(profileID, preconditions)
+}
+
+// SearchPreconditionsCrossProject browses or searches Preconditions in the
+// profile's configured source projects for cross-project linking
+// (RND_P_4TFINT_05-322). An empty query lists all; paged from offset with the
+// total match count.
+func (a *App) SearchPreconditionsCrossProject(profileID, query, project string, offset, limit int) (CrossProjectPreconditionPage, error) {
+	if err := a.requireStore(); err != nil {
+		return CrossProjectPreconditionPage{}, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return CrossProjectPreconditionPage{}, err
+	}
+	sources := scopeCrossProjectSources(p.CrossProjectSources, project)
+	if len(sources) == 0 {
+		return CrossProjectPreconditionPage{Preconditions: []testrepo.Precondition{}}, nil
+	}
+	b, err := a.backendFor(profileID)
+	if err != nil {
+		return CrossProjectPreconditionPage{}, err
+	}
+	rows, total, err := b.SearchPreconditionsAcrossProjects(a.ctx, sources, query, offset, clampCrossProjectLimit(limit))
+	if err != nil {
+		return CrossProjectPreconditionPage{}, err
+	}
+	out := make([]testrepo.Precondition, 0, len(rows))
+	for _, pc := range rows {
+		out = append(out, testrepo.Precondition{
+			Key:         pc.Key,
+			Summary:     pc.Summary,
+			Type:        pc.Type,
+			Description: pc.Description,
+			Condition:   pc.Condition,
+		})
+	}
+	return CrossProjectPreconditionPage{Preconditions: out, Total: total}, nil
+}
+
 // --- pytest helper (FR-7.2) ---
 
 // ExportPytest generates a Python test scaffold from a Test Set / Plan /

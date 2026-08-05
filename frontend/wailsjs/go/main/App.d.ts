@@ -59,6 +59,8 @@ export function BulkSetTestRunStatus(arg1:string,arg2:string,arg3:Array<string>,
 
 export function BulkTransitionTests(arg1:string,arg2:Array<string>,arg3:string):Promise<main.BulkTransitionResult>;
 
+export function CacheExternalPreconditions(arg1:string,arg2:Array<testrepo.Precondition>):Promise<void>;
+
 export function ChangeTestType(arg1:string,arg2:string,arg3:string):Promise<testrepo.TypeConversion>;
 
 export function CheckJiraTestSteps(arg1:string,arg2:string):Promise<main.JiraStepInfo>;
@@ -214,6 +216,8 @@ export function GetExecutionsForPlans(arg1:string,arg2:Array<string>):Promise<Ar
 export function GetIgnoreWords():Promise<Array<string>>;
 
 export function GetParamModel(arg1:string,arg2:string):Promise<coverage.ParamModel>;
+
+export function GetProfileCrossProjectSources(arg1:string):Promise<string>;
 
 export function GetProfileProjectKey(arg1:string):Promise<string>;
 
@@ -383,6 +387,10 @@ export function ScanDuplicateGroupSteps(arg1:string,arg2:string):Promise<testrep
 
 export function ScanDuplicates(arg1:string):Promise<testrepo.DuplicateReport>;
 
+export function SearchPreconditionsCrossProject(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<main.CrossProjectPreconditionPage>;
+
+export function SearchTestsCrossProject(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<main.CrossProjectTestPage>;
+
 export function SeedDemoCoverageExample(arg1:string):Promise<string>;
 
 export function SeedEUICCReference(arg1:string):Promise<coverage.EUICCSeedSummary>;
@@ -402,6 +410,8 @@ export function SetCoverageProjects(arg1:string,arg2:Array<coverage.ProjectConfi
 export function SetDefaultProfile(arg1:string):Promise<void>;
 
 export function SetMemberVersion(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function SetProfileCrossProjectSources(arg1:string,arg2:string):Promise<void>;
 
 export function SetRequirementLinkType(arg1:string):Promise<void>;
 

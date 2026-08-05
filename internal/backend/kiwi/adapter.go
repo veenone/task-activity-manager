@@ -349,6 +349,18 @@ func (a *Adapter) ListTestsBasic(ctx context.Context, keys []string) ([]backend.
 	return out, nil
 }
 
+// SearchTestsAcrossProjects / SearchPreconditionsAcrossProjects have no Kiwi
+// analog (Kiwi has no cross-Product issue-key search and no separate
+// precondition issues), so they return no candidates. Cross-project linking
+// (RND_P_4TFINT_05-322) is an Xray-only capability today.
+func (a *Adapter) SearchTestsAcrossProjects(ctx context.Context, projectKeys []string, query string, offset, limit int) ([]backend.TestBasic, int, error) {
+	return []backend.TestBasic{}, 0, nil
+}
+
+func (a *Adapter) SearchPreconditionsAcrossProjects(ctx context.Context, projectKeys []string, query string, offset, limit int) ([]backend.Precondition, int, error) {
+	return []backend.Precondition{}, 0, nil
+}
+
 // GetTestFields is a single TestCase refetch by pk (spec §3.1).
 func (a *Adapter) GetTestFields(ctx context.Context, key string) (backend.Test, error) {
 	id, err := parseKiwiID(key)

@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
-import { ListTests, GetTestSteps, errMsg } from "../api";
-import type { TestCase, Step, StepDraft } from "../api";
+import { ListTests, SearchTestsCrossProject, GetTestSteps, errMsg } from "../api";
+import type { Step, StepDraft } from "../api";
+import { ProjectSidebar } from "./ProjectSidebar";
+import { Pager } from "./Pager";
+
+// A normalized source row: same-project rows carry no projectKey; cross-project
+// rows (RND_P_4TFINT_05-322) carry the owning project's key.
+interface SourceRow {
+  key: string;
+  summary: string;
+  projectKey?: string;
+}
 
 interface Props {
   profileId: string;
@@ -8,6 +18,11 @@ interface Props {
   targetLabel: string;
   // Test key to exclude from the source list (the test being edited), if any.
   excludeKey?: string;
+  // When true, only search the profile's configured source projects (cross-
+  // project), with no same-project toggle (RND_P_4TFINT_05-322).
+  crossProjectOnly?: boolean;
+  // Configured source project keys, for the left project filter sidebar.
+  sourceProjects?: string[];
   // Called with the chosen source and the selected steps. stepIds are the
   // source step xray_ids (for a backend clone); steps carries their content
   // (for callers building a local draft). May return a promise; the modal shows
@@ -30,18 +45,28 @@ export function CloneStepsModal({
   profileId,
   targetLabel,
   excludeKey,
+  crossProjectOnly,
+  sourceProjects,
   onConfirm,
   onCancel,
 }: Props) {
   // Stage 1 — source search.
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<TestCase[]>([]);
+  const [results, setResults] = useState<SourceRow[]>([]);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(false);
+  // When on, search source tests in the profile's configured source projects.
+  // Forced (and toggle hidden) when opened as a cross-project picker.
+  const [crossProject, setCrossProject] = useState(!!crossProjectOnly);
+  const [project, setProject] = useState("");
+  const projects = sourceProjects ?? [];
+  // Show the owning-project badge only when browsing all projects (#322).
+  const showProjectBadge = crossProject && project === "";
 
   // Stage 2 — step selection for the chosen source.
-  const [source, setSource] = useState<TestCase | null>(null);
+  const [source, setSource] = useState<SourceRow | null>(null);
   const [sourceSteps, setSourceSteps] = useState<Step[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -51,30 +76,44 @@ export function CloneStepsModal({
 
   useEffect(() => {
     setPage(0);
-  }, [search]);
+  }, [search, crossProject, project]);
 
   useEffect(() => {
     if (source) return; // pause searching while choosing steps
     let cancelled = false;
     const handle = setTimeout(() => {
       setSearching(true);
-      ListTests(profileId, {
-        search,
-        status: "",
-        folderId: "",
-        containerKey: "",
-        component: "",
-        execType: "",
-        review: "",
-        sortBy: "key",
-        desc: false,
-        limit: PAGE_SIZE,
-        offset: page * PAGE_SIZE,
-      })
+      setError("");
+      const req = crossProject
+        ? SearchTestsCrossProject(profileId, search, project, page * pageSize, pageSize).then((p) => ({
+            tests: (p.tests ?? []).map((r) => ({
+              key: r.key,
+              summary: r.summary,
+              projectKey: r.projectKey,
+            })),
+            total: p.total ?? 0,
+          }))
+        : ListTests(profileId, {
+            search,
+            status: "",
+            folderId: "",
+            containerKey: "",
+            component: "",
+            execType: "",
+            review: "",
+            sortBy: "key",
+            desc: false,
+            limit: pageSize,
+            offset: page * pageSize,
+          }).then((p) => ({
+            tests: (p.tests ?? []).map((t) => ({ key: t.key, summary: t.summary })),
+            total: p.total ?? 0,
+          }));
+      req
         .then((p) => {
           if (cancelled) return;
-          setResults(p.tests ?? []);
-          setTotal(p.total ?? 0);
+          setResults(p.tests);
+          setTotal(p.total);
         })
         .catch((e) => {
           if (!cancelled) setError(errMsg(e));
@@ -87,9 +126,9 @@ export function CloneStepsModal({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [profileId, search, page, source]);
+  }, [profileId, search, page, pageSize, source, crossProject, project]);
 
-  async function chooseSource(t: TestCase) {
+  async function chooseSource(t: SourceRow) {
     setError("");
     setStepsLoading(true);
     setSource(t);
@@ -147,6 +186,13 @@ export function CloneStepsModal({
         </div>
 
         <div className="add-tests-body">
+          {!source && crossProject && projects.length > 0 && (
+            <ProjectSidebar
+              projects={projects}
+              selected={project}
+              onSelect={setProject}
+            />
+          )}
           <div className="add-tests-main">
             {!source ? (
               <>
@@ -156,51 +202,69 @@ export function CloneStepsModal({
                 <input
                   className="detail-input"
                   autoFocus
-                  placeholder="Search key, summary, description…"
+                  placeholder={
+                    crossProject
+                      ? "Search other projects by key or summary…"
+                      : "Search key, summary, description…"
+                  }
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
+                {!crossProjectOnly && (
+                  <label className="pick-crossproj">
+                    <input
+                      type="checkbox"
+                      checked={crossProject}
+                      onChange={(e) => setCrossProject(e.target.checked)}
+                    />
+                    Search other projects
+                  </label>
+                )}
                 {searching ? (
                   <p className="muted">Searching…</p>
                 ) : (
-                  <ul className="add-test-list">
-                    {visibleResults.map((t) => (
-                      <li key={t.key}>
-                        <button
-                          className="link-btn clone-src-pick"
-                          onClick={() => chooseSource(t)}
-                        >
-                          <span className="mono">{t.key}</span> {t.summary}
-                        </button>
-                      </li>
-                    ))}
-                    {visibleResults.length === 0 && (
-                      <li className="muted">No tests match.</li>
-                    )}
-                  </ul>
-                )}
-                {total > PAGE_SIZE && (
-                  <div className="add-test-pager">
-                    <button
-                      className="btn"
-                      disabled={page === 0 || searching}
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    >
-                      ‹ Prev
-                    </button>
-                    <span className="muted">
-                      {(page * PAGE_SIZE + 1).toLocaleString()}–
-                      {Math.min((page + 1) * PAGE_SIZE, total).toLocaleString()}{" "}
-                      of {total.toLocaleString()}
-                    </span>
-                    <button
-                      className="btn"
-                      disabled={(page + 1) * PAGE_SIZE >= total || searching}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      Next ›
-                    </button>
+                  <div className="pick-table-wrap">
+                    <table className="pick-table">
+                      <tbody>
+                        {visibleResults.map((t) => (
+                          <tr
+                            key={t.key}
+                            className="pick-row"
+                            onClick={() => chooseSource(t)}
+                          >
+                            <td className="pick-key mono">{t.key}</td>
+                            <td className="pick-summary">
+                              {t.summary}
+                              {showProjectBadge && t.projectKey && (
+                                <span className="pick-proj-badge">
+                                  {t.projectKey}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {visibleResults.length === 0 && (
+                          <tr>
+                            <td className="pick-empty" colSpan={2}>
+                              No tests match.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
+                )}
+                {total > 0 && (
+                  <Pager
+                    page={page}
+                    pageSize={pageSize}
+                    total={total}
+                    onPage={setPage}
+                    onPageSize={(n) => {
+                      setPageSize(n);
+                      setPage(0);
+                    }}
+                  />
                 )}
               </>
             ) : (
