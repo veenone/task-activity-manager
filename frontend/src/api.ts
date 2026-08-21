@@ -16,6 +16,7 @@ export {
   ListRequirementLinkTypeDetails,
   GetCapabilities,
   SetShowCoverage,
+  SetTourSeenVersion,
   ListProfiles,
   CreateProfile,
   CreateProfileReusingToken,
@@ -511,6 +512,9 @@ export interface Settings {
   theme: string; // "light" | "dark" | "system" | "" (= light)
   requirementLinkType: string; // Jira issue-link type for Test->Requirement coverage; default "tested by"
   showCoverage: boolean; // reveal the opt-in, hidden-by-default Coverage tab
+  // Version of the onboarding tour this user has already been through, 0 when
+  // never. A later release re-offers a rewritten tour by bumping TOUR_VERSION.
+  tourSeenVersion: number;
 }
 
 // Capabilities mirrors backend.Capabilities — what the active profile's
@@ -693,14 +697,24 @@ export interface SyncState {
   testCount: number;
 }
 
+// StageFailure mirrors testrepo.StageFailure — one sync stage that errored
+// without aborting the whole run (RND_P_4TFINT_05-336).
+export interface StageFailure {
+  stage: string;
+  message: string;
+}
+
 // SyncLogEntry mirrors testrepo.SyncLogEntry — one sync run's outcome (FR-1.7).
 export interface SyncLogEntry {
   id: number;
   startedAt: string;
   finishedAt: string;
+  // "success", "partial" or "error". "partial" means the run finished and its
+  // data is usable, but at least one stage did not complete.
   outcome: string;
   fetched: number;
   error: string;
+  stageFailures: StageFailure[];
 }
 
 // SavedView mirrors testrepo.SavedView — a named browse filter (FR-11.4). The

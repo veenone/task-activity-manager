@@ -854,6 +854,15 @@ func (a *App) SetShowCoverage(show bool) error {
 	return a.settings.SetShowCoverage(show)
 }
 
+// SetTourSeenVersion records that the user has completed or skipped the
+// onboarding tour at the given version (RND_P_4TFINT_05-335).
+func (a *App) SetTourSeenVersion(v int) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.settings.SetTourSeenVersion(v)
+}
+
 // --- Connection & sync (FR-1, FR-8) ---
 
 // TestConnection verifies a server URL and credential, returning the display
@@ -1135,13 +1144,26 @@ func (a *App) runSync(profileID string, forceFull bool) error {
 
 	// Record the run in the sync history (FR-1.7). A logging failure must not
 	// mask the sync result.
+	//
+	// A partial run is its own outcome: the pull finished and the data is
+	// usable, but a stage did not complete. It stays an error to the caller so
+	// the UI cannot show it as a clean sync, which is the -336 defect
+	// (RND_P_4TFINT_05-336).
 	outcome, errMsg := "success", ""
-	if syncErr != nil {
+	var stageFailures []testrepo.StageFailure
+	var partial *syncer.PartialSyncError
+	switch {
+	case syncErr == nil:
+	case errors.As(syncErr, &partial):
+		outcome, errMsg = "partial", partial.Error()
+		stageFailures = partial.StageFailures
+	default:
 		outcome, errMsg = "error", syncErr.Error()
 	}
 	if logErr := a.repo.RecordSyncLog(
 		profileID, started.Format(time.RFC3339),
 		time.Now().UTC().Format(time.RFC3339), outcome, lastFetched, errMsg,
+		stageFailures,
 	); logErr != nil {
 		log.Printf("xtm: record sync log: %v", logErr)
 	}
