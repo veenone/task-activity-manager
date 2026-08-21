@@ -478,8 +478,8 @@ export function GetTestMeta(arg1, arg2) {
   return window['go']['main']['App']['GetTestMeta'](arg1, arg2);
 }
 
-export function GetTestPreconditions(arg1, arg2) {
-  return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2);
+export function GetTestPreconditions(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTestPreconditions'](arg1, arg2, arg3);
 }
 
 export function GetTestRequirements(arg1, arg2) {
@@ -526,8 +526,8 @@ export function ImportRequirements(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['ImportRequirements'](arg1, arg2, arg3, arg4, arg5);
 }
 
-export function ImportTests(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['ImportTests'](arg1, arg2, arg3, arg4, arg5);
+export function ImportTests(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['ImportTests'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function LinkExistingBugToRun(arg1, arg2, arg3, arg4) {

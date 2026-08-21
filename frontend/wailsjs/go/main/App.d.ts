@@ -251,7 +251,7 @@ export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promis
 
 export function GetTestMeta(arg1:string,arg2:string):Promise<jira.TestMeta>;
 
-export function GetTestPreconditions(arg1:string,arg2:string):Promise<Array<testrepo.Precondition>>;
+export function GetTestPreconditions(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.Precondition>>;
 
 export function GetTestRequirements(arg1:string,arg2:string):Promise<Array<testrepo.Requirement>>;
 
@@ -275,7 +275,7 @@ export function ImportProfile():Promise<profile.Profile>;
 
 export function ImportRequirements(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<testrepo.RequirementImportResult>;
 
-export function ImportTests(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.ImportMapping,arg5:boolean):Promise<testrepo.ImportResult>;
+export function ImportTests(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.ImportMapping,arg5:boolean,arg6:boolean):Promise<testrepo.ImportResult>;
 
 export function LinkExistingBugToRun(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
