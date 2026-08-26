@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useViewState } from "../lib/viewState";
 import {
-  ListTests,
   ListMatchingKeys,
   ListStatuses,
   ListTestCallLinks,
@@ -18,12 +17,12 @@ import { useNotice } from "./useNotice";
 import { formatDate } from "../dates";
 import { REVIEW_ENABLED, useCapabilities } from "../features";
 import type {
-  TestPage,
   TestQuery,
   TestCase,
   PendingChange,
   SavedView,
 } from "../api";
+import { useTests } from "../queries/tests";
 
 interface Props {
   profileId: string;
@@ -277,7 +276,25 @@ export function TestTable({
   const [pageSize, setPageSize] = useViewState(profileId, "browse", "pageSize", DEFAULT_PAGE_SIZE);
   const [pageInput, setPageInput] = useState("");
 
-  const [page, setPage] = useState<TestPage>({ tests: [], total: 0 });
+  // The browse grid's page comes from the query cache (audit A3, Phase 2);
+  // refreshKey is folded in as the migration bridge (see useTests).
+  const q: TestQuery = {
+    search: debouncedSearch,
+    status: status.trim(),
+    folderId,
+    containerKey,
+    component,
+    execType,
+    review,
+    sortBy,
+    desc,
+    limit: pageSize,
+    offset,
+  };
+  const testsQuery = useTests(profileId, q, refreshKey);
+  const page = testsQuery.data ?? { tests: [], total: 0 };
+  const loading = testsQuery.isFetching;
+  const listError = testsQuery.error ? errMsg(testsQuery.error) : "";
   // Keys of tests that call another test in their steps — drives the grid cue.
   const [callerKeys, setCallerKeys] = useState<Set<string>>(new Set());
   // Roving tabindex over the grid rows, tracked by index because rows are
@@ -287,7 +304,6 @@ export function TestTable({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingFocusRef = useRef<number | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectingAll, setSelectingAll] = useState(false);
   const [selectAllError, setSelectAllError] = useState("");
@@ -419,6 +435,7 @@ export function TestTable({
     });
     if (!name || !name.trim()) return;
     const query = JSON.stringify({ search, status, execType, review, sortBy, desc });
+    setError("");
     try {
       const v = await CreateSavedView(profileId, name.trim(), query);
       setSavedViews((prev) => [v, ...prev]);
@@ -455,6 +472,7 @@ export function TestTable({
 
   async function deleteActiveView() {
     if (!activeView) return;
+    setError("");
     try {
       await DeleteSavedView(profileId, activeView);
       setSavedViews((prev) => prev.filter((v) => v.id !== activeView));
@@ -485,51 +503,7 @@ export function TestTable({
     profileId,
   ]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError("");
-    const q: TestQuery = {
-      search: debouncedSearch,
-      status: status.trim(),
-      folderId,
-      containerKey,
-      component,
-      execType,
-      review,
-      sortBy,
-      desc,
-      limit: pageSize,
-      offset,
-    };
-    ListTests(profileId, q)
-      .then((p) => {
-        if (!cancelled) setPage(p);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(errMsg(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    profileId,
-    debouncedSearch,
-    status,
-    execType,
-    folderId,
-    containerKey,
-    component,
-    review,
-    sortBy,
-    desc,
-    offset,
-    pageSize,
-    refreshKey,
-  ]);
+  // (The browse page fetch now lives in the useTests query above.)
 
   function toggleSort(col: SortCol) {
     if (sortBy === col) {
@@ -774,7 +748,11 @@ export function TestTable({
         )}
       </div>
 
-      {error && <div className="error-text table-error">{error}</div>}
+      {/* A live load failure (listError) always wins over a stale imperative
+          save/delete-view error, so a real fetch error is never masked. */}
+      {(listError || error) && (
+        <div className="error-text table-error">{listError || error}</div>
+      )}
 
       {canSelectAllMatching && (
         <div className="select-all-banner">
