@@ -1,9 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  GetExecutionsForPlans,
   GetRequirementTraceability,
   GetStatistics,
   GetSubTaskTraceability,
   GetTraceabilitySankey,
+  ListBugsWithTests,
+  ListContainers,
   ListRequirementsWithCoverage,
 } from "../api";
 import { call } from "../lib/apiCall";
@@ -71,5 +74,52 @@ export function useSubTaskSankey(
     queryFn: () =>
       call(() => GetSubTaskTraceability(profileId, parentSel, crossMembers)),
     enabled: !!profileId,
+  });
+}
+
+// useTraceabilityPlanContainers loads the Test Plan options for the plan filter.
+export function useTraceabilityPlanContainers(profileId: string) {
+  return useQuery({
+    queryKey: keys.traceabilityPlanContainers(profileId),
+    queryFn: () => call(() => ListContainers(profileId, "testplan")),
+    enabled: !!profileId,
+  });
+}
+
+// useTraceabilityExecContainers loads the Test Execution containers; the view
+// derives the distinct parent options from them.
+export function useTraceabilityExecContainers(profileId: string) {
+  return useQuery({
+    queryKey: keys.traceabilityExecContainers(profileId),
+    queryFn: () => call(() => ListContainers(profileId, "testexec")),
+    enabled: !!profileId,
+  });
+}
+
+// useTraceabilityExecutions loads the executions that cascade from the selected
+// plans; re-keys on the plan selection.
+export function useTraceabilityExecutions(
+  profileId: string,
+  planSel: string[],
+) {
+  return useQuery({
+    queryKey: keys.traceabilityExecutions(profileId, planSel),
+    queryFn: () => call(() => GetExecutionsForPlans(profileId, planSel)),
+    enabled: !!profileId,
+    // Keep the previous executions visible while a new plan selection loads, so
+    // the dropdown count doesn't blink to 0 mid-cascade. The prune effect keys
+    // on the query data ref, which placeholderData holds stable during the
+    // refetch, so it still prunes only once the new options land.
+    placeholderData: (prev) => prev,
+  });
+}
+
+// useTraceabilityBugs loads the bugs-with-tests list for the cross-project view;
+// only fetched while the cross-project toggle is on.
+export function useTraceabilityBugs(profileId: string, crossProject: boolean) {
+  return useQuery({
+    queryKey: keys.traceabilityBugs(profileId),
+    queryFn: () => call(() => ListBugsWithTests(profileId)),
+    enabled: !!profileId && crossProject,
   });
 }
