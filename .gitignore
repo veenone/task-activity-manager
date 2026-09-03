@@ -1,7 +1,7 @@
 # Wails / frontend build output
-build/bin
+xtm/build/bin
 node_modules
-frontend/dist
+xtm/frontend/dist
 
 # Release artifacts (produced by scripts/release.ps1)
 dist/

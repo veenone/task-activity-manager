@@ -59,7 +59,7 @@ jobs:
 
       - name: Build & bundle
         shell: pwsh
-        run: ./scripts/release.ps1 -Version ${{ steps.ver.outputs.version }}
+        run: ./xtm/scripts/release.ps1 -Version ${{ steps.ver.outputs.version }}
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -68,16 +68,16 @@ jobs:
           name: Xray Test Manager v${{ steps.ver.outputs.version }}
           generate_release_notes: true
           files: |
-            dist/*.exe
-            dist/*.zip
-            dist/SHA256SUMS.txt
+            xtm/dist/*.exe
+            xtm/dist/*.zip
+            xtm/dist/SHA256SUMS.txt
 
       - name: Upload artifacts (manual runs)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: xray-test-manager-${{ steps.ver.outputs.version }}
-          path: dist/*
+          path: xtm/dist/*
 
   release-macos:
     runs-on: macos-latest
@@ -110,6 +110,7 @@ jobs:
           echo "Building version $v"
 
       - name: Build universal .app
+        working-directory: xtm
         run: wails build -platform darwin/universal -clean
 
       # --- Code signing + notarization (optional) ---
@@ -153,7 +154,7 @@ jobs:
 
       - name: Codesign .app
         if: steps.sign.outputs.enabled == 'true'
-        working-directory: build/bin
+        working-directory: xtm/build/bin
         run: |
           codesign --force --deep --options runtime --timestamp \
             --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" "xray-test-manager.app"
@@ -161,7 +162,7 @@ jobs:
 
       - name: Notarize + staple
         if: steps.sign.outputs.enabled == 'true' && steps.sign.outputs.notarize == 'true'
-        working-directory: build/bin
+        working-directory: xtm/build/bin
         run: |
           ditto -c -k --keepParent "xray-test-manager.app" "$RUNNER_TEMP/notarize.zip"
           xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
@@ -171,7 +172,7 @@ jobs:
           xcrun stapler staple "xray-test-manager.app"
 
       - name: Package .app (zip + checksum)
-        working-directory: build/bin
+        working-directory: xtm/build/bin
         run: |
           app="xray-test-manager.app"
           out="xray-test-manager-${{ steps.ver.outputs.version }}-macos-universal.zip"
@@ -187,12 +188,12 @@ jobs:
           name: Xray Test Manager v${{ steps.ver.outputs.version }}
           generate_release_notes: true
           files: |
-            build/bin/*.zip
-            build/bin/SHA256SUMS-macos.txt
+            xtm/build/bin/*.zip
+            xtm/build/bin/SHA256SUMS-macos.txt
 
       - name: Upload artifacts (manual runs)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: xray-test-manager-macos-${{ steps.ver.outputs.version }}
-          path: build/bin/*.zip
+          path: xtm/build/bin/*.zip
