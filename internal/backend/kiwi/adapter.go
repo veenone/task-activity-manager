@@ -58,6 +58,22 @@ type Adapter struct {
 	// redo detection.
 	hasReviewPlugin bool
 
+	// pageMu/pageCache hold one sync's worth of TestCase rows. Kiwi's
+	// TestCase.filter has no server-side limit or offset — verified against a
+	// live instance, which answers "Cannot resolve keyword 'limit'" because the
+	// RPC only accepts model field lookups — so a page has to be sliced from
+	// the full scoped result. Without this cache every page refetched the whole
+	// product: on a real 18,583-test product that was 186 full fetches, about
+	// eight minutes, to store 18,583 rows once.
+	//
+	// The cache is keyed by scope and reset when the caller asks for offset 0,
+	// which is how the sync engine starts every pull (engine.go's pullTests
+	// walks offsets from 0). That keeps it to one pull's lifetime: a later sync
+	// starts at 0 and refetches, so an edited or new test is never missed.
+	pageMu    sync.Mutex
+	pageKey   string
+	pageCache []kiwiTestCase
+
 	// detectMu/detectDone guard ensureDetected (P4.5): detectMu serializes
 	// concurrent callers so two goroutines racing into ensureDetected on the
 	// same Adapter never double-probe or observe a half-written pair of
@@ -192,6 +208,37 @@ func (a *Adapter) fetchTestCases(ctx context.Context, filter map[string]any) ([]
 	return rows, nil
 }
 
+// scopedCases returns every TestCase in a product, sorted by id, fetching from
+// the server only when the scope changes or a new pull begins.
+//
+// startAt == 0 means the caller is at the top of a fresh pull, so the cache is
+// discarded and the scope re-fetched. Every later offset in that same pull is
+// served from memory. See the pageCache field comment for why paging cannot be
+// pushed to the server.
+func (a *Adapter) scopedCases(ctx context.Context, projectKey string, startAt int) ([]kiwiTestCase, error) {
+	a.pageMu.Lock()
+	defer a.pageMu.Unlock()
+
+	if startAt > 0 && a.pageKey == projectKey && a.pageCache != nil {
+		return a.pageCache, nil
+	}
+
+	filter := map[string]any{}
+	if projectKey != "" {
+		filter["category__product__name"] = projectKey
+	}
+	rows, err := a.fetchTestCases(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	// Sorted once, here, so every page slices the same stable order. Kiwi
+	// rejects order_by, so this cannot be asked of the server either.
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+
+	a.pageKey, a.pageCache = projectKey, rows
+	return rows, nil
+}
+
 // fetchTestCaseByID fetches a single TestCase by pk via
 // TestCase.filter({"pk": id}), erroring if no row is returned.
 func (a *Adapter) fetchTestCaseByID(ctx context.Context, id int) (kiwiTestCase, error) {
@@ -281,15 +328,21 @@ func (a *Adapter) fetchComponentsForCase(ctx context.Context, id int) ([]string,
 // Kiwi pull is always "full" and the hub diffs locally via content-hash
 // (spec §5 OQ-2).
 func (a *Adapter) SearchTestsPage(ctx context.Context, projectKey, scopeJQL, since string, startAt, maxResults int) ([]backend.Test, int, error) {
-	filter := map[string]any{}
-	if projectKey != "" {
-		filter["category__product__name"] = projectKey
-	}
-	rows, err := a.fetchTestCases(ctx, filter)
+	rows, err := a.scopedCases(ctx, projectKey, startAt)
 	if err != nil {
 		return nil, 0, err
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+	// An empty result is ambiguous on the wire: Kiwi returns [] both for a
+	// product with no tests and for a product name that does not exist, because
+	// its filters are case-sensitive and it does not validate the lookup value.
+	// Typing "SPHERE HSM" for "Sphere HSM" therefore synced nothing and said
+	// nothing. Only when the result is empty is it worth one extra call to tell
+	// the two apart.
+	if len(rows) == 0 && projectKey != "" && startAt == 0 {
+		if err := a.explainEmptyProduct(ctx, projectKey); err != nil {
+			return nil, 0, err
+		}
+	}
 
 	total := len(rows)
 	if startAt < 0 {
@@ -912,20 +965,173 @@ func (a *Adapter) GetBugDetail(ctx context.Context, bugKey string) (backend.BugD
 
 // --- folders ---
 
+// Kiwi has no folder tree, but it has Categories: a per-product grouping with
+// exactly one per test case, used to organise the repository. That is the same
+// job an Xray Test Repository folder does, so categories surface as folders.
+//
+// The mapping is flat by nature. A Kiwi Category is {name, product,
+// description} with no parent, so every category is a root folder and the tree
+// is one level deep. A nested Xray hierarchy cannot round-trip through Kiwi,
+// which matters for the migration bridge and is why folder WRITES stay
+// unsupported here (see CreateFolder below).
+//
+// The "--default--" category Kiwi creates for every product is treated as
+// unfiled rather than as a folder, matching how Xray shows tests that are in
+// no folder.
+
+// kiwiCategory is a Category.filter row.
+type kiwiCategory struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// fetchCategories returns a product's categories, excluding the default one.
+func (a *Adapter) fetchCategories(ctx context.Context, projectKey string) ([]kiwiCategory, error) {
+	if projectKey == "" {
+		return nil, nil
+	}
+	var rows []kiwiCategory
+	if err := a.c.call(ctx, "Category.filter",
+		[]any{map[string]any{"product__name": projectKey}}, &rows); err != nil {
+		return nil, err
+	}
+	out := make([]kiwiCategory, 0, len(rows))
+	for _, r := range rows {
+		if r.Name == kiwiDefaultCategory {
+			continue
+		}
+		out = append(out, r)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+// explainEmptyProduct turns a silent empty sync into an actionable error when
+// the product name is wrong. It returns nil when the name is genuinely correct
+// and the product simply holds no tests, so an empty product still syncs
+// cleanly.
+func (a *Adapter) explainEmptyProduct(ctx context.Context, projectKey string) error {
+	var products []struct {
+		Name string `json:"name"`
+	}
+	if err := a.c.call(ctx, "Product.filter", []any{map[string]any{}}, &products); err != nil {
+		// The probe is a courtesy. If it fails, fall back to the old behaviour
+		// of an empty sync rather than inventing a second failure.
+		return nil
+	}
+
+	names := make([]string, 0, len(products))
+	for _, p := range products {
+		if p.Name == projectKey {
+			return nil // exact match: the product exists and is simply empty
+		}
+		names = append(names, p.Name)
+	}
+	for _, n := range names {
+		if strings.EqualFold(n, projectKey) {
+			return fmt.Errorf(
+				"kiwi: no product named %q; did you mean %q? Product names are case-sensitive",
+				projectKey, n)
+		}
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return fmt.Errorf("kiwi: no product named %q, and this server has no products", projectKey)
+	}
+	return fmt.Errorf("kiwi: no product named %q. Available products: %s",
+		projectKey, strings.Join(names, ", "))
+}
+
 func (a *Adapter) FolderTree(ctx context.Context, projectKey string) (backend.FolderTreeResult, error) {
-	return backend.FolderTreeResult{}, nil // P4.2 — EMPTY: no folder tree in core (spec §3.10)
+	cats, err := a.fetchCategories(ctx, projectKey)
+	if err != nil {
+		return backend.FolderTreeResult{}, err
+	}
+	if len(cats) == 0 {
+		return backend.FolderTreeResult{}, nil
+	}
+
+	// Test membership comes off the rows the pull already fetched, so building
+	// the tree costs no extra round trip per folder. startAt 0 is deliberate:
+	// FolderTree runs at the top of a sync stage, so it refreshes the scope the
+	// page walk then reuses.
+	rows, err := a.scopedCases(ctx, projectKey, 0)
+	if err != nil {
+		return backend.FolderTreeResult{}, err
+	}
+	counts := map[int]int{}
+	membership := map[string]string{}
+	for _, tc := range rows {
+		if tc.CategoryID == 0 || tc.CategoryName == kiwiDefaultCategory {
+			continue
+		}
+		counts[tc.CategoryID]++
+		// The VALUE is a folder id, not a name: syncFolders feeds this map
+		// straight to ApplyTestFolders, which writes it into
+		// test_case.folder_id, and the UI joins that against test_folder.id.
+		// Xray holds the same invariant by making a folder's id its path.
+		membership[strconv.Itoa(tc.ID)] = strconv.Itoa(tc.CategoryID)
+	}
+
+	folders := make([]backend.Folder, 0, len(cats))
+	withTests := make([]backend.FolderRef, 0, len(cats))
+	for _, c := range cats {
+		id := strconv.Itoa(c.ID)
+		n := counts[c.ID]
+		folders = append(folders, backend.Folder{
+			ID:       id,
+			ParentID: "",
+			Name:     c.Name,
+			// The native id a move would target. Kiwi cannot move tests
+			// between categories through this adapter yet, but the field is
+			// what a future MoveTestToFolder would use.
+			XrayID: id,
+			// Flat, so a category's own count is also its total.
+			TestCount:      n,
+			TotalTestCount: n,
+		})
+		if n > 0 {
+			withTests = append(withTests, backend.FolderRef{ID: id, Path: c.Name})
+		}
+	}
+	return backend.FolderTreeResult{
+		Folders:          folders,
+		TreeMembership:   membership,
+		FoldersWithTests: withTests,
+	}, nil
 }
 
 func (a *Adapter) ListFolders(ctx context.Context, projectKey string) ([]backend.Folder, error) {
-	return nil, nil // P4.2 — EMPTY (spec §3.10)
+	tree, err := a.FolderTree(ctx, projectKey)
+	if err != nil {
+		return nil, err
+	}
+	return tree.Folders, nil
 }
 
 func (a *Adapter) ListTestsInFolder(ctx context.Context, projectKey, folderID string) ([]string, error) {
-	return nil, nil // P4.2 — EMPTY (spec §3.10)
+	id, err := strconv.Atoi(folderID)
+	if err != nil {
+		return nil, fmt.Errorf("kiwi: folder id %q is not a category id", folderID)
+	}
+	rows, err := a.fetchTestCases(ctx, map[string]any{"category": id})
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, len(rows))
+	for i, tc := range rows {
+		keys[i] = strconv.Itoa(tc.ID)
+	}
+	return keys, nil
 }
 
+// Folder writes stay unsupported. A category is not a folder in the sense a
+// write implies: it has no parent, so a nested path cannot be created, and
+// Category.create would be inventing product-level structure from a folder
+// name. Reads surface what already exists; writes would fabricate it.
 func (a *Adapter) CreateFolder(ctx context.Context, projectKey, parentPath, name string) error {
-	return backend.ErrUnsupported // P4.2 (write)
+	return backend.ErrUnsupported
 }
 
 func (a *Adapter) RenameFolder(ctx context.Context, projectKey, path, newName string) error {
@@ -1058,12 +1264,15 @@ func (a *Adapter) AddComment(ctx context.Context, issueKey, body string) error {
 // ensureDetected now delivers regardless of what Capabilities() reports.
 func (a *Adapter) Capabilities() backend.Capabilities {
 	caps := backend.Capabilities{
-		Name:                        "kiwi",
-		IDStyle:                     "numeric", // Kiwi pks are ints (spec §4.1; see p4_1-report.md for the "integer" vs "numeric" note)
-		SupportsJQLScope:            false,     // Product/Version/Build + ORM filters, not JQL
-		StepModel:                   "inline-text",
-		SupportsTestTypes:           true, // is_automated -> Manual/Automated
-		SupportsFolders:             false,
+		Name:              "kiwi",
+		IDStyle:           "numeric", // Kiwi pks are ints (spec §4.1; see p4_1-report.md for the "integer" vs "numeric" note)
+		SupportsJQLScope:  false,     // Product/Version/Build + ORM filters, not JQL
+		StepModel:         "inline-text",
+		SupportsTestTypes: true, // is_automated -> Manual/Automated
+
+		// Categories read as a flat folder set; they cannot be reshaped.
+		SupportsFolders:             true,
+		SupportsFolderWrites:        false,
 		SupportsPreconditionObjects: false,
 		SupportsRequirementObjects:  false, // flipped below if the requirements plugin was detected
 		SupportsIssueLinkTypes:      false, // flipped below if the requirements plugin was detected (typed links verifies/validates/derives-from/related, spec §3.8/§4.2)
