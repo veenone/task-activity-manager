@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - The monorepo is named `agile-suite`; Go modules are `agile-suite/core` and `agile-suite/xtm`.
-- XTM is never edited for TAM's sake beyond import paths, except the cutover edits this plan names explicitly (Task 4: `initStore` wiring, the `bugs.go` lookup, `shutdown`).
+- XTM is never edited for TAM's sake beyond import paths, except the edits this plan names explicitly: Task 3 passes `st.DB()` to the three lifted constructors in `initStore`; Task 4 rewires `initStore` and `shutdown` to the shared database and adds the `bugs.go` lookup.
 - Every task leaves XTM's full Go suite (`go test ./internal/...` inside `xtm/`) and frontend suite (`npx vitest run` inside `xtm/frontend/`) green.
 - `core` holds only what a task in this plan needs. No speculative packages.
 - The Windows Credential Manager prefix `xray-test-manager:` and the keyring service name stay exactly as they are, so stored PATs keep working after the move.
@@ -768,7 +768,7 @@ done
 grep -n "shareddb.Open\|NewManager(st" core/profile/*_test.go core/connection/*_test.go core/settings/*_test.go | head
 ```
 
-Expected: every `store.Open(` became `shareddb.Open(` and every `NewManager(st)` became `NewManager(st.DB())`. `settings_test.go` line 30 returns `settings.NewManager(st.DB()), st`; its callers use `st.DB()`, which `*store.DB` also provides, so they compile unchanged.
+Expected: every `store.Open(` became `shareddb.Open(` and every `NewManager(st)` became `NewManager(st.DB())`. `settings_test.go` has a second helper (around line 25) that returns the store alongside the manager, declared as `*store.Store`. That type no longer resolves once the import is `shareddb`: change the return type to `*store.DB` and add `"agile-suite/core/store"` to that file's imports (core's package keeps the short name `store`). Its callers only use `st.DB()`, which `*store.DB` provides, so nothing else changes.
 
 - [ ] **Step 5: Add the credential dependencies to `core` and run its tests**
 
@@ -876,6 +876,7 @@ Create `xtm/internal/sharedmigrate/sharedmigrate_test.go`:
 package sharedmigrate_test
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -884,23 +885,30 @@ import (
 	"agile-suite/xtm/internal/store"
 )
 
-func openBoth(t *testing.T) (*store.Store, *shareddbDB) {
+// openBoth opens a fresh XTM store (the source) and a fresh shared database
+// (the target) in the test's temp dir and returns their handles.
+func openBoth(t *testing.T) (src, dst *sql.DB) {
 	t.Helper()
-	src, err := store.Open(filepath.Join(t.TempDir(), "xtm.db"))
+	xtm, err := store.Open(filepath.Join(t.TempDir(), "xtm.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	dst, err := shareddb.Open(filepath.Join(t.TempDir(), "profiles.db"))
+	shared, err := shareddb.Open(filepath.Join(t.TempDir(), "profiles.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = src.Close(); _ = dst.Close() })
-	return src, dst
+	t.Cleanup(func() { _ = xtm.Close(); _ = shared.Close() })
+	return xtm.DB(), shared.DB()
 }
 
-func count(t *testing.T, db interface {
-	QueryRow(string, ...any) interface{ Scan(...any) error }
-}, table string) int {
+func mustExec(t *testing.T, db *sql.DB, stmt string) {
+	t.Helper()
+	if _, err := db.Exec(stmt); err != nil {
+		t.Fatalf("%s: %v", stmt, err)
+	}
+}
+
+func count(t *testing.T, db *sql.DB, table string) int {
 	t.Helper()
 	var n int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
@@ -911,68 +919,37 @@ func count(t *testing.T, db interface {
 
 func TestImportCopiesRowsOnceAndKeepsExistingTargets(t *testing.T) {
 	src, dst := openBoth(t)
-	mustExec(t, src.DB(), `INSERT INTO profiles (id, name, jira_url, project_key, created_at, bug_issue_type) VALUES ('p1', 'One', 'https://j', 'ONE', '2026-01-01T00:00:00Z', 'Defect')`)
-	mustExec(t, src.DB(), `INSERT INTO connection (id, workspace_id, name, url) VALUES ('p1', 'p1', 'One', 'https://j')`)
-	mustExec(t, src.DB(), `INSERT INTO app_setting (key, value) VALUES ('theme', 'dark')`)
+	mustExec(t, src, `INSERT INTO profiles (id, name, jira_url, project_key, created_at, bug_issue_type) VALUES ('p1', 'One', 'https://j', 'ONE', '2026-01-01T00:00:00Z', 'Defect')`)
+	mustExec(t, src, `INSERT INTO connection (id, workspace_id, name, url) VALUES ('p1', 'p1', 'One', 'https://j')`)
+	mustExec(t, src, `INSERT INTO app_setting (key, value) VALUES ('theme', 'dark')`)
 	// A row already in the shared file must win over the copy.
-	mustExec(t, dst.DB(), `INSERT INTO app_setting (key, value) VALUES ('theme', 'light')`)
+	mustExec(t, dst, `INSERT INTO app_setting (key, value) VALUES ('theme', 'light')`)
 
-	if err := sharedmigrate.ImportFromStore(src.DB(), dst.DB()); err != nil {
+	if err := sharedmigrate.ImportFromStore(src, dst); err != nil {
 		t.Fatalf("first import: %v", err)
 	}
-	if got := count(t, dst.DB(), "profiles"); got != 1 {
+	if got := count(t, dst, "profiles"); got != 1 {
 		t.Fatalf("profiles copied = %d; want 1", got)
 	}
-	if got := count(t, dst.DB(), "connection"); got != 1 {
+	if got := count(t, dst, "connection"); got != 1 {
 		t.Fatalf("connections copied = %d; want 1", got)
 	}
 	var theme string
-	if err := dst.DB().QueryRow(`SELECT value FROM app_setting WHERE key = 'theme'`).Scan(&theme); err != nil || theme != "light" {
-		t.Fatalf("theme = %q, %v; existing shared value must be kept", theme, err)
+	if err := dst.QueryRow(`SELECT value FROM app_setting WHERE key = 'theme'`).Scan(&theme); err != nil || theme != "light" {
+		t.Fatalf("theme = %q, %v; the existing shared value must be kept", theme, err)
 	}
 
-	// A second profile added to the old store afterwards must NOT be copied:
-	// the import is a one-time move, not a sync.
-	mustExec(t, src.DB(), `INSERT INTO profiles (id, name, jira_url, project_key, created_at) VALUES ('p2', 'Two', 'https://j', 'TWO', '2026-01-02T00:00:00Z')`)
-	if err := sharedmigrate.ImportFromStore(src.DB(), dst.DB()); err != nil {
+	// A profile added to the old store afterwards must NOT be copied: the
+	// import is a one-time move, not a sync.
+	mustExec(t, src, `INSERT INTO profiles (id, name, jira_url, project_key, created_at) VALUES ('p2', 'Two', 'https://j', 'TWO', '2026-01-02T00:00:00Z')`)
+	if err := sharedmigrate.ImportFromStore(src, dst); err != nil {
 		t.Fatalf("second import: %v", err)
 	}
-	if got := count(t, dst.DB(), "profiles"); got != 1 {
+	if got := count(t, dst, "profiles"); got != 1 {
 		t.Fatalf("second import copied again: profiles = %d; want 1", got)
 	}
 }
 ```
-
-Add the two helpers at the bottom of the same file (the interface in `count` is only there to accept both handles; keep it):
-
-```go
-type shareddbDB = interface {
-	DB() *sql.DB
-	Close() error
-}
-
-func mustExec(t *testing.T, db *sql.DB, stmt string) {
-	t.Helper()
-	if _, err := db.Exec(stmt); err != nil {
-		t.Fatalf("%s: %v", stmt, err)
-	}
-}
-```
-
-and add `"database/sql"` to the imports. Simplify `count` to take `*sql.DB` directly:
-
-```go
-func count(t *testing.T, db *sql.DB, table string) int {
-	t.Helper()
-	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
-		t.Fatalf("count %s: %v", table, err)
-	}
-	return n
-}
-```
-
-and call it as `count(t, dst.DB(), "profiles")` (already the case above).
 
 - [ ] **Step 2: Run it to confirm it fails**
 
