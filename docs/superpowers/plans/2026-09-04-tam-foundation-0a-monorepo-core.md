@@ -147,7 +147,7 @@ In `.github/workflows/release.yml`:
 - lines 156, 164, 174: `working-directory: build/bin` becomes `working-directory: xtm/build/bin`
 - lines 190-191 and 198: `build/bin/` becomes `xtm/build/bin/`
 
-`xtm/scripts/release.ps1` needs no change: it resolves `$root = Split-Path -Parent $PSScriptRoot`, which is now `xtm/`.
+`xtm/scripts/release.ps1` resolves `$root = Split-Path -Parent $PSScriptRoot`, which is now `xtm/`; its user-guide bundling path must therefore point one level up at the suite root `docs/`. (The plan first claimed no change was needed; the final fix wave corrected the path.)
 
 - [ ] **Step 6: Write the root guides**
 
@@ -822,7 +822,7 @@ grep -rl '"agile-suite/xtm/internal/\(profile\|connection\|settings\)"' xtm --in
 cd xtm && go mod edit -require=agile-suite/core@v0.0.0 && go mod tidy
 ```
 
-`go.work` makes the `core` module resolve locally; the `require` line just records the dependency.
+Go rejects `agile-suite/core` as a `require` target because the path has no dot in its first element, and `go.work` does not exempt it. Add a `replace agile-suite/core => ../core` line to `xtm/go.mod` (`go mod tidy` keeps it), then build.
 
 - [ ] **Step 7: Verify XTM is unchanged in behaviour**
 
