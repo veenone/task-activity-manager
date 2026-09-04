@@ -1092,7 +1092,7 @@ Switch the **color theme** from **More → Theme: Light / Dark / System**.
 
 **More → Diagnostics** shows the test cache database path (your profiles live
 in the shared `agile-suite/profiles.db`, whose path appears in the exported
-diagnostics), log path, schema version, and environment details — useful when
+diagnostics), log path, schema version, and environment details, useful when
 reporting an issue.
 
 ![Figure 34: Diagnostics](images/34-diagnostics.png)
