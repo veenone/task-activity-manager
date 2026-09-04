@@ -59,6 +59,13 @@ func TestImportCopiesRowsOnceAndKeepsExistingTargets(t *testing.T) {
 	if got := count(t, dst, "connection"); got != 1 {
 		t.Fatalf("connections copied = %d; want 1", got)
 	}
+	var issueType, mode, url string
+	if err := dst.QueryRow(`SELECT bug_issue_type, bug_project_mode, jira_url FROM profiles WHERE id = 'p1'`).Scan(&issueType, &mode, &url); err != nil {
+		t.Fatalf("read copied profile: %v", err)
+	}
+	if issueType != "Defect" || mode != "test" || url != "https://j" {
+		t.Fatalf("copied profile values = %q/%q/%q; want Defect/test/https://j", issueType, mode, url)
+	}
 	var theme string
 	if err := dst.QueryRow(`SELECT value FROM app_setting WHERE key = 'theme'`).Scan(&theme); err != nil || theme != "light" {
 		t.Fatalf("theme = %q, %v; the existing shared value must be kept", theme, err)

@@ -27,6 +27,9 @@ jobs:
         # isn't built in this job; all tests live under internal/ anyway.
         working-directory: xtm
         run: go test ./internal/...
+      - name: Go tests (core)
+        working-directory: core
+        run: go test ./...
 
   build-windows:
     runs-on: windows-latest

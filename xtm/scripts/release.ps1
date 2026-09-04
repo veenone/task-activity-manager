@@ -136,7 +136,8 @@ if (-not $NoInstaller) {
 # ships alongside the binaries. The generated docs/user-guide/dist build output
 # and the images/.gitkeep placeholder are deliberately excluded.
 Step "Bundling user guide"
-$guideSrc = Join-Path $root "docs\user-guide"
+# The user guide lives at the suite repo root (docs/), one level above xtm/.
+$guideSrc = Join-Path (Split-Path -Parent $root) "docs\user-guide"
 if (Test-Path (Join-Path $guideSrc "USER_GUIDE.md")) {
   $guideStage = Join-Path $env:TEMP "xtm-user-guide-$Version"
   if (Test-Path $guideStage) { Remove-Item $guideStage -Recurse -Force }
@@ -152,7 +153,7 @@ if (Test-Path (Join-Path $guideSrc "USER_GUIDE.md")) {
   Remove-Item $guideStage -Recurse -Force
   Write-Host "Bundled user guide -> $(Split-Path $guideZip -Leaf)"
 } else {
-  Write-Warning "User guide not found at $guideSrc - skipping guide bundle."
+  throw "User guide not found at $guideSrc; a release must ship it."
 }
 
 # --- Checksums ---------------------------------------------------------------

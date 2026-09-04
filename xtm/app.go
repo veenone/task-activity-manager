@@ -258,6 +258,7 @@ func (a *App) ExportDiagnostics() (string, error) {
 	fmt.Fprintf(&b, "Schema version: %d\n", d.SchemaVersion)
 	fmt.Fprintf(&b, "Profiles:       %d\n", d.ProfileCount)
 	fmt.Fprintf(&b, "Database:       %s\n", d.DBPath)
+	fmt.Fprintf(&b, "Shared profiles: %s\n", a.sharedPath)
 	fmt.Fprintf(&b, "Log file:       %s\n", d.LogPath)
 	if d.StartupError != "" {
 		fmt.Fprintf(&b, "Startup error:  %s\n", d.StartupError)

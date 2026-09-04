@@ -1090,8 +1090,10 @@ Switch the **color theme** from **More → Theme: Light / Dark / System**.
 
 ## 20. Diagnostics & troubleshooting
 
-**More → Diagnostics** shows the database path, log path, schema version, and
-environment details — useful when reporting an issue.
+**More → Diagnostics** shows the test cache database path (your profiles live
+in the shared `agile-suite/profiles.db`, whose path appears in the exported
+diagnostics), log path, schema version, and environment details — useful when
+reporting an issue.
 
 ![Figure 34: Diagnostics](images/34-diagnostics.png)
 *Figure 34 — The Diagnostics dialog.*
@@ -1099,7 +1101,7 @@ environment details — useful when reporting an issue.
 | Symptom | What to try |
 | --- | --- |
 | Blank window on launch | Install the Microsoft WebView2 runtime, relaunch. |
-| "Backend failed to start" | Note the DB/log path shown, check the log; try removing the database file and relaunching. |
+| "Backend failed to start" | Note the DB/log path shown, check the log; try removing the test cache database (`xtm.db`) and relaunching; this does not touch your profiles, which live in the shared `agile-suite/profiles.db`. |
 | Sync shows 0 tests | Check the project key and that the PAT has access; confirm the scope JQL isn't excluding everything. |
 | Edits not in Jira | They are local until you **Commit** (see §17). Check the pending badge. |
 | A commit reports **Conflict** | Sync, then override or keep-remote in the Pending Changes dialog. |

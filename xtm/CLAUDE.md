@@ -29,16 +29,25 @@ in commit messages; keep using them.
 
 ## Layout
 
+This directory is the `xtm/` module of the agile-suite monorepo (Go module
+`agile-suite/xtm`; `go.work` at the repo root ties it to the shared `core`
+module in `../core/`). Profiles, connections, settings, and the OS credential
+stores live in `core`, not here.
+
 ```
 main.go              Wails entry point, window options, bound App
 app.go               App struct — backend wired to the React frontend
 internal/
   jira/              Jira DC + Xray Server REST client (/rest/api/2/ + /rest/raven/2.0/)
   store/             SQLite local store, schema, and migrations
-  profile/           Connection profiles + OS credential storage
-  settings/          Global app preferences (default profile, theme)
   testrepo/          Local Test repository — browse/search/filter + all local mutations
   syncer/            Pull-sync engine (Jira -> store) and commit engine (store -> Jira)
+../core/             Shared suite module (agile-suite/core)
+  store/             SQLite open + ordered-migration runner both apps use
+  shareddb/          The shared profile database: schema, Open, DefaultPath
+  profile/           Connection profiles + OS credential storage
+  connection/        Per-workspace connections (backend, URL, project)
+  settings/          Global app preferences
 frontend/            React + TypeScript (Vite), rendered in WebView2
   src/api.ts         Re-exports the generated Wails bindings as the frontend's typed API
   wailsjs/           GENERATED bindings — do not hand-edit
@@ -60,6 +69,16 @@ console, so a backend init failure must surface as a returned error, not a
 nil-pointer panic. `startup` captures any failure into `startupErr`; `Health()`
 and `GetDiagnostics()` stay callable even when the store failed to open so the
 frontend can show what actually broke.
+
+**Profiles, connections, and settings live in the shared suite database**,
+`<user config dir>/agile-suite/profiles.db` (`core/shareddb`), which
+`initStore` opens next to `xtm.db`. On the first launch after the upgrade,
+`internal/sharedmigrate` copies the rows from `xtm.db` across once and records
+a marker so it never runs again. XTM's own store still declares its old
+`profiles`, `connection`, and `app_setting` tables, but only as a downgrade
+backup: nothing reads or writes them any more, and `testrepo` gets a profile's
+defect settings through a lookup the app injects from the profile manager
+instead of querying the table.
 
 **Local edits are a journal, committed later — not written through.** Mutating
 methods (`EditTestField`, `TransitionTest`, `BulkEditTests`, step/precondition/
@@ -120,6 +139,7 @@ wails dev                       # run with hot reload (Go + Vite)
 wails build                     # produce build/bin/xray-test-manager.exe
 go build ./...                  # compile-check the Go backend only
 go test ./...                   # run all Go tests (the backend has broad coverage)
+cd ../core; go test ./...       # the shared core's tests (profiles, settings, store runner)
 go test ./internal/syncer/...   # one package
 go test ./internal/testrepo/ -run TestImportTests   # one test by name
 gofmt -w .                      # format

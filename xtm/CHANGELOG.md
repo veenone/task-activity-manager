@@ -102,6 +102,15 @@ reaches v49.
 - The frontend gains a **Vitest suite** (#146), 26 files at time of writing,
   plus `@tanstack/react-query`, `@tanstack/react-virtual`, `driver.js`, and
   Testing Library.
+- Connection profiles, their connections, and app settings now live in a shared
+  suite database at `%AppData%\agile-suite\profiles.db` (the user config
+  directory on other platforms), so a Jira connection set up once is available
+  to every suite app. On the first launch after upgrading, XTM copies its
+  existing profiles across once and reads them from the shared file from then
+  on; the rows in `xtm.db` are left in place as a backup and are no longer
+  used. If you downgrade to an earlier version it reads that backup as it was
+  at upgrade time, and any profile created while downgraded is not carried
+  into the shared database later.
 
 ## [1.9.0] - 2026-08-11
 
