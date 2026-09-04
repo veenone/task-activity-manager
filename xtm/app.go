@@ -18,15 +18,15 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"agile-suite/core/connection"
+	"agile-suite/core/profile"
+	"agile-suite/core/settings"
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/backend/kiwi"
 	"agile-suite/xtm/internal/backend/xray"
 	"agile-suite/xtm/internal/bridge"
-	"agile-suite/xtm/internal/connection"
 	"agile-suite/xtm/internal/coverage"
 	"agile-suite/xtm/internal/jira"
-	"agile-suite/xtm/internal/profile"
-	"agile-suite/xtm/internal/settings"
 	"agile-suite/xtm/internal/store"
 	"agile-suite/xtm/internal/syncer"
 	"agile-suite/xtm/internal/testrepo"
@@ -119,11 +119,11 @@ func (a *App) initStore() error {
 		return fmt.Errorf("open local store at %s: %w", dbPath, err)
 	}
 	a.store = st
-	a.profiles = profile.NewManager(st)
-	a.connections = connection.NewManager(st)
+	a.profiles = profile.NewManager(st.DB())
+	a.connections = connection.NewManager(st.DB())
 	a.bridgeMappings = bridge.NewMappingStore(st)
 	a.creds = profile.NewCredentialStore()
-	a.settings = settings.NewManager(st)
+	a.settings = settings.NewManager(st.DB())
 	a.repo = testrepo.NewRepository(st)
 	a.cov = coverage.New(st, a.repo)
 	log.Printf("xtm: local store ready at %s", dbPath)

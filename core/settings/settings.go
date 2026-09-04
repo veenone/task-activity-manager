@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"agile-suite/xtm/internal/store"
 )
 
 const (
@@ -48,9 +46,9 @@ type Manager struct {
 	ignoreMu sync.Mutex
 }
 
-// NewManager returns a settings manager backed by the given store.
-func NewManager(s *store.Store) *Manager {
-	return &Manager{db: s.DB()}
+// NewManager returns a settings manager over the given database.
+func NewManager(db *sql.DB) *Manager {
+	return &Manager{db: db}
 }
 
 // Get returns the current settings, with zero values for anything unset.

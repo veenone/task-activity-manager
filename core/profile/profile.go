@@ -14,8 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"agile-suite/xtm/internal/connection"
-	"agile-suite/xtm/internal/store"
+	"agile-suite/core/connection"
 )
 
 // ErrNotFound is returned when a profile id does not exist.
@@ -73,9 +72,10 @@ type Manager struct {
 	conns *connection.Manager
 }
 
-// NewManager returns a profile manager backed by the given store.
-func NewManager(s *store.Store) *Manager {
-	return &Manager{db: s.DB(), conns: connection.NewManager(s)}
+// NewManager returns a profile manager over the given database, which must
+// hold the shareddb tables.
+func NewManager(db *sql.DB) *Manager {
+	return &Manager{db: db, conns: connection.NewManager(db)}
 }
 
 // syncConnection upserts the profile's primary connection row (id == p.ID) so

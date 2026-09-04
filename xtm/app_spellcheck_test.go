@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"agile-suite/xtm/internal/profile"
-	"agile-suite/xtm/internal/settings"
+	"agile-suite/core/profile"
+	"agile-suite/core/settings"
 	"agile-suite/xtm/internal/store"
 	"agile-suite/xtm/internal/testrepo"
 )
@@ -20,12 +20,12 @@ func newSpellApp(t *testing.T) *App {
 	a := NewApp()
 	a.store = st
 	a.repo = testrepo.NewRepository(st)
-	a.settings = settings.NewManager(st)
+	a.settings = settings.NewManager(st.DB())
 	// requireStore() (called by every App method) also checks a.profiles, so
 	// wire it here too, mirroring initStore's real wiring — the brief's
 	// helper omitted it since ListMisspellings/ApplyCorrection/AddIgnoreWord
 	// don't otherwise touch profiles.
-	a.profiles = profile.NewManager(st)
+	a.profiles = profile.NewManager(st.DB())
 	return a
 }
 

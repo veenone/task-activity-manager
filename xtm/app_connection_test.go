@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"agile-suite/core/connection"
+	"agile-suite/core/profile"
+	"agile-suite/core/settings"
 	"agile-suite/xtm/internal/backend/kiwi"
 	"agile-suite/xtm/internal/backend/xray"
-	"agile-suite/xtm/internal/connection"
-	"agile-suite/xtm/internal/profile"
-	"agile-suite/xtm/internal/settings"
 	"agile-suite/xtm/internal/store"
 	"agile-suite/xtm/internal/testrepo"
 )
@@ -66,10 +66,10 @@ func newTestApp(t *testing.T) *App {
 		priorityCache: map[string][]string{},
 	}
 	a.store = st
-	a.profiles = profile.NewManager(st)
-	a.connections = connection.NewManager(st)
+	a.profiles = profile.NewManager(st.DB())
+	a.connections = connection.NewManager(st.DB())
 	a.creds = newMemCredentialStore()
-	a.settings = settings.NewManager(st)
+	a.settings = settings.NewManager(st.DB())
 	a.repo = testrepo.NewRepository(st)
 	return a
 }

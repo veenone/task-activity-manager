@@ -3,16 +3,20 @@ module agile-suite/xtm
 go 1.25.0
 
 require (
-	github.com/danieljoos/wincred v1.2.3
 	github.com/google/uuid v1.6.0
 	github.com/wailsapp/wails/v2 v2.15.0
 	github.com/xuri/excelize/v2 v2.10.1
-	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/time v0.15.0
 	modernc.org/sqlite v1.53.0
 )
 
 require (
+	github.com/danieljoos/wincred v1.2.3 // indirect
+	github.com/zalando/go-keyring v0.2.8 // indirect
+)
+
+require (
+	agile-suite/core v0.0.0
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -54,3 +58,5 @@ require (
 )
 
 // replace github.com/wailsapp/wails/v2 v2.12.0 => C:\Users\<username>\go\pkg\mod
+
+replace agile-suite/core => ../core

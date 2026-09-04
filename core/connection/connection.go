@@ -15,8 +15,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	"agile-suite/xtm/internal/store"
 )
 
 // ErrNotFound is returned when a connection id does not exist.
@@ -51,9 +49,9 @@ type Manager struct {
 	db *sql.DB
 }
 
-// NewManager returns a connection manager backed by the given store.
-func NewManager(s *store.Store) *Manager {
-	return &Manager{db: s.DB()}
+// NewManager returns a connection manager over the given database.
+func NewManager(db *sql.DB) *Manager {
+	return &Manager{db: db}
 }
 
 const selectColumns = `id, workspace_id, name, backend, url, project_key, scope_jql, bug_issue_type, bug_project_mode, bug_project_key, ca_cert, allow_untrusted_tls, role, created_at`

@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"agile-suite/xtm/internal/connection"
-	"agile-suite/xtm/internal/profile"
-	"agile-suite/xtm/internal/store"
+	"agile-suite/core/connection"
+	"agile-suite/core/profile"
+	"agile-suite/core/shareddb"
 )
 
 // newManagerWithConnections returns a profile.Manager and a connection.Manager
@@ -14,12 +14,12 @@ import (
 // resulting connection rows directly (Phase 6 bridge task B1's shim seam).
 func newManagerWithConnections(t *testing.T) (*profile.Manager, *connection.Manager) {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	st, err := shareddb.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	return profile.NewManager(st), connection.NewManager(st)
+	return profile.NewManager(st.DB()), connection.NewManager(st.DB())
 }
 
 // TestCreateProfileCreatesMatchingConnection verifies profile.Manager.Create

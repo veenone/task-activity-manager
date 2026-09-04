@@ -5,18 +5,18 @@ import (
 	"testing"
 	"time"
 
-	"agile-suite/xtm/internal/connection"
-	"agile-suite/xtm/internal/store"
+	"agile-suite/core/connection"
+	"agile-suite/core/shareddb"
 )
 
 func newManager(t *testing.T) *connection.Manager {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	st, err := shareddb.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	return connection.NewManager(st)
+	return connection.NewManager(st.DB())
 }
 
 func TestCreateGetListDelete(t *testing.T) {

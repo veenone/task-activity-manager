@@ -4,18 +4,18 @@ import (
 	"path/filepath"
 	"testing"
 
-	"agile-suite/xtm/internal/profile"
-	"agile-suite/xtm/internal/store"
+	"agile-suite/core/profile"
+	"agile-suite/core/shareddb"
 )
 
 func newManager(t *testing.T) *profile.Manager {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	st, err := shareddb.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	return profile.NewManager(st)
+	return profile.NewManager(st.DB())
 }
 
 func TestCreateProfileStoresScopeJQL(t *testing.T) {

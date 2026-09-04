@@ -4,30 +4,31 @@ import (
 	"path/filepath"
 	"testing"
 
-	"agile-suite/xtm/internal/settings"
-	"agile-suite/xtm/internal/store"
+	"agile-suite/core/settings"
+	"agile-suite/core/shareddb"
+	"agile-suite/core/store"
 )
 
 func newManager(t *testing.T) *settings.Manager {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	st, err := shareddb.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	return settings.NewManager(st)
+	return settings.NewManager(st.DB())
 }
 
 // newManagerWithStore is newManager plus the store, for tests that need to
 // write a raw row behind the manager's back.
-func newManagerWithStore(t *testing.T) (*settings.Manager, *store.Store) {
+func newManagerWithStore(t *testing.T) (*settings.Manager, *store.DB) {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	st, err := shareddb.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
-	return settings.NewManager(st), st
+	return settings.NewManager(st.DB()), st
 }
 
 // TestTourSeenVersionRoundTrips covers the onboarding tour's "already seen"
