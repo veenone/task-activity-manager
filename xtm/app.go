@@ -21,12 +21,15 @@ import (
 	"agile-suite/core/connection"
 	"agile-suite/core/profile"
 	"agile-suite/core/settings"
+	"agile-suite/core/shareddb"
+	coreStore "agile-suite/core/store"
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/backend/kiwi"
 	"agile-suite/xtm/internal/backend/xray"
 	"agile-suite/xtm/internal/bridge"
 	"agile-suite/xtm/internal/coverage"
 	"agile-suite/xtm/internal/jira"
+	"agile-suite/xtm/internal/sharedmigrate"
 	"agile-suite/xtm/internal/store"
 	"agile-suite/xtm/internal/syncer"
 	"agile-suite/xtm/internal/testrepo"
@@ -52,6 +55,8 @@ func recoverToError(method string, errp *error) {
 type App struct {
 	ctx            context.Context
 	store          *store.Store
+	shared         *coreStore.DB
+	sharedPath     string
 	profiles       *profile.Manager
 	connections    *connection.Manager
 	bridgeMappings *bridge.MappingStore
@@ -119,19 +124,52 @@ func (a *App) initStore() error {
 		return fmt.Errorf("open local store at %s: %w", dbPath, err)
 	}
 	a.store = st
-	a.profiles = profile.NewManager(st.DB())
-	a.connections = connection.NewManager(st.DB())
+
+	sharedPath, err := shareddb.DefaultPath()
+	if err != nil {
+		return fmt.Errorf("resolve shared profile database path: %w", err)
+	}
+	shared, err := shareddb.Open(sharedPath)
+	if err != nil {
+		return fmt.Errorf("open shared profile database at %s: %w", sharedPath, err)
+	}
+	a.shared = shared
+	a.sharedPath = sharedPath
+	// First run after the upgrade: carry this install's profiles, connections,
+	// and settings into the shared file. A no-op on every later start.
+	if err := sharedmigrate.ImportFromStore(st.DB(), shared.DB()); err != nil {
+		return fmt.Errorf("import profiles into the shared database: %w", err)
+	}
+
+	a.profiles = profile.NewManager(shared.DB())
+	a.connections = connection.NewManager(shared.DB())
 	a.bridgeMappings = bridge.NewMappingStore(st)
 	a.creds = profile.NewCredentialStore()
-	a.settings = settings.NewManager(st.DB())
+	a.settings = settings.NewManager(shared.DB())
 	a.repo = testrepo.NewRepository(st)
+	a.repo.SetBugSettingsLookup(func(id string) (testrepo.BugSettings, error) {
+		p, err := a.profiles.Get(id)
+		if err != nil {
+			return testrepo.BugSettings{}, err
+		}
+		return testrepo.BugSettings{
+			IssueType:   p.BugIssueType,
+			ProjectMode: p.BugProjectMode,
+			ProjectKey:  p.BugProjectKey,
+		}, nil
+	})
 	a.cov = coverage.New(st, a.repo)
-	log.Printf("xtm: local store ready at %s", dbPath)
+	log.Printf("xtm: local store ready at %s; shared profiles at %s", dbPath, sharedPath)
 	return nil
 }
 
 // shutdown closes the local database when the window is closed.
 func (a *App) shutdown(ctx context.Context) {
+	if a.shared != nil {
+		if err := a.shared.Close(); err != nil {
+			log.Printf("xtm: close shared profile database: %v", err)
+		}
+	}
 	if a.store != nil {
 		if err := a.store.Close(); err != nil {
 			log.Printf("xtm: close local store: %v", err)

@@ -79,35 +79,46 @@ type bugLinkSnap struct {
 }
 
 // ProfileBugIssueType returns the profile's configured defect issuetype,
-// defaulting to "Bug". It reads the profiles table directly (same store) so the
-// syncer can recognize the right defect type without depending on the profile
-// manager.
+// defaulting to "Bug".
 func (r *Repository) ProfileBugIssueType(profileID string) string {
-	var t string
-	err := r.db.QueryRow(`SELECT bug_issue_type FROM profiles WHERE id = ?`, profileID).Scan(&t)
-	if err != nil || strings.TrimSpace(t) == "" {
+	s, ok := r.lookupBugSettings(profileID)
+	if !ok || strings.TrimSpace(s.IssueType) == "" {
 		return "Bug"
 	}
-	return t
+	return s.IssueType
 }
 
 // ProfileBugProjectMode returns the profile's bug-project mode
 // ("test" | "execution" | "dedicated"), defaulting to "test".
 func (r *Repository) ProfileBugProjectMode(profileID string) string {
-	var m string
-	err := r.db.QueryRow(`SELECT bug_project_mode FROM profiles WHERE id = ?`, profileID).Scan(&m)
-	if err != nil || strings.TrimSpace(m) == "" {
+	s, ok := r.lookupBugSettings(profileID)
+	if !ok || strings.TrimSpace(s.ProjectMode) == "" {
 		return "test"
 	}
-	return strings.TrimSpace(m)
+	return strings.TrimSpace(s.ProjectMode)
 }
 
-// ProfileBugProjectKey returns the profile's dedicated bug project key (non-empty
-// only when bug_project_mode = "dedicated").
+// ProfileBugProjectKey returns the profile's dedicated bug project key
+// (non-empty only when the mode is "dedicated").
 func (r *Repository) ProfileBugProjectKey(profileID string) string {
-	var k string
-	_ = r.db.QueryRow(`SELECT bug_project_key FROM profiles WHERE id = ?`, profileID).Scan(&k)
-	return strings.TrimSpace(k)
+	s, ok := r.lookupBugSettings(profileID)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(s.ProjectKey)
+}
+
+// lookupBugSettings runs the injected lookup; ok is false when no lookup is
+// installed or it fails, in which case callers use their defaults.
+func (r *Repository) lookupBugSettings(profileID string) (BugSettings, bool) {
+	if r.bugSettings == nil {
+		return BugSettings{}, false
+	}
+	s, err := r.bugSettings(profileID)
+	if err != nil {
+		return BugSettings{}, false
+	}
+	return s, true
 }
 
 // ReplaceAllBugs reconciles the cached bug issues for a profile (full replace on

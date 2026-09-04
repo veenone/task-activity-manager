@@ -324,6 +324,24 @@ func columnForField(field string) (string, bool) {
 // Repository reads and writes cached data, scoped per profile.
 type Repository struct {
 	db *sql.DB
+	// bugSettings answers the per-profile defect settings the syncer needs.
+	// Profiles live in the shared database now, so the app injects this
+	// lookup instead of the repository querying a profiles table in its own
+	// file. Nil means "use the defaults".
+	bugSettings func(profileID string) (BugSettings, error)
+}
+
+// BugSettings are the per-profile defect settings the syncer needs.
+type BugSettings struct {
+	IssueType   string
+	ProjectMode string
+	ProjectKey  string
+}
+
+// SetBugSettingsLookup installs the function used to resolve a profile's
+// defect settings.
+func (r *Repository) SetBugSettingsLookup(fn func(profileID string) (BugSettings, error)) {
+	r.bugSettings = fn
 }
 
 // NewRepository returns a repository backed by the given store.
