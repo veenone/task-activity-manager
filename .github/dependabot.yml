@@ -12,17 +12,17 @@ updates:
       actions:
         patterns: ["*"]
 
-  # Go modules (backend).
+  # Go modules: the XTM app and the shared core (the root holds only go.work).
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories: ["/xtm", "/core"]
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "deps"
 
-  # npm (frontend).
+  # npm (the XTM frontend lives inside its module).
   - package-ecosystem: "npm"
-    directory: "/frontend"
+    directory: "/xtm/frontend"
     schedule:
       interval: "weekly"
     commit-message:
