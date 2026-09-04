@@ -153,6 +153,11 @@ cd frontend; npx tsc --noEmit   # typecheck only
 Prerequisites: Go 1.25+, Node.js, and the Wails CLI
 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0`).
 
+After moving or copying the checkout to a new folder, the first `wails dev` may
+open a blank window: Vite keys its dependency cache on the project path and
+rebuilds it while the page is already loading. Reload the window (F5) or run
+`wails dev` a second time.
+
 Most backend behavior is verified by Go unit tests against the store and the
 demo client. When changing backend logic, add or update the `_test.go` beside
 it. The frontend has a Vitest suite (`frontend/src/**/*.test.ts{,x}`) covering
