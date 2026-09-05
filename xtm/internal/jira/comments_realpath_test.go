@@ -62,7 +62,7 @@ func TestRealAddCommentDemoMakesNoCall(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := &Client{baseURL: "demo", token: "t", http: srv.Client()}
+	c := newClientWith("demo", "t", srv.Client())
 	if err := c.AddComment(context.Background(), "TEST-1", "anything"); err != nil {
 		t.Fatalf("AddComment (demo): %v", err)
 	}

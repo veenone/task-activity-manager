@@ -193,7 +193,7 @@ func TestListIssueLinkTypeDetails(t *testing.T) {
 		t.Fatalf("live parse = %+v, want [{Tests tested by tests}]", got)
 	}
 
-	demo := &Client{baseURL: "demo", token: "t", http: srv.Client()}
+	demo := newClientWith("demo", "t", srv.Client())
 	dd, err := demo.ListIssueLinkTypeDetails(context.Background())
 	if err != nil {
 		t.Fatalf("ListIssueLinkTypeDetails (demo): %v", err)
@@ -234,7 +234,7 @@ func TestRealUpdateTestRequirementsNoOps(t *testing.T) {
 	}
 
 	// Demo URL short-circuits before any HTTP.
-	demo := &Client{baseURL: "demo", token: "t", http: srv.Client()}
+	demo := newClientWith("demo", "t", srv.Client())
 	if err := demo.UpdateTestRequirements(
 		context.Background(), "QA-1", []string{"PRD-1"}, []string{"100"}); err != nil {
 		t.Fatalf("demo UpdateTestRequirements: %v", err)

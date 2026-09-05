@@ -160,7 +160,7 @@ func TestListTestPreconditionsUsesPluralPath(t *testing.T) {
 // not, pressing Refresh in demo mode would overwrite correct links with an
 // empty set, since the caller persists whatever this returns.
 func TestListTestPreconditionsDemoMatchesSyncedLinks(t *testing.T) {
-	c := &Client{baseURL: "demo", token: "t", http: http.DefaultClient}
+	c := newClientWith("demo", "t", http.DefaultClient)
 
 	_, links, err := demoPreconditionsAndLinks(themeFor("demo"), "DEMO")
 	if err != nil {
@@ -198,7 +198,7 @@ func TestListTestPreconditionsDemoMatchesSyncedLinks(t *testing.T) {
 // TestListTestPreconditionsDemoUnlinkedTest checks a demo Test with no
 // preconditions answers empty rather than erroring.
 func TestListTestPreconditionsDemoUnlinkedTest(t *testing.T) {
-	c := &Client{baseURL: "demo", token: "t", http: http.DefaultClient}
+	c := newClientWith("demo", "t", http.DefaultClient)
 	got, err := c.ListTestPreconditions(context.Background(), "DEMO-999999")
 	if err != nil {
 		t.Fatalf("demo ListTestPreconditions: %v", err)
