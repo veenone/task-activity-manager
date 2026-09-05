@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterAll, beforeAll, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -60,6 +60,8 @@ function renderView() {
 // jsdom does no layout, so every element reports offsetHeight 0. The row
 // virtualiser reads that as an empty viewport and mounts no rows at all, so
 // the scroll container is given the height a real window would give it.
+const realOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight");
+
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
     configurable: true,
@@ -67,6 +69,14 @@ beforeAll(() => {
       return this.classList.contains("issue-body") ? 600 : 0;
     },
   });
+});
+
+afterAll(() => {
+  if (realOffsetHeight) {
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", realOffsetHeight);
+  } else {
+    delete (HTMLElement.prototype as { offsetHeight?: number }).offsetHeight;
+  }
 });
 
 beforeEach(() => {
@@ -83,6 +93,11 @@ beforeEach(() => {
 
 const lastQuery = () => vi.mocked(api.ListIssues).mock.calls.at(-1)?.[1];
 
+// The pager formats its counts for the machine's locale, so the expectation
+// has to group its thousands the same way rather than hard-coding a comma.
+const showing = (first: number, last: number, total: number) =>
+  `Showing ${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()}`;
+
 describe("BacklogView", () => {
   it("renders the page with the seven columns and the count", async () => {
     renderView();
@@ -95,7 +110,7 @@ describe("BacklogView", () => {
     expect(within(row).getByText("R. Anand")).toBeInTheDocument();
     expect(within(row).getByText("12")).toBeInTheDocument();
     expect(within(row).getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("Showing 1 to 25 of 1,248")).toBeInTheDocument();
+    expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument();
     expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25 });
   });
 
@@ -121,14 +136,14 @@ describe("BacklogView", () => {
     expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() => expect(lastQuery()?.offset).toBe(25));
-    expect(screen.getByText("Showing 26 to 50 of 1,248")).toBeInTheDocument();
+    expect(screen.getByText(showing(26, 50, 1248))).toBeInTheDocument();
     // Page one is still cached, so going back is served without another
     // backend call and the pager is what shows the move.
     await userEvent.click(screen.getByRole("button", { name: "Previous page" }));
-    await waitFor(() => expect(screen.getByText("Showing 1 to 25 of 1,248")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
-    await waitFor(() => expect(screen.getByText("Showing 26 to 50 of 1,248")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(showing(26, 50, 1248))).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Bug", pressed: false }));
     await waitFor(() => expect(lastQuery()).toMatchObject({ types: ["bug"], offset: 0 }));
   });
@@ -139,6 +154,16 @@ describe("BacklogView", () => {
     await userEvent.click(screen.getByRole("row", { name: /PLAT-409/ }));
     expect(screen.getByRole("row", { name: /PLAT-409/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("row", { name: /PLAT-412/ })).toHaveAttribute("aria-selected", "false");
+  });
+
+  it("moves between rows with the arrow keys and selects with Enter", async () => {
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-409")).toBeInTheDocument());
+    screen.getByRole("row", { name: /PLAT-412/ }).focus();
+    await userEvent.keyboard("{ArrowDown}");
+    expect(screen.getByRole("row", { name: /PLAT-409/ })).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("row", { name: /PLAT-409/ })).toHaveAttribute("aria-selected", "true");
   });
 
   it("explains an empty cache", async () => {

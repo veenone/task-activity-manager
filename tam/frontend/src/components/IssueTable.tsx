@@ -12,9 +12,8 @@ interface Props {
 }
 
 // IssueTable renders one page of issues with the mockup's seven columns.
-// Rows are virtualised so a 500-row page stays light; the overscan is wide
-// enough that a viewport with no measured height (jsdom in tests) still
-// renders a full 25-row page.
+// Rows are virtualised so a long page stays light. jsdom performs no layout,
+// so the test stubs the scroll container's height (see BacklogView.test.tsx).
 export function IssueTable({ issues, selectedKey, onSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -24,9 +23,22 @@ export function IssueTable({ issues, selectedKey, onSelect }: Props) {
     overscan: 30,
   });
 
+  // moveFocus walks the roving tabindex to a neighbouring row. The rows are
+  // absolutely positioned siblings, so the index attribute is what finds them.
+  function moveFocus(from: number, delta: number) {
+    const next = scrollRef.current?.querySelector<HTMLElement>(`[data-row-index="${from + delta}"]`);
+    next?.focus();
+  }
+
   return (
-    <div className="issue-table" role="table" aria-label="Issues">
-      <div className="issue-row issue-head" role="row" aria-label="key type summary status assignee sprint pts">
+    <div
+      className="issue-table"
+      role="grid"
+      aria-label="Issues"
+      aria-multiselectable="false"
+      aria-rowcount={issues.length + 1}
+    >
+      <div className="issue-row issue-head" role="row" aria-rowindex={1} aria-label="key type summary status assignee sprint pts">
         <span role="columnheader">KEY</span>
         <span role="columnheader">TYPE</span>
         <span role="columnheader">SUMMARY</span>
@@ -36,7 +48,7 @@ export function IssueTable({ issues, selectedKey, onSelect }: Props) {
         <span role="columnheader">PTS</span>
       </div>
       <div className="issue-body" ref={scrollRef} role="rowgroup">
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+        <div role="presentation" style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {virtualizer.getVirtualItems().map((v) => {
             const iss = issues[v.index];
             const selected = iss.key === selectedKey;
@@ -45,7 +57,9 @@ export function IssueTable({ issues, selectedKey, onSelect }: Props) {
                 key={iss.key}
                 role="row"
                 aria-selected={selected}
+                aria-rowindex={v.index + 2}
                 aria-label={`${iss.key} ${iss.summary}`}
+                data-row-index={v.index}
                 className={`issue-row${selected ? " issue-row-selected" : v.index % 2 ? " issue-row-alt" : ""}`}
                 style={{ position: "absolute", top: 0, left: 0, right: 0, height: v.size, transform: `translateY(${v.start}px)` }}
                 onClick={() => onSelect(iss.key)}
@@ -53,9 +67,15 @@ export function IssueTable({ issues, selectedKey, onSelect }: Props) {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     onSelect(iss.key);
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    moveFocus(v.index, 1);
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    moveFocus(v.index, -1);
                   }
                 }}
-                tabIndex={0}
+                tabIndex={selected || (selectedKey === "" && v.index === 0) ? 0 : -1}
               >
                 <span role="cell" className="issue-key">{iss.key}</span>
                 <span role="cell"><TypeChip type={iss.type} /></span>

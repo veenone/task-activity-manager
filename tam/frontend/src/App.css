@@ -153,6 +153,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-row-alt { background: var(--bg-subtle); }
 .issue-row:not(.issue-head):hover { background: var(--row-hover); cursor: pointer; }
 .issue-row-selected, .issue-row-selected:hover { background: var(--accent-soft); }
+.issue-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .issue-key { font-weight: 600; }
 .issue-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pager { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; }

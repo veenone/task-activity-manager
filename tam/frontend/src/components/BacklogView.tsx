@@ -7,10 +7,6 @@ import { IssueTable } from "./IssueTable";
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 250;
-// The UI is English only and the mockup groups thousands with a comma, so the
-// pager formats its counts against a fixed locale rather than the machine's
-// regional settings, which would otherwise render 1,248 as 1.248.
-const COUNT_LOCALE = "en-US";
 
 // useDebounced returns value after it has stopped changing for delay ms, so
 // typing in the search box does not query the backend on every keystroke.
@@ -43,11 +39,6 @@ export function BacklogView() {
     setSelectedKey("");
   }, [activeId]);
 
-  // A filter change goes back to the first page.
-  useEffect(() => {
-    setPage(0);
-  }, [search, types, sprintId]);
-
   const query = useMemo<IssueQuery>(
     () => ({ text: search, types, sprintId, offset: page * PAGE_SIZE, limit: PAGE_SIZE }),
     [search, types, sprintId, page],
@@ -62,8 +53,12 @@ export function BacklogView() {
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
   const filtered = search !== "" || types.length > 0 || sprintId !== "";
 
+  // Every filter change goes back to the first page, and it does so in the
+  // same event as the filter itself so no render ever pairs a new filter with
+  // the old offset.
   function toggleType(id: string) {
     setTypes((cur) => (cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id]));
+    setPage(0);
   }
 
   return (
@@ -75,7 +70,10 @@ export function BacklogView() {
           aria-label="Search issues"
           placeholder="Search summary, key, label"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            setPage(0);
+          }}
         />
         <div className="type-filter" role="group" aria-label="Issue types">
           {ISSUE_TYPES.map((t) => (
@@ -94,7 +92,10 @@ export function BacklogView() {
           className="detail-input filter-sprint"
           aria-label="Sprint"
           value={sprintId}
-          onChange={(e) => setSprintId(e.target.value)}
+          onChange={(e) => {
+            setSprintId(e.target.value);
+            setPage(0);
+          }}
         >
           <option value="">All sprints</option>
           {(sprints.data ?? []).map((s) => (
@@ -118,7 +119,7 @@ export function BacklogView() {
             <IssueTable issues={rows} selectedKey={selectedKey} onSelect={setSelectedKey} />
           )}
           <div className="pager">
-            <span className="muted small">{`Showing ${first.toLocaleString(COUNT_LOCALE)} to ${last.toLocaleString(COUNT_LOCALE)} of ${total.toLocaleString(COUNT_LOCALE)}`}</span>
+            <span className="muted small">{`Showing ${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()}`}</span>
             <span className="pager-buttons">
               <button type="button" className="btn" aria-label="Previous page" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Prev</button>
               <span className="muted small">{`${page + 1} / ${lastPage + 1}`}</span>
