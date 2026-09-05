@@ -87,10 +87,19 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
 
       {tab === "links" && (
         <div role="tabpanel" id="panel-links" aria-labelledby="tab-links" className="tab-panel">
+          <div className="detail-section-head">
+            <h3>Links</h3>
+            <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()} disabled={detail.isFetching}>
+              {detail.isFetching ? "Refreshing" : "Refresh"}
+            </button>
+          </div>
           {detail.isPending ? (
             <p className="muted">Loading links</p>
           ) : detail.isError ? (
-            <p className="error-text" data-testid="detail-error">Could not load the links: {detail.error.message}</p>
+            <p className="error-text" data-testid="links-error">
+              Could not load the links: {detail.error.message}{" "}
+              <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()}>Retry</button>
+            </p>
           ) : detail.data.links.length === 0 ? (
             <p className="muted">No links.</p>
           ) : (
@@ -106,11 +115,17 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
             {tests.data && tests.data.length > 0 && (
               <span className="muted small">via XTM, link: {tests.data[0].linkType}</span>
             )}
+            <button type="button" className="btn btn-ghost" onClick={() => void tests.refetch()} disabled={tests.isFetching}>
+              {tests.isFetching ? "Refreshing" : "Refresh"}
+            </button>
           </div>
           {tests.isPending ? (
             <p className="muted">Loading tests</p>
           ) : tests.isError ? (
-            <p className="error-text">Could not load the linked tests: {tests.error.message}</p>
+            <p className="error-text" data-testid="tests-error">
+              Could not load the linked tests: {tests.error.message}{" "}
+              <button type="button" className="btn btn-ghost" onClick={() => void tests.refetch()}>Retry</button>
+            </p>
           ) : tests.data.length === 0 ? (
             <p className="muted">No linked tests.</p>
           ) : (

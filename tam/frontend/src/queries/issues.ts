@@ -37,6 +37,7 @@ export function useLinkedTests(profileId: string, key: string) {
     queryKey: keys.linkedTests(profileId, key),
     queryFn: () => call(() => ListLinkedTests(profileId, key)),
     enabled: !!profileId && !!key,
+    retry: false,
   });
 }
 

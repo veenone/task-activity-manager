@@ -87,6 +87,27 @@ describe("IssueDetailPanel", () => {
     expect(api.GetIssueDetail).toHaveBeenCalledTimes(2);
   });
 
+  it("retries the linked tests after a failure", async () => {
+    vi.mocked(api.ListLinkedTests).mockRejectedValueOnce(new Error("jira: 503"));
+    renderPanel();
+    await userEvent.click(screen.getByRole("tab", { name: "Tests" }));
+    const tests = screen.getByRole("tabpanel", { name: "Tests" });
+    await waitFor(() => expect(within(tests).getByTestId("tests-error")).toHaveTextContent("jira: 503"));
+    await userEvent.click(within(tests).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(within(tests).getByText("XT-1018")).toBeInTheDocument());
+    expect(api.ListLinkedTests).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the Links tab recoverable", async () => {
+    vi.mocked(api.GetIssueDetail).mockRejectedValueOnce(new Error("jira: 502"));
+    renderPanel();
+    await userEvent.click(screen.getByRole("tab", { name: "Links" }));
+    const links = screen.getByRole("tabpanel", { name: "Links" });
+    await waitFor(() => expect(within(links).getByTestId("links-error")).toHaveTextContent("jira: 502"));
+    await userEvent.click(within(links).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(within(links).getByText("XT-1018")).toBeInTheDocument());
+  });
+
   it("says when there are no linked tests and closes", async () => {
     vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
     const onClose = renderPanel();

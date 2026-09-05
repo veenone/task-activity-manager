@@ -130,7 +130,7 @@ export function BacklogView() {
           </div>
         </div>
         {selected && (
-          <IssueDetailPanel profileId={activeId} issue={selected} onClose={() => setSelectedKey("")} />
+          <IssueDetailPanel key={selected.key} profileId={activeId} issue={selected} onClose={() => setSelectedKey("")} />
         )}
       </div>
     </section>
