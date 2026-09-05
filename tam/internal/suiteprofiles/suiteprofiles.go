@@ -28,8 +28,10 @@ func Visible(ps []profile.Profile) []profile.Profile {
 }
 
 // IsDemoURL reports whether a Jira URL selects the offline demo dataset:
-// "demo" on its own, or a "demo:" or "demo-" variant. It mirrors XTM's rule so
-// a demo profile made in either app is a demo profile in both.
+// "demo" on its own, or a "demo:" or "demo-" variant. That covers the demo
+// forms XTM recognises, so a demo profile made in either app is a demo profile
+// in both. XTM also treats a "mock:" prefix as demo; TAM leaves that out on
+// purpose, since the mock fixtures belong to XTM's test data.
 func IsDemoURL(url string) bool {
 	u := strings.ToLower(strings.TrimSpace(url))
 	return u == "demo" || strings.HasPrefix(u, "demo:") || strings.HasPrefix(u, "demo-")

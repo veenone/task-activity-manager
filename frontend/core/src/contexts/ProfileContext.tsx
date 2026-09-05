@@ -59,6 +59,10 @@ export function useProfile<
   return ctx as unknown as ProfileState<P, S>;
 }
 
+// backend has to be referentially stable, so build it once at module level.
+// The provider's callbacks close over its identity, and an inline object
+// literal would hand them a new backend on every render, re-creating reload
+// and every effect that depends on it.
 export function ProfileProvider<
   P extends { id: string },
   S extends { defaultProfileId?: string; theme?: string },

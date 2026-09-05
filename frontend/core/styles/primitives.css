@@ -224,6 +224,11 @@
   line-height: 1.5;
 }
 
+/* The notice dialog puts this on the message of an error-tone notice. */
+.error-text {
+  color: var(--danger-text);
+}
+
 .pending-head {
   display: flex;
   align-items: center;

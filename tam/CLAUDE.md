@@ -38,5 +38,6 @@ wails.json does that for you.
 
 Same as XTM's: logic in `internal/`, `app.go` only adapts it to Wails; Jira
 is the system of record; credentials go to the OS credential manager only;
-`TODO(tam): desc` marks planned work. Profiles TAM creates carry backend
-`jira`; Kiwi profiles from XTM are hidden. UI text uses no em dashes.
+`TODO(tam): desc` marks planned work. TAM creates Jira profiles, which core
+stores with backend `xray`; Kiwi profiles from XTM are hidden. UI text uses
+no em dashes.
