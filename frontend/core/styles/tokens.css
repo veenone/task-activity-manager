@@ -1,0 +1,65 @@
+/* Design tokens shared by the suite's apps. Light values are the defaults;
+   [data-theme="dark"] re-points them. XTM's App.css carries the same blocks
+   until its chrome moves onto the shared shell. Keep the two in step. */
+
+:root {
+  --surface: #fff;
+  --surface-2: #f6f7f9;
+  --surface-3: #fafbfc;
+  --surface-sunken: #f4f5f7;
+  --border: #dfe1e6;
+  --border-strong: #c4c9d4;
+  --border-subtle: #eceef1;
+  --text: #1f2933;
+  --text-strong: #374151;
+  --text-muted: #6b7280;
+  --accent: #3b5bdb;
+  --accent-hover: #2f49b3;
+  --accent-soft: rgba(59, 91, 219, 0.13);
+  --row-hover: #eef0f3;
+  --danger-text: #c0392b;
+  /* semantic warn (separate from --accent/--danger) for non-destructive but
+     attention-worthy callouts, e.g. "you're editing your active profile". */
+  --warn-text: #925b0a;
+  --warn-border: #e4b761;
+  --warn-soft: rgba(202, 138, 4, 0.12);
+  --ok-text: #1f7a52;
+  /* Previously-undefined tokens: they were referenced with hardcoded light
+     fallbacks that never re-pointed in dark mode. Now real tokens in both
+     themes (audit S1). */
+  --warning: #b7791f;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --card-border: var(--border);
+  --accent-strong: #2b6cb0;
+  --bg-subtle: var(--surface-2);
+}
+
+:root[data-theme="dark"] {
+  --surface: #1b2331;
+  --surface-2: #161d28;
+  --surface-3: #131a24;
+  --surface-sunken: #131a24;
+  --border: #2e3a4d;
+  --border-strong: #3a4a66;
+  --border-subtle: #242f3e;
+  --text: #e6e9ee;
+  --text-strong: #ccd4e0;
+  --text-muted: #94a3b8;
+  --accent: #5b78f0;
+  --accent-hover: #748df5;
+  --accent-soft: rgba(91, 120, 240, 0.20);
+  --row-hover: #222d3c;
+  --danger-text: #f0a0a0;
+  --warn-text: #e0b062;
+  --warn-border: #6b5525;
+  --warn-soft: rgba(224, 176, 98, 0.13);
+  --ok-text: #5fd0a0;
+  /* Dark counterparts for the tokens fixed in audit S1. */
+  --warning: #e0b062;
+  --warning-bg: #2a2109;
+  --warning-text: #f0c674;
+  --card-border: var(--border);
+  --accent-strong: #6ea8fe;
+  --bg-subtle: var(--surface-2);
+}

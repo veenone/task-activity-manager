@@ -14,6 +14,7 @@ import {
   errMsg,
 } from "../api";
 import type { Profile, Settings } from "../api";
+import { applyTheme } from "@agile-suite/core";
 
 // ProfileContext owns the active-workspace state that was previously threaded
 // through App.tsx as the app's most-drilled value (`profileId={activeId}`).
@@ -26,16 +27,6 @@ import type { Profile, Settings } from "../api";
 // for useProfile(). The raw setters are exposed transitionally because several
 // composite handlers (importProfile, deleteProfile, toggleCoverage) still live
 // in App and will move into their own contexts (Nav / Modal) in later steps.
-
-// applyTheme resolves the preference ("system" follows the OS) and sets the
-// data-theme attribute the CSS tokens key off (FR-12.2).
-function applyTheme(theme: string) {
-  const dark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia?.("(prefers-color-scheme: dark)").matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-}
 
 interface ProfileApi {
   profiles: Profile[];

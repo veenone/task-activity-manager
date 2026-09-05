@@ -1,0 +1,12 @@
+{
+  "name": "agile-suite",
+  "private": true,
+  "workspaces": [
+    "frontend/core",
+    "xtm/frontend"
+  ],
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}
