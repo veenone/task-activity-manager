@@ -121,3 +121,39 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .topbar-btn-primary:hover { background: var(--accent-hover); }
 .chip-sync { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+
+/* Backlog: filter bar, grid, pager */
+.filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-search { width: 300px; }
+.filter-sprint { width: 140px; }
+.filter-note { margin-left: auto; }
+.type-filter { display: flex; gap: 6px; }
+.chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; }
+.chip-type-task { background: #dbeafe; color: #1e40af; }
+.chip-type-story { background: #dcfce7; color: #166534; }
+.chip-type-bug { background: #fee2e2; color: #991b1b; }
+.chip-type-epic { background: #ede9fe; color: #5b21b6; }
+.chip-type-requirement { background: #fef3c7; color: #92400e; }
+.chip-type-none { background: var(--surface-3); color: var(--text-muted); }
+.chip-toggle { cursor: pointer; opacity: 0.55; padding: 4px 10px; border-radius: 12px; }
+.chip-toggle.chip-on, .chip-toggle:hover { opacity: 1; }
+.chip-toggle.chip-on { border-color: currentColor; }
+.chip-status { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
+.chip-status-todo { background: var(--surface-3); color: var(--text); }
+.chip-status-active { background: #dbeafe; color: #1e40af; }
+.chip-status-done { background: #dcfce7; color: #166534; }
+
+.backlog-body { display: flex; gap: 12px; align-items: flex-start; }
+.backlog-grid { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.backlog-empty { padding: 32px; text-align: center; }
+.issue-table { display: flex; flex-direction: column; font-size: 12px; }
+.issue-row { display: grid; grid-template-columns: 84px 56px 1fr 96px 96px 52px 40px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); }
+.issue-head { height: 30px; background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 600; position: sticky; top: 0; }
+.issue-body { max-height: calc(100vh - 300px); overflow: auto; }
+.issue-row-alt { background: var(--bg-subtle); }
+.issue-row:not(.issue-head):hover { background: var(--row-hover); cursor: pointer; }
+.issue-row-selected, .issue-row-selected:hover { background: var(--accent-soft); }
+.issue-key { font-weight: 600; }
+.issue-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pager { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; }
+.pager-buttons { display: flex; align-items: center; gap: 8px; }

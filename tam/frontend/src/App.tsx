@@ -5,6 +5,7 @@ import type { HealthInfo, Profile, Settings } from "./api";
 import { VIEWS, useView } from "./nav";
 import { useModal } from "./modals";
 import { Placeholder } from "./components/Placeholder";
+import { BacklogView } from "./components/BacklogView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { useSync } from "./contexts/SyncContext";
@@ -141,7 +142,7 @@ export default function App() {
                 </span>
               )}
             </div>
-            <Placeholder view={current} />
+            {current.id === "backlog" ? <BacklogView /> : <Placeholder view={current} />}
           </>
         )}
       </main>
