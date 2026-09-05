@@ -1910,7 +1910,7 @@ npm test --workspaces --if-present
 npm run typecheck --workspaces --if-present
 ```
 
-Expected: one `package-lock.json` at the root; `node_modules/@agile-suite/core` is a link to `frontend/core`; XTM's suite passes with the moved files gone (it runs fewer than 196 tests now) and core's suite passes the moved `DialogContext` and `apiError` tests plus the new ones. Add the two "Tests N passed" lines: the sum must be at least 196. `typecheck` (which for XTM is `tsc && vite build` via `npm run build`, so run `cd xtm/frontend && npm run build` as well) must be clean.
+Expected: one `package-lock.json` at the root; `node_modules/@agile-suite/core` is a link to `frontend/core`; XTM's suite passes with the moved files gone (it runs fewer than 196 tests now) and core's suite passes the moved `DialogContext` and `apiError` tests plus the new ones. Add the two "Tests N passed" lines: the sum must be at least 196. XTM has no `typecheck` script, so also run `npm run build` inside `xtm/frontend` (tsc plus the Vite build); it must be clean.
 
 Then, inside `xtm/`, `wails build` must succeed and `wails dev` must open the XTM window with the dialogs, menus, and theme working: open Manage Profiles, trigger a confirm (delete a throwaway profile and cancel), and switch the theme.
 
@@ -2241,7 +2241,7 @@ describe("App shell", () => {
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: "Epics" }));
     expect(screen.getByRole("heading", { name: "Epics" })).toBeInTheDocument();
-    expect(screen.getByText(/arrive in Phase 2/)).toBeInTheDocument();
+    expect(screen.getByText(/arrives in Phase 2/)).toBeInTheDocument();
   });
 
   it("surfaces a startup failure instead of a blank page", async () => {
@@ -2311,7 +2311,8 @@ describe("ProfilesModal", () => {
     await waitFor(() =>
       expect(api.CreateProfile).toHaveBeenCalledWith("Demo team", "demo", "DEMO", "", true),
     );
-    expect(api.ListProfiles).toHaveBeenCalledTimes(2);
+    // The provider reloads the list once the save went through.
+    expect(api.ListProfiles).toHaveBeenCalledTimes(1);
   });
 
   it("shows the backend's validation message", async () => {
@@ -2348,7 +2349,7 @@ export function Placeholder({ view }: { view: ViewInfo }) {
       <div className="placeholder-card">
         <div className="placeholder-glyph" aria-hidden="true" />
         <h2 className="placeholder-title">
-          {view.label} arrive in {view.phase}
+          The {view.label} view arrives in {view.phase}
         </h2>
         <p className="placeholder-blurb">{view.blurb}</p>
         <p className="placeholder-blurb">
