@@ -111,6 +111,9 @@ reaches v49.
   used. If you downgrade to an earlier version it reads that backup as it was
   at upgrade time, and any profile created while downgraded is not carried
   into the shared database later.
+- The dialog system, the modal and menu primitives, the API call helpers,
+  and the query client now come from the shared `@agile-suite/core`
+  package. No behaviour change; XTM's own files re-export them.
 
 ## [1.9.0] - 2026-08-11
 

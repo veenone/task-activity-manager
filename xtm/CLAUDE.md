@@ -50,6 +50,7 @@ internal/
   settings/          Global app preferences
 frontend/            React + TypeScript (Vite), rendered in WebView2
   src/api.ts         Re-exports the generated Wails bindings as the frontend's typed API
+  src/contexts/, components/   several files are re-exports from @agile-suite/core (frontend/core)
   wailsjs/           GENERATED bindings — do not hand-edit
 scripts/release.ps1  Version-stamp + bundle portable exe and Inno Setup installer into dist/
 ```
@@ -152,6 +153,11 @@ cd frontend; npx tsc --noEmit   # typecheck only
 
 Prerequisites: Go 1.25+, Node.js, and the Wails CLI
 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0`).
+
+`npm install` runs at the repo root, not in `frontend/`, since this is an npm
+workspace now. The dialog system, `Modal`, `Menu`, `LiveRegion`, the API call
+helpers, and the query client factory come from `@agile-suite/core`
+(`frontend/core` at the repo root); XTM's own files re-export them.
 
 Most backend behavior is verified by Go unit tests against the store and the
 demo client. When changing backend logic, add or update the `_test.go` beside
