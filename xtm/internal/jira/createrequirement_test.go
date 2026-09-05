@@ -136,7 +136,7 @@ func TestGetRequirementCreateFieldsSurfacesRequiredLabels(t *testing.T) {
 // TestGetRequirementCreateFieldsDemo returns a representative required field
 // offline so the create flow can be exercised in demo mode.
 func TestGetRequirementCreateFieldsDemo(t *testing.T) {
-	demo := &Client{baseURL: "demo", token: "t", http: http.DefaultClient}
+	demo := newClientWith("demo", "t", http.DefaultClient)
 	got, err := demo.GetRequirementCreateFields(context.Background(), "DEMO", "Story")
 	if err != nil {
 		t.Fatalf("GetRequirementCreateFields (demo): %v", err)
