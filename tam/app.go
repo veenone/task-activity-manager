@@ -9,11 +9,14 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 
 	"agile-suite/core/profile"
 	"agile-suite/core/settings"
 	"agile-suite/core/shareddb"
 	"agile-suite/core/store"
+	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/suiteprofiles"
 	"agile-suite/tam/internal/tamstore"
 )
@@ -28,6 +31,10 @@ type App struct {
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
 	settings   *settings.Manager
+	repo       *issuerepo.Repository
+	backendMu  sync.Mutex
+	backends   map[string]backend.IssueBackend
+	syncing    map[string]bool
 	dbPath     string
 	sharedPath string
 	logPath    string
@@ -86,6 +93,9 @@ func (a *App) initStore() error {
 	}
 	a.local = local
 	a.dbPath = dbPath
+	a.repo = issuerepo.New(local.DB())
+	a.backends = map[string]backend.IssueBackend{}
+	a.syncing = map[string]bool{}
 
 	sharedPath, err := shareddb.DefaultPath()
 	if err != nil {
@@ -210,13 +220,20 @@ func (a *App) CreateProfile(name, jiraURL, projectKey, token string, makeDefault
 }
 
 // DeleteProfile removes a profile from the shared store, so it disappears
-// from XTM as well, and drops its credential.
+// from XTM as well, drops its credential, and purges the rows TAM cached
+// for it locally.
 func (a *App) DeleteProfile(id string) error {
 	if err := a.requireStore(); err != nil {
 		return err
 	}
 	if err := a.profiles.Delete(id); err != nil {
 		return err
+	}
+	a.forgetBackend(id)
+	if err := a.repo.PurgeProfile(a.ctx, id); err != nil {
+		// The shared profile row is already gone, so a failed purge leaves
+		// stale local rows rather than a half-deleted profile. Log it.
+		log.Printf("tam: purge local rows for %s: %v", id, err)
 	}
 	if err := a.creds.Delete(id); err != nil {
 		log.Printf("tam: delete credentials for %s: %v", id, err)

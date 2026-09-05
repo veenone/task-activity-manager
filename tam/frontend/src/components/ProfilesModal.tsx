@@ -1,8 +1,66 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Modal, useConfirm, useProfile, errMsg } from "@agile-suite/core";
-import { CreateProfile, DeleteProfile, isDemoUrl } from "../api";
+import { CreateProfile, DeleteProfile, GetProfileSetting, SetProfileSetting, isDemoUrl } from "../api";
 import type { Profile, Settings } from "../api";
+
+const REQUIREMENT_TYPE_KEY = "requirement_issue_type";
+
+// RequirementTypeField edits the one TAM setting a profile has today: the
+// Jira issue type name TAM treats as a requirement. It saves on blur or
+// Enter and shows the backend's default as the placeholder.
+function RequirementTypeField({ profile }: { profile: Profile }) {
+  const [value, setValue] = useState("");
+  const [saved, setSaved] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    GetProfileSetting(profile.id, REQUIREMENT_TYPE_KEY)
+      .then((v) => {
+        if (live) {
+          setValue(v);
+          setSaved(v);
+        }
+      })
+      .catch((e) => live && setError(errMsg(e)));
+    return () => {
+      live = false;
+    };
+  }, [profile.id]);
+
+  async function save() {
+    const next = value.trim();
+    if (next === saved) return;
+    try {
+      await SetProfileSetting(profile.id, REQUIREMENT_TYPE_KEY, next);
+      setSaved(next);
+      setError("");
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
+  return (
+    <span className="profile-setting">
+      <input
+        className="detail-input detail-input-inline"
+        aria-label={`Requirement issue type for ${profile.name}`}
+        placeholder="Requirement"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => void save()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void save();
+          }
+        }}
+      />
+      {error && <span className="error-text small">{error}</span>}
+    </span>
+  );
+}
 
 // ProfilesModal lists the profiles the suite shares and creates or deletes
 // them. Deleting removes the row from XTM as well, so the confirm says so.
@@ -72,6 +130,7 @@ export function ProfilesModal({ onClose }: { onClose: () => void }) {
                 {isDemoUrl(p.jiraUrl) ? "demo" : p.jiraUrl}
                 {p.id === defaultProfileId ? " · default" : ""}
               </span>
+              <RequirementTypeField profile={p} />
               <button className="btn" onClick={() => setDefault(p.id)}>
                 {p.id === defaultProfileId ? "Clear default" : "Make default"}
               </button>
@@ -83,7 +142,10 @@ export function ProfilesModal({ onClose }: { onClose: () => void }) {
           {profiles.length === 0 && <li className="muted">No profiles yet.</li>}
         </ul>
         <p className="muted small">
-          Kiwi TCMS profiles from XTM are not listed; TAM talks to Jira only.
+          Kiwi TCMS profiles from XTM are not listed; TAM talks to Jira only. The requirement
+          field is the Jira issue type name TAM syncs as a requirement; leave it empty for
+          "Requirement". Changing it resets the sync cursor, so the next sync pulls
+          everything again; run a Full sync to drop rows of the old type.
         </p>
 
         <form onSubmit={submit} className="profile-form">
