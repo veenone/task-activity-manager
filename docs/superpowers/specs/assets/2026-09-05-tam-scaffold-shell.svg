@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="800" viewBox="0 0 1240 800" font-family="Segoe UI, system-ui, sans-serif" font-size="13">
+  <defs>
+    <style>
+      .txt{fill:#1F2937}.muted{fill:#6B7280}.sm{font-size:11px}.xs{font-size:10px}.b{font-weight:600}
+      .surface{fill:#FFFFFF;stroke:#E1E4EA}.row-alt{fill:#FAFBFC}.row-sel{fill:#E8ECFB}
+      .accent{fill:#3B5BDB}.accent-txt{fill:#3B5BDB}
+      .field{fill:#FFFFFF;stroke:#C9CED8}
+    </style>
+  </defs>
+
+  <!-- app ground -->
+  <rect width="1240" height="800" fill="#F7F8FA"/>
+
+  <!-- ===== topbar (frontend/core AppShell) ===== -->
+  <rect x="0" y="0" width="1240" height="48" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="20" y="30" class="txt b" font-size="15">Task Activity Manager</text>
+  <rect x="212" y="15" width="48" height="18" rx="9" fill="#FEF3C7" stroke="#F59E0B"/>
+  <text x="222" y="28" class="xs b" fill="#92400E">DEMO</text>
+  <!-- profile picker: reads the shared profiles.db -->
+  <rect x="284" y="11" width="232" height="26" rx="4" class="surface"/>
+  <text x="294" y="28" class="txt">Demo team (DEMO)</text>
+  <path d="M500 21 l5 6 l5 -6" stroke="#6B7280" fill="none" stroke-width="1.5"/>
+  <!-- right cluster -->
+  <rect x="986" y="11" width="88" height="26" rx="4" class="surface"/>
+  <text x="998" y="28" class="txt">Manage</text>
+  <rect x="1086" y="11" width="66" height="26" rx="4" class="surface"/>
+  <text x="1100" y="28" class="txt">Theme</text>
+  <rect x="1164" y="11" width="56" height="26" rx="4" class="surface"/>
+  <text x="1180" y="28" class="txt">Help</text>
+
+  <!-- ===== nav rail ===== -->
+  <rect x="0" y="48" width="180" height="724" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <rect x="8" y="64" width="164" height="32" rx="6" class="row-sel"/>
+  <text x="22" y="85" class="accent-txt b">Backlog</text>
+  <text x="22" y="125" class="txt">Epics</text>
+  <text x="22" y="165" class="txt">Boards</text>
+  <text x="22" y="205" class="txt">Reports</text>
+  <text x="22" y="245" class="txt">Rituals</text>
+  <line x1="16" y1="270" x2="164" y2="270" stroke="#E1E4EA"/>
+  <text x="22" y="298" class="muted sm">Suite</text>
+  <text x="22" y="322" class="txt">Tests (XTM)</text>
+  <text x="22" y="340" class="muted xs">opens Xray Test Manager</text>
+
+  <!-- ===== main: empty state, the view arrives in Phase 1 ===== -->
+  <rect x="200" y="68" width="1020" height="24" fill="none"/>
+  <text x="200" y="86" class="txt b" font-size="16">Backlog</text>
+  <text x="264" y="86" class="muted">Demo team · DEMO</text>
+
+  <rect x="200" y="108" width="1020" height="300" rx="8" class="surface"/>
+  <!-- placeholder glyph -->
+  <rect x="680" y="150" width="60" height="44" rx="6" fill="#E8ECFB"/>
+  <rect x="690" y="160" width="40" height="5" rx="2" fill="#3B5BDB"/>
+  <rect x="690" y="171" width="28" height="5" rx="2" fill="#3B5BDB" opacity="0.6"/>
+  <rect x="690" y="182" width="34" height="5" rx="2" fill="#3B5BDB" opacity="0.35"/>
+  <text x="710" y="230" class="txt b" font-size="15" text-anchor="middle">The Backlog arrives in Phase 1</text>
+  <text x="710" y="254" class="muted" text-anchor="middle">Issue sync, the grid, and the detail panel are the first feature slice.</text>
+  <text x="710" y="272" class="muted" text-anchor="middle">This build proves the shell, the shared profiles, and the demo profile.</text>
+  <rect x="612" y="300" width="196" height="30" rx="4" class="surface"/>
+  <text x="710" y="320" class="txt" text-anchor="middle">Open the foundation design</text>
+
+  <!-- ===== status bar ===== -->
+  <rect x="180" y="772" width="1060" height="28" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <circle cx="196" cy="786" r="4" fill="#16A34A"/>
+  <text x="206" y="790" class="sm txt">Local store ready · tam.db</text>
+  <text x="380" y="790" class="sm muted">Profiles shared with XTM · agile-suite/profiles.db</text>
+  <text x="1100" y="790" class="sm muted">Theme: system</text>
+
+  <!-- ===== dim + Manage profiles dialog (frontend/core DialogProvider) ===== -->
+  <rect x="0" y="0" width="1240" height="800" fill="#0F172A" opacity="0.28"/>
+  <rect x="370" y="150" width="500" height="470" rx="10" fill="#FFFFFF" stroke="#C9CED8"/>
+  <text x="394" y="186" class="txt b" font-size="15">Profiles</text>
+  <text x="394" y="206" class="muted sm">One list for the whole suite. A profile made here shows up in Xray Test Manager too.</text>
+  <text x="826" y="186" class="muted" font-size="16">×</text>
+
+  <!-- existing profiles -->
+  <rect x="394" y="222" width="452" height="30" rx="4" class="row-sel"/>
+  <text x="406" y="242" class="txt b">Demo team (DEMO)</text>
+  <text x="640" y="242" class="muted sm">demo · default</text>
+  <rect x="394" y="254" width="452" height="30" rx="4" fill="none"/>
+  <text x="406" y="274" class="txt">Acme Platform (PLAT)</text>
+  <text x="640" y="274" class="muted sm">https://jira.acme.example</text>
+  <text x="406" y="306" class="muted xs">Kiwi TCMS profiles from XTM are not listed; TAM talks to Jira only.</text>
+
+  <line x1="394" y1="322" x2="846" y2="322" stroke="#E1E4EA"/>
+  <text x="394" y="346" class="txt b">New profile</text>
+
+  <text x="394" y="374" class="sm muted">Name</text>
+  <rect x="394" y="380" width="452" height="28" rx="4" class="field"/>
+  <text x="404" y="399" class="txt">Demo team</text>
+
+  <text x="394" y="428" class="sm muted">Jira URL</text>
+  <rect x="394" y="434" width="300" height="28" rx="4" class="field"/>
+  <text x="404" y="453" class="txt">demo</text>
+  <text x="704" y="453" class="muted sm">"demo" runs offline with sample data</text>
+
+  <text x="394" y="482" class="sm muted">Project key</text>
+  <rect x="394" y="488" width="140" height="28" rx="4" class="field"/>
+  <text x="404" y="507" class="txt">DEMO</text>
+
+  <text x="554" y="482" class="sm muted">Personal access token</text>
+  <rect x="554" y="488" width="292" height="28" rx="4" class="field"/>
+  <text x="564" y="507" class="muted">stored in Windows Credential Manager</text>
+
+  <rect x="394" y="536" width="452" height="1" fill="#E1E4EA"/>
+  <rect x="394" y="552" width="16" height="16" rx="3" class="field"/>
+  <path d="M397 560 l4 4 l8 -8" stroke="#3B5BDB" stroke-width="2" fill="none"/>
+  <text x="418" y="565" class="txt">Make this the default profile</text>
+
+  <rect x="676" y="580" width="80" height="28" rx="4" class="surface"/>
+  <text x="696" y="599" class="txt">Cancel</text>
+  <rect x="766" y="580" width="80" height="28" rx="4" class="accent"/>
+  <text x="790" y="599" fill="#FFFFFF" class="b">Save</text>
+</svg>
