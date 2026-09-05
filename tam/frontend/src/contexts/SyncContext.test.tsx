@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
+import { render, screen, waitFor, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
@@ -96,6 +96,23 @@ describe("SyncProvider", () => {
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
     await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("60"));
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
+  });
+
+  it("runs one sync when the button is clicked twice in the same tick", async () => {
+    vi.mocked(api.SyncIssues).mockImplementation(
+      () => new Promise<api.SyncSummary>(() => {}),
+    );
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    const button = screen.getByRole("button", { name: "Sync" });
+    // Both clicks land before React re-renders, so the disabled attribute
+    // cannot be what stops the second one.
+    act(() => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+    expect(api.SyncIssues).toHaveBeenCalledTimes(1);
   });
 
   it("records a failure and returns to idle", async () => {

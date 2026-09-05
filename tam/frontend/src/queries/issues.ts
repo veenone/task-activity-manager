@@ -11,13 +11,17 @@ import type { IssueQuery } from "../api";
 import { keys } from "./keys";
 
 // useIssues loads one page of the Backlog. placeholderData keeps the previous
-// page on screen while the next one loads, so paging does not flash.
+// page on screen while the next one loads, so paging does not flash. It is
+// kept only when the previous page belonged to the same profile: showing one
+// profile's rows under another profile's name would be a lie, so a profile
+// switch falls back to the pending state.
 export function useIssues(profileId: string, q: IssueQuery) {
   return useQuery({
     queryKey: keys.issues(profileId, q),
     queryFn: () => call(() => ListIssues(profileId, q)),
     enabled: !!profileId,
-    placeholderData: (prev) => prev,
+    placeholderData: (prev, prevQuery) =>
+      prevQuery?.queryKey[0] === profileId ? prev : undefined,
   });
 }
 

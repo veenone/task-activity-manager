@@ -44,12 +44,20 @@ function Loader() {
   return null;
 }
 
+// Switcher stands in for the topbar's profile picker, which lives above
+// BacklogView in the shell.
+function Switcher() {
+  const { setActiveId } = useProfile<api.Profile, api.Settings>();
+  return <button type="button" onClick={() => setActiveId("p2")}>Switch profile</button>;
+}
+
 function renderView() {
   return render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
           <Loader />
+          <Switcher />
           <BacklogView />
         </ProfileProvider>
       </DialogProvider>
@@ -83,6 +91,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Acme Platform", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
+    { id: "p2", name: "Ops", jiraUrl: "demo", projectKey: "OPS", backend: "jira", createdAt: "" },
   ]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: rows, total: 1248 });
@@ -164,6 +173,24 @@ describe("BacklogView", () => {
     expect(screen.getByRole("row", { name: /PLAT-409/ })).toHaveFocus();
     await userEvent.keyboard("{Enter}");
     expect(screen.getByRole("row", { name: /PLAT-409/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("switching profiles drops the search text before the first query", async () => {
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search issues" }), "promo");
+    await waitFor(() => expect(lastQuery()?.text).toBe("promo"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Switch profile" }));
+    await waitFor(() =>
+      expect(vi.mocked(api.ListIssues).mock.calls.some((c) => c[0] === "p2")).toBe(true),
+    );
+    const firstForP2 = vi.mocked(api.ListIssues).mock.calls.find((c) => c[0] === "p2");
+    expect(firstForP2?.[1]).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25 });
+    // No query for the new profile may carry the old profile's filters.
+    for (const c of vi.mocked(api.ListIssues).mock.calls) {
+      if (c[0] === "p2") expect(c[1].text).toBe("");
+    }
   });
 
   it("explains an empty cache", async () => {

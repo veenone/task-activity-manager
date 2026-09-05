@@ -50,9 +50,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const { notice } = useNotice();
   // The reducer refuses a second SYNC_START, but the bound call must not run
-  // twice either, so the guard reads the latest status through a ref.
-  const statusRef = useRef(state.status);
-  statusRef.current = state.status;
+  // twice either, and two clicks in one tick both see the pre-dispatch state.
+  // So the guard lives in the ref and runSync claims it, rather than the ref
+  // trailing the reducer a render behind.
+  const statusRef = useRef<SyncStatus>("idle");
 
   useEffect(
     () =>
@@ -65,6 +66,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const runSync = useCallback(
     async (full: boolean) => {
       if (!activeId || statusRef.current !== "idle") return;
+      statusRef.current = "syncing";
       dispatch({
         type: "SYNC_START",
         clearError: true,
@@ -77,6 +79,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SYNC_ERROR", message });
         void notice({ title: "Sync failed", message, tone: "error" });
       } finally {
+        statusRef.current = "idle";
         dispatch({ type: "SYNC_END" });
         invalidateProfileData(qc, activeId);
       }

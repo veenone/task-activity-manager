@@ -144,7 +144,8 @@ export function ProfilesModal({ onClose }: { onClose: () => void }) {
         <p className="muted small">
           Kiwi TCMS profiles from XTM are not listed; TAM talks to Jira only. The requirement
           field is the Jira issue type name TAM syncs as a requirement; leave it empty for
-          "Requirement".
+          "Requirement". Changing it resets the sync cursor, so the next sync pulls
+          everything again; run a Full sync to drop rows of the old type.
         </p>
 
         <form onSubmit={submit} className="profile-form">

@@ -11,18 +11,21 @@ const SEARCH_DELAY_MS = 250;
 
 // useDebounced returns value after it has stopped changing for delay ms, so
 // typing in the search box does not query the backend on every keystroke.
-function useDebounced<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
+// resetKey cuts the wait short: while the stored value belongs to an older
+// key the incoming one is returned straight away, so a profile switch never
+// queries the new profile with the text typed for the old one.
+export function useDebounced<T>(value: T, delay: number, resetKey: unknown): T {
+  const [stored, setStored] = useState({ key: resetKey, value });
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
+    const t = setTimeout(() => setStored({ key: resetKey, value }), delay);
     return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
+  }, [value, delay, resetKey]);
+  return stored.key === resetKey ? stored.value : value;
 }
 
 // BacklogView is the issue grid with its filter bar and pager. Filter and
-// page state live here and reset when the profile changes. Selection is
-// kept here too, so the detail panel can sit beside the table.
+// page state live here and reset in the same render the profile changes in.
+// Selection is kept here too, so the detail panel can sit beside the table.
 export function BacklogView() {
   const { activeId } = useProfile<Profile, Settings>();
   const [text, setText] = useState("");
@@ -30,15 +33,21 @@ export function BacklogView() {
   const [sprintId, setSprintId] = useState("");
   const [page, setPage] = useState(0);
   const [selectedKey, setSelectedKey] = useState("");
-  const search = useDebounced(text, SEARCH_DELAY_MS);
 
-  useEffect(() => {
+  // The filters belong to the profile they were set for, so a switch clears
+  // them during the render that first sees the new id. An effect would be one
+  // commit too late: a query would go out pairing the new profile with the
+  // old filters before the reset landed.
+  const [filtersFor, setFiltersFor] = useState(activeId);
+  if (filtersFor !== activeId) {
+    setFiltersFor(activeId);
     setText("");
     setTypes([]);
     setSprintId("");
     setPage(0);
     setSelectedKey("");
-  }, [activeId]);
+  }
+  const search = useDebounced(text, SEARCH_DELAY_MS, activeId);
 
   const query = useMemo<IssueQuery>(
     () => ({ text: search, types, sprintId, offset: page * PAGE_SIZE, limit: PAGE_SIZE }),

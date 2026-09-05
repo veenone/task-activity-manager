@@ -49,6 +49,33 @@ describe("issue queries", () => {
     expect(api.ListIssues).toHaveBeenCalledWith("p1", query);
   });
 
+  it("drops the placeholder page when the profile changes", async () => {
+    const row: api.Issue = { key: "PLAT-1", id: "1", project: "PLAT", type: "task", summary: "x", status: "To Do", assignee: "", reporter: "", priority: "", labels: [], sprintId: "", sprintName: "", parentKey: "", rank: "", created: "", updated: "" };
+    vi.mocked(api.ListIssues).mockResolvedValueOnce({ issues: [row], total: 1 });
+    // The second profile never resolves, so the render right after the switch
+    // is the one that would show p1's rows if the placeholder leaked.
+    vi.mocked(api.ListIssues).mockImplementation(() => new Promise(() => {}));
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useIssues(id, query), {
+      wrapper: wrapper(),
+      initialProps: { id: "p1" },
+    });
+    await waitFor(() => expect(result.current.data?.total).toBe(1));
+    rerender({ id: "p2" });
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isPending).toBe(true);
+  });
+
+  it("keeps the placeholder page while paging within one profile", async () => {
+    const { result, rerender } = renderHook(({ q }: { q: typeof query }) => useIssues("p1", q), {
+      wrapper: wrapper(),
+      initialProps: { q: query },
+    });
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    vi.mocked(api.ListIssues).mockImplementation(() => new Promise(() => {}));
+    rerender({ q: { ...query, offset: 25 } });
+    expect(result.current.data).toBeDefined();
+  });
+
   it("invalidateProfileData refetches the issue and sync-state families", async () => {
     const qc = createQueryClient();
     const { result } = renderHook(() => ({ issues: useIssues("p1", query), state: useSyncState("p1") }), { wrapper: wrapper(qc) });
