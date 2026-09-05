@@ -9,11 +9,14 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"sync"
 
 	"agile-suite/core/profile"
 	"agile-suite/core/settings"
 	"agile-suite/core/shareddb"
 	"agile-suite/core/store"
+	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/suiteprofiles"
 	"agile-suite/tam/internal/tamstore"
 )
@@ -28,6 +31,9 @@ type App struct {
 	profiles   *profile.Manager
 	creds      profile.CredentialStore
 	settings   *settings.Manager
+	repo       *issuerepo.Repository
+	backendMu  sync.Mutex
+	backends   map[string]backend.IssueBackend
 	dbPath     string
 	sharedPath string
 	logPath    string
@@ -86,6 +92,8 @@ func (a *App) initStore() error {
 	}
 	a.local = local
 	a.dbPath = dbPath
+	a.repo = issuerepo.New(local.DB())
+	a.backends = map[string]backend.IssueBackend{}
 
 	sharedPath, err := shareddb.DefaultPath()
 	if err != nil {
