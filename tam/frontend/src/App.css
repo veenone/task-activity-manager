@@ -181,3 +181,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .linked-key { font-weight: 600; min-width: 64px; }
 .link-group { margin-bottom: 12px; }
 .link-group-title { font-size: 12px; margin-bottom: 6px; }
+
+.profile-setting { display: inline-flex; flex-direction: column; gap: 2px; }
+.profile-setting .detail-input-inline { width: 150px; }

@@ -6,8 +6,9 @@ Desktop tools for Jira Data Center that share one code spine:
   `xtm/README.md`.
 - **Task Activity Manager** (`tam/`): agile task management for scrum
   masters, product owners, and team members (tasks, epics, stories, bugs,
-  requirements). It shares connection profiles with XTM and is currently at
-  the foundation scaffold stage (shell, Profiles dialog, placeholder views).
+  requirements). It shares connection profiles with XTM, syncs a project's
+  issues into a local cache, and shows them in a Backlog grid with a
+  read-only detail panel. Writes arrive with plan 1b.
 
 Both are Go + Wails + React apps that sync Jira into a local SQLite cache and
 push edits back on commit.
