@@ -19,6 +19,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(backend.listProfiles).mockResolvedValue([
     { id: "a", name: "A" },
     { id: "b", name: "B" },
@@ -54,6 +55,17 @@ describe("ProfileProvider", () => {
       await result.current.reload();
     });
     expect(result.current.activeId).toBe("a");
+  });
+
+  it("keeps the failure message when the load rejects", async () => {
+    vi.mocked(backend.listProfiles).mockRejectedValue(new Error("store is locked"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { result } = renderHook(() => useProfile<P, S>(), { wrapper });
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.error).toBe("store is locked");
+    spy.mockRestore();
   });
 
   it("setDefault toggles and persists", async () => {

@@ -30,6 +30,8 @@ export interface ProfileState<
   defaultProfileId: string;
   theme: string;
   loading: boolean;
+  // The message from the last failed reload, empty when the last one worked.
+  error: string;
   activeProfile: P | undefined;
   setActiveId: Dispatch<SetStateAction<string>>;
   // Applies the theme at once, then persists it.
@@ -66,6 +68,7 @@ export function ProfileProvider<
   const [defaultProfileId, setDefaultProfileId] = useState("");
   const [theme, setThemeState] = useState("light");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const setTheme = useCallback(
     async (next: string) => {
@@ -95,6 +98,7 @@ export function ProfileProvider<
 
   const reload = useCallback(async (): Promise<S | null> => {
     setLoading(true);
+    setError("");
     try {
       const [ps, s] = await Promise.all([
         backend.listProfiles(),
@@ -116,7 +120,9 @@ export function ProfileProvider<
       }
       return s;
     } catch (e) {
-      console.error("load profiles:", errMsg(e));
+      const msg = errMsg(e);
+      console.error("load profiles:", msg);
+      setError(msg);
       return null;
     } finally {
       setLoading(false);
@@ -135,6 +141,7 @@ export function ProfileProvider<
       defaultProfileId,
       theme,
       loading,
+      error,
       activeProfile,
       setActiveId,
       setTheme,
@@ -147,6 +154,7 @@ export function ProfileProvider<
       defaultProfileId,
       theme,
       loading,
+      error,
       activeProfile,
       setTheme,
       setDefault,

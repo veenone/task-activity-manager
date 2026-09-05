@@ -11,8 +11,16 @@ import { AboutModal } from "./components/AboutModal";
 // App is the shell: topbar, nav rail, the active view, and the status bar.
 // It matches docs/superpowers/specs/assets/2026-09-05-tam-scaffold-shell.svg.
 export default function App() {
-  const { profiles, activeId, setActiveId, activeProfile, theme, setTheme, reload } =
-    useProfile<Profile, Settings>();
+  const {
+    profiles,
+    activeId,
+    setActiveId,
+    activeProfile,
+    theme,
+    setTheme,
+    reload,
+    error: profileError,
+  } = useProfile<Profile, Settings>();
   const { view, setView } = useView();
   const { isOpen, openModal, closeModal } = useModal();
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -126,7 +134,11 @@ export default function App() {
       <footer className="statusbar">
         <span className={`dot ${health?.ok ? "dot-ok" : "dot-warn"}`} aria-hidden="true" />
         <span>{health?.ok ? "Local store ready · tam.db" : "Starting up"}</span>
-        <span className="muted">Profiles shared with XTM · agile-suite/profiles.db</span>
+        {!startupFailed && profileError ? (
+          <span className="error-text">Profiles could not be loaded: {profileError}</span>
+        ) : (
+          <span className="muted">Profiles shared with XTM · agile-suite/profiles.db</span>
+        )}
         <span className="muted statusbar-right">Theme: {theme}</span>
       </footer>
 

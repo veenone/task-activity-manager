@@ -68,6 +68,18 @@ describe("App shell", () => {
     expect(screen.getByText(/arrives in Phase 2/)).toBeInTheDocument();
   });
 
+  it("says so when the profiles cannot be loaded", async () => {
+    vi.mocked(api.ListProfiles).mockRejectedValue(new Error("profiles.db is locked"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderApp();
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Profiles could not be loaded: profiles.db is locked/),
+      ).toBeInTheDocument(),
+    );
+    spy.mockRestore();
+  });
+
   it("surfaces a startup failure instead of a blank page", async () => {
     vi.mocked(api.Health).mockResolvedValue({
       ok: false, error: "open local store: disk full", dbPath: "", sharedPath: "", logPath: "",
