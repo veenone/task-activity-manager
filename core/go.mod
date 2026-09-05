@@ -6,6 +6,7 @@ require (
 	github.com/danieljoos/wincred v1.2.3
 	github.com/google/uuid v1.6.0
 	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/time v0.15.0
 	modernc.org/sqlite v1.53.0
 )
 

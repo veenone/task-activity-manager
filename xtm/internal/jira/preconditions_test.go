@@ -14,7 +14,7 @@ import (
 
 // newTestClient points a Client at a mock server.
 func newTestClient(srv *httptest.Server) *Client {
-	return &Client{baseURL: srv.URL, token: "t", http: srv.Client()}
+	return newClientWith(srv.URL, "t", srv.Client())
 }
 
 // TestListPreconditionsResolvesTypeAndPaginates exercises the live-Jira path:
