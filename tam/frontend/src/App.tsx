@@ -7,6 +7,9 @@ import { useModal } from "./modals";
 import { Placeholder } from "./components/Placeholder";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
+import { useSync } from "./contexts/SyncContext";
+import { useSyncState } from "./queries/issues";
+import { formatWhen } from "./lib/format";
 
 // App is the shell: topbar, nav rail, the active view, and the status bar.
 // It matches docs/superpowers/specs/assets/2026-09-05-tam-scaffold-shell.svg.
@@ -23,6 +26,8 @@ export default function App() {
   } = useProfile<Profile, Settings>();
   const { view, setView } = useView();
   const { isOpen, openModal, closeModal } = useModal();
+  const { progress, syncError, canSync, canSwitchProfile, runSync } = useSync();
+  const syncState = useSyncState(activeId);
   const [health, setHealth] = useState<HealthInfo | null>(null);
 
   useEffect(() => {
@@ -61,6 +66,7 @@ export default function App() {
             className="profile-select"
             value={activeId}
             onChange={(e) => setActiveId(e.target.value)}
+            disabled={!canSwitchProfile}
           >
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
@@ -72,6 +78,15 @@ export default function App() {
         </div>
         <div className="topbar-right">
           <button className="topbar-btn" onClick={() => openModal("profiles")}>Manage</button>
+          <Menu
+            label="Sync"
+            align="right"
+            triggerClassName="topbar-btn topbar-btn-primary"
+            items={[
+              { key: "sync", label: "Sync changes", onClick: () => void runSync(false), disabled: !canSync },
+              { key: "full", label: "Full sync", title: "Clears the cached issues and fetches everything", onClick: () => void runSync(true), disabled: !canSync },
+            ]}
+          />
           <Menu
             label="Theme"
             align="right"
@@ -136,8 +151,28 @@ export default function App() {
         <span>{health?.ok ? "Local store ready · tam.db" : "Starting up"}</span>
         {!startupFailed && profileError ? (
           <span className="error-text">Profiles could not be loaded: {profileError}</span>
+        ) : activeProfile ? (
+          <span data-testid="sync-summary">
+            {syncState.data
+              ? syncState.data.lastSynced
+                ? `${syncState.data.issueCount.toLocaleString()} issues, last synced ${formatWhen(syncState.data.lastSynced)}`
+                : "Not synced yet"
+              : ""}
+          </span>
         ) : (
           <span className="muted">Profiles shared with XTM · agile-suite/profiles.db</span>
+        )}
+        {progress && (
+          <span className="chip chip-sync" role="status">
+            {progress.total > 0
+              ? `Syncing: ${progress.fetched} of ${progress.total}`
+              : progress.stage || "Syncing"}
+          </span>
+        )}
+        {(syncError || syncState.data?.lastError) && !progress && (
+          <span className="error-text" data-testid="sync-error">
+            Last sync failed: {syncError || syncState.data?.lastError}
+          </span>
         )}
         <span className="muted statusbar-right">Theme: {theme}</span>
       </footer>

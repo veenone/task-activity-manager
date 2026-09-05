@@ -118,3 +118,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .form-error { color: var(--danger-text); margin-bottom: 8px; }
 .about-list { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 12px 0; }
 .about-list dt { color: var(--text-muted); }
+.topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.topbar-btn-primary:hover { background: var(--accent-hover); }
+.chip-sync { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
