@@ -6,9 +6,11 @@ that share a Go core.
 - `xtm/`: Xray Test Manager. Read `xtm/CLAUDE.md` for everything about it;
   run Wails, Go tests, and the frontend from inside `xtm/`.
 - `core/`: the shared Go spine (store runner, profiles, connections,
-  settings, credentials). Added by packages only when an app needs them.
-- `tam/`: Task Activity Manager. Scaffolded (shell, Profiles dialog,
-  placeholder views); read `tam/CLAUDE.md` for everything about it.
+  settings, credentials, and the Jira transport in `core/jira`). Added by
+  packages only when an app needs them.
+- `tam/`: Task Activity Manager. Syncs a project's issues and shows them in
+  the Backlog with a detail panel; read `tam/CLAUDE.md` for everything
+  about it.
 - `frontend/core`: the shared React package (`@agile-suite/core`) both
   frontends build on: dialog primitives, contexts, API helpers.
 - `docs/superpowers/`: design specs and implementation plans for the suite.

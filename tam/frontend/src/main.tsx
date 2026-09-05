@@ -9,6 +9,7 @@ import App from "./App";
 import { profileBackend } from "./profileBackend";
 import { ViewProvider } from "./nav";
 import { ModalProvider } from "./modals";
+import { SyncProvider } from "./contexts/SyncContext";
 
 const queryClient = createQueryClient();
 
@@ -17,11 +18,13 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <ViewProvider>
-            <ModalProvider>
-              <App />
-            </ModalProvider>
-          </ViewProvider>
+          <SyncProvider>
+            <ViewProvider>
+              <ModalProvider>
+                <App />
+              </ModalProvider>
+            </ViewProvider>
+          </SyncProvider>
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>

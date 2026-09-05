@@ -9,6 +9,7 @@ import App from "./App";
 import { profileBackend } from "./profileBackend";
 import { ViewProvider } from "./nav";
 import { ModalProvider } from "./modals";
+import { SyncProvider } from "./contexts/SyncContext";
 
 vi.mock("./api", async () => {
   const actual = await vi.importActual<typeof import("./api")>("./api");
@@ -22,6 +23,14 @@ vi.mock("./api", async () => {
     GetSettings: vi.fn(),
     SetTheme: vi.fn(),
     SetDefaultProfile: vi.fn(),
+    SyncIssues: vi.fn(),
+    GetSyncState: vi.fn(),
+    ListIssues: vi.fn(),
+    GetIssueDetail: vi.fn(),
+    ListLinkedTests: vi.fn(),
+    ListSprints: vi.fn(),
+    GetProfileSetting: vi.fn(),
+    SetProfileSetting: vi.fn(),
     EventsOn: vi.fn(() => () => {}),
     BrowserOpenURL: vi.fn(),
   };
@@ -32,11 +41,13 @@ function renderApp() {
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <ViewProvider>
-            <ModalProvider>
-              <App />
-            </ModalProvider>
-          </ViewProvider>
+          <SyncProvider>
+            <ViewProvider>
+              <ModalProvider>
+                <App />
+              </ModalProvider>
+            </ViewProvider>
+          </SyncProvider>
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
@@ -51,6 +62,10 @@ beforeEach(() => {
     { id: "p1", name: "Demo team", jiraUrl: "demo", projectKey: "DEMO", backend: "jira", createdAt: "" },
   ]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
+  vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0 });
+  vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
+  vi.mocked(api.ListSprints).mockResolvedValue([]);
+  vi.mocked(api.GetProfileSetting).mockResolvedValue("");
 });
 
 describe("App shell", () => {
@@ -78,6 +93,29 @@ describe("App shell", () => {
       ).toBeInTheDocument(),
     );
     spy.mockRestore();
+  });
+
+  it("syncs from the topbar and refreshes the status bar", async () => {
+    vi.mocked(api.SyncIssues).mockImplementation(async () => {
+      vi.mocked(api.GetSyncState).mockResolvedValue({
+        lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 60,
+      });
+      return { fetched: 60, upserted: 60, skipped: 0, full: false, elapsed: "1s" };
+    });
+    renderApp();
+    await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent("Not synced yet"));
+    await userEvent.click(screen.getByRole("button", { name: "Sync" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Sync changes" }));
+    await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent(/60 issues, last synced today/));
+    expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
+  });
+
+  it("shows the last sync error in the status bar", async () => {
+    vi.mocked(api.GetSyncState).mockResolvedValue({
+      lastSynced: "2026-09-05T10:42:00Z", lastFull: "", lastError: "jira: 502 Bad Gateway", issueCount: 12,
+    });
+    renderApp();
+    await waitFor(() => expect(screen.getByTestId("sync-error")).toHaveTextContent("jira: 502 Bad Gateway"));
   });
 
   it("surfaces a startup failure instead of a blank page", async () => {

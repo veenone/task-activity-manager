@@ -20,3 +20,16 @@ export { ApiError, normalizeError } from "./lib/apiError";
 export { errMsg } from "./lib/errMsg";
 export { applyTheme } from "./lib/theme";
 export { createQueryClient } from "./lib/queryClient";
+export {
+  syncReducer,
+  initialSyncState,
+  canSync,
+  canCommit,
+  canSwitchProfile,
+} from "./contexts/syncMachine";
+export type {
+  SyncProgress,
+  SyncStatus,
+  SyncMachineState,
+  SyncAction,
+} from "./contexts/syncMachine";
