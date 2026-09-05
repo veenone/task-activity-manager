@@ -120,10 +120,10 @@ func (a *App) shutdown(ctx context.Context) {
 
 func (a *App) requireStore() error {
 	if a.startupErr != "" {
-		return fmt.Errorf("local store unavailable: %s", a.startupErr)
+		return fmt.Errorf("shared profile store unavailable: %s", a.startupErr)
 	}
 	if a.profiles == nil {
-		return errors.New("local store not initialised")
+		return errors.New("shared profile store not initialised")
 	}
 	return nil
 }
@@ -195,7 +195,9 @@ func (a *App) CreateProfile(name, jiraURL, projectKey, token string, makeDefault
 	}
 	if strings.TrimSpace(token) != "" {
 		if err := a.creds.Save(p.ID, strings.TrimSpace(token)); err != nil {
-			_ = a.profiles.Delete(p.ID)
+			if delErr := a.profiles.Delete(p.ID); delErr != nil {
+				log.Printf("tam: rollback profile %s after credential save failure: %v", p.ID, delErr)
+			}
 			return profile.Profile{}, fmt.Errorf("save credentials: %w", err)
 		}
 	}

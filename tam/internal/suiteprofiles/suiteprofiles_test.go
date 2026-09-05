@@ -1,9 +1,11 @@
 package suiteprofiles_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"agile-suite/core/profile"
+	"agile-suite/core/shareddb"
 	"agile-suite/tam/internal/suiteprofiles"
 )
 
@@ -24,6 +26,28 @@ func TestVisibleDropsKiwiProfiles(t *testing.T) {
 		if got[i].ID != id {
 			t.Errorf("got[%d] = %s, want %s", i, got[i].ID, id)
 		}
+	}
+}
+
+func TestBackendConstantStoresXray(t *testing.T) {
+	db, err := shareddb.Open(filepath.Join(t.TempDir(), "profiles.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer db.Close()
+
+	m := profile.NewManager(db.DB())
+	p, err := m.Create("Team", "https://jira.acme.example", "PLAT", "", "", "", "", "", false, suiteprofiles.Backend)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if p.Backend != "xray" {
+		t.Errorf("Backend = %q, want %q", p.Backend, "xray")
+	}
+
+	visible := suiteprofiles.Visible([]profile.Profile{p})
+	if len(visible) != 1 || visible[0].ID != p.ID {
+		t.Errorf("Visible did not include the created profile: %+v", visible)
 	}
 }
 

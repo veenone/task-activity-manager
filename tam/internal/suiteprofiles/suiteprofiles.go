@@ -9,9 +9,10 @@ import (
 	"agile-suite/core/profile"
 )
 
-// Backend is the backend value TAM writes on the profiles it creates. XTM
-// treats any value other than "kiwi" as a Jira connection, so the same row
-// works in both apps.
+// Backend is the value TAM passes to core when it creates a profile. Core
+// normalizes every non-kiwi value to "xray" when it writes the row, so the
+// stored backend is "xray", not "jira". The constant's job is only to mean
+// "a Jira profile, not Kiwi", so the same row is usable from XTM too.
 const Backend = "jira"
 
 // Visible drops the profiles TAM cannot use. Kiwi TCMS is not Jira.
