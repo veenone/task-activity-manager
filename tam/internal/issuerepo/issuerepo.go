@@ -23,8 +23,10 @@ type Repository struct {
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
 // IssueQuery is the Backlog's filter and page. Text matches key, summary,
-// and labels, case-insensitively. An empty Types list means every type.
-// Limit defaults to 25 and is capped at 500.
+// and labels; the match is case-insensitive for ASCII only, since it runs
+// through SQLite's default LIKE, which does not fold non-ASCII case. An
+// empty Types list means every type. Limit defaults to 25 and is capped
+// at 500.
 type IssueQuery struct {
 	Text     string   `json:"text"`
 	Types    []string `json:"types"`

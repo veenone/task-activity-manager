@@ -103,12 +103,26 @@ func (a *App) emitProgress(p syncer.Progress) {
 
 // SyncIssues pulls the profile's issues, incrementally or in full, and
 // emits tam:sync-progress frames while it runs. It returns when the sync
-// has finished or failed.
+// has finished or failed. One sync per profile at a time: a second call
+// while the first is still running is refused rather than queued.
 func (a *App) SyncIssues(profileID string, full bool) (syncer.Summary, error) {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
 		return syncer.Summary{}, err
 	}
+	a.backendMu.Lock()
+	if a.syncing[p.ID] {
+		a.backendMu.Unlock()
+		return syncer.Summary{}, errors.New("a sync is already running for this profile")
+	}
+	a.syncing[p.ID] = true
+	a.backendMu.Unlock()
+	defer func() {
+		a.backendMu.Lock()
+		delete(a.syncing, p.ID)
+		a.backendMu.Unlock()
+	}()
+
 	b, err := a.backendFor(p)
 	if err != nil {
 		return syncer.Summary{}, err
@@ -208,6 +222,8 @@ func (a *App) GetProfileSetting(profileID, key string) (string, error) {
 
 // SetProfileSetting writes a per-profile TAM setting and drops the
 // profile's cached backend, since the requirement type feeds into it.
+// Changing the requirement type also resets the sync cursor, so the next
+// sync pulls the whole scope again under the new type.
 func (a *App) SetProfileSetting(profileID, key, value string) error {
 	if err := a.requireStore(); err != nil {
 		return err
@@ -217,6 +233,11 @@ func (a *App) SetProfileSetting(profileID, key, value string) error {
 	}
 	if err := a.repo.SetProfileSetting(a.ctx, profileID, key, strings.TrimSpace(value)); err != nil {
 		return err
+	}
+	if key == settingRequirementType {
+		if err := a.repo.ResetSyncCursor(a.ctx, profileID); err != nil {
+			return err
+		}
 	}
 	a.forgetBackend(profileID)
 	return nil

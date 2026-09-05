@@ -73,3 +73,34 @@ func (r *Repository) SetProfileSetting(ctx context.Context, profileID, key, valu
 	}
 	return nil
 }
+
+// ResetSyncCursor clears last_synced so the next sync pulls everything
+// again. last_full and last_error are left alone.
+func (r *Repository) ResetSyncCursor(ctx context.Context, profileID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES (?, '', '', '')
+		 ON CONFLICT(profile_id) DO UPDATE SET last_synced = ''`, profileID)
+	if err != nil {
+		return fmt.Errorf("reset sync cursor: %w", err)
+	}
+	return nil
+}
+
+// PurgeProfile drops everything the local store holds for a profile: its
+// links, issues, sync state, and settings. The profile row itself lives in
+// the shared database, so deleting it there leaves these rows orphaned
+// until this runs.
+func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, table := range []string{"issue_link", "issue", "sync_state", "profile_setting"} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
+			return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
+		}
+	}
+	return tx.Commit()
+}

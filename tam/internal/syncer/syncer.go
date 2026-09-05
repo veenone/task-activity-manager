@@ -128,9 +128,11 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 
 // fail records the error without advancing last_synced, sends the terminal
 // frame, and wraps the cause as a PartialSyncError when pages had landed.
+// The state write drops the cancellation, since a cancelled sync is exactly
+// the case where the status bar needs to say what went wrong.
 func (e *Engine) fail(ctx context.Context, profileID string, state issuerepo.SyncState, pages int, sum Summary, cause error, emit func(Progress)) (Summary, error) {
 	state.LastError = cause.Error()
-	_ = e.repo.SetSyncState(ctx, profileID, state)
+	_ = e.repo.SetSyncState(context.WithoutCancel(ctx), profileID, state)
 	emit(Progress{Phase: "issues", Fetched: sum.Fetched, Done: true, Stage: "Failed"})
 	if pages > 0 {
 		return sum, &PartialSyncError{Pages: pages, Err: cause}

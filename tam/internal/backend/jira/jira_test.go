@@ -75,7 +75,7 @@ func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	if total != 2 || len(page) != 2 {
 		t.Fatalf("total %d rows %d", total, len(page))
 	}
-	wantJQL := `project = PLAT AND issuetype in ("Task", "Epic", "Story", "Bug", "Business Requirement") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
+	wantJQL := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Business Requirement") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
 	if len(f.searches) != 1 || !strings.HasPrefix(f.searches[0], wantJQL+" | fields=") {
 		t.Errorf("search request = %q", f.searches)
 	}

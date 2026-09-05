@@ -47,16 +47,16 @@ func TestLogicalTypeIsCaseInsensitiveAndUsesTheRequirementName(t *testing.T) {
 func TestBuildJQL(t *testing.T) {
 	names := jiraTypeNames(backend.AllTypes, "Requirement")
 	got := buildJQL("PLAT", " labels = promo ", "2026-09-05T10:42:00Z", names)
-	want := `project = PLAT AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
+	want := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
 	if got != want {
 		t.Errorf("jql =\n%s\nwant\n%s", got, want)
 	}
 	got = buildJQL("PLAT", "", "", jiraTypeNames([]string{backend.TypeBug}, "Requirement"))
-	want = `project = PLAT AND issuetype in ("Bug") ORDER BY key ASC`
+	want = `project = "PLAT" AND issuetype in ("Bug") ORDER BY key ASC`
 	if got != want {
 		t.Errorf("minimal jql = %s", got)
 	}
-	if got := buildJQL("PLAT", "", "not a time", names); got != `project = PLAT AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") ORDER BY key ASC` {
+	if got := buildJQL("PLAT", "", "not a time", names); got != `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") ORDER BY key ASC` {
 		t.Errorf("an unparseable since is dropped: %s", got)
 	}
 }

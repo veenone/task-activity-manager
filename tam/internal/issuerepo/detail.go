@@ -12,11 +12,6 @@ import (
 	"agile-suite/tam/internal/backend"
 )
 
-// defaultTestLinkType is the link type TAM assumes between a requirement or
-// story and its tests when the shared setting is empty; it is XTM's first
-// candidate too.
-const defaultTestLinkType = "Tested By"
-
 // LinkedTest is a test reached from an issue through the requirement link
 // type, for the detail panel's Tests tab.
 type LinkedTest struct {
@@ -123,16 +118,22 @@ func (r *Repository) ListLinks(ctx context.Context, profileID, key string) ([]ba
 }
 
 // ListLinkedTests returns the tests linked to key through linkType, compared
-// case-insensitively, in either direction. An empty linkType means the
-// default "Tested By".
+// case-insensitively, in either direction. When linkType is empty the suite
+// has not been told which link type it uses, so anything whose name contains
+// "test" counts: Jira instances name it "Tested By", "Tests", "Test Case
+// Linkage" and more, and a guess that matches too much beats an exact guess
+// that matches nothing.
 func (r *Repository) ListLinkedTests(ctx context.Context, profileID, key, linkType string) ([]LinkedTest, error) {
 	want := strings.TrimSpace(linkType)
+	query := `SELECT to_key, to_summary, link_type FROM issue_link
+		 WHERE profile_id = ? AND from_key = ? AND lower(link_type) = lower(?) ORDER BY to_key`
+	arg := want
 	if want == "" {
-		want = defaultTestLinkType
+		query = `SELECT to_key, to_summary, link_type FROM issue_link
+		 WHERE profile_id = ? AND from_key = ? AND lower(link_type) LIKE ? ORDER BY to_key`
+		arg = "%test%"
 	}
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT to_key, to_summary, link_type FROM issue_link
-		 WHERE profile_id = ? AND from_key = ? AND lower(link_type) = lower(?) ORDER BY to_key`, profileID, key, want)
+	rows, err := r.db.QueryContext(ctx, query, profileID, key, arg)
 	if err != nil {
 		return nil, fmt.Errorf("linked tests for %s: %w", key, err)
 	}

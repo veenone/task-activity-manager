@@ -86,7 +86,7 @@ func buildJQL(projectKey, scopeJQL, since string, typeNames []string) string {
 	for i, n := range typeNames {
 		quoted[i] = strconv.Quote(n)
 	}
-	jql := fmt.Sprintf("project = %s AND issuetype in (%s)", projectKey, strings.Join(quoted, ", "))
+	jql := fmt.Sprintf("project = %s AND issuetype in (%s)", strconv.Quote(projectKey), strings.Join(quoted, ", "))
 	if s := strings.TrimSpace(scopeJQL); s != "" {
 		jql += " AND (" + s + ")"
 	}

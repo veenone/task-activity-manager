@@ -85,6 +85,8 @@ func TestListLinkedTestsFiltersByLinkTypeCaseInsensitively(t *testing.T) {
 		{Direction: "inward", Type: "Tested By", Key: "XT-1019", Summary: "Expired promo code rejected", IssueType: "Test"},
 		{Direction: "inward", Type: "Tested By", Key: "XT-1018", Summary: "Promo code applies discount", IssueType: "Test"},
 		{Direction: "outward", Type: "Relates", Key: "PLAT-350", Summary: "Promotions and discounts", IssueType: "Epic"},
+		{Direction: "inward", Type: "Verified By", Key: "XT-2001", Summary: "Promo code audit trail", IssueType: "Test"},
+		{Direction: "inward", Type: "Test Case Linkage", Key: "XT-2002", Summary: "Promo code expiry", IssueType: "Test"},
 	}}
 	if err := r.WriteDetail(ctx, "p1", "PLAT-412", d, time.Now()); err != nil {
 		t.Fatalf("write: %v", err)
@@ -96,9 +98,18 @@ func TestListLinkedTestsFiltersByLinkTypeCaseInsensitively(t *testing.T) {
 	if len(tests) != 2 || tests[0].Key != "XT-1018" || tests[1].Key != "XT-1019" || tests[0].LinkType != "Tested By" {
 		t.Errorf("tests = %+v", tests)
 	}
-	tests, err = r.ListLinkedTests(ctx, "p1", "PLAT-412", "")
+	tests, err = r.ListLinkedTests(ctx, "p1", "PLAT-412", "Tested By")
 	if err != nil || len(tests) != 2 {
-		t.Errorf("empty link type falls back to Tested By: %+v, %v", tests, err)
+		t.Errorf("an exact link type excludes Verified By: %+v, %v", tests, err)
+	}
+	tests, err = r.ListLinkedTests(ctx, "p1", "PLAT-412", "")
+	if err != nil || len(tests) != 3 || tests[2].Key != "XT-2002" {
+		t.Errorf("an empty link type matches anything test-shaped: %+v, %v", tests, err)
+	}
+	for _, lt := range tests {
+		if lt.Key == "XT-2001" {
+			t.Error(`the fallback matches on "test", so "Verified By" stays out`)
+		}
 	}
 	tests, err = r.ListLinkedTests(ctx, "p1", "PLAT-412", "Verifies")
 	if err != nil || len(tests) != 0 {

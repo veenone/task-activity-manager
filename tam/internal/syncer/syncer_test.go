@@ -216,3 +216,82 @@ func TestSyncAgainstTheDemoBackend(t *testing.T) {
 		t.Errorf("epics after sync = %d, %v", page.Total, err)
 	}
 }
+
+// cancelOnSearch is a backend whose connection test passes and whose first
+// page cancels the caller's context, the way a user pressing Cancel or a
+// closing window does mid-sync.
+type cancelOnSearch struct {
+	cancel context.CancelFunc
+}
+
+func (c *cancelOnSearch) TestConnection(context.Context) (backend.User, error) {
+	return backend.User{Name: "fake"}, nil
+}
+func (c *cancelOnSearch) IsDemo() bool { return false }
+func (c *cancelOnSearch) SearchIssuesPage(ctx context.Context, _, _, _ string, _ []string, _, _ int) ([]backend.Issue, int, error) {
+	c.cancel()
+	return nil, 0, ctx.Err()
+}
+func (c *cancelOnSearch) GetIssueDetail(context.Context, string) (backend.IssueDetail, error) {
+	return backend.IssueDetail{}, errors.New("not used")
+}
+func (c *cancelOnSearch) IssueTypes(context.Context, string) ([]backend.IssueType, error) {
+	return nil, nil
+}
+
+func TestCancelledSyncStillRecordsLastError(t *testing.T) {
+	repo := newRepo(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	e := syncer.New(&cancelOnSearch{cancel: cancel}, repo)
+
+	_, err := e.Sync(ctx, "p1", "PLAT", "", false, nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want it to wrap context.Canceled", err)
+	}
+	st, stErr := repo.SyncState(context.Background(), "p1")
+	if stErr != nil {
+		t.Fatalf("read state: %v", stErr)
+	}
+	if st.LastError == "" {
+		t.Error("a cancelled sync must still leave last_error for the status bar")
+	}
+	if st.LastSynced != "" {
+		t.Errorf("last_synced = %q, want it left alone", st.LastSynced)
+	}
+}
+
+func TestFullSyncFailingOnItsFirstPageKeepsThePreviousRows(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	fb := &fake{pages: [][]backend.Issue{{issue("PLAT-1", "task")}}}
+	e := syncer.New(fb, repo)
+	e.PageSize = 10
+	first := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	e.Now = fixedClock(first)
+	if _, err := e.Sync(ctx, "p1", "PLAT", "", true, nil); err != nil {
+		t.Fatalf("seed sync: %v", err)
+	}
+	before, _ := repo.SyncState(ctx, "p1")
+	if before.LastFull == "" || before.IssueCount != 1 {
+		t.Fatalf("seed state = %+v", before)
+	}
+
+	fb.failPage = 1
+	fb.failErr = errors.New("jira: 502 Bad Gateway")
+	e.Now = fixedClock(first.Add(time.Hour))
+	_, err := e.Sync(ctx, "p1", "PLAT", "", true, nil)
+	if err == nil || errors.As(err, new(*syncer.PartialSyncError)) {
+		t.Fatalf("err = %v, want a plain failure before any page landed", err)
+	}
+	after, _ := repo.SyncState(ctx, "p1")
+	if after.IssueCount != 1 {
+		t.Errorf("rows = %d, want the previous data kept when the full sync never got a page", after.IssueCount)
+	}
+	if after.LastFull != before.LastFull {
+		t.Errorf("last_full = %q, want %q", after.LastFull, before.LastFull)
+	}
+	if after.LastError != "jira: 502 Bad Gateway" {
+		t.Errorf("last error = %q", after.LastError)
+	}
+}
