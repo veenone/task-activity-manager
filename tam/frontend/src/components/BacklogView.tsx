@@ -4,6 +4,7 @@ import { ISSUE_TYPES } from "../api";
 import type { IssueQuery, Profile, Settings } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
 import { IssueTable } from "./IssueTable";
+import { IssueDetailPanel } from "./IssueDetailPanel";
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 250;
@@ -48,6 +49,7 @@ export function BacklogView() {
 
   const total = issues.data?.total ?? 0;
   const rows = issues.data?.issues ?? [];
+  const selected = rows.find((r) => r.key === selectedKey);
   const first = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const last = Math.min(total, (page + 1) * PAGE_SIZE);
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
@@ -127,7 +129,9 @@ export function BacklogView() {
             </span>
           </div>
         </div>
-        {/* The detail panel arrives in the next task and mounts here. */}
+        {selected && (
+          <IssueDetailPanel profileId={activeId} issue={selected} onClose={() => setSelectedKey("")} />
+        )}
       </div>
     </section>
   );

@@ -158,3 +158,26 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pager { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; }
 .pager-buttons { display: flex; align-items: center; gap: 8px; }
+
+/* Detail panel */
+.detail-panel { width: 352px; flex: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; max-height: calc(100vh - 200px); overflow: auto; }
+.detail-head { display: flex; align-items: center; gap: 8px; }
+.detail-key { font-size: 15px; }
+.detail-close { margin-left: auto; }
+.detail-summary { font-size: 14px; margin: 8px 0 12px; }
+.tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 0; color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: 600; }
+.tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+.field-list { display: grid; grid-template-columns: 96px 1fr; gap: 10px 8px; font-size: 12px; margin-bottom: 12px; }
+.field-list dt { color: var(--text-muted); }
+.chip-label { background: var(--surface-3); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 8px; margin-right: 4px; }
+.accent-text { color: var(--accent); }
+.detail-section-head { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; }
+.detail-section-head h3 { font-size: 12px; }
+.detail-description { white-space: pre-wrap; font-size: 12px; }
+.detail-note { margin-top: 16px; }
+.linked-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.linked-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
+.linked-key { font-weight: 600; min-width: 64px; }
+.link-group { margin-bottom: 12px; }
+.link-group-title { font-size: 12px; margin-bottom: 6px; }
