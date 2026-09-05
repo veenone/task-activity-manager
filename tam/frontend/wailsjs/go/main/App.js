@@ -14,22 +14,54 @@ export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
 
+export function GetIssueDetail(arg1, arg2) {
+  return window['go']['main']['App']['GetIssueDetail'](arg1, arg2);
+}
+
+export function GetProfileSetting(arg1, arg2) {
+  return window['go']['main']['App']['GetProfileSetting'](arg1, arg2);
+}
+
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
+}
+
+export function GetSyncState(arg1) {
+  return window['go']['main']['App']['GetSyncState'](arg1);
 }
 
 export function Health() {
   return window['go']['main']['App']['Health']();
 }
 
+export function ListIssues(arg1, arg2) {
+  return window['go']['main']['App']['ListIssues'](arg1, arg2);
+}
+
+export function ListLinkedTests(arg1, arg2) {
+  return window['go']['main']['App']['ListLinkedTests'](arg1, arg2);
+}
+
 export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
+}
+
+export function ListSprints(arg1) {
+  return window['go']['main']['App']['ListSprints'](arg1);
 }
 
 export function SetDefaultProfile(arg1) {
   return window['go']['main']['App']['SetDefaultProfile'](arg1);
 }
 
+export function SetProfileSetting(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetProfileSetting'](arg1, arg2, arg3);
+}
+
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
+}
+
+export function SyncIssues(arg1, arg2) {
+  return window['go']['main']['App']['SyncIssues'](arg1, arg2);
 }

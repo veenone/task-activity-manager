@@ -7,7 +7,7 @@ import {
   canSwitchProfile,
 } from "./syncMachine";
 import type { SyncMachineState, SyncAction } from "./syncMachine";
-import type { SyncProgress } from "../api";
+import type { SyncProgress } from "./syncMachine";
 
 const frame = (over: Partial<SyncProgress> = {}): SyncProgress => ({
   phase: "tests",
