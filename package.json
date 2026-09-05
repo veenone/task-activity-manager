@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "frontend/core",
-    "xtm/frontend"
+    "xtm/frontend",
+    "tam/frontend"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
