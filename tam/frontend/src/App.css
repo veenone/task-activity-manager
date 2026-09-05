@@ -1,0 +1,120 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  -webkit-font-smoothing: antialiased;
+}
+input, button, select { font-family: inherit; font-size: inherit; }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  grid-template-rows: 48px 1fr 28px;
+  grid-template-areas: "top top" "rail main" "rail status";
+}
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
+.brand { font-size: 15px; font-weight: 600; }
+.chip { padding: 2px 8px; border-radius: 9px; font-size: 10px; font-weight: 600; }
+.chip-demo { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning); }
+.profile-select {
+  min-width: 232px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.nav-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 8px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.nav-item {
+  text-align: left;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.nav-item:hover:not(:disabled) { background: var(--row-hover); }
+.nav-item:disabled { color: var(--text-muted); cursor: default; }
+.nav-item-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav-divider { height: 1px; margin: 12px 8px; background: var(--border); }
+.nav-section { padding: 0 14px 4px; font-size: 11px; color: var(--text-muted); }
+.nav-hint { padding: 0 14px; font-size: 10px; color: var(--text-muted); }
+
+.main { grid-area: main; padding: 20px; overflow: auto; }
+.view-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.view-head h2 { font-size: 16px; }
+.muted { color: var(--text-muted); }
+.small { font-size: 11px; }
+
+.placeholder-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+.placeholder-glyph { width: 60px; height: 44px; border-radius: 6px; background: var(--accent-soft); margin-bottom: 16px; }
+.placeholder-title { font-size: 15px; }
+.placeholder-blurb { color: var(--text-muted); }
+
+.statusbar {
+  grid-area: status;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  font-size: 11px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.statusbar-right { margin-left: auto; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-ok { background: var(--ok-text); }
+.dot-warn { background: var(--warning); }
+
+.startup-error {
+  padding: 16px;
+  border: 1px solid var(--warn-border);
+  background: var(--warn-soft);
+  border-radius: 8px;
+}
+.startup-error h2 { font-size: 14px; margin-bottom: 8px; }
+
+.profiles-modal { width: min(520px, 92vw); }
+.profile-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.profile-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; }
+.profile-row:hover { background: var(--row-hover); }
+.profile-name { font-weight: 600; flex: 1; }
+.profile-form { display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 12px; }
+.profile-form h3 { font-size: 13px; margin-bottom: 8px; }
+.check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.form-error { color: var(--danger-text); margin-bottom: 8px; }
+.about-list { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 12px 0; }
+.about-list dt { color: var(--text-muted); }

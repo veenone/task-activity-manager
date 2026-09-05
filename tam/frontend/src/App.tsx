@@ -1,0 +1,154 @@
+import { useEffect, useState } from "react";
+import { Menu, LiveRegion, useProfile, errMsg } from "@agile-suite/core";
+import { Health, EventsOn, isDemoUrl } from "./api";
+import type { HealthInfo, Profile, Settings } from "./api";
+import { VIEWS, useView } from "./nav";
+import { useModal } from "./modals";
+import { Placeholder } from "./components/Placeholder";
+import { ProfilesModal } from "./components/ProfilesModal";
+import { AboutModal } from "./components/AboutModal";
+
+// App is the shell: topbar, nav rail, the active view, and the status bar.
+// It matches docs/superpowers/specs/assets/2026-09-05-tam-scaffold-shell.svg.
+export default function App() {
+  const {
+    profiles,
+    activeId,
+    setActiveId,
+    activeProfile,
+    theme,
+    setTheme,
+    reload,
+    error: profileError,
+  } = useProfile<Profile, Settings>();
+  const { view, setView } = useView();
+  const { isOpen, openModal, closeModal } = useModal();
+  const [health, setHealth] = useState<HealthInfo | null>(null);
+
+  useEffect(() => {
+    Health()
+      .then((h) => {
+        setHealth(h);
+        if (h.ok) void reload();
+      })
+      .catch((e) =>
+        setHealth({ ok: false, error: errMsg(e), dbPath: "", sharedPath: "", logPath: "" }),
+      );
+  }, [reload]);
+
+  useEffect(() => {
+    const offProfiles = EventsOn("menu:profiles", () => openModal("profiles"));
+    const offAbout = EventsOn("menu:about", () => openModal("about"));
+    return () => {
+      offProfiles();
+      offAbout();
+    };
+  }, [openModal]);
+
+  const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
+  const demo = isDemoUrl(activeProfile?.jiraUrl);
+  const startupFailed = health !== null && !health.ok;
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <div className="topbar-left">
+          <span className="brand">Task Activity Manager</span>
+          {demo && <span className="chip chip-demo">DEMO</span>}
+          <label className="sr-only" htmlFor="profile-select">Profile</label>
+          <select
+            id="profile-select"
+            className="profile-select"
+            value={activeId}
+            onChange={(e) => setActiveId(e.target.value)}
+          >
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.projectKey})
+              </option>
+            ))}
+            {profiles.length === 0 && <option value="">No profile</option>}
+          </select>
+        </div>
+        <div className="topbar-right">
+          <button className="topbar-btn" onClick={() => openModal("profiles")}>Manage</button>
+          <Menu
+            label="Theme"
+            align="right"
+            items={["light", "dark", "system"].map((t) => ({
+              key: t,
+              label: t[0].toUpperCase() + t.slice(1),
+              checked: theme === t,
+              onClick: () => void setTheme(t),
+            }))}
+          />
+          <Menu
+            label="Help"
+            align="right"
+            items={[{ key: "about", label: "About", onClick: () => openModal("about") }]}
+          />
+        </div>
+      </header>
+
+      <nav className="nav-rail" aria-label="Views">
+        {VIEWS.map((v) => (
+          <button
+            key={v.id}
+            className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
+            aria-current={v.id === view ? "page" : undefined}
+            onClick={() => setView(v.id)}
+          >
+            {v.label}
+          </button>
+        ))}
+        <div className="nav-divider" />
+        <div className="nav-section">Suite</div>
+        <button className="nav-item" disabled title="The launcher arrives in Phase 6">
+          Tests (XTM)
+        </button>
+        <div className="nav-hint">opens Xray Test Manager</div>
+      </nav>
+
+      <main className="main">
+        {startupFailed ? (
+          <div className="startup-error" role="alert">
+            <h2>The local store could not be opened</h2>
+            <p>{health.error}</p>
+            {health.logPath && <p>Log: {health.logPath}</p>}
+          </div>
+        ) : (
+          <>
+            <div className="view-head">
+              <h2 id="view-title">{current.label}</h2>
+              {activeProfile && (
+                <span className="muted">
+                  {activeProfile.name} · {activeProfile.projectKey}
+                </span>
+              )}
+            </div>
+            <Placeholder view={current} />
+          </>
+        )}
+      </main>
+
+      <footer className="statusbar">
+        <span className={`dot ${health?.ok ? "dot-ok" : "dot-warn"}`} aria-hidden="true" />
+        <span>{health?.ok ? "Local store ready · tam.db" : "Starting up"}</span>
+        {!startupFailed && profileError ? (
+          <span className="error-text">Profiles could not be loaded: {profileError}</span>
+        ) : (
+          <span className="muted">Profiles shared with XTM · agile-suite/profiles.db</span>
+        )}
+        <span className="muted statusbar-right">Theme: {theme}</span>
+      </footer>
+
+      {/* LiveRegion's assertive channel is itself a role="alert" node, so it
+          stands down while the startup error owns that role. Nothing calls
+          announce() on this path anyway: no feature code runs without a
+          store. */}
+      {!startupFailed && <LiveRegion />}
+      {isOpen("profiles") && <ProfilesModal onClose={closeModal} />}
+      {isOpen("about") && <AboutModal onClose={closeModal} />}
+    </div>
+  );
+}

@@ -2,6 +2,8 @@
 xtm/build/bin
 node_modules
 xtm/frontend/dist
+tam/build/bin
+tam/frontend/dist
 
 # Release artifacts (produced by scripts/release.ps1)
 dist/

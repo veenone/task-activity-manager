@@ -1595,11 +1595,7 @@ export interface CRShare {
   pending: number;
 }
 
-// errMsg renders any thrown value (unknown in strict mode) as a string.
-export function errMsg(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return typeof e === "string" ? e : String(e);
-}
+export { errMsg } from "@agile-suite/core";
 
 // isDemoUrl reports whether a profile's Jira URL selects demo mode: "demo", a
 // "demo:" / "mock:" prefix, or a "demo-" variant like "demo-pkcs" that picks a

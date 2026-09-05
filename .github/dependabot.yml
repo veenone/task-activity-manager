@@ -12,17 +12,18 @@ updates:
       actions:
         patterns: ["*"]
 
-  # Go modules: the XTM app and the shared core (the root holds only go.work).
+  # Go modules: the XTM app, TAM, and the shared core (the root holds only go.work).
   - package-ecosystem: "gomod"
-    directories: ["/xtm", "/core"]
+    directories: ["/xtm", "/core", "/tam"]
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "deps"
 
-  # npm (the XTM frontend lives inside its module).
+  # npm (workspace root; the lock file and node_modules are shared across the
+  # three frontend packages).
   - package-ecosystem: "npm"
-    directory: "/xtm/frontend"
+    directory: "/"
     schedule:
       interval: "weekly"
     commit-message:

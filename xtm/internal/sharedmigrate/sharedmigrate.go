@@ -10,9 +10,40 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 const markerKey = "xtm_profiles_imported"
+
+// Tables lists the shared tables in import order. Columns names every column
+// the import copies for each; the drift test compares it with XTM's own
+// table definitions.
+var Tables = []string{"profiles", "connection", "app_setting"}
+
+var Columns = map[string][]string{
+	"profiles": {
+		"id", "name", "jira_url", "project_key", "created_at", "scope_jql",
+		"bug_issue_type", "bug_project_mode", "bug_project_key", "ca_cert",
+		"allow_untrusted_tls", "backend", "cross_project_sources",
+	},
+	"connection": {
+		"id", "workspace_id", "name", "backend", "url", "project_key", "scope_jql",
+		"bug_issue_type", "bug_project_mode", "bug_project_key", "ca_cert",
+		"allow_untrusted_tls", "role", "created_at",
+	},
+	"app_setting": {"key", "value"},
+}
+
+// copySQL builds the SELECT and INSERT OR IGNORE statements for one table from
+// its column list.
+func copySQL(table string) (selectSQL, insertSQL string, n int) {
+	cols := Columns[table]
+	list := strings.Join(cols, ", ")
+	marks := strings.TrimSuffix(strings.Repeat("?, ", len(cols)), ", ")
+	return "SELECT " + list + " FROM " + table,
+		"INSERT OR IGNORE INTO " + table + " (" + list + ") VALUES (" + marks + ")",
+		len(cols)
+}
 
 // ImportFromStore copies profiles, connection, and app_setting rows from src
 // (XTM's store) into dst (the shared database) unless dst already carries the
@@ -31,23 +62,11 @@ func ImportFromStore(src, dst *sql.DB) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := copyRows(tx, src,
-		`SELECT id, name, jira_url, project_key, created_at, scope_jql, bug_issue_type, bug_project_mode, bug_project_key, ca_cert, allow_untrusted_tls, backend, cross_project_sources FROM profiles`,
-		`INSERT OR IGNORE INTO profiles (id, name, jira_url, project_key, created_at, scope_jql, bug_issue_type, bug_project_mode, bug_project_key, ca_cert, allow_untrusted_tls, backend, cross_project_sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		13); err != nil {
-		return fmt.Errorf("copy profiles: %w", err)
-	}
-	if err := copyRows(tx, src,
-		`SELECT id, workspace_id, name, backend, url, project_key, scope_jql, bug_issue_type, bug_project_mode, bug_project_key, ca_cert, allow_untrusted_tls, role, created_at FROM connection`,
-		`INSERT OR IGNORE INTO connection (id, workspace_id, name, backend, url, project_key, scope_jql, bug_issue_type, bug_project_mode, bug_project_key, ca_cert, allow_untrusted_tls, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		14); err != nil {
-		return fmt.Errorf("copy connections: %w", err)
-	}
-	if err := copyRows(tx, src,
-		`SELECT key, value FROM app_setting`,
-		`INSERT OR IGNORE INTO app_setting (key, value) VALUES (?, ?)`,
-		2); err != nil {
-		return fmt.Errorf("copy settings: %w", err)
+	for _, table := range Tables {
+		selectSQL, insertSQL, n := copySQL(table)
+		if err := copyRows(tx, src, selectSQL, insertSQL, n); err != nil {
+			return fmt.Errorf("copy %s: %w", table, err)
+		}
 	}
 	if _, err := tx.Exec(
 		`INSERT INTO meta (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = '1'`,
