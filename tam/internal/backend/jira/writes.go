@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -107,6 +108,13 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	}
 	if d.StoryPoints != nil && ids.Points != "" {
 		fields[ids.Points] = *d.StoryPoints
+	}
+	if d.ParentKey != "" {
+		if ids.EpicLink != "" && d.Type != backend.TypeEpic {
+			fields[ids.EpicLink] = d.ParentKey
+		} else {
+			log.Printf("tam: %s has no Epic Link field; parent %s dropped from the create of %q", b.c.BaseURL(), d.ParentKey, d.Summary)
+		}
 	}
 	if len(d.Extra) > 0 {
 		kinds := map[string]string{}

@@ -24,8 +24,8 @@ var fieldColumns = map[string]string{
 	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee",
 }
 
-// draftTypes are the logical types a draft may have in plan 1b.
-var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true}
+// draftTypes are the logical types a draft may have.
+var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true}
 
 // staleDetailStamp backdates a fabricated detail cache (one writeField built
 // from nothing, rather than a real fetch) so it reads as stale at once.
@@ -276,29 +276,44 @@ func updateDraftJSON(ctx context.Context, tx *sql.Tx, profileID, key, field, val
 	return err
 }
 
-// CreateDraft inserts a placeholder row under the next temporary key and a
-// create row holding the draft as JSON. It returns the temporary key.
+// CreateDraft inserts one draft. See CreateDrafts.
 func (r *Repository) CreateDraft(ctx context.Context, profileID, projectKey string, d backend.IssueDraft) (string, error) {
-	if !draftTypes[d.Type] {
-		return "", fmt.Errorf("type %q cannot be created here; plan 1b creates tasks, stories, and bugs", d.Type)
-	}
-	if strings.TrimSpace(d.Summary) == "" {
-		return "", errors.New("summary cannot be empty")
-	}
-	d.Summary = strings.TrimSpace(d.Summary)
-	if d.Labels == nil {
-		d.Labels = []string{}
-	}
-	if d.Extra == nil {
-		d.Extra = map[string]string{}
-	}
-	encoded, err := json.Marshal(d)
+	keys, err := r.CreateDrafts(ctx, profileID, projectKey, []backend.IssueDraft{d}, "")
 	if err != nil {
-		return "", fmt.Errorf("encode draft: %w", err)
+		return "", err
+	}
+	return keys[0], nil
+}
+
+// CreateDrafts inserts placeholder rows under the next temporary keys, one
+// create row each holding the draft as JSON, in one transaction: any
+// invalid draft fails the whole batch. note lands on every audit entry
+// (the import puts the file name there). It returns the temporary keys in
+// order.
+func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey string, drafts []backend.IssueDraft, note string) ([]string, error) {
+	if len(drafts) == 0 {
+		return nil, errors.New("nothing to create")
+	}
+	for i := range drafts {
+		d := &drafts[i]
+		if !draftTypes[d.Type] {
+			return nil, fmt.Errorf("type %q cannot be created here; tasks, stories, bugs, and requirements can", d.Type)
+		}
+		if strings.TrimSpace(d.Summary) == "" {
+			return nil, errors.New("summary cannot be empty")
+		}
+		d.Summary = strings.TrimSpace(d.Summary)
+		d.ParentKey = strings.TrimSpace(d.ParentKey)
+		if d.Labels == nil {
+			d.Labels = []string{}
+		}
+		if d.Extra == nil {
+			d.Extra = map[string]string{}
+		}
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer tx.Rollback()
 
@@ -306,34 +321,43 @@ func (r *Repository) CreateDraft(ctx context.Context, profileID, projectKey stri
 	if err := tx.QueryRowContext(ctx,
 		`SELECT COALESCE(MAX(CAST(SUBSTR(key, ?) AS INTEGER)), 0) FROM issue WHERE profile_id = ? AND key LIKE ?`,
 		len(DraftPrefix)+1, profileID, DraftPrefix+"%").Scan(&last); err != nil {
-		return "", fmt.Errorf("next draft key: %w", err)
+		return nil, fmt.Errorf("next draft key: %w", err)
 	}
-	key := fmt.Sprintf("%s%d", DraftPrefix, last+1)
 	now := time.Now().UTC().Format(time.RFC3339)
-	labels, _ := json.Marshal(d.Labels)
-	var points sql.NullFloat64
-	if d.StoryPoints != nil {
-		points = sql.NullFloat64{Float64: *d.StoryPoints, Valid: true}
-	}
-	detail, _ := json.Marshal(backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
-			sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
-		VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, '', '', '', ?, '', ?, '', '', ?, ?)`,
-		profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Priority, string(labels),
-		points, now, string(detail), now); err != nil {
-		return "", fmt.Errorf("insert draft: %w", err)
-	}
-	if err := journal.Put(tx, profileID, EntityIssueCreate, key, FieldCreate, "", string(encoded), ""); err != nil {
-		return "", err
-	}
-	if err := journal.Audit(tx, profileID, EntityIssue, key, "create", "", "", d.Summary, ""); err != nil {
-		return "", err
+	keys := make([]string, 0, len(drafts))
+	for _, d := range drafts {
+		last++
+		key := fmt.Sprintf("%s%d", DraftPrefix, last)
+		encoded, err := json.Marshal(d)
+		if err != nil {
+			return nil, fmt.Errorf("encode draft: %w", err)
+		}
+		labels, _ := json.Marshal(d.Labels)
+		var points sql.NullFloat64
+		if d.StoryPoints != nil {
+			points = sql.NullFloat64{Float64: *d.StoryPoints, Valid: true}
+		}
+		detail, _ := json.Marshal(backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}})
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
+				sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
+			VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, '', '', ?, ?, '', ?, '', '', ?, ?)`,
+			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Priority, string(labels),
+			d.ParentKey, points, now, string(detail), now); err != nil {
+			return nil, fmt.Errorf("insert draft: %w", err)
+		}
+		if err := journal.Put(tx, profileID, EntityIssueCreate, key, FieldCreate, "", string(encoded), ""); err != nil {
+			return nil, err
+		}
+		if err := journal.Audit(tx, profileID, EntityIssue, key, "create", "", "", d.Summary, note); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
 	}
 	if err := tx.Commit(); err != nil {
-		return "", err
+		return nil, err
 	}
-	return key, nil
+	return keys, nil
 }
 
 // Rekey moves a draft to the key Jira assigned, across the row, its links,

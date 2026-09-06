@@ -141,6 +141,14 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 	if specs, _ := b.CreateFields(ctx, "ACME", backend.TypeTask); len(specs) != 0 {
 		t.Errorf("tasks need nothing extra: %+v", specs)
 	}
+	req, _ := b.CreateFields(ctx, "ACME", backend.TypeRequirement)
+	if len(req) != 1 || req[0].Name != "Source" || req[0].Type != "string" {
+		t.Errorf("requirement create fields: %+v", req)
+	}
+	withParent, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeStory, Summary: "Child", ParentKey: "ACME-350"})
+	if got, _ := b.GetIssue(ctx, withParent); got.ParentKey != "ACME-350" {
+		t.Errorf("parent stored: %+v", got)
+	}
 }
 
 func pts(v float64) *float64 { return &v }

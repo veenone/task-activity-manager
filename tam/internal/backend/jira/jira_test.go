@@ -86,6 +86,8 @@ func newBackend(t *testing.T, fields string) (*jirabackend.Backend, *fakeJira) {
 
 const twoFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true}]`
 
+const threeFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true}]`
+
 func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	ctx := context.Background()

@@ -203,20 +203,24 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 	b.over[key] = backend.Issue{
 		Key: key, ID: fmt.Sprintf("%d", 30000+b.nextKey), Project: projectKey, Type: d.Type, Summary: d.Summary,
 		Status: "To Do", Assignee: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
-		StoryPoints: d.StoryPoints, Created: now, Updated: now,
+		ParentKey: d.ParentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
 	}
 	b.desc[key] = d.Description
 	return key, nil
 }
 
-// CreateFields asks for one extra field on bugs, so the New issue form's
-// create-meta section can be seen offline.
+// CreateFields asks for one extra field on bugs and one on requirements,
+// so the New issue dialog's create-meta section can be seen offline for
+// both an option field and a text field.
 func (b *Backend) CreateFields(_ context.Context, _, logicalType string) ([]backend.FieldSpec, error) {
-	if logicalType != backend.TypeBug {
-		return []backend.FieldSpec{}, nil
+	switch logicalType {
+	case backend.TypeBug:
+		return []backend.FieldSpec{{
+			ID: "customfield_10050", Name: "Severity", Type: "option", Required: true,
+			AllowedValues: []backend.FieldOption{{ID: "1", Value: "Minor"}, {ID: "2", Value: "Major"}, {ID: "3", Value: "Critical"}},
+		}}, nil
+	case backend.TypeRequirement:
+		return []backend.FieldSpec{{ID: "customfield_10060", Name: "Source", Type: "string", Required: true, AllowedValues: []backend.FieldOption{}}}, nil
 	}
-	return []backend.FieldSpec{{
-		ID: "customfield_10050", Name: "Severity", Type: "option", Required: true,
-		AllowedValues: []backend.FieldOption{{ID: "1", Value: "Minor"}, {ID: "2", Value: "Major"}, {ID: "3", Value: "Critical"}},
-	}}, nil
+	return []backend.FieldSpec{}, nil
 }

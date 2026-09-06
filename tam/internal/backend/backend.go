@@ -57,14 +57,19 @@ type Issue struct {
 // the form rendered as text, keyed by Jira field id; the backend sends each
 // as a string, or as {"name": value} when the field takes an option.
 type IssueDraft struct {
-	Type        string            `json:"type"`
-	Summary     string            `json:"summary"`
-	Description string            `json:"description"`
-	Priority    string            `json:"priority"`
-	Labels      []string          `json:"labels"`
-	Assignee    string            `json:"assignee"`
-	StoryPoints *float64          `json:"storyPoints"`
-	Extra       map[string]string `json:"extra"`
+	Type        string   `json:"type"`
+	Summary     string   `json:"summary"`
+	Description string   `json:"description"`
+	Priority    string   `json:"priority"`
+	Labels      []string `json:"labels"`
+	Assignee    string   `json:"assignee"`
+	StoryPoints *float64 `json:"storyPoints"`
+
+	// ParentKey is the epic (or parent) the draft belongs under. The Jira
+	// backend sends it through the Epic Link field when it exists.
+	ParentKey string `json:"parentKey"`
+
+	Extra map[string]string `json:"extra"`
 }
 
 // SplitLabels turns the comma list the form and the journal use back into
