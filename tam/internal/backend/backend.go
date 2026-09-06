@@ -39,6 +39,12 @@ type Issue struct {
 	Rank        string   `json:"rank"`
 	Created     string   `json:"created"`
 	Updated     string   `json:"updated"`
+
+	// Pending and Draft are computed by the repository's reads, never
+	// stored: Pending says the journal holds a change for this key, Draft
+	// says the key is a local placeholder Commit has not yet created.
+	Pending bool `json:"pending"`
+	Draft   bool `json:"draft"`
 }
 
 // Link is one issue link seen from the issue that owns it.

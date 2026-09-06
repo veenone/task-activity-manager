@@ -8,17 +8,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"agile-suite/core/journal"
 	"agile-suite/core/store"
 )
 
-// Schema is TAM's database layout. Version 2 adds the issue cache, issue
-// links, per-profile sync state, and per-profile settings. Every table is
-// created with IF NOT EXISTS from Base, so a version 1 file (which had no app
-// tables) gains them on open; a migration entry is only needed when an
-// existing table changes shape.
+// Schema is TAM's local schema. Version 3 adds the shared journal tables;
+// their statements are idempotent, so an older database picks them up on
+// its next open without a migration step.
 var Schema = store.Schema{
-	Version: 2,
-	Base:    baseDDL,
+	Version: 3,
+	Base:    baseDDL + journal.DDL,
 	Indexes: indexDDL,
 }
 

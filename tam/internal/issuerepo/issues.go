@@ -19,7 +19,7 @@ const (
 
 // issueColumns is the SELECT list every row read uses, in scan order.
 const issueColumns = `key, id, project, type, summary, status, assignee, reporter, priority, labels,
-	sprint_id, sprint_name, parent_key, story_points, rank, created, updated`
+	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
 // UpsertPage writes one page of issues for the profile inside one
 // transaction. With clearFirst the profile's issues and links are deleted
@@ -32,10 +32,10 @@ func (r *Repository) UpsertPage(ctx context.Context, profileID string, page []ba
 	defer tx.Rollback()
 
 	if clearFirst {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM issue_link WHERE profile_id = ?`, profileID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM issue_link WHERE profile_id = ? AND from_key NOT LIKE ?`, profileID, DraftPrefix+"%"); err != nil {
 			return fmt.Errorf("clear links: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM issue WHERE profile_id = ?`, profileID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM issue WHERE profile_id = ? AND key NOT LIKE ?`, profileID, DraftPrefix+"%"); err != nil {
 			return fmt.Errorf("clear issues: %w", err)
 		}
 	}
@@ -191,13 +191,14 @@ type scanner interface {
 
 func scanIssue(s scanner) (backend.Issue, error) {
 	var (
-		iss    backend.Issue
-		labels string
-		points sql.NullFloat64
+		iss     backend.Issue
+		labels  string
+		points  sql.NullFloat64
+		pending int
 	)
 	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.Assignee,
 		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
-		&iss.Rank, &iss.Created, &iss.Updated); err != nil {
+		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err
 	}
 	if err := json.Unmarshal([]byte(labels), &iss.Labels); err != nil {
@@ -208,6 +209,8 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		v := points.Float64
 		iss.StoryPoints = &v
 	}
+	iss.Pending = pending != 0
+	iss.Draft = strings.HasPrefix(iss.Key, DraftPrefix)
 	return iss, nil
 }
 
