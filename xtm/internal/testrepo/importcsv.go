@@ -1,23 +1,18 @@
 package testrepo
 
 import (
-	"bytes"
 	"database/sql"
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/xuri/excelize/v2"
+	"agile-suite/core/importfile"
 )
 
 // ImportPreview is what a freshly-parsed import file looks like before mapping
 // (FR-10.5): its column headers and the number of data rows.
-type ImportPreview struct {
-	Headers  []string `json:"headers"`
-	RowCount int      `json:"rowCount"`
-}
+type ImportPreview = importfile.Preview
 
 // ImportMapping maps Test fields to spreadsheet column headers (FR-10.4). An
 // empty value means the field is unmapped. Summary is required. The step
@@ -93,10 +88,7 @@ type testCreatePayload struct {
 
 // ParseImportPreview reads the header row and counts data rows (FR-10.2 / 10.5).
 func ParseImportPreview(records [][]string) (ImportPreview, error) {
-	if len(records) == 0 {
-		return ImportPreview{}, fmt.Errorf("the file is empty")
-	}
-	return ImportPreview{Headers: records[0], RowCount: len(records) - 1}, nil
+	return importfile.ParsePreview(records)
 }
 
 // groupImportRows maps spreadsheet rows to Test payloads using a column mapping
@@ -511,10 +503,7 @@ func (r *Repository) RenameTest(profileID, oldKey, newKey string) error {
 // ParseRecords parses raw import file bytes into rows — CSV or XLSX (FR-10.1 /
 // 10.2). For XLSX the first worksheet is used.
 func ParseRecords(data []byte, isXlsx bool) ([][]string, error) {
-	if isXlsx {
-		return parseXLSX(data)
-	}
-	return readCSV(string(stripUTF8BOM(data)))
+	return importfile.ParseRecords(data, isXlsx)
 }
 
 // utf8BOMBytes is the UTF-8 byte-order mark (EF BB BF) that Excel and Windows
@@ -524,40 +513,13 @@ var utf8BOMBytes = []byte{0xEF, 0xBB, 0xBF}
 
 // stripUTF8BOM removes a leading UTF-8 BOM so the first column header (commonly
 // Summary) maps cleanly and gap analysis can proceed.
-func stripUTF8BOM(data []byte) []byte {
-	return bytes.TrimPrefix(data, utf8BOMBytes)
-}
+func stripUTF8BOM(data []byte) []byte { return importfile.StripUTF8BOM(data) }
 
 // readCSV parses CSV content leniently (variable field counts allowed).
-func readCSV(content string) ([][]string, error) {
-	reader := csv.NewReader(strings.NewReader(content))
-	reader.FieldsPerRecord = -1
-	reader.TrimLeadingSpace = true
-	records, err := reader.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("parse CSV: %w", err)
-	}
-	return records, nil
-}
+func readCSV(content string) ([][]string, error) { return importfile.ReadCSV(content) }
 
 // parseXLSX reads the first worksheet of an XLSX file into rows (FR-10.1).
-func parseXLSX(data []byte) ([][]string, error) {
-	f, err := excelize.OpenReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("open xlsx: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
-	sheets := f.GetSheetList()
-	if len(sheets) == 0 {
-		return nil, fmt.Errorf("the workbook has no sheets")
-	}
-	rows, err := f.GetRows(sheets[0])
-	if err != nil {
-		return nil, fmt.Errorf("read xlsx rows: %w", err)
-	}
-	return rows, nil
-}
+func parseXLSX(data []byte) ([][]string, error) { return importfile.ParseXLSX(data) }
 
 // ImportTemplateCSV returns a starter CSV with the supported columns (FR-10.3),
 // matching the current Test fields (Components included) and the export column
