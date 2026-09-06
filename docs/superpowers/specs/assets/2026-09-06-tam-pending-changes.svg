@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="800" viewBox="0 0 1240 800" font-family="Segoe UI, system-ui, sans-serif" font-size="13">
+  <defs>
+    <style>
+      .txt{fill:#1F2937}.muted{fill:#6B7280}.sm{font-size:11px}.xs{font-size:10px}.b{font-weight:600}
+      .surface{fill:#FFFFFF;stroke:#E1E4EA}.row-alt{fill:#FAFBFC}.row-sel{fill:#E8ECFB}
+      .accent{fill:#3B5BDB}.accent-txt{fill:#3B5BDB}.danger-txt{fill:#B42318}
+    </style>
+  </defs>
+
+  <!-- Plan 1b: the Pending changes dialog over the Backlog, after a Commit
+       that pushed two issues and held one back on a conflict. -->
+
+  <rect width="1240" height="800" fill="#F7F8FA"/>
+
+  <!-- ===== topbar (dimmed under the overlay) ===== -->
+  <rect x="0" y="0" width="1240" height="48" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="20" y="30" class="txt b" font-size="15">Task Activity Manager</text>
+  <rect x="212" y="15" width="48" height="18" rx="9" fill="#FEF3C7" stroke="#F59E0B"/>
+  <text x="222" y="28" class="xs b" fill="#92400E">DEMO</text>
+  <rect x="284" y="11" width="232" height="26" rx="4" class="surface"/>
+  <text x="294" y="28" class="txt">Acme Platform (PLAT)</text>
+  <rect x="986" y="11" width="88" height="26" rx="4" class="surface"/>
+  <text x="998" y="28" class="txt">Manage</text>
+  <rect x="1086" y="11" width="66" height="26" rx="4" class="surface"/>
+  <text x="1105" y="28" class="muted">Sync</text>
+  <rect x="1164" y="11" width="56" height="26" rx="4" class="surface"/>
+  <text x="1180" y="28" class="txt">Help</text>
+
+  <!-- ===== nav rail ===== -->
+  <rect x="0" y="48" width="180" height="724" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <rect x="8" y="64" width="164" height="32" rx="6" class="row-sel"/>
+  <text x="22" y="85" class="accent-txt b">Backlog</text>
+  <text x="22" y="125" class="txt">Epics</text>
+  <text x="22" y="165" class="txt">Boards</text>
+  <text x="22" y="205" class="txt">Reports</text>
+  <text x="22" y="245" class="txt">Rituals</text>
+
+  <!-- ===== backlog behind the dialog: three rows with the pending dot and a draft ===== -->
+  <text x="200" y="80" class="txt b" font-size="17">Backlog</text>
+  <text x="272" y="80" class="muted">PLAT · 1,249 issues</text>
+  <rect x="200" y="96" width="300" height="28" rx="4" class="surface"/>
+  <text x="212" y="114" class="muted">Search summary, key, label</text>
+  <rect x="1084" y="96" width="76" height="28" rx="4" class="accent"/>
+  <text x="1100" y="114" fill="#FFFFFF" class="b">+ New</text>
+  <rect x="200" y="136" width="1020" height="620" class="surface"/>
+  <rect x="200" y="136" width="1020" height="30" fill="#F3F4F6" stroke="#E1E4EA"/>
+  <g class="sm b muted">
+    <text x="212" y="156">KEY</text><text x="300" y="156">TYPE</text><text x="360" y="156">SUMMARY</text>
+    <text x="820" y="156">STATUS</text><text x="920" y="156">ASSIGNEE</text><text x="1040" y="156">SPRINT</text><text x="1110" y="156">PTS</text>
+  </g>
+  <g class="sm">
+    <rect x="200" y="166" width="1020" height="34" fill="#FFFFFF"/>
+    <text x="212" y="188" class="txt b">TAM-NEW-1</text>
+    <rect x="300" y="176" width="36" height="16" rx="8" fill="#DBEAFE"/><text x="307" y="188" fill="#1E40AF" class="xs b">Task</text>
+    <text x="360" y="188" class="txt">Add a retry to the payment webhook consumer</text>
+    <rect x="820" y="176" width="44" height="16" rx="3" fill="#FEF3C7"/><text x="828" y="188" fill="#92400E" class="xs b">Draft</text>
+    <text x="920" y="188" class="txt">M. Ortiz</text><text x="1040" y="188" class="txt">-</text><text x="1110" y="188" class="txt">3</text>
+    <circle cx="1196" cy="183" r="3.5" fill="#F59E0B"/>
+    <rect x="200" y="200" width="1020" height="34" class="row-alt"/>
+    <text x="212" y="222" class="txt">PLAT-412</text>
+    <rect x="300" y="210" width="40" height="16" rx="8" fill="#DCFCE7"/><text x="307" y="222" fill="#166534" class="xs b">Story</text>
+    <text x="360" y="222" class="txt">Checkout: apply promo code at payment step</text>
+    <rect x="820" y="210" width="72" height="16" rx="3" fill="#DBEAFE"/><text x="826" y="222" fill="#1E40AF" class="xs b">In Progress</text>
+    <text x="920" y="222" class="txt">R. Anand</text><text x="1040" y="222" class="txt">12</text><text x="1110" y="222" class="txt">8</text>
+    <circle cx="1196" cy="217" r="3.5" fill="#F59E0B"/>
+    <rect x="200" y="234" width="1020" height="34" fill="#FFFFFF"/>
+    <text x="212" y="256" class="txt">PLAT-409</text>
+    <rect x="300" y="244" width="36" height="16" rx="8" fill="#DBEAFE"/><text x="307" y="256" fill="#1E40AF" class="xs b">Task</text>
+    <text x="360" y="256" class="txt">Rotate payment gateway API keys</text>
+    <rect x="820" y="244" width="44" height="16" rx="3" fill="#F3F4F6"/><text x="828" y="256" fill="#374151" class="xs b">To Do</text>
+    <text x="920" y="256" class="txt">-</text><text x="1040" y="256" class="txt">12</text><text x="1110" y="256" class="txt">2</text>
+  </g>
+
+  <!-- ===== overlay ===== -->
+  <rect x="0" y="0" width="1240" height="800" fill="#111827" opacity="0.35"/>
+
+  <!-- ===== Pending changes dialog ===== -->
+  <rect x="270" y="110" width="700" height="580" rx="8" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="294" y="144" class="txt b" font-size="15">Pending changes</text>
+  <text x="430" y="144" class="muted">3 changes on 2 issues, plus 1 new issue</text>
+  <text x="944" y="144" class="muted">x</text>
+
+  <!-- commit result banner -->
+  <rect x="294" y="160" width="652" height="44" rx="4" fill="#FEF3C7" stroke="#F59E0B"/>
+  <text x="308" y="178" class="txt b sm">Last commit: 1 issue pushed, 1 created (TAM-NEW-2 is now PLAT-501), 1 held back.</text>
+  <text x="308" y="195" class="sm" fill="#92400E">PLAT-412 changed in Jira since you edited it. Resolve it below, then commit again.</text>
+
+  <!-- group: conflict -->
+  <rect x="294" y="218" width="652" height="176" rx="6" fill="#FFF7ED" stroke="#F59E0B"/>
+  <text x="308" y="242" class="txt b">PLAT-412</text>
+  <text x="378" y="242" class="txt">Checkout: apply promo code at payment step</text>
+  <rect x="846" y="228" width="86" height="18" rx="9" fill="#FEE2E2" stroke="#F87171"/>
+  <text x="858" y="241" class="xs b" fill="#991B1B">CONFLICT</text>
+  <g class="sm">
+    <text x="308" y="268" class="muted b">Field</text><text x="420" y="268" class="muted b">Base</text><text x="580" y="268" class="muted b">Mine</text><text x="740" y="268" class="muted b">Remote</text>
+    <line x1="308" y1="274" x2="932" y2="274" stroke="#E1E4EA"/>
+    <text x="308" y="292" class="txt">Story points</text><text x="420" y="292" class="txt">5</text><text x="580" y="292" class="txt b">8</text><text x="740" y="292" class="danger-txt">13</text>
+    <text x="308" y="314" class="txt">Labels</text><text x="420" y="314" class="txt">checkout, promo</text><text x="580" y="314" class="txt b">checkout, promo, q3</text><text x="740" y="314" class="txt">checkout, promo</text>
+    <text x="308" y="340" class="muted xs">Base is the value when you edited. Remote is Jira now. Override pushes Mine over Remote; Keep remote drops your edits.</text>
+  </g>
+  <rect x="308" y="354" width="90" height="26" rx="4" class="accent"/>
+  <text x="326" y="371" fill="#FFFFFF" class="b sm">Override</text>
+  <rect x="406" y="354" width="104" height="26" rx="4" class="surface"/>
+  <text x="420" y="371" class="txt sm">Keep remote</text>
+
+  <!-- group: draft -->
+  <rect x="294" y="408" width="652" height="96" rx="6" class="surface"/>
+  <text x="308" y="432" class="txt b">TAM-NEW-1</text>
+  <rect x="396" y="418" width="44" height="18" rx="9" fill="#FEF3C7" stroke="#F59E0B"/>
+  <text x="405" y="431" class="xs b" fill="#92400E">Draft</text>
+  <text x="452" y="432" class="txt">Add a retry to the payment webhook consumer</text>
+  <g class="sm">
+    <text x="308" y="458" class="muted">New Task in PLAT · priority Medium · assignee M. Ortiz · 3 points</text>
+    <text x="308" y="480" class="muted">Commit creates it in Jira and swaps the temporary key for the real one.</text>
+  </g>
+  <rect x="856" y="418" width="76" height="24" rx="4" class="surface"/>
+  <text x="870" y="434" class="txt sm">Discard</text>
+
+  <!-- group: edit -->
+  <rect x="294" y="518" width="652" height="92" rx="6" class="surface"/>
+  <text x="308" y="542" class="txt b">PLAT-409</text>
+  <text x="378" y="542" class="txt">Rotate payment gateway API keys</text>
+  <g class="sm">
+    <text x="308" y="568" class="muted">Assignee</text><text x="420" y="568" class="txt">(none)</text><text x="520" y="568" class="muted">to</text><text x="548" y="568" class="txt b">M. Ortiz</text>
+    <text x="308" y="590" class="muted">Priority</text><text x="420" y="590" class="txt">Medium</text><text x="520" y="590" class="muted">to</text><text x="548" y="590" class="txt b">High</text>
+  </g>
+  <rect x="856" y="528" width="76" height="24" rx="4" class="surface"/>
+  <text x="870" y="544" class="txt sm">Discard</text>
+
+  <!-- footer actions -->
+  <line x1="294" y1="628" x2="946" y2="628" stroke="#E1E4EA"/>
+  <text x="294" y="656" class="muted sm">Edits are pushed with Jira's own field update; a conflict holds only that issue back.</text>
+  <rect x="716" y="642" width="104" height="30" rx="4" class="surface"/>
+  <text x="732" y="662" class="txt">Discard all</text>
+  <rect x="830" y="642" width="116" height="30" rx="4" class="accent"/>
+  <text x="852" y="662" fill="#FFFFFF" class="b">Commit (2)</text>
+
+  <!-- ===== status bar ===== -->
+  <rect x="0" y="772" width="1240" height="28" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="196" y="790" class="muted sm">1,249 issues, last synced today 10:42</text>
+  <rect x="1000" y="777" width="154" height="18" rx="9" fill="#FEF3C7" stroke="#F59E0B"/>
+  <text x="1010" y="790" class="xs b" fill="#92400E">3 pending changes: Commit</text>
+</svg>
