@@ -2,6 +2,7 @@ package jira_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,7 +19,10 @@ import (
 type fakeJira struct {
 	fieldCalls int32
 	searches   []string
-	fields     string // the /rest/api/2/field body
+	fields     string   // the /rest/api/2/field body
+	writes     []string // "METHOD path body" for every PUT and POST
+	createKey  string   // key the POST /issue answers with
+	createFail bool     // POST /issue answers 400
 }
 
 func (f *fakeJira) handler(t *testing.T) http.Handler {
@@ -36,6 +40,30 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5}},
 				{"id":"2","key":"PLAT-388","fields":{"summary":"Single use","status":{"name":"Approved"},"issuetype":{"name":"Business Requirement"},"project":{"key":"PLAT"},"labels":["promo"]}}
 			]}`))
+		case r.Method == http.MethodPut || r.Method == http.MethodPost:
+			body, _ := io.ReadAll(r.Body)
+			f.writes = append(f.writes, r.Method+" "+r.URL.Path+" "+string(body))
+			if r.URL.Path == "/rest/api/2/issue" {
+				if f.createFail {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"errorMessages":[],"errors":{"customfield_10050":"Severity is required."}}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"id":"9001","key":"` + f.createKey + `"}`))
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/rest/api/2/issue/createmeta":
+			f.searches = append(f.searches, "createmeta "+r.URL.RawQuery)
+			_, _ = w.Write([]byte(`{"projects":[{"key":"PLAT","issuetypes":[{"name":"Bug","fields":{
+				"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},
+				"project":{"required":true,"name":"Project","schema":{"type":"project"}},
+				"issuetype":{"required":true,"name":"Issue Type","schema":{"type":"issuetype"}},
+				"customfield_10016":{"required":true,"name":"Story Points","schema":{"type":"number"}},
+				"customfield_10050":{"required":true,"name":"Severity","schema":{"type":"option"},"allowedValues":[{"id":"1","value":"Minor"},{"id":"3","value":"Critical"}]},
+				"components":{"required":true,"name":"Component/s","schema":{"type":"array","items":"component"},"allowedValues":[{"id":"100","name":"Checkout"}]},
+				"environment":{"required":false,"name":"Environment","schema":{"type":"string"}}
+			}}]}]}`))
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/PLAT-412"):
 			_, _ = w.Write([]byte(`{"id":"1","key":"PLAT-412","fields":{"description":"As a shopper","issuelinks":[{"type":{"name":"Tested By"},"inwardIssue":{"key":"XT-1018","fields":{"summary":"Applies discount","issuetype":{"name":"Test"}}}}],"customfield_10016":5}}`))
 		case r.URL.Path == "/rest/api/2/project/PLAT":

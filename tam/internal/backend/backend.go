@@ -101,6 +101,24 @@ func ParsePoints(s string) (*float64, error) {
 	return &v, nil
 }
 
+// FieldSpec is one create-meta field the New issue form must ask for
+// because Jira requires it and the form does not already carry it. Type is
+// string, option, number, date, or array; option and array fields list
+// their AllowedValues.
+type FieldSpec struct {
+	ID            string        `json:"id"`
+	Name          string        `json:"name"`
+	Type          string        `json:"type"`
+	Required      bool          `json:"required"`
+	AllowedValues []FieldOption `json:"allowedValues"`
+}
+
+// FieldOption is one allowed value of an option field.
+type FieldOption struct {
+	ID    string `json:"id"`
+	Value string `json:"value"`
+}
+
 // Link is one issue link seen from the issue that owns it.
 type Link struct {
 	Direction string `json:"direction"` // "outward" or "inward"
@@ -144,4 +162,16 @@ type IssueBackend interface {
 	// links, and the custom fields.
 	GetIssueDetail(ctx context.Context, key string) (IssueDetail, error)
 	IssueTypes(ctx context.Context, projectKey string) ([]IssueType, error)
+	// GetIssue reads one issue's row fields, for the version check before a
+	// commit and the refresh after it.
+	GetIssue(ctx context.Context, key string) (Issue, error)
+	// UpdateIssue pushes edited fields, keyed by the logical field name
+	// (summary, description, priority, labels, storyPoints, assignee) with
+	// the text form the journal holds.
+	UpdateIssue(ctx context.Context, key string, fields map[string]string) error
+	// CreateIssue creates the draft and returns the key Jira assigned.
+	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, error)
+	// CreateFields lists the required create-meta fields of a logical type
+	// that the New issue form does not already carry.
+	CreateFields(ctx context.Context, projectKey, logicalType string) ([]FieldSpec, error)
 }

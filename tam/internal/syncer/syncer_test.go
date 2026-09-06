@@ -57,6 +57,18 @@ func (f *fake) GetIssueDetail(context.Context, string) (backend.IssueDetail, err
 	return backend.IssueDetail{}, errors.New("not used")
 }
 func (f *fake) IssueTypes(context.Context, string) ([]backend.IssueType, error) { return nil, nil }
+func (f *fake) GetIssue(context.Context, string) (backend.Issue, error) {
+	return backend.Issue{}, errors.New("not used")
+}
+func (f *fake) UpdateIssue(context.Context, string, map[string]string) error {
+	return errors.New("not used")
+}
+func (f *fake) CreateIssue(context.Context, string, backend.IssueDraft) (string, error) {
+	return "", errors.New("not used")
+}
+func (f *fake) CreateFields(context.Context, string, string) ([]backend.FieldSpec, error) {
+	return nil, errors.New("not used")
+}
 
 func issue(key, typ string) backend.Issue {
 	return backend.Issue{Key: key, ID: key, Project: "PLAT", Type: typ, Summary: key, Status: "To Do", Rank: key, Updated: "2026-09-01T00:00:00Z"}
@@ -237,6 +249,18 @@ func (c *cancelOnSearch) GetIssueDetail(context.Context, string) (backend.IssueD
 }
 func (c *cancelOnSearch) IssueTypes(context.Context, string) ([]backend.IssueType, error) {
 	return nil, nil
+}
+func (c *cancelOnSearch) GetIssue(context.Context, string) (backend.Issue, error) {
+	return backend.Issue{}, errors.New("not used")
+}
+func (c *cancelOnSearch) UpdateIssue(context.Context, string, map[string]string) error {
+	return errors.New("not used")
+}
+func (c *cancelOnSearch) CreateIssue(context.Context, string, backend.IssueDraft) (string, error) {
+	return "", errors.New("not used")
+}
+func (c *cancelOnSearch) CreateFields(context.Context, string, string) ([]backend.FieldSpec, error) {
+	return nil, errors.New("not used")
 }
 
 func TestCancelledSyncStillRecordsLastError(t *testing.T) {
