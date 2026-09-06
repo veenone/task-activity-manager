@@ -11,7 +11,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -53,9 +53,11 @@ beforeEach(() => {
     { key: "XT-1019", summary: "Expired promo code rejected", linkType: "Tested By" },
   ]);
   vi.mocked(api.EditIssue).mockResolvedValue();
+  vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([
-    { id: 4, occurredAt: "2026-09-06T10:10:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "commit", field: "create", beforeVal: "", afterVal: "{\"summary\":\"x\"}", note: "" },
-    { id: 3, occurredAt: "2026-09-06T10:07:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "discard", field: "create", beforeVal: "{\"summary\":\"x\"}", afterVal: "", note: "" },
+    { id: 5, occurredAt: "2026-09-06T10:10:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "commit", field: "create", beforeVal: "", afterVal: "{\"summary\":\"x\"}", note: "" },
+    { id: 4, occurredAt: "2026-09-06T10:07:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "discard", field: "create", beforeVal: "{\"summary\":\"x\"}", afterVal: "", note: "" },
+    { id: 3, occurredAt: "2026-09-06T10:06:00Z", actor: "araha", entityType: "link", entityKey: "PLAT-412", action: "link", field: "Relates|outward|XT-1018", beforeVal: "", afterVal: "XT-1018", note: "" },
     { id: 2, occurredAt: "2026-09-06T10:05:00Z", actor: "araha", entityType: "issue", entityKey: "PLAT-412", action: "edit", field: "storyPoints", beforeVal: "5", afterVal: "8", note: "" },
     { id: 1, occurredAt: "2026-09-06T10:00:00Z", actor: "araha", entityType: "issue", entityKey: "PLAT-412", action: "edit", field: "summary", beforeVal: "Checkout: apply promo code", afterVal: "Checkout: apply promo code at payment step", note: "" },
   ]);
@@ -201,11 +203,12 @@ describe("IssueDetailPanel write path", () => {
     renderPanel();
     await user.click(await screen.findByRole("tab", { name: "Activity" }));
     const items = await screen.findAllByRole("listitem");
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(5);
     expect(items[0]).toHaveTextContent("araha pushed the draft to Jira");
     expect(items[1]).toHaveTextContent("araha discarded the draft");
-    expect(items[2]).toHaveTextContent("araha edited Story points: 5 to 8");
-    expect(items[3]).toHaveTextContent("araha edited Summary");
+    expect(items[2]).toHaveTextContent("araha added a link: Relates (outward) to XT-1018");
+    expect(items[3]).toHaveTextContent("araha edited Story points: 5 to 8");
+    expect(items[4]).toHaveTextContent("araha edited Summary");
     expect(api.ListActivity).toHaveBeenCalledWith("p1", "PLAT-412", 200);
   });
 
@@ -217,5 +220,24 @@ describe("IssueDetailPanel write path", () => {
     );
     expect(await screen.findByText("Draft", { selector: "span.chip-draft" })).toBeInTheDocument();
     expect(screen.getByText("Commit creates this issue in Jira and gives it a real key.")).toBeInTheDocument();
+  });
+
+  it("marks a pending link on the Links tab and discards it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetIssueDetail).mockResolvedValue({
+      key: "PLAT-412", description: "d", fields: {},
+      links: [
+        { direction: "inward", type: "Tested By", key: "XT-1018", summary: "Promo code applies discount", issueType: "Test" },
+        { direction: "outward", type: "Relates", key: "XT-1031", summary: "Retried payment is not charged twice", issueType: "Test", pending: true, pendingId: 41 },
+      ],
+    });
+    vi.mocked(api.DiscardPendingChange).mockResolvedValue();
+    renderPanel();
+    await user.click(await screen.findByRole("tab", { name: "Links" }));
+    const row = (await screen.findByText("XT-1031")).closest("li")!;
+    expect(row).toHaveTextContent("pending");
+    await user.click(within(row).getByRole("button", { name: "Discard link to XT-1031" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 41));
+    expect(screen.getByRole("heading", { name: "Add link" })).toBeInTheDocument();
   });
 });

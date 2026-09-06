@@ -12,9 +12,8 @@ interface Props {
   onCreated: (key: string) => void;
 }
 
-// CREATABLE are the types plan 1b can draft. Requirements and epics arrive
-// with plan 1c.
-const CREATABLE: IssueType[] = ["task", "story", "bug"];
+// CREATABLE are the types this app can draft. Epics arrive later.
+const CREATABLE: IssueType[] = ["task", "story", "bug", "requirement"];
 
 // MetaField renders one create-meta field by its schema type: a select for
 // option and array fields with values, a date or number input, or text.
@@ -92,7 +91,7 @@ export function NewIssueModal({ onClose, onCreated }: Props) {
       priority: priority.trim(),
       labels: labels.split(",").map((l) => l.trim()).filter(Boolean),
       assignee: assignee.trim(),
-      storyPoints: points.trim() === "" ? null : Number(points.trim()),
+      storyPoints: type === "requirement" || points.trim() === "" ? null : Number(points.trim()),
       extra: Object.fromEntries(Object.entries(extra).filter(([, v]) => v.trim() !== "")),
     };
     setError("");
@@ -145,10 +144,12 @@ export function NewIssueModal({ onClose, onCreated }: Props) {
           <span className="muted small">Assignee</span>
           <input id="new-assignee" className="detail-input" type="text" placeholder="Jira username" value={assignee} onChange={(e) => setAssignee(e.target.value)} />
         </label>
-        <label className="edit-row" htmlFor="new-points">
-          <span className="muted small">Story points</span>
-          <input id="new-points" className="detail-input" type="text" inputMode="decimal" value={points} onChange={(e) => setPoints(e.target.value)} />
-        </label>
+        {type !== "requirement" && (
+          <label className="edit-row" htmlFor="new-points">
+            <span className="muted small">Story points</span>
+            <input id="new-points" className="detail-input" type="text" inputMode="decimal" value={points} onChange={(e) => setPoints(e.target.value)} />
+          </label>
+        )}
 
         <div className="meta-fields">
           {meta.isError ? (

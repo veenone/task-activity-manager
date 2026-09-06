@@ -1,11 +1,13 @@
 import { useState } from "react";
 import type { Issue, Link } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
+import { useDiscardById } from "../queries/pending";
 import { formatWhen } from "../lib/format";
 import { useSync } from "../contexts/SyncContext";
 import { TypeChip } from "./TypeChip";
 import { EditableFields } from "./EditableFields";
 import { ActivityTab } from "./ActivityTab";
+import { AddLinkForm } from "./AddLinkForm";
 
 type Tab = "details" | "links" | "tests" | "activity";
 
@@ -29,6 +31,7 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("details");
   const detail = useIssueDetail(profileId, issue.key);
   const tests = useLinkedTests(profileId, issue.key);
+  const discardLink = useDiscardById(profileId);
   // A sync or commit running elsewhere must not race a save: the row refresh
   // that follows either one can overwrite an edit made while it was in flight.
   const { status } = useSync();
@@ -112,8 +115,12 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
           ) : detail.data.links.length === 0 ? (
             <p className="muted">No links.</p>
           ) : (
-            <LinkGroups links={detail.data.links} />
+            <LinkGroups
+              links={detail.data.links}
+              onDiscard={(id, key) => discardLink.mutate({ id, key: issue.key }, { onError: () => undefined })}
+            />
           )}
+          <AddLinkForm profileId={profileId} issueKey={issue.key} onAdded={() => void detail.refetch()} />
         </div>
       )}
 
@@ -156,8 +163,8 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
 }
 
 // LinkGroups lists links grouped by type, then direction, in the order the
-// store returns them.
-function LinkGroups({ links }: { links: Link[] }) {
+// store returns them, and marks a link still pending a Commit.
+function LinkGroups({ links, onDiscard }: { links: Link[]; onDiscard: (id: number, key: string) => void }) {
   const groups = new Map<string, Link[]>();
   for (const l of links) {
     const k = `${l.type} (${l.direction})`;
@@ -174,6 +181,13 @@ function LinkGroups({ links }: { links: Link[] }) {
                 <span className="accent-text linked-key">{l.key}</span>
                 <span>{l.summary}</span>
                 <span className="muted small">{l.issueType}</span>
+                {l.pending && (
+                  <>
+                    <span className="pending-dot" role="img" aria-label="Pending changes" />
+                    <span className="muted small">pending</span>
+                    <button type="button" className="btn btn-ghost" aria-label={`Discard link to ${l.key}`} onClick={() => onDiscard(l.pendingId ?? 0, l.key)}>Discard</button>
+                  </>
+                )}
               </li>
             ))}
           </ul>

@@ -12,4 +12,5 @@ export const keys = {
   pending: (profileId: string) => [profileId, "pending"] as const,
   activity: (profileId: string, key: string) => [profileId, "issue", key, "activity"] as const,
   createFields: (profileId: string, type: string) => [profileId, "createFields", type] as const,
+  linkTypes: (profileId: string) => [profileId, "linkTypes"] as const,
 };

@@ -112,4 +112,19 @@ describe("NewIssueModal", () => {
     await user.click(within(dialog).getByRole("button", { name: "Create draft" }));
     expect(await within(dialog).findByText(/summary cannot be empty/)).toBeInTheDocument();
   });
+
+  it("offers Requirement and hides story points for it", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New issue" });
+    expect(within(dialog).getByLabelText("Story points")).toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "requirement");
+    expect(within(dialog).queryByLabelText("Story points")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Summary"), "Single-use promo codes");
+    await user.click(within(dialog).getByRole("button", { name: "Create draft" }));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.type).toBe("requirement");
+    expect(draft.storyPoints).toBeNull();
+  });
 });

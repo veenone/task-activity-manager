@@ -241,3 +241,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .import-file { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .import-mapping { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
 .import-mapping-head { display: grid; grid-template-columns: 96px 1fr; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+
+/* Plan 1c: links */
+.add-link { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.add-link h3 { margin: 0; font-size: 13px; }
+.add-link-key { display: flex; gap: 6px; }
+.add-link-key .detail-input { flex: 1; }
+.linked-row .pending-dot { margin-left: 4px; }
+.pending-row-link { grid-template-columns: 110px auto auto 1fr auto; }

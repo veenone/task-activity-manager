@@ -52,6 +52,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
     setError("");
     setResult(null);
     setPreview(null);
+    setNote("");
     setBusy(true);
     try {
       const b64 = await readFileAsBase64(file);
@@ -117,7 +118,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
             {picked.name}: <span>{`${plural(preview.headers.length, "column", "columns")}, ${plural(preview.rowCount, "row", "rows")}`}</span>
           </p>
         )}
-        <button type="button" className="btn btn-ghost" onClick={() => void template()}>Download template</button>
+        <button type="button" className="btn btn-ghost" disabled={locked} onClick={() => void template()}>Download template</button>
         {note && <span className="muted small" role="status">{note}</span>}
       </div>
 

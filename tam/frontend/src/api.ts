@@ -91,6 +91,8 @@ export interface Link {
   key: string;
   summary: string;
   issueType: string;
+  pending?: boolean;
+  pendingId?: number;
 }
 
 export interface IssueDetail {
@@ -220,9 +222,32 @@ export interface Conflict {
   fields: FieldConflict[];
 }
 
+export interface LinkType {
+  name: string;
+  inward: string;
+  outward: string;
+}
+
+export interface LinkDraft {
+  type: string;
+  direction: "outward" | "inward";
+  toKey: string;
+  toSummary: string;
+  toType: string;
+}
+
+// linkPhrase words a link the way Jira does: "PLAT-1 blocks PAY-7" reads
+// from the type's outward wording, "is blocked by" from its inward one.
+export function linkPhrase(types: LinkType[], type: string, direction: string): string {
+  const t = types.find((x) => x.name === type);
+  if (!t) return direction === "inward" ? `${type} (inward)` : type;
+  return direction === "inward" ? t.inward : t.outward;
+}
+
 export interface CommitResult {
   committed: string[];
   created: { tempKey: string; key: string }[];
+  linked: { key: string; toKey: string; type: string }[];
   conflicts: Conflict[];
   failures: { key: string; error: string }[];
   remaining: number;
@@ -351,6 +376,14 @@ export const ImportIssues = (
 ): Promise<ImportResult> =>
   App.ImportIssues(profileId, contentB64, isXlsx, fileName, importer.Mapping.createFrom(mapping), dryRun) as Promise<ImportResult>;
 export const SaveImportTemplate: () => Promise<string> = App.SaveImportTemplate;
+
+export const GetLinkTypes: (profileId: string) => Promise<LinkType[]> = App.GetLinkTypes;
+// LookupIssue is cast the same way ListIssues is above: the generated
+// binding types the issue type as a plain string, narrowed to IssueType here.
+export const LookupIssue = (profileId: string, key: string): Promise<Issue> =>
+  App.LookupIssue(profileId, key) as Promise<Issue>;
+export const AddLink = (profileId: string, key: string, link: LinkDraft): Promise<void> =>
+  App.AddLink(profileId, key, backend.LinkDraft.createFrom(link));
 
 // isDemoUrl mirrors suiteprofiles.IsDemoURL in the backend: "demo" on its own
 // or a "demo:" / "demo-" variant selects the offline dataset.
