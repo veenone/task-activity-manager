@@ -54,7 +54,10 @@ export function AddLinkForm({ profileId, issueKey, onAdded }: Props) {
     e.preventDefault();
     if (!target || !selected) return;
     const [type, direction] = selected.split("|") as [string, "outward" | "inward"];
-    const link: LinkDraft = { type, direction, toKey: target.key, toSummary: target.summary, toType: target.type };
+    // target.type is the logical lowercase type (empty for a foreign Test);
+    // capitalise it for the draft so pending and pushed link cards read alike.
+    const toType = target.type ? target.type[0].toUpperCase() + target.type.slice(1) : "Issue";
+    const link: LinkDraft = { type, direction, toKey: target.key, toSummary: target.summary, toType };
     setError("");
     try {
       await add.mutateAsync({ key: issueKey, link });

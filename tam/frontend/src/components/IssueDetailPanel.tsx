@@ -185,7 +185,7 @@ function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard
           <h3 className="link-group-title">{label.replace(/ \((inward|outward)\)$/, "")} <span className="muted small">{label.match(/\((inward|outward)\)$/)?.[1]}</span></h3>
           <ul className="linked-list">
             {items.map((l) => (
-              <li key={`${l.direction}-${l.key}`} className="linked-row">
+              <li key={`${l.type}-${l.direction}-${l.key}`} className="linked-row">
                 <span className="accent-text linked-key">{l.key}</span>
                 <span>{l.summary}</span>
                 <span className="muted small">{l.issueType}</span>

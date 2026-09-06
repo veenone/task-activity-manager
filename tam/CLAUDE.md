@@ -33,7 +33,7 @@ The demo backend keeps writes in memory, hands out keys from 500, and
 stages one conflict: the first Commit of an edit to the curated story
 (`<project>-412`) is held back. Editable fields are summary, description,
 priority, labels, story points, and assignee; drafts can be tasks, stories,
-and bugs. Requirements, Excel import, and cross-project links are plan 1c.
+bugs, and requirements. Excel import and cross-project links are plan 1c.
 
 ## The write features (plan 1c)
 

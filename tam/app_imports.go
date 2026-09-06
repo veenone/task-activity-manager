@@ -15,11 +15,18 @@ import (
 	"agile-suite/tam/internal/importer"
 )
 
+// maxImportBytes is the largest decoded upload ImportIssues and PreviewImport
+// accept.
+const maxImportBytes = 20 * 1024 * 1024
+
 // decodeImport base64-decodes an uploaded file and parses it into rows.
 func decodeImport(contentB64 string, isXlsx bool) ([][]string, error) {
 	data, err := base64.StdEncoding.DecodeString(contentB64)
 	if err != nil {
 		return nil, fmt.Errorf("decode upload: %w", err)
+	}
+	if len(data) > maxImportBytes {
+		return nil, errors.New("the file is larger than 20 MB")
 	}
 	return importfile.ParseRecords(data, isXlsx)
 }

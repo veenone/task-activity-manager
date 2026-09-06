@@ -51,7 +51,7 @@ describe("AddLinkForm", () => {
     expect(api.LookupIssue).toHaveBeenCalledWith("p1", "PAY-77");
     await user.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(api.AddLink).toHaveBeenCalledWith("p1", "PLAT-412", {
-      type: "Blocks", direction: "inward", toKey: "PAY-77", toSummary: "Rotate gateway signing keys", toType: "task",
+      type: "Blocks", direction: "inward", toKey: "PAY-77", toSummary: "Rotate gateway signing keys", toType: "Task",
     }));
     expect(onAdded).toHaveBeenCalled();
     expect(screen.getByLabelText("Issue key")).toHaveValue("");

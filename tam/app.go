@@ -34,8 +34,8 @@ type App struct {
 	repo      *issuerepo.Repository
 	backendMu sync.Mutex
 	backends  map[string]backend.IssueBackend
-	// busy names the operation running for a profile ("sync" or "commit"),
-	// so the two never overlap; the frontend reducer mirrors this.
+	// busy names the operation running for a profile ("sync", "commit", or
+	// "import"), so none of them overlap; the frontend reducer mirrors this.
 	busy       map[string]string
 	dbPath     string
 	sharedPath string

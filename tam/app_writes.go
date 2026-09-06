@@ -11,8 +11,8 @@ import (
 	"agile-suite/tam/internal/committer"
 )
 
-// acquire marks the profile as running what ("sync" or "commit") and
-// refuses while either runs. Callers defer release.
+// acquire marks the profile as running what ("sync", "commit", or "import")
+// and refuses while any of them runs. Callers defer release.
 func (a *App) acquire(profileID, what string) error {
 	a.backendMu.Lock()
 	defer a.backendMu.Unlock()
