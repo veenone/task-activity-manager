@@ -162,8 +162,8 @@ describe("PendingChangesModal", () => {
     expect(within(card).getByText("Conflict")).toBeInTheDocument();
     const table = within(card).getByRole("table");
     const bodyRows = within(table).getAllByRole("row").slice(1);
-    expect(bodyRows[0]).toHaveTextContent("Story points 5 8 13");
-    expect(bodyRows[1]).toHaveTextContent("Labels checkout, promo checkout, promo, q3 checkout, promo");
+    expect(within(bodyRows[0]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Story points", "5", "8", "13"]);
+    expect(within(bodyRows[1]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Labels", "checkout, promo", "checkout, promo, q3", "checkout, promo"]);
     expect(within(dialog).getByRole("button", { name: "Commit (0)" })).toBeDisabled();
 
     await user.click(within(card).getByRole("button", { name: "Override" }));

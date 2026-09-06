@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Issue, Link } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { formatWhen } from "../lib/format";
+import { useSync } from "../contexts/SyncContext";
 import { TypeChip } from "./TypeChip";
 import { EditableFields } from "./EditableFields";
 import { ActivityTab } from "./ActivityTab";
@@ -28,6 +29,10 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("details");
   const detail = useIssueDetail(profileId, issue.key);
   const tests = useLinkedTests(profileId, issue.key);
+  // A sync or commit running elsewhere must not race a save: the row refresh
+  // that follows either one can overwrite an edit made while it was in flight.
+  const { status } = useSync();
+  const busy = status !== "idle";
 
   return (
     <aside className="detail-panel" aria-labelledby="detail-title">
@@ -84,6 +89,7 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
             issue={issue}
             description={detail.data?.description ?? ""}
             descriptionReady={detail.isSuccess}
+            busy={busy}
           />
         </div>
       )}

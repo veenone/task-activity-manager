@@ -53,9 +53,9 @@ export function ConflictCard({ profileId, conflict, disabled }: Props) {
         <tbody>
           {conflict.fields.map((f) => (
             <tr key={f.field}>
-              <td>{fieldLabel(f.field)}</td>{" "}
-              <td>{f.base || "(none)"}</td>{" "}
-              <td className="b">{f.mine || "(none)"}</td>{" "}
+              <td>{fieldLabel(f.field)}</td>
+              <td>{f.base || "(none)"}</td>
+              <td className="b">{f.mine || "(none)"}</td>
               <td className={f.remote !== f.base ? "danger-text" : ""}>{f.remote || "(none)"}</td>
             </tr>
           ))}

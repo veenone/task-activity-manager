@@ -183,6 +183,9 @@ func TestSyncKeepsPendingColumnsAndADraft(t *testing.T) {
 	if err := repo.EditField(ctx, "p1", "PLAT-1", "labels", "x, y"); err != nil {
 		t.Fatal(err)
 	}
+	if err := repo.EditField(ctx, "p1", "PLAT-1", "description", "mine desc"); err != nil {
+		t.Fatal(err)
+	}
 	remote := []backend.Issue{{Key: "PLAT-1", ID: "1", Project: "PLAT", Type: backend.TypeTask, Summary: "theirs", Status: "Done", Labels: []string{"z"}, Updated: "2026-09-02T00:00:00Z"}}
 	for _, full := range []bool{false, true} {
 		if err := repo.UpsertPage(ctx, "p1", remote, time.Now(), full); err != nil {
@@ -204,6 +207,16 @@ func TestSyncKeepsPendingColumnsAndADraft(t *testing.T) {
 		if p.BaseVersion != v1 {
 			t.Errorf("a sync never moves the base: %+v", p)
 		}
+	}
+	// A full sync deletes and reinserts the row, dropping its detail cache;
+	// the pending description must survive, and the fabricated stub detail
+	// must look stale so the panel refetches instead of serving it as fresh.
+	det, fetchedAt, ok, err := repo.ReadDetail(ctx, "p1", "PLAT-1")
+	if err != nil || !ok || det.Description != "mine desc" {
+		t.Fatalf("pending description survives the full sync: %+v %v %v", det, ok, err)
+	}
+	if time.Since(fetchedAt) < 10*time.Minute {
+		t.Errorf("a stub detail must not read as freshly fetched: %v", fetchedAt)
 	}
 }
 
@@ -260,6 +273,61 @@ func TestReplaceRowOverwritesAndClearsTheDetailCache(t *testing.T) {
 	}
 	if _, _, ok, _ := repo.ReadDetail(ctx, "p1", "PLAT-1"); ok {
 		t.Error("the detail cache is dropped so the panel refetches")
+	}
+}
+
+func TestReplaceRowReappliesAPendingEditThatSurvivedACommit(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedOne(t, repo, "p1")
+	if err := repo.EditField(ctx, "p1", "PLAT-1", "summary", "mine"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-1", "priority", "High"); err != nil {
+		t.Fatal(err)
+	}
+	pend, _ := repo.PendingForKey(ctx, "p1", "PLAT-1")
+	var summaryChange journal.PendingChange
+	for _, p := range pend {
+		if p.Field == "summary" {
+			summaryChange = p
+		}
+	}
+	if err := repo.MarkCommitted(ctx, "p1", []journal.PendingChange{summaryChange}); err != nil {
+		t.Fatal(err)
+	}
+	// Jira's row reflects the committed summary and its own (stale) priority;
+	// the still-pending priority edit must not be lost to the overwrite.
+	fresh := backend.Issue{Key: "PLAT-1", ID: "1", Project: "PLAT", Type: backend.TypeTask, Summary: "mine", Status: "To Do", Priority: "Medium", Labels: []string{"a"}, StoryPoints: pts(3), Updated: "2026-09-08T00:00:00Z"}
+	if err := repo.ReplaceRow(ctx, "p1", fresh); err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
+	if iss.Summary != "mine" || iss.Priority != "High" {
+		t.Errorf("the committed field takes Jira's value, the other keeps the pending text: %+v", iss)
+	}
+}
+
+func TestDiscardSkipsTheRevertWhenTheIssueVanished(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedOne(t, repo, "p1")
+	if err := repo.EditField(ctx, "p1", "PLAT-1", "description", "mine"); err != nil {
+		t.Fatal(err)
+	}
+	// A full sync that no longer returns PLAT-1 drops the row.
+	if err := repo.UpsertPage(ctx, "p1", nil, time.Now(), true); err != nil {
+		t.Fatalf("full sync: %v", err)
+	}
+	if _, err := repo.GetIssue(ctx, "p1", "PLAT-1"); !errors.Is(err, issuerepo.ErrNotFound) {
+		t.Fatalf("row should be gone: %v", err)
+	}
+	n, err := repo.DiscardAllPendingChanges(ctx, "p1")
+	if err != nil || n != 1 {
+		t.Fatalf("discard all must not fail for the whole profile: %d %v", n, err)
+	}
+	if pend, _ := repo.ListPendingChanges(ctx, "p1"); len(pend) != 0 {
+		t.Errorf("journal empty: %+v", pend)
 	}
 }
 

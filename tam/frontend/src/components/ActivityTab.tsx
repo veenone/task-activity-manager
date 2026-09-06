@@ -8,8 +8,21 @@ interface Props {
   issueKey: string;
 }
 
-// describe turns one audit entry into a sentence: who did what to which field.
+// describe turns one audit entry into a sentence: who did what to which
+// field. A draft's create row always carries Field "create" (never empty),
+// so its commit and discard entries are told apart by entityType, checked
+// first, rather than by whether a field is set.
 export function describe(a: AuditEntry): string {
+  if (a.entityType === "issue_create") {
+    switch (a.action) {
+      case "commit":
+        return `${a.actor} pushed the draft to Jira`;
+      case "discard":
+        return `${a.actor} discarded the draft`;
+      case "create":
+        return `${a.actor} drafted this issue: ${a.afterVal}`;
+    }
+  }
   const field = a.field ? fieldLabel(a.field) : "";
   const change = a.field ? `${field}: ${a.beforeVal || "(none)"} to ${a.afterVal || "(none)"}` : "";
   switch (a.action) {
@@ -20,9 +33,9 @@ export function describe(a: AuditEntry): string {
     case "created":
       return `${a.actor} created it in Jira as ${a.afterVal} (was ${a.beforeVal})`;
     case "commit":
-      return a.field ? `${a.actor} pushed ${change}` : `${a.actor} pushed the draft to Jira`;
+      return `${a.actor} pushed ${change}`;
     case "discard":
-      return a.field ? `${a.actor} discarded ${field}: back to ${a.afterVal || "(none)"}` : `${a.actor} discarded the draft`;
+      return `${a.actor} discarded ${field}: back to ${a.afterVal || "(none)"}`;
     case "override":
       return `${a.actor} chose to override Jira's version ${a.afterVal}`;
     default:

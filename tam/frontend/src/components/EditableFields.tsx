@@ -12,6 +12,9 @@ interface Props {
   // detail has loaded, so the textarea is enabled and its edit is genuine.
   description: string;
   descriptionReady: boolean;
+  // busy says a sync or commit is running; Save stays disabled so an edit
+  // made mid-commit is never lost to the row refresh that follows it.
+  busy: boolean;
 }
 
 type Values = Record<EditableField, string>;
@@ -31,7 +34,7 @@ function valuesOf(issue: Issue, description: string): Values {
 // changes becomes one journal row when Save edit is pressed; unchanged
 // fields are not sent. Validation mirrors the store's so the common
 // mistakes never round-trip.
-export function EditableFields({ profileId, issue, description, descriptionReady }: Props) {
+export function EditableFields({ profileId, issue, description, descriptionReady, busy }: Props) {
   const base = valuesOf(issue, description);
   const [values, setValues] = useState<Values>(base);
   const [dirty, setDirty] = useState<Set<EditableField>>(new Set());
@@ -112,7 +115,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
         </label>
       ))}
       <div className="edit-actions">
-        <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || edit.isPending}>
+        <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || edit.isPending || busy}>
           {edit.isPending ? "Saving" : "Save edit"}
         </button>
         {error ? (

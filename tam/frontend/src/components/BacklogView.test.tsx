@@ -25,6 +25,11 @@ vi.mock("../api", async () => {
   };
 });
 
+// A selected row's IssueDetailPanel reads useSync to hold Save during a sync
+// or commit; its provider needs more wiring than this view otherwise uses,
+// so it is mocked here rather than wired up just for that.
+vi.mock("../contexts/SyncContext", () => ({ useSync: () => ({ status: "idle" }) }));
+
 function issue(over: Partial<Issue>): Issue {
   return {
     key: "PLAT-1", id: "1", project: "PLAT", type: "task", summary: "x", status: "To Do", assignee: "", reporter: "",

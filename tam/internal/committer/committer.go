@@ -128,9 +128,14 @@ func (e *Engine) commitCreate(ctx context.Context, profileID, projectKey, tempKe
 		return
 	}
 	if err := e.repo.Rekey(ctx, profileID, tempKey, realKey); err != nil {
-		// Jira has the issue. Report the real key so the user can find it;
-		// the next full sync brings its row in and the draft can be
-		// discarded by hand.
+		// Jira has the issue even though the local rename failed. Clear the
+		// journal under the temp key and audit the creation there so a retry
+		// reconciles instead of posting a duplicate; report the real key so
+		// the user can find it. The next full sync brings its row in.
+		if merr := e.repo.MarkCreatedWithoutRekey(ctx, profileID, tempKey, realKey, rows); merr != nil {
+			res.Failures = append(res.Failures, Failure{Key: realKey, Error: fmt.Sprintf("created in Jira as %s but the local row could not be renamed, and the journal could not be cleared: %v", realKey, merr)})
+			return
+		}
 		res.Failures = append(res.Failures, Failure{Key: realKey, Error: fmt.Sprintf("created in Jira as %s but the local row could not be renamed: %v", realKey, err)})
 		return
 	}
@@ -153,6 +158,11 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 		res.Failures = append(res.Failures, Failure{Key: key, Error: err.Error()})
 		return
 	}
+	// rows is sorted oldest first; comparing against the oldest edit's base is
+	// enough because a later edit on the same key can only keep that base or
+	// move it forward (EditField reads the row's current `updated` for a
+	// fresh edit and journal.Upsert leaves an existing base alone), so it
+	// never predates the oldest row's base.
 	if remote.Updated != rows[0].BaseVersion {
 		res.Conflicts = append(res.Conflicts, e.conflict(ctx, key, remote, rows))
 		return
@@ -214,13 +224,15 @@ func (e *Engine) ResolveOverride(ctx context.Context, profileID, key, remoteVers
 	return e.repo.SetBaseVersion(ctx, profileID, key, remoteVersion)
 }
 
-// ResolveKeepRemote drops the held issue's edits and takes Jira's row.
+// ResolveKeepRemote drops the held issue's edits and takes Jira's row. It
+// fetches before discarding anything, so a network failure leaves the local
+// edits intact instead of dropping them for a row it never got.
 func (e *Engine) ResolveKeepRemote(ctx context.Context, profileID, key string) error {
-	if _, err := e.repo.DiscardKey(ctx, profileID, key); err != nil {
-		return err
-	}
 	fresh, err := e.b.GetIssue(ctx, key)
 	if err != nil {
+		return err
+	}
+	if _, err := e.repo.DiscardKey(ctx, profileID, key); err != nil {
 		return err
 	}
 	return e.repo.ReplaceRow(ctx, profileID, fresh)

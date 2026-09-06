@@ -259,6 +259,53 @@ func TestCommitCreatesDraftsFirstAndRekeysThem(t *testing.T) {
 	}
 }
 
+func TestCommitAuditsAFailedRekeySoARetryDoesNotDuplicate(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	temp, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "New task"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A row already sits at the key Jira is about to hand back (f.nextKey
+	// starts at 501), so Rekey's UPDATE collides with the primary key.
+	if err := repo.UpsertPage(ctx, "p1", []backend.Issue{
+		{Key: "PLAT-501", ID: "9", Project: "PLAT", Type: backend.TypeTask, Summary: "already here", Updated: "2026-09-01T00:00:00Z"},
+	}, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Failures) != 1 || res.Failures[0].Key != "PLAT-501" {
+		t.Fatalf("failure names the real key: %+v", res.Failures)
+	}
+	if pend, _ := repo.PendingForKey(ctx, "p1", temp); len(pend) != 0 {
+		t.Errorf("the temp key's journal is cleared so a retry does not repost: %+v", pend)
+	}
+	act, _ := repo.ListActivity(ctx, "p1", temp, 0)
+	found := false
+	for _, a := range act {
+		if a.Action == "created" && strings.Contains(a.Note, "PLAT-501") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("audited under the temp key with the real key in the note: %+v", act)
+	}
+	if len(f.creates) != 1 {
+		t.Fatalf("the draft was posted once: %v", f.creates)
+	}
+
+	if _, err := eng.Commit(ctx, "p1", "PLAT"); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.creates) != 1 {
+		t.Errorf("a retry must not post the draft again: %d", len(f.creates))
+	}
+}
+
 func TestFailuresKeepTheRowsForNextTime(t *testing.T) {
 	eng, repo, f := setup(t)
 	ctx := context.Background()

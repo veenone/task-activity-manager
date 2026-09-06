@@ -6,12 +6,18 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createQueryClient } from "@agile-suite/core";
 import * as api from "../api";
 import type { Issue } from "../api";
+import { useSync } from "../contexts/SyncContext";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
   return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn() };
 });
+
+// The panel reads useSync to hold Save while a sync or commit runs. Its
+// provider needs a profile and a dialog host the panel does not otherwise
+// use, so it is mocked here rather than wired up for every test.
+vi.mock("../contexts/SyncContext", () => ({ useSync: vi.fn(() => ({ status: "idle" })) }));
 
 const story: Issue = {
   key: "PLAT-412", id: "1", project: "PLAT", type: "story", summary: "Checkout: apply promo code at payment step",
@@ -31,6 +37,8 @@ function renderPanel(onClose = vi.fn()) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vi.mocked(useSync).mockReturnValue({ status: "idle" } as any);
   vi.mocked(api.GetIssueDetail).mockResolvedValue({
     key: "PLAT-412",
     description: "As a shopper I can enter a promo code on the payment step.",
@@ -46,6 +54,8 @@ beforeEach(() => {
   ]);
   vi.mocked(api.EditIssue).mockResolvedValue();
   vi.mocked(api.ListActivity).mockResolvedValue([
+    { id: 4, occurredAt: "2026-09-06T10:10:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "commit", field: "create", beforeVal: "", afterVal: "{\"summary\":\"x\"}", note: "" },
+    { id: 3, occurredAt: "2026-09-06T10:07:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "discard", field: "create", beforeVal: "{\"summary\":\"x\"}", afterVal: "", note: "" },
     { id: 2, occurredAt: "2026-09-06T10:05:00Z", actor: "araha", entityType: "issue", entityKey: "PLAT-412", action: "edit", field: "storyPoints", beforeVal: "5", afterVal: "8", note: "" },
     { id: 1, occurredAt: "2026-09-06T10:00:00Z", actor: "araha", entityType: "issue", entityKey: "PLAT-412", action: "edit", field: "summary", beforeVal: "Checkout: apply promo code", afterVal: "Checkout: apply promo code at payment step", note: "" },
   ]);
@@ -147,6 +157,18 @@ describe("IssueDetailPanel write path", () => {
     expect(await screen.findByText("Saved. Commit pushes it to Jira.")).toBeInTheDocument();
   });
 
+  it("keeps Save disabled while a sync or commit is running", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(useSync).mockReturnValue({ status: "committing" } as any);
+    const user = userEvent.setup();
+    renderPanel();
+    const summary = await screen.findByLabelText("Summary");
+    await user.clear(summary);
+    await user.type(summary, "Checkout: promo code at payment");
+    expect(screen.getByRole("button", { name: "Save edit" })).toBeDisabled();
+    expect(api.EditIssue).not.toHaveBeenCalled();
+  });
+
   it("refuses a blank summary and non-numeric points before calling the backend", async () => {
     const user = userEvent.setup();
     renderPanel();
@@ -179,9 +201,11 @@ describe("IssueDetailPanel write path", () => {
     renderPanel();
     await user.click(await screen.findByRole("tab", { name: "Activity" }));
     const items = await screen.findAllByRole("listitem");
-    expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent("araha edited Story points: 5 to 8");
-    expect(items[1]).toHaveTextContent("araha edited Summary");
+    expect(items).toHaveLength(4);
+    expect(items[0]).toHaveTextContent("araha pushed the draft to Jira");
+    expect(items[1]).toHaveTextContent("araha discarded the draft");
+    expect(items[2]).toHaveTextContent("araha edited Story points: 5 to 8");
+    expect(items[3]).toHaveTextContent("araha edited Summary");
     expect(api.ListActivity).toHaveBeenCalledWith("p1", "PLAT-412", 200);
   });
 

@@ -27,6 +27,10 @@ var fieldColumns = map[string]string{
 // draftTypes are the logical types a draft may have in plan 1b.
 var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true}
 
+// staleDetailStamp backdates a fabricated detail cache (one writeField built
+// from nothing, rather than a real fetch) so it reads as stale at once.
+const staleDetailStamp = "1970-01-01T00:00:00Z"
+
 // execer is the subset of *sql.Tx and *sql.DB the field helpers use.
 type execer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
@@ -129,9 +133,15 @@ func writeField(ctx context.Context, q execer, profileID, key, field, value stri
 		if err != nil {
 			return fmt.Errorf("encode detail for %s: %w", key, err)
 		}
+		// No detail was ever fetched for this row (a fresh row, or one a full
+		// sync just deleted and reinserted), so this is a fabricated stub, not
+		// a real read of Jira. Stamp it old rather than now, or the detail
+		// cache looks fresh and the panel serves the stub for ten minutes
+		// instead of refetching and picking up the links. A draft's detail
+		// already has a stamp from CreateDraft, so it never hits this branch.
 		at := fetchedAt.String
 		if at == "" {
-			at = time.Now().UTC().Format(time.RFC3339)
+			at = staleDetailStamp
 		}
 		_, err = q.ExecContext(ctx, `UPDATE issue SET detail_json = ?, detail_fetched_at = ? WHERE profile_id = ? AND key = ?`, string(encoded), at, profileID, key)
 		return err
@@ -367,6 +377,12 @@ func (r *Repository) ReplaceRow(ctx context.Context, profileID string, iss backe
 		profileID, iss.Key); err != nil {
 		return fmt.Errorf("clear detail for %s: %w", iss.Key, err)
 	}
+	// A pending edit that was not part of the push this row came from (made
+	// while the commit was in flight, or left behind because only some of the
+	// issue's fields were pushed) must survive the overwrite.
+	if err := reapplyPending(ctx, tx, profileID, map[string]bool{iss.Key: true}); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -459,8 +475,20 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		if _, err := tx.ExecContext(ctx, `DELETE FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey); err != nil {
 			return fmt.Errorf("drop draft %s: %w", p.EntityKey, err)
 		}
-	} else if err := writeField(ctx, tx, profileID, p.EntityKey, p.Field, p.BeforeVal); err != nil {
-		return fmt.Errorf("revert %s.%s: %w", p.EntityKey, p.Field, err)
+	} else {
+		var exists int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey).Scan(&exists)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			// A full sync no longer returns this issue. There is no row left
+			// to revert; still drop the journal row and record the discard.
+		case err != nil:
+			return fmt.Errorf("check %s exists: %w", p.EntityKey, err)
+		default:
+			if err := writeField(ctx, tx, profileID, p.EntityKey, p.Field, p.BeforeVal); err != nil {
+				return fmt.Errorf("revert %s.%s: %w", p.EntityKey, p.Field, err)
+			}
+		}
 	}
 	if err := journal.Delete(tx, profileID, []int64{p.ID}); err != nil {
 		return err
@@ -486,6 +514,35 @@ func (r *Repository) MarkCommitted(ctx context.Context, profileID string, change
 		}
 	}
 	if err := journal.Delete(tx, profileID, ids); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// MarkCreatedWithoutRekey clears a draft's journal rows when Jira accepted
+// the create but the local rename to the real key failed: it deletes the
+// create (and any edit) rows under the temp key, same as MarkCommitted, then
+// audits the creation under the temp key with the real key in the note, so a
+// retry sees nothing pending and does not post the draft again. The draft
+// row keeps its temporary key; the next sync brings the real row in.
+func (r *Repository) MarkCreatedWithoutRekey(ctx context.Context, profileID, tempKey, realKey string, rows []journal.PendingChange) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	ids := make([]int64, 0, len(rows))
+	for _, p := range rows {
+		ids = append(ids, p.ID)
+		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, ""); err != nil {
+			return err
+		}
+	}
+	if err := journal.Delete(tx, profileID, ids); err != nil {
+		return err
+	}
+	note := fmt.Sprintf("created in Jira as %s but the local rename failed; the row keeps its temporary key until the next sync", realKey)
+	if err := journal.Audit(tx, profileID, EntityIssue, tempKey, "created", "", tempKey, realKey, note); err != nil {
 		return err
 	}
 	return tx.Commit()
