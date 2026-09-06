@@ -10,11 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/user"
 	"sort"
 	"strings"
 	"time"
 
+	"agile-suite/core/journal"
 	"agile-suite/xtm/internal/store"
 )
 
@@ -4821,51 +4821,7 @@ func parseStepEntityKey(s string) (testKey, xrayID string, ok bool) {
 // is updated; if the new value matches the existing BeforeVal (i.e. the user
 // reverted to the original), the row is deleted.
 func upsertPendingChange(tx *sql.Tx, profileID, entityType, entityKey, field, currentVal, newValue, baseVersion string) error {
-	var existingBefore string
-	err := tx.QueryRow(
-		`SELECT before_val FROM pending_change
-		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
-		profileID, entityType, entityKey, field,
-	).Scan(&existingBefore)
-
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		_, ierr := tx.Exec(
-			`INSERT INTO pending_change
-			   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			profileID, entityType, entityKey, field, currentVal, newValue, baseVersion, now,
-		)
-		if ierr != nil {
-			return fmt.Errorf("insert pending change: %w", ierr)
-		}
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read existing pending: %w", err)
-	}
-
-	if newValue == existingBefore {
-		// Reverted to original — drop the pending change.
-		if _, derr := tx.Exec(
-			`DELETE FROM pending_change
-			 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
-			profileID, entityType, entityKey, field,
-		); derr != nil {
-			return fmt.Errorf("delete pending: %w", derr)
-		}
-		return nil
-	}
-
-	if _, uerr := tx.Exec(
-		`UPDATE pending_change SET after_val = ?, created_at = ?
-		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
-		newValue, now, profileID, entityType, entityKey, field,
-	); uerr != nil {
-		return fmt.Errorf("update pending: %w", uerr)
-	}
-	return nil
+	return journal.Upsert(tx, profileID, entityType, entityKey, field, currentVal, newValue, baseVersion)
 }
 
 // putPendingChange records (or coalesces) a pending field change
@@ -4880,39 +4836,7 @@ func upsertPendingChange(tx *sql.Tx, profileID, entityType, entityKey, field, cu
 // revert-vs-edit against a freshly-read base and only reach here on the
 // "genuine edit" branch — the write path must not second-guess that).
 func putPendingChange(tx *sql.Tx, profileID, entityType, entityKey, field, currentVal, newValue, baseVersion string) error {
-	var existingBefore string
-	err := tx.QueryRow(
-		`SELECT before_val FROM pending_change
-		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
-		profileID, entityType, entityKey, field,
-	).Scan(&existingBefore)
-
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		_, ierr := tx.Exec(
-			`INSERT INTO pending_change
-			   (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			profileID, entityType, entityKey, field, currentVal, newValue, baseVersion, now,
-		)
-		if ierr != nil {
-			return fmt.Errorf("insert pending change: %w", ierr)
-		}
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read existing pending: %w", err)
-	}
-
-	if _, uerr := tx.Exec(
-		`UPDATE pending_change SET after_val = ?, created_at = ?
-		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
-		newValue, now, profileID, entityType, entityKey, field,
-	); uerr != nil {
-		return fmt.Errorf("update pending: %w", uerr)
-	}
-	return nil
+	return journal.Put(tx, profileID, entityType, entityKey, field, currentVal, newValue, baseVersion)
 }
 
 // dropPendingChange removes a pending_change row outright. Used when a caller
@@ -4939,27 +4863,12 @@ func dropPendingChange(tx *sql.Tx, profileID, entityType, entityKey, field strin
 // EditTestStepField, DiscardPendingChange, TransitionTest, and the
 // commit / conflict paths.
 func writeAudit(tx *sql.Tx, profileID, entityType, entityKey, action, field, beforeVal, afterVal, note string) error {
-	if _, err := tx.Exec(
-		`INSERT INTO audit_log
-		   (profile_id, occurred_at, actor, entity_type, entity_key, action, field, before_val, after_val, note)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		profileID, time.Now().UTC().Format(time.RFC3339),
-		currentActor(), entityType, entityKey, action, field, beforeVal, afterVal, note,
-	); err != nil {
-		return fmt.Errorf("audit log: %w", err)
-	}
-	return nil
+	return journal.Audit(tx, profileID, entityType, entityKey, action, field, beforeVal, afterVal, note)
 }
 
 // currentActor returns the OS username for the audit trail, falling back to
 // "user" if it cannot be resolved.
-func currentActor() string {
-	u, err := user.Current()
-	if err != nil || u == nil || u.Username == "" {
-		return "user"
-	}
-	return u.Username
-}
+func currentActor() string { return journal.Actor() }
 
 // scanner abstracts *sql.Row and *sql.Rows so scanTest serves Get and List.
 type scanner interface {
