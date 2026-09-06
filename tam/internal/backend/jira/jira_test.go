@@ -23,6 +23,7 @@ type fakeJira struct {
 	writes     []string // "METHOD path body" for every PUT and POST
 	createKey  string   // key the POST /issue answers with
 	createFail bool     // POST /issue answers 400
+	linkTypes  string   // the /rest/api/2/issueLinkType body
 }
 
 func (f *fakeJira) handler(t *testing.T) http.Handler {
@@ -40,6 +41,8 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5}},
 				{"id":"2","key":"PLAT-388","fields":{"summary":"Single use","status":{"name":"Approved"},"issuetype":{"name":"Business Requirement"},"project":{"key":"PLAT"},"labels":["promo"]}}
 			]}`))
+		case r.URL.Path == "/rest/api/2/issueLinkType" && r.Method == http.MethodGet:
+			_, _ = w.Write([]byte(f.linkTypes))
 		case r.Method == http.MethodPut || r.Method == http.MethodPost:
 			body, _ := io.ReadAll(r.Body)
 			f.writes = append(f.writes, r.Method+" "+r.URL.Path+" "+string(body))
@@ -77,7 +80,7 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 
 func newBackend(t *testing.T, fields string) (*jirabackend.Backend, *fakeJira) {
 	t.Helper()
-	f := &fakeJira{fields: fields}
+	f := &fakeJira{fields: fields, linkTypes: `{"issueLinkTypes":[{"id":"10000","name":"Blocks","inward":"is blocked by","outward":"blocks"},{"id":"10003","name":"Relates","inward":"relates to","outward":"relates to"}]}`}
 	srv := httptest.NewServer(f.handler(t))
 	t.Cleanup(srv.Close)
 	c := corejira.NewClientWithHTTP(srv.URL, "tok", srv.Client())

@@ -492,14 +492,17 @@ func (r *Repository) DiscardKey(ctx context.Context, profileID, key string) (int
 }
 
 func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.PendingChange) error {
-	if p.EntityType == EntityIssueCreate {
+	switch {
+	case p.EntityType == EntityIssueCreate:
 		if _, err := tx.ExecContext(ctx, `DELETE FROM issue_link WHERE profile_id = ? AND from_key = ?`, profileID, p.EntityKey); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey); err != nil {
 			return fmt.Errorf("drop draft %s: %w", p.EntityKey, err)
 		}
-	} else {
+	case p.EntityType == EntityLink:
+		// A link that was never pushed: nothing on the row to revert.
+	default:
 		var exists int
 		err := tx.QueryRowContext(ctx, `SELECT 1 FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey).Scan(&exists)
 		switch {

@@ -24,6 +24,9 @@ type Backend struct {
 	mu         sync.Mutex
 	ids        fieldIDs
 	discovered bool
+
+	linkTypes       []backend.LinkType
+	linkTypesLoaded bool
 }
 
 // New builds the backend. requirementType is the profile's Jira name for

@@ -25,6 +25,8 @@ type fake struct {
 	updateErr map[string]error
 	createErr error
 	getErr    map[string]error
+	links     []string
+	linkErr   error
 }
 
 func newFake() *fake {
@@ -96,6 +98,16 @@ func (f *fake) CreateIssue(_ context.Context, projectKey string, d backend.Issue
 	f.nextKey++
 	f.rows[key] = backend.Issue{Key: key, ID: "9", Project: projectKey, Type: d.Type, Summary: d.Summary, Status: "To Do", Labels: d.Labels, StoryPoints: d.StoryPoints, Updated: "2026-09-07T00:00:00Z"}
 	return key, nil
+}
+func (f *fake) LinkTypes(context.Context) ([]backend.LinkType, error) {
+	return []backend.LinkType{{Name: "Relates", Inward: "relates to", Outward: "relates to"}}, nil
+}
+func (f *fake) CreateLink(_ context.Context, fromKey string, d backend.LinkDraft) error {
+	if f.linkErr != nil {
+		return f.linkErr
+	}
+	f.links = append(f.links, fromKey+" "+d.Direction+" "+d.Type+" "+d.ToKey)
+	return nil
 }
 
 func setup(t *testing.T) (*committer.Engine, *issuerepo.Repository, *fake) {

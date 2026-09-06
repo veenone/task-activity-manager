@@ -124,6 +124,24 @@ type FieldOption struct {
 	Value string `json:"value"`
 }
 
+// LinkType is one of Jira's issue link types with its two phrasings, for
+// example Blocks: "blocks" outward, "is blocked by" inward.
+type LinkType struct {
+	Name    string `json:"name"`
+	Inward  string `json:"inward"`
+	Outward string `json:"outward"`
+}
+
+// LinkDraft is a link the user asked for: the type, which side the source
+// issue is on, and the target with the summary and type the lookup showed.
+type LinkDraft struct {
+	Type      string `json:"type"`
+	Direction string `json:"direction"` // "outward" or "inward"
+	ToKey     string `json:"toKey"`
+	ToSummary string `json:"toSummary"`
+	ToType    string `json:"toType"`
+}
+
 // Link is one issue link seen from the issue that owns it.
 type Link struct {
 	Direction string `json:"direction"` // "outward" or "inward"
@@ -131,6 +149,10 @@ type Link struct {
 	Key       string `json:"key"`       // the other issue
 	Summary   string `json:"summary"`
 	IssueType string `json:"issueType"` // the other issue's Jira type name
+	// Pending marks a link the journal holds and Commit has not pushed;
+	// PendingID is its journal row, for Discard.
+	Pending   bool  `json:"pending"`
+	PendingID int64 `json:"pendingId"`
 }
 
 // IssueDetail is what the detail panel shows beyond the grid columns.
@@ -179,4 +201,9 @@ type IssueBackend interface {
 	// CreateFields lists the required create-meta fields of a logical type
 	// that the New issue form does not already carry.
 	CreateFields(ctx context.Context, projectKey, logicalType string) ([]FieldSpec, error)
+	// LinkTypes lists the issue link types the instance defines.
+	LinkTypes(ctx context.Context) ([]LinkType, error)
+	// CreateLink links fromKey to the draft's target with the draft's type
+	// and direction.
+	CreateLink(ctx context.Context, fromKey string, d LinkDraft) error
 }

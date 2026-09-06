@@ -152,3 +152,32 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 }
 
 func pts(v float64) *float64 { return &v }
+
+func TestDemoBackendLinks(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+	types, _ := b.LinkTypes(ctx)
+	if len(types) != 3 || types[1].Inward != "is blocked by" {
+		t.Errorf("link types: %+v", types)
+	}
+	foreign, err := b.GetIssue(ctx, "XT-1018")
+	if err != nil || foreign.Summary != "Promo code applies discount" || foreign.Project != "XT" {
+		t.Errorf("foreign lookup: %+v %v", foreign, err)
+	}
+	if err := b.CreateLink(ctx, "ACME-409", backend.LinkDraft{Type: "Blocks", Direction: "inward", ToKey: "XT-1018", ToSummary: "Promo code applies discount", ToType: "Test"}); err != nil {
+		t.Fatalf("CreateLink: %v", err)
+	}
+	d, _ := b.GetIssueDetail(ctx, "ACME-409")
+	found := false
+	for _, l := range d.Links {
+		if l.Key == "XT-1018" && l.Type == "Blocks" && l.Direction == "inward" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("created link missing from the detail: %+v", d.Links)
+	}
+	if err := b.CreateLink(ctx, "ACME-409", backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "NOPE-1"}); err == nil {
+		t.Error("unknown target must fail")
+	}
+}

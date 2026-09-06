@@ -20,6 +20,9 @@ const (
 	EntityIssueCreate = "issue_create"
 	// FieldCreate is the field name on a create row.
 	FieldCreate = "create"
+	// EntityLink is the journal entity type of a link to create. The row's
+	// field is LinkField(d) and its after_val the LinkDraft as JSON.
+	EntityLink = "link"
 )
 
 // pendingFlag is the computed column every issue read carries.
