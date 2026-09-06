@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { createQueryClient } from "@agile-suite/core";
+import { DialogProvider, createQueryClient } from "@agile-suite/core";
 import * as api from "../api";
 import type { Issue } from "../api";
 import { useSync } from "../contexts/SyncContext";
@@ -29,7 +29,9 @@ const story: Issue = {
 function renderPanel(onClose = vi.fn()) {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <IssueDetailPanel profileId="p1" issue={story} onClose={onClose} />
+      <DialogProvider>
+        <IssueDetailPanel profileId="p1" issue={story} onClose={onClose} />
+      </DialogProvider>
     </QueryClientProvider>,
   );
   return onClose;
@@ -215,7 +217,9 @@ describe("IssueDetailPanel write path", () => {
   it("marks a draft in the panel head", async () => {
     render(
       <QueryClientProvider client={createQueryClient()}>
-        <IssueDetailPanel profileId="p1" issue={{ ...story, key: "TAM-NEW-1", status: "Draft", draft: true, pending: true }} onClose={vi.fn()} />
+        <DialogProvider>
+          <IssueDetailPanel profileId="p1" issue={{ ...story, key: "TAM-NEW-1", status: "Draft", draft: true, pending: true }} onClose={vi.fn()} />
+        </DialogProvider>
       </QueryClientProvider>,
     );
     expect(await screen.findByText("Draft", { selector: "span.chip-draft" })).toBeInTheDocument();
@@ -239,5 +243,22 @@ describe("IssueDetailPanel write path", () => {
     await user.click(within(row).getByRole("button", { name: "Discard link to XT-1031" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 41));
     expect(screen.getByRole("heading", { name: "Add link" })).toBeInTheDocument();
+  });
+
+  it("surfaces a failed link discard", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetIssueDetail).mockResolvedValue({
+      key: "PLAT-412", description: "d", fields: {},
+      links: [
+        { direction: "outward", type: "Relates", key: "XT-1031", summary: "Retried payment is not charged twice", issueType: "Test", pending: true, pendingId: 41 },
+      ],
+    });
+    vi.mocked(api.DiscardPendingChange).mockRejectedValueOnce(new Error("row is gone"));
+    renderPanel();
+    await user.click(await screen.findByRole("tab", { name: "Links" }));
+    const row = (await screen.findByText("XT-1031")).closest("li")!;
+    await user.click(within(row).getByRole("button", { name: "Discard link to XT-1031" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 41));
+    expect(await screen.findByText(/row is gone/)).toBeInTheDocument();
   });
 });

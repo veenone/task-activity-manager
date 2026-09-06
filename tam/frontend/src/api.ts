@@ -236,14 +236,6 @@ export interface LinkDraft {
   toType: string;
 }
 
-// linkPhrase words a link the way Jira does: "PLAT-1 blocks PAY-7" reads
-// from the type's outward wording, "is blocked by" from its inward one.
-export function linkPhrase(types: LinkType[], type: string, direction: string): string {
-  const t = types.find((x) => x.name === type);
-  if (!t) return direction === "inward" ? `${type} (inward)` : type;
-  return direction === "inward" ? t.inward : t.outward;
-}
-
 export interface CommitResult {
   committed: string[];
   created: { tempKey: string; key: string }[];

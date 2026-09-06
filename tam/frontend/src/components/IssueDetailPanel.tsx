@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errMsg, useNotice } from "@agile-suite/core";
 import type { Issue, Link } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { useDiscardById } from "../queries/pending";
@@ -32,6 +33,7 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
   const detail = useIssueDetail(profileId, issue.key);
   const tests = useLinkedTests(profileId, issue.key);
   const discardLink = useDiscardById(profileId);
+  const { notice } = useNotice();
   // A sync or commit running elsewhere must not race a save: the row refresh
   // that follows either one can overwrite an edit made while it was in flight.
   const { status } = useSync();
@@ -117,7 +119,13 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
           ) : (
             <LinkGroups
               links={detail.data.links}
-              onDiscard={(id, key) => discardLink.mutate({ id, key: issue.key }, { onError: () => undefined })}
+              discarding={discardLink.isPending}
+              onDiscard={(id) =>
+                discardLink.mutate(
+                  { id, key: issue.key },
+                  { onError: (e) => void notice({ title: "Discard failed", message: errMsg(e), tone: "error" }) },
+                )
+              }
             />
           )}
           <AddLinkForm profileId={profileId} issueKey={issue.key} onAdded={() => void detail.refetch()} />
@@ -164,7 +172,7 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
 
 // LinkGroups lists links grouped by type, then direction, in the order the
 // store returns them, and marks a link still pending a Commit.
-function LinkGroups({ links, onDiscard }: { links: Link[]; onDiscard: (id: number, key: string) => void }) {
+function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard: (id: number) => void; discarding: boolean }) {
   const groups = new Map<string, Link[]>();
   for (const l of links) {
     const k = `${l.type} (${l.direction})`;
@@ -185,7 +193,7 @@ function LinkGroups({ links, onDiscard }: { links: Link[]; onDiscard: (id: numbe
                   <>
                     <span className="pending-dot" role="img" aria-label="Pending changes" />
                     <span className="muted small">pending</span>
-                    <button type="button" className="btn btn-ghost" aria-label={`Discard link to ${l.key}`} onClick={() => onDiscard(l.pendingId ?? 0, l.key)}>Discard</button>
+                    <button type="button" className="btn btn-ghost" aria-label={`Discard link to ${l.key}`} disabled={discarding} onClick={() => onDiscard(l.pendingId ?? 0)}>Discard</button>
                   </>
                 )}
               </li>
