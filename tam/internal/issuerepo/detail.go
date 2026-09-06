@@ -93,6 +93,9 @@ func (r *Repository) WriteDetail(ctx context.Context, profileID, key string, d b
 			return fmt.Errorf("write link %s -> %s: %w", key, l.Key, err)
 		}
 	}
+	if err := reapplyPending(ctx, tx, profileID, map[string]bool{key: true}); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 

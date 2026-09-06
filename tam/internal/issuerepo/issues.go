@@ -21,9 +21,38 @@ const (
 const issueColumns = `key, id, project, type, summary, status, assignee, reporter, priority, labels,
 	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
-// UpsertPage writes one page of issues for the profile inside one
-// transaction. With clearFirst the profile's issues and links are deleted
-// first, in the same transaction, which is how a full sync starts.
+const upsertIssueSQL = `
+	INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
+		sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(profile_id, key) DO UPDATE SET
+		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
+		status = excluded.status, assignee = excluded.assignee, reporter = excluded.reporter,
+		priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
+		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
+		story_points = excluded.story_points, rank = excluded.rank, created = excluded.created,
+		updated = excluded.updated, synced_at = excluded.synced_at`
+
+func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Issue, syncedAt time.Time) error {
+	labels, err := json.Marshal(nonNil(iss.Labels))
+	if err != nil {
+		return fmt.Errorf("labels for %s: %w", iss.Key, err)
+	}
+	var points sql.NullFloat64
+	if iss.StoryPoints != nil {
+		points = sql.NullFloat64{Float64: *iss.StoryPoints, Valid: true}
+	}
+	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, iss.Status,
+		iss.Assignee, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
+		points, iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("upsert %s: %w", iss.Key, err)
+	}
+	return nil
+}
+
+// UpsertPage lands one page from Jira. With clearFirst the profile's synced
+// rows go first (drafts stay). Columns with a pending edit are written back
+// from the journal afterwards, so a sync never hides a local change.
 func (r *Repository) UpsertPage(ctx context.Context, profileID string, page []backend.Issue, syncedAt time.Time, clearFirst bool) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -39,38 +68,15 @@ func (r *Repository) UpsertPage(ctx context.Context, profileID string, page []ba
 			return fmt.Errorf("clear issues: %w", err)
 		}
 	}
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
-			sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(profile_id, key) DO UPDATE SET
-			id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
-			status = excluded.status, assignee = excluded.assignee, reporter = excluded.reporter,
-			priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
-			sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
-			story_points = excluded.story_points, rank = excluded.rank, created = excluded.created,
-			updated = excluded.updated, synced_at = excluded.synced_at`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	synced := syncedAt.UTC().Format(time.RFC3339)
+	keys := make(map[string]bool, len(page))
 	for _, iss := range page {
-		labels, err := json.Marshal(nonNil(iss.Labels))
-		if err != nil {
-			return fmt.Errorf("labels for %s: %w", iss.Key, err)
+		if err := upsertIssue(ctx, tx, profileID, iss, syncedAt); err != nil {
+			return err
 		}
-		var points sql.NullFloat64
-		if iss.StoryPoints != nil {
-			points = sql.NullFloat64{Float64: *iss.StoryPoints, Valid: true}
-		}
-		if _, err := stmt.ExecContext(ctx, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, iss.Status,
-			iss.Assignee, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
-			points, iss.Rank, iss.Created, iss.Updated, synced); err != nil {
-			return fmt.Errorf("upsert %s: %w", iss.Key, err)
-		}
+		keys[iss.Key] = true
+	}
+	if err := reapplyPending(ctx, tx, profileID, keys); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

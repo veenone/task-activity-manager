@@ -4,7 +4,12 @@
 // implementation lives in backend/jira, the offline one in backend/demo.
 package backend
 
-import "context"
+import (
+	"context"
+	"errors"
+	"strconv"
+	"strings"
+)
 
 // Logical issue types. Every issue TAM manages is one of these five; the
 // Jira names they map to are the backend's business.
@@ -45,6 +50,55 @@ type Issue struct {
 	// says the key is a local placeholder Commit has not yet created.
 	Pending bool `json:"pending"`
 	Draft   bool `json:"draft"`
+}
+
+// IssueDraft is a new issue as the form captured it. Type is the logical
+// type (task, story, bug). Extra carries the create-meta required fields
+// the form rendered as text, keyed by Jira field id; the backend sends each
+// as a string, or as {"name": value} when the field takes an option.
+type IssueDraft struct {
+	Type        string            `json:"type"`
+	Summary     string            `json:"summary"`
+	Description string            `json:"description"`
+	Priority    string            `json:"priority"`
+	Labels      []string          `json:"labels"`
+	Assignee    string            `json:"assignee"`
+	StoryPoints *float64          `json:"storyPoints"`
+	Extra       map[string]string `json:"extra"`
+}
+
+// SplitLabels turns the comma list the form and the journal use back into
+// Jira's label slice, trimming blanks.
+func SplitLabels(s string) []string {
+	out := []string{}
+	for _, l := range strings.Split(s, ",") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// FormatPoints renders story points the way the journal and the forms
+// show them: a plain number, or empty for none.
+func FormatPoints(p *float64) string {
+	if p == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*p, 'f', -1, 64)
+}
+
+// ParsePoints reads the text form back; blank means none.
+func ParsePoints(s string) (*float64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil, errors.New("story points must be a number")
+	}
+	return &v, nil
 }
 
 // Link is one issue link seen from the issue that owns it.
