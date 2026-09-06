@@ -2,7 +2,7 @@
 
 **Status:** proposed · **Date:** 2026-09-05
 **Parent:** [`2026-09-04-tam-foundation-design.md`](2026-09-04-tam-foundation-design.md), which fixes the repository shape, the shared core, the data model, and the write model this spec builds on.
-**Mockups:** [`assets/2026-09-05-tam-backlog-read-path.svg`](assets/2026-09-05-tam-backlog-read-path.svg) is what plan 1a ships: the Backlog with a read-only detail panel and a sync in progress. [`assets/2026-09-04-tam-shell-backlog.svg`](assets/2026-09-04-tam-shell-backlog.svg) is the same view once plan 1b adds the write controls. [`assets/2026-09-06-tam-pending-changes.svg`](assets/2026-09-06-tam-pending-changes.svg) is plan 1b's Pending changes dialog with one issue held back by a conflict.
+**Mockups:** [`assets/2026-09-05-tam-backlog-read-path.svg`](assets/2026-09-05-tam-backlog-read-path.svg) is what plan 1a ships: the Backlog with a read-only detail panel and a sync in progress. [`assets/2026-09-04-tam-shell-backlog.svg`](assets/2026-09-04-tam-shell-backlog.svg) is the same view once plan 1b adds the write controls. [`assets/2026-09-06-tam-pending-changes.svg`](assets/2026-09-06-tam-pending-changes.svg) is plan 1b's Pending changes dialog with one issue held back by a conflict. [`assets/2026-09-06-tam-import-and-links.svg`](assets/2026-09-06-tam-import-and-links.svg) is plan 1c's Import issues dialog and the Links tab's Add link form.
 
 ## 1. What this phase delivers
 
@@ -12,7 +12,7 @@ Phase 1 is the first feature subsystem: issues. Everything TAM does later is a v
 
 **Plan 1b, the write path.** The shared journal lifted from XTM (`pending_change`, `audit_log`, the coalescing upsert, and the audit writer); edit and create through the journal; Commit with the base-version conflict check and the override and keep-remote resolutions; the pending-change dot and the Commit chip; and the detail panel's Activity tab. Section 13 is its design.
 
-**Plan 1c, the write features.** Excel import on XTM's importer, cross-project links, and requirement creation against Jira's create-meta fields, all riding on 1b's journal. Plan 1c gets its own section once 1b has merged.
+**Plan 1c, the write features.** Excel import on XTM's importer, cross-project links, and requirement creation against Jira's create-meta fields, all riding on 1b's journal. Section 14 is its design.
 
 ## 2. Decisions
 
@@ -231,3 +231,55 @@ Go: `core/journal` against a temp file (insert, update, revert-drops-row, audit,
 ### 13.10 Implementation notes
 
 Recorded when plan 1b was written. `core/journal` exposes `Get`, `Delete`, `DeleteForKey`, and `SetBaseVersion` keyed by entity key rather than a `Discard`, because the revert of an entity's columns belongs to each app. `IssueBackend` grew a fourth method, `GetIssue`, for the version check and the row refresh, and `UpdateIssue` takes the journal's text values keyed by logical field so the backend owns Jira's shapes. Description edits live in the cached detail, since the row has no description column. The conflict cards render inside the Pending changes dialog, as the mockup shows, rather than in a separate dialog. The demo's staged conflict is the curated story rekeyed to the profile's project, held back once.
+
+## 14. Plan 1c design: the write features
+
+Decided 2026-09-06 after 1b merged. Everything here rides on 1b's journal, drafts, and commit pass. The user chose drafts through the journal for import, link creation only (no removal, no links in the bulk sync), the requirement type in the existing New issue dialog, XTM's import flow trimmed to TAM's fields, and one plan with the file parser lifted into `core` first.
+
+### 14.1 Scope
+
+Three features. Excel or CSV import that turns rows into drafts. Link creation from the Links tab, journaled and pushed on Commit. Requirement creation as a fourth creatable type. Deferred: link removal (needs link ids the detail fetch does not keep), links in the bulk sync, a per-row preview table in the import dialog, epic creation, and subtask parents.
+
+### 14.2 `core/importfile`
+
+Lifted from XTM's `testrepo/importcsv.go`: `ParseRecords(data []byte, isXlsx bool) ([][]string, error)` (CSV with the UTF-8 BOM stripped, or the first worksheet of an XLSX through excelize), `Preview{Headers []string; RowCount int}` and `ParsePreview(records) (Preview, error)`. XTM's `ParseRecords`, `ParseImportPreview`, `readCSV`, `parseXLSX`, and `stripUTF8BOM` become delegators and its `ImportPreview` type an alias, so no caller changes; `core` gains the excelize dependency. Own PR, gated by XTM's Go and Vitest suites, the same shape as the `core/jira` and `core/journal` lifts.
+
+### 14.3 Import
+
+`tam/internal/importer`. A `Mapping` names the column header for each of eight fields: type, summary, description, priority, labels, assignee, story points, parent key; an empty name means unmapped. `AutoMap(headers)` matches headers case-insensitively with spaces and underscores ignored and a few synonyms ("Issue Type" for type, "Points" and "Story Points" for story points, "Epic", "Epic Link", and "Parent" for the parent key). Validation per row: summary required; type blank or unmapped means task, otherwise it must be one of task, story, bug, requirement, or the profile's requirement type name, case-insensitively; story points numeric when present; a parent key must exist in the profile's cache; labels split on commas. `Run(ctx, repo, profileID, projectKey, requirementType, records, mapping, fileName, dryRun) (Result, error)` returns `Result{Rows int; Created []string; Errors []RowError{Row int; Message string}}`. A dry run only validates. An import creates every valid row's draft in one transaction through a new `CreateDrafts(ctx, profileID, projectKey string, drafts []IssueDraft, note string) ([]string, error)` on the repository, whose audit entries carry "imported from <file name>"; rows with errors are skipped and listed. `IssueDraft` gains `ParentKey`; a draft row stores it in `parent_key`; the Jira backend sends it through the discovered Epic Link field when the type is not an epic and the field exists, and drops it with a log line otherwise. A template CSV (headers Type, Summary, Description, Priority, Labels, Assignee, Story Points, Parent, plus one example row) is saved through the Wails save dialog.
+
+### 14.4 Links
+
+A pending link is a journal row of entity type `link`: `entity_key` is the source issue, `field` is `<type name>|<direction>|<target key>` (so the journal's uniqueness rejects a duplicate), `after_val` is the link as JSON (`LinkDraft{Type, Direction, ToKey, ToSummary, ToType}`, direction `outward` or `inward`). There is no base version; links do not conflict.
+
+`IssueBackend` grows `LinkTypes(ctx) ([]LinkType{Name, Inward, Outward}, error)` and `CreateLink(ctx, fromKey string, d LinkDraft) error`. The Jira implementation reads `/rest/api/2/issueLinkType` once per backend and POSTs `/rest/api/2/issueLink` with the source as `outwardIssue` for an outward link and as `inwardIssue` for an inward one, the shape XTM's `CreateBugLink` uses. The demo defines three types (Relates: "relates to" both ways; Blocks: "blocks" and "is blocked by"; Tested By: "tests" and "is tested by"), keeps created links in an overlay that `GetIssueDetail` merges, and answers `GetIssue` for the `XT-` keys its curated details reference with synthetic Test issues, so a cross-project link can be checked offline.
+
+The repository gains `AddLink(ctx, profileID, key string, d LinkDraft) error` (journals with `Put`, audits `link`), `PendingLinks(ctx, profileID, key) ([]Link, error)`, and `ReadDetail` merges pending links into the detail's links with `Link.Pending = true`. Discarding a link row deletes it and audits; nothing to revert. The committer handles `link` rows after edits: `CreateLink`, `MarkCommitted`, then the detail cache for the source key is dropped so the panel refetches. Failures are recorded like edits.
+
+### 14.5 Requirement creation
+
+`requirement` joins the creatable types. The New issue dialog hides Story points when the type is requirement, and the demo's `CreateFields` asks for one required string field, Source, on requirements. Commit already maps the logical type to the profile's requirement type name.
+
+### 14.6 Bound methods
+
+`PreviewImport(contentB64 string, isXlsx bool) (importfile.Preview, error)`, `AutoMapImport(headers []string) importer.Mapping`, `ImportIssues(profileID, contentB64 string, isXlsx bool, fileName string, mapping importer.Mapping, dryRun bool) (importer.Result, error)`, `SaveImportTemplate() (string, error)`, `GetLinkTypes(profileID string) ([]backend.LinkType, error)`, `LookupIssue(profileID, key string) (backend.Issue, error)`, `AddLink(profileID, key string, link backend.LinkDraft) error`. File contents travel base64-encoded from a browser file input, as XTM's import does. Import and Commit exclude each other through the `busy` guard.
+
+### 14.7 Frontend
+
+- An Import button beside New on the Backlog opens the Import issues dialog: file input (CSV or XLSX), the header row and row count, one select per field pre-filled by `AutoMapImport`, a Dry run button whose result lists row errors, an Import button whose result says how many drafts were created and lists the skipped rows, and a Download template link. Drafts appear in the grid at once.
+- The Links tab gains an Add link form: a select of link phrasings (each type's outward and inward wording), a target key input with a Check button that shows the target's summary and type through `LookupIssue`, and Add. Pending links list with the amber dot and a Discard action; the tab's refresh keeps them.
+- The Pending changes dialog shows a link card ("PLAT-412 relates to XT-1018" with the target's summary) with Discard; it counts toward Commit (n).
+- The Activity tab words link entries: added, pushed, discarded.
+- The New issue dialog offers Requirement.
+
+### 14.8 Errors
+
+An import never partially fails: the dry run and the import validate every row first, skip the invalid ones, and create the rest in one transaction; a parse error (bad file, empty file) stops the dialog with the message. A link to a key `LookupIssue` cannot find is rejected at Check; a duplicate pending link is rejected with "already pending". Link pushes that fail keep their rows and land in the commit banner with Jira's message.
+
+### 14.9 Verification
+
+Go: `core/importfile` against a CSV with a BOM and an XLSX built with excelize in the test; `importer` for auto-mapping, every validation rule, dry run, and an import that creates drafts with parents; the repository's `CreateDrafts`, `AddLink`, pending link merge, and discard; both backends' link types and link creation (httptest for Jira, including the direction mapping); the committer pushing a link and recording a failure; XTM's suites for the parser lift. Vitest: the import dialog (mapping, dry run errors, import result), the Add link form (check, add, duplicate), the pending link card, the requirement type in the New dialog. The demo profile runs it offline: import the template, link PLAT-412 to XT-1018, create a requirement with a Source, Commit.
+
+### 14.10 Mockup
+
+[`assets/2026-09-06-tam-import-and-links.svg`](assets/2026-09-06-tam-import-and-links.svg): the Import issues dialog after a dry run, and the Links tab with the Add link form and a pending link.

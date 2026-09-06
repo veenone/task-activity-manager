@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="800" viewBox="0 0 1240 800" font-family="Segoe UI, system-ui, sans-serif" font-size="13">
+  <defs>
+    <style>
+      .txt{fill:#1F2937}.muted{fill:#6B7280}.sm{font-size:11px}.xs{font-size:10px}.b{font-weight:600}
+      .surface{fill:#FFFFFF;stroke:#E1E4EA}.row-alt{fill:#FAFBFC}.row-sel{fill:#E8ECFB}
+      .accent{fill:#3B5BDB}.accent-txt{fill:#3B5BDB}.danger-txt{fill:#B42318}.warn{fill:#FEF3C7;stroke:#F59E0B}
+    </style>
+  </defs>
+
+  <!-- Plan 1c: left, the Import issues dialog after a dry run; right, the
+       Links tab with the Add link form and one pending link. -->
+
+  <rect width="1240" height="800" fill="#F7F8FA"/>
+
+  <!-- ===== topbar ===== -->
+  <rect x="0" y="0" width="1240" height="48" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="20" y="30" class="txt b" font-size="15">Task Activity Manager</text>
+  <rect x="212" y="15" width="48" height="18" rx="9" class="warn"/>
+  <text x="222" y="28" class="xs b" fill="#92400E">DEMO</text>
+  <rect x="284" y="11" width="232" height="26" rx="4" class="surface"/>
+  <text x="294" y="28" class="txt">Acme Platform (PLAT)</text>
+  <rect x="986" y="11" width="88" height="26" rx="4" class="surface"/>
+  <text x="998" y="28" class="txt">Manage</text>
+  <rect x="1086" y="11" width="66" height="26" rx="4" class="surface"/>
+  <text x="1105" y="28" class="muted">Sync</text>
+  <rect x="1164" y="11" width="56" height="26" rx="4" class="surface"/>
+  <text x="1180" y="28" class="txt">Help</text>
+
+  <!-- ===== nav rail ===== -->
+  <rect x="0" y="48" width="180" height="724" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <rect x="8" y="64" width="164" height="32" rx="6" class="row-sel"/>
+  <text x="22" y="85" class="accent-txt b">Backlog</text>
+  <text x="22" y="125" class="txt">Epics</text>
+  <text x="22" y="165" class="txt">Boards</text>
+  <text x="22" y="205" class="txt">Reports</text>
+  <text x="22" y="245" class="txt">Rituals</text>
+
+  <!-- ===== backlog head with New and Import ===== -->
+  <text x="200" y="80" class="txt b" font-size="17">Backlog</text>
+  <text x="272" y="80" class="muted">PLAT · 1,249 issues</text>
+  <rect x="200" y="96" width="260" height="28" rx="4" class="surface"/>
+  <text x="212" y="114" class="muted">Search summary, key, label</text>
+  <rect x="580" y="96" width="76" height="28" rx="4" class="surface"/>
+  <text x="600" y="114" class="txt b">Import</text>
+  <rect x="664" y="96" width="76" height="28" rx="4" class="accent"/>
+  <text x="682" y="114" fill="#FFFFFF" class="b">+ New</text>
+
+  <!-- ===== Import issues dialog ===== -->
+  <rect x="200" y="140" width="560" height="600" rx="8" class="surface"/>
+  <text x="220" y="170" class="txt b" font-size="15">Import issues</text>
+  <text x="330" y="170" class="muted">into PLAT</text>
+  <text x="738" y="170" class="muted">x</text>
+
+  <rect x="220" y="188" width="520" height="30" rx="4" class="surface"/>
+  <text x="232" y="207" class="txt">backlog-q3.xlsx</text>
+  <text x="380" y="207" class="muted sm">14 columns · 42 rows</text>
+  <text x="640" y="207" class="accent-txt sm">Download template</text>
+
+  <text x="220" y="244" class="muted b sm">FIELD</text>
+  <text x="400" y="244" class="muted b sm">COLUMN</text>
+  <line x1="220" y1="250" x2="740" y2="250" stroke="#E1E4EA"/>
+  <g class="sm">
+    <text x="220" y="272" class="txt">Type</text>
+    <rect x="400" y="258" width="200" height="22" rx="3" class="surface"/><text x="410" y="273" class="txt">Issue Type</text>
+    <text x="220" y="300" class="txt">Summary</text>
+    <rect x="400" y="286" width="200" height="22" rx="3" class="surface"/><text x="410" y="301" class="txt">Summary</text>
+    <text x="220" y="328" class="txt">Description</text>
+    <rect x="400" y="314" width="200" height="22" rx="3" class="surface"/><text x="410" y="329" class="txt">Description</text>
+    <text x="220" y="356" class="txt">Priority</text>
+    <rect x="400" y="342" width="200" height="22" rx="3" class="surface"/><text x="410" y="357" class="txt">Priority</text>
+    <text x="220" y="384" class="txt">Labels</text>
+    <rect x="400" y="370" width="200" height="22" rx="3" class="surface"/><text x="410" y="385" class="txt">Labels</text>
+    <text x="220" y="412" class="txt">Assignee</text>
+    <rect x="400" y="398" width="200" height="22" rx="3" class="surface"/><text x="410" y="413" class="muted">(not mapped)</text>
+    <text x="220" y="440" class="txt">Story points</text>
+    <rect x="400" y="426" width="200" height="22" rx="3" class="surface"/><text x="410" y="441" class="txt">Points</text>
+    <text x="220" y="468" class="txt">Parent key</text>
+    <rect x="400" y="454" width="200" height="22" rx="3" class="surface"/><text x="410" y="469" class="txt">Epic Link</text>
+  </g>
+
+  <!-- dry run result -->
+  <rect x="220" y="492" width="520" height="150" rx="6" class="warn"/>
+  <text x="234" y="514" class="txt b sm">Dry run: 39 rows would become drafts, 3 would be skipped.</text>
+  <g class="sm">
+    <text x="234" y="538" class="danger-txt">Row 7</text><text x="290" y="538" class="txt">Summary is empty.</text>
+    <text x="234" y="558" class="danger-txt">Row 18</text><text x="290" y="558" class="txt">Story points "eight" is not a number.</text>
+    <text x="234" y="578" class="danger-txt">Row 31</text><text x="290" y="578" class="txt">Parent PLAT-999 is not in the cache. Sync first or clear the cell.</text>
+    <text x="234" y="606" class="muted">Types default to Task. Drafts join the Backlog now; Commit creates them in Jira.</text>
+    <text x="234" y="626" class="muted">Import runs in one transaction; skipped rows stay in the file for a second pass.</text>
+  </g>
+
+  <line x1="220" y1="660" x2="740" y2="660" stroke="#E1E4EA"/>
+  <rect x="520" y="676" width="94" height="30" rx="4" class="surface"/>
+  <text x="540" y="696" class="txt">Dry run</text>
+  <rect x="624" y="676" width="116" height="30" rx="4" class="accent"/>
+  <text x="650" y="696" fill="#FFFFFF" class="b">Import 39</text>
+
+  <!-- ===== detail panel: Links tab ===== -->
+  <rect x="790" y="140" width="430" height="600" class="surface"/>
+  <text x="806" y="168" class="txt b" font-size="15">PLAT-412</text>
+  <rect x="880" y="154" width="40" height="16" rx="8" fill="#DCFCE7"/><text x="887" y="166" fill="#166534" class="xs b">Story</text>
+  <text x="1196" y="168" class="muted">x</text>
+  <text x="806" y="192" class="txt">Checkout: apply promo code at payment step</text>
+  <g class="sm">
+    <text x="806" y="222" class="muted">Details</text>
+    <text x="866" y="222" class="accent-txt b">Links</text>
+    <text x="910" y="222" class="muted">Tests</text>
+    <text x="956" y="222" class="muted">Activity</text>
+  </g>
+  <line x1="866" y1="228" x2="900" y2="228" stroke="#3B5BDB" stroke-width="2"/>
+  <line x1="790" y1="232" x2="1220" y2="232" stroke="#E1E4EA"/>
+
+  <text x="806" y="258" class="txt b">Links</text>
+  <text x="1150" y="258" class="muted sm">Refresh</text>
+  <g class="sm">
+    <text x="806" y="284" class="muted b xs">TESTED BY</text>
+    <text x="806" y="304" class="accent-txt">XT-1018</text><text x="870" y="304" class="txt">Promo code applies discount</text>
+    <text x="806" y="324" class="accent-txt">XT-1019</text><text x="870" y="324" class="txt">Expired promo code rejected</text>
+    <text x="806" y="352" class="muted b xs">RELATES</text>
+    <text x="806" y="372" class="accent-txt">PLAT-388</text><text x="870" y="372" class="txt">Promo codes must be single-use per customer</text>
+    <text x="806" y="392" class="accent-txt">XT-1031</text><text x="870" y="392" class="txt">Retried payment is not charged twice</text>
+    <circle cx="1120" cy="388" r="3.5" fill="#F59E0B"/>
+    <text x="1130" y="392" class="muted">pending</text>
+    <text x="1176" y="392" class="accent-txt">Discard</text>
+  </g>
+
+  <!-- add link form -->
+  <rect x="806" y="416" width="398" height="150" rx="6" class="surface"/>
+  <text x="820" y="440" class="txt b">Add link</text>
+  <g class="sm">
+    <text x="820" y="466" class="muted">Link</text>
+    <rect x="900" y="452" width="290" height="22" rx="3" class="surface"/><text x="910" y="467" class="txt">is blocked by</text>
+    <text x="820" y="496" class="muted">Issue key</text>
+    <rect x="900" y="482" width="180" height="22" rx="3" class="surface"/><text x="910" y="497" class="txt">PAY-77</text>
+    <rect x="1090" y="482" width="60" height="22" rx="3" class="surface"/><text x="1104" y="497" class="txt">Check</text>
+    <text x="900" y="524" class="txt">PAY-77 · Task · Rotate gateway signing keys</text>
+    <rect x="1130" y="536" width="60" height="22" rx="3" class="accent"/><text x="1148" y="551" fill="#FFFFFF" class="b">Add</text>
+    <text x="820" y="551" class="muted">Journaled now, pushed on Commit.</text>
+  </g>
+
+  <!-- ===== status bar ===== -->
+  <rect x="0" y="772" width="1240" height="28" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="196" y="790" class="muted sm">1,249 issues, last synced today 10:42</text>
+  <rect x="1000" y="777" width="154" height="18" rx="9" class="warn"/>
+  <text x="1010" y="790" class="xs b" fill="#92400E">1 pending change: Commit</text>
+</svg>
