@@ -35,12 +35,28 @@ stages one conflict: the first Commit of an edit to the curated story
 priority, labels, story points, and assignee; drafts can be tasks, stories,
 and bugs. Requirements, Excel import, and cross-project links are plan 1c.
 
+## The write features (plan 1c)
+
+Import: the Backlog's Import button takes a CSV or XLSX (parsed by
+`core/importfile`, XTM's parser lifted out), maps columns to the eight draft
+fields (`internal/importer`), validates rows with file row numbers, and
+creates the valid rows as drafts in one transaction (`CreateDrafts`, audited
+"imported from <file>"). Links: the Links tab's Add link form journals a
+link (entity type `link`, field `<type>|<direction>|<target>`); the
+repository merges pending links into the cached detail; the committer pushes
+link rows after edits with `POST /rest/api/2/issueLink` and drops the
+source's detail cache. Requirements are creatable; the demo asks for a
+Source field on them and answers lookups for the `XT-` keys its curated
+details reference. Link removal, links in the bulk sync, epics, and
+subtask parents are not in scope.
+
 ## Layout
 
     main.go              Wails entry point, window, menu
     app.go               App struct: startup, profiles, settings
     app_issues.go        the issue methods: sync, list, detail, per-profile settings
     app_writes.go        the write methods: edit, create, commit, and conflict resolution
+    app_imports.go       the import methods: preview, mapping, and creating drafts from a file
     internal/tamstore/   TAM's own SQLite file (schema version 3: issue, issue_link, sync_state,
                           profile_setting, plus the shared journal tables pending_change and audit_log)
     internal/backend/    IssueBackend seam and DTOs; backend/jira on core/jira, backend/demo on internal/demo
@@ -48,6 +64,7 @@ and bugs. Requirements, Excel import, and cross-project links are plan 1c.
     internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile
                           settings, the pending-change journal, and drafts
     internal/committer/  pushes the journal to Jira and resolves conflicts
+    internal/importer/   maps import columns to draft fields and validates rows
     internal/syncer/     the paging engine; emits tam:sync-progress through app_issues.go
     internal/suiteprofiles/  which shared profiles TAM shows, demo detection, validation
     frontend/            React app on @agile-suite/core (see ../frontend/core)
@@ -55,7 +72,8 @@ and bugs. Requirements, Excel import, and cross-project links are plan 1c.
       src/queries/       TanStack Query keys, hooks, and the post-sync invalidation
       src/contexts/      SyncContext on the shared sync reducer
       src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
-                          PendingChangesModal, ConflictCard, NewIssueModal, ProfilesModal, AboutModal
+                          PendingChangesModal, ConflictCard, NewIssueModal, ProfilesModal, AboutModal,
+                          ImportIssuesModal, AddLinkForm
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands
