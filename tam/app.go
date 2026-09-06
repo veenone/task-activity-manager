@@ -25,16 +25,18 @@ import (
 // is callable from JavaScript, so it only validates and delegates; the rules
 // live in internal/.
 type App struct {
-	ctx        context.Context
-	local      *store.DB
-	shared     *store.DB
-	profiles   *profile.Manager
-	creds      profile.CredentialStore
-	settings   *settings.Manager
-	repo       *issuerepo.Repository
-	backendMu  sync.Mutex
-	backends   map[string]backend.IssueBackend
-	syncing    map[string]bool
+	ctx       context.Context
+	local     *store.DB
+	shared    *store.DB
+	profiles  *profile.Manager
+	creds     profile.CredentialStore
+	settings  *settings.Manager
+	repo      *issuerepo.Repository
+	backendMu sync.Mutex
+	backends  map[string]backend.IssueBackend
+	// busy names the operation running for a profile ("sync" or "commit"),
+	// so the two never overlap; the frontend reducer mirrors this.
+	busy       map[string]string
 	dbPath     string
 	sharedPath string
 	logPath    string
@@ -95,7 +97,7 @@ func (a *App) initStore() error {
 	a.dbPath = dbPath
 	a.repo = issuerepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
-	a.syncing = map[string]bool{}
+	a.busy = map[string]string{}
 
 	sharedPath, err := shareddb.DefaultPath()
 	if err != nil {

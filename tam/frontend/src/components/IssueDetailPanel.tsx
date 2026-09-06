@@ -2,14 +2,18 @@ import { useState } from "react";
 import type { Issue, Link } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { formatWhen } from "../lib/format";
+import { useSync } from "../contexts/SyncContext";
 import { TypeChip } from "./TypeChip";
+import { EditableFields } from "./EditableFields";
+import { ActivityTab } from "./ActivityTab";
 
-type Tab = "details" | "links" | "tests";
+type Tab = "details" | "links" | "tests" | "activity";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "details", label: "Details" },
   { id: "links", label: "Links" },
   { id: "tests", label: "Tests" },
+  { id: "activity", label: "Activity" },
 ];
 
 interface Props {
@@ -25,12 +29,17 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("details");
   const detail = useIssueDetail(profileId, issue.key);
   const tests = useLinkedTests(profileId, issue.key);
+  // A sync or commit running elsewhere must not race a save: the row refresh
+  // that follows either one can overwrite an edit made while it was in flight.
+  const { status } = useSync();
+  const busy = status !== "idle";
 
   return (
     <aside className="detail-panel" aria-labelledby="detail-title">
       <div className="detail-head">
         <h2 id="detail-title" className="detail-key">{issue.key}</h2>
         <TypeChip type={issue.type} />
+        {issue.draft && <span className="chip chip-draft">Draft</span>}
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
       <p className="detail-summary">{issue.summary}</p>
@@ -54,34 +63,34 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
 
       {tab === "details" && (
         <div role="tabpanel" id="panel-details" aria-labelledby="tab-details" className="tab-panel">
+          {issue.draft && (
+            <p className="muted small detail-note">Commit creates this issue in Jira and gives it a real key.</p>
+          )}
           <dl className="field-list">
             <dt>Status</dt><dd>{issue.status || "-"}</dd>
-            <dt>Assignee</dt><dd>{issue.assignee || "-"}</dd>
             <dt>Sprint</dt><dd>{issue.sprintName || "-"}</dd>
-            <dt>Story points</dt><dd>{issue.storyPoints ?? "-"}</dd>
             <dt>{issue.type === "epic" ? "Parent" : "Epic"}</dt><dd>{issue.parentKey ? <span className="accent-text">{issue.parentKey}</span> : "-"}</dd>
-            <dt>Priority</dt><dd>{issue.priority || "-"}</dd>
-            <dt>Labels</dt>
-            <dd>{issue.labels.length ? issue.labels.map((l) => <span key={l} className="chip chip-label">{l}</span>) : "-"}</dd>
             <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>
           </dl>
           <div className="detail-section-head">
-            <h3>Description</h3>
+            <h3>Fields</h3>
             <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()} disabled={detail.isFetching}>
               {detail.isFetching ? "Refreshing" : "Refresh"}
             </button>
           </div>
-          {detail.isPending ? (
-            <p className="muted">Loading description</p>
-          ) : detail.isError ? (
+          {detail.isError && (
             <p className="error-text" data-testid="detail-error">
               Could not load the details: {detail.error.message}{" "}
               <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()}>Retry</button>
             </p>
-          ) : (
-            <p className="detail-description">{detail.data.description || <span className="muted">No description.</span>}</p>
           )}
-          <p className="muted small detail-note">Fields load from the cache first, then refresh from Jira when the panel opens.</p>
+          <EditableFields
+            profileId={profileId}
+            issue={issue}
+            description={detail.data?.description ?? ""}
+            descriptionReady={detail.isSuccess}
+            busy={busy}
+          />
         </div>
       )}
 
@@ -140,6 +149,8 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
           )}
         </div>
       )}
+
+      {tab === "activity" && <ActivityTab profileId={profileId} issueKey={issue.key} />}
     </aside>
   );
 }

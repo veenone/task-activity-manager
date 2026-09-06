@@ -5,6 +5,8 @@ import type { IssueQuery, Profile, Settings } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
 import { IssueTable } from "./IssueTable";
 import { IssueDetailPanel } from "./IssueDetailPanel";
+import { useModal } from "../modals";
+import { NewIssueModal } from "./NewIssueModal";
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 250;
@@ -55,6 +57,7 @@ export function BacklogView() {
   );
   const issues = useIssues(activeId, query);
   const sprints = useSprints(activeId);
+  const { isOpen, openModal, closeModal } = useModal();
 
   const total = issues.data?.total ?? 0;
   const rows = issues.data?.issues ?? [];
@@ -113,7 +116,9 @@ export function BacklogView() {
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
-        <span className="muted small filter-note">Read-only until plan 1b</span>
+        <button type="button" className="btn btn-primary filter-new" disabled={!activeId} onClick={() => openModal("newIssue")}>
+          + New
+        </button>
       </div>
 
       <div className="backlog-body">
@@ -142,6 +147,16 @@ export function BacklogView() {
           <IssueDetailPanel key={selected.key} profileId={activeId} issue={selected} onClose={() => setSelectedKey("")} />
         )}
       </div>
+
+      {isOpen("newIssue") && (
+        <NewIssueModal
+          onClose={closeModal}
+          onCreated={(key) => {
+            setPage(0);
+            setSelectedKey(key);
+          }}
+        />
+      )}
     </section>
   );
 }

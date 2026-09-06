@@ -12,24 +12,50 @@ collection "Task Activity Manager" mirrors it.
 
 Plan 1a (issues, read path): sync by project into `tam.db`, the Backlog
 grid, and a read-only detail panel, on the demo dataset or a live Jira DC.
-Plan 1b adds the journal, create and edit, Commit, Excel import, and links.
+Plan 1b (this branch) adds the journal, create and edit, and Commit.
+Requirements, Excel import, and cross-project links are plan 1c.
+
+## The write path (plan 1b)
+
+Edits and creates go through the journal in `tam.db` (`pending_change` and
+`audit_log`, shared DDL and helpers in `core/journal`). `issuerepo.EditField`
+writes the row and journals the change with the row's `updated` as the base
+version; `CreateDraft` inserts a `TAM-NEW-n` row with status `Draft` and a
+create row holding the draft as JSON. Sync never deletes a draft and never
+overwrites a column with a pending edit. `internal/committer` pushes the
+journal: drafts first (POST, then rekey), then per-issue version checks and
+PUTs; an issue whose remote `updated` moved is held back with base, mine,
+and remote per field, and the user picks Override (rebase, push next time)
+or Keep remote (drop the edits, take Jira's row). Commit and sync exclude
+each other through `App.busy` and the shared reducer's `committing` state.
+
+The demo backend keeps writes in memory, hands out keys from 500, and
+stages one conflict: the first Commit of an edit to the curated story
+(`<project>-412`) is held back. Editable fields are summary, description,
+priority, labels, story points, and assignee; drafts can be tasks, stories,
+and bugs. Requirements, Excel import, and cross-project links are plan 1c.
 
 ## Layout
 
     main.go              Wails entry point, window, menu
     app.go               App struct: startup, profiles, settings
     app_issues.go        the issue methods: sync, list, detail, per-profile settings
-    internal/tamstore/   TAM's own SQLite file (schema version 2: issue, issue_link, sync_state, profile_setting)
+    app_writes.go        the write methods: edit, create, commit, and conflict resolution
+    internal/tamstore/   TAM's own SQLite file (schema version 3: issue, issue_link, sync_state,
+                          profile_setting, plus the shared journal tables pending_change and audit_log)
     internal/backend/    IssueBackend seam and DTOs; backend/jira on core/jira, backend/demo on internal/demo
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile
-    internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile settings
+    internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile
+                          settings, the pending-change journal, and drafts
+    internal/committer/  pushes the journal to Jira and resolves conflicts
     internal/syncer/     the paging engine; emits tam:sync-progress through app_issues.go
     internal/suiteprofiles/  which shared profiles TAM shows, demo detection, validation
     frontend/            React app on @agile-suite/core (see ../frontend/core)
       src/api.ts         typed access to the bindings; plain shapes for fixtures
       src/queries/       TanStack Query keys, hooks, and the post-sync invalidation
       src/contexts/      SyncContext on the shared sync reducer
-      src/components/    BacklogView, IssueTable, IssueDetailPanel, ProfilesModal, AboutModal
+      src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
+                          PendingChangesModal, ConflictCard, NewIssueModal, ProfilesModal, AboutModal
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands

@@ -7,6 +7,7 @@ import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "
 import * as api from "../api";
 import type { Issue } from "../api";
 import { profileBackend } from "../profileBackend";
+import { ModalProvider } from "../modals";
 import { BacklogView } from "./BacklogView";
 
 vi.mock("../api", async () => {
@@ -23,6 +24,11 @@ vi.mock("../api", async () => {
     ListLinkedTests: vi.fn(),
   };
 });
+
+// A selected row's IssueDetailPanel reads useSync to hold Save during a sync
+// or commit; its provider needs more wiring than this view otherwise uses,
+// so it is mocked here rather than wired up just for that.
+vi.mock("../contexts/SyncContext", () => ({ useSync: () => ({ status: "idle" }) }));
 
 function issue(over: Partial<Issue>): Issue {
   return {
@@ -56,9 +62,11 @@ function renderView() {
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <Loader />
-          <Switcher />
-          <BacklogView />
+          <ModalProvider>
+            <Loader />
+            <Switcher />
+            <BacklogView />
+          </ModalProvider>
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
@@ -121,6 +129,7 @@ describe("BacklogView", () => {
     expect(within(row).getByText("5")).toBeInTheDocument();
     expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument();
     expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25 });
+    expect(screen.getByRole("button", { name: "+ New" })).toBeInTheDocument();
   });
 
   it("filters by text, type chips, and sprint", async () => {
@@ -197,5 +206,24 @@ describe("BacklogView", () => {
     vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
     renderView();
     await waitFor(() => expect(screen.getByText(/No issues cached yet/)).toBeInTheDocument());
+  });
+
+  it("shows the pending dot and the Draft chip on rows", async () => {
+    vi.mocked(api.ListIssues).mockResolvedValue({
+      issues: [
+        issue({ key: "TAM-NEW-1", summary: "Add a retry", status: "Draft", draft: true, pending: true }),
+        issue({ key: "PLAT-412", summary: "Promo", status: "In Progress", pending: true }),
+        issue({ key: "PLAT-409", summary: "Rotate keys" }),
+      ],
+      total: 3,
+    });
+    renderView();
+    await waitFor(() => expect(screen.getByText("Add a retry")).toBeInTheDocument());
+    const rows = await screen.findAllByRole("row");
+    // rows[0] is the header row.
+    expect(within(rows[1]).getByLabelText("Pending changes")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Draft")).toBeInTheDocument();
+    expect(within(rows[2]).getByLabelText("Pending changes")).toBeInTheDocument();
+    expect(within(rows[3]).queryByLabelText("Pending changes")).not.toBeInTheDocument();
   });
 });

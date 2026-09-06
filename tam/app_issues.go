@@ -110,18 +110,10 @@ func (a *App) SyncIssues(profileID string, full bool) (syncer.Summary, error) {
 	if err != nil {
 		return syncer.Summary{}, err
 	}
-	a.backendMu.Lock()
-	if a.syncing[p.ID] {
-		a.backendMu.Unlock()
-		return syncer.Summary{}, errors.New("a sync is already running for this profile")
+	if err := a.acquire(p.ID, "sync"); err != nil {
+		return syncer.Summary{}, err
 	}
-	a.syncing[p.ID] = true
-	a.backendMu.Unlock()
-	defer func() {
-		a.backendMu.Lock()
-		delete(a.syncing, p.ID)
-		a.backendMu.Unlock()
-	}()
+	defer a.release(p.ID)
 
 	b, err := a.backendFor(p)
 	if err != nil {
@@ -164,7 +156,7 @@ func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error)
 	if err != nil {
 		return backend.IssueDetail{}, err
 	}
-	if ok && time.Since(fetchedAt) < detailFreshFor {
+	if ok && (strings.HasPrefix(key, issuerepo.DraftPrefix) || time.Since(fetchedAt) < detailFreshFor) {
 		return cached, nil
 	}
 	b, err := a.backendFor(p)

@@ -9,4 +9,7 @@ export const keys = {
     [profileId, "issue", key, "tests"] as const,
   sprints: (profileId: string) => [profileId, "sprints"] as const,
   syncState: (profileId: string) => [profileId, "syncState"] as const,
+  pending: (profileId: string) => [profileId, "pending"] as const,
+  activity: (profileId: string, key: string) => [profileId, "issue", key, "activity"] as const,
+  createFields: (profileId: string, type: string) => [profileId, "createFields", type] as const,
 };

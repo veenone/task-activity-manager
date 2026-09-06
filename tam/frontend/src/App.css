@@ -126,7 +126,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-search { width: 300px; }
 .filter-sprint { width: 140px; }
-.filter-note { margin-left: auto; }
 .type-filter { display: flex; gap: 6px; }
 .chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; }
 .chip-type-task { background: #dbeafe; color: #1e40af; }
@@ -184,3 +183,54 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 .profile-setting { display: inline-flex; flex-direction: column; gap: 2px; }
 .profile-setting .detail-input-inline { width: 150px; }
+
+/* Plan 1b: pending changes */
+.chip-pending {
+  background: var(--warn-bg, #fef3c7);
+  color: var(--warn-fg, #92400e);
+  border: 1px solid var(--warn-border, #f59e0b);
+  cursor: pointer;
+  font-weight: 600;
+}
+.chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
+.chip-conflict { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; text-transform: uppercase; font-size: 10px; }
+.pending-modal { width: min(700px, 92vw); max-height: 86vh; display: flex; flex-direction: column; }
+.pending-head { display: flex; align-items: center; gap: 12px; }
+.pending-head h2 { margin: 0; font-size: 15px; }
+.pending-head .detail-close { margin-left: auto; }
+.pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
+.pending-banner p { margin: 2px 0; }
+.pending-banner-warn { background: var(--warn-bg, #fef3c7); border-color: var(--warn-border, #f59e0b); }
+.pending-list { display: flex; flex-direction: column; gap: 12px; overflow: auto; padding: 8px 0; }
+.pending-card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+.pending-card-conflict { background: #fff7ed; border-color: #f59e0b; }
+.pending-card-head { display: flex; align-items: center; gap: 10px; }
+.pending-card-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pending-discard { margin-left: auto; }
+.pending-rows { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.pending-row { display: grid; grid-template-columns: 110px 1fr auto 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+.pending-empty { padding: 24px 0; text-align: center; }
+.pending-footer { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; }
+.pending-footer-buttons { margin-left: auto; display: flex; gap: 8px; }
+.b { font-weight: 600; }
+
+/* Plan 1b: editable details, activity, grid markers */
+.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: 6px; vertical-align: middle; }
+.edit-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.edit-row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: start; }
+.edit-row .detail-input { width: 100%; box-sizing: border-box; }
+.edit-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.activity-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.activity-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; }
+.activity-row .small:last-child { grid-column: 2; }
+
+/* Plan 1b: new issue */
+.filter-new { margin-left: auto; }
+.new-issue-modal { width: min(640px, 92vw); max-height: 86vh; overflow: auto; }
+.meta-fields { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+
+/* Plan 1b: conflicts */
+.conflict-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.conflict-table th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
+.conflict-table td { padding: 4px 8px 4px 0; vertical-align: top; }
+.danger-text { color: #b42318; }

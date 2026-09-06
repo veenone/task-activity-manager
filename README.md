@@ -8,7 +8,8 @@ Desktop tools for Jira Data Center that share one code spine:
   masters, product owners, and team members (tasks, epics, stories, bugs,
   requirements). It shares connection profiles with XTM, syncs a project's
   issues into a local cache, and shows them in a Backlog grid with a
-  read-only detail panel. Writes arrive with plan 1b.
+  read-only detail panel. Plan 1b adds local edits and drafts, a journal,
+  Commit with conflict detection, and an Activity tab.
 
 Both are Go + Wails + React apps that sync Jira into a local SQLite cache and
 push edits back on commit.
