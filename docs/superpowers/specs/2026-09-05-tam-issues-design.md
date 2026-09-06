@@ -2,7 +2,7 @@
 
 **Status:** proposed · **Date:** 2026-09-05
 **Parent:** [`2026-09-04-tam-foundation-design.md`](2026-09-04-tam-foundation-design.md), which fixes the repository shape, the shared core, the data model, and the write model this spec builds on.
-**Mockups:** [`assets/2026-09-05-tam-backlog-read-path.svg`](assets/2026-09-05-tam-backlog-read-path.svg) is what plan 1a ships: the Backlog with a read-only detail panel and a sync in progress. [`assets/2026-09-04-tam-shell-backlog.svg`](assets/2026-09-04-tam-shell-backlog.svg) is the same view once plan 1b adds the write controls.
+**Mockups:** [`assets/2026-09-05-tam-backlog-read-path.svg`](assets/2026-09-05-tam-backlog-read-path.svg) is what plan 1a ships: the Backlog with a read-only detail panel and a sync in progress. [`assets/2026-09-04-tam-shell-backlog.svg`](assets/2026-09-04-tam-shell-backlog.svg) is the same view once plan 1b adds the write controls. [`assets/2026-09-06-tam-pending-changes.svg`](assets/2026-09-06-tam-pending-changes.svg) is plan 1b's Pending changes dialog with one issue held back by a conflict.
 
 ## 1. What this phase delivers
 
@@ -10,7 +10,9 @@ Phase 1 is the first feature subsystem: issues. Everything TAM does later is a v
 
 **Plan 1a, the read path.** The shared Jira client lifted from XTM; TAM's issue backend with a Jira and a demo implementation; the `issue` and `issue_link` tables; sync by project; the Backlog grid with search, type chips, a sprint filter, and paging; a read-only detail panel with Details, Links, and Tests tabs; and the demo dataset that drives all of it offline. Nothing in 1a writes to Jira.
 
-**Plan 1b, the write path.** The shared journal lifted from XTM (`pending_change`, `audit_log`, commit orchestration, the base-version conflict check); create and edit through the journal; Commit; Excel import on XTM's importer; cross-project links; requirement creation; the pending-change dot and the Commit chip; and the detail panel's Activity tab. Plan 1b gets its own plan document once 1a has merged and its shapes are settled; section 9 records what 1a has to leave in place for it.
+**Plan 1b, the write path.** The shared journal lifted from XTM (`pending_change`, `audit_log`, the coalescing upsert, and the audit writer); edit and create through the journal; Commit with the base-version conflict check and the override and keep-remote resolutions; the pending-change dot and the Commit chip; and the detail panel's Activity tab. Section 13 is its design.
+
+**Plan 1c, the write features.** Excel import on XTM's importer, cross-project links, and requirement creation against Jira's create-meta fields, all riding on 1b's journal. Plan 1c gets its own section once 1b has merged.
 
 ## 2. Decisions
 
@@ -171,3 +173,57 @@ TAM's app gains, all TAM-local under `tam/frontend/src`:
 ## 12. Out of scope for this phase
 
 Sprint and board entities and the agile client (Phase 3), the epic tree (Phase 2), reports (Phase 4), Confluence (Phase 5), the cross-link views inside XTM (Phase 6), and any non-Jira backend for TAM.
+
+## 13. Plan 1b design: the write path
+
+Decided 2026-09-06 after 1a merged. Everything here rides on 1a's shapes; section 9's promises were checked first: `issue.updated` is the base version, `detail_json` holds the discovered custom fields (enough for the six editable fields), the `IssueBackend` grows by three methods, and the row shape gains the `pending` flag the grid reserved.
+
+### 13.1 Scope
+
+Edit and create through the journal, Commit with conflict detection, the pending markers, and the Activity tab. Editable fields are summary, description, priority, labels, story points, and assignee. Creatable types are task, story, and bug; requirement creation, Excel import, and cross-project links are plan 1c. Status and sprint moves are the live path and arrive with boards in Phase 3.
+
+### 13.2 `core/journal`
+
+Lifted from XTM's `testrepo`: the `pending_change` and `audit_log` tables and the two transaction-level helpers behind every XTM edit. `Upsert(tx, profileID, entityType, entityKey, field, before, after, baseVersion)` keeps one row per entity and field: a first edit inserts, a later edit updates `after_val`, and a value returning to its original deletes the row. `Audit(tx, profileID, entityType, entityKey, action, field, before, after, note)` appends to the trail. The package also exports the DDL both apps' stores include, the `PendingChange` and `AuditEntry` shapes, `List(db, profileID)`, `Discard(db, profileID, id)`, `DiscardAll`, `Delete(tx, ids)` for a committed batch, and `Entries(db, profileID, entityKey, limit)`. XTM's `upsertPendingChange` and `writeAudit` become one-line delegators, the same shape as the `jira` embedding; its list and discard methods keep their bodies. The extraction is its own PR, gated by XTM's full Go and Vitest suites.
+
+### 13.3 TAM store, schema version 3
+
+`tam.db` gains the two journal tables from the shared DDL. `issuerepo` gains:
+
+- `EditField(ctx, profileID, key, field, value)`: in one transaction, read the row's current value and `updated`, write the new value to the row, journal it with `updated` as the base version, audit it. Unknown or read-only fields are rejected.
+- `CreateDraft(ctx, profileID, draft)`: insert a row under the next temporary key (`TAM-NEW-1`, `TAM-NEW-2`, per profile) with status `Draft`, plus one pending row of entity type `issue_create` whose `after_val` is the draft as JSON, and an audit entry. Returns the temporary key.
+- `PendingKeys(ctx, profileID)`: the keys with at least one pending row, for the grid's dot and the `pending` flag on `Issue`.
+- `Rekey(ctx, profileID, tempKey, realKey)`: moves a draft to its real key across `issue`, `issue_link`, `pending_change`, and `audit_log` in one transaction.
+- `ReplaceRow(ctx, profileID, issue)`: replaces a row from a fresh Jira read after a commit or a keep-remote.
+
+Sync never touches drafts or pending rows: a full sync's clear skips keys with the temporary prefix, and an upsert of a key with pending rows does not overwrite the locally edited columns (the pending `after_val` wins until Commit).
+
+### 13.4 Backend additions
+
+`IssueBackend` grows `UpdateIssue(ctx, key string, fields map[string]any) error`, `CreateIssue(ctx, projectKey, typeName string, fields map[string]any) (string, error)`, and `CreateFields(ctx, projectKey, typeName string) ([]FieldSpec, error)`. The Jira implementation maps the six fields to Jira's shapes (priority and assignee as `{name}`, labels as a list, story points through the discovered custom field id) and PUTs `/rest/api/2/issue/{key}`; creates POST `/rest/api/2/issue`; `CreateFields` reads `createmeta` with the fields expansion and returns the required fields the form does not already carry as name, id, and schema type. The demo backend accepts all three in memory, hands out keys from `PLAT-500` upward, bumps `updated` on every write, and can stage a conflict (a demo issue whose remote `updated` moves after an edit) so the resolution dialog is testable offline.
+
+### 13.5 The commit pass
+
+`tam/internal/committer`, not XTM's engine. It groups the profile's pending rows by key and runs creates first: POST, then `Rekey`. For each edited issue it fetches the remote `updated`; a mismatch holds the issue back as a conflict carrying base, mine, and remote for every pending field, read from the fetched issue. Otherwise it PUTs the fields, replaces the row from Jira, deletes the pending rows, and audits `committed`. A failed PUT or POST keeps the rows and records the error. `Result` lists committed keys, created keys with their temporary ones, conflicts, and failures, plus counts. Override rewrites the held issue's base versions to the remote `updated` so the next Commit pushes; keep remote deletes its pending rows and replaces the row from Jira. Commit and sync exclude each other through the shared reducer's states and a per-profile in-flight guard on the Go side.
+
+### 13.6 Bound methods
+
+`EditIssue(profileID, key, field, value string) error`, `CreateIssue(profileID string, draft IssueDraft) (string, error)`, `GetCreateFields(profileID, typeName string) ([]backend.FieldSpec, error)`, `ListPendingChanges(profileID string) ([]journal.PendingChange, error)`, `DiscardPendingChange(profileID string, id int64) error`, `DiscardAllPendingChanges(profileID string) (int, error)`, `CommitPendingChanges(profileID string) (committer.Result, error)`, `ResolveConflictOverride(profileID, key, remoteVersion string) error`, `ResolveConflictKeepRemote(profileID, key string) error`, `ListActivity(profileID, key string, limit int) ([]journal.AuditEntry, error)`.
+
+### 13.7 Frontend
+
+- The Details tab becomes editable: inputs for the six fields and a Save edit button that journals each changed field; a Draft chip on rows and panels of uncommitted creates.
+- A New button on the Backlog opens the New issue dialog: type, summary, description, priority, labels, assignee, then the create-meta required fields rendered as text inputs. The draft appears in the grid at once.
+- Rows with pending rows show the amber dot from the mockup; `Issue.pending` drives it.
+- The status bar's Commit chip shows the pending count and opens the Pending changes dialog: changes grouped by issue with before and after, per-row discard, discard all, and Commit. The commit result lands in a banner naming committed, created, conflicted, and failed keys.
+- Conflicts open the resolution dialog: one card per held issue with a base, mine, remote table and Override and Keep remote buttons.
+- The Activity tab lists the audit entries for the issue, newest first.
+- The sync reducer's `committing` state is wired: Commit disables Sync and the profile picker, and the reverse.
+
+### 13.8 Errors
+
+Commit is per issue; one failure or conflict never blocks the others, and the rows of anything not committed stay for the next attempt. A create whose POST succeeded but whose rekey failed is reported with the real key and audited, so the next sync reconciles rather than duplicates it. A create-meta failure degrades the New issue dialog to the minimal form with a note. A partial commit shows the banner and leaves the chip's count at what remains. Every backend error passes through the shared normaliser.
+
+### 13.9 Verification
+
+Go: `core/journal` against a temp file (insert, update, revert-drops-row, audit, list, discard, delete); `issuerepo` edit, draft, rekey, replace, pending keys, and the sync guards for drafts and pending rows; `committer` against a fake backend for the clean path, a conflict with both resolutions, a create with rekey, and a mid-run failure; the demo backend's writes and its staged conflict. The `core/journal` PR keeps XTM's suites green. Vitest covers the editable panel, the New issue dialog, the pending dialog, the conflict dialog, the Activity tab, and the reducer wiring. The demo profile runs the loop offline: edit, create, see the dot and the chip, commit, force a conflict, resolve it both ways.
