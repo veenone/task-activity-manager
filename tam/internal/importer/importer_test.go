@@ -2,6 +2,7 @@ package importer_test
 
 import (
 	"context"
+	"encoding/csv"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -150,11 +151,65 @@ func TestRunRefusesAMappingWithoutSummaryOrWithAMissingColumn(t *testing.T) {
 func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 	data := importer.TemplateCSV()
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 2 || !strings.HasPrefix(lines[0], "Type,Summary,Description,Priority,Labels,Assignee,Story Points,Parent") {
+	if len(lines) != 5 || !strings.HasPrefix(lines[0], "Type,Summary,Description,Priority,Labels,Assignee,Story Points,Parent") {
 		t.Errorf("template: %q", string(data))
 	}
-	m := importer.AutoMap(strings.Split(lines[0], ","))
+	records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
+	if err != nil {
+		t.Fatalf("parse template: %v", err)
+	}
+	m := importer.AutoMap(records[0])
 	if m.Type == "" || m.Summary == "" || m.StoryPoints == "" || m.ParentKey == "" {
 		t.Errorf("template headers must auto-map: %+v", m)
+	}
+	for i, row := range records[1:] {
+		if row[7] != "" {
+			t.Errorf("row %d parent cell must be empty: %q", i+2, row[7])
+		}
+	}
+	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo := issuerepo.New(db.DB())
+	res, err := importer.Run(context.Background(), repo, "p1", "PLAT", "Business Requirement", records, m, "template.csv", true)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Rows != 4 || len(res.Errors) != 0 {
+		t.Errorf("template dry run against a fresh repo: %+v", res)
+	}
+}
+
+func TestRunSkipsRowsAlreadyDraftedOrRepeatedInTheFile(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Apply promo at payment"}); err != nil {
+		t.Fatal(err)
+	}
+	rows := [][]string{
+		records()[0],
+		{"Story", "Apply promo at payment", "", "", "", "", "", ""}, // matches the existing draft
+		{"Task", "Brand new row", "", "", "", "", "", ""},
+		{"Task", "Brand new row", "", "", "", "", "", ""}, // repeats row 3
+	}
+	m := importer.AutoMap(rows[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", rows, m, "f.csv", true)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Rows != 3 || len(res.Errors) != 2 {
+		t.Fatalf("result: %+v", res)
+	}
+	got := map[int]string{}
+	for _, e := range res.Errors {
+		got[e.Row] = e.Message
+	}
+	if got[2] != "Already a draft (TAM-NEW-1); commit or discard it first." {
+		t.Errorf("row 2: %q", got[2])
+	}
+	if got[4] != "Duplicate of row 3." {
+		t.Errorf("row 4: %q", got[4])
 	}
 }

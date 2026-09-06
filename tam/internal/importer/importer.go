@@ -166,7 +166,10 @@ func requirementLabel(requirementType string) string {
 }
 
 // Run validates every data row and, unless dryRun, creates the valid ones
-// as drafts in one transaction. Rows with errors are skipped and listed.
+// as drafts in one transaction. Rows with errors are skipped and listed. A
+// row whose type and summary already match a draft from an earlier import,
+// or repeat an earlier row of this same file, are skipped too, so a second
+// pass over a partly-imported file never duplicates.
 func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey, requirementType string, records [][]string, m Mapping, fileName string, dryRun bool) (Result, error) {
 	if len(records) < 2 {
 		return Result{}, errors.New("the file has a header row but no data rows")
@@ -175,6 +178,11 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 	if err != nil {
 		return Result{}, err
 	}
+	drafted, err := repo.DraftIndex(ctx, profileID)
+	if err != nil {
+		return Result{}, err
+	}
+	seen := map[string]int{}
 	res := Result{Created: []string{}, Errors: []RowError{}}
 	var drafts []backend.IssueDraft
 	parents := map[string]string{}
@@ -195,6 +203,16 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 			fail(err.Error() + ".")
 			continue
 		}
+		dupKey := strings.ToLower(typ + "|" + summary)
+		if draftKey, ok := drafted[dupKey]; ok {
+			fail(fmt.Sprintf("Already a draft (%s); commit or discard it first.", draftKey))
+			continue
+		}
+		if firstRow, ok := seen[dupKey]; ok {
+			fail(fmt.Sprintf("Duplicate of row %d.", firstRow))
+			continue
+		}
+		seen[dupKey] = fileRow
 		pointsRaw := cell(row, c.points)
 		points, err := backend.ParsePoints(pointsRaw)
 		if err != nil {
@@ -247,8 +265,14 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 }
 
 // TemplateCSV is a starter file with the supported columns and one example
-// row.
+// row per creatable type. The Parent cell is left empty on every row: a
+// parent key only resolves against issues already cached in the target
+// project, so a filled-in example would fail for any profile whose cache
+// does not happen to hold that key.
 func TemplateCSV() []byte {
 	return []byte("Type,Summary,Description,Priority,Labels,Assignee,Story Points,Parent\n" +
-		"Story,Apply promo code at payment step,As a shopper I can enter a promo code,High,\"checkout, promo\",ranand,5,PLAT-350\n")
+		"Task,Rotate the payment gateway keys,Rotate before the audit,Medium,security,,2,\n" +
+		"Story,Apply promo code at payment step,As a shopper I can enter a promo code,High,\"checkout, promo\",,5,\n" +
+		"Bug,Promo code field accepts whitespace,Trim the input before validating,Low,promo,,1,\n" +
+		"Requirement,Promo codes are single-use per customer,Enforced at redemption,High,promo,,,\n")
 }

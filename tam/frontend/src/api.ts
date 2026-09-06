@@ -248,6 +248,7 @@ export interface CommitResult {
 export interface ImportPreview {
   headers: string[];
   rowCount: number;
+  sample: string[];
 }
 
 export interface ImportMapping {

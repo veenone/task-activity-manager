@@ -46,10 +46,14 @@ func TestParseRecordsXLSXReadsTheFirstSheet(t *testing.T) {
 
 func TestParsePreview(t *testing.T) {
 	pv, err := importfile.ParsePreview([][]string{{"A", "B"}, {"1", "2"}, {"3"}})
-	if err != nil || len(pv.Headers) != 2 || pv.RowCount != 2 {
+	if err != nil || len(pv.Headers) != 2 || pv.RowCount != 2 || strings.Join(pv.Sample, ",") != "1,2" {
 		t.Errorf("preview = %+v %v", pv, err)
 	}
 	if _, err := importfile.ParsePreview(nil); err == nil || err.Error() != "the file is empty" {
 		t.Errorf("empty: %v", err)
+	}
+	headerOnly, err := importfile.ParsePreview([][]string{{"A", "B"}})
+	if err != nil || len(headerOnly.Sample) != 0 {
+		t.Errorf("header only: %+v %v", headerOnly, err)
 	}
 }

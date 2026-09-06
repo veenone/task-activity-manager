@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useProfile } from "@agile-suite/core";
 import { ISSUE_TYPES } from "../api";
 import type { IssueQuery, Profile, Settings } from "../api";
@@ -8,23 +8,10 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useModal } from "../modals";
 import { NewIssueModal } from "./NewIssueModal";
 import { ImportIssuesModal } from "./ImportIssuesModal";
+import { useDebounced } from "../lib/useDebounced";
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 250;
-
-// useDebounced returns value after it has stopped changing for delay ms, so
-// typing in the search box does not query the backend on every keystroke.
-// resetKey cuts the wait short: while the stored value belongs to an older
-// key the incoming one is returned straight away, so a profile switch never
-// queries the new profile with the text typed for the old one.
-export function useDebounced<T>(value: T, delay: number, resetKey: unknown): T {
-  const [stored, setStored] = useState({ key: resetKey, value });
-  useEffect(() => {
-    const t = setTimeout(() => setStored({ key: resetKey, value }), delay);
-    return () => clearTimeout(t);
-  }, [value, delay, resetKey]);
-  return stored.key === resetKey ? stored.value : value;
-}
 
 // BacklogView is the issue grid with its filter bar and pager. Filter and
 // page state live here and reset in the same render the profile changes in.

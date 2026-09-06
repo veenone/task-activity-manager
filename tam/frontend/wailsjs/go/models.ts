@@ -456,6 +456,7 @@ export namespace importfile {
 	export class Preview {
 	    headers: string[];
 	    rowCount: number;
+	    sample: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Preview(source);
@@ -465,6 +466,7 @@ export namespace importfile {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.headers = source["headers"];
 	        this.rowCount = source["rowCount"];
+	        this.sample = source["sample"];
 	    }
 	}
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Modal, call, errMsg, useProfile } from "@agile-suite/core";
@@ -7,6 +7,7 @@ import type { ImportMapping, ImportPreview, ImportResult, Profile, Settings } fr
 import { invalidateWrites } from "../queries/invalidate";
 import { useSync } from "../contexts/SyncContext";
 import { plural } from "../lib/format";
+import { useDebounced } from "../lib/useDebounced";
 
 interface Props {
   onClose: () => void;
@@ -20,19 +21,33 @@ interface Picked {
 }
 
 const EMPTY: ImportMapping = { type: "", summary: "", description: "", priority: "", labels: "", assignee: "", storyPoints: "", parentKey: "" };
+const PREFLIGHT_DELAY_MS = 250;
 
-// resultLine words a dry run or an import.
-export function resultLine(r: ImportResult, dryRun: boolean): string {
+// Preflight is the automatic dry run that keeps the Import button and its
+// row count in step with the current file and mapping.
+type Preflight =
+  | { kind: "none" }
+  | { kind: "needsSummary" }
+  | { kind: "running" }
+  | { kind: "ready"; r: ImportResult }
+  | { kind: "error"; message: string };
+
+// preflightLine words the automatic dry run: how many of the file's rows
+// will become drafts and how many will be skipped.
+function preflightLine(r: ImportResult): string {
   const skipped = r.errors.length;
-  if (dryRun) {
-    const ok = r.rows - skipped;
-    return `Dry run: ${ok} ${ok === 1 ? "row would become a draft" : "rows would become drafts"}, ${skipped} would be skipped.`;
-  }
-  return `Imported ${plural(r.created.length, "draft", "drafts")}; ${plural(skipped, "row was", "rows were")} skipped.`;
+  return `${r.rows - skipped} of ${plural(r.rows, "row", "rows")} will become drafts; ${skipped} will be skipped.`;
 }
 
-// ImportIssuesModal turns a CSV or XLSX into drafts: pick, preview, map,
-// dry run, import. The file's bytes go to the backend base64-encoded.
+// resultLine words a finished import that created at least one draft.
+function resultLine(r: ImportResult): string {
+  return `Imported ${plural(r.created.length, "draft", "drafts")}; ${plural(r.errors.length, "row was", "rows were")} skipped.`;
+}
+
+// ImportIssuesModal turns a CSV or XLSX into drafts: pick, map, and import.
+// Every mapping change runs a debounced dry run in the background so the
+// Import button always shows how many rows will actually become drafts. The
+// file's bytes go to the backend base64-encoded.
 export function ImportIssuesModal({ onClose, onImported }: Props) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const qc = useQueryClient();
@@ -40,11 +55,47 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
   const [picked, setPicked] = useState<Picked | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<ImportMapping>(EMPTY);
-  const [result, setResult] = useState<{ r: ImportResult; dryRun: boolean } | null>(null);
+  const [preflight, setPreflight] = useState<Preflight>({ kind: "none" });
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const locked = busy || status !== "idle";
+  const [importing, setImporting] = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const locked = busy || importing || status !== "idle";
+
+  const debouncedMapping = useDebounced(mapping, PREFLIGHT_DELAY_MS, picked?.name ?? "");
+
+  // Run the preflight after a file is picked (right away, since the
+  // debounce resets on a new file) and after every mapping change (after
+  // the debounce settles).
+  useEffect(() => {
+    if (!picked) {
+      setPreflight({ kind: "none" });
+      return;
+    }
+    if (!debouncedMapping.summary) {
+      setPreflight({ kind: "needsSummary" });
+      return;
+    }
+    let cancelled = false;
+    setPreflight({ kind: "running" });
+    void (async () => {
+      try {
+        const r = await call(() => ImportIssues(activeId, picked.b64, picked.isXlsx, picked.name, debouncedMapping, true));
+        if (!cancelled) setPreflight({ kind: "ready", r });
+      } catch (err) {
+        if (!cancelled) setPreflight({ kind: "error", message: errMsg(err) });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeId, picked, debouncedMapping]);
+
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [result]);
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -69,18 +120,17 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
     }
   }
 
-  async function run(dryRun: boolean) {
-    if (!picked) return;
-    if (!mapping.summary) {
-      setError("Map a Summary column first.");
-      return;
-    }
+  const validRows = preflight.kind === "ready" ? preflight.r.rows - preflight.r.errors.length : 0;
+  const importDisabled = locked || preflight.kind !== "ready" || validRows === 0;
+
+  async function runImport() {
+    if (!picked || importDisabled) return;
     setError("");
-    setBusy(true);
+    setImporting(true);
     try {
-      const r = await call(() => ImportIssues(activeId, picked.b64, picked.isXlsx, picked.name, mapping, dryRun));
-      setResult({ r, dryRun });
-      if (!dryRun && r.created.length > 0) {
+      const r = await call(() => ImportIssues(activeId, picked.b64, picked.isXlsx, picked.name, mapping, false));
+      setResult(r);
+      if (r.created.length > 0) {
         invalidateWrites(qc, activeId);
         onImported(r.created);
         // Clear the picked file so a second click cannot re-import the same
@@ -90,7 +140,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
     } catch (err) {
       setError(errMsg(err));
     } finally {
-      setBusy(false);
+      setImporting(false);
     }
   }
 
@@ -133,37 +183,80 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
               <span className="muted small">{f.label}</span>
               <select id={`map-${f.id}`} className="detail-input" value={mapping[f.id]} onChange={(e) => setMapping((m) => ({ ...m, [f.id]: e.target.value }))} disabled={locked}>
                 <option value="">(not mapped)</option>
-                {preview.headers.map((h, i) => (
-                  <option key={`${i}-${h}`} value={h}>{h || `(column ${i + 1})`}</option>
-                ))}
+                {preview.headers.map((h, i) => {
+                  const label = h || `(column ${i + 1})`;
+                  const sample = preview.sample[i]?.trim();
+                  return (
+                    <option key={`${i}-${h}`} value={h}>{sample ? `${label} (e.g. ${sample})` : label}</option>
+                  );
+                })}
               </select>
             </label>
           ))}
         </div>
       )}
 
+      {!result && picked && preflight.kind !== "none" && (
+        <div
+          className={`pending-banner${preflight.kind === "ready" && preflight.r.errors.length ? " pending-banner-warn" : ""}`}
+          role={preflight.kind === "error" ? "alert" : "status"}
+        >
+          {preflight.kind === "needsSummary" && <p className="b">Map a Summary column first.</p>}
+          {preflight.kind === "error" && <p className="error-text small">{preflight.message}</p>}
+          {preflight.kind === "ready" && (
+            <>
+              <p className="b">{preflightLine(preflight.r)}</p>
+              {preflight.r.errors.length > 0 && (
+                <div className="import-errors">
+                  {preflight.r.errors.map((e) => (
+                    <p key={`${e.row}-${e.message}`}>
+                      <span className="danger-text">{`Row ${e.row}`}</span>{" "}
+                      <span>{e.message}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {result && (
-        <div className={`pending-banner${result.r.errors.length ? " pending-banner-warn" : ""}`} role="status">
-          <p className="b">{resultLine(result.r, result.dryRun)}</p>
-          {result.r.errors.map((e) => (
-            <p key={`${e.row}-${e.message}`} className="small">
-              <span className="danger-text">{`Row ${e.row}`}</span>{" "}
-              <span>{e.message}</span>
-            </p>
-          ))}
-          <p className="muted small">Types default to Task. Drafts join the Backlog now; Commit creates them in Jira.</p>
+        <div
+          ref={resultRef}
+          className={`pending-banner${result.created.length === 0 ? " pending-banner-fail" : result.errors.length ? " pending-banner-warn" : ""}`}
+          role={result.created.length === 0 ? "alert" : "status"}
+        >
+          {result.created.length === 0 ? (
+            <>
+              <p className="b">Nothing was imported.</p>
+              <p>Every row was skipped. Fix the rows below and pick the file again.</p>
+            </>
+          ) : (
+            <p className="b">{resultLine(result)}</p>
+          )}
+          {result.errors.length > 0 && (
+            <div className="import-errors">
+              {result.errors.map((e) => (
+                <p key={`${e.row}-${e.message}`}>
+                  <span className="danger-text">{`Row ${e.row}`}</span>{" "}
+                  <span>{e.message}</span>
+                </p>
+              ))}
+            </div>
+          )}
+          {result.created.length > 0 && (
+            <p className="muted small">Types default to Task. Drafts join the Backlog now; Commit creates them in Jira.</p>
+          )}
         </div>
       )}
 
       {error && <p className="error-text small" role="alert">{error}</p>}
 
       <div className="pending-footer">
-        <span className="muted small">Import runs in one transaction; skipped rows stay in the file for a second pass.</span>
+        <span className="muted small">Rows that already became drafts are skipped, so the same file can be imported again after fixing the rest.</span>
         <span className="pending-footer-buttons">
-          <button type="button" className="btn" disabled={!picked || locked} onClick={() => void run(true)}>Dry run</button>
-          <button type="button" className="btn btn-primary" disabled={!picked || locked} onClick={() => void run(false)}>
-            {result?.dryRun ? `Import ${result.r.rows - result.r.errors.length}` : "Import"}
-          </button>
+          <button type="button" className="btn btn-primary" disabled={importDisabled} onClick={() => void runImport()}>{`Import ${validRows}`}</button>
         </span>
       </div>
     </Modal>
