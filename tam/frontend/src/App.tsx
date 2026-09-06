@@ -15,7 +15,9 @@ import { usePendingChanges } from "./queries/pending";
 import { formatWhen } from "./lib/format";
 
 // App is the shell: topbar, nav rail, the active view, and the status bar.
-// It matches docs/superpowers/specs/assets/2026-09-05-tam-scaffold-shell.svg.
+// The topbar, profile controls, and status bar mirror XTM's App.tsx/App.css
+// so the two windows read as one product; the nav rail is TAM's own element
+// (XTM switches views with topbar tabs instead of a rail).
 export default function App() {
   const {
     profiles,
@@ -62,9 +64,9 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="topbar-left">
+        <div className="topbar-zone topbar-left">
           <span className="brand">Task Activity Manager</span>
-          {demo && <span className="chip chip-demo">DEMO</span>}
+          {demo && <span className="demo-chip">DEMO</span>}
           <label className="sr-only" htmlFor="profile-select">Profile</label>
           <select
             id="profile-select"
@@ -80,9 +82,9 @@ export default function App() {
             ))}
             {profiles.length === 0 && <option value="">No profile</option>}
           </select>
-        </div>
-        <div className="topbar-right">
           <button className="topbar-btn" onClick={() => openModal("profiles")}>Manage</button>
+        </div>
+        <div className="topbar-zone topbar-right">
           <Menu
             label="Sync"
             align="right"
@@ -110,48 +112,50 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="nav-rail" aria-label="Views">
-        {VIEWS.map((v) => (
-          <button
-            key={v.id}
-            className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
-            aria-current={v.id === view ? "page" : undefined}
-            onClick={() => setView(v.id)}
-          >
-            {v.label}
+      <div className="app-body">
+        <nav className="nav-rail" aria-label="Views">
+          {VIEWS.map((v) => (
+            <button
+              key={v.id}
+              className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
+              aria-current={v.id === view ? "page" : undefined}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}
+            </button>
+          ))}
+          <div className="nav-divider" />
+          <div className="nav-section">Suite</div>
+          <button className="nav-item" disabled title="The launcher arrives in Phase 6">
+            Tests (XTM)
           </button>
-        ))}
-        <div className="nav-divider" />
-        <div className="nav-section">Suite</div>
-        <button className="nav-item" disabled title="The launcher arrives in Phase 6">
-          Tests (XTM)
-        </button>
-        <div className="nav-hint">opens Xray Test Manager</div>
-      </nav>
+          <div className="nav-hint">opens Xray Test Manager</div>
+        </nav>
 
-      <main className="main">
-        {startupFailed ? (
-          <div className="startup-error" role="alert">
-            <h2>The local store could not be opened</h2>
-            <p>{health.error}</p>
-            {health.logPath && <p>Log: {health.logPath}</p>}
-          </div>
-        ) : (
-          <>
-            <div className="view-head">
-              <h2 id="view-title">{current.label}</h2>
-              {activeProfile && (
-                <span className="muted">
-                  {activeProfile.name} · {activeProfile.projectKey}
-                </span>
-              )}
+        <main className="main">
+          {startupFailed ? (
+            <div className="startup-error" role="alert">
+              <h2>The local store could not be opened</h2>
+              <p>{health.error}</p>
+              {health.logPath && <p>Log: {health.logPath}</p>}
             </div>
-            {current.id === "backlog" ? <BacklogView /> : <Placeholder view={current} />}
-          </>
-        )}
-      </main>
+          ) : (
+            <>
+              <div className="view-head">
+                <h2 id="view-title">{current.label}</h2>
+                {activeProfile && (
+                  <span className="muted">
+                    {activeProfile.name} · {activeProfile.projectKey}
+                  </span>
+                )}
+              </div>
+              {current.id === "backlog" ? <BacklogView /> : <Placeholder view={current} />}
+            </>
+          )}
+        </main>
+      </div>
 
-      <footer className="statusbar">
+      <footer className="app-statusbar">
         <span className={`dot ${health?.ok ? "dot-ok" : "dot-warn"}`} aria-hidden="true" />
         <span>{health?.ok ? "Local store ready · tam.db" : "Starting up"}</span>
         {!startupFailed && profileError ? (

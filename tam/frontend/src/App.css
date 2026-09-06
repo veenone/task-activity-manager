@@ -9,37 +9,14 @@ body {
 }
 input, button, select { font-family: inherit; font-size: inherit; }
 
-.app {
-  height: 100%;
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  grid-template-rows: 48px 1fr 28px;
-  grid-template-areas: "top top" "rail main" "rail status";
-}
-.topbar {
-  grid-area: top;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-.topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
-.brand { font-size: 15px; font-weight: 600; }
+/* The topbar, brand, profile select, demo chip, and app shell frame now come
+   from @agile-suite/core (mirrored from XTM's App.css) so both windows share
+   one look. app-body wraps the nav rail and the main area side by side; XTM
+   has no equivalent since it switches views with topbar tabs, not a rail. */
+.app-body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chip { padding: 2px 8px; border-radius: 9px; font-size: 10px; font-weight: 600; }
-.chip-demo { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning); }
-.profile-select {
-  min-width: 232px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-}
 
 .nav-rail {
-  grid-area: rail;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -58,15 +35,16 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .nav-item:hover:not(:disabled) { background: var(--row-hover); }
 .nav-item:disabled { color: var(--text-muted); cursor: default; }
-.nav-item-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* Active-item fill matches XTM's .view-tab-active token treatment (solid
+   accent, white text) so the rail's selection state reads like XTM's tabs. */
+.nav-item-active { background: var(--accent); color: #fff; font-weight: 600; }
 .nav-divider { height: 1px; margin: 12px 8px; background: var(--border); }
 .nav-section { padding: 0 14px 4px; font-size: 11px; color: var(--text-muted); }
 .nav-hint { padding: 0 14px; font-size: 10px; color: var(--text-muted); }
 
-.main { grid-area: main; padding: 20px; overflow: auto; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 20px; overflow: auto; }
 .view-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
 .view-head h2 { font-size: 16px; }
-.muted { color: var(--text-muted); }
 .small { font-size: 11px; }
 
 .placeholder-card {
@@ -84,16 +62,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .placeholder-title { font-size: 15px; }
 .placeholder-blurb { color: var(--text-muted); }
 
-.statusbar {
-  grid-area: status;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 0 16px;
-  font-size: 11px;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-}
+/* .app-statusbar's frame (height, background, border, font-size) comes from
+   core; TAM's footer holds several children, so it adds the gap XTM's single-
+   line footer doesn't need. */
+.app-statusbar { gap: 16px; }
 .statusbar-right { margin-left: auto; }
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot-ok { background: var(--ok-text); }

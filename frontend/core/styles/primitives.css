@@ -271,17 +271,108 @@
 }
 
 /* Menu defaults its trigger to this class, so the package carries it. */
+/* Bar-native button: blends into the dark topbar instead of a bright chip. */
 .topbar-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 5px 10px;
-  color: var(--text);
+  background: #2a3850;
+  border: 1px solid #3a4a66;
+  border-radius: 5px;
+  padding: 5px 11px;
   cursor: pointer;
+  color: #e8eaed;
+  font-size: 13px;
+  white-space: nowrap;
 }
-.topbar-btn:hover {
-  background: var(--row-hover);
+.topbar-btn:hover:not(:disabled) {
+  background: #344563;
+  border-color: #4a5d80;
+}
+
+/* Application shell, mirrored from XTM's App.css */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+:root[data-theme="dark"] .app {
+  background: var(--surface-2);
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  row-gap: 8px;
+  padding: 8px 14px;
+  background: #1b2638;
+  color: #e8eaed;
+  flex-shrink: 0;
+  border-bottom: 1px solid #0f1722;
+  /* Wrap the zones onto a second row when the window is too narrow to hold
+     them side by side, instead of letting them shrink and overlap. */
+  flex-wrap: wrap;
+}
+/* Three balanced zones: equal-flex sides center the nav tabs between them.
+   Sizing on content (flex-basis: auto) — not 0 — so a zone keeps its intrinsic
+   width and wraps as a unit rather than collapsing under its contents. */
+.topbar-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-left {
+  flex: 1 1 auto;
+}
+.topbar-right {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+.brand {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+.profile-select {
+  background: #2a3850;
+  color: #e8eaed;
+  border: 1px solid #3a4a66;
+  border-radius: 5px;
+  padding: 5px 8px;
+  max-width: 220px;
+  text-overflow: ellipsis;
+}
+/* Disabled while a sync is running: switching profiles mid-sync would race the
+   in-flight pull, so the dropdown is locked (with a tooltip) until it finishes. */
+.profile-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.demo-chip {
+  background: #f4b942;
+  color: #1b2638;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+/* Bottom status bar — sync progress / state lives here so the header isn't
+   crowded by the variable-width progress bar (FR-1). */
+.app-statusbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 14px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.muted {
+  color: var(--text-muted);
 }
