@@ -83,6 +83,9 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
       if (!dryRun && r.created.length > 0) {
         invalidateWrites(qc, activeId);
         onImported(r.created);
+        // Clear the picked file so a second click cannot re-import the same
+        // rows; the result banner and the mapping display stay as they are.
+        setPicked(null);
       }
     } catch (err) {
       setError(errMsg(err));

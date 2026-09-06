@@ -95,6 +95,25 @@ func TestDiscardingALinkDropsTheRowOnly(t *testing.T) {
 	}
 }
 
+func TestWriteDetailRefreshLeavesThePendingLinkInPlace(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedOne(t, repo, "p1")
+	_ = repo.WriteDetail(ctx, "p1", "PLAT-1", backend.IssueDetail{Description: "d", Links: []backend.Link{{Direction: "inward", Type: "Tested By", Key: "XT-1", Summary: "Existing", IssueType: "Test"}}}, time.Now())
+	if err := repo.AddLink(ctx, "p1", "PLAT-1", relates("XT-9")); err != nil {
+		t.Fatalf("AddLink: %v", err)
+	}
+	// A refresh (what a re-fetch after a miss or a stale cache does) must not
+	// drop the link the journal still holds.
+	if err := repo.WriteDetail(ctx, "p1", "PLAT-1", backend.IssueDetail{Description: "d2", Links: []backend.Link{{Direction: "inward", Type: "Tested By", Key: "XT-1", Summary: "Existing", IssueType: "Test"}}}, time.Now()); err != nil {
+		t.Fatalf("WriteDetail refresh: %v", err)
+	}
+	d, _, ok, err := repo.ReadDetail(ctx, "p1", "PLAT-1")
+	if err != nil || !ok || len(d.Links) != 2 || d.Links[0].Pending || !d.Links[1].Pending || d.Links[1].Key != "XT-9" {
+		t.Errorf("the pending link survives a refresh, after the cached ones: %+v %v %v", d.Links, ok, err)
+	}
+}
+
 func TestClearDetailDropsTheCache(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()

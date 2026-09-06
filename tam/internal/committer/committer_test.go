@@ -409,6 +409,27 @@ func TestCommitLinksFromADraftFollowTheRealKey(t *testing.T) {
 	}
 }
 
+func TestLinkFromAFailedDraftIsLeftForNextTime(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	temp, _ := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "New task"})
+	_ = repo.AddLink(ctx, "p1", temp, backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "XT-9"})
+	f.createErr = errors.New("POST failed: 400 Severity is required")
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.links) != 0 {
+		t.Errorf("a link still under a draft key must not be pushed: %v", f.links)
+	}
+	if links, _ := repo.PendingLinks(ctx, "p1", temp); len(links) != 1 {
+		t.Errorf("the link row stays pending: %+v", links)
+	}
+	if len(res.Failures) != 1 || res.Failures[0].Key != temp {
+		t.Errorf("exactly one failure, the create's: %+v", res.Failures)
+	}
+}
+
 func TestLinkFailureKeepsTheRow(t *testing.T) {
 	eng, repo, f := setup(t)
 	ctx := context.Background()

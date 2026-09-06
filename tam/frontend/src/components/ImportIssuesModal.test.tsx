@@ -95,6 +95,8 @@ describe("ImportIssuesModal", () => {
     await waitFor(() => expect(api.ImportIssues).toHaveBeenCalledWith("p1", expect.any(String), false, "backlog.csv", { ...mapping, priority: "Points" }, false));
     expect(await screen.findByText("Imported 1 draft; 1 row was skipped.")).toBeInTheDocument();
     expect(onImported).toHaveBeenCalledWith(["TAM-NEW-1"]);
+    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Dry run" })).toBeDisabled();
   });
 
   it("shows a parse error and offers the template", async () => {

@@ -130,10 +130,22 @@ func cell(row []string, i int) string {
 	return strings.TrimSpace(row[i])
 }
 
+// blank reports whether every mapped cell of row is empty, so a row that is
+// blank across the columns the mapping actually reads can be skipped rather
+// than counted and reported as a missing summary.
+func blank(row []string, c columns) bool {
+	for _, i := range []int{c.typ, c.summary, c.description, c.priority, c.labels, c.assignee, c.points, c.parent} {
+		if cell(row, i) != "" {
+			return false
+		}
+	}
+	return true
+}
+
 // logicalType maps a type cell to a creatable logical type. Blank means
 // task; the profile's requirement type name counts as requirement.
-func logicalType(cell, requirementType string) (string, error) {
-	n := strings.ToLower(strings.TrimSpace(cell))
+func logicalType(raw, requirementType string) (string, error) {
+	n := strings.ToLower(strings.TrimSpace(raw))
 	switch n {
 	case "", backend.TypeTask:
 		return backend.TypeTask, nil
@@ -143,7 +155,7 @@ func logicalType(cell, requirementType string) (string, error) {
 	if requirementType != "" && n == strings.ToLower(strings.TrimSpace(requirementType)) {
 		return backend.TypeRequirement, nil
 	}
-	return "", fmt.Errorf("Type %q cannot be created; use Task, Story, Bug, or %s", strings.TrimSpace(cell), requirementLabel(requirementType))
+	return "", fmt.Errorf("Type %q cannot be created; use Task, Story, Bug, or %s", strings.TrimSpace(raw), requirementLabel(requirementType))
 }
 
 func requirementLabel(requirementType string) string {
@@ -163,11 +175,15 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Rows: len(records) - 1, Created: []string{}, Errors: []RowError{}}
+	res := Result{Created: []string{}, Errors: []RowError{}}
 	var drafts []backend.IssueDraft
-	parents := map[string]bool{}
+	parents := map[string]string{}
 	for i, row := range records[1:] {
 		fileRow := i + 2
+		if blank(row, c) {
+			continue
+		}
+		res.Rows++
 		fail := func(msg string) { res.Errors = append(res.Errors, RowError{Row: fileRow, Message: msg}) }
 		summary := cell(row, c.summary)
 		if summary == "" {
@@ -179,28 +195,31 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 			fail(err.Error() + ".")
 			continue
 		}
-		points, err := backend.ParsePoints(cell(row, c.points))
+		pointsRaw := cell(row, c.points)
+		points, err := backend.ParsePoints(pointsRaw)
 		if err != nil {
-			fail(fmt.Sprintf("Story points %q is not a number.", cell(row, c.points)))
+			fail(fmt.Sprintf("Story points %q is not a number.", pointsRaw))
 			continue
 		}
 		parent := cell(row, c.parent)
 		if parent != "" {
-			known, seen := parents[parent]
+			msg, seen := parents[parent]
 			if !seen {
-				_, err := repo.GetIssue(ctx, profileID, parent)
+				iss, err := repo.GetIssue(ctx, profileID, parent)
 				switch {
 				case errors.Is(err, issuerepo.ErrNotFound):
-					known = false
+					msg = fmt.Sprintf("Parent %s is not in the cache. Sync first or clear the cell.", parent)
 				case err != nil:
 					return Result{}, err
+				case iss.Draft:
+					msg = fmt.Sprintf("Parent %s is a draft; commit it first.", parent)
 				default:
-					known = true
+					msg = ""
 				}
-				parents[parent] = known
+				parents[parent] = msg
 			}
-			if !known {
-				fail(fmt.Sprintf("Parent %s is not in the cache. Sync first or clear the cell.", parent))
+			if msg != "" {
+				fail(msg)
 				continue
 			}
 		}

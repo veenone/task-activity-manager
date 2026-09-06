@@ -50,6 +50,7 @@ func records() [][]string {
 		{"Task", "Bad points", "", "", "", "", "eight", ""},
 		{"Task", "Unknown parent", "", "", "", "", "", "PLAT-999"},
 		{"Business Requirement", "Single-use promo codes", "", "", "promo", "", "", ""},
+		{"", "", "", "", "", "", "", ""},
 	}
 }
 
@@ -61,6 +62,7 @@ func TestRunDryRunValidatesEveryRuleAndCreatesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
+	// The trailing blank row is not counted in Rows and produces no error.
 	if res.Rows != 7 || len(res.Created) != 0 || len(res.Errors) != 4 {
 		t.Fatalf("result: %+v", res)
 	}
@@ -108,6 +110,27 @@ func TestRunImportsTheValidRowsAsDrafts(t *testing.T) {
 	act, _ := repo.ListActivity(ctx, "p1", "TAM-NEW-1", 0)
 	if len(act) != 1 || act[0].Note != "imported from backlog.csv" {
 		t.Errorf("audit note: %+v", act)
+	}
+}
+
+func TestRunRefusesADraftAsAParent(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	draft, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Not committed yet"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := importer.AutoMap(records()[0])
+	rows := [][]string{
+		records()[0],
+		{"Task", "Child of a draft", "", "", "", "", "", draft},
+	}
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "Business Requirement", rows, m, "backlog.csv", true)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 1 || !strings.Contains(res.Errors[0].Message, draft+" is a draft; commit it first.") {
+		t.Errorf("errors: %+v", res.Errors)
 	}
 }
 

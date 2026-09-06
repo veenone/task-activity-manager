@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 
 	"agile-suite/core/journal"
 	"agile-suite/tam/internal/backend"
@@ -196,18 +197,23 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 }
 
 // commitLinks pushes every link row, read fresh so a link added from a
-// draft carries the key the create pass gave it. Each push is its own
-// journal delete, and the source's detail cache is dropped so the panel
-// refetches the links Jira now holds.
+// draft carries the key the create pass gave it. A row whose source is
+// still a draft (its create failed this pass) is left for next time: it is
+// neither pushed nor reported as a failure. Each push is its own journal
+// delete, and the source's detail cache is dropped so the panel refetches
+// the links Jira now holds.
 func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result) {
 	all, err := e.repo.ListPendingChanges(ctx, profileID)
 	if err != nil {
-		res.Failures = append(res.Failures, Failure{Key: "", Error: "the journal could not be read for links: " + err.Error()})
+		res.Failures = append(res.Failures, Failure{Key: "links", Error: "the journal could not be read for links: " + err.Error()})
 		return
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	for _, p := range all {
 		if p.EntityType != issuerepo.EntityLink {
+			continue
+		}
+		if strings.HasPrefix(p.EntityKey, issuerepo.DraftPrefix) {
 			continue
 		}
 		var d backend.LinkDraft

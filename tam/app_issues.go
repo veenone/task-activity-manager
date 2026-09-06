@@ -184,7 +184,11 @@ func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error)
 	if err := a.repo.WriteDetail(a.ctx, p.ID, key, d, time.Now()); err != nil {
 		return backend.IssueDetail{}, err
 	}
-	return d, nil
+	fresh, _, _, err := a.repo.ReadDetail(a.ctx, p.ID, key)
+	if err != nil {
+		return backend.IssueDetail{}, err
+	}
+	return fresh, nil
 }
 
 // ListLinkedTests returns the tests linked to key through the suite's
