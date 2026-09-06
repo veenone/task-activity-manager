@@ -1,5 +1,57 @@
 export namespace backend {
 	
+	export class FieldOption {
+	    id: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FieldOption(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.value = source["value"];
+	    }
+	}
+	export class FieldSpec {
+	    id: string;
+	    name: string;
+	    type: string;
+	    required: boolean;
+	    allowedValues: FieldOption[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FieldSpec(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.required = source["required"];
+	        this.allowedValues = this.convertValues(source["allowedValues"], FieldOption);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Issue {
 	    key: string;
 	    id: string;
@@ -18,6 +70,8 @@ export namespace backend {
 	    rank: string;
 	    created: string;
 	    updated: string;
+	    pending: boolean;
+	    draft: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Issue(source);
@@ -42,6 +96,8 @@ export namespace backend {
 	        this.rank = source["rank"];
 	        this.created = source["created"];
 	        this.updated = source["updated"];
+	        this.pending = source["pending"];
+	        this.draft = source["draft"];
 	    }
 	}
 	export class Link {
@@ -80,6 +136,158 @@ export namespace backend {
 	        this.description = source["description"];
 	        this.links = this.convertValues(source["links"], Link);
 	        this.fields = source["fields"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class IssueDraft {
+	    type: string;
+	    summary: string;
+	    description: string;
+	    priority: string;
+	    labels: string[];
+	    assignee: string;
+	    storyPoints?: number;
+	    extra: Record<string, string>;
+	
+	    static createFrom(source: any = {}) {
+	        return new IssueDraft(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.summary = source["summary"];
+	        this.description = source["description"];
+	        this.priority = source["priority"];
+	        this.labels = source["labels"];
+	        this.assignee = source["assignee"];
+	        this.storyPoints = source["storyPoints"];
+	        this.extra = source["extra"];
+	    }
+	}
+
+}
+
+export namespace committer {
+	
+	export class FieldConflict {
+	    field: string;
+	    base: string;
+	    mine: string;
+	    remote: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FieldConflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.field = source["field"];
+	        this.base = source["base"];
+	        this.mine = source["mine"];
+	        this.remote = source["remote"];
+	    }
+	}
+	export class Conflict {
+	    key: string;
+	    summary: string;
+	    remoteVersion: string;
+	    fields: FieldConflict[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Conflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.remoteVersion = source["remoteVersion"];
+	        this.fields = this.convertValues(source["fields"], FieldConflict);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Created {
+	    tempKey: string;
+	    key: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Created(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tempKey = source["tempKey"];
+	        this.key = source["key"];
+	    }
+	}
+	export class Failure {
+	    key: string;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Failure(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.error = source["error"];
+	    }
+	}
+	
+	export class Result {
+	    committed: string[];
+	    created: Created[];
+	    conflicts: Conflict[];
+	    failures: Failure[];
+	    remaining: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.committed = source["committed"];
+	        this.created = this.convertValues(source["created"], Created);
+	        this.conflicts = this.convertValues(source["conflicts"], Conflict);
+	        this.failures = this.convertValues(source["failures"], Failure);
+	        this.remaining = source["remaining"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -203,6 +411,67 @@ export namespace issuerepo {
 	        this.lastFull = source["lastFull"];
 	        this.lastError = source["lastError"];
 	        this.issueCount = source["issueCount"];
+	    }
+	}
+
+}
+
+export namespace journal {
+	
+	export class AuditEntry {
+	    id: number;
+	    occurredAt: string;
+	    actor: string;
+	    entityType: string;
+	    entityKey: string;
+	    action: string;
+	    field: string;
+	    beforeVal: string;
+	    afterVal: string;
+	    note: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuditEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.occurredAt = source["occurredAt"];
+	        this.actor = source["actor"];
+	        this.entityType = source["entityType"];
+	        this.entityKey = source["entityKey"];
+	        this.action = source["action"];
+	        this.field = source["field"];
+	        this.beforeVal = source["beforeVal"];
+	        this.afterVal = source["afterVal"];
+	        this.note = source["note"];
+	    }
+	}
+	export class PendingChange {
+	    id: number;
+	    entityType: string;
+	    entityKey: string;
+	    field: string;
+	    beforeVal: string;
+	    afterVal: string;
+	    baseVersion: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PendingChange(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.entityType = source["entityType"];
+	        this.entityKey = source["entityKey"];
+	        this.field = source["field"];
+	        this.beforeVal = source["beforeVal"];
+	        this.afterVal = source["afterVal"];
+	        this.baseVersion = source["baseVersion"];
+	        this.createdAt = source["createdAt"];
 	    }
 	}
 
