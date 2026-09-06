@@ -7,6 +7,7 @@ import { IssueTable } from "./IssueTable";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useModal } from "../modals";
 import { NewIssueModal } from "./NewIssueModal";
+import { ImportIssuesModal } from "./ImportIssuesModal";
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 250;
@@ -116,6 +117,9 @@ export function BacklogView() {
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
+        <button type="button" className="btn filter-import" disabled={!activeId} onClick={() => openModal("import")}>
+          Import
+        </button>
         <button type="button" className="btn btn-primary filter-new" disabled={!activeId} onClick={() => openModal("newIssue")}>
           + New
         </button>
@@ -154,6 +158,16 @@ export function BacklogView() {
           onCreated={(key) => {
             setPage(0);
             setSelectedKey(key);
+          }}
+        />
+      )}
+
+      {isOpen("import") && (
+        <ImportIssuesModal
+          onClose={closeModal}
+          onImported={(keys) => {
+            setPage(0);
+            setSelectedKey(keys[0] ?? "");
           }}
         />
       )}

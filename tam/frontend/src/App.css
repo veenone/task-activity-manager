@@ -225,7 +225,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .activity-row .small:last-child { grid-column: 2; }
 
 /* Plan 1b: new issue */
-.filter-new { margin-left: auto; }
 .new-issue-modal { width: min(640px, 92vw); max-height: 86vh; overflow: auto; }
 .meta-fields { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
 
@@ -234,3 +233,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .conflict-table th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
 .conflict-table td { padding: 4px 8px 4px 0; vertical-align: top; }
 .danger-text { color: #b42318; }
+
+/* Plan 1c: import */
+.filter-import { margin-left: auto; }
+.filter-import + .filter-new { margin-left: 8px; }
+.import-modal { width: min(640px, 92vw); max-height: 88vh; overflow: auto; }
+.import-file { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.import-mapping { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.import-mapping-head { display: grid; grid-template-columns: 96px 1fr; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }

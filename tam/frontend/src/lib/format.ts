@@ -12,3 +12,9 @@ export function formatWhen(iso: string, now: Date = new Date()): string {
     d.getDate() === now.getDate();
   return sameDay ? `today ${time}` : `${d.toLocaleDateString()} ${time}`;
 }
+
+// plural picks the singular or plural word for a count and prefixes it with
+// the count itself, e.g. plural(1, "row", "rows") -> "1 row".
+export function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}

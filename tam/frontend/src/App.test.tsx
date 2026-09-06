@@ -37,6 +37,10 @@ vi.mock("./api", async () => {
     DiscardPendingChange: vi.fn(),
     DiscardAllPendingChanges: vi.fn(),
     CommitPendingChanges: vi.fn(),
+    PreviewImport: vi.fn(),
+    AutoMapImport: vi.fn(),
+    ImportIssues: vi.fn(),
+    SaveImportTemplate: vi.fn(),
   };
 });
 

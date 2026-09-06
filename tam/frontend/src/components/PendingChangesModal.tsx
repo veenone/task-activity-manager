@@ -6,14 +6,11 @@ import { ISSUE_TYPES } from "../api";
 import { groupPending, useDiscardAll, useDiscardChange, usePendingChanges } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
 import { useSync } from "../contexts/SyncContext";
+import { plural } from "../lib/format";
 import { ConflictCard } from "./ConflictCard";
 
 interface Props {
   onClose: () => void;
-}
-
-function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 // summaryLine is the dialog's subtitle: "3 changes on 2 issues, 1 of them new".
