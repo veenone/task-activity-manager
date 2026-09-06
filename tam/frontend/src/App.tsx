@@ -8,8 +8,10 @@ import { Placeholder } from "./components/Placeholder";
 import { BacklogView } from "./components/BacklogView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
+import { PendingChangesModal } from "./components/PendingChangesModal";
 import { useSync } from "./contexts/SyncContext";
 import { useSyncState } from "./queries/issues";
+import { usePendingChanges } from "./queries/pending";
 import { formatWhen } from "./lib/format";
 
 // App is the shell: topbar, nav rail, the active view, and the status bar.
@@ -29,6 +31,8 @@ export default function App() {
   const { isOpen, openModal, closeModal } = useModal();
   const { progress, syncError, canSync, canSwitchProfile, runSync } = useSync();
   const syncState = useSyncState(activeId);
+  const pending = usePendingChanges(activeId);
+  const pendingCount = pending.data?.length ?? 0;
   const [health, setHealth] = useState<HealthInfo | null>(null);
 
   useEffect(() => {
@@ -170,6 +174,11 @@ export default function App() {
               : progress.stage || "Syncing"}
           </span>
         )}
+        {pendingCount > 0 && (
+          <button type="button" className="chip chip-pending" onClick={() => openModal("pending")}>
+            {`${pendingCount} pending ${pendingCount === 1 ? "change" : "changes"}: Commit`}
+          </button>
+        )}
         {(syncError || syncState.data?.lastError) && !progress && (
           <span className="error-text" data-testid="sync-error">
             Last sync failed: {syncError || syncState.data?.lastError}
@@ -185,6 +194,7 @@ export default function App() {
       {!startupFailed && <LiveRegion />}
       {isOpen("profiles") && <ProfilesModal onClose={closeModal} />}
       {isOpen("about") && <AboutModal onClose={closeModal} />}
+      {isOpen("pending") && <PendingChangesModal onClose={closeModal} />}
     </div>
   );
 }

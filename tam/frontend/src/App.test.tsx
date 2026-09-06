@@ -33,6 +33,10 @@ vi.mock("./api", async () => {
     SetProfileSetting: vi.fn(),
     EventsOn: vi.fn(() => () => {}),
     BrowserOpenURL: vi.fn(),
+    ListPendingChanges: vi.fn(),
+    DiscardPendingChange: vi.fn(),
+    DiscardAllPendingChanges: vi.fn(),
+    CommitPendingChanges: vi.fn(),
   };
 });
 
@@ -66,6 +70,7 @@ beforeEach(() => {
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
   vi.mocked(api.ListSprints).mockResolvedValue([]);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
+  vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
 });
 
 describe("App shell", () => {
@@ -108,6 +113,19 @@ describe("App shell", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: "Sync changes" }));
     await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent(/60 issues, last synced today/));
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
+  });
+
+  it("shows the Commit chip with the pending count and opens the dialog", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 1, entityType: "issue", entityKey: "PLAT-409", field: "priority", beforeVal: "Medium", afterVal: "High", baseVersion: "v1", createdAt: "" },
+      { id: 2, entityType: "issue", entityKey: "PLAT-409", field: "assignee", beforeVal: "", afterVal: "M. Ortiz", baseVersion: "v1", createdAt: "" },
+      { id: 3, entityType: "issue_create", entityKey: "TAM-NEW-1", field: "create", beforeVal: "", afterVal: '{"type":"task","summary":"x","description":"","priority":"","labels":[],"assignee":"","storyPoints":null,"extra":{}}', baseVersion: "", createdAt: "" },
+    ]);
+    renderApp();
+    const chip = await screen.findByRole("button", { name: "3 pending changes: Commit" });
+    await user.click(chip);
+    expect(await screen.findByRole("dialog", { name: "Pending changes" })).toBeInTheDocument();
   });
 
   it("shows the last sync error in the status bar", async () => {

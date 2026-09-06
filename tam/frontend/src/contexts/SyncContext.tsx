@@ -1,10 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   syncReducer,
   initialSyncState,
   canSync as canSyncSel,
+  canCommit as canCommitSel,
   canSwitchProfile as canSwitchProfileSel,
   useNotice,
   useProfile,
@@ -12,15 +13,14 @@ import {
   errMsg,
 } from "@agile-suite/core";
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
-import { EventsOn, SyncIssues } from "../api";
-import type { Profile, Settings } from "../api";
-import { invalidateProfileData } from "../queries/invalidate";
+import { CommitPendingChanges, EventsOn, SyncIssues } from "../api";
+import type { CommitResult, Profile, Settings } from "../api";
+import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
-// SyncContext owns TAM's sync lifecycle on the shared reducer: it subscribes
-// to the progress event, runs the bound SyncIssues call, refreshes the
-// profile's queries afterwards, and reports failures with a notice. Unlike
-// XTM's provider it also owns the orchestration, because TAM has no commit
-// path yet and the call is one line.
+// SyncProvider owns the one reducer that keeps sync and commit from
+// overlapping. Both actions gate on the selectors before dispatching and the
+// reducer refuses a start in any state but idle, so a double click or a
+// keyboard repeat cannot start a second run.
 
 const PROGRESS_EVENT = "tam:sync-progress";
 
@@ -29,9 +29,15 @@ interface SyncApi {
   progress: SyncProgress | null;
   syncError: string;
   canSync: boolean;
+  canCommit: boolean;
   canSwitchProfile: boolean;
-  // runSync pulls the active profile's issues; full clears and refetches.
   runSync: (full: boolean) => Promise<void>;
+  // runCommit resolves to the result, or null when nothing ran or the call
+  // failed (the failure is shown as a notice).
+  runCommit: () => Promise<CommitResult | null>;
+  // lastCommit is the most recent result for the active profile, for the
+  // Pending changes dialog's banner. It clears when the profile changes.
+  lastCommit: CommitResult | null;
 }
 
 const SyncContext = createContext<SyncApi | null>(null);
@@ -49,11 +55,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const { activeId } = useProfile<Profile, Settings>();
   const qc = useQueryClient();
   const { notice } = useNotice();
-  // The reducer refuses a second SYNC_START, but the bound call must not run
-  // twice either, and two clicks in one tick both see the pre-dispatch state.
-  // So the guard lives in the ref and runSync claims it, rather than the ref
-  // trailing the reducer a render behind.
   const statusRef = useRef<SyncStatus>("idle");
+  const [lastCommit, setLastCommit] = useState<CommitResult | null>(null);
 
   useEffect(
     () =>
@@ -62,6 +65,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       ),
     [],
   );
+
+  useEffect(() => {
+    setLastCommit(null);
+  }, [activeId]);
 
   const runSync = useCallback(
     async (full: boolean) => {
@@ -87,16 +94,38 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     [activeId, qc, notice],
   );
 
+  const runCommit = useCallback(async (): Promise<CommitResult | null> => {
+    if (!activeId || statusRef.current !== "idle") return null;
+    statusRef.current = "committing";
+    dispatch({ type: "COMMIT_START" });
+    try {
+      const res = await call(() => CommitPendingChanges(activeId));
+      setLastCommit(res);
+      return res;
+    } catch (e) {
+      void notice({ title: "Commit failed", message: errMsg(e), tone: "error" });
+      return null;
+    } finally {
+      statusRef.current = "idle";
+      dispatch({ type: "COMMIT_END" });
+      invalidateWrites(qc, activeId);
+      invalidateProfileData(qc, activeId);
+    }
+  }, [activeId, qc, notice]);
+
   const api = useMemo<SyncApi>(
     () => ({
       status: state.status,
       progress: state.progress,
       syncError: state.syncError,
       canSync: canSyncSel(state) && !!activeId,
+      canCommit: canCommitSel(state) && !!activeId,
       canSwitchProfile: canSwitchProfileSel(state),
       runSync,
+      runCommit,
+      lastCommit,
     }),
-    [state, activeId, runSync],
+    [state, activeId, runSync, runCommit, lastCommit],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

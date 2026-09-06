@@ -9,7 +9,7 @@
 // class's createFrom so the binding receives the shape it declares.
 
 import * as App from "../wailsjs/go/main/App";
-import { issuerepo } from "../wailsjs/go/models";
+import { backend, issuerepo } from "../wailsjs/go/models";
 
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 export type { SyncProgress } from "@agile-suite/core";
@@ -79,6 +79,10 @@ export interface Issue {
   rank: string;
   created: string;
   updated: string;
+  // Computed by the store on every read. Optional so fixtures that predate
+  // plan 1b still type-check; the backend always sends both.
+  pending?: boolean;
+  draft?: boolean;
 }
 
 export interface Link {
@@ -135,6 +139,95 @@ export interface LinkedTest {
   linkType: string;
 }
 
+// DRAFT_PREFIX starts the temporary key of an issue created locally and
+// not yet committed. It matches issuerepo.DraftPrefix.
+export const DRAFT_PREFIX = "TAM-NEW-";
+
+export type EditableField = "summary" | "description" | "priority" | "labels" | "storyPoints" | "assignee";
+
+export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
+  { id: "summary", label: "Summary" },
+  { id: "description", label: "Description" },
+  { id: "priority", label: "Priority" },
+  { id: "labels", label: "Labels" },
+  { id: "storyPoints", label: "Story points" },
+  { id: "assignee", label: "Assignee" },
+];
+
+export function fieldLabel(field: string): string {
+  return EDITABLE_FIELDS.find((f) => f.id === field)?.label ?? field;
+}
+
+export interface PendingChange {
+  id: number;
+  entityType: string;
+  entityKey: string;
+  field: string;
+  beforeVal: string;
+  afterVal: string;
+  baseVersion: string;
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  id: number;
+  occurredAt: string;
+  actor: string;
+  entityType: string;
+  entityKey: string;
+  action: string;
+  field: string;
+  beforeVal: string;
+  afterVal: string;
+  note: string;
+}
+
+export interface IssueDraft {
+  type: IssueType;
+  summary: string;
+  description: string;
+  priority: string;
+  labels: string[];
+  assignee: string;
+  storyPoints: number | null;
+  extra: Record<string, string>;
+}
+
+export interface FieldOption {
+  id: string;
+  value: string;
+}
+
+export interface FieldSpec {
+  id: string;
+  name: string;
+  type: "string" | "option" | "number" | "date" | "array" | string;
+  required: boolean;
+  allowedValues: FieldOption[];
+}
+
+export interface FieldConflict {
+  field: string;
+  base: string;
+  mine: string;
+  remote: string;
+}
+
+export interface Conflict {
+  key: string;
+  summary: string;
+  remoteVersion: string;
+  fields: FieldConflict[];
+}
+
+export interface CommitResult {
+  committed: string[];
+  created: { tempKey: string; key: string }[];
+  conflicts: Conflict[];
+  failures: { key: string; error: string }[];
+  remaining: number;
+}
+
 export const Health: () => Promise<HealthInfo> = App.Health;
 export const GetDiagnostics: () => Promise<Diagnostics> = App.GetDiagnostics;
 export const ListProfiles: () => Promise<Profile[]> = App.ListProfiles;
@@ -172,6 +265,26 @@ export const SetProfileSetting: (
   key: string,
   value: string,
 ) => Promise<void> = App.SetProfileSetting;
+
+export const EditIssue: (profileId: string, key: string, field: string, value: string) => Promise<void> =
+  App.EditIssue;
+export const CreateIssue = (profileId: string, draft: IssueDraft): Promise<string> =>
+  App.CreateIssue(profileId, backend.IssueDraft.createFrom(draft));
+export const GetCreateFields: (profileId: string, typeName: string) => Promise<FieldSpec[]> =
+  App.GetCreateFields;
+export const ListPendingChanges: (profileId: string) => Promise<PendingChange[]> = App.ListPendingChanges;
+export const DiscardPendingChange: (profileId: string, id: number) => Promise<void> =
+  App.DiscardPendingChange;
+export const DiscardAllPendingChanges: (profileId: string) => Promise<number> =
+  App.DiscardAllPendingChanges;
+export const CommitPendingChanges: (profileId: string) => Promise<CommitResult> =
+  App.CommitPendingChanges;
+export const ResolveConflictOverride: (profileId: string, key: string, remoteVersion: string) => Promise<void> =
+  App.ResolveConflictOverride;
+export const ResolveConflictKeepRemote: (profileId: string, key: string) => Promise<void> =
+  App.ResolveConflictKeepRemote;
+export const ListActivity: (profileId: string, key: string, limit: number) => Promise<AuditEntry[]> =
+  App.ListActivity;
 
 // isDemoUrl mirrors suiteprofiles.IsDemoURL in the backend: "demo" on its own
 // or a "demo:" / "demo-" variant selects the offline dataset.
