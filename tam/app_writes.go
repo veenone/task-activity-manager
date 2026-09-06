@@ -170,3 +170,50 @@ func (a *App) ListActivity(profileID, key string, limit int) ([]journal.AuditEnt
 	}
 	return rows, nil
 }
+
+// GetLinkTypes lists the link types the profile's Jira defines.
+func (a *App) GetLinkTypes(profileID string) ([]backend.LinkType, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return nil, err
+	}
+	b, err := a.backendFor(p)
+	if err != nil {
+		return nil, err
+	}
+	types, err := b.LinkTypes(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if types == nil {
+		types = []backend.LinkType{}
+	}
+	return types, nil
+}
+
+// LookupIssue reads one issue from Jira by key, any project, so the Add
+// link form can confirm a target and show its summary.
+func (a *App) LookupIssue(profileID, key string) (backend.Issue, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return backend.Issue{}, err
+	}
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return backend.Issue{}, errors.New("issue key is empty")
+	}
+	b, err := a.backendFor(p)
+	if err != nil {
+		return backend.Issue{}, err
+	}
+	return b.GetIssue(a.ctx, key)
+}
+
+// AddLink journals a link from key to the draft's target.
+func (a *App) AddLink(profileID, key string, link backend.LinkDraft) error {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return err
+	}
+	return a.repo.AddLink(a.ctx, p.ID, strings.TrimSpace(key), link)
+}
