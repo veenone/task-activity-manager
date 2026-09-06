@@ -1,12 +1,14 @@
 name: Release
 
-# Tag a release to build and publish Windows + macOS artifacts:
-#   git tag v0.2.0 && git push origin v0.2.0
-# The two jobs upload to the same GitHub Release for the tag.
+# Tag an XTM release to build and publish Windows + macOS artifacts:
+#   git tag xtm/v1.10.0 && git push origin xtm/v1.10.0
+# The two jobs upload to the same GitHub Release for the tag. The xtm/ prefix
+# is what keeps this workflow from firing on tags for the other apps in the
+# repository.
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["xtm/v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -52,7 +54,7 @@ jobs:
           $v = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             "${{ github.event.inputs.version }}"
           } else {
-            "${{ github.ref_name }}".TrimStart("v")
+            "${{ github.ref_name }}" -replace '^xtm/v', ''
           }
           "version=$v" >> $env:GITHUB_OUTPUT
           Write-Host "Building version $v"
@@ -104,7 +106,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             v="${{ github.event.inputs.version }}"
           else
-            v="${GITHUB_REF_NAME#v}"
+            v="${GITHUB_REF_NAME#xtm/v}"
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "Building version $v"

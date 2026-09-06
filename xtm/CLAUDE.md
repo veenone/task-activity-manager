@@ -171,7 +171,7 @@ Version is single-sourced in `wails.json` (`info.productVersion`).
 `scripts/release.ps1 -Version X.Y.Z` stamps it, builds the portable exe, compiles
 the installer from `build/windows/installer/installer.iss` with Inno Setup (needs
 `ISCC.exe`), bundles the user guide, and writes `SHA256SUMS.txt` into `dist/`
-(`-NoInstaller` skips the installer). Pushing a `vX.Y.Z` tag triggers
+(`-NoInstaller` skips the installer). Pushing an `xtm/vX.Y.Z` tag triggers
 `.github/workflows/release.yml` on `windows-latest` to build and publish a
 GitHub Release. See README for the artifact table.
 
