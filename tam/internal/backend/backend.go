@@ -1,6 +1,6 @@
 // Package backend is the seam between Task Activity Manager and the system
-// that holds its issues. IssueBackend is deliberately small: what the read
-// path needs, and nothing the write path will add later. The Jira
+// that holds its issues. IssueBackend carries the read path and the write
+// path plan 1b added: version checks, edits, and issue creation. The Jira
 // implementation lives in backend/jira, the offline one in backend/demo.
 package backend
 
