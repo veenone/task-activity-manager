@@ -214,3 +214,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .pending-footer { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; }
 .pending-footer-buttons { margin-left: auto; display: flex; gap: 8px; }
 .b { font-weight: 600; }
+
+/* Plan 1b: editable details, activity, grid markers */
+.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: 6px; vertical-align: middle; }
+.edit-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.edit-row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: start; }
+.edit-row .detail-input { width: 100%; box-sizing: border-box; }
+.edit-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.activity-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.activity-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; }
+.activity-row .small:last-child { grid-column: 2; }

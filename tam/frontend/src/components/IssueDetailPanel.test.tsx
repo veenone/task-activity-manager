@@ -10,7 +10,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn() };
 });
 
 const story: Issue = {
@@ -44,6 +44,11 @@ beforeEach(() => {
     { key: "XT-1018", summary: "Promo code applies discount", linkType: "Tested By" },
     { key: "XT-1019", summary: "Expired promo code rejected", linkType: "Tested By" },
   ]);
+  vi.mocked(api.EditIssue).mockResolvedValue();
+  vi.mocked(api.ListActivity).mockResolvedValue([
+    { id: 2, occurredAt: "2026-09-06T10:05:00Z", actor: "araha", entityType: "issue", entityKey: "PLAT-412", action: "edit", field: "storyPoints", beforeVal: "5", afterVal: "8", note: "" },
+    { id: 1, occurredAt: "2026-09-06T10:00:00Z", actor: "araha", entityType: "issue", entityKey: "PLAT-412", action: "edit", field: "summary", beforeVal: "Checkout: apply promo code", afterVal: "Checkout: apply promo code at payment step", note: "" },
+  ]);
 });
 
 describe("IssueDetailPanel", () => {
@@ -53,13 +58,12 @@ describe("IssueDetailPanel", () => {
     expect(screen.getByText("Checkout: apply promo code at payment step")).toBeInTheDocument();
     const details = screen.getByRole("tabpanel", { name: "Details" });
     expect(within(details).getByText("In Progress")).toBeInTheDocument();
-    expect(within(details).getByText("R. Anand")).toBeInTheDocument();
+    expect(within(details).getByLabelText("Assignee")).toHaveValue("R. Anand");
     expect(within(details).getByText("Sprint 12 - Checkout polish")).toBeInTheDocument();
-    expect(within(details).getByText("5")).toBeInTheDocument();
+    expect(within(details).getByLabelText("Story points")).toHaveValue("5");
     expect(within(details).getByText("PLAT-350")).toBeInTheDocument();
-    expect(within(details).getByText("checkout")).toBeInTheDocument();
-    expect(within(details).getByText("Loading description")).toBeInTheDocument();
-    await waitFor(() => expect(within(details).getByText(/As a shopper I can enter a promo code/)).toBeInTheDocument());
+    expect(within(details).getByLabelText("Labels")).toHaveValue("checkout, promo");
+    await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue("As a shopper I can enter a promo code on the payment step."));
     expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412");
   });
 
@@ -81,9 +85,9 @@ describe("IssueDetailPanel", () => {
     vi.mocked(api.GetIssueDetail).mockRejectedValueOnce(new Error("jira: 502 Bad Gateway"));
     renderPanel();
     await waitFor(() => expect(screen.getByTestId("detail-error")).toHaveTextContent("jira: 502 Bad Gateway"));
-    expect(screen.getByText("R. Anand")).toBeInTheDocument();
+    expect(screen.getByLabelText("Assignee")).toHaveValue("R. Anand");
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
-    await waitFor(() => expect(screen.getByText(/As a shopper I can enter a promo code/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue("As a shopper I can enter a promo code on the payment step."));
     expect(api.GetIssueDetail).toHaveBeenCalledTimes(2);
   });
 
@@ -115,5 +119,79 @@ describe("IssueDetailPanel", () => {
     await waitFor(() => expect(screen.getByText("No linked tests.")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("IssueDetailPanel write path", () => {
+  it("prefills the editable fields and saves only what changed, in field order", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const summary = await screen.findByLabelText("Summary");
+    expect(summary).toHaveValue("Checkout: apply promo code at payment step");
+    expect(screen.getByLabelText("Labels")).toHaveValue("checkout, promo");
+    expect(screen.getByLabelText("Story points")).toHaveValue("5");
+    const description = await screen.findByLabelText("Description");
+    await waitFor(() => expect(description).toHaveValue("As a shopper I can enter a promo code on the payment step."));
+    const save = screen.getByRole("button", { name: "Save edit" });
+    expect(save).toBeDisabled();
+
+    await user.clear(screen.getByLabelText("Story points"));
+    await user.type(screen.getByLabelText("Story points"), "8");
+    await user.clear(summary);
+    await user.type(summary, "Checkout: promo code at payment");
+    expect(save).toBeEnabled();
+    await user.click(save);
+    await waitFor(() => expect(api.EditIssue).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.EditIssue).mock.calls[0]).toEqual(["p1", "PLAT-412", "summary", "Checkout: promo code at payment"]);
+    expect(vi.mocked(api.EditIssue).mock.calls[1]).toEqual(["p1", "PLAT-412", "storyPoints", "8"]);
+    expect(await screen.findByText("Saved. Commit pushes it to Jira.")).toBeInTheDocument();
+  });
+
+  it("refuses a blank summary and non-numeric points before calling the backend", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const summary = await screen.findByLabelText("Summary");
+    await user.clear(summary);
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(await screen.findByText("Summary cannot be empty.")).toBeInTheDocument();
+    await user.type(summary, "x");
+    await user.clear(screen.getByLabelText("Story points"));
+    await user.type(screen.getByLabelText("Story points"), "eight");
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(await screen.findByText("Story points must be a number.")).toBeInTheDocument();
+    expect(api.EditIssue).not.toHaveBeenCalled();
+  });
+
+  it("shows the backend's error and keeps the edits in the form", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.EditIssue).mockRejectedValueOnce(new Error("field \"priority\" cannot be edited"));
+    renderPanel();
+    const priority = await screen.findByLabelText("Priority");
+    await user.clear(priority);
+    await user.type(priority, "Highest");
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(await screen.findByText(/cannot be edited/)).toBeInTheDocument();
+    expect(priority).toHaveValue("Highest");
+  });
+
+  it("lists the activity newest first on the Activity tab", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await user.click(await screen.findByRole("tab", { name: "Activity" }));
+    const items = await screen.findAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("araha edited Story points: 5 to 8");
+    expect(items[1]).toHaveTextContent("araha edited Summary");
+    expect(api.ListActivity).toHaveBeenCalledWith("p1", "PLAT-412", 200);
+  });
+
+  it("marks a draft in the panel head", async () => {
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <IssueDetailPanel profileId="p1" issue={{ ...story, key: "TAM-NEW-1", status: "Draft", draft: true, pending: true }} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText("Draft", { selector: "span.chip-draft" })).toBeInTheDocument();
+    expect(screen.getByText("Commit creates this issue in Jira and gives it a real key.")).toBeInTheDocument();
   });
 });

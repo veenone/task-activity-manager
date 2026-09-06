@@ -77,10 +77,17 @@ export function IssueTable({ issues, selectedKey, onSelect }: Props) {
                 }}
                 tabIndex={selected || (selectedKey === "" && v.index === 0) ? 0 : -1}
               >
-                <span role="gridcell" className="issue-key">{iss.key}</span>
+                <span role="gridcell" className="issue-key">
+                  {iss.key}
+                  {iss.pending && <span className="pending-dot" role="img" aria-label="Pending changes" title="Has pending changes" />}
+                </span>
                 <span role="gridcell"><TypeChip type={iss.type} /></span>
                 <span role="gridcell" className="issue-summary" title={iss.summary}>{iss.summary}</span>
-                <span role="gridcell"><span className={`chip chip-status chip-status-${statusClass(iss.status)}`}>{iss.status}</span></span>
+                <span role="gridcell">
+                  {iss.draft
+                    ? <span className="chip chip-draft">Draft</span>
+                    : <span className={`chip chip-status chip-status-${statusClass(iss.status)}`}>{iss.status}</span>}
+                </span>
                 <span role="gridcell">{iss.assignee || "-"}</span>
                 <span role="gridcell" title={iss.sprintName}>{iss.sprintId || "-"}</span>
                 <span role="gridcell">{iss.storyPoints ?? "-"}</span>

@@ -198,4 +198,23 @@ describe("BacklogView", () => {
     renderView();
     await waitFor(() => expect(screen.getByText(/No issues cached yet/)).toBeInTheDocument());
   });
+
+  it("shows the pending dot and the Draft chip on rows", async () => {
+    vi.mocked(api.ListIssues).mockResolvedValue({
+      issues: [
+        issue({ key: "TAM-NEW-1", summary: "Add a retry", status: "Draft", draft: true, pending: true }),
+        issue({ key: "PLAT-412", summary: "Promo", status: "In Progress", pending: true }),
+        issue({ key: "PLAT-409", summary: "Rotate keys" }),
+      ],
+      total: 3,
+    });
+    renderView();
+    await waitFor(() => expect(screen.getByText("Add a retry")).toBeInTheDocument());
+    const rows = await screen.findAllByRole("row");
+    // rows[0] is the header row.
+    expect(within(rows[1]).getByLabelText("Pending changes")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Draft")).toBeInTheDocument();
+    expect(within(rows[2]).getByLabelText("Pending changes")).toBeInTheDocument();
+    expect(within(rows[3]).queryByLabelText("Pending changes")).not.toBeInTheDocument();
+  });
 });
