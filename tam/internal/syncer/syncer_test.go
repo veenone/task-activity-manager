@@ -69,6 +69,12 @@ func (f *fake) CreateIssue(context.Context, string, backend.IssueDraft) (string,
 func (f *fake) CreateFields(context.Context, string, string) ([]backend.FieldSpec, error) {
 	return nil, errors.New("not used")
 }
+func (f *fake) LinkTypes(context.Context) ([]backend.LinkType, error) {
+	return nil, errors.New("not used")
+}
+func (f *fake) CreateLink(context.Context, string, backend.LinkDraft) error {
+	return errors.New("not used")
+}
 
 func issue(key, typ string) backend.Issue {
 	return backend.Issue{Key: key, ID: key, Project: "PLAT", Type: typ, Summary: key, Status: "To Do", Rank: key, Updated: "2026-09-01T00:00:00Z"}
@@ -261,6 +267,12 @@ func (c *cancelOnSearch) CreateIssue(context.Context, string, backend.IssueDraft
 }
 func (c *cancelOnSearch) CreateFields(context.Context, string, string) ([]backend.FieldSpec, error) {
 	return nil, errors.New("not used")
+}
+func (c *cancelOnSearch) LinkTypes(context.Context) ([]backend.LinkType, error) {
+	return nil, errors.New("not used")
+}
+func (c *cancelOnSearch) CreateLink(context.Context, string, backend.LinkDraft) error {
+	return errors.New("not used")
 }
 
 func TestCancelledSyncStillRecordsLastError(t *testing.T) {

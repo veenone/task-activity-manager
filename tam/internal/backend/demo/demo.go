@@ -27,6 +27,7 @@ type Backend struct {
 	desc     map[string]string
 	nextKey  int
 	conflict map[string]bool
+	links    map[string][]backend.Link
 }
 
 // New returns a demo backend for the project key. An empty key uses the
@@ -35,7 +36,7 @@ func New(projectKey string) *Backend {
 	if projectKey == "" {
 		projectKey = demo.ProjectKey
 	}
-	b := &Backend{project: projectKey, over: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 500, conflict: map[string]bool{}}
+	b := &Backend{project: projectKey, over: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 500, conflict: map[string]bool{}, links: map[string][]backend.Link{}}
 	b.conflict[b.ConflictKey()] = true
 	return b
 }
@@ -108,6 +109,7 @@ func (b *Backend) GetIssueDetail(_ context.Context, key string) (backend.IssueDe
 	if desc, ok := b.desc[key]; ok {
 		d.Description = desc
 	}
+	d.Links = append(d.Links, b.links[key]...)
 	return d, nil
 }
 
@@ -123,6 +125,11 @@ func (b *Backend) IssueTypes(context.Context, string) ([]backend.IssueType, erro
 
 func (b *Backend) find(key string) (backend.Issue, bool) {
 	for _, iss := range b.issues() {
+		if iss.Key == key {
+			return iss, true
+		}
+	}
+	for _, iss := range demo.ForeignIssues(b.project) {
 		if iss.Key == key {
 			return iss, true
 		}
@@ -203,20 +210,51 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 	b.over[key] = backend.Issue{
 		Key: key, ID: fmt.Sprintf("%d", 30000+b.nextKey), Project: projectKey, Type: d.Type, Summary: d.Summary,
 		Status: "To Do", Assignee: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
-		StoryPoints: d.StoryPoints, Created: now, Updated: now,
+		ParentKey: d.ParentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
 	}
 	b.desc[key] = d.Description
 	return key, nil
 }
 
-// CreateFields asks for one extra field on bugs, so the New issue form's
-// create-meta section can be seen offline.
+// CreateFields asks for one extra field on bugs and one on requirements,
+// so the New issue dialog's create-meta section can be seen offline for
+// both an option field and a text field.
 func (b *Backend) CreateFields(_ context.Context, _, logicalType string) ([]backend.FieldSpec, error) {
-	if logicalType != backend.TypeBug {
-		return []backend.FieldSpec{}, nil
+	switch logicalType {
+	case backend.TypeBug:
+		return []backend.FieldSpec{{
+			ID: "customfield_10050", Name: "Severity", Type: "option", Required: true,
+			AllowedValues: []backend.FieldOption{{ID: "1", Value: "Minor"}, {ID: "2", Value: "Major"}, {ID: "3", Value: "Critical"}},
+		}}, nil
+	case backend.TypeRequirement:
+		return []backend.FieldSpec{{ID: "customfield_10060", Name: "Source", Type: "string", Required: true, AllowedValues: []backend.FieldOption{}}}, nil
 	}
-	return []backend.FieldSpec{{
-		ID: "customfield_10050", Name: "Severity", Type: "option", Required: true,
-		AllowedValues: []backend.FieldOption{{ID: "1", Value: "Minor"}, {ID: "2", Value: "Major"}, {ID: "3", Value: "Critical"}},
-	}}, nil
+	return []backend.FieldSpec{}, nil
+}
+
+// demoLinkTypes are the three link types the demo defines.
+var demoLinkTypes = []backend.LinkType{
+	{Name: "Relates", Inward: "relates to", Outward: "relates to"},
+	{Name: "Blocks", Inward: "is blocked by", Outward: "blocks"},
+	{Name: "Tested By", Inward: "is tested by", Outward: "tests"},
+}
+
+func (b *Backend) LinkTypes(context.Context) ([]backend.LinkType, error) {
+	return append([]backend.LinkType{}, demoLinkTypes...), nil
+}
+
+// CreateLink records the link so the detail shows it from now on.
+func (b *Backend) CreateLink(_ context.Context, fromKey string, d backend.LinkDraft) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := b.find(fromKey); !ok {
+		return fmt.Errorf("demo: no issue %s", fromKey)
+	}
+	if _, ok := b.find(d.ToKey); !ok {
+		return fmt.Errorf("demo: no issue %s", d.ToKey)
+	}
+	b.links[fromKey] = append(b.links[fromKey], backend.Link{
+		Direction: d.Direction, Type: d.Type, Key: d.ToKey, Summary: d.ToSummary, IssueType: d.ToType,
+	})
+	return nil
 }

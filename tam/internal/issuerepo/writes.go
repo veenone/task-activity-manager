@@ -24,8 +24,8 @@ var fieldColumns = map[string]string{
 	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee",
 }
 
-// draftTypes are the logical types a draft may have in plan 1b.
-var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true}
+// draftTypes are the logical types a draft may have.
+var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true}
 
 // staleDetailStamp backdates a fabricated detail cache (one writeField built
 // from nothing, rather than a real fetch) so it reads as stale at once.
@@ -276,29 +276,44 @@ func updateDraftJSON(ctx context.Context, tx *sql.Tx, profileID, key, field, val
 	return err
 }
 
-// CreateDraft inserts a placeholder row under the next temporary key and a
-// create row holding the draft as JSON. It returns the temporary key.
+// CreateDraft inserts one draft. See CreateDrafts.
 func (r *Repository) CreateDraft(ctx context.Context, profileID, projectKey string, d backend.IssueDraft) (string, error) {
-	if !draftTypes[d.Type] {
-		return "", fmt.Errorf("type %q cannot be created here; plan 1b creates tasks, stories, and bugs", d.Type)
-	}
-	if strings.TrimSpace(d.Summary) == "" {
-		return "", errors.New("summary cannot be empty")
-	}
-	d.Summary = strings.TrimSpace(d.Summary)
-	if d.Labels == nil {
-		d.Labels = []string{}
-	}
-	if d.Extra == nil {
-		d.Extra = map[string]string{}
-	}
-	encoded, err := json.Marshal(d)
+	keys, err := r.CreateDrafts(ctx, profileID, projectKey, []backend.IssueDraft{d}, "")
 	if err != nil {
-		return "", fmt.Errorf("encode draft: %w", err)
+		return "", err
+	}
+	return keys[0], nil
+}
+
+// CreateDrafts inserts placeholder rows under the next temporary keys, one
+// create row each holding the draft as JSON, in one transaction: any
+// invalid draft fails the whole batch. note lands on every audit entry
+// (the import puts the file name there). It returns the temporary keys in
+// order.
+func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey string, drafts []backend.IssueDraft, note string) ([]string, error) {
+	if len(drafts) == 0 {
+		return nil, errors.New("nothing to create")
+	}
+	for i := range drafts {
+		d := &drafts[i]
+		if !draftTypes[d.Type] {
+			return nil, fmt.Errorf("type %q cannot be created here; tasks, stories, bugs, and requirements can", d.Type)
+		}
+		if strings.TrimSpace(d.Summary) == "" {
+			return nil, errors.New("summary cannot be empty")
+		}
+		d.Summary = strings.TrimSpace(d.Summary)
+		d.ParentKey = strings.TrimSpace(d.ParentKey)
+		if d.Labels == nil {
+			d.Labels = []string{}
+		}
+		if d.Extra == nil {
+			d.Extra = map[string]string{}
+		}
 	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer tx.Rollback()
 
@@ -306,244 +321,41 @@ func (r *Repository) CreateDraft(ctx context.Context, profileID, projectKey stri
 	if err := tx.QueryRowContext(ctx,
 		`SELECT COALESCE(MAX(CAST(SUBSTR(key, ?) AS INTEGER)), 0) FROM issue WHERE profile_id = ? AND key LIKE ?`,
 		len(DraftPrefix)+1, profileID, DraftPrefix+"%").Scan(&last); err != nil {
-		return "", fmt.Errorf("next draft key: %w", err)
+		return nil, fmt.Errorf("next draft key: %w", err)
 	}
-	key := fmt.Sprintf("%s%d", DraftPrefix, last+1)
 	now := time.Now().UTC().Format(time.RFC3339)
-	labels, _ := json.Marshal(d.Labels)
-	var points sql.NullFloat64
-	if d.StoryPoints != nil {
-		points = sql.NullFloat64{Float64: *d.StoryPoints, Valid: true}
-	}
-	detail, _ := json.Marshal(backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}})
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
-			sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
-		VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, '', '', '', ?, '', ?, '', '', ?, ?)`,
-		profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Priority, string(labels),
-		points, now, string(detail), now); err != nil {
-		return "", fmt.Errorf("insert draft: %w", err)
-	}
-	if err := journal.Put(tx, profileID, EntityIssueCreate, key, FieldCreate, "", string(encoded), ""); err != nil {
-		return "", err
-	}
-	if err := journal.Audit(tx, profileID, EntityIssue, key, "create", "", "", d.Summary, ""); err != nil {
-		return "", err
+	keys := make([]string, 0, len(drafts))
+	for _, d := range drafts {
+		last++
+		key := fmt.Sprintf("%s%d", DraftPrefix, last)
+		encoded, err := json.Marshal(d)
+		if err != nil {
+			return nil, fmt.Errorf("encode draft: %w", err)
+		}
+		labels, _ := json.Marshal(d.Labels)
+		var points sql.NullFloat64
+		if d.StoryPoints != nil {
+			points = sql.NullFloat64{Float64: *d.StoryPoints, Valid: true}
+		}
+		detail, _ := json.Marshal(backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}})
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
+				sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
+			VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, '', '', ?, ?, '', ?, '', '', ?, ?)`,
+			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Priority, string(labels),
+			d.ParentKey, points, now, string(detail), now); err != nil {
+			return nil, fmt.Errorf("insert draft: %w", err)
+		}
+		if err := journal.Put(tx, profileID, EntityIssueCreate, key, FieldCreate, "", string(encoded), ""); err != nil {
+			return nil, err
+		}
+		if err := journal.Audit(tx, profileID, EntityIssue, key, "create", "", "", d.Summary, note); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
 	}
 	if err := tx.Commit(); err != nil {
-		return "", err
+		return nil, err
 	}
-	return key, nil
-}
-
-// Rekey moves a draft to the key Jira assigned, across the row, its links,
-// its journal rows, and its audit trail, and audits the creation.
-func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for _, stmt := range []string{
-		`UPDATE issue SET key = ? WHERE profile_id = ? AND key = ?`,
-		`UPDATE issue_link SET from_key = ? WHERE profile_id = ? AND from_key = ?`,
-		`UPDATE pending_change SET entity_key = ? WHERE profile_id = ? AND entity_key = ?`,
-		`UPDATE audit_log SET entity_key = ? WHERE profile_id = ? AND entity_key = ?`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt, realKey, profileID, tempKey); err != nil {
-			return fmt.Errorf("rekey %s to %s: %w", tempKey, realKey, err)
-		}
-	}
-	if err := journal.Audit(tx, profileID, EntityIssue, realKey, "created", "", tempKey, realKey, "created in Jira"); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// ReplaceRow overwrites every column of one issue from a fresh Jira read and
-// drops its detail cache so the panel refetches. It does not touch the
-// journal; callers delete the rows first when that is the intent.
-func (r *Repository) ReplaceRow(ctx context.Context, profileID string, iss backend.Issue) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := upsertIssue(ctx, tx, profileID, iss, time.Now()); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE issue SET detail_json = NULL, detail_fetched_at = NULL WHERE profile_id = ? AND key = ?`,
-		profileID, iss.Key); err != nil {
-		return fmt.Errorf("clear detail for %s: %w", iss.Key, err)
-	}
-	// A pending edit that was not part of the push this row came from (made
-	// while the commit was in flight, or left behind because only some of the
-	// issue's fields were pushed) must survive the overwrite.
-	if err := reapplyPending(ctx, tx, profileID, map[string]bool{iss.Key: true}); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// SetBaseVersion rebases an issue's pending changes onto the remote version
-// the user chose to override, and audits the choice.
-func (r *Repository) SetBaseVersion(ctx context.Context, profileID, key, version string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := journal.SetBaseVersion(tx, profileID, key, version); err != nil {
-		return err
-	}
-	if err := journal.Audit(tx, profileID, EntityIssue, key, "override", "", "", version, "pending edits rebased onto the remote version"); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// DiscardPendingChange reverts one journal row: a field edit goes back to
-// its before value, a create row takes its draft row with it.
-func (r *Repository) DiscardPendingChange(ctx context.Context, profileID string, id int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	p, err := journal.Get(tx, profileID, id)
-	if err != nil {
-		return err
-	}
-	if err := discardOne(ctx, tx, profileID, p); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// DiscardAllPendingChanges reverts every journal row of the profile and
-// returns how many it reverted.
-func (r *Repository) DiscardAllPendingChanges(ctx context.Context, profileID string) (int, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-	all, err := journal.List(tx, profileID)
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range all {
-		if err := discardOne(ctx, tx, profileID, p); err != nil {
-			return 0, err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	return len(all), nil
-}
-
-// DiscardKey reverts every pending change of one issue, which is what a
-// keep-remote resolution does before it replaces the row.
-func (r *Repository) DiscardKey(ctx context.Context, profileID, key string) (int, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-	rows, err := journal.ListForKey(tx, profileID, key)
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range rows {
-		if err := discardOne(ctx, tx, profileID, p); err != nil {
-			return 0, err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	return len(rows), nil
-}
-
-func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.PendingChange) error {
-	if p.EntityType == EntityIssueCreate {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM issue_link WHERE profile_id = ? AND from_key = ?`, profileID, p.EntityKey); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey); err != nil {
-			return fmt.Errorf("drop draft %s: %w", p.EntityKey, err)
-		}
-	} else {
-		var exists int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey).Scan(&exists)
-		switch {
-		case errors.Is(err, sql.ErrNoRows):
-			// A full sync no longer returns this issue. There is no row left
-			// to revert; still drop the journal row and record the discard.
-		case err != nil:
-			return fmt.Errorf("check %s exists: %w", p.EntityKey, err)
-		default:
-			if err := writeField(ctx, tx, profileID, p.EntityKey, p.Field, p.BeforeVal); err != nil {
-				return fmt.Errorf("revert %s.%s: %w", p.EntityKey, p.Field, err)
-			}
-		}
-	}
-	if err := journal.Delete(tx, profileID, []int64{p.ID}); err != nil {
-		return err
-	}
-	return journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "discard", p.Field, p.AfterVal, p.BeforeVal, "")
-}
-
-// MarkCommitted deletes the journal rows a commit pushed and audits each.
-func (r *Repository) MarkCommitted(ctx context.Context, profileID string, changes []journal.PendingChange) error {
-	if len(changes) == 0 {
-		return nil
-	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	ids := make([]int64, 0, len(changes))
-	for _, p := range changes {
-		ids = append(ids, p.ID)
-		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, ""); err != nil {
-			return err
-		}
-	}
-	if err := journal.Delete(tx, profileID, ids); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// MarkCreatedWithoutRekey clears a draft's journal rows when Jira accepted
-// the create but the local rename to the real key failed: it deletes the
-// create (and any edit) rows under the temp key, same as MarkCommitted, then
-// audits the creation under the temp key with the real key in the note, so a
-// retry sees nothing pending and does not post the draft again. The draft
-// row keeps its temporary key; the next sync brings the real row in.
-func (r *Repository) MarkCreatedWithoutRekey(ctx context.Context, profileID, tempKey, realKey string, rows []journal.PendingChange) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	ids := make([]int64, 0, len(rows))
-	for _, p := range rows {
-		ids = append(ids, p.ID)
-		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, ""); err != nil {
-			return err
-		}
-	}
-	if err := journal.Delete(tx, profileID, ids); err != nil {
-		return err
-	}
-	note := fmt.Sprintf("created in Jira as %s but the local rename failed; the row keeps its temporary key until the next sync", realKey)
-	if err := journal.Audit(tx, profileID, EntityIssue, tempKey, "created", "", tempKey, realKey, note); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return keys, nil
 }

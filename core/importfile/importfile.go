@@ -14,18 +14,25 @@ import (
 )
 
 // Preview is what a freshly parsed file looks like before mapping: its
-// column headers and the number of data rows.
+// column headers, the number of data rows, and a sample row so a mapping UI
+// can show what each column actually holds.
 type Preview struct {
 	Headers  []string `json:"headers"`
 	RowCount int      `json:"rowCount"`
+	Sample   []string `json:"sample"`
 }
 
-// ParsePreview reads the header row and counts the data rows.
+// ParsePreview reads the header row, counts the data rows, and keeps the
+// first data row as a sample; Sample is an empty slice when there is none.
 func ParsePreview(records [][]string) (Preview, error) {
 	if len(records) == 0 {
 		return Preview{}, fmt.Errorf("the file is empty")
 	}
-	return Preview{Headers: records[0], RowCount: len(records) - 1}, nil
+	sample := []string{}
+	if len(records) > 1 {
+		sample = records[1]
+	}
+	return Preview{Headers: records[0], RowCount: len(records) - 1, Sample: sample}, nil
 }
 
 // ParseRecords parses raw file bytes into rows, CSV or XLSX. For XLSX the

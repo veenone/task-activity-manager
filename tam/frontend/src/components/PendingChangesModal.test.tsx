@@ -104,7 +104,7 @@ describe("PendingChangesModal", () => {
   it("commits and shows the result banner with the key mapping", async () => {
     const user = userEvent.setup();
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({
-      committed: ["PLAT-409"], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501" }], conflicts: [], failures: [], remaining: 0,
+      committed: ["PLAT-409"], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501" }], linked: [], conflicts: [], failures: [], remaining: 0,
     });
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
     renderModal();
@@ -119,7 +119,7 @@ describe("PendingChangesModal", () => {
   it("names failures in the banner and keeps their rows", async () => {
     const user = userEvent.setup();
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({
-      committed: [], created: [], conflicts: [],
+      committed: [], created: [], linked: [], conflicts: [],
       failures: [{ key: "PLAT-409", error: "PUT failed: 400 priority is invalid" }, { key: "TAM-NEW-1", error: "Severity is required" }],
       remaining: 3,
     });
@@ -143,7 +143,7 @@ describe("PendingChangesModal", () => {
     // the held issue's rows, as the store would.
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(conflictRows).mockResolvedValue(conflictRows.slice(0, 2));
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({
-      committed: ["PLAT-409"], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501" }],
+      committed: ["PLAT-409"], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501" }], linked: [],
       conflicts: [{ key: "PLAT-412", summary: "Checkout: apply promo code at payment step", remoteVersion: "2026-09-06T11:00:00Z", fields: [
         { field: "storyPoints", base: "5", mine: "8", remote: "13" },
         { field: "labels", base: "checkout, promo", mine: "checkout, promo, q3", remote: "checkout, promo" },
@@ -178,7 +178,7 @@ describe("PendingChangesModal", () => {
       { id: 5, entityType: "issue", entityKey: "PLAT-412", field: "storyPoints", beforeVal: "5", afterVal: "8", baseVersion: "v1", createdAt: "" },
     ]);
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({
-      committed: [], created: [],
+      committed: [], created: [], linked: [],
       conflicts: [{ key: "PLAT-412", summary: "Promo", remoteVersion: "v2", fields: [{ field: "storyPoints", base: "5", mine: "8", remote: "13" }] }],
       failures: [], remaining: 1,
     });
@@ -200,5 +200,21 @@ describe("PendingChangesModal", () => {
     const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
     await user.click(await within(dialog).findByRole("button", { name: "Discard priority on PLAT-409" }));
     expect(await screen.findByText(/row is gone/)).toBeInTheDocument();
+  });
+
+  it("shows a link card and counts pushed links in the banner", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValueOnce([
+      { id: 9, entityType: "link", entityKey: "PLAT-412", field: "Relates|outward|XT-1018", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ type: "Relates", direction: "outward", toKey: "XT-1018", toSummary: "Promo code applies discount", toType: "Test" }) },
+    ]).mockResolvedValue([]);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({ committed: [], created: [], linked: [{ key: "PLAT-412", toKey: "XT-1018", type: "Relates" }], conflicts: [], failures: [], remaining: 0 });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
+    expect(card).toHaveTextContent("Relates (outward) XT-1018 Promo code applies discount");
+    expect(within(card).getByRole("button", { name: "Discard link to XT-1018" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Commit (1)" }));
+    expect(await within(dialog).findByText("Last commit: 1 link pushed.")).toBeInTheDocument();
   });
 });

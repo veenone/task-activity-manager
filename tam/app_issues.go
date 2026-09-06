@@ -75,6 +75,20 @@ func (a *App) backendFor(p profile.Profile) (backend.IssueBackend, error) {
 	return b, nil
 }
 
+// backendForProfile resolves the profile and its backend in one step, the
+// pair every bound write method starts with.
+func (a *App) backendForProfile(profileID string) (profile.Profile, backend.IssueBackend, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return profile.Profile{}, nil, err
+	}
+	b, err := a.backendFor(p)
+	if err != nil {
+		return profile.Profile{}, nil, err
+	}
+	return p, b, nil
+}
+
 // forgetBackend drops a cached backend so the next call rebuilds it, which
 // is what changing the requirement type needs.
 func (a *App) forgetBackend(profileID string) {
@@ -170,7 +184,11 @@ func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error)
 	if err := a.repo.WriteDetail(a.ctx, p.ID, key, d, time.Now()); err != nil {
 		return backend.IssueDetail{}, err
 	}
-	return d, nil
+	fresh, _, _, err := a.repo.ReadDetail(a.ctx, p.ID, key)
+	if err != nil {
+		return backend.IssueDetail{}, err
+	}
+	return fresh, nil
 }
 
 // ListLinkedTests returns the tests linked to key through the suite's

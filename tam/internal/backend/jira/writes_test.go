@@ -120,4 +120,23 @@ func TestCreateFieldsKeepsOnlyRequiredUnknownFields(t *testing.T) {
 	}
 }
 
+func TestCreateIssueSendsTheParentThroughEpicLinkWhenItExists(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.createKey = "PLAT-502"
+	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Under an epic", ParentKey: "PLAT-350"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f.writes[len(f.writes)-1], `"customfield_10014":"PLAT-350"`) {
+		t.Errorf("epic link missing: %s", f.writes[len(f.writes)-1])
+	}
+	noEpic, f2 := newBackend(t, twoFields)
+	f2.createKey = "PLAT-503"
+	if _, err := noEpic.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "No field", ParentKey: "PLAT-350"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(f2.writes[len(f2.writes)-1], "PLAT-350") {
+		t.Errorf("the parent must be dropped when the field is missing: %s", f2.writes[len(f2.writes)-1])
+	}
+}
+
 func pts(v float64) *float64 { return &v }

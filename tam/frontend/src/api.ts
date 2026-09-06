@@ -9,7 +9,7 @@
 // class's createFrom so the binding receives the shape it declares.
 
 import * as App from "../wailsjs/go/main/App";
-import { backend, issuerepo } from "../wailsjs/go/models";
+import { backend, importer, issuerepo } from "../wailsjs/go/models";
 
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 export type { SyncProgress } from "@agile-suite/core";
@@ -91,6 +91,8 @@ export interface Link {
   key: string;
   summary: string;
   issueType: string;
+  pending?: boolean;
+  pendingId?: number;
 }
 
 export interface IssueDetail {
@@ -220,12 +222,81 @@ export interface Conflict {
   fields: FieldConflict[];
 }
 
+export interface LinkType {
+  name: string;
+  inward: string;
+  outward: string;
+}
+
+export interface LinkDraft {
+  type: string;
+  direction: "outward" | "inward";
+  toKey: string;
+  toSummary: string;
+  toType: string;
+}
+
 export interface CommitResult {
   committed: string[];
   created: { tempKey: string; key: string }[];
+  linked: { key: string; toKey: string; type: string }[];
   conflicts: Conflict[];
   failures: { key: string; error: string }[];
   remaining: number;
+}
+
+export interface ImportPreview {
+  headers: string[];
+  rowCount: number;
+  sample: string[];
+}
+
+export interface ImportMapping {
+  type: string;
+  summary: string;
+  description: string;
+  priority: string;
+  labels: string;
+  assignee: string;
+  storyPoints: string;
+  parentKey: string;
+}
+
+export interface ImportRowError {
+  row: number;
+  message: string;
+}
+
+export interface ImportResult {
+  rows: number;
+  created: string[];
+  errors: ImportRowError[];
+}
+
+// IMPORT_FIELDS are the draft fields a column can feed, in dialog order.
+export const IMPORT_FIELDS: { id: keyof ImportMapping; label: string }[] = [
+  { id: "type", label: "Type" },
+  { id: "summary", label: "Summary" },
+  { id: "description", label: "Description" },
+  { id: "priority", label: "Priority" },
+  { id: "labels", label: "Labels" },
+  { id: "assignee", label: "Assignee" },
+  { id: "storyPoints", label: "Story points" },
+  { id: "parentKey", label: "Parent key" },
+];
+
+// readFileAsBase64 reads a browser File into the base64 the import
+// bindings take (the data URL's payload, after the comma).
+export function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("The file could not be read."));
+    reader.onload = () => {
+      const url = String(reader.result ?? "");
+      resolve(url.slice(url.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 export const Health: () => Promise<HealthInfo> = App.Health;
@@ -285,6 +356,27 @@ export const ResolveConflictKeepRemote: (profileId: string, key: string) => Prom
   App.ResolveConflictKeepRemote;
 export const ListActivity: (profileId: string, key: string, limit: number) => Promise<AuditEntry[]> =
   App.ListActivity;
+
+export const PreviewImport: (contentB64: string, isXlsx: boolean) => Promise<ImportPreview> = App.PreviewImport;
+export const AutoMapImport: (headers: string[]) => Promise<ImportMapping> = App.AutoMapImport;
+export const ImportIssues = (
+  profileId: string,
+  contentB64: string,
+  isXlsx: boolean,
+  fileName: string,
+  mapping: ImportMapping,
+  dryRun: boolean,
+): Promise<ImportResult> =>
+  App.ImportIssues(profileId, contentB64, isXlsx, fileName, importer.Mapping.createFrom(mapping), dryRun) as Promise<ImportResult>;
+export const SaveImportTemplate: () => Promise<string> = App.SaveImportTemplate;
+
+export const GetLinkTypes: (profileId: string) => Promise<LinkType[]> = App.GetLinkTypes;
+// LookupIssue is cast the same way ListIssues is above: the generated
+// binding types the issue type as a plain string, narrowed to IssueType here.
+export const LookupIssue = (profileId: string, key: string): Promise<Issue> =>
+  App.LookupIssue(profileId, key) as Promise<Issue>;
+export const AddLink = (profileId: string, key: string, link: LinkDraft): Promise<void> =>
+  App.AddLink(profileId, key, backend.LinkDraft.createFrom(link));
 
 // isDemoUrl mirrors suiteprofiles.IsDemoURL in the backend: "demo" on its own
 // or a "demo:" / "demo-" variant selects the offline dataset.

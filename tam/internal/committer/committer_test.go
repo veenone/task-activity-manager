@@ -25,6 +25,8 @@ type fake struct {
 	updateErr map[string]error
 	createErr error
 	getErr    map[string]error
+	links     []string
+	linkErr   error
 }
 
 func newFake() *fake {
@@ -96,6 +98,16 @@ func (f *fake) CreateIssue(_ context.Context, projectKey string, d backend.Issue
 	f.nextKey++
 	f.rows[key] = backend.Issue{Key: key, ID: "9", Project: projectKey, Type: d.Type, Summary: d.Summary, Status: "To Do", Labels: d.Labels, StoryPoints: d.StoryPoints, Updated: "2026-09-07T00:00:00Z"}
 	return key, nil
+}
+func (f *fake) LinkTypes(context.Context) ([]backend.LinkType, error) {
+	return []backend.LinkType{{Name: "Relates", Inward: "relates to", Outward: "relates to"}}, nil
+}
+func (f *fake) CreateLink(_ context.Context, fromKey string, d backend.LinkDraft) error {
+	if f.linkErr != nil {
+		return f.linkErr
+	}
+	f.links = append(f.links, fromKey+" "+d.Direction+" "+d.Type+" "+d.ToKey)
+	return nil
 }
 
 func setup(t *testing.T) (*committer.Engine, *issuerepo.Repository, *fake) {
@@ -348,5 +360,86 @@ func TestCommitWithNothingPendingIsEmpty(t *testing.T) {
 	}
 	if len(f.updates) != 0 {
 		t.Error("no writes")
+	}
+}
+
+func TestCommitPushesLinksAfterEditsAndClearsTheDetail(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	_ = repo.WriteDetail(ctx, "p1", "PLAT-1", backend.IssueDetail{Description: "cached"}, time.Now())
+	_ = repo.EditField(ctx, "p1", "PLAT-1", "summary", "uno")
+	_ = repo.AddLink(ctx, "p1", "PLAT-1", backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "XT-9", ToSummary: "A test", ToType: "Test"})
+	_ = repo.AddLink(ctx, "p1", "PLAT-2", backend.LinkDraft{Type: "Relates", Direction: "inward", ToKey: "PAY-1"})
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(res.Committed, ",") != "PLAT-1" || len(res.Linked) != 2 || res.Remaining != 0 {
+		t.Errorf("result: %+v", res)
+	}
+	if len(f.links) != 2 || f.links[0] != "PLAT-1 outward Relates XT-9" || f.links[1] != "PLAT-2 inward Relates PAY-1" {
+		t.Errorf("links pushed in key order after the edit: %v", f.links)
+	}
+	if len(f.updates) != 1 {
+		t.Errorf("the edit was pushed once: %v", f.updates)
+	}
+	if _, _, ok, _ := repo.ReadDetail(ctx, "p1", "PLAT-1"); ok {
+		t.Error("the detail cache is dropped after a link push")
+	}
+	act, _ := repo.ListActivity(ctx, "p1", "PLAT-2", 0)
+	if len(act) != 2 || act[0].Action != "commit" || act[0].EntityType != issuerepo.EntityLink {
+		t.Errorf("link commit audited: %+v", act)
+	}
+}
+
+func TestCommitLinksFromADraftFollowTheRealKey(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	temp, _ := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "Draft with a link"})
+	_ = repo.AddLink(ctx, "p1", temp, backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "XT-9"})
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Created) != 1 || len(res.Linked) != 1 || res.Linked[0].Key != "PLAT-501" || res.Remaining != 0 {
+		t.Errorf("result: %+v", res)
+	}
+	if len(f.links) != 1 || f.links[0] != "PLAT-501 outward Relates XT-9" {
+		t.Errorf("the link is pushed under the real key: %v", f.links)
+	}
+}
+
+func TestLinkFromAFailedDraftIsLeftForNextTime(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	temp, _ := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "New task"})
+	_ = repo.AddLink(ctx, "p1", temp, backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "XT-9"})
+	f.createErr = errors.New("POST failed: 400 Severity is required")
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.links) != 0 {
+		t.Errorf("a link still under a draft key must not be pushed: %v", f.links)
+	}
+	if links, _ := repo.PendingLinks(ctx, "p1", temp); len(links) != 1 {
+		t.Errorf("the link row stays pending: %+v", links)
+	}
+	if len(res.Failures) != 1 || res.Failures[0].Key != temp {
+		t.Errorf("exactly one failure, the create's: %+v", res.Failures)
+	}
+}
+
+func TestLinkFailureKeepsTheRow(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	_ = repo.AddLink(ctx, "p1", "PLAT-1", backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "XT-9"})
+	f.linkErr = errors.New("POST failed: 404 XT-9 does not exist")
+	res, _ := eng.Commit(ctx, "p1", "PLAT")
+	if len(res.Failures) != 1 || res.Failures[0].Key != "PLAT-1" || !strings.Contains(res.Failures[0].Error, "XT-9") || res.Remaining != 1 {
+		t.Errorf("result: %+v", res)
+	}
+	if links, _ := repo.PendingLinks(ctx, "p1", "PLAT-1"); len(links) != 1 {
+		t.Errorf("row kept: %+v", links)
 	}
 }

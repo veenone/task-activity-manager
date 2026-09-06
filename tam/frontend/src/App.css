@@ -9,37 +9,14 @@ body {
 }
 input, button, select { font-family: inherit; font-size: inherit; }
 
-.app {
-  height: 100%;
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  grid-template-rows: 48px 1fr 28px;
-  grid-template-areas: "top top" "rail main" "rail status";
-}
-.topbar {
-  grid-area: top;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-.topbar-left, .topbar-right { display: flex; align-items: center; gap: 12px; }
-.brand { font-size: 15px; font-weight: 600; }
+/* The topbar, brand, profile select, demo chip, and app shell frame now come
+   from @agile-suite/core (mirrored from XTM's App.css) so both windows share
+   one look. app-body wraps the nav rail and the main area side by side; XTM
+   has no equivalent since it switches views with topbar tabs, not a rail. */
+.app-body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chip { padding: 2px 8px; border-radius: 9px; font-size: 10px; font-weight: 600; }
-.chip-demo { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning); }
-.profile-select {
-  min-width: 232px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-}
 
 .nav-rail {
-  grid-area: rail;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -58,15 +35,16 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .nav-item:hover:not(:disabled) { background: var(--row-hover); }
 .nav-item:disabled { color: var(--text-muted); cursor: default; }
-.nav-item-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* Active-item fill matches XTM's .view-tab-active token treatment (solid
+   accent, white text) so the rail's selection state reads like XTM's tabs. */
+.nav-item-active { background: var(--accent); color: #fff; font-weight: 600; }
 .nav-divider { height: 1px; margin: 12px 8px; background: var(--border); }
 .nav-section { padding: 0 14px 4px; font-size: 11px; color: var(--text-muted); }
 .nav-hint { padding: 0 14px; font-size: 10px; color: var(--text-muted); }
 
-.main { grid-area: main; padding: 20px; overflow: auto; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 20px; overflow: auto; }
 .view-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
 .view-head h2 { font-size: 16px; }
-.muted { color: var(--text-muted); }
 .small { font-size: 11px; }
 
 .placeholder-card {
@@ -84,16 +62,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .placeholder-title { font-size: 15px; }
 .placeholder-blurb { color: var(--text-muted); }
 
-.statusbar {
-  grid-area: status;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 0 16px;
-  font-size: 11px;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-}
+/* .app-statusbar's frame (height, background, border, font-size) comes from
+   core; TAM's footer holds several children, so it adds the gap XTM's single-
+   line footer doesn't need. */
+.app-statusbar { gap: 16px; }
 .statusbar-right { margin-left: auto; }
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot-ok { background: var(--ok-text); }
@@ -107,15 +79,36 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .startup-error h2 { font-size: 14px; margin-bottom: 8px; }
 
-.profiles-modal { width: min(520px, 92vw); }
-.profile-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.profile-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; }
-.profile-row:hover { background: var(--row-hover); }
-.profile-name { font-weight: 600; flex: 1; }
-.profile-form { display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 12px; }
-.profile-form h3 { font-size: 13px; margin-bottom: 8px; }
+/* The row's star/name/key/Active badge/Delete sit on one line via the
+   shared .profiles-list-row; the URL hint and the requirement-type field
+   are TAM's own additions (XTM has no equivalent since those live in its
+   per-profile detail pane instead), so they stack below inside this
+   wrapper. */
+.profiles-row-item {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.profiles-row-item:last-child {
+  border-bottom: none;
+}
+.profiles-row-meta {
+  padding: 0 8px 8px;
+}
+/* Inside the modal, the modal already provides the padding and background,
+   so flatten ProfileForm's standalone card styling the same way XTM's own
+   .profiles-detail .profile-form does; TAM has no second column to divide
+   the list from the create form, so a border-top stands in for it. */
+.profiles-modal .profile-form {
+  padding: 0;
+  gap: 0;
+  background: none;
+  border-radius: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 4px;
+}
 .check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
-.form-error { color: var(--danger-text); margin-bottom: 8px; }
 .about-list { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 12px 0; }
 .about-list dt { color: var(--text-muted); }
 .topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -181,7 +174,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .link-group { margin-bottom: 12px; }
 .link-group-title { font-size: 12px; margin-bottom: 6px; }
 
-.profile-setting { display: inline-flex; flex-direction: column; gap: 2px; }
+.profile-setting { display: inline-flex; flex-direction: column; gap: 2px; padding: 0 8px 8px; }
 .profile-setting .detail-input-inline { width: 150px; }
 
 /* Plan 1b: pending changes */
@@ -194,10 +187,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
 .chip-conflict { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; text-transform: uppercase; font-size: 10px; }
-.pending-modal { width: min(700px, 92vw); max-height: 86vh; display: flex; flex-direction: column; }
-.pending-head { display: flex; align-items: center; gap: 12px; }
-.pending-head h2 { margin: 0; font-size: 15px; }
-.pending-head .detail-close { margin-left: auto; }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }
 .pending-banner-warn { background: var(--warn-bg, #fef3c7); border-color: var(--warn-border, #f59e0b); }
@@ -225,7 +214,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .activity-row .small:last-child { grid-column: 2; }
 
 /* Plan 1b: new issue */
-.filter-new { margin-left: auto; }
 .new-issue-modal { width: min(640px, 92vw); max-height: 86vh; overflow: auto; }
 .meta-fields { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
 
@@ -234,3 +222,15 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .conflict-table th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
 .conflict-table td { padding: 4px 8px 4px 0; vertical-align: top; }
 .danger-text { color: #b42318; }
+
+/* Plan 1c: import */
+.filter-import { margin-left: auto; }
+.filter-import + .filter-new { margin-left: 8px; }
+
+/* Plan 1c: links */
+.add-link { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.add-link h3 { margin: 0; font-size: 13px; }
+.add-link-key { display: flex; gap: 6px; }
+.add-link-key .detail-input { flex: 1; }
+.linked-row .pending-dot { margin-left: 4px; }
+.pending-row-link { grid-template-columns: 110px auto auto 1fr auto; }

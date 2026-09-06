@@ -9,7 +9,8 @@ Desktop tools for Jira Data Center that share one code spine:
   requirements). It shares connection profiles with XTM, syncs a project's
   issues into a local cache, and shows them in a Backlog grid with a
   read-only detail panel. Plan 1b adds local edits and drafts, a journal,
-  Commit with conflict detection, and an Activity tab.
+  Commit with conflict detection, and an Activity tab. Plan 1c adds Excel
+  import to drafts, cross-project links, and requirement creation.
 
 Both are Go + Wails + React apps that sync Jira into a local SQLite cache and
 push edits back on commit.

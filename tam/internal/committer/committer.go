@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 
 	"agile-suite/core/journal"
 	"agile-suite/tam/internal/backend"
@@ -47,10 +48,18 @@ type Failure struct {
 	Error string `json:"error"`
 }
 
+// Linked is a link Commit created.
+type Linked struct {
+	Key   string `json:"key"`
+	ToKey string `json:"toKey"`
+	Type  string `json:"type"`
+}
+
 // Result is what one Commit did. Remaining counts the journal rows left.
 type Result struct {
 	Committed []string   `json:"committed"`
 	Created   []Created  `json:"created"`
+	Linked    []Linked   `json:"linked"`
 	Conflicts []Conflict `json:"conflicts"`
 	Failures  []Failure  `json:"failures"`
 	Remaining int        `json:"remaining"`
@@ -70,7 +79,7 @@ func New(b backend.IssueBackend, repo *issuerepo.Repository) *Engine {
 // Commit pushes every pending change of the profile. Only a store failure
 // returns an error; per-issue outcomes land in the Result.
 func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Result, error) {
-	res := Result{Committed: []string{}, Created: []Created{}, Conflicts: []Conflict{}, Failures: []Failure{}}
+	res := Result{Committed: []string{}, Created: []Created{}, Linked: []Linked{}, Conflicts: []Conflict{}, Failures: []Failure{}}
 	all, err := e.repo.ListPendingChanges(ctx, profileID)
 	if err != nil {
 		return res, err
@@ -78,6 +87,9 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 	byKey := map[string][]journal.PendingChange{}
 	var creates, edits []string
 	for _, p := range all {
+		if p.EntityType == issuerepo.EntityLink {
+			continue
+		}
 		if _, seen := byKey[p.EntityKey]; !seen {
 			if p.EntityType == issuerepo.EntityIssueCreate {
 				creates = append(creates, p.EntityKey)
@@ -101,6 +113,7 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 	for _, key := range edits {
 		e.commitEdit(ctx, profileID, key, byKey[key], &res)
 	}
+	e.commitLinks(ctx, profileID, &res)
 
 	left, err := e.repo.ListPendingChanges(ctx, profileID)
 	if err != nil {
@@ -181,6 +194,46 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 	}
 	e.refresh(ctx, profileID, key)
 	res.Committed = append(res.Committed, key)
+}
+
+// commitLinks pushes every link row, read fresh so a link added from a
+// draft carries the key the create pass gave it. A row whose source is
+// still a draft (its create failed this pass) is left for next time: it is
+// neither pushed nor reported as a failure. Each push is its own journal
+// delete, and the source's detail cache is dropped so the panel refetches
+// the links Jira now holds.
+func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result) {
+	all, err := e.repo.ListPendingChanges(ctx, profileID)
+	if err != nil {
+		res.Failures = append(res.Failures, Failure{Key: "links", Error: "the journal could not be read for links: " + err.Error()})
+		return
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
+	for _, p := range all {
+		if p.EntityType != issuerepo.EntityLink {
+			continue
+		}
+		if strings.HasPrefix(p.EntityKey, issuerepo.DraftPrefix) {
+			continue
+		}
+		var d backend.LinkDraft
+		if err := json.Unmarshal([]byte(p.AfterVal), &d); err != nil {
+			res.Failures = append(res.Failures, Failure{Key: p.EntityKey, Error: "the link could not be decoded: " + err.Error()})
+			continue
+		}
+		if err := e.b.CreateLink(ctx, p.EntityKey, d); err != nil {
+			res.Failures = append(res.Failures, Failure{Key: p.EntityKey, Error: err.Error()})
+			continue
+		}
+		if err := e.repo.MarkCommitted(ctx, profileID, []journal.PendingChange{p}); err != nil {
+			res.Failures = append(res.Failures, Failure{Key: p.EntityKey, Error: "linked in Jira but the journal could not be cleared: " + err.Error()})
+			continue
+		}
+		if err := e.repo.ClearDetail(ctx, profileID, p.EntityKey); err != nil {
+			log.Printf("tam: clear detail for %s after a link push: %v", p.EntityKey, err)
+		}
+		res.Linked = append(res.Linked, Linked{Key: p.EntityKey, ToKey: d.ToKey, Type: d.Type})
+	}
 }
 
 // conflict builds the three-way view. The remote description is fetched

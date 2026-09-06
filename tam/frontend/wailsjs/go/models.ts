@@ -106,6 +106,8 @@ export namespace backend {
 	    key: string;
 	    summary: string;
 	    issueType: string;
+	    pending: boolean;
+	    pendingId: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Link(source);
@@ -118,6 +120,8 @@ export namespace backend {
 	        this.key = source["key"];
 	        this.summary = source["summary"];
 	        this.issueType = source["issueType"];
+	        this.pending = source["pending"];
+	        this.pendingId = source["pendingId"];
 	    }
 	}
 	export class IssueDetail {
@@ -164,6 +168,7 @@ export namespace backend {
 	    labels: string[];
 	    assignee: string;
 	    storyPoints?: number;
+	    parentKey: string;
 	    extra: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
@@ -179,7 +184,45 @@ export namespace backend {
 	        this.labels = source["labels"];
 	        this.assignee = source["assignee"];
 	        this.storyPoints = source["storyPoints"];
+	        this.parentKey = source["parentKey"];
 	        this.extra = source["extra"];
+	    }
+	}
+	
+	export class LinkDraft {
+	    type: string;
+	    direction: string;
+	    toKey: string;
+	    toSummary: string;
+	    toType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkDraft(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.direction = source["direction"];
+	        this.toKey = source["toKey"];
+	        this.toSummary = source["toSummary"];
+	        this.toType = source["toType"];
+	    }
+	}
+	export class LinkType {
+	    name: string;
+	    inward: string;
+	    outward: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkType(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.inward = source["inward"];
+	        this.outward = source["outward"];
 	    }
 	}
 
@@ -270,9 +313,26 @@ export namespace committer {
 	    }
 	}
 	
+	export class Linked {
+	    key: string;
+	    toKey: string;
+	    type: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Linked(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.toKey = source["toKey"];
+	        this.type = source["type"];
+	    }
+	}
 	export class Result {
 	    committed: string[];
 	    created: Created[];
+	    linked: Linked[];
 	    conflicts: Conflict[];
 	    failures: Failure[];
 	    remaining: number;
@@ -285,6 +345,7 @@ export namespace committer {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.committed = source["committed"];
 	        this.created = this.convertValues(source["created"], Created);
+	        this.linked = this.convertValues(source["linked"], Linked);
 	        this.conflicts = this.convertValues(source["conflicts"], Conflict);
 	        this.failures = this.convertValues(source["failures"], Failure);
 	        this.remaining = source["remaining"];
@@ -307,6 +368,106 @@ export namespace committer {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace importer {
+	
+	export class Mapping {
+	    type: string;
+	    summary: string;
+	    description: string;
+	    priority: string;
+	    labels: string;
+	    assignee: string;
+	    storyPoints: string;
+	    parentKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Mapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.summary = source["summary"];
+	        this.description = source["description"];
+	        this.priority = source["priority"];
+	        this.labels = source["labels"];
+	        this.assignee = source["assignee"];
+	        this.storyPoints = source["storyPoints"];
+	        this.parentKey = source["parentKey"];
+	    }
+	}
+	export class RowError {
+	    row: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RowError(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = source["row"];
+	        this.message = source["message"];
+	    }
+	}
+	export class Result {
+	    rows: number;
+	    created: string[];
+	    errors: RowError[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rows = source["rows"];
+	        this.created = source["created"];
+	        this.errors = this.convertValues(source["errors"], RowError);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace importfile {
+	
+	export class Preview {
+	    headers: string[];
+	    rowCount: number;
+	    sample: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Preview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.headers = source["headers"];
+	        this.rowCount = source["rowCount"];
+	        this.sample = source["sample"];
+	    }
 	}
 
 }

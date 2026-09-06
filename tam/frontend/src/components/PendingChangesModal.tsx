@@ -6,14 +6,11 @@ import { ISSUE_TYPES } from "../api";
 import { groupPending, useDiscardAll, useDiscardChange, usePendingChanges } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
 import { useSync } from "../contexts/SyncContext";
+import { plural } from "../lib/format";
 import { ConflictCard } from "./ConflictCard";
 
 interface Props {
   onClose: () => void;
-}
-
-function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
 }
 
 // summaryLine is the dialog's subtitle: "3 changes on 2 issues, 1 of them new".
@@ -31,10 +28,11 @@ export function bannerLine(r: CommitResult): string {
     const mapping = r.created.map((c) => `${c.tempKey} is now ${c.key}`).join(", ");
     parts.push(`${r.created.length} created (${mapping})`);
   }
+  if (r.linked.length) parts.push(plural(r.linked.length, "link pushed", "links pushed"));
   if (r.conflicts.length) parts.push(`${r.conflicts.length} held back`);
   if (r.failures.length) parts.push(`${r.failures.length} failed`);
   if (parts.length === 0) return "Last commit: nothing to push.";
-  if (!r.committed.length && !r.created.length) return `Last commit: nothing pushed, ${parts.join(", ")}.`;
+  if (!r.committed.length && !r.created.length && !r.linked.length) return `Last commit: nothing pushed, ${parts.join(", ")}.`;
   return `Last commit: ${parts.join(", ")}.`;
 }
 
@@ -128,6 +126,17 @@ export function PendingChangesModal({ onClose }: Props) {
                   </>
                 ) : (
                   <ul className="pending-rows">
+                    {g.links.map(({ row, link }) => (
+                      <li key={row.id} className="pending-row pending-row-link">
+                        <span className="muted pending-field">Link</span>{" "}
+                        <span className="b">{`${link.type} (${link.direction})`}</span>{" "}
+                        <span className="accent-text">{link.toKey}</span>{" "}
+                        <span>{link.toSummary}</span>{" "}
+                        <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Discard link to ${link.toKey}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}>
+                          Discard
+                        </button>
+                      </li>
+                    ))}
                     {g.edits.map((row) => (
                       <li key={row.id} className="pending-row">
                         <span className="muted pending-field">{fieldLabel(row.field)}</span>{" "}

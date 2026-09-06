@@ -159,7 +159,7 @@ func TestCreateDraftNumbersPerProfileAndEditsUpdateItsJSON(t *testing.T) {
 		t.Errorf("editing a draft rewrites its JSON instead of adding a row: %+v", pend)
 	}
 	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "x"}); err == nil {
-		t.Error("only task, story, and bug can be drafted in 1b")
+		t.Error("an epic draft must be refused")
 	}
 	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask}); err == nil {
 		t.Error("a draft needs a summary")
@@ -412,6 +412,59 @@ func TestMarkCommittedSetBaseVersionAndDiscardKey(t *testing.T) {
 	}
 	if seen["override"] != 1 || seen["commit"] != 1 || seen["discard"] != 1 {
 		t.Errorf("audit actions: %v", seen)
+	}
+}
+
+func TestCreateDraftsIsOneTransactionWithParentsAndANote(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedOne(t, repo, "p1")
+	drafts := []backend.IssueDraft{
+		{Type: backend.TypeTask, Summary: "First", ParentKey: "PLAT-1", Labels: []string{"a"}},
+		{Type: backend.TypeRequirement, Summary: "Second", Priority: "High"},
+		{Type: backend.TypeBug, Summary: "Third", StoryPoints: pts(2)},
+	}
+	keys, err := repo.CreateDrafts(ctx, "p1", "PLAT", drafts, "imported from backlog.xlsx")
+	if err != nil {
+		t.Fatalf("CreateDrafts: %v", err)
+	}
+	if strings.Join(keys, ",") != "TAM-NEW-1,TAM-NEW-2,TAM-NEW-3" {
+		t.Errorf("keys = %v", keys)
+	}
+	first, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-1")
+	if first.ParentKey != "PLAT-1" || !first.Draft || !first.Pending {
+		t.Errorf("first: %+v", first)
+	}
+	second, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-2")
+	if second.Type != backend.TypeRequirement || second.Priority != "High" {
+		t.Errorf("second: %+v", second)
+	}
+	act, _ := repo.ListActivity(ctx, "p1", "TAM-NEW-3", 0)
+	if len(act) != 1 || act[0].Action != "create" || act[0].Note != "imported from backlog.xlsx" {
+		t.Errorf("audit note: %+v", act)
+	}
+	pend, _ := repo.PendingForKey(ctx, "p1", "TAM-NEW-1")
+	var stored backend.IssueDraft
+	_ = json.Unmarshal([]byte(pend[0].AfterVal), &stored)
+	if stored.ParentKey != "PLAT-1" {
+		t.Errorf("create JSON keeps the parent: %s", pend[0].AfterVal)
+	}
+
+	// One bad draft fails the whole call and leaves nothing behind.
+	bad := []backend.IssueDraft{{Type: backend.TypeTask, Summary: "Ok"}, {Type: backend.TypeEpic, Summary: "Nope"}}
+	if _, err := repo.CreateDrafts(ctx, "p1", "PLAT", bad, ""); err == nil {
+		t.Fatal("an epic draft must be refused")
+	}
+	if _, err := repo.GetIssue(ctx, "p1", "TAM-NEW-4"); !errors.Is(err, issuerepo.ErrNotFound) {
+		t.Errorf("nothing from the failed batch: %v", err)
+	}
+	if _, err := repo.CreateDrafts(ctx, "p1", "PLAT", nil, ""); err == nil {
+		t.Error("an empty batch is refused")
+	}
+	// The single-draft path still works and now accepts requirements.
+	k, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeRequirement, Summary: "Req"})
+	if err != nil || k != "TAM-NEW-4" {
+		t.Errorf("CreateDraft requirement: %q %v", k, err)
 	}
 }
 

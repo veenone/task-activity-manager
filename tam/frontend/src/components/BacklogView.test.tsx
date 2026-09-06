@@ -22,6 +22,10 @@ vi.mock("../api", async () => {
     ListSprints: vi.fn(),
     GetIssueDetail: vi.fn(),
     ListLinkedTests: vi.fn(),
+    PreviewImport: vi.fn(),
+    AutoMapImport: vi.fn(),
+    ImportIssues: vi.fn(),
+    SaveImportTemplate: vi.fn(),
   };
 });
 
@@ -225,5 +229,12 @@ describe("BacklogView", () => {
     expect(within(rows[1]).getByText("Draft")).toBeInTheDocument();
     expect(within(rows[2]).getByLabelText("Pending changes")).toBeInTheDocument();
     expect(within(rows[3]).queryByLabelText("Pending changes")).not.toBeInTheDocument();
+  });
+
+  it("opens the Import issues dialog from the toolbar", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("button", { name: "Import" }));
+    expect(await screen.findByRole("dialog", { name: "Import issues (CSV or XLSX)" })).toBeInTheDocument();
   });
 });

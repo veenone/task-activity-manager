@@ -271,17 +271,312 @@
 }
 
 /* Menu defaults its trigger to this class, so the package carries it. */
+/* Bar-native button: blends into the dark topbar instead of a bright chip. */
 .topbar-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--surface);
+  background: #2a3850;
+  border: 1px solid #3a4a66;
+  border-radius: 5px;
+  padding: 5px 11px;
+  cursor: pointer;
+  color: #e8eaed;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.topbar-btn:hover:not(:disabled) {
+  background: #344563;
+  border-color: #4a5d80;
+}
+
+/* Application shell, mirrored from XTM's App.css */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+:root[data-theme="dark"] .app {
+  background: var(--surface-2);
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  row-gap: 8px;
+  padding: 8px 14px;
+  background: #1b2638;
+  color: #e8eaed;
+  flex-shrink: 0;
+  border-bottom: 1px solid #0f1722;
+  /* Wrap the zones onto a second row when the window is too narrow to hold
+     them side by side, instead of letting them shrink and overlap. */
+  flex-wrap: wrap;
+}
+/* Three balanced zones: equal-flex sides center the nav tabs between them.
+   Sizing on content (flex-basis: auto) — not 0 — so a zone keeps its intrinsic
+   width and wraps as a unit rather than collapsing under its contents. */
+.topbar-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar-left {
+  flex: 1 1 auto;
+}
+.topbar-right {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+.brand {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+.profile-select {
+  background: #2a3850;
+  color: #e8eaed;
+  border: 1px solid #3a4a66;
+  border-radius: 5px;
+  padding: 5px 8px;
+  max-width: 220px;
+  text-overflow: ellipsis;
+}
+/* Disabled while a sync is running: switching profiles mid-sync would race the
+   in-flight pull, so the dropdown is locked (with a tooltip) until it finishes. */
+.profile-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.demo-chip {
+  background: #f4b942;
+  color: #1b2638;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+/* Bottom status bar — sync progress / state lives here so the header isn't
+   crowded by the variable-width progress bar (FR-1). */
+.app-statusbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 14px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+.muted {
+  color: var(--text-muted);
+}
+
+/* Import and pending dialogs, mirrored from XTM's App.css */
+.pending-modal {
+  width: min(840px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+/* Modals built on .pending-modal cap at 80vh with a fixed header and footer, so
+   the body must scroll. Without this, tall content (e.g. the 13-field import
+   mapping, RND_P_4TFINT_05-308) overflows and pushes the action buttons off the
+   bottom of the screen, making the dialog unusable. */
+.pending-modal .bulk-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.bulk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.bulk-row span {
+  font-weight: 600;
+}
+.bulk-row select,
+.bulk-row input,
+.bulk-row textarea {
+  font-size: 13px;
+  color: var(--text);
+}
+.bulk-row select {
+  padding: 5px 8px;
   border: 1px solid var(--border-strong);
   border-radius: 4px;
-  padding: 5px 10px;
-  color: var(--text);
+  background: var(--surface);
+}
+.import-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.import-mapping {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+/* Each mapping field (label over select) fills its grid cell. */
+.import-mapping .bulk-row select {
+  width: 100%;
+}
+@media (max-width: 560px) {
+  .import-mapping {
+    grid-template-columns: 1fr;
+  }
+}
+.import-validation {
+  font-size: 13px;
+}
+.commit-fail-list {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-size: 12px;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-hover);
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:disabled {
+  color: #888;
+  cursor: default;
+}
+.ok-text {
+  color: #1e7e34;
+}
+.warn-text {
+  color: #a06000;
+}
+.mono {
+  font-family: "Consolas", "SF Mono", "Menlo", monospace;
+  font-size: 12px;
+}
+
+/* Profile management dialog, mirrored from XTM's App.css */
+.modal.profiles-modal {
+  width: min(820px, 92vw);
+  max-width: 820px;
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+}
+.profiles-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.profiles-modal-head h2 {
+  margin: 0;
+}
+.profiles-modal-head-text {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.profiles-modal-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.profiles-list-label {
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 650;
+  padding: 4px 4px 6px;
+}
+.profiles-list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 0 1 auto;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+.profiles-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 6px;
   cursor: pointer;
 }
-.topbar-btn:hover {
-  background: var(--row-hover);
+.profiles-list-row:hover {
+  background: var(--hover-bg, rgba(127, 127, 127, 0.12));
+}
+.profiles-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profiles-row-key {
+  font-size: 12px;
+}
+.profiles-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  color: var(--accent, #f5b301);
+}
+.profiles-badge-active {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ok-text);
+  border: 1px solid var(--ok-text);
+  background: color-mix(in srgb, var(--ok-text) 12%, transparent);
+  padding: 2px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.profiles-mode-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.profiles-mode-kicker {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.profiles-mode-kicker-new {
+  color: var(--accent);
+}
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  padding: 18px;
+  border-radius: 6px;
+  text-align: left;
 }

@@ -8,6 +8,7 @@ package demo
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"strings"
 	"time"
 
@@ -188,6 +189,32 @@ func Detail(projectKey, key string) (backend.IssueDetail, bool) {
 		}
 	}
 	return backend.IssueDetail{}, false
+}
+
+// ForeignIssues are the issues outside the project that the curated
+// details link to (the XT test keys), as minimal rows so a lookup for a
+// cross-project link has something to find offline.
+func ForeignIssues(projectKey string) []backend.Issue {
+	seen := map[string]bool{}
+	out := []backend.Issue{}
+	for _, d := range curatedDetails {
+		for _, l := range d.Links {
+			if strings.HasPrefix(l.Key, ProjectKey+"-") || seen[l.Key] {
+				continue
+			}
+			seen[l.Key] = true
+			project := l.Key
+			if i := strings.LastIndex(l.Key, "-"); i > 0 {
+				project = l.Key[:i]
+			}
+			out = append(out, backend.Issue{
+				Key: l.Key, ID: l.Key, Project: project, Type: "", Summary: l.Summary, Status: "Done",
+				Reporter: "PO", Labels: []string{}, Updated: base.Format(time.RFC3339),
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
+	return out
 }
 
 // rekey swaps the PLAT prefix for projectKey. Keys with another prefix (the

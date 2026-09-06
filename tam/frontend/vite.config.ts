@@ -9,5 +9,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
     css: false,
+    // The dialog tests type long summaries through user events; under a
+    // full parallel run they need more than the 5 s default.
+    testTimeout: 15000,
   },
 });

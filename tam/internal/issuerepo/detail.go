@@ -52,9 +52,24 @@ func (r *Repository) ReadDetail(ctx context.Context, profileID, key string) (bac
 	if err != nil {
 		return backend.IssueDetail{}, time.Time{}, false, err
 	}
+	pending, err := r.PendingLinks(ctx, profileID, key)
+	if err != nil {
+		return backend.IssueDetail{}, time.Time{}, false, err
+	}
+	links = append(links, pending...)
 	d.Key = key
 	d.Links = links
 	return d, at, true, nil
+}
+
+// ClearDetail drops the cached detail so the next panel open refetches it,
+// which is what a pushed link needs: Jira now has a link the cache lacks.
+func (r *Repository) ClearDetail(ctx context.Context, profileID, key string) error {
+	if _, err := r.db.ExecContext(ctx,
+		`UPDATE issue SET detail_json = NULL, detail_fetched_at = NULL WHERE profile_id = ? AND key = ?`, profileID, key); err != nil {
+		return fmt.Errorf("clear detail for %s: %w", key, err)
+	}
+	return nil
 }
 
 // WriteDetail caches d for key and replaces the issue's links, in one

@@ -13,6 +13,18 @@ interface Props {
 // so its commit and discard entries are told apart by entityType, checked
 // first, rather than by whether a field is set.
 export function describe(a: AuditEntry): string {
+  if (a.entityType === "link") {
+    const [type = "", direction = "", key = ""] = a.field.split("|");
+    const what = `${type} (${direction}) to ${key}`;
+    switch (a.action) {
+      case "link":
+        return `${a.actor} added a link: ${what}`;
+      case "commit":
+        return `${a.actor} pushed the link ${what}`;
+      case "discard":
+        return `${a.actor} discarded the link ${what}`;
+    }
+  }
   if (a.entityType === "issue_create") {
     switch (a.action) {
       case "commit":
