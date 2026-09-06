@@ -55,11 +55,7 @@ func (a *App) CreateIssue(profileID string, draft backend.IssueDraft) (string, e
 // GetCreateFields asks the backend which required fields the New issue
 // form must add for the type.
 func (a *App) GetCreateFields(profileID, typeName string) ([]backend.FieldSpec, error) {
-	p, err := a.requireProfile(profileID)
-	if err != nil {
-		return nil, err
-	}
-	b, err := a.backendFor(p)
+	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -132,11 +128,7 @@ func (a *App) CommitPendingChanges(profileID string) (committer.Result, error) {
 // ResolveConflictOverride rebases a held issue's edits so the next Commit
 // pushes them over Jira's values.
 func (a *App) ResolveConflictOverride(profileID, key, remoteVersion string) error {
-	p, err := a.requireProfile(profileID)
-	if err != nil {
-		return err
-	}
-	b, err := a.backendFor(p)
+	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
 		return err
 	}
@@ -145,11 +137,7 @@ func (a *App) ResolveConflictOverride(profileID, key, remoteVersion string) erro
 
 // ResolveConflictKeepRemote drops a held issue's edits and takes Jira's row.
 func (a *App) ResolveConflictKeepRemote(profileID, key string) error {
-	p, err := a.requireProfile(profileID)
-	if err != nil {
-		return err
-	}
-	b, err := a.backendFor(p)
+	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
 		return err
 	}
@@ -173,11 +161,7 @@ func (a *App) ListActivity(profileID, key string, limit int) ([]journal.AuditEnt
 
 // GetLinkTypes lists the link types the profile's Jira defines.
 func (a *App) GetLinkTypes(profileID string) ([]backend.LinkType, error) {
-	p, err := a.requireProfile(profileID)
-	if err != nil {
-		return nil, err
-	}
-	b, err := a.backendFor(p)
+	_, b, err := a.backendForProfile(profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -194,15 +178,11 @@ func (a *App) GetLinkTypes(profileID string) ([]backend.LinkType, error) {
 // LookupIssue reads one issue from Jira by key, any project, so the Add
 // link form can confirm a target and show its summary.
 func (a *App) LookupIssue(profileID, key string) (backend.Issue, error) {
-	p, err := a.requireProfile(profileID)
-	if err != nil {
-		return backend.Issue{}, err
-	}
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return backend.Issue{}, errors.New("issue key is empty")
 	}
-	b, err := a.backendFor(p)
+	_, b, err := a.backendForProfile(profileID)
 	if err != nil {
 		return backend.Issue{}, err
 	}

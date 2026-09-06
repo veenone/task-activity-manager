@@ -75,6 +75,20 @@ func (a *App) backendFor(p profile.Profile) (backend.IssueBackend, error) {
 	return b, nil
 }
 
+// backendForProfile resolves the profile and its backend in one step, the
+// pair every bound write method starts with.
+func (a *App) backendForProfile(profileID string) (profile.Profile, backend.IssueBackend, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return profile.Profile{}, nil, err
+	}
+	b, err := a.backendFor(p)
+	if err != nil {
+		return profile.Profile{}, nil, err
+	}
+	return p, b, nil
+}
+
 // forgetBackend drops a cached backend so the next call rebuilds it, which
 // is what changing the requirement type needs.
 func (a *App) forgetBackend(profileID string) {
