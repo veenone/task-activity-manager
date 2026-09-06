@@ -79,15 +79,36 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .startup-error h2 { font-size: 14px; margin-bottom: 8px; }
 
-.profiles-modal { width: min(520px, 92vw); }
-.profile-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.profile-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 4px; }
-.profile-row:hover { background: var(--row-hover); }
-.profile-name { font-weight: 600; flex: 1; }
-.profile-form { display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 12px; }
-.profile-form h3 { font-size: 13px; margin-bottom: 8px; }
+/* The row's star/name/key/Active badge/Delete sit on one line via the
+   shared .profiles-list-row; the URL hint and the requirement-type field
+   are TAM's own additions (XTM has no equivalent since those live in its
+   per-profile detail pane instead), so they stack below inside this
+   wrapper. */
+.profiles-row-item {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.profiles-row-item:last-child {
+  border-bottom: none;
+}
+.profiles-row-meta {
+  padding: 0 8px 8px;
+}
+/* Inside the modal, the modal already provides the padding and background,
+   so flatten ProfileForm's standalone card styling the same way XTM's own
+   .profiles-detail .profile-form does; TAM has no second column to divide
+   the list from the create form, so a border-top stands in for it. */
+.profiles-modal .profile-form {
+  padding: 0;
+  gap: 0;
+  background: none;
+  border-radius: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 4px;
+}
 .check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
-.form-error { color: var(--danger-text); margin-bottom: 8px; }
 .about-list { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 12px 0; }
 .about-list dt { color: var(--text-muted); }
 .topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -153,7 +174,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .link-group { margin-bottom: 12px; }
 .link-group-title { font-size: 12px; margin-bottom: 6px; }
 
-.profile-setting { display: inline-flex; flex-direction: column; gap: 2px; }
+.profile-setting { display: inline-flex; flex-direction: column; gap: 2px; padding: 0 8px 8px; }
 .profile-setting .detail-input-inline { width: 150px; }
 
 /* Plan 1b: pending changes */
