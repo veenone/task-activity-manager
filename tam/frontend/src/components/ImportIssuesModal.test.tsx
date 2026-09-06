@@ -70,20 +70,20 @@ describe("ImportIssuesModal", () => {
     const user = userEvent.setup();
     vi.mocked(api.ImportIssues).mockResolvedValue({ rows: 2, created: [], errors: [{ row: 3, message: "Summary is empty." }] });
     renderModal();
+    await screen.findByText("Import issues (CSV or XLSX)");
     await pickFile(user);
     const [b64, isXlsx] = vi.mocked(api.PreviewImport).mock.calls[0];
     expect(atob(b64)).toBe(csv);
     expect(isXlsx).toBe(false);
-    expect(await screen.findByText("3 columns, 2 rows")).toBeInTheDocument();
-    expect(screen.getByLabelText("Summary")).toHaveValue("Summary");
+    expect(await screen.findByText("backlog.csv (2 rows)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Summary *")).toHaveValue("Summary");
     expect(screen.getByLabelText("Story points")).toHaveValue("Points");
     expect(screen.getByLabelText("Assignee")).toHaveValue("");
-    expect(within(screen.getByLabelText("Summary")).getByText("Summary (e.g. Apply promo)")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Summary *")).getByText("Summary (e.g. Apply promo)")).toBeInTheDocument();
     await waitFor(() => expect(api.ImportIssues).toHaveBeenCalledWith("p1", b64, false, "backlog.csv", mapping, true));
-    expect(await screen.findByText("1 of 2 rows will become drafts; 1 will be skipped.")).toBeInTheDocument();
-    expect(screen.getByText("Row 3")).toBeInTheDocument();
-    expect(screen.getByText("Summary is empty.")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Import 1" })).toBeInTheDocument();
+    expect(await screen.findByText("1 valid row, 1 skipped.")).toBeInTheDocument();
+    expect(screen.getByText("row 3: Summary is empty.")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Import" })).toBeEnabled();
   });
 
   it("imports with the edited mapping and reports the drafts", async () => {
@@ -91,13 +91,13 @@ describe("ImportIssuesModal", () => {
     vi.mocked(api.ImportIssues).mockResolvedValue({ rows: 2, created: ["TAM-NEW-1"], errors: [{ row: 3, message: "Summary is empty." }] });
     const { onImported } = renderModal();
     await pickFile(user);
-    await screen.findByRole("button", { name: "Import 1" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import" })).toBeEnabled());
     await user.selectOptions(screen.getByLabelText("Priority"), "Points");
-    await user.click(screen.getByRole("button", { name: "Import 1" }));
+    await user.click(screen.getByRole("button", { name: "Import" }));
     await waitFor(() => expect(api.ImportIssues).toHaveBeenCalledWith("p1", expect.any(String), false, "backlog.csv", { ...mapping, priority: "Points" }, false));
-    expect(await screen.findByText("Imported 1 draft; 1 row was skipped.")).toBeInTheDocument();
+    expect(await screen.findByText("✓ Imported 1 draft as pending creates (1 skipped). Commit them from the Pending changes dialog.")).toBeInTheDocument();
     expect(onImported).toHaveBeenCalledWith(["TAM-NEW-1"]);
-    expect(screen.getByRole("button", { name: /Import/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 
   it("shows a parse error and offers the template", async () => {
@@ -110,7 +110,7 @@ describe("ImportIssuesModal", () => {
     expect(vi.mocked(api.PreviewImport).mock.calls[0][1]).toBe(true);
     await user.click(screen.getByRole("button", { name: "Download template" }));
     await waitFor(() => expect(api.SaveImportTemplate).toHaveBeenCalled());
-    expect(await screen.findByText("Template saved to C:/tam-import-template.csv")).toBeInTheDocument();
+    expect(await screen.findByText("C:/tam-import-template.csv")).toBeInTheDocument();
   });
 
   it("shows the preflight message and disables Import when no Summary column is mapped", async () => {
@@ -119,22 +119,23 @@ describe("ImportIssuesModal", () => {
     renderModal();
     await pickFile(user);
     expect(await screen.findByText("Map a Summary column first.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Import/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
     expect(api.ImportIssues).not.toHaveBeenCalled();
   });
 
-  it("shows the zero-drafts outcome as an alert when every row is skipped on import", async () => {
+  it("shows the zero-drafts outcome when every row is skipped on import", async () => {
     const user = userEvent.setup();
     vi.mocked(api.ImportIssues)
       .mockResolvedValueOnce({ rows: 1, created: [], errors: [] })
       .mockResolvedValueOnce({ rows: 1, created: [], errors: [{ row: 2, message: "Already a draft (TAM-NEW-1); commit or discard it first." }] });
     renderModal();
     await pickFile(user);
-    await user.click(await screen.findByRole("button", { name: "Import 1" }));
-    const banner = await screen.findByRole("alert");
-    expect(within(banner).getByText("Nothing was imported.")).toBeInTheDocument();
-    expect(within(banner).getByText("Every row was skipped. Fix the rows below and pick the file again.")).toBeInTheDocument();
-    expect(within(banner).getByText("Row 2")).toBeInTheDocument();
-    expect(within(banner).getByText("Already a draft (TAM-NEW-1); commit or discard it first.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("Nothing was imported.")).toBeInTheDocument();
+    expect(screen.getByText("row 2: Already a draft (TAM-NEW-1); commit or discard it first.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Validate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
 });

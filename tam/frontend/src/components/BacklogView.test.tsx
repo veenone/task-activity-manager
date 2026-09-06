@@ -235,6 +235,6 @@ describe("BacklogView", () => {
     const user = userEvent.setup();
     renderView();
     await user.click(await screen.findByRole("button", { name: "Import" }));
-    expect(await screen.findByRole("dialog", { name: "Import issues" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Import issues (CSV or XLSX)" })).toBeInTheDocument();
   });
 });

@@ -376,3 +376,95 @@
 .muted {
   color: var(--text-muted);
 }
+
+/* Import and pending dialogs, mirrored from XTM's App.css */
+.pending-modal {
+  width: min(840px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+/* Modals built on .pending-modal cap at 80vh with a fixed header and footer, so
+   the body must scroll. Without this, tall content (e.g. the 13-field import
+   mapping, RND_P_4TFINT_05-308) overflows and pushes the action buttons off the
+   bottom of the screen, making the dialog unusable. */
+.pending-modal .bulk-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.bulk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.bulk-row span {
+  font-weight: 600;
+}
+.bulk-row select,
+.bulk-row input,
+.bulk-row textarea {
+  font-size: 13px;
+  color: var(--text);
+}
+.bulk-row select {
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+}
+.import-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.import-mapping {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+/* Each mapping field (label over select) fills its grid cell. */
+.import-mapping .bulk-row select {
+  width: 100%;
+}
+@media (max-width: 560px) {
+  .import-mapping {
+    grid-template-columns: 1fr;
+  }
+}
+.import-validation {
+  font-size: 13px;
+}
+.commit-fail-list {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-size: 12px;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-hover);
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.link-btn:disabled {
+  color: #888;
+  cursor: default;
+}
+.ok-text {
+  color: #1e7e34;
+}
+.warn-text {
+  color: #a06000;
+}
+.mono {
+  font-family: "Consolas", "SF Mono", "Menlo", monospace;
+  font-size: 12px;
+}
