@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Modal, call, errMsg, useProfile } from "@agile-suite/core";
@@ -63,6 +63,11 @@ export function NewIssueModal({ onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false);
   const meta = useCreateFields(activeId, type);
   const specs = meta.data ?? [];
+  const summaryRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    summaryRef.current?.focus();
+  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -122,7 +127,7 @@ export function NewIssueModal({ onClose, onCreated }: Props) {
         </label>
         <label className="edit-row" htmlFor="new-summary">
           <span className="muted small">Summary</span>
-          <input id="new-summary" className="detail-input" type="text" value={summary} onChange={(e) => setSummary(e.target.value)} autoFocus />
+          <input id="new-summary" ref={summaryRef} className="detail-input" type="text" value={summary} onChange={(e) => setSummary(e.target.value)} />
         </label>
         <label className="edit-row" htmlFor="new-description">
           <span className="muted small">Description</span>

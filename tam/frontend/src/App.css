@@ -228,3 +228,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-new { margin-left: auto; }
 .new-issue-modal { width: min(640px, 92vw); max-height: 86vh; overflow: auto; }
 .meta-fields { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+
+/* Plan 1b: conflicts */
+.conflict-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.conflict-table th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
+.conflict-table td { padding: 4px 8px 4px 0; vertical-align: top; }
+.danger-text { color: #b42318; }

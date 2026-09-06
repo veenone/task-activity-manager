@@ -227,3 +227,7 @@ Commit is per issue; one failure or conflict never blocks the others, and the ro
 ### 13.9 Verification
 
 Go: `core/journal` against a temp file (insert, update, revert-drops-row, audit, list, discard, delete); `issuerepo` edit, draft, rekey, replace, pending keys, and the sync guards for drafts and pending rows; `committer` against a fake backend for the clean path, a conflict with both resolutions, a create with rekey, and a mid-run failure; the demo backend's writes and its staged conflict. The `core/journal` PR keeps XTM's suites green. Vitest covers the editable panel, the New issue dialog, the pending dialog, the conflict dialog, the Activity tab, and the reducer wiring. The demo profile runs the loop offline: edit, create, see the dot and the chip, commit, force a conflict, resolve it both ways.
+
+### 13.10 Implementation notes
+
+Recorded when plan 1b was written. `core/journal` exposes `Get`, `Delete`, `DeleteForKey`, and `SetBaseVersion` keyed by entity key rather than a `Discard`, because the revert of an entity's columns belongs to each app. `IssueBackend` grew a fourth method, `GetIssue`, for the version check and the row refresh, and `UpdateIssue` takes the journal's text values keyed by logical field so the backend owns Jira's shapes. Description edits live in the cached detail, since the row has no description column. The conflict cards render inside the Pending changes dialog, as the mockup shows, rather than in a separate dialog. The demo's staged conflict is the curated story rekeyed to the profile's project, held back once.

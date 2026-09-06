@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Modal, useConfirm, useProfile } from "@agile-suite/core";
+import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
 import { fieldLabel } from "../api";
 import type { CommitResult, IssueDraft, Profile, Settings } from "../api";
 import { ISSUE_TYPES } from "../api";
@@ -53,6 +53,7 @@ export function PendingChangesModal({ onClose }: Props) {
   const discardOne = useDiscardChange(activeId);
   const discardAll = useDiscardAll(activeId);
   const { confirm } = useConfirm();
+  const { notice } = useNotice();
   const { canCommit, runCommit, lastCommit, status } = useSync();
 
   const rows = pending.data ?? [];
@@ -61,6 +62,10 @@ export function PendingChangesModal({ onClose }: Props) {
   const pushable = groups.filter((g) => !conflictKeys.has(g.key)).length;
   const busy = status !== "idle" || discardOne.isPending || discardAll.isPending;
 
+  function onDiscardError(e: unknown) {
+    void notice({ title: "Discard failed", message: errMsg(e), tone: "error" });
+  }
+
   async function onDiscardAll() {
     const ok = await confirm({
       title: "Discard all pending changes?",
@@ -68,7 +73,7 @@ export function PendingChangesModal({ onClose }: Props) {
       confirmLabel: "Discard all",
       danger: true,
     });
-    if (ok) discardAll.mutate();
+    if (ok) discardAll.mutate(undefined, { onError: onDiscardError });
   }
 
   return (
@@ -111,7 +116,7 @@ export function PendingChangesModal({ onClose }: Props) {
                   {g.createRow && <span className="chip chip-draft">Draft</span>}
                   {g.draft && <span className="pending-card-summary">{g.draft.summary}</span>}
                   {g.createRow && (
-                    <button type="button" className="btn pending-discard" disabled={busy} aria-label={`Discard ${g.key}`} onClick={() => discardOne.mutate(g.createRow!)}>
+                    <button type="button" className="btn pending-discard" disabled={busy} aria-label={`Discard ${g.key}`} onClick={() => discardOne.mutate(g.createRow!, { onError: onDiscardError })}>
                       Discard
                     </button>
                   )}
@@ -129,7 +134,7 @@ export function PendingChangesModal({ onClose }: Props) {
                         <span>{row.beforeVal || "(none)"}</span>{" "}
                         <span className="muted">to</span>{" "}
                         <span className="b">{row.afterVal || "(none)"}</span>{" "}
-                        <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Discard ${row.field} on ${g.key}`} onClick={() => discardOne.mutate(row)}>
+                        <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Discard ${row.field} on ${g.key}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}>
                           Discard
                         </button>
                       </li>

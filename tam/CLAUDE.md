@@ -14,6 +14,26 @@ Plan 1a (issues, read path): sync by project into `tam.db`, the Backlog
 grid, and a read-only detail panel, on the demo dataset or a live Jira DC.
 Plan 1b adds the journal, create and edit, Commit, Excel import, and links.
 
+## The write path (plan 1b)
+
+Edits and creates go through the journal in `tam.db` (`pending_change` and
+`audit_log`, shared DDL and helpers in `core/journal`). `issuerepo.EditField`
+writes the row and journals the change with the row's `updated` as the base
+version; `CreateDraft` inserts a `TAM-NEW-n` row with status `Draft` and a
+create row holding the draft as JSON. Sync never deletes a draft and never
+overwrites a column with a pending edit. `internal/committer` pushes the
+journal: drafts first (POST, then rekey), then per-issue version checks and
+PUTs; an issue whose remote `updated` moved is held back with base, mine,
+and remote per field, and the user picks Override (rebase, push next time)
+or Keep remote (drop the edits, take Jira's row). Commit and sync exclude
+each other through `App.busy` and the shared reducer's `committing` state.
+
+The demo backend keeps writes in memory, hands out keys from 500, and
+stages one conflict: the first Commit of an edit to the curated story
+(`<project>-412`) is held back. Editable fields are summary, description,
+priority, labels, story points, and assignee; drafts can be tasks, stories,
+and bugs. Requirements, Excel import, and cross-project links are plan 1c.
+
 ## Layout
 
     main.go              Wails entry point, window, menu

@@ -131,4 +131,74 @@ describe("PendingChangesModal", () => {
     expect(within(dialog).getByText("TAM-NEW-1: Severity is required")).toBeInTheDocument();
     expect(within(dialog).getAllByRole("group")).toHaveLength(2);
   });
+
+  it("shows a held issue with base, mine, and remote and resolves it either way", async () => {
+    const user = userEvent.setup();
+    const conflictRows: PendingChange[] = [
+      { id: 5, entityType: "issue", entityKey: "PLAT-412", field: "storyPoints", beforeVal: "5", afterVal: "8", baseVersion: "v1", createdAt: "" },
+      { id: 4, entityType: "issue", entityKey: "PLAT-412", field: "labels", beforeVal: "checkout, promo", afterVal: "checkout, promo, q3", baseVersion: "v1", createdAt: "" },
+      ...rows,
+    ];
+    // The first read shows every row; every read after the commit shows only
+    // the held issue's rows, as the store would.
+    vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(conflictRows).mockResolvedValue(conflictRows.slice(0, 2));
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: ["PLAT-409"], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501" }],
+      conflicts: [{ key: "PLAT-412", summary: "Checkout: apply promo code at payment step", remoteVersion: "2026-09-06T11:00:00Z", fields: [
+        { field: "storyPoints", base: "5", mine: "8", remote: "13" },
+        { field: "labels", base: "checkout, promo", mine: "checkout, promo, q3", remote: "checkout, promo" },
+      ] }],
+      failures: [], remaining: 2,
+    });
+    vi.mocked(api.ResolveConflictOverride).mockResolvedValue();
+    vi.mocked(api.ResolveConflictKeepRemote).mockResolvedValue();
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
+    expect(await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501), 1 held back.")).toBeInTheDocument();
+    expect(within(dialog).getByText("PLAT-412 changed in Jira since you edited it. Resolve it below, then commit again.")).toBeInTheDocument();
+
+    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
+    expect(within(card).getByText("Conflict")).toBeInTheDocument();
+    const table = within(card).getByRole("table");
+    const bodyRows = within(table).getAllByRole("row").slice(1);
+    expect(bodyRows[0]).toHaveTextContent("Story points 5 8 13");
+    expect(bodyRows[1]).toHaveTextContent("Labels checkout, promo checkout, promo, q3 checkout, promo");
+    expect(within(dialog).getByRole("button", { name: "Commit (0)" })).toBeDisabled();
+
+    await user.click(within(card).getByRole("button", { name: "Override" }));
+    await waitFor(() => expect(api.ResolveConflictOverride).toHaveBeenCalledWith("p1", "PLAT-412", "2026-09-06T11:00:00Z"));
+    await waitFor(() => expect(within(dialog).queryByText("Conflict")).not.toBeInTheDocument());
+    expect(await within(dialog).findByRole("button", { name: "Commit (1)" })).toBeEnabled();
+  });
+
+  it("keep remote drops the edits", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 5, entityType: "issue", entityKey: "PLAT-412", field: "storyPoints", beforeVal: "5", afterVal: "8", baseVersion: "v1", createdAt: "" },
+    ]);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [],
+      conflicts: [{ key: "PLAT-412", summary: "Promo", remoteVersion: "v2", fields: [{ field: "storyPoints", base: "5", mine: "8", remote: "13" }] }],
+      failures: [], remaining: 1,
+    });
+    vi.mocked(api.ResolveConflictKeepRemote).mockResolvedValue();
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
+    await user.click(within(card).getByRole("button", { name: "Keep remote" }));
+    await waitFor(() => expect(api.ResolveConflictKeepRemote).toHaveBeenCalledWith("p1", "PLAT-412"));
+    expect(await within(dialog).findByText("Nothing pending. Edit an issue or create one and it shows up here.")).toBeInTheDocument();
+  });
+
+  it("shows a notice when discarding fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.DiscardPendingChange).mockRejectedValue(new Error("row is gone"));
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Discard priority on PLAT-409" }));
+    expect(await screen.findByText(/row is gone/)).toBeInTheDocument();
+  });
 });

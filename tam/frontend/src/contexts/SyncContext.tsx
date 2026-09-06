@@ -38,6 +38,10 @@ interface SyncApi {
   // lastCommit is the most recent result for the active profile, for the
   // Pending changes dialog's banner. It clears when the profile changes.
   lastCommit: CommitResult | null;
+  // dismissConflict drops one held issue from lastCommit once it has been
+  // resolved, so the dialog shows it as an ordinary group (override) or
+  // not at all (keep remote).
+  dismissConflict: (key: string) => void;
 }
 
 const SyncContext = createContext<SyncApi | null>(null);
@@ -113,6 +117,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [activeId, qc, notice]);
 
+  const dismissConflict = useCallback((key: string) => {
+    setLastCommit((cur) => (cur ? { ...cur, conflicts: cur.conflicts.filter((c) => c.key !== key) } : cur));
+  }, []);
+
   const api = useMemo<SyncApi>(
     () => ({
       status: state.status,
@@ -124,8 +132,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       runSync,
       runCommit,
       lastCommit,
+      dismissConflict,
     }),
-    [state, activeId, runSync, runCommit, lastCommit],
+    [state, activeId, runSync, runCommit, lastCommit, dismissConflict],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;
