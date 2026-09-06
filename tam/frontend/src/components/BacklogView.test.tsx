@@ -7,6 +7,7 @@ import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "
 import * as api from "../api";
 import type { Issue } from "../api";
 import { profileBackend } from "../profileBackend";
+import { ModalProvider } from "../modals";
 import { BacklogView } from "./BacklogView";
 
 vi.mock("../api", async () => {
@@ -56,9 +57,11 @@ function renderView() {
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <Loader />
-          <Switcher />
-          <BacklogView />
+          <ModalProvider>
+            <Loader />
+            <Switcher />
+            <BacklogView />
+          </ModalProvider>
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
@@ -121,6 +124,7 @@ describe("BacklogView", () => {
     expect(within(row).getByText("5")).toBeInTheDocument();
     expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument();
     expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25 });
+    expect(screen.getByRole("button", { name: "+ New" })).toBeInTheDocument();
   });
 
   it("filters by text, type chips, and sprint", async () => {

@@ -85,7 +85,7 @@ func TestFullSyncClearKeepsDraftRows(t *testing.T) {
 	for _, iss := range page.Issues {
 		keys = append(keys, iss.Key)
 	}
-	if len(keys) != 2 || keys[0] != "PLAT-2" || keys[1] != "TAM-NEW-1" {
+	if len(keys) != 2 || keys[0] != "TAM-NEW-1" || keys[1] != "PLAT-2" {
 		t.Errorf("after a full clear the draft survives and PLAT-1 goes: %v", keys)
 	}
 }

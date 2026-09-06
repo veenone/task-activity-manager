@@ -126,7 +126,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-search { width: 300px; }
 .filter-sprint { width: 140px; }
-.filter-note { margin-left: auto; }
 .type-filter { display: flex; gap: 6px; }
 .chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; }
 .chip-type-task { background: #dbeafe; color: #1e40af; }
@@ -224,3 +223,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .activity-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .activity-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; }
 .activity-row .small:last-child { grid-column: 2; }
+
+/* Plan 1b: new issue */
+.filter-new { margin-left: auto; }
+.new-issue-modal { width: min(640px, 92vw); max-height: 86vh; overflow: auto; }
+.meta-fields { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }

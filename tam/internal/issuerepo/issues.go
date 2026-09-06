@@ -81,8 +81,8 @@ func (r *Repository) UpsertPage(ctx context.Context, profileID string, page []ba
 	return tx.Commit()
 }
 
-// ListIssues returns one page matching q, ordered by rank with unranked rows
-// last, then by key.
+// ListIssues returns one page matching q, drafts first, then by rank with
+// unranked rows last, then by key.
 func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQuery) (IssuePage, error) {
 	where, args := issueFilter(profileID, q)
 	var total int
@@ -102,7 +102,7 @@ func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQu
 	}
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+issueColumns+` FROM issue WHERE `+where+
-			` ORDER BY CASE WHEN rank = '' THEN 1 ELSE 0 END, rank, key LIMIT ? OFFSET ?`,
+			` ORDER BY CASE WHEN key LIKE '`+DraftPrefix+`%' THEN 0 WHEN rank = '' THEN 2 ELSE 1 END, rank, key LIMIT ? OFFSET ?`,
 		append(args, limit, offset)...)
 	if err != nil {
 		return IssuePage{}, fmt.Errorf("list issues: %w", err)
