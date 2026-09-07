@@ -145,7 +145,7 @@ describe("App shell", () => {
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
   });
 
-  it("shows the Commit chip with the pending count and opens the dialog", async () => {
+  it("shows the pending button beside Sync and opens the dialog", async () => {
     const user = userEvent.setup();
     vi.mocked(api.ListPendingChanges).mockResolvedValue([
       { id: 1, entityType: "issue", entityKey: "PLAT-409", field: "priority", beforeVal: "Medium", afterVal: "High", baseVersion: "v1", createdAt: "" },
@@ -153,7 +153,7 @@ describe("App shell", () => {
       { id: 3, entityType: "issue_create", entityKey: "TAM-NEW-1", field: "create", beforeVal: "", afterVal: '{"type":"task","summary":"x","description":"","priority":"","labels":[],"assignee":"","storyPoints":null,"extra":{}}', baseVersion: "", createdAt: "" },
     ]);
     renderApp();
-    const chip = await screen.findByRole("button", { name: "3 pending changes: Commit" });
+    const chip = await screen.findByRole("button", { name: "3 pending" });
     await user.click(chip);
     expect(await screen.findByRole("dialog", { name: "Pending changes" })).toBeInTheDocument();
   });

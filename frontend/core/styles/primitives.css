@@ -272,6 +272,29 @@
 
 /* Menu defaults its trigger to this class, so the package carries it. */
 /* Bar-native button: blends into the dark topbar instead of a bright chip. */
+/* Uncommitted-change button, mirrored from XTM's App.css. It sits at the
+   left of the top bar's right zone, before the primary action. */
+.btn-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(244, 185, 66, 0.14);
+  border: 1px solid #f4b942;
+  color: #f4b942;
+  border-radius: 5px;
+  padding: 5px 11px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.btn-pending:hover:not(:disabled) {
+  background: rgba(244, 185, 66, 0.24);
+}
+.btn-pending .pending-dot {
+  background: #f4b942;
+}
+
 .topbar-btn {
   display: inline-flex;
   align-items: center;
