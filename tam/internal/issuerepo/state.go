@@ -97,7 +97,7 @@ func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
 	}
 	defer tx.Rollback()
 
-	for _, table := range []string{"issue_link", "issue", "sync_state", "profile_setting"} {
+	for _, table := range []string{"issue_link", "issue", "sync_state", "profile_setting", "jira_user"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
 			return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
 		}

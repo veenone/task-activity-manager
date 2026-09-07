@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, vi, afterAll, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -78,28 +78,6 @@ function renderView() {
   );
 }
 
-// jsdom does no layout, so every element reports offsetHeight 0. The row
-// virtualiser reads that as an empty viewport and mounts no rows at all, so
-// the scroll container is given the height a real window would give it.
-const realOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetHeight");
-
-beforeAll(() => {
-  Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
-    configurable: true,
-    get(this: HTMLElement) {
-      return this.classList.contains("issue-body") ? 600 : 0;
-    },
-  });
-});
-
-afterAll(() => {
-  if (realOffsetHeight) {
-    Object.defineProperty(HTMLElement.prototype, "offsetHeight", realOffsetHeight);
-  } else {
-    delete (HTMLElement.prototype as { offsetHeight?: number }).offsetHeight;
-  }
-});
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.ListProfiles).mockResolvedValue([
@@ -119,22 +97,25 @@ const lastQuery = () => vi.mocked(api.ListIssues).mock.calls.at(-1)?.[1];
 // The pager formats its counts for the machine's locale, so the expectation
 // has to group its thousands the same way rather than hard-coding a comma.
 const showing = (first: number, last: number, total: number) =>
-  `Showing ${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()}`;
+  `${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()}`;
 
 describe("BacklogView", () => {
   it("renders the page with the seven columns and the count", async () => {
     renderView();
     await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
-    const header = screen.getByRole("row", { name: /key type summary status assignee sprint pts/i });
-    expect(header).toBeInTheDocument();
+    // Every column header is a button now, so the columns are named by the
+    // controls that sort them rather than by an aria-label on the row.
+    for (const label of ["Key", "Type", "Summary", "Status", "Assignee", "Sprint", "Pts"]) {
+      expect(screen.getByRole("columnheader", { name: new RegExp(label) })).toBeInTheDocument();
+    }
     const row = screen.getByRole("row", { name: /PLAT-412/ });
     expect(within(row).getByText("Story")).toBeInTheDocument();
     expect(within(row).getByText("In Progress")).toBeInTheDocument();
     expect(within(row).getByText("R. Anand")).toBeInTheDocument();
-    expect(within(row).getByText("12")).toBeInTheDocument();
+    expect(within(row).getByText("Sprint 12")).toBeInTheDocument();
     expect(within(row).getByText("5")).toBeInTheDocument();
     expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument();
-    expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25 });
+    expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false });
     expect(screen.getByRole("button", { name: "+ New" })).toBeInTheDocument();
   });
 
@@ -201,11 +182,106 @@ describe("BacklogView", () => {
       expect(vi.mocked(api.ListIssues).mock.calls.some((c) => c[0] === "p2")).toBe(true),
     );
     const firstForP2 = vi.mocked(api.ListIssues).mock.calls.find((c) => c[0] === "p2");
-    expect(firstForP2?.[1]).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25 });
+    expect(firstForP2?.[1]).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false });
     // No query for the new profile may carry the old profile's filters.
     for (const c of vi.mocked(api.ListIssues).mock.calls) {
       if (c[0] === "p2") expect(c[1].text).toBe("");
     }
+  });
+
+  it("sorts a column ascending, then descending, then back to rank order", async () => {
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
+    // The default order is the store's, and the grid says so out loud.
+    expect(screen.getByText(/In Jira rank order/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /Key/ })).toHaveAttribute("aria-sort", "none");
+
+    await userEvent.click(screen.getByRole("button", { name: "Sort by Key" }));
+    await waitFor(() => expect(lastQuery()?.sort).toBe("key"));
+    expect(lastQuery()?.desc).toBe(false);
+    expect(lastQuery()?.offset).toBe(0);
+    expect(screen.getByRole("columnheader", { name: /Key/ })).toHaveAttribute("aria-sort", "ascending");
+
+    await userEvent.click(screen.getByRole("button", { name: "Sort by Key" }));
+    await waitFor(() => expect(lastQuery()?.desc).toBe(true));
+    expect(screen.getByRole("columnheader", { name: /Key/ })).toHaveAttribute("aria-sort", "descending");
+
+    // The third click returns to the default order, whose query key was
+    // already fetched on mount, so TanStack serves it from cache and no new
+    // ListIssues call is made. The rendered state is the evidence here.
+    await userEvent.click(screen.getByRole("button", { name: "Sort by Key" }));
+    await waitFor(() =>
+      expect(screen.getByRole("columnheader", { name: /Key/ })).toHaveAttribute("aria-sort", "none"),
+    );
+    expect(screen.getByText(/In Jira rank order/)).toBeInTheDocument();
+  });
+
+  it("starts a numeric column at its largest value", async () => {
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Sort by Pts" }));
+    await waitFor(() => expect(lastQuery()?.sort).toBe("storyPoints"));
+    expect(lastQuery()?.desc).toBe(true);
+  });
+
+  it("returns to rank order when the profile changes", async () => {
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Sort by Key" }));
+    await waitFor(() => expect(lastQuery()?.sort).toBe("key"));
+    await userEvent.click(screen.getByRole("button", { name: "Switch profile" }));
+    await waitFor(() =>
+      expect(vi.mocked(api.ListIssues).mock.calls.some((c) => c[0] === "p2")).toBe(true),
+    );
+    for (const c of vi.mocked(api.ListIssues).mock.calls) {
+      if (c[0] === "p2") expect(c[1].sort).toBe("");
+    }
+  });
+
+  it("jumps to the first and last page and takes a typed page number", async () => {
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
+    // 1,248 issues at 25 a page is 50 pages.
+    expect(screen.getByRole("spinbutton", { name: "Page" })).toHaveValue(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Last page" }));
+    await waitFor(() => expect(lastQuery()?.offset).toBe(49 * 25));
+    expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+    expect(screen.getByText(showing(1226, 1248, 1248))).toBeInTheDocument();
+
+    // Page one's query key was already fetched on mount, so TanStack serves
+    // it from cache and makes no new call. The rendered state is the evidence.
+    await userEvent.click(screen.getByRole("button", { name: "First page" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled(),
+    );
+    expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument();
+
+    // Clearing the box leaves it empty rather than snapping back to 1, so a
+    // two-digit page can be typed over it without becoming "123".
+    const pageInput = screen.getByRole("spinbutton", { name: "Page" });
+    await userEvent.clear(pageInput);
+    await userEvent.type(pageInput, "23");
+    await waitFor(() => expect(lastQuery()?.offset).toBe(22 * 25));
+    expect(pageInput).toHaveValue(23);
+
+    // A page past the end is a half-typed number, not a jump to the last page.
+    await userEvent.clear(pageInput);
+    await userEvent.type(pageInput, "9");
+    expect(lastQuery()?.offset).toBe(8 * 25);
+  });
+
+  it("changes the page size and returns to the first page", async () => {
+    renderView();
+    await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await waitFor(() => expect(lastQuery()?.offset).toBe(25));
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Rows per page" }), "100");
+    await waitFor(() => expect(lastQuery()?.limit).toBe(100));
+    expect(lastQuery()?.offset).toBe(0);
+    // 1,248 at 100 a page is 13 pages, not 50.
+    expect(screen.getByText("of 13")).toBeInTheDocument();
   });
 
   it("explains an empty cache", async () => {

@@ -331,3 +331,18 @@ func TestFullSyncFailingOnItsFirstPageKeepsThePreviousRows(t *testing.T) {
 		t.Errorf("last error = %q", after.LastError)
 	}
 }
+
+// The two lookups the forms use; neither sync nor commit calls them.
+func (f *fake) SearchUsers(context.Context, string, string) ([]backend.User, error) {
+	return nil, nil
+}
+func (f *fake) Priorities(context.Context) ([]string, error) { return nil, nil }
+
+func (c *cancelOnSearch) SearchUsers(context.Context, string, string) ([]backend.User, error) {
+	return nil, nil
+}
+func (c *cancelOnSearch) Priorities(context.Context) ([]string, error) { return nil, nil }
+
+func (f *fake) SubtaskTypeName(context.Context, string) (string, error) { return "Technical task", nil }
+
+func (c *cancelOnSearch) SubtaskTypeName(context.Context, string) (string, error) { return "", nil }

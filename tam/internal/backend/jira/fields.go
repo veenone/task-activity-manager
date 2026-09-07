@@ -39,9 +39,12 @@ func (f fieldIDs) list() []string {
 	return out
 }
 
-// logicalType maps a Jira issue type name to one of the five TAM types, or
-// "" when it is none of them.
-func logicalType(name, requirementType string) string {
+// logicalType maps a Jira issue type name to one of TAM's types, or "" when
+// it is none of them. subtaskType is the project's own name for its sub-task
+// level, discovered rather than assumed: the default is "Sub-task", but an
+// instance may call it anything, and one seen in the field calls it
+// "Technical task".
+func logicalType(name, requirementType string, pt projectTypes) string {
 	n := strings.ToLower(strings.TrimSpace(name))
 	switch n {
 	case "task":
@@ -53,19 +56,41 @@ func logicalType(name, requirementType string) string {
 	case "bug":
 		return backend.TypeBug
 	}
+	// A built-in name above keeps its meaning, so an instance that reuses one
+	// for a level of its own does not shadow it here.
+	if n != "" && n == strings.ToLower(strings.TrimSpace(pt.subtask)) {
+		return backend.TypeSubtask
+	}
+	// The project's own word for the task level, "Todo" on an instance seen
+	// in the field. "Task" is already handled above, so this is what makes a
+	// renamed task level read as one.
+	if n != "" && n == strings.ToLower(strings.TrimSpace(pt.task)) {
+		return backend.TypeTask
+	}
 	if n != "" && n == strings.ToLower(strings.TrimSpace(requirementType)) {
 		return backend.TypeRequirement
 	}
 	return ""
 }
 
-// jiraTypeNames turns logical types into the Jira names the JQL quotes.
-func jiraTypeNames(types []string, requirementType string) []string {
+// jiraTypeNames turns logical types into the Jira names the JQL quotes. A
+// name the project does not define is dropped rather than quoted: Jira
+// rejects the whole query when an issuetype in it does not exist, so asking
+// for sub-tasks on a project without them would fail the sync instead of
+// returning nothing.
+func jiraTypeNames(types []string, requirementType string, pt projectTypes) []string {
 	names := make([]string, 0, len(types))
 	for _, t := range types {
 		switch t {
 		case backend.TypeTask:
-			names = append(names, "Task")
+			// The project's own name for the level, so an instance that calls
+			// it "Todo" is asked for the type it actually has. The default
+			// only stands in when the project could not be read.
+			if pt.task != "" {
+				names = append(names, pt.task)
+			} else {
+				names = append(names, "Task")
+			}
 		case backend.TypeEpic:
 			names = append(names, "Epic")
 		case backend.TypeStory:
@@ -74,6 +99,10 @@ func jiraTypeNames(types []string, requirementType string) []string {
 			names = append(names, "Bug")
 		case backend.TypeRequirement:
 			names = append(names, requirementType)
+		case backend.TypeSubtask:
+			if strings.TrimSpace(pt.subtask) != "" {
+				names = append(names, pt.subtask)
+			}
 		}
 	}
 	return names
@@ -125,7 +154,7 @@ type keyed struct {
 }
 
 // parseIssue maps one raw search hit onto the grid row.
-func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string) backend.Issue {
+func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt projectTypes) backend.Issue {
 	iss := backend.Issue{Key: raw.Key, ID: raw.ID, Labels: []string{}}
 	f := raw.Fields
 	_ = json.Unmarshal(f["summary"], &iss.Summary)
@@ -143,7 +172,7 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string) bac
 		iss.Priority = priority.Name
 	}
 	if err := json.Unmarshal(f["issuetype"], &issueType); err == nil {
-		iss.Type = logicalType(issueType.Name, requirementType)
+		iss.Type = logicalType(issueType.Name, requirementType, pt)
 	}
 	var assignee, reporter *userRef
 	if err := json.Unmarshal(f["assignee"], &assignee); err == nil && assignee != nil {

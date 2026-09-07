@@ -37,8 +37,40 @@ func TestSchemaVersionThreeAddsTheJournalTablesToAnOlderDatabase(t *testing.T) {
 			t.Errorf("table %s after upgrade: %v", table, err)
 		}
 	}
-	if v, _ := store.ReadSchemaVersion(db.DB()); v != 3 {
-		t.Errorf("schema version = %d, want 3", v)
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}
+
+// The user cache arrives the same idempotent way the journal tables did: an
+// older database picks it up when it is next opened.
+func TestSchemaVersionFourAddsTheUserCacheToAnOlderDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE jira_user`,
+		`UPDATE meta SET value = '3' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var name string
+	if err := db.DB().QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'jira_user'`).Scan(&name); err != nil {
+		t.Errorf("jira_user after upgrade: %v", err)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != 4 {
+		t.Errorf("schema version = %d, want 4", v)
 	}
 }
 

@@ -8,6 +8,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useModal } from "../modals";
 import { NewIssueModal } from "./NewIssueModal";
 import { useDebounced } from "../lib/useDebounced";
+import { useSubtaskType } from "../queries/people";
 
 const SEARCH_DELAY_MS = 250;
 
@@ -26,7 +27,7 @@ function findIssue(tree: EpicTreeData, key: string): Issue | undefined {
 // EpicsView is the epic to story to task tree: a toolbar over EpicTree, with
 // the same detail panel the Backlog uses for whichever issue is selected.
 export function EpicsView() {
-  const { activeId } = useProfile<Profile, Settings>();
+  const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const [text, setText] = useState("");
   const [sprintId, setSprintId] = useState("");
   const [showDone, setShowDone] = useState(false);
@@ -59,6 +60,7 @@ export function EpicsView() {
   const query = useMemo<TreeQuery>(() => ({ text: search, sprintId, showDone }), [search, sprintId, showDone]);
   const tree = useEpicTree(activeId, query);
   const sprints = useSprints(activeId);
+  const subtaskType = useSubtaskType(activeId);
   const { isOpen, openModal, closeModal } = useModal();
 
   useEffect(() => {
@@ -84,7 +86,7 @@ export function EpicsView() {
   const empty = epicCount === 0 && orphanCount === 0;
 
   return (
-    <section className="backlog" aria-labelledby="view-title">
+    <section className="backlog" aria-label="Epics">
       <div className="filter-bar">
         <input
           type="search"
@@ -126,8 +128,11 @@ export function EpicsView() {
         </button>
       </div>
 
-      <p className="muted epics-summary">{`${epicCount} epics, ${issueCount} issues, ${orphanCount} without an epic`}</p>
-      {tree.data?.truncated && <p className="muted small">Showing the first 5,000 issues. Narrow the filter.</p>}
+      <p className="muted epics-summary">
+        {`${epicCount} epics, ${issueCount} issues, ${orphanCount} without an epic`}
+        {tree.isFetching && !tree.isLoading && <span className="epics-refreshing"> · refreshing</span>}
+      </p>
+      {tree.data?.truncated && <p className="muted small epics-note">Showing the first 5,000 issues. Narrow the filter.</p>}
 
       <div className="epics-body">
         <div className="epics-tree-pane">
@@ -141,10 +146,10 @@ export function EpicsView() {
             </p>
           ) : (
             <>
-              {tree.isFetching && !tree.isLoading && <p className="muted small">Refreshing</p>}
               {tree.data && (
                 <EpicTree
                   tree={tree.data}
+                  subtaskLabel={subtaskType.data}
                   selectedKey={selectedKey}
                   onSelect={setSelectedKey}
                   expanded={expanded}
@@ -156,7 +161,7 @@ export function EpicsView() {
           )}
         </div>
         {selected && (
-          <IssueDetailPanel key={selected.key} profileId={activeId} issue={selected} onClose={() => setSelectedKey("")} />
+          <IssueDetailPanel key={selected.key} profileId={activeId} issue={selected} jiraUrl={activeProfile?.jiraUrl} onClose={() => setSelectedKey("")} />
         )}
       </div>
 
@@ -164,6 +169,9 @@ export function EpicsView() {
         <NewIssueModal
           onClose={closeModal}
           initialType="epic"
+          // The button says "+ New epic", so the dialog creates an epic and
+          // does not re-ask. Anything else is drafted from the Backlog.
+          lockType
           onCreated={(key) => {
             setSelectedKey(key);
             setExpanded((prev) => new Set(prev).add(key));

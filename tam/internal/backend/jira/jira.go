@@ -27,7 +27,27 @@ type Backend struct {
 
 	linkTypes       []backend.LinkType
 	linkTypesLoaded bool
+
+	// projectTypeCache holds each project's resolved level names. Both are
+	// read from the project rather than assumed, because the instance names
+	// them: the sub-task level defaults to "Sub-task" but one seen in the
+	// field calls it "Technical task", and the plain task level defaults to
+	// "Task" but the same instance calls it "Todo". Cached so a sync's every
+	// page does not re-read the project.
+	projectTypeCache map[string]projectTypes
 }
+
+// projectTypes are the Jira names one project gives the two levels TAM cannot
+// assume. Either is "" when the project defines no such type.
+type projectTypes struct {
+	task    string
+	subtask string
+}
+
+// taskAliases are the names an instance gives the plain task level, in the
+// order they are preferred. "Task" is Jira's default; "Todo" is what an
+// instance seen in the field calls it.
+var taskAliases = []string{"task", "todo", "to do"}
 
 // New builds the backend. requirementType is the profile's Jira name for
 // requirements; empty means DefaultRequirementType.
@@ -35,7 +55,11 @@ func New(c *corejira.Client, requirementType string) *Backend {
 	if strings.TrimSpace(requirementType) == "" {
 		requirementType = DefaultRequirementType
 	}
-	return &Backend{c: c, requirementType: strings.TrimSpace(requirementType)}
+	return &Backend{
+		c:                c,
+		requirementType:  strings.TrimSpace(requirementType),
+		projectTypeCache: map[string]projectTypes{},
+	}
 }
 
 // TestConnection fetches the authenticated user.
@@ -93,7 +117,8 @@ func (b *Backend) discover(ctx context.Context) fieldIDs {
 // SearchIssuesPage runs one page of the scope JQL and maps the rows.
 func (b *Backend) SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, since string, types []string, startAt, maxResults int) ([]backend.Issue, int, error) {
 	ids := b.discover(ctx)
-	jql := buildJQL(projectKey, scopeJQL, since, jiraTypeNames(types, b.requirementType))
+	pt := b.typesOrEmpty(ctx, projectKey)
+	jql := buildJQL(projectKey, scopeJQL, since, jiraTypeNames(types, b.requirementType, pt))
 	fields := append(append([]string{}, baseFields...), ids.list()...)
 	page, err := b.c.SearchIssues(ctx, jql, fields, startAt, maxResults)
 	if err != nil {
@@ -101,7 +126,7 @@ func (b *Backend) SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, si
 	}
 	issues := make([]backend.Issue, 0, len(page.Issues))
 	for _, raw := range page.Issues {
-		issues = append(issues, parseIssue(raw, ids, b.requirementType))
+		issues = append(issues, parseIssue(raw, ids, b.requirementType, pt))
 	}
 	return issues, page.Total, nil
 }
@@ -129,6 +154,67 @@ func (b *Backend) GetIssueDetail(ctx context.Context, key string) (backend.Issue
 }
 
 // IssueTypes lists the project's issue types.
+// resolveTypes reads a project's issue types once and works out what it calls
+// the two levels TAM cannot assume. A project usually defines exactly one
+// sub-task type; when it defines several the first Jira lists is used, which
+// is the order the project's own create dialog offers them in.
+func (b *Backend) resolveTypes(ctx context.Context, projectKey string) (projectTypes, error) {
+	b.mu.Lock()
+	if pt, ok := b.projectTypeCache[projectKey]; ok {
+		b.mu.Unlock()
+		return pt, nil
+	}
+	b.mu.Unlock()
+
+	types, err := b.c.IssueTypes(ctx, projectKey)
+	if err != nil {
+		return projectTypes{}, err
+	}
+	var pt projectTypes
+	bestTask := len(taskAliases) // lower is a better match
+	for _, t := range types {
+		if t.Subtask {
+			if pt.subtask == "" {
+				pt.subtask = t.Name
+			}
+			continue
+		}
+		n := strings.ToLower(strings.TrimSpace(t.Name))
+		for i, alias := range taskAliases {
+			if n == alias && i < bestTask {
+				pt.task, bestTask = t.Name, i
+			}
+		}
+	}
+	b.mu.Lock()
+	b.projectTypeCache[projectKey] = pt
+	b.mu.Unlock()
+	if pt.subtask == "" {
+		log.Printf("tam: %s has no sub-task type in %s; sub-tasks are unavailable there", b.c.BaseURL(), projectKey)
+	}
+	if pt.task == "" {
+		log.Printf("tam: %s has no task-level type in %s; the Task filter stays empty there", b.c.BaseURL(), projectKey)
+	}
+	return pt, nil
+}
+
+// SubtaskTypeName is the project's sub-task type name, "" when it has none.
+func (b *Backend) SubtaskTypeName(ctx context.Context, projectKey string) (string, error) {
+	pt, err := b.resolveTypes(ctx, projectKey)
+	return pt.subtask, err
+}
+
+// typesOrEmpty is resolveTypes with the error swallowed, for the paths that
+// only need to recognise a type and must not fail because the project lookup
+// did.
+func (b *Backend) typesOrEmpty(ctx context.Context, projectKey string) projectTypes {
+	pt, err := b.resolveTypes(ctx, projectKey)
+	if err != nil {
+		log.Printf("tam: resolve the issue types for %s: %v", projectKey, err)
+	}
+	return pt
+}
+
 func (b *Backend) IssueTypes(ctx context.Context, projectKey string) ([]backend.IssueType, error) {
 	types, err := b.c.IssueTypes(ctx, projectKey)
 	if err != nil {

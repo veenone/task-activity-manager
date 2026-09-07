@@ -115,16 +115,29 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (val
 // validateParent enforces the two-level hierarchy: an epic takes no parent,
 // and a parent must be an epic in the profile's cache and not the issue
 // itself. An empty value takes the issue out of its epic.
+// validateParent checks a parent for the issue's own level. The parent field
+// means two different things: for a sub-task it is Jira's own parent, which
+// is any ordinary issue, and for everything else it is the Epic Link, which
+// must be an epic. A sub-task without one is not a sub-task, so its parent is
+// also the one that cannot be blank.
 func validateParent(ctx context.Context, q execer, profileID, key, ownType, value string) error {
 	value = strings.TrimSpace(value)
+	sub := ownType == backend.TypeSubtask
 	if ownType == backend.TypeEpic && value != "" {
 		return errors.New("an epic cannot be placed under another epic")
 	}
 	if value == "" {
+		if sub {
+			return errors.New("a sub-task needs a parent issue")
+		}
 		return nil
 	}
+	noun := "epic"
+	if sub {
+		noun = "parent"
+	}
 	if strings.EqualFold(value, key) {
-		return errors.New("an issue cannot be its own epic")
+		return fmt.Errorf("an issue cannot be its own %s", noun)
 	}
 	var typ string
 	err := q.QueryRowContext(ctx, `SELECT type FROM issue WHERE profile_id = ? AND key = ?`, profileID, value).Scan(&typ)
@@ -132,7 +145,18 @@ func validateParent(ctx context.Context, q execer, profileID, key, ownType, valu
 		return fmt.Errorf("%s is not in the cache; sync first", value)
 	}
 	if err != nil {
-		return fmt.Errorf("check epic %s: %w", value, err)
+		return fmt.Errorf("check %s %s: %w", noun, value, err)
+	}
+	if sub {
+		// Jira allows a sub-task under any standard issue, and under neither
+		// an epic nor another sub-task.
+		if typ == backend.TypeEpic {
+			return fmt.Errorf("%s is an epic; a sub-task hangs off an issue", value)
+		}
+		if typ == backend.TypeSubtask {
+			return fmt.Errorf("%s is a sub-task; sub-tasks cannot nest", value)
+		}
+		return nil
 	}
 	if typ != backend.TypeEpic {
 		return fmt.Errorf("%s is not an epic", value)

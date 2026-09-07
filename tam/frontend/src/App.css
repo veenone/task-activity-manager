@@ -13,6 +13,38 @@ input, button, select { font-family: inherit; font-size: inherit; }
    from @agile-suite/core (mirrored from XTM's App.css) so both windows share
    one look. app-body wraps the nav rail and the main area side by side; XTM
    has no equivalent since it switches views with topbar tabs, not a rail. */
+/* The view tab row, mirrored from XTM's: its own band under the topbar,
+   tabs centred, on the same dark ground so the two read as one header. */
+.view-tabs-bar {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 6px 14px;
+  background: #1b2638;
+  border-bottom: 1px solid #0f1722;
+  overflow-x: auto;
+}
+.view-tabs {
+  display: flex;
+  gap: 2px;
+  background: #2a3850;
+  border-radius: 5px;
+  padding: 2px;
+}
+.view-tab {
+  background: transparent;
+  border: none;
+  color: #9aa7bd;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.view-tab:hover { color: #e8eaed; }
+.view-tab-active { background: var(--accent); color: #fff; }
+.view-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 .app-body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 .chip { padding: 2px 8px; border-radius: 9px; font-size: 10px; font-weight: 600; }
 
@@ -23,6 +55,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
   padding: 16px 8px;
   background: var(--surface);
   border-right: 1px solid var(--border);
+  /* The rail scrolls on its own if it ever outgrows a short window, rather
+     than stretching .app-body past the viewport. */
+  flex: none;
+  min-height: 0;
+  overflow-y: auto;
 }
 .nav-item {
   text-align: left;
@@ -33,6 +70,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
   color: var(--text);
   cursor: pointer;
 }
+/* The rail is optional now, so it says what it is and offers its own way
+   out; a panel the user opened from a menu should be closable where it is. */
+.nav-rail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 6px 6px 14px; }
+.nav-rail-head .nav-section { padding: 0; }
+.nav-rail-hide { padding: 2px 6px; line-height: 1; font-size: 11px; color: var(--text-muted); }
+.nav-rail-hide:hover:not(:disabled) { color: var(--text); }
 .nav-item:hover:not(:disabled) { background: var(--row-hover); }
 .nav-item:disabled { color: var(--text-muted); cursor: default; }
 /* Active-item fill matches XTM's .view-tab-active token treatment (solid
@@ -42,11 +85,20 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .nav-section { padding: 0 14px 4px; font-size: 11px; color: var(--text-muted); }
 .nav-hint { padding: 0 14px; font-size: 10px; color: var(--text-muted); }
 
-.main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 20px; overflow: auto; }
-.view-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
-.view-head h2 { font-size: 16px; }
+/* The window never scrolls as a whole: the shell is one flex chain from .app
+   down, and only the tree, the table body, and the detail panel scroll, each
+   inside its own bounded box. That is what lets the filter bar, the column
+   header, and the pager stay put while the rows move, and it is why the panes
+   below size themselves off their parent instead of off calc(100vh - a
+   guess), which was only ever right at one window height.
+
+   min-height: 0 at every level: a flex child defaults to min-height auto and
+   refuses to shrink below its content, so one missing declaration anywhere in
+   the chain lets the table push the pager off the bottom of the window. */
+.main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
 .small { font-size: 11px; }
 
+.placeholder { flex: 1; min-height: 0; overflow: auto; display: grid; place-content: center; }
 .placeholder-card {
   display: flex;
   flex-direction: column;
@@ -72,6 +124,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .dot-warn { background: var(--warning); }
 
 .startup-error {
+  min-height: 0;
+  overflow: auto;
   padding: 16px;
   border: 1px solid var(--warn-border);
   background: var(--warn-soft);
@@ -79,53 +133,25 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .startup-error h2 { font-size: 14px; margin-bottom: 8px; }
 
-/* The row's star/name/key/Active badge/Delete sit on one line via the
-   shared .profiles-list-row; the URL hint and the requirement-type field
-   are TAM's own additions (XTM has no equivalent since those live in its
-   per-profile detail pane instead), so they stack below inside this
-   wrapper. */
-.profiles-row-item {
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.profiles-row-item:last-child {
-  border-bottom: none;
-}
-.profiles-row-meta {
-  padding: 0 8px 8px;
-}
-/* Inside the modal, the modal already provides the padding and background,
-   so flatten ProfileForm's standalone card styling the same way XTM's own
-   .profiles-detail .profile-form does; TAM has no second column to divide
-   the list from the create form, so a border-top stands in for it. */
-.profiles-modal .profile-form {
-  padding: 0;
-  gap: 0;
-  background: none;
-  border-radius: 0;
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-  margin-top: 4px;
-}
+/* The Manage Profiles dialog is entirely the shared master-detail one in
+   @agile-suite/core's primitives.css now, so TAM adds nothing to it. */
 .check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
-.about-list { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 12px 0; }
-.about-list dt { color: var(--text-muted); }
 .topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .topbar-btn-primary:hover { background: var(--accent-hover); }
 .chip-sync { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
 
 /* Backlog: filter bar, grid, pager */
-.filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-bar { flex: none; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .filter-search { width: 300px; }
 .filter-sprint { width: 140px; }
 .type-filter { display: flex; gap: 6px; }
-.chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; }
+.chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-type-task { background: #dbeafe; color: #1e40af; }
 .chip-type-story { background: #dcfce7; color: #166534; }
 .chip-type-bug { background: #fee2e2; color: #991b1b; }
 .chip-type-epic { background: #ede9fe; color: #5b21b6; }
 .chip-type-requirement { background: #fef3c7; color: #92400e; }
+.chip-type-subtask { background: #e0f2fe; color: #075985; }
 .chip-type-none { background: var(--surface-3); color: var(--text-muted); }
 .chip-toggle { cursor: pointer; opacity: 0.55; padding: 4px 10px; border-radius: 12px; }
 .chip-toggle.chip-on, .chip-toggle:hover { opacity: 1; }
@@ -135,37 +161,187 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-status-active { background: #dbeafe; color: #1e40af; }
 .chip-status-done { background: #dcfce7; color: #166534; }
 
-.backlog-body { display: flex; gap: 12px; align-items: flex-start; }
-.backlog-grid { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
-.backlog-empty { padding: 32px; text-align: center; }
-.issue-table { display: flex; flex-direction: column; font-size: 12px; }
-.issue-row { display: grid; grid-template-columns: 84px 56px 1fr 96px 96px 52px 40px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); }
-.issue-head { height: 30px; background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 600; position: sticky; top: 0; }
-.issue-body { max-height: calc(100vh - 300px); overflow: auto; }
+/* Both views are a fixed toolbar over a body that takes the rest. */
+.backlog { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* No gap and no rounded seam: XTM's table and detail sidebar meet on a
+   single 1px border, so the pair reads as one surface rather than two cards
+   with a gutter between them. */
+.backlog-body { flex: 1; min-height: 0; display: flex; gap: 0; align-items: stretch; }
+.backlog-grid { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 6px 0 0 6px; overflow: hidden; }
+/* The seam belongs to the panel's own left border. */
+.backlog-body:has(.detail-panel) .backlog-grid { border-right: none; border-radius: 6px 0 0 6px; }
+.backlog-body:not(:has(.detail-panel)) .backlog-grid { border-radius: 6px; }
+.backlog-empty { flex: 1; display: grid; place-content: center; padding: 32px; text-align: center; }
+.issue-table { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 12px; }
+/* Track 1 is --issue-key-w, measured from the keys on the page by
+   lib/keyColumn.ts, not a fixed width: a fixed 84px held about eleven
+   characters, and Jira DC allows a ten-character project key, so a legal key
+   like PLATFORM-98765 wrapped inside this 34px row and the type chip's opaque
+   background painted over it. The fallback is only for a table that renders
+   before the property lands. */
+/* Every track is a fixed width, including SUMMARY, so opening the detail
+   panel cannot move a single column: the table keeps its size and the body
+   scrolls sideways instead. A 1fr summary made the whole grid reflow the
+   moment a row was selected, which is the one time the reader is looking
+   closely at it. width: max-content sizes the row to its tracks and
+   min-width: 100% lets it still fill a wider pane, leaving the slack at the
+   right rather than redistributing it. */
+.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) 104px 420px 132px 116px 96px 44px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
+/* Every cell clips to its track. Without this a grid item wider than its
+   track paints over its neighbour (nowrap) or wraps to two lines in a row
+   whose height is locked at 34px, and a clipped value reads as a complete
+   one. The ellipsis is the honesty: it says "there is more here", and the
+   title attribute on each cell carries the rest. */
+.issue-row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The header lives inside .issue-body now, so it is laid out in the same
+   content box as the rows (no scrollbar-width drift between the two grids)
+   and its sticky positioning finally has the scrolling ancestor it always
+   assumed. z-index keeps it over the rows it pins above. */
+.issue-head { height: 30px; background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+/* Owns both axes: the header is inside it, so a sideways scroll takes the
+   column labels with the rows. */
+.issue-body { flex: 1; min-height: 0; overflow: auto; }
+/* Header cells are buttons now: the row already looked sortable, so it had
+   to either become sortable or stop advertising it. */
+.issue-sort { display: inline-flex; align-items: center; gap: 4px; width: 100%; min-width: 0; background: none; border: none; padding: 0; cursor: pointer; color: inherit; font: inherit; letter-spacing: inherit; text-transform: uppercase; }
+.issue-sort > :first-child, .issue-sort { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue-sort:hover { color: var(--text); }
+.issue-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.issue-sort-active { color: var(--accent); }
+/* The caret is always present so the header does not reflow on sort, and is
+   dimmed until its column is the active one. */
+.issue-sort-caret { flex: none; font-size: 9px; opacity: 0.35; }
+.issue-sort-active .issue-sort-caret { opacity: 1; }
+/* Rank order is the point of a backlog and was the one thing the grid never
+   said out loud. */
+.issue-order { flex: none; padding: 5px 10px; border-bottom: 1px solid var(--border-subtle); }
 .issue-row-alt { background: var(--bg-subtle); }
 .issue-row:not(.issue-head):hover { background: var(--row-hover); cursor: pointer; }
 .issue-row-selected, .issue-row-selected:hover { background: var(--accent-soft); }
 .issue-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.issue-key { font-weight: 600; }
-.issue-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pager { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; }
-.pager-buttons { display: flex; align-items: center; gap: 8px; }
+.issue-key { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* The detail panel's title is the one key that links out to the instance:
+   in a grid the row already owns the click. */
+.issue-key-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.issue-key-link:hover { color: var(--accent-hover); }
+.issue-key-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
+.issue-key-ext { font-size: 9px; opacity: 0.75; flex: none; }
+/* On the panel's dark head the link reads light, not accent-blue. */
+.detail-head .issue-key-link { color: #e8eaed; }
+.detail-head .issue-key-link:hover { color: #fff; }
+/* Pinned to the floor of the card, the way the reference's is, so the page
+   controls are in the same place whatever the row count. */
+.pager { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-top: 1px solid var(--border); background: var(--surface-2); flex-wrap: wrap; }
+.pager-buttons { display: flex; align-items: center; gap: 4px; }
+/* Square, evenly sized step buttons: first / previous / next / last read as
+   one control group rather than four words of different lengths. */
+.pager-step { min-width: 28px; padding: 4px 6px; text-align: center; }
+.pager-page { display: flex; align-items: center; gap: 6px; margin: 0 4px; }
+.pager-page-input { width: 52px; padding: 3px 6px; text-align: center; margin-bottom: 0; }
+.pager-size { width: 104px; padding: 3px 6px; margin-bottom: 0; }
+.pager-range { margin-left: auto; }
 
 /* Detail panel */
-.detail-panel { width: 352px; flex: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; max-height: calc(100vh - 200px); overflow: auto; }
-.detail-head { display: flex; align-items: center; gap: 8px; }
-.detail-key { font-size: 15px; }
-.detail-close { margin-left: auto; }
-.detail-summary { font-size: 14px; margin: 8px 0 12px; }
-.tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
-.tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 0; color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: 600; }
-.tab-active { color: var(--accent); border-bottom-color: var(--accent); }
-.field-list { display: grid; grid-template-columns: 96px 1fr; gap: 10px 8px; font-size: 12px; margin-bottom: 12px; }
-.field-list dt { color: var(--text-muted); }
+/* The detail sidebar, mirrored from XTM's (references/xtm-detail-sidebar.png):
+   a dark instrument bar over a padded scrolling body, with the panel itself
+   holding no padding so the bar can run edge to edge. */
+/* width is set inline (drag to resize); these bound the drag range. */
+.detail-panel { width: 352px; min-width: 300px; max-width: 900px; flex: none; align-self: stretch; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 0 6px 6px 0; overflow: hidden; position: relative; }
+/* The draggable divider on the panel's left edge, mirrored from XTM's. It
+   sits over the seam rather than beside it, so the two panes stay flush. */
+.detail-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; margin-left: -3px; cursor: col-resize; z-index: 5; }
+.detail-resizer:hover { background: var(--accent); opacity: 0.35; }
+.detail-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #1b2638;
+  color: #e8eaed;
+}
+.detail-head-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.detail-head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.detail-key { font-size: 13px; font-weight: 600; color: #e8eaed; }
+/* The status reads as a chip on the bar rather than as a row in the grid,
+   which is what makes the key and its state one statement. */
+.detail-head-status {
+  font-size: 11px;
+  background: #2a3850;
+  color: #c7d0e0;
+  border: 1px solid #3a4a66;
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.detail-actions { display: flex; gap: 8px; margin-top: 14px; }
+.new-issue-parent { font-weight: 600; color: var(--text); padding-top: 6px; }
+.detail-close { color: #9aa7bd; flex-shrink: 0; }
+.detail-close:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.detail-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 18px; }
+.detail-summary { font-size: 14px; margin: 0 0 12px; }
+/* The label/value grid XTM uses for the read-only facts above the editor. */
+.detail-fields { display: grid; grid-template-columns: 84px 1fr; gap: 8px 10px; align-items: center; margin-bottom: 4px; font-size: 12px; }
+.detail-fields dt { color: var(--text-muted); }
+.detail-fields dd { margin: 0; }
+/* Section headings double as dividers, which is what gives the dense panel
+   its rhythm; the whole heading is the toggle. */
+.detail-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 20px 0 9px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.detail-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+.detail-section-toggle:hover { color: var(--text); }
+.detail-section-chevron { font-size: 9px; }
+.detail-section-count {
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  padding: 0 6px;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+.detail-section-action { margin-left: auto; font-size: 11px; }
 .chip-label { background: var(--surface-3); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 8px; margin-right: 4px; }
 .accent-text { color: var(--accent); }
-.detail-section-head { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; }
-.detail-section-head h3 { font-size: 12px; }
 .detail-description { white-space: pre-wrap; font-size: 12px; }
 .detail-note { margin-top: 16px; }
 .linked-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
@@ -173,9 +349,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .linked-key { font-weight: 600; min-width: 64px; }
 .link-group { margin-bottom: 12px; }
 .link-group-title { font-size: 12px; margin-bottom: 6px; }
-
-.profile-setting { display: inline-flex; flex-direction: column; gap: 2px; padding: 0 8px 8px; }
-.profile-setting .detail-input-inline { width: 150px; }
 
 /* Plan 1b: pending changes */
 .chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
@@ -197,8 +370,16 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* Plan 1b: editable details, activity, grid markers */
 .pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: 6px; vertical-align: middle; }
+/* .detail-input carries margin-bottom for the detail panel's stacked fields;
+   inside a gap-spaced form that margin doubled the rhythm and left dead space
+   under the last row. */
 .edit-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.edit-form .edit-row > .detail-input, .edit-form .edit-row > .edit-cell > .detail-input { margin-bottom: 0; }
 .edit-row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: start; }
+/* A row whose hint sits beside the control uses a real <label> for the name
+   rather than a wrapping one, so the hint does not become part of the field's
+   label text. It has to line up with the wrapping rows either way. */
+.edit-row > label.muted { padding-top: 6px; }
 .edit-row .detail-input { width: 100%; box-sizing: border-box; }
 .edit-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .activity-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -206,8 +387,28 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .activity-row .small:last-child { grid-column: 2; }
 
 /* Plan 1b: new issue */
-.new-issue-modal { width: min(640px, 92vw); max-height: 86vh; overflow: auto; }
-.meta-fields { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+/* The dialog wears the house chrome now (pending-modal: fixed head, scrolling
+   body, pinned footer). It used to be a bare .modal whose whole self was the
+   scroller, so on a project with several required fields the title and the
+   Create draft button both scrolled away, and .edit-form, written for the
+   16px-padded detail panel, ran the fields flush to the dialog's edge. */
+.new-issue-modal { width: min(640px, 92vw); }
+.new-issue-modal .bulk-body { display: flex; flex-direction: column; gap: 10px; }
+.new-issue-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.new-issue-title h2 { margin: 0; }
+.new-issue-title p { margin: 0; }
+/* Takes the slack in the footer so the buttons stay right-aligned whether or
+   not there is an error to show. */
+.new-issue-status { flex: 1; min-width: 0; }
+.meta-fields { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+/* A cell that stacks its control over a hint, for the fields whose value is a
+   list and would otherwise say so only in a placeholder that vanishes on the
+   first keystroke. */
+.edit-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.edit-cell .detail-input { margin-bottom: 0; }
+.edit-cell select[multiple] { padding: 4px; }
+.field-required { color: var(--danger-text); }
+.detail-input[aria-invalid="true"] { border-color: var(--danger-text); }
 
 /* Plan 1b: conflicts */
 .conflict-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
@@ -220,13 +421,25 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-import + .filter-new { margin-left: 8px; }
 
 /* Phase 2: Epics */
-.epics-body { display: flex; gap: 12px; align-items: flex-start; min-height: 0; flex: 1; }
+.epics-body { display: flex; gap: 0; align-items: stretch; min-height: 0; flex: 1; }
 /* The tree pane takes every pixel the detail panel does not, and the tree
    fills it. The shared .folder-tree width is XTM's sidebar width, right for
    a sidebar and far too narrow when the tree is the view's main content. */
-.epics-tree-pane { flex: 1; min-width: 0; overflow: auto; }
-.epics-tree-pane .folder-tree { width: 100%; border-right: none; border: 1px solid var(--border); border-radius: 6px; }
-.epics-summary { margin-bottom: 4px; }
+/* The pane is the card and the tree inside it is the only scroller. Both
+   used to declare overflow: auto, so the outer box owned the vertical axis
+   and the inner one the horizontal, and a drag to read a long summary
+   scrolled a different element than the drag before it. Neither had a
+   bounded height either, since .main was the real scroller, so the tree grew
+   the page instead of scrolling in place the way the Backlog's rows do. */
+.epics-tree-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.epics-body:has(.detail-panel) .epics-tree-pane { border-right: none; border-radius: 6px 0 0 6px; }
+.epics-tree-pane .folder-tree { flex: 1; min-height: 0; width: 100%; border-right: none; border: none; border-radius: 0; overflow: auto; }
+.epics-tree-pane > .muted, .epics-tree-pane > .error-text { padding: 16px; }
+.epics-summary { flex: none; margin-bottom: 4px; }
+.epics-note { flex: none; }
+/* Refetch state rides on the summary line the view already shows, so it
+   cannot push the tree's rows down a line every time a query refreshes. */
+.epics-refreshing { color: var(--text-muted); }
 
 /* Plan 1c: links */
 .add-link { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
@@ -235,3 +448,45 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .add-link-key .detail-input { flex: 1; }
 .linked-row .pending-dot { margin-left: 4px; }
 .pending-row-link { grid-template-columns: 110px auto auto 1fr auto; }
+
+/* Assignee combobox: an input with a clear button and a floating result
+   list, so a person is picked rather than a username remembered. */
+.assignee-picker { position: relative; min-width: 0; }
+.assignee-field { display: flex; align-items: stretch; gap: 0; }
+.assignee-field .detail-input { flex: 1; min-width: 0; margin-bottom: 0; }
+.assignee-clear { padding: 2px 7px; font-size: 11px; color: var(--text-muted); flex: none; }
+.assignee-clear:hover:not(:disabled) { color: var(--text); }
+.assignee-list {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 210px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: var(--modal-shadow);
+}
+.assignee-note { display: block; padding: 6px 8px; line-height: 1.45; }
+.assignee-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.assignee-option-active { background: var(--accent-soft); }
+.detail-activity-head { display: flex; justify-content: flex-end; margin-bottom: 6px; }

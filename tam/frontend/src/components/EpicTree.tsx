@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import type { EpicNode, EpicTreeData, Issue } from "../api";
 import { MAX_ORPHAN_ROWS, NO_EPIC_KEY, ownerOf, visibleRows } from "../lib/epicTreeItems";
 import type { Row } from "../lib/epicTreeItems";
 import { EpicChildRow, EpicRow } from "./EpicRow";
+import { keyColumnWidth } from "../lib/keyColumn";
 
 export const MOVED_FLASH_MS = 2000;
 
 interface Props {
   tree: EpicTreeData;
+  subtaskLabel?: string;
   selectedKey: string;
   onSelect: (key: string) => void;
   expanded: Set<string>;
@@ -16,7 +18,7 @@ interface Props {
   movedKey: string;
 }
 
-export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChange, movedKey }: Props) {
+export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, onExpandedChange, movedKey }: Props) {
   const rootRef = useRef<HTMLElement>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const [flashKey, setFlashKey] = useState("");
@@ -61,6 +63,15 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
   }, [movedKey]);
 
   const rows = visibleRows(tree, expanded);
+  // One width for every row: each .epic-row is its own grid container, so a
+  // per-row max-content track would size each row to its own key and the
+  // columns would stop lining up. "All epics" is in the list because it sits
+  // in the same column.
+  const keyWidth = keyColumnWidth([
+    "All epics",
+    ...tree.epics.flatMap((n) => [n.issue.key, ...n.children.map((c) => c.key)]),
+    ...tree.orphans.map((o) => o.key),
+  ]);
   const indexOf = new Map(rows.map((r, i) => [r.id, i] as const));
 
   // Exactly one row keeps tabIndex 0: it defaults to the selection, and
@@ -131,6 +142,7 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
       <EpicChildRow
         key={child.key}
         child={child}
+        subtaskLabel={subtaskLabel}
         ownerKey={ownerKey}
         index={indexOf.get(child.key)}
         selected={child.key === selectedKey}
@@ -149,6 +161,7 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
       <div className="folder-node" key={rowKey}>
         <EpicRow
           kind={kind}
+          subtaskLabel={subtaskLabel}
           rowKey={rowKey}
           node={node}
           count={count}
@@ -174,7 +187,13 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
   }
 
   return (
-    <nav className="folder-tree" aria-label="Epics" role="tree" ref={rootRef}>
+    <nav
+      className="folder-tree"
+      aria-label="Epics"
+      role="tree"
+      ref={rootRef}
+      style={{ "--epic-key-w": keyWidth } as CSSProperties}
+    >
       <div
         role="treeitem"
         aria-selected={selectedKey === ""}
@@ -186,8 +205,9 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
       >
         <span className="folder-caret" />
         <span />
-        <span className="folder-name">All epics</span>
-        <span className="folder-count">{tree.epics.length}</span>
+        <span className="epic-cell epic-cell-key">All epics</span>
+        <span className="epic-cell epic-cell-summary" />
+        <span className="epic-cell folder-count epic-cell-progress">{tree.epics.length}</span>
       </div>
 
       {tree.epics.map((node) => branch("epic", node.issue.key, expanded.has(node.issue.key), node.children, node))}

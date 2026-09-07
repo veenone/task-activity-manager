@@ -124,7 +124,7 @@
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
@@ -135,7 +135,7 @@
   color: inherit;
 }
 .btn-ghost:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--ghost-hover);
 }
 .btn-danger {
   background: #dc2626;
@@ -180,7 +180,7 @@
      obscured its title. Sits above the menus (41) and below the multiselect
      panel (70), which opens from inside dialogs. */
   z-index: 60;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--overlay-scrim);
   display: flex;
   justify-content: center;
   overflow-y: auto;
@@ -191,7 +191,7 @@
   margin: auto;
   background: var(--surface);
   border-radius: 8px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--modal-shadow);
 }
 
 /* Editable fields in the detail panel */
@@ -521,6 +521,45 @@
   font-size: 12.5px;
   color: var(--text-muted);
 }
+/* Sits under the profile list, for whatever an app has to say about which
+   profiles it shows. */
+.profiles-list-note {
+  padding: 10px 4px 0;
+  line-height: 1.45;
+}
+/* min-height: 0 at every level: a flex child defaults to min-height: auto and
+   refuses to shrink below its content, which would let the form push straight
+   through the modal's max-height instead of scrolling inside it. */
+.profiles-modal-body {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+.profiles-list {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  flex: 0 0 240px;
+  min-height: 0;
+  border-right: 1px solid var(--card-border);
+  padding-right: 12px;
+}
+/* Create is the primary action: a full-width accent button pinned above the
+   list. Import sits directly under it because both bring a profile into
+   existence, so a user looking to add one finds them together. */
+.profiles-create-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+/* Quieter than the accent Create button: importing is the rarer path. */
+.profiles-import-btn {
+  font-size: 13px;
+  padding: 7px 9px;
+}
 .profiles-list-label {
   font-size: 11px;
   letter-spacing: 0.09em;
@@ -547,6 +586,10 @@
 }
 .profiles-list-row:hover {
   background: var(--hover-bg, rgba(127, 127, 127, 0.12));
+}
+.profiles-list-row-selected,
+.profiles-list-row-selected:hover {
+  background: var(--accent-soft);
 }
 .profiles-row-name {
   flex: 1;
@@ -594,6 +637,94 @@
 .profiles-mode-kicker-new {
   color: var(--accent);
 }
+.profiles-mode-kicker-edit {
+  color: var(--text-muted);
+}
+.profiles-mode-title {
+  font-size: 14px;
+  font-weight: 620;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+/* The profile name is human text, not a code key: match the header's own sans
+   face and size so it sits on the kicker's baseline instead of reading as a
+   mismatched monospace token. */
+.profiles-mode-title .mono {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 620;
+}
+/* The scrolling region: the form is the only part that grows without bound
+   (advanced TLS), so it scrolls while the head and the list stay anchored. */
+.profiles-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+/* The detail pane reuses ProfileForm, which carries its own card padding and
+   background for standalone use; inside the modal the modal already provides
+   the inset, so flatten it to align with the list pane. */
+.profiles-detail .profile-form {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+/* Amber caution shown only when the opened profile is the active one: saving
+   here changes the live connection, not a new profile. */
+.profiles-active-caution {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 12px 0 4px;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-border);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 12.5px;
+  color: var(--warn-text);
+  line-height: 1.45;
+}
+.profiles-active-caution svg {
+  flex: none;
+  margin-top: 1px;
+}
+.profiles-active-caution b {
+  font-weight: 700;
+}
+/* Start state shown on open: nothing editable until the user picks a profile
+   or chooses to create one. */
+.profiles-empty {
+  margin: auto;
+  text-align: center;
+  max-width: 300px;
+  padding: 32px 0;
+}
+.profiles-empty-mark {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 14px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.profiles-empty h3 {
+  margin: 0 0 6px;
+  font-size: 15.5px;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.profiles-empty p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
 .profile-form {
   display: flex;
   flex-direction: column;
@@ -602,6 +733,285 @@
   padding: 18px;
   border-radius: 6px;
   text-align: left;
+}
+.profile-form h2 {
+  font-size: 15px;
+}
+.profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.profile-form input,
+.profile-form select,
+.profile-form textarea {
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+/* The checkbox row is the one label that reads left to right. */
+.profile-form-checkbox {
+  flex-direction: row;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.profile-form-checkbox input {
+  margin-top: 2px;
+}
+.profile-form-advanced summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+.profile-form-advanced[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Export / Delete sit hard left of Cancel / Save in the form's footer. */
+.profile-form-extra {
+  margin-right: auto;
+  display: flex;
+  gap: 8px;
+}
+/* The token input and its show/hide eye read as one control. */
+.pat-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+.pat-field input {
+  flex: 1;
+  min-width: 0;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+}
+.pat-toggle {
+  border: 1px solid var(--border-strong);
+  border-radius: 0 4px 4px 0;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+/* Inline per-field validation error, and the quieter explanatory hint. */
+.field-error {
+  display: block;
+  color: var(--danger-text);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.field-hint {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.field-hint-warn {
+  color: var(--warn-text);
+  flex-basis: 100%;
+}
+/* Shown when an edit is about to clear the profile's cached issues. */
+.form-warning {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+/* ===== About dialog, mirrored from XTM's App.css ===== */
+.about-card {
+  position: relative;
+  width: 430px;
+  max-width: calc(100vw - 32px);
+  margin: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow:
+    0 24px 60px -12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  animation: about-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes about-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .about-card {
+    animation: none;
+  }
+}
+.about-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #d6deea;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: background 0.12s;
+}
+.about-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+/* Header "scan panel": dark instrument band with a faint grid and accent glow. */
+.about-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 26px 24px;
+  background:
+    radial-gradient(
+      130% 120% at 88% -20%,
+      color-mix(in srgb, var(--accent) 38%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(135deg, #1d2942 0%, #141b29 100%);
+  color: #fff;
+  overflow: hidden;
+}
+.about-banner-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(105deg, #000 18%, transparent 78%);
+  pointer-events: none;
+}
+.about-logo {
+  flex-shrink: 0;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  position: relative;
+  border-radius: 11px;
+  object-fit: cover;
+}
+.about-id {
+  position: relative;
+  min-width: 0;
+}
+.about-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: #fff;
+  line-height: 1.15;
+}
+.about-kicker {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 55%, #cdd6e6);
+}
+
+.about-body {
+  padding: 20px 24px 22px;
+}
+.about-tagline {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* Technical readout "plate" */
+.about-plate {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  padding: 6px 14px 10px;
+}
+.about-plate-label {
+  display: block;
+  margin: 8px 0 2px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.about-info {
+  margin: 0;
+}
+.about-row {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.about-row:first-of-type {
+  border-top: none;
+}
+.about-row dt {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.about-row dd {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-strong);
+  word-break: break-all;
+  text-align: right;
+}
+
+.about-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.about-arrow {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.about-foot {
+  padding: 11px 24px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  font-size: 10.5px;
+  text-align: center;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
 }
 
 /* Folder tree, mirrored from XTM's App.css (around lines 2765 to 2870), for
@@ -652,9 +1062,15 @@
 .folder-item:hover {
   background: var(--row-hover);
 }
+/* --accent-soft re-points in dark mode; the literal #e1e8ff this used to
+   carry did not, so the selected row was light-periwinkle text on a
+   light-periwinkle fill, about 2.6:1, and was the least readable row in a
+   dark window. The !important went with it: it was suppressing the
+   epic-row-moved flash on a row that was both moved and selected, which is
+   the common case, since a parent change is made on the selected issue. */
 .folder-selected {
-  background: #e1e8ff !important;
-  color: var(--accent-hover);
+  background: var(--accent-soft);
+  color: var(--text-strong);
   font-weight: 500;
 }
 .folder-caret {
@@ -684,24 +1100,53 @@
   border-left: 1px dotted var(--border-strong);
 }
 
-/* The Epics tree's shared row grid: an epic's own row and a child's row both
-   carry it alongside folder-item, so the caret, type chip, key, summary,
-   status or progress, points, and pending dot line up across the two kinds
-   of row. An epic (or the orphans header) folds its key+summary into one
-   folder-name cell and its progress into one folder-count cell, each
-   spanning the two tracks a child spreads its key/summary and status/points
-   across, so the two row shapes still line up column for column. */
+/* The Epics tree's shared row grid. Every row kind, an epic header, a child,
+   and the "All epics" row, now emits the same seven cells in the same tracks,
+   so the columns line up by construction rather than by two shapes agreeing.
+   They did not agree: an epic header used to fold key+summary into one
+   spanning cell while a child split them, and with tracks 5 and 6 sized auto
+   in each row's own grid, column 5 started up to 110px apart between the two.
+   Fixed tracks for status and points is what actually makes the rows align,
+   since a grid cannot see its siblings without subgrid.
+
+   Track 3 is --epic-key-w, measured from the keys in the tree by
+   lib/keyColumn.ts. It used to be a fixed 92px, which with the nowrap
+   inherited from folder-item meant a longer key had nowhere to go but
+   sideways, straight over the summary, with no ellipsis and no background to
+   hide behind. That was the overlap. */
 .epic-row {
   display: grid;
-  grid-template-columns: 12px 44px 92px 1fr auto auto 12px;
+  grid-template-columns: 12px 44px var(--epic-key-w, 92px) 420px 132px 44px 13px;
   gap: 6px;
   align-items: center;
 }
-.epic-row .folder-name {
-  grid-column: 3 / span 2;
+/* Sized to its tracks, filling a wider pane without redistributing the
+   slack: every column is fixed, so opening the detail panel scrolls the tree
+   sideways rather than moving its columns. This is safe now that each cell
+   clips (a long summary used to widen the row, and a long key, in a fixed
+   track, never widened it at all and overlapped the summary instead). */
+.epic-row {
+  width: max-content;
+  min-width: 100%;
 }
-.epic-row .folder-count {
+/* Every cell clips to its track, so no cell can paint over its neighbour. */
+.epic-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.epic-cell-key {
+  font-variant-numeric: tabular-nums;
+}
+/* The epic header's progress reading spans the status and points tracks the
+   child rows use, so "8 of 12 done, 34 pts" has room without a column of its
+   own and still starts where the status chips start. */
+.epic-cell-progress {
   grid-column: 5 / span 2;
+  margin-left: 0;
+}
+.epic-cell-points {
+  text-align: right;
 }
 /* Two seconds on a row that just moved to another epic. The warn tint is
    the same vocabulary the pending dot and the Commit chip use for a local

@@ -523,3 +523,11 @@ func TestLinkFailureKeepsTheRow(t *testing.T) {
 		t.Errorf("row kept: %+v", links)
 	}
 }
+
+// The two lookups the forms use; neither sync nor commit calls them.
+func (f *fake) SearchUsers(context.Context, string, string) ([]backend.User, error) {
+	return nil, nil
+}
+func (f *fake) Priorities(context.Context) ([]string, error) { return nil, nil }
+
+func (f *fake) SubtaskTypeName(context.Context, string) (string, error) { return "Technical task", nil }

@@ -33,6 +33,14 @@
   --card-border: var(--border);
   --accent-strong: #2b6cb0;
   --bg-subtle: var(--surface-2);
+  /* Dialog chrome. These were literals in primitives.css and so were the same
+     in both themes: a black scrim and a black drop shadow read as depth on a
+     light ground and as nothing on a dark one, and the ghost button's black
+     hover wash darkened the surface it was meant to lift. */
+  --overlay-scrim: rgba(0, 0, 0, 0.4);
+  --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  --ghost-hover: rgba(0, 0, 0, 0.08);
+  --on-accent: #fff;
 }
 
 :root[data-theme="dark"] {
@@ -62,4 +70,8 @@
   --card-border: var(--border);
   --accent-strong: #6ea8fe;
   --bg-subtle: var(--surface-2);
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
+  --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --ghost-hover: rgba(255, 255, 255, 0.10);
+  --on-accent: #fff;
 }

@@ -288,9 +288,9 @@ describe("EpicsView", () => {
     let resolveSecond!: (v: EpicTreeData) => void;
     vi.mocked(api.GetEpicTree).mockReturnValueOnce(new Promise<EpicTreeData>((res) => { resolveSecond = res; }));
     await user.click(screen.getByRole("checkbox", { name: "Show done" }));
-    expect(await screen.findByText("Refreshing")).toBeInTheDocument();
+    expect(await screen.findByText(/refreshing/)).toBeInTheDocument();
     resolveSecond(tree);
-    await waitFor(() => expect(screen.queryByText("Refreshing")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/refreshing/)).not.toBeInTheDocument());
   });
 
   it("shows the empty state when nothing is cached", async () => {

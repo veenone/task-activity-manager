@@ -33,11 +33,19 @@ export function useActivity(profileId: string, key: string) {
   });
 }
 
+// CREATE_FIELDS_FRESH_FOR is how long a type's required-field list is served
+// without asking Jira again. The list only changes when someone edits the
+// project's screens, and the create dialog gates its submit button on this
+// query, so refetching it on every open and every type toggle made the dialog
+// wait on a round trip whose answer had not changed.
+const CREATE_FIELDS_FRESH_FOR = 10 * 60 * 1000;
+
 export function useCreateFields(profileId: string, type: string) {
   return useQuery({
     queryKey: keys.createFields(profileId, type),
     queryFn: () => call(() => GetCreateFields(profileId, type)),
     enabled: !!profileId && !!type,
+    staleTime: CREATE_FIELDS_FRESH_FOR,
     retry: false,
   });
 }

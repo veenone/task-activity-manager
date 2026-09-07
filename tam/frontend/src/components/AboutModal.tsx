@@ -1,33 +1,95 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@agile-suite/core";
-import { GetDiagnostics } from "../api";
+import { GetDiagnostics, BrowserOpenURL } from "../api";
 import type { Diagnostics } from "../api";
+import appIcon from "../assets/images/appicon.png";
 
-export function AboutModal({ onClose }: { onClose: () => void }) {
-  const [d, setD] = useState<Diagnostics | null>(null);
-  useEffect(() => {
-    GetDiagnostics().then(setD).catch(() => setD(null));
-  }, []);
+const DOCS_URL = "https://docs.atlassian.com/software/jira/docs/api/REST/latest/";
+
+// LogoMark shows the application's own icon (the same image used for the
+// window and the executable), so About matches the app's identity everywhere.
+function LogoMark() {
   return (
-    <Modal onClose={onClose} labelledBy="about-title">
-      <div className="pending-head">
-        <h2 id="about-title">About Task Activity Manager</h2>
-      </div>
-      <div className="bulk-body">
-        <p>Agile task management for Jira Data Center. Part of the agile suite with Xray Test Manager.</p>
-        {d && (
-          <dl className="about-list">
-            <dt>Version</dt><dd>{d.version || "dev"}</dd>
-            <dt>Local store</dt><dd>{d.dbPath} (schema {d.schemaVersion})</dd>
-            <dt>Shared profiles</dt><dd>{d.sharedPath}</dd>
-            <dt>Log</dt><dd>{d.logPath}</dd>
-            <dt>Runtime</dt><dd>{d.goVersion} on {d.os}/{d.arch}</dd>
+    <img
+      className="about-logo"
+      src={appIcon}
+      width={44}
+      height={44}
+      alt=""
+      aria-hidden="true"
+    />
+  );
+}
+
+// AboutModal is the Help → About dialog, laid out exactly like XTM's: app
+// identity in a dark "scan panel" banner, then a precise technical readout of
+// the runtime on a sunken plate, useful to paste into a bug report. TAM's rows
+// carry two paths XTM has no equivalent for, the shared profile database and
+// the log, because they are the first two things to check when the suite's two
+// windows disagree about which profiles exist.
+export function AboutModal({ onClose }: { onClose: () => void }) {
+  const [diag, setDiag] = useState<Diagnostics | null>(null);
+
+  useEffect(() => {
+    GetDiagnostics()
+      .then(setDiag)
+      .catch(() => {});
+  }, []);
+
+  const rows: Array<[string, string]> = [
+    ["Version", diag?.version ? `v${diag.version}` : "…"],
+    ["Schema", diag ? `v${diag.schemaVersion}` : "…"],
+    ["Runtime", diag ? `${diag.goVersion} · ${diag.os}/${diag.arch}` : "…"],
+    ["Targets", "Jira DC 8.14+"],
+    ["Database", diag?.dbPath || "—"],
+    ["Profiles", diag?.sharedPath || "—"],
+    ["Log", diag?.logPath || "—"],
+  ];
+
+  return (
+    <Modal onClose={onClose} className="about-card" label="About Task Activity Manager">
+      <button className="about-close" onClick={onClose} title="Close" aria-label="Close">
+        ✕
+      </button>
+
+      <header className="about-banner">
+        <span className="about-banner-grid" aria-hidden="true" />
+        <LogoMark />
+        <div className="about-id">
+          <h2 className="about-name">Task Activity Manager</h2>
+          <p className="about-kicker">Agile Backlog · Data Center</p>
+        </div>
+      </header>
+
+      <div className="about-body">
+        <p className="about-tagline">
+          A fast, local-first desktop tool for planning and tracking Jira Data
+          Center work at scale. Part of the agile suite with Xray Test Manager.
+        </p>
+
+        <div className="about-plate">
+          <span className="about-plate-label">Build &amp; environment</span>
+          <dl className="about-info">
+            {rows.map(([k, v]) => (
+              <div className="about-row" key={k}>
+                <dt>{k}</dt>
+                <dd className="mono">{v}</dd>
+              </div>
+            ))}
           </dl>
-        )}
-        <div className="form-actions form-actions-end">
-          <button className="btn btn-primary" onClick={onClose}>Close</button>
+        </div>
+
+        <div className="about-actions">
+          <button className="btn about-link" onClick={() => BrowserOpenURL(DOCS_URL)}>
+            Documentation <span className="about-arrow">↗</span>
+          </button>
+          <button className="btn btn-primary" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
+
+      <footer className="about-foot">© 2026 Achmad Fienan Rahardianto</footer>
     </Modal>
   );
 }

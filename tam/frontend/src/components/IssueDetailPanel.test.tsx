@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { DialogProvider, createQueryClient } from "@agile-suite/core";
+import { DialogProvider, ProfileProvider, createQueryClient } from "@agile-suite/core";
+import { profileBackend } from "../profileBackend";
 import * as api from "../api";
 import type { Issue } from "../api";
 import { useSync } from "../contexts/SyncContext";
@@ -11,7 +12,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), CreateIssue: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -33,11 +34,15 @@ const epics: Issue[] = [
   { ...story, key: "PLAT-320", id: "3", type: "epic", summary: "Search relevance rework", parentKey: "" },
 ];
 
+// The panel opens the create dialog for a sub-task, and that dialog reads the
+// active profile, so the harness carries a provider the way the app does.
 function renderPanel(onClose = vi.fn()) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
-        <IssueDetailPanel profileId="p1" issue={story} onClose={onClose} />
+        <ProfileProvider backend={profileBackend}>
+          <IssueDetailPanel profileId="p1" issue={story} onClose={onClose} />
+        </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
   );
@@ -64,6 +69,9 @@ beforeEach(() => {
   vi.mocked(api.EditIssue).mockResolvedValue();
   vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
+  vi.mocked(api.SearchUsers).mockResolvedValue([{ name: "ranand", displayName: "R. Anand" }]);
+  vi.mocked(api.ListPriorities).mockResolvedValue(["Highest", "High", "Medium", "Low"]);
+  vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
   vi.mocked(api.ListActivity).mockResolvedValue([
     { id: 5, occurredAt: "2026-09-06T10:10:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "commit", field: "create", beforeVal: "", afterVal: "{\"summary\":\"x\"}", note: "" },
     { id: 4, occurredAt: "2026-09-06T10:07:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "discard", field: "create", beforeVal: "{\"summary\":\"x\"}", afterVal: "", note: "" },
@@ -73,15 +81,62 @@ beforeEach(() => {
   ]);
 });
 
+// The panel stacks collapsible sections now instead of tabs. Fields is open
+// on mount; the rest are opened by their heading, which is what a reader
+// does, and the region the heading controls is what the assertions read.
+async function openSection(title: string): Promise<HTMLElement> {
+  const toggle = await screen.findByRole("button", { name: new RegExp(`^${title}`) });
+  if (toggle.getAttribute("aria-expanded") !== "true") {
+    await userEvent.click(toggle);
+  }
+  const id = toggle.getAttribute("aria-controls");
+  const region = id ? document.getElementById(id) : null;
+  if (!region) throw new Error(`no region for section ${title}`);
+  return region;
+}
+
+function section(title: string): HTMLElement {
+  const toggle = screen.getByRole("button", { name: new RegExp(`^${title}`) });
+  const id = toggle.getAttribute("aria-controls");
+  const region = id ? document.getElementById(id) : null;
+  if (!region) throw new Error(`no region for section ${title}`);
+  return region;
+}
+
 describe("IssueDetailPanel", () => {
+  it("drafts a sub-task from the body, under the issue it is about", async () => {
+    renderPanel();
+    // The action sits with the content it produces, not in the crowded head.
+    const draft = await screen.findByRole("button", { name: "+ Technical task" });
+    expect(draft).toBeInTheDocument();
+    await userEvent.click(draft);
+    const dialog = await screen.findByRole("dialog", { name: /^New / });
+    // The parent is the issue the panel is about, stated rather than chosen.
+    expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Type")).not.toBeInTheDocument();
+  });
+
+  it("is resizeable, and remembers the width", async () => {
+    renderPanel();
+    const panel = await screen.findByRole("complementary");
+    expect(panel).toHaveStyle({ width: "352px" });
+    const grip = panel.querySelector(".detail-resizer");
+    expect(grip).toBeInTheDocument();
+  });
+
   it("shows the cached fields at once and the description once fetched", async () => {
     renderPanel();
     expect(screen.getByRole("heading", { name: "PLAT-412" })).toBeInTheDocument();
     expect(screen.getByText("Checkout: apply promo code at payment step")).toBeInTheDocument();
-    const details = screen.getByRole("tabpanel", { name: "Details" });
-    expect(within(details).getByText("In Progress")).toBeInTheDocument();
+    // Status reads as a chip on the panel's head, beside the key, the way
+    // XTM's does; the sprint and the other read-only facts sit in the grid
+    // above the editable fields.
+    expect(screen.getByText("In Progress")).toBeInTheDocument();
+    expect(screen.getByText("Sprint 12 - Checkout polish")).toBeInTheDocument();
+    const details = section("Fields");
+    // The assignee input shows the display name it was synced with; what it
+    // stores once a person is picked is the username.
     expect(within(details).getByLabelText("Assignee")).toHaveValue("R. Anand");
-    expect(within(details).getByText("Sprint 12 - Checkout polish")).toBeInTheDocument();
     expect(within(details).getByLabelText("Story points")).toHaveValue("5");
     expect(within(details).getByLabelText("Labels")).toHaveValue("checkout, promo");
     await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue("As a shopper I can enter a promo code on the payment step."));
@@ -90,13 +145,11 @@ describe("IssueDetailPanel", () => {
 
   it("switches to Links and Tests", async () => {
     renderPanel();
-    await userEvent.click(screen.getByRole("tab", { name: "Links" }));
-    const links = screen.getByRole("tabpanel", { name: "Links" });
+    const links = await openSection("Links");
     await waitFor(() => expect(within(links).getByText("XT-1018")).toBeInTheDocument());
     expect(within(links).getByText("Tested By")).toBeInTheDocument();
     expect(within(links).getByText("PLAT-388")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("tab", { name: "Tests" }));
-    const tests = screen.getByRole("tabpanel", { name: "Tests" });
+    const tests = await openSection("Covered by tests");
     await waitFor(() => expect(within(tests).getByText("XT-1019")).toBeInTheDocument());
     expect(within(tests).getByText(/via XTM, link: Tested By/)).toBeInTheDocument();
     expect(api.ListLinkedTests).toHaveBeenCalledWith("p1", "PLAT-412");
@@ -115,8 +168,7 @@ describe("IssueDetailPanel", () => {
   it("retries the linked tests after a failure", async () => {
     vi.mocked(api.ListLinkedTests).mockRejectedValueOnce(new Error("jira: 503"));
     renderPanel();
-    await userEvent.click(screen.getByRole("tab", { name: "Tests" }));
-    const tests = screen.getByRole("tabpanel", { name: "Tests" });
+    const tests = await openSection("Covered by tests");
     await waitFor(() => expect(within(tests).getByTestId("tests-error")).toHaveTextContent("jira: 503"));
     await userEvent.click(within(tests).getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(within(tests).getByText("XT-1018")).toBeInTheDocument());
@@ -126,8 +178,7 @@ describe("IssueDetailPanel", () => {
   it("keeps the Links tab recoverable", async () => {
     vi.mocked(api.GetIssueDetail).mockRejectedValueOnce(new Error("jira: 502"));
     renderPanel();
-    await userEvent.click(screen.getByRole("tab", { name: "Links" }));
-    const links = screen.getByRole("tabpanel", { name: "Links" });
+    const links = await openSection("Links");
     await waitFor(() => expect(within(links).getByTestId("links-error")).toHaveTextContent("jira: 502"));
     await userEvent.click(within(links).getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(within(links).getByText("XT-1018")).toBeInTheDocument());
@@ -136,7 +187,7 @@ describe("IssueDetailPanel", () => {
   it("says when there are no linked tests and closes", async () => {
     vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
     const onClose = renderPanel();
-    await userEvent.click(screen.getByRole("tab", { name: "Tests" }));
+    await openSection("Covered by tests");
     await waitFor(() => expect(screen.getByText("No linked tests.")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalled();
@@ -199,9 +250,10 @@ describe("IssueDetailPanel write path", () => {
     const user = userEvent.setup();
     vi.mocked(api.EditIssue).mockRejectedValueOnce(new Error("field \"priority\" cannot be edited"));
     renderPanel();
+    // Priority is the instance's own list now, not a text box.
     const priority = await screen.findByLabelText("Priority");
-    await user.clear(priority);
-    await user.type(priority, "Highest");
+    await waitFor(() => expect(within(priority as HTMLElement).getByRole("option", { name: "Highest" })).toBeInTheDocument());
+    await user.selectOptions(priority, "Highest");
     await user.click(screen.getByRole("button", { name: "Save edit" }));
     expect(await screen.findByText(/cannot be edited/)).toBeInTheDocument();
     expect(priority).toHaveValue("Highest");
@@ -210,7 +262,7 @@ describe("IssueDetailPanel write path", () => {
   it("lists the activity newest first on the Activity tab", async () => {
     const user = userEvent.setup();
     renderPanel();
-    await user.click(await screen.findByRole("tab", { name: "Activity" }));
+    await openSection("Activity");
     const items = await screen.findAllByRole("listitem");
     expect(items).toHaveLength(5);
     expect(items[0]).toHaveTextContent("araha pushed the draft to Jira");
@@ -244,7 +296,7 @@ describe("IssueDetailPanel write path", () => {
     });
     vi.mocked(api.DiscardPendingChange).mockResolvedValue();
     renderPanel();
-    await user.click(await screen.findByRole("tab", { name: "Links" }));
+    await openSection("Links");
     const row = (await screen.findByText("XT-1031")).closest("li")!;
     expect(row).toHaveTextContent("pending");
     await user.click(within(row).getByRole("button", { name: "Discard link to XT-1031" }));
@@ -262,7 +314,7 @@ describe("IssueDetailPanel write path", () => {
     });
     vi.mocked(api.DiscardPendingChange).mockRejectedValueOnce(new Error("row is gone"));
     renderPanel();
-    await user.click(await screen.findByRole("tab", { name: "Links" }));
+    await openSection("Links");
     const row = (await screen.findByText("XT-1031")).closest("li")!;
     await user.click(within(row).getByRole("button", { name: "Discard link to XT-1031" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 41));
@@ -306,7 +358,7 @@ describe("IssueDetailPanel Epic field", () => {
         </DialogProvider>
       </QueryClientProvider>,
     );
-    const details = await screen.findByRole("tabpanel", { name: "Details" });
+    const details = await openSection("Fields");
     expect(screen.queryByLabelText("Epic")).not.toBeInTheDocument();
     expect(within(details).queryByText("Epic")).not.toBeInTheDocument();
     expect(within(details).queryByText("Parent")).not.toBeInTheDocument();

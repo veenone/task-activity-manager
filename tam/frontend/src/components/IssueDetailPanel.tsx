@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { errMsg, useNotice } from "@agile-suite/core";
 import type { Issue, Link } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
@@ -6,30 +7,97 @@ import { useDiscardById } from "../queries/pending";
 import { formatWhen } from "../lib/format";
 import { useSync } from "../contexts/SyncContext";
 import { TypeChip } from "./TypeChip";
+import { IssueKeyLink } from "./IssueKeyLink";
+import { NewIssueModal } from "./NewIssueModal";
+import { useSubtaskType } from "../queries/people";
 import { EditableFields } from "./EditableFields";
 import { ActivityTab } from "./ActivityTab";
 import { AddLinkForm } from "./AddLinkForm";
 
-type Tab = "details" | "links" | "tests" | "activity";
+// Section is one collapsible block of the panel. XTM's detail sidebar stacks
+// its sections under uppercase headings rather than hiding them behind tabs,
+// so a reader scrolls one column instead of hunting three; this mirrors that,
+// with everything but the fields closed on open so the panel still starts
+// short.
+function Section({
+  title,
+  count,
+  open,
+  onToggle,
+  action,
+  children,
+}: {
+  title: string;
+  count?: number;
+  open: boolean;
+  onToggle: () => void;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  const id = `detail-section-${title.toLowerCase().replace(/\s+/g, "-")}`;
+  return (
+    <section className="detail-section">
+      <h4 className="detail-section-title">
+        <button
+          type="button"
+          className="detail-section-toggle"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={onToggle}
+        >
+          <span className="detail-section-chevron" aria-hidden="true">{open ? "▾" : "▸"}</span>
+          {title}
+          {count !== undefined && <span className="detail-section-count">{count}</span>}
+        </button>
+        {action}
+      </h4>
+      <div id={id} hidden={!open}>
+        {children}
+      </div>
+    </section>
+  );
+}
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "details", label: "Details" },
-  { id: "links", label: "Links" },
-  { id: "tests", label: "Tests" },
-  { id: "activity", label: "Activity" },
-];
+const DEFAULT_WIDTH = 352;
+const MIN_WIDTH = 300;
+const MAX_WIDTH = 900;
+const WIDTH_KEY = "tam.detailPanelWidth";
+
+// The width is a per-machine reading preference, so it lives in the WebView's
+// own storage rather than in the shared settings both apps read. Storage can
+// throw (a locked-down WebView, a cleared profile), and a panel that cannot
+// remember its width must still open at a sensible one.
+function readStoredWidth(): string {
+  try {
+    return window.localStorage.getItem(WIDTH_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeWidth(w: number) {
+  try {
+    window.localStorage.setItem(WIDTH_KEY, String(w));
+  } catch {
+    /* a width that cannot be remembered is not worth failing a drag over */
+  }
+}
 
 interface Props {
   profileId: string;
   issue: Issue;
+  jiraUrl?: string;
   onClose: () => void;
 }
 
 // IssueDetailPanel shows one issue beside the grid. The grid row's fields
 // render at once; the description, links, and linked tests load through the
 // backend's detail cache. Nothing here writes; the actions arrive in plan 1b.
-export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
-  const [tab, setTab] = useState<Tab>("details");
+export function IssueDetailPanel({ profileId, issue, jiraUrl, onClose }: Props) {
+  // Fields open, everything else closed: the panel starts on what a reader
+  // came for and lets them reach the rest without leaving the column.
+  const [open, setOpen] = useState<Record<string, boolean>>({ fields: true });
+  const toggle = (id: string) => setOpen((cur) => ({ ...cur, [id]: !cur[id] }));
   const detail = useIssueDetail(profileId, issue.key);
   const tests = useLinkedTests(profileId, issue.key);
   const discardLink = useDiscardById(profileId);
@@ -38,74 +106,124 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
   // that follows either one can overwrite an edit made while it was in flight.
   const { status } = useSync();
   const busy = status !== "idle";
+  const subtaskType = useSubtaskType(profileId);
+  const [drafting, setDrafting] = useState(false);
+  // The panel's width is the reader's, not the layout's: a 352px column is
+  // right for a glance and wrong for a long description. Kept per machine so
+  // it survives a restart, the way XTM's does.
+  const [width, setWidth] = useState(() => {
+    const saved = Number(readStoredWidth());
+    return Number.isFinite(saved) && saved >= MIN_WIDTH ? Math.min(saved, MAX_WIDTH) : DEFAULT_WIDTH;
+  });
+
+  // The panel is anchored to the right, so dragging left widens it.
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (ev: MouseEvent) =>
+      setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startW - (ev.clientX - startX))));
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setWidth((w) => {
+        storeWidth(w);
+        return w;
+      });
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+  // Jira allows a sub-task under any standard issue, and under neither an
+  // epic nor another sub-task; a draft has no key to hang one off yet.
+  const canHoldSubtasks =
+    !issue.draft &&
+    issue.type !== "epic" &&
+    issue.type !== "subtask" &&
+    (subtaskType.data ?? "") !== "";
 
   return (
-    <aside className="detail-panel" aria-labelledby="detail-title">
+    <aside className="detail-panel" style={{ width }} aria-labelledby="detail-title">
+      <div className="detail-resizer" onMouseDown={startResize} title="Drag to resize" />
+      {/* The dark instrument bar XTM's detail sidebar carries: the key and
+          its status on the left, the actions on the right. */}
       <div className="detail-head">
-        <h2 id="detail-title" className="detail-key">{issue.key}</h2>
-        <TypeChip type={issue.type} />
-        {issue.draft && <span className="chip chip-draft">Draft</span>}
-        <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
+        <div className="detail-head-id">
+          <h2 id="detail-title" className="detail-key">
+            <IssueKeyLink jiraUrl={jiraUrl} issueKey={issue.key} />
+          </h2>
+          {issue.draft ? (
+            <span className="chip chip-draft">Draft</span>
+          ) : (
+            issue.status && <span className="detail-head-status">{issue.status}</span>
+          )}
+        </div>
+        <div className="detail-head-actions">
+          <TypeChip type={issue.type} subtaskLabel={subtaskType.data} />
+          <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close" title="Close">✕</button>
+        </div>
       </div>
+
+      <div className="detail-body">
+
+      {issue.draft && (
+        <p className="muted small detail-note">Commit creates this issue in Jira and gives it a real key.</p>
+      )}
       <p className="detail-summary">{issue.summary}</p>
+      <dl className="detail-fields">
+        <dt>Sprint</dt><dd>{issue.sprintName || "-"}</dd>
+        <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>
+        <dt>Reporter</dt><dd>{issue.reporter || "-"}</dd>
+      </dl>
 
-      <div className="tabs" role="tablist" aria-label="Issue sections">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={tab === t.id}
-            aria-controls={`panel-${t.id}`}
-            className={`tab${tab === t.id ? " tab-active" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
+      <Section
+        title="Fields"
+        open={open.fields ?? false}
+        onToggle={() => toggle("fields")}
+        action={
+          <button type="button" className="btn btn-ghost detail-section-action" onClick={() => void detail.refetch()} disabled={detail.isFetching}>
+            {detail.isFetching ? "Refreshing" : "Refresh"}
           </button>
-        ))}
-      </div>
+        }
+      >
+        {detail.isError && (
+          <p className="error-text" data-testid="detail-error">
+            Could not load the details: {detail.error.message}{" "}
+            <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()}>Retry</button>
+          </p>
+        )}
+        <EditableFields
+          profileId={profileId}
+          issue={issue}
+          description={detail.data?.description ?? ""}
+          descriptionReady={detail.isSuccess}
+          busy={busy}
+        />
+      </Section>
 
-      {tab === "details" && (
-        <div role="tabpanel" id="panel-details" aria-labelledby="tab-details" className="tab-panel">
-          {issue.draft && (
-            <p className="muted small detail-note">Commit creates this issue in Jira and gives it a real key.</p>
-          )}
-          <dl className="field-list">
-            <dt>Status</dt><dd>{issue.status || "-"}</dd>
-            <dt>Sprint</dt><dd>{issue.sprintName || "-"}</dd>
-            <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>
-          </dl>
-          <div className="detail-section-head">
-            <h3>Fields</h3>
-            <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()} disabled={detail.isFetching}>
-              {detail.isFetching ? "Refreshing" : "Refresh"}
-            </button>
-          </div>
-          {detail.isError && (
-            <p className="error-text" data-testid="detail-error">
-              Could not load the details: {detail.error.message}{" "}
-              <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()}>Retry</button>
-            </p>
-          )}
-          <EditableFields
-            profileId={profileId}
-            issue={issue}
-            description={detail.data?.description ?? ""}
-            descriptionReady={detail.isSuccess}
-            busy={busy}
-          />
+      {canHoldSubtasks && (
+        <div className="detail-actions">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setDrafting(true)}
+            title={`Draft a ${subtaskType.data} under ${issue.key}`}
+          >
+            + {subtaskType.data}
+          </button>
         </div>
       )}
 
-      {tab === "links" && (
-        <div role="tabpanel" id="panel-links" aria-labelledby="tab-links" className="tab-panel">
-          <div className="detail-section-head">
-            <h3>Links</h3>
-            <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()} disabled={detail.isFetching}>
-              {detail.isFetching ? "Refreshing" : "Refresh"}
-            </button>
-          </div>
+      <Section
+        title="Links"
+        count={detail.data?.links.length}
+        open={open.links ?? false}
+        onToggle={() => toggle("links")}
+      >
           {detail.isPending ? (
             <p className="muted">Loading links</p>
           ) : detail.isError ? (
@@ -128,20 +246,22 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
             />
           )}
           <AddLinkForm profileId={profileId} issueKey={issue.key} onAdded={() => void detail.refetch()} />
-        </div>
-      )}
+      </Section>
 
-      {tab === "tests" && (
-        <div role="tabpanel" id="panel-tests" aria-labelledby="tab-tests" className="tab-panel">
-          <div className="detail-section-head">
-            <h3>Covered by tests</h3>
-            {tests.data && tests.data.length > 0 && (
-              <span className="muted small">via XTM, link: {tests.data[0].linkType}</span>
-            )}
-            <button type="button" className="btn btn-ghost" onClick={() => void tests.refetch()} disabled={tests.isFetching}>
-              {tests.isFetching ? "Refreshing" : "Refresh"}
-            </button>
-          </div>
+      <Section
+        title="Covered by tests"
+        count={tests.data?.length}
+        open={open.tests ?? false}
+        onToggle={() => toggle("tests")}
+        action={
+          <button type="button" className="btn btn-ghost detail-section-action" onClick={() => void tests.refetch()} disabled={tests.isFetching}>
+            {tests.isFetching ? "Refreshing" : "Refresh"}
+          </button>
+        }
+      >
+          {tests.data && tests.data.length > 0 && (
+            <p className="muted small">via XTM, link: {tests.data[0].linkType}</p>
+          )}
           {tests.isPending ? (
             <p className="muted">Loading tests</p>
           ) : tests.isError ? (
@@ -161,10 +281,22 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
               ))}
             </ul>
           )}
-        </div>
-      )}
+      </Section>
 
-      {tab === "activity" && <ActivityTab profileId={profileId} issueKey={issue.key} />}
+      <Section title="Activity" open={open.activity ?? false} onToggle={() => toggle("activity")}>
+        <ActivityTab profileId={profileId} issueKey={issue.key} />
+      </Section>
+      </div>
+
+      {drafting && (
+        <NewIssueModal
+          onClose={() => setDrafting(false)}
+          initialType="subtask"
+          lockType
+          parentKey={issue.key}
+          onCreated={() => setDrafting(false)}
+        />
+      )}
     </aside>
   );
 }

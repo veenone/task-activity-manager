@@ -12,11 +12,11 @@ import (
 	"agile-suite/core/store"
 )
 
-// Schema is TAM's local schema. Version 3 adds the shared journal tables;
-// their statements are idempotent, so an older database picks them up on
-// its next open without a migration step.
+// Schema is TAM's local schema. Version 4 adds the cached Jira user list
+// behind the assignee picker. Every statement is idempotent, so an older
+// database picks the new tables up on its next open without a migration step.
 var Schema = store.Schema{
-	Version: 3,
+	Version: 4,
 	Base:    baseDDL + journal.DDL,
 	Indexes: indexDDL,
 }
@@ -67,11 +67,23 @@ CREATE TABLE IF NOT EXISTS profile_setting (
 	key        TEXT NOT NULL,
 	value      TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, key)
+);
+-- The people who can be assigned an issue on this profile's instance, so the
+-- assignee picker answers a keystroke from disk instead of a round trip, and
+-- still answers at all when Jira cannot be reached. name is the username the
+-- write path sends; display_name is what the user reads.
+CREATE TABLE IF NOT EXISTS jira_user (
+	profile_id   TEXT NOT NULL,
+	name         TEXT NOT NULL,
+	display_name TEXT NOT NULL DEFAULT '',
+	cached_at    TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, name)
 );`
 
 const indexDDL = `
 CREATE INDEX IF NOT EXISTS issue_profile_type   ON issue (profile_id, type);
-CREATE INDEX IF NOT EXISTS issue_profile_sprint ON issue (profile_id, sprint_id);`
+CREATE INDEX IF NOT EXISTS issue_profile_sprint ON issue (profile_id, sprint_id);
+CREATE INDEX IF NOT EXISTS jira_user_profile_display ON jira_user (profile_id, display_name);`
 
 // Open opens (or creates) TAM's database at path.
 func Open(path string) (*store.DB, error) { return store.Open(path, Schema) }

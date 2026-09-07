@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,6 +26,66 @@ const issueColumns = `key, id, project, type, summary, status, assignee, reporte
 // last, then key. ListIssues and the tree share it so the grid and the
 // Epics view agree on one row order.
 const issueOrder = ` ORDER BY CASE WHEN key LIKE '` + DraftPrefix + `%' THEN 0 WHEN rank = '' THEN 2 ELSE 1 END, rank, key`
+
+// sortColumns maps the sort keys the grid sends to the SQL that orders by
+// them. It is a whitelist, not a format string: the value from the frontend
+// only ever selects an entry here, so no caller input reaches the query.
+//
+// Every expression sorts blanks last, so a page of issues does not open on a
+// block of rows with nothing in the sorted column. Story points are numeric
+// and NULL when unset; the rest are text, compared case-insensitively because
+// a Jira status or display name is prose, not an identifier.
+var sortColumns = map[string]string{
+	"key":         "key COLLATE NOCASE",
+	"type":        "type = '' , type COLLATE NOCASE",
+	"summary":     "summary = '' , summary COLLATE NOCASE",
+	"status":      "status = '' , status COLLATE NOCASE",
+	"assignee":    "assignee = '' , assignee COLLATE NOCASE",
+	"sprint":      "sprint_name = '' , sprint_name COLLATE NOCASE",
+	"storyPoints": "story_points IS NULL, story_points",
+}
+
+// SortColumns lists the sort keys ListIssues accepts, for the frontend and
+// the tests to agree with without repeating the list.
+func SortColumns() []string {
+	out := make([]string, 0, len(sortColumns))
+	for k := range sortColumns {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// orderFor is the ORDER BY for q: the default rank order when no sort column
+// is named or the name is not one this store knows, otherwise the named
+// column with the key as the tie-break so equal values keep a stable page
+// boundary. Drafts stay pinned to the top under every sort: they are the
+// user's own uncommitted rows and burying them under a sort would hide work
+// that has not reached Jira yet.
+func orderFor(q IssueQuery) string {
+	expr, ok := sortColumns[q.Sort]
+	if !ok {
+		return issueOrder
+	}
+	dir := " ASC"
+	if q.Desc {
+		dir = " DESC"
+	}
+	// The blanks-last guard and the tie-break are not reversed with the
+	// column: blanks belong at the bottom either way, and the tie-break only
+	// has to be deterministic.
+	parts := strings.Split(expr, " , ")
+	ordered := make([]string, len(parts))
+	for i, part := range parts {
+		if i < len(parts)-1 {
+			ordered[i] = part // the "is blank" guard, always ascending
+			continue
+		}
+		ordered[i] = part + dir
+	}
+	return ` ORDER BY CASE WHEN key LIKE '` + DraftPrefix + `%' THEN 0 ELSE 1 END, ` +
+		strings.Join(ordered, ", ") + `, key`
+}
 
 const upsertIssueSQL = `
 	INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
@@ -86,8 +147,9 @@ func (r *Repository) UpsertPage(ctx context.Context, profileID string, page []ba
 	return tx.Commit()
 }
 
-// ListIssues returns one page matching q, drafts first, then by rank with
-// unranked rows last, then by key.
+// ListIssues returns one page matching q. Rows come back in q's sort order,
+// or drafts first then rank with unranked rows last then key when q names no
+// sort column.
 func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQuery) (IssuePage, error) {
 	where, args := issueFilter(profileID, q)
 	var total int
@@ -106,7 +168,7 @@ func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQu
 		offset = 0
 	}
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT `+issueColumns+` FROM issue WHERE `+where+issueOrder+` LIMIT ? OFFSET ?`,
+		`SELECT `+issueColumns+` FROM issue WHERE `+where+orderFor(q)+` LIMIT ? OFFSET ?`,
 		append(args, limit, offset)...)
 	if err != nil {
 		return IssuePage{}, fmt.Errorf("list issues: %w", err)

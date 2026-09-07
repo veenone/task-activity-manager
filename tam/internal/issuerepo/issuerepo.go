@@ -33,6 +33,13 @@ type IssueQuery struct {
 	SprintID string   `json:"sprintId"`
 	Offset   int      `json:"offset"`
 	Limit    int      `json:"limit"`
+	// Sort names the column the grid is ordered by: one of the keys in
+	// sortColumns, or "" for the default rank order. Desc reverses it.
+	// Sorting happens here rather than in the frontend because the grid is
+	// paged: the frontend only ever holds one page, so a client-side sort
+	// would order 25 rows out of a project's thousands.
+	Sort string `json:"sort"`
+	Desc bool   `json:"desc"`
 }
 
 // IssuePage is one page of rows plus the total the filter matches.
