@@ -292,6 +292,24 @@ describe("BoardsView refresh", () => {
     expect(await screen.findByText("2 boards were skipped: Ops, Platform")).toBeInTheDocument();
   });
 
+  it("says why a Refresh failed and offers a Retry", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.SyncBoards).mockRejectedValueOnce(new Error("a commit is already running for this profile"));
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    const banner = await screen.findByText(/Could not refresh the boards: a commit is already running for this profile/);
+    expect(banner.closest(".pending-banner-warn")).toBeInTheDocument();
+    expect(screen.queryByText("Refreshing")).not.toBeInTheDocument();
+
+    await user.click(within(banner.closest(".pending-banner-warn") as HTMLElement).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(api.SyncBoards).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByText(/Could not refresh the boards/)).not.toBeInTheDocument(),
+    );
+  });
+
   it("is disabled while the shared sync is running", async () => {
     sync.canSync = false;
     sync.status = "syncing";

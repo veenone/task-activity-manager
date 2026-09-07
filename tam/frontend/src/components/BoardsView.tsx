@@ -1,14 +1,14 @@
 import { useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { useProfile } from "@agile-suite/core";
+import { errMsg, useProfile } from "@agile-suite/core";
 import type { BoardView, Issue, Profile, Settings, Swimlane } from "../api";
 import { useBoard, useBoardSprints, useBoards, useBoardsUnavailable, useSyncBoards } from "../queries/boards";
 import { useSyncState } from "../queries/issues";
 import { useSync } from "../contexts/SyncContext";
 import { clampFocus, findCard, moveFocus, parsePos, posId } from "../lib/boardCells";
 import type { Pos } from "../lib/boardCells";
-import { plural } from "../lib/format";
 import { BoardBody } from "./BoardBody";
+import { BoardsBanner } from "./BoardsBanner";
 import { BoardSummaryLine } from "./BoardNotes";
 import { BoardsToolbar } from "./BoardsToolbar";
 import { IssueDetailPanel } from "./IssueDetailPanel";
@@ -68,7 +68,6 @@ export function BoardsView() {
   const unavailable = useBoardsUnavailable(activeId);
   const syncState = useSyncState(activeId);
   const sync = useSyncBoards(activeId);
-  const dropped = sync.data?.dropped ?? [];
 
   const data = view.data;
   // Exactly one card is focusable, in every state: the one focus is on when
@@ -132,11 +131,12 @@ export function BoardsView() {
         onRefresh={() => sync.mutate()}
       />
 
-      {dropped.length > 0 && (
-        <div className="pending-banner">
-          <p>{`${plural(dropped.length, "board", "boards")} ${dropped.length === 1 ? "was" : "were"} skipped: ${dropped.join(", ")}`}</p>
-        </div>
-      )}
+      <BoardsBanner
+        error={sync.isError ? errMsg(sync.error) : ""}
+        dropped={sync.data?.dropped ?? []}
+        canRetry={canSync && !sync.isPending}
+        onRetry={() => sync.mutate()}
+      />
 
       {data && <BoardSummaryLine view={data} sprint={sprint} lastSynced={syncState.data?.lastSynced ?? ""} />}
 
