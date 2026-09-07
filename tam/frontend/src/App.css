@@ -178,13 +178,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .profile-setting .detail-input-inline { width: 150px; }
 
 /* Plan 1b: pending changes */
-.chip-pending {
-  background: var(--warn-bg, #fef3c7);
-  color: var(--warn-fg, #92400e);
-  border: 1px solid var(--warn-border, #f59e0b);
-  cursor: pointer;
-  font-weight: 600;
-}
 .chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
 .chip-conflict { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; text-transform: uppercase; font-size: 10px; }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
@@ -228,8 +221,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-import + .filter-new { margin-left: 8px; }
 
 /* Phase 2: Epics */
-.epics-body { display: flex; min-height: 0; flex: 1; }
+.epics-body { display: flex; gap: 12px; align-items: flex-start; min-height: 0; flex: 1; }
+/* The tree pane takes every pixel the detail panel does not, and the tree
+   fills it. The shared .folder-tree width is XTM's sidebar width, right for
+   a sidebar and far too narrow when the tree is the view's main content. */
 .epics-tree-pane { flex: 1; min-width: 0; overflow: auto; }
+.epics-tree-pane .folder-tree { width: 100%; border-right: none; border: 1px solid var(--border); border-radius: 6px; }
 .epics-summary { margin-bottom: 4px; }
 
 /* Plan 1c: links */

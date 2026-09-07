@@ -86,6 +86,17 @@ export default function App() {
           <button className="topbar-btn" onClick={() => openModal("profiles")}>Manage</button>
         </div>
         <div className="topbar-zone topbar-right">
+          {pendingCount > 0 && (
+            <button
+              type="button"
+              className="btn-pending"
+              onClick={() => openModal("pending")}
+              title="Show uncommitted changes"
+            >
+              <span className="pending-dot" aria-hidden="true" />
+              {`${pendingCount} pending`}
+            </button>
+          )}
           <Menu
             label="Sync"
             align="right"
@@ -178,11 +189,6 @@ export default function App() {
               ? `Syncing: ${progress.fetched} of ${progress.total}`
               : progress.stage || "Syncing"}
           </span>
-        )}
-        {pendingCount > 0 && (
-          <button type="button" className="chip chip-pending" onClick={() => openModal("pending")}>
-            {`${pendingCount} pending ${pendingCount === 1 ? "change" : "changes"}: Commit`}
-          </button>
         )}
         {(syncError || syncState.data?.lastError) && !progress && (
           <span className="error-text" data-testid="sync-error">
