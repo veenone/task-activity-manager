@@ -19,7 +19,7 @@ const (
 )
 
 // issueColumns is the SELECT list every row read uses, in scan order.
-const issueColumns = `key, id, project, type, summary, status, assignee, reporter, priority, labels,
+const issueColumns = `key, id, project, type, summary, status, status_id, assignee, reporter, priority, labels,
 	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
 // issueOrder puts drafts first, then ranked rows by rank with unranked rows
@@ -88,19 +88,19 @@ func orderFor(q IssueQuery) string {
 }
 
 const upsertIssueSQL = `
-	INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
+	INSERT INTO issue (profile_id, key, id, project, type, summary, status, status_id, assignee, reporter, priority, labels,
 		sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, key) DO UPDATE SET
 		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
-		status = excluded.status, assignee = excluded.assignee, reporter = excluded.reporter,
+		status = excluded.status, status_id = excluded.status_id, assignee = excluded.assignee, reporter = excluded.reporter,
 		priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
 		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
 		story_points = excluded.story_points, rank = excluded.rank, created = excluded.created,
 		updated = excluded.updated, synced_at = excluded.synced_at`
 
 func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Issue, syncedAt time.Time) error {
-	labels, err := json.Marshal(nonNil(iss.Labels))
+	labels, err := json.Marshal(backend.NonNil(iss.Labels))
 	if err != nil {
 		return fmt.Errorf("labels for %s: %w", iss.Key, err)
 	}
@@ -108,7 +108,7 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 	if iss.StoryPoints != nil {
 		points = sql.NullFloat64{Float64: *iss.StoryPoints, Valid: true}
 	}
-	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, iss.Status,
+	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, iss.Status, iss.StatusID,
 		iss.Assignee, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
 		points, iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
 		return fmt.Errorf("upsert %s: %w", iss.Key, err)
@@ -226,6 +226,92 @@ func (r *Repository) ListSprints(ctx context.Context, profileID string) ([]Sprin
 	return out, rows.Err()
 }
 
+// keyChunk is how many keys go into one IN list. SQLite's default limit on
+// host parameters is 999, so a board of thousands of cards is read in
+// several statements rather than one that would fail.
+const keyChunk = 500
+
+// IssuesByKeys returns the cached issues for keys, in the caller's own
+// order, skipping the keys the cache does not hold. A board's card order is
+// the board's, not the database's, and no ORDER BY can ask SQL to return an
+// IN list in the order it was given, so the rows are scanned into a map and
+// the caller's slice is walked to build the result.
+func (r *Repository) IssuesByKeys(ctx context.Context, profileID string, keys []string) ([]backend.Issue, error) {
+	if len(keys) == 0 {
+		return []backend.Issue{}, nil
+	}
+	found := make(map[string]backend.Issue, len(keys))
+	for start := 0; start < len(keys); start += keyChunk {
+		end := start + keyChunk
+		if end > len(keys) {
+			end = len(keys)
+		}
+		chunk := keys[start:end]
+		marks := strings.TrimSuffix(strings.Repeat("?, ", len(chunk)), ", ")
+		args := make([]any, 0, len(chunk)+1)
+		args = append(args, profileID)
+		for _, k := range chunk {
+			args = append(args, k)
+		}
+		if err := r.scanIssuesInto(ctx, found,
+			`SELECT `+issueColumns+` FROM issue WHERE profile_id = ? AND key IN (`+marks+`)`, args); err != nil {
+			return nil, err
+		}
+	}
+	out := make([]backend.Issue, 0, len(keys))
+	for _, k := range keys {
+		if iss, ok := found[k]; ok {
+			out = append(out, iss)
+		}
+	}
+	return out, nil
+}
+
+// draftsSQL reads the profile's drafts. It matches them the way every other
+// read in the package does, by the DraftPrefix key, so there is one
+// definition of what a draft is and scanIssue's Draft flag agrees with it.
+const draftsSQL = `SELECT ` + issueColumns + ` FROM issue WHERE profile_id = ? AND key LIKE ? ORDER BY key`
+
+// DraftIssues returns the profile's local drafts in key order. The board
+// asks for these separately from the board's own keys: Jira's board issue
+// list is where those come from and it can never name a draft key, so
+// without this a draft would never reach a board at all. Drafts are
+// project-level, which is why every board and every sprint of the profile
+// gets the same ones.
+func (r *Repository) DraftIssues(ctx context.Context, profileID string) ([]backend.Issue, error) {
+	rows, err := r.db.QueryContext(ctx, draftsSQL, profileID, DraftPrefix+"%")
+	if err != nil {
+		return nil, fmt.Errorf("draft issues: %w", err)
+	}
+	defer rows.Close()
+	out := []backend.Issue{}
+	for rows.Next() {
+		iss, err := scanIssue(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, iss)
+	}
+	return out, rows.Err()
+}
+
+// scanIssuesInto runs one row read and files every row under its key.
+func (r *Repository) scanIssuesInto(ctx context.Context, into map[string]backend.Issue, query string, args []any) error {
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("issues by keys: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		iss, err := scanIssue(rows)
+		if err != nil {
+			return err
+		}
+		into[iss.Key] = iss
+	}
+	return rows.Err()
+}
+
 // issueFilter builds the WHERE clause for q. The profile is always the first
 // condition, so an empty query still scopes to one profile.
 func issueFilter(profileID string, q IssueQuery) (string, []any) {
@@ -268,7 +354,7 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		points  sql.NullFloat64
 		pending int
 	)
-	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.Assignee,
+	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.StatusID, &iss.Assignee,
 		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
 		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err
@@ -276,7 +362,7 @@ func scanIssue(s scanner) (backend.Issue, error) {
 	if err := json.Unmarshal([]byte(labels), &iss.Labels); err != nil {
 		return backend.Issue{}, fmt.Errorf("labels for %s: %w", iss.Key, err)
 	}
-	iss.Labels = nonNil(iss.Labels)
+	iss.Labels = backend.NonNil(iss.Labels)
 	if points.Valid {
 		v := points.Float64
 		iss.StoryPoints = &v
@@ -284,11 +370,4 @@ func scanIssue(s scanner) (backend.Issue, error) {
 	iss.Pending = pending != 0
 	iss.Draft = strings.HasPrefix(iss.Key, DraftPrefix)
 	return iss, nil
-}
-
-func nonNil(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return s
 }

@@ -13,9 +13,98 @@ collection "Task Activity Manager" mirrors it.
 Plan 1a (issues, read path): sync by project into `tam.db`, the Backlog
 grid, and a read-only detail panel, on the demo dataset or a live Jira DC.
 Plan 1b adds the journal, create and edit, and Commit. Plan 1c adds Excel
-import, cross-project links, and requirement creation. Phase 2 (this
-branch) adds the epic and story hierarchy: the Epics view, `parentKey` as
-the seventh editable field, and epic creation.
+import, cross-project links, and requirement creation. Phase 2 adds the
+epic and story hierarchy: the Epics view, `parentKey` as the seventh
+editable field, and epic creation. Phase 3a (this branch) adds the Boards
+view: boards, columns, and sprints synced from Jira's Agile API, read only.
+
+## Phase 3a: boards
+
+`core/jira/agile.go` is the Agile 1.0 transport: `Boards`, `BoardConfiguration`,
+`Sprints`, and `BoardIssueKeys`, each paged to exhaustion and returning
+Jira's raw shape. A Data Center with no Jira Software answers `Boards`
+with 404, mapped to `ErrNoAgile`; a kanban board's sprint call answers 400,
+mapped to `ErrNoSprints`. TAM's `internal/backend.BoardBackend` is the
+read-only capability those four calls back, kept off `IssueBackend` so
+only a backend that can speak Jira's Agile API has to answer for it; the
+demo backend implements it too, with one scrum board (three sprints, one
+closed) and one kanban board.
+
+Schema version 5 adds four tables to `tam.db`, all keyed by profile:
+`board`, `board_column`, `sprint`, and `board_issue` (a board's membership
+of one scope, `sprint_id` empty for the board's own list and a sprint id
+otherwise). It also adds a `status_id` column to `issue`, which is how a
+card is matched to a column. Since `CREATE TABLE IF NOT EXISTS` cannot add
+a column to a table that already exists, this is the plan's first store
+migration (`tamstore.Schema.Migrations`): it adds the column, then clears
+every profile's sync watermark. **An incremental sync only re-reads issues
+Jira reports changed since the watermark, so a row cached before version 5
+would never get a status id filled in on its own; clearing the watermark
+is what makes the next sync for each profile re-read every issue and fill
+the column in, without purging anything first.**
+
+Schema version 6 re-keys `sprint` from `(profile_id, id)` to
+`(profile_id, board_id, id)`. Jira Data Center hands the same sprint to
+every board whose filter reaches it, and the sync clears and writes
+sprints one board at a time, so two scrum boards over one project used to
+collide on the second board's insert and take the whole pass down. SQLite
+cannot change a primary key in place, so the migration drops the table and
+recreates it: it is a cache the next sync refills, and nothing joins to
+its rows.
+
+`internal/boardrepo` is the store layer over the four tables, beside
+`issuerepo` since boards are their own concern. It never imports
+`issuerepo`: what it needs from the issue cache is the two-method
+`IssueSource` interface (`IssuesByKeys`, `DraftIssues`), which `app.go`
+satisfies with the issue repository it already holds. `boardrepo.Board`
+composes the view a board draws: columns in board order, cards bucketed
+into them by status id (a draft goes to the first column that collects
+any status, since Jira has never assigned it one), and the lanes the
+chosen swimlane (none, assignee, epic) asks for. A card whose status is
+in no column is counted into `Unmapped`, and its status name into
+`UnmappedStatuses`, not listed card by card. A cell caps at 200 cards and
+the whole view at 2,000; past either cap a card is only counted, in
+`Overflow` and `Capped`. `DonePoints` is summed in the same walk, over
+every mapped card rather than the ones a capped cell drew, by
+`backend.IsDone`: the definition lives in `internal/backend` because both
+`boardrepo` and `issuerepo` count by it and `boardrepo` may not import
+`issuerepo`. `NeedsStatusSync` is true when every cached card
+still carries an empty status id, which is the state right after the
+version 5 migration and before the next sync; the view tells the user to
+sync rather than drawing an empty board and blaming them for it.
+
+`internal/syncer/boards.go` is `Engine.SyncBoards`, reached through a type
+assertion on `backend.BoardBackend` so a backend without it is skipped,
+not failed. It runs after the issues pass in a regular sync, and alone
+from the Boards view's Refresh. For each board it reads columns, sprints,
+its own issue list, and the issue keys of its active and future sprints
+only, then writes all of it for that board in one transaction with
+`boardrepo.ReplaceBoard`; a board whose read fails at any point is
+recorded in the summary's `Dropped` with a one-line reason from
+`internal/errtext` (added during review: it strips HTML tags and
+collapses whitespace, since a 403 answered with an HTML login page hands
+the transport a kilobyte of markup) and is left exactly as it was. The
+four bound methods are `ListBoards`, `ListBoardSprints`, `GetBoard`, and
+`SyncBoards`, all in `app_boards.go`. Nothing in Phase 3a writes to Jira;
+`BoardCard` refuses a drag and announces that dragging arrives in the
+next release.
+
+Two facts worth knowing before they cost you a debugging session:
+
+- **An incremental sync cannot backfill `status_id`.** That is the whole
+  reason version 5's migration clears the sync watermark rather than just
+  adding the column: without the reset, every issue cached before this
+  branch would carry an empty status id forever, since nothing would ever
+  ask Jira for it again.
+- **A board's membership is whatever Jira's board endpoint returned at
+  sync time.** TAM does not compute board membership from status; it
+  caches the key list `/board/{id}/issue` and `/board/{id}/sprint/{id}/issue`
+  answered with. A card moved on the web board moves in TAM only after
+  the next sync, boards sync included.
+- **Only the active and future sprints have their cards fetched.** A
+  closed sprint stays in the sprint list, for history, but its membership
+  is never pulled, so the sprint picker offers only active and future
+  sprints and no others.
 
 ## The write path (plan 1b)
 
@@ -305,28 +394,38 @@ until one is entered. A Kiwi profile file is refused.
     app_issues.go        the issue methods: sync, list, detail, per-profile settings
     app_writes.go        the write methods: edit, create, commit, and conflict resolution
     app_imports.go       the import methods: preview, mapping, and creating drafts from a file
-    internal/tamstore/   TAM's own SQLite file (schema version 4: issue, issue_link, sync_state,
-                          profile_setting, jira_user, plus the shared journal tables pending_change
-                          and audit_log)
-    internal/backend/    IssueBackend seam and DTOs; backend/jira on core/jira, backend/demo on internal/demo
+    app_boards.go        the board methods: list boards, list sprints, get a board's view, sync boards
+    internal/tamstore/   TAM's own SQLite file (schema version 6: issue (with status_id), issue_link,
+                          sync_state, profile_setting, jira_user, board, board_column, board_issue,
+                          sprint, plus the shared journal tables pending_change and audit_log)
+    internal/backend/    IssueBackend and BoardBackend seams and DTOs; backend/jira on core/jira,
+                          backend/demo on internal/demo
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile
     internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile
                           settings, the pending-change journal, and drafts; tree.go groups the
                           cache into the Epics view's tree
+    internal/boardrepo/  the store layer over board, board_column, board_issue, and sprint; view.go
+                          composes the Boards view's data over the issue cache through IssueSource
     internal/committer/  pushes the journal to Jira and resolves conflicts
     internal/importer/   maps import columns to draft fields and validates rows
-    internal/syncer/     the paging engine; emits tam:sync-progress through app_issues.go
+    internal/syncer/     the paging engine; emits tam:sync-progress through app_issues.go; boards.go
+                          is the boards pass, reached through backend.BoardBackend
+    internal/errtext/    reduces an error to one readable line (strips HTML tags, collapses
+                          whitespace) for sync summaries and dropped-board reasons
     internal/suiteprofiles/  which shared profiles TAM shows, demo detection, validation
     frontend/            React app on @agile-suite/core (see ../frontend/core)
       src/api.ts         typed access to the bindings; plain shapes for fixtures
       src/lib/keyColumn.ts  the issue-key column width both tables share
       src/queries/       TanStack Query keys, hooks, and the post-sync invalidation
       src/contexts/      SyncContext on the shared sync reducer
+      src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
+                          over the lane/column/index grid
       src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
                           AssigneePicker, PriorityPicker,
                           PendingChangesModal, ConflictCard, NewIssueModal, ProfilesModal,
                           ProfileForm, AboutModal, ImportIssuesModal, AddLinkForm, EpicsView,
-                          EpicTree, EpicRow
+                          EpicTree, EpicRow, BoardsView, BoardsToolbar, BoardBody, BoardGrid,
+                          BoardCard, BoardNotes
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands

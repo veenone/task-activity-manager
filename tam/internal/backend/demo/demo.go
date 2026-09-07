@@ -53,7 +53,9 @@ func (b *Backend) TestConnection(context.Context) (backend.User, error) {
 func (b *Backend) IsDemo() bool { return true }
 
 // issues is the dataset with the overlay applied: rewritten rows replace
-// their originals, created rows follow. Callers hold b.mu.
+// their originals, created rows follow. Every row leaves with its status id
+// filled in from its status name, since the dataset stores names and the
+// board joins by id. Callers hold b.mu.
 func (b *Backend) issues() []backend.Issue {
 	all := demo.Issues(b.project)
 	seen := map[string]bool{}
@@ -67,6 +69,9 @@ func (b *Backend) issues() []backend.Issue {
 		if !seen[k] {
 			all = append(all, o)
 		}
+	}
+	for i := range all {
+		all[i] = statusIDFor(all[i])
 	}
 	return all
 }
@@ -131,7 +136,7 @@ func (b *Backend) find(key string) (backend.Issue, bool) {
 	}
 	for _, iss := range demo.ForeignIssues(b.project) {
 		if iss.Key == key {
-			return iss, true
+			return statusIDFor(iss), true
 		}
 	}
 	return backend.Issue{}, false

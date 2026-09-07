@@ -3,10 +3,12 @@ package syncer_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
+	corejira "agile-suite/core/jira"
 	"agile-suite/tam/internal/backend"
 	demobackend "agile-suite/tam/internal/backend/demo"
 	"agile-suite/tam/internal/issuerepo"
@@ -26,12 +28,36 @@ func newRepo(t *testing.T) *issuerepo.Repository {
 
 // fake is a scripted IssueBackend: fixed pages, an optional page that
 // fails, and a record of the since values it was asked for.
+//
+// The board fields (below sinceSeen) let the same fake stand in for
+// backend.BoardBackend too, scripted per board id so the composed-sync
+// tests in this file and the boards pass tests in boards_test.go can share
+// one backend rather than keeping two.
 type fake struct {
 	pages     [][]backend.Issue
 	failPage  int // 1-based page index that returns failErr; 0 for none
 	failErr   error
 	connErr   error
 	sinceSeen []string
+
+	boards       []backend.Board
+	boardsErr    error
+	columns      map[int][]backend.BoardColumn
+	columnsErr   map[int]error
+	sprints      map[int][]backend.Sprint
+	sprintsErr   map[int]error
+	issueKeys    map[int]map[string][]string
+	issueKeysErr map[int]map[string]error
+	// keysRequested records every (boardID, sprintID) pair BoardIssueKeys
+	// was asked for, so a test can assert only active and future sprints
+	// had their keys fetched.
+	keysRequested []boardKeyRequest
+}
+
+// boardKeyRequest is one call the boards pass made to BoardIssueKeys.
+type boardKeyRequest struct {
+	BoardID  int
+	SprintID string
 }
 
 func (f *fake) TestConnection(context.Context) (backend.User, error) {
@@ -75,6 +101,39 @@ func (f *fake) LinkTypes(context.Context) ([]backend.LinkType, error) {
 func (f *fake) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
 }
+
+// Boards, BoardColumns, BoardSprints, and BoardIssueKeys make *fake satisfy
+// backend.BoardBackend too, each scripted by board id so the same fake
+// drives both an issues pass and a boards pass in one test.
+func (f *fake) Boards(context.Context, string) ([]backend.Board, error) {
+	return f.boards, f.boardsErr
+}
+
+func (f *fake) BoardColumns(_ context.Context, boardID int) ([]backend.BoardColumn, error) {
+	if err := f.columnsErr[boardID]; err != nil {
+		return nil, err
+	}
+	return f.columns[boardID], nil
+}
+
+func (f *fake) BoardSprints(_ context.Context, boardID int) ([]backend.Sprint, error) {
+	if err := f.sprintsErr[boardID]; err != nil {
+		return nil, err
+	}
+	return f.sprints[boardID], nil
+}
+
+func (f *fake) BoardIssueKeys(_ context.Context, boardID int, sprintID string) ([]string, error) {
+	f.keysRequested = append(f.keysRequested, boardKeyRequest{BoardID: boardID, SprintID: sprintID})
+	if errs, ok := f.issueKeysErr[boardID]; ok {
+		if err := errs[sprintID]; err != nil {
+			return nil, err
+		}
+	}
+	return f.issueKeys[boardID][sprintID], nil
+}
+
+var _ backend.BoardBackend = (*fake)(nil)
 
 func issue(key, typ string) backend.Issue {
 	return backend.Issue{Key: key, ID: key, Project: "PLAT", Type: typ, Summary: key, Status: "To Do", Rank: key, Updated: "2026-09-01T00:00:00Z"}
@@ -346,3 +405,143 @@ func (c *cancelOnSearch) Priorities(context.Context) ([]string, error) { return 
 func (f *fake) SubtaskTypeName(context.Context, string) (string, error) { return "Technical task", nil }
 
 func (c *cancelOnSearch) SubtaskTypeName(context.Context, string) (string, error) { return "", nil }
+
+func TestSyncRunsIssuesThenBoards(t *testing.T) {
+	repo, boards := newBoardRepos(t)
+	fb := &fake{
+		pages:   [][]backend.Issue{{issue("PLAT-1", "task")}},
+		boards:  []backend.Board{{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}},
+		columns: map[int][]backend.BoardColumn{1: {{Name: "To Do", StatusIDs: []string{"1"}}}},
+		sprints: map[int][]backend.Sprint{1: {}},
+		issueKeys: map[int]map[string][]string{
+			1: {"": {"PLAT-1"}},
+		},
+	}
+	e := syncer.New(fb, repo)
+	e.Boards = boards
+
+	var frames []syncer.Progress
+	sum, err := e.Sync(context.Background(), "p1", "PLAT", "", false, func(p syncer.Progress) {
+		frames = append(frames, p)
+	})
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if sum.Upserted != 1 {
+		t.Errorf("issues upserted = %d, want 1", sum.Upserted)
+	}
+	if sum.Boards == nil {
+		t.Fatal("summary.Boards is nil, want the boards pass to have run")
+	}
+	// The frames say the order: every issue frame the pass emits lands
+	// before the first board frame, and the terminal frame closes the run
+	// after both passes.
+	firstBoard := -1
+	for i, f := range frames {
+		if f.Phase == "boards" {
+			firstBoard = i
+			break
+		}
+	}
+	if firstBoard < 1 {
+		t.Fatalf("frames = %+v, want issue frames before the first board frame", frames)
+	}
+	for _, f := range frames[:firstBoard] {
+		if f.Phase != "issues" || f.Done {
+			t.Errorf("frame before the boards phase = %+v, want an unfinished issues frame", f)
+		}
+	}
+	last := frames[len(frames)-1]
+	if last.Phase != "issues" || !last.Done {
+		t.Errorf("last frame = %+v, want the terminal issues frame", last)
+	}
+	if sum.Boards.Boards != 1 || sum.Boards.Unavailable {
+		t.Errorf("boards summary = %+v", sum.Boards)
+	}
+	got, err := boards.ListBoards(context.Background(), "p1")
+	if err != nil || len(got) != 1 {
+		t.Fatalf("boards after a composed sync = %+v, %v", got, err)
+	}
+}
+
+func TestBoardsFailureDoesNotFailTheIssueSyncAndKeepsLastSynced(t *testing.T) {
+	repo, boards := newBoardRepos(t)
+	fb := &fake{
+		pages:     [][]backend.Issue{{issue("PLAT-1", "task")}},
+		boardsErr: errors.New("jira: 500 Internal Server Error"),
+	}
+	e := syncer.New(fb, repo)
+	e.Boards = boards
+	start := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	e.Now = fixedClock(start)
+
+	sum, err := e.Sync(context.Background(), "p1", "PLAT", "", false, nil)
+	if err != nil {
+		t.Fatalf("sync: %v, want the boards failure not to fail the issue sync", err)
+	}
+	if sum.Upserted != 1 {
+		t.Errorf("issues upserted = %d, want 1", sum.Upserted)
+	}
+	if sum.Boards == nil {
+		t.Fatal("summary.Boards is nil, want the failed pass carried in the summary")
+	}
+	st, err := repo.SyncState(context.Background(), "p1")
+	if err != nil {
+		t.Fatalf("sync state: %v", err)
+	}
+	// The watermark is this run's own start: the issues landed, so the
+	// next sync must not refetch the world because the boards failed.
+	if st.LastSynced != start.Format(time.RFC3339) {
+		t.Errorf("last_synced = %q, want this run's start %q", st.LastSynced, start.Format(time.RFC3339))
+	}
+	if st.LastError != "" {
+		t.Errorf("last error = %q, want the issue sync recorded as successful", st.LastError)
+	}
+}
+
+func TestErrNoAgileMarksUnavailableAndRemovesNoBoards(t *testing.T) {
+	repo, boards := newBoardRepos(t)
+	// Seed a board from an earlier run when the instance still had an
+	// Agile API, so the test can prove ErrNoAgile leaves it alone.
+	if err := boards.ReplaceBoard(context.Background(), "p1",
+		backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}, nil, nil, nil); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+
+	fb := &fake{
+		pages:     [][]backend.Issue{{issue("PLAT-1", "task")}},
+		boardsErr: fmt.Errorf("project PLAT boards: %w", corejira.ErrNoAgile),
+	}
+	e := syncer.New(fb, repo)
+	e.Boards = boards
+
+	sum, err := e.Sync(context.Background(), "p1", "PLAT", "", false, nil)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if sum.Boards == nil || !sum.Boards.Unavailable {
+		t.Fatalf("boards summary = %+v, want Unavailable", sum.Boards)
+	}
+	got, err := boards.ListBoards(context.Background(), "p1")
+	if err != nil || len(got) != 1 {
+		t.Fatalf("boards after ErrNoAgile = %+v, %v, want the seeded board left alone", got, err)
+	}
+	v, err := repo.ProfileSetting(context.Background(), "p1", "boards_unavailable")
+	if err != nil || v != "true" {
+		t.Errorf("boards_unavailable = %q, %v, want it recorded", v, err)
+	}
+}
+
+func TestNilBoardsFieldRunsNoBoardsPass(t *testing.T) {
+	repo := newRepo(t)
+	fb := &fake{pages: [][]backend.Issue{{issue("PLAT-1", "task")}}}
+	e := syncer.New(fb, repo)
+
+	sum, err := e.Sync(context.Background(), "p1", "PLAT", "", false, nil)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if sum.Boards != nil {
+		t.Errorf("summary.Boards = %+v, want nil when the engine has no Boards repository", sum.Boards)
+	}
+}

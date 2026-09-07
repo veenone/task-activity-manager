@@ -147,6 +147,11 @@ func (a *App) DeleteProfile(id string) error {
 		// stale local rows rather than a half-deleted profile. Log it.
 		log.Printf("tam: purge local rows for %s: %v", id, err)
 	}
+	// The board tables are boardrepo's, not issuerepo's, so they are purged
+	// beside it rather than by it.
+	if err := a.boards.PurgeProfile(a.ctx, id); err != nil {
+		log.Printf("tam: purge local board rows for %s: %v", id, err)
+	}
 	if err := a.creds.Delete(id); err != nil {
 		log.Printf("tam: delete credentials for %s: %v", id, err)
 	}

@@ -122,7 +122,10 @@ func Issues(projectKey string) []backend.Issue {
 		iss := c
 		iss.Key = rekey(iss.Key, projectKey)
 		iss.ParentKey = rekey(iss.ParentKey, projectKey)
-		iss.Labels = nonNil(iss.Labels)
+		// backend.NonNil is not enough here: curated is package state and
+		// the caller must never be handed its own slice. Copying covers
+		// the nil case too, since a copy of nil is the empty slice.
+		iss.Labels = append([]string{}, iss.Labels...)
 		iss.Project = projectKey
 		iss.ID = fmt.Sprintf("%d", 10000+i)
 		iss.Rank = fmt.Sprintf("0|i%04d:", i)
@@ -230,11 +233,4 @@ func rekey(key, projectKey string) string {
 		return projectKey + strings.TrimPrefix(key, ProjectKey)
 	}
 	return key
-}
-
-func nonNil(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return append([]string{}, s...)
 }

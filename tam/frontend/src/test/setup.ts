@@ -2,7 +2,14 @@
 import "@testing-library/jest-dom/vitest";
 
 import { afterEach } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
+
+// findBy* waits 1000ms by default, which is generous on an idle machine and
+// not always enough when fourteen test files run in parallel: a query that
+// waits on a resolved promise plus a re-render (the sub-task button waits on
+// GetSubtaskTypeName) can miss that window under load and fail a suite that
+// passes serially. The same reason vite.config.ts raises testTimeout.
+configure({ asyncUtilTimeout: 5000 });
 
 // Testing Library only registers its own afterEach cleanup when Vitest globals
 // are enabled, and this project keeps them off (vite.config.ts sets no

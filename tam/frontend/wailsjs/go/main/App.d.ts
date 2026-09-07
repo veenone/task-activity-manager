@@ -4,6 +4,7 @@ import {backend} from '../models';
 import {importer} from '../models';
 import {committer} from '../models';
 import {profile} from '../models';
+import {boardrepo} from '../models';
 import {main} from '../models';
 import {issuerepo} from '../models';
 import {settings} from '../models';
@@ -33,6 +34,8 @@ export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promi
 
 export function ExportProfile(arg1:string):Promise<string>;
 
+export function GetBoard(arg1:string,arg2:number,arg3:string,arg4:string):Promise<boardrepo.BoardView>;
+
 export function GetCreateFields(arg1:string,arg2:string):Promise<Array<backend.FieldSpec>>;
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
@@ -58,6 +61,10 @@ export function ImportIssues(arg1:string,arg2:string,arg3:boolean,arg4:string,ar
 export function ImportProfile():Promise<profile.Profile>;
 
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
+
+export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrepo.Sprint>>;
+
+export function ListBoards(arg1:string):Promise<Array<boardrepo.Board>>;
 
 export function ListEpics(arg1:string):Promise<Array<backend.Issue>>;
 
@@ -92,6 +99,8 @@ export function SetNavRailVisible(arg1:boolean):Promise<void>;
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
+
+export function SyncBoards(arg1:string):Promise<syncer.BoardSummary>;
 
 export function SyncIssues(arg1:string,arg2:boolean):Promise<syncer.Summary>;
 

@@ -140,7 +140,12 @@ func sinceClause(rfc3339 string) string {
 	return fmt.Sprintf(`updated >= "%s"`, t.UTC().Add(-time.Hour).Format("2006-01-02 15:04"))
 }
 
+// named is Jira's {"id": ..., "name": ...} object, the shape status,
+// priority, and issue type all arrive in. The id is decoded because the
+// board matches cards to columns by status id; it comes in the same object
+// as the name, so reading it asks Jira for nothing extra.
 type named struct {
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -167,6 +172,7 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 	var status, priority, issueType named
 	if err := json.Unmarshal(f["status"], &status); err == nil {
 		iss.Status = status.Name
+		iss.StatusID = status.ID
 	}
 	if err := json.Unmarshal(f["priority"], &priority); err == nil {
 		iss.Priority = priority.Name

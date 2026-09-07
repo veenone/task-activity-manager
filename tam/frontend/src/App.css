@@ -441,6 +441,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
    cannot push the tree's rows down a line every time a query refreshes. */
 .epics-refreshing { color: var(--text-muted); }
 
+/* Phase 3a: Boards. The board and its notes stack in one pane beside the
+   detail panel. min-width: 0 is not optional on a horizontal scroller inside
+   a flex row: without it the board's own width wins and the panel is pushed
+   out of the window. */
+.boards-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.boards-pane .board-scroll { min-width: 0; }
+
 /* Plan 1c: links */
 .add-link { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
 .add-link h3 { margin: 0; font-size: 13px; }

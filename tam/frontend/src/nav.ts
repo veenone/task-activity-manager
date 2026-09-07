@@ -27,7 +27,7 @@ export const VIEWS: ViewInfo[] = [
     id: "boards",
     label: "Boards",
     phase: "Phase 3",
-    blurb: "Kanban and the active sprint, with live drag.",
+    blurb: "The board's own columns, the active sprint, and the cards in them.",
   },
   {
     id: "reports",

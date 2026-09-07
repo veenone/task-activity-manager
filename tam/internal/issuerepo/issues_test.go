@@ -3,6 +3,7 @@ package issuerepo_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -160,5 +161,173 @@ func TestListSprintsIsDistinctAndSorted(t *testing.T) {
 	}
 	if len(sprints) != 2 || sprints[0].ID != "12" || sprints[0].Name != "Sprint 12" || sprints[1].ID != "13" {
 		t.Errorf("sprints = %+v", sprints)
+	}
+}
+
+func TestUpsertKeepsTheStatusID(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
+	page := sample()
+	page[0].StatusID = "3"
+	page[1].StatusID = "1"
+	if err := r.UpsertPage(ctx, "p1", page, now, false); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	got, err := r.GetIssue(ctx, "p1", "PLAT-412")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.StatusID != "3" || got.Status != "In Progress" {
+		t.Errorf("row = %q / %q, want In Progress / 3", got.Status, got.StatusID)
+	}
+	// A second sync of the same issue in a new status carries the new id.
+	page[0].Status, page[0].StatusID = "Done", "5"
+	if err := r.UpsertPage(ctx, "p1", page[:1], now.Add(time.Minute), false); err != nil {
+		t.Fatalf("second upsert: %v", err)
+	}
+	if got, _ := r.GetIssue(ctx, "p1", "PLAT-412"); got.StatusID != "5" {
+		t.Errorf("status id after the second sync = %q, want 5", got.StatusID)
+	}
+	// An issue synced without one reads back empty rather than failing.
+	if got, _ := r.GetIssue(ctx, "p1", "PLAT-350"); got.StatusID != "" {
+		t.Errorf("status id = %q, want empty", got.StatusID)
+	}
+}
+
+func TestIssuesByKeysReturnsTheCallersOrderAndSkipsWhatIsNotCached(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
+	if err := r.UpsertPage(ctx, "p1", sample(), now, false); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	// A board's order is neither the key order nor the rank order, and the
+	// missing key is one a board filter reached outside the project.
+	keys := []string{"PLAT-347", "OPS-9", "PLAT-412", "PLAT-350"}
+	got, err := r.IssuesByKeys(ctx, "p1", keys)
+	if err != nil {
+		t.Fatalf("by keys: %v", err)
+	}
+	want := []string{"PLAT-347", "PLAT-412", "PLAT-350"}
+	if len(got) != len(want) {
+		t.Fatalf("got %d issues, want %d", len(got), len(want))
+	}
+	for i, k := range want {
+		if got[i].Key != k {
+			t.Errorf("row %d = %s, want %s", i, got[i].Key, k)
+		}
+	}
+	if got[0].Summary == "" || got[0].Labels == nil {
+		t.Errorf("rows come back whole: %+v", got[0])
+	}
+	// Another profile's cache is not readable through the same keys.
+	other, err := r.IssuesByKeys(ctx, "p2", keys)
+	if err != nil || len(other) != 0 {
+		t.Errorf("other profile = %+v, %v; want empty", other, err)
+	}
+}
+
+func TestIssuesByKeysWithNoKeys(t *testing.T) {
+	r := newRepo(t)
+	got, err := r.IssuesByKeys(context.Background(), "p1", nil)
+	if err != nil {
+		t.Fatalf("nil keys: %v", err)
+	}
+	if got == nil || len(got) != 0 {
+		t.Errorf("nil keys = %+v, want an empty slice", got)
+	}
+	if got, err = r.IssuesByKeys(context.Background(), "p1", []string{}); err != nil || len(got) != 0 {
+		t.Errorf("empty keys = %+v, %v", got, err)
+	}
+}
+
+func TestDraftIssuesReadsTheProfilesDraftsInKeyOrder(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
+	if err := r.UpsertPage(ctx, "p1", sample(), now, false); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	first, err := r.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "Draft one"})
+	if err != nil {
+		t.Fatalf("first draft: %v", err)
+	}
+	second, err := r.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Draft two"})
+	if err != nil {
+		t.Fatalf("second draft: %v", err)
+	}
+	if _, err := r.CreateDraft(ctx, "p2", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "Another profile"}); err != nil {
+		t.Fatalf("other profile draft: %v", err)
+	}
+
+	got, err := r.DraftIssues(ctx, "p1")
+	if err != nil {
+		t.Fatalf("drafts: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("drafts = %+v, want the two of this profile and no synced row", got)
+	}
+	if got[0].Key != first || got[1].Key != second {
+		t.Errorf("drafts = %s, %s; want %s, %s in key order", got[0].Key, got[1].Key, first, second)
+	}
+	for _, iss := range got {
+		if !iss.Draft {
+			t.Errorf("%s came back without the Draft flag", iss.Key)
+		}
+		if iss.StatusID != "" {
+			t.Errorf("%s has status id %q; a draft Jira has never seen has none", iss.Key, iss.StatusID)
+		}
+		if iss.Labels == nil {
+			t.Errorf("%s came back with nil labels; the rows are whole", iss.Key)
+		}
+	}
+	if got[0].Summary != "Draft one" {
+		t.Errorf("first draft = %+v", got[0])
+	}
+}
+
+func TestDraftIssuesWithNoDrafts(t *testing.T) {
+	r := newRepo(t)
+	got, err := r.DraftIssues(context.Background(), "p1")
+	if err != nil {
+		t.Fatalf("drafts: %v", err)
+	}
+	if got == nil || len(got) != 0 {
+		t.Errorf("drafts = %+v, want an empty slice", got)
+	}
+}
+
+func TestIssuesByKeysReadsPastTheChunkBoundary(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
+	// One more than a chunk, so the read spans two statements.
+	const n = 501
+	page := make([]backend.Issue, 0, n)
+	keys := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		key := fmt.Sprintf("PLAT-%d", 1000+i)
+		page = append(page, backend.Issue{Key: key, ID: key, Project: "PLAT", Type: "task", Summary: key, Status: "To Do", StatusID: "1"})
+		keys = append(keys, key)
+	}
+	if err := r.UpsertPage(ctx, "p1", page, now, false); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	// Reversed, so a chunk that quietly reordered its rows would show.
+	for i, j := 0, len(keys)-1; i < j; i, j = i+1, j-1 {
+		keys[i], keys[j] = keys[j], keys[i]
+	}
+	got, err := r.IssuesByKeys(ctx, "p1", keys)
+	if err != nil {
+		t.Fatalf("by keys: %v", err)
+	}
+	if len(got) != n {
+		t.Fatalf("got %d issues, want %d", len(got), n)
+	}
+	for i, k := range keys {
+		if got[i].Key != k {
+			t.Fatalf("row %d = %s, want %s", i, got[i].Key, k)
+		}
 	}
 }

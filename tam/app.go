@@ -17,9 +17,16 @@ import (
 	"agile-suite/core/shareddb"
 	"agile-suite/core/store"
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/tamstore"
 )
+
+// The issue repository satisfies boardrepo's read seam: this is the one
+// place that imports both packages, so it is where the check belongs.
+// Drift here would surface as the boards view compiling against a
+// different repository than the one app_boards.go actually passes it.
+var _ boardrepo.IssueSource = (*issuerepo.Repository)(nil)
 
 // App is the backend bound to the React frontend. Every exported method here
 // is callable from JavaScript, so it only validates and delegates; the rules
@@ -32,6 +39,7 @@ type App struct {
 	creds     profile.CredentialStore
 	settings  *settings.Manager
 	repo      *issuerepo.Repository
+	boards    *boardrepo.Repository
 	backendMu sync.Mutex
 	backends  map[string]backend.IssueBackend
 	// busy names the operation running for a profile ("sync", "commit", or
@@ -98,6 +106,7 @@ func (a *App) initStore() error {
 	a.local = local
 	a.dbPath = dbPath
 	a.repo = issuerepo.New(local.DB())
+	a.boards = boardrepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
 
