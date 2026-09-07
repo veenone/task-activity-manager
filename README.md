@@ -12,7 +12,9 @@ Desktop tools for Jira Data Center that share one code spine:
   Commit with conflict detection, and an Activity tab. Plan 1c adds Excel
   import to drafts, cross-project links, and requirement creation. Phase 2
   adds an Epics view showing each epic with its stories, tasks, bugs, and
-  requirements, and lets an issue be moved under one.
+  requirements, and lets an issue be moved under one. Phase 3a adds a
+  read-only Boards view: a project's boards, their columns, and their
+  sprints, synced from Jira's Agile API.
 
 Both are Go + Wails + React apps that sync Jira into a local SQLite cache and
 push edits back on commit.

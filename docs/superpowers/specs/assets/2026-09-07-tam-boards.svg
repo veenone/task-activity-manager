@@ -7,9 +7,11 @@
     </style>
   </defs>
 
-  <!-- Phase 3a: the Boards view, read only. Board and sprint pickers, columns
-       from the board's own configuration, cards from the issue cache, and
-       swimlanes by assignee. -->
+  <!-- Phase 3a: the Boards view, read only. Board and sprint pickers (the
+       sprint picker offers only the active and future sprints, since those
+       are the only ones a sync fetches membership for), the summary line,
+       columns from the board's own configuration, cards from the issue
+       cache, and swimlanes by assignee. -->
 
   <rect width="1240" height="800" fill="#F7F8FA"/>
 
@@ -44,113 +46,120 @@
     <text x="258" y="115" class="txt">Acme Platform Scrum</text>
     <text x="500" y="110" class="muted">Sprint</text>
     <rect x="546" y="97" width="180" height="26" rx="4" class="surface"/>
-    <text x="556" y="115" class="txt">Sprint 12 (active)</text>
+    <text x="556" y="115" class="txt">Sprint 12 (Active)</text>
     <text x="748" y="110" class="muted">Swimlanes</text>
     <rect x="822" y="97" width="130" height="26" rx="4" class="surface"/>
     <text x="832" y="115" class="txt">Assignee</text>
+    <rect x="964" y="99" width="90" height="22" rx="11" fill="#F3F4F6" stroke="#E1E4EA"/>
+    <text x="980" y="114" class="xs b muted">Read only</text>
     <rect x="1064" y="97" width="90" height="26" rx="4" class="surface"/>
     <text x="1082" y="115" class="txt">Refresh</text>
   </g>
 
+  <!-- summary line: sprint state and dates, points done, last synced, the
+       same line BoardSummaryLine composes above the grid. -->
+  <text x="200" y="133" class="txt sm">Sprint 12, active, ends 20 Sep. 7 of 27 points done. Synced today 10:42.</text>
+
   <!-- column headers -->
   <g>
-    <rect x="200" y="136" width="320" height="30" class="col"/>
-    <text x="214" y="156" class="txt b sm">To Do</text>
-    <text x="440" y="156" class="muted sm">4 cards, 9 pts</text>
-    <rect x="528" y="136" width="320" height="30" class="col"/>
-    <text x="542" y="156" class="txt b sm">In Progress</text>
-    <text x="768" y="156" class="muted sm">2 cards, 11 pts</text>
-    <rect x="856" y="136" width="320" height="30" class="col"/>
-    <text x="870" y="156" class="txt b sm">Done</text>
-    <text x="1096" y="156" class="muted sm">3 cards, 7 pts</text>
+    <rect x="200" y="156" width="320" height="30" class="col"/>
+    <text x="214" y="176" class="txt b sm">To Do</text>
+    <text x="440" y="176" class="muted sm">4 cards, 9 pts</text>
+    <rect x="528" y="156" width="320" height="30" class="col"/>
+    <text x="542" y="176" class="txt b sm">In Progress</text>
+    <text x="768" y="176" class="muted sm">2 cards, 11 pts</text>
+    <rect x="856" y="156" width="320" height="30" class="col"/>
+    <text x="870" y="176" class="txt b sm">Done</text>
+    <text x="1096" y="176" class="muted sm">3 cards, 7 pts</text>
   </g>
 
   <!-- swimlane 1 -->
-  <rect x="200" y="174" width="976" height="24" fill="#FAFBFC" stroke="#E1E4EA"/>
-  <text x="214" y="191" class="txt b sm">R. Anand</text>
-  <text x="300" y="191" class="muted sm">3 cards</text>
+  <rect x="200" y="194" width="976" height="24" fill="#FAFBFC" stroke="#E1E4EA"/>
+  <text x="214" y="211" class="txt b sm">R. Anand</text>
+  <text x="300" y="211" class="muted sm">3 cards</text>
 
   <g class="sm">
     <!-- to do -->
-    <rect x="208" y="206" width="304" height="58" rx="6" class="surface"/>
-    <text x="220" y="226" class="accent-txt b">PLAT-398</text>
-    <rect x="288" y="214" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="295" y="225" fill="#166534" class="xs b">Story</text>
-    <text x="220" y="246" class="txt">Show the discount breakdown</text>
-    <text x="440" y="246" class="muted">3 pts</text>
+    <rect x="208" y="226" width="304" height="58" rx="6" class="surface"/>
+    <text x="220" y="246" class="accent-txt b">PLAT-398</text>
+    <rect x="288" y="234" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="295" y="245" fill="#166534" class="xs b">Story</text>
+    <text x="220" y="266" class="txt">Show the discount breakdown</text>
+    <text x="440" y="266" class="muted">3 pts</text>
 
     <!-- in progress -->
-    <rect x="536" y="206" width="304" height="58" rx="6" class="surface"/>
-    <text x="548" y="226" class="accent-txt b">PLAT-412</text>
-    <rect x="616" y="214" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="623" y="225" fill="#166534" class="xs b">Story</text>
-    <circle cx="820" cy="221" r="3.5" fill="#F59E0B"/>
-    <text x="548" y="246" class="txt">Checkout: apply promo code</text>
-    <text x="768" y="246" class="muted">8 pts</text>
+    <rect x="536" y="226" width="304" height="58" rx="6" class="surface"/>
+    <text x="548" y="246" class="accent-txt b">PLAT-412</text>
+    <rect x="616" y="234" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="623" y="245" fill="#166534" class="xs b">Story</text>
+    <circle cx="820" cy="241" r="3.5" fill="#F59E0B"/>
+    <text x="548" y="266" class="txt">Checkout: apply promo code</text>
+    <text x="768" y="266" class="muted">8 pts</text>
 
     <!-- done -->
-    <rect x="864" y="206" width="304" height="58" rx="6" class="surface"/>
-    <text x="876" y="226" class="accent-txt b">PLAT-331</text>
-    <rect x="944" y="214" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="951" y="225" fill="#166534" class="xs b">Story</text>
-    <text x="876" y="246" class="txt">Guest checkout without an account</text>
-    <text x="1096" y="246" class="muted">5 pts</text>
+    <rect x="864" y="226" width="304" height="58" rx="6" class="surface"/>
+    <text x="876" y="246" class="accent-txt b">PLAT-331</text>
+    <rect x="944" y="234" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="951" y="245" fill="#166534" class="xs b">Story</text>
+    <text x="876" y="266" class="txt">Guest checkout without an account</text>
+    <text x="1096" y="266" class="muted">5 pts</text>
   </g>
 
   <!-- swimlane 2 -->
-  <rect x="200" y="278" width="976" height="24" fill="#FAFBFC" stroke="#E1E4EA"/>
-  <text x="214" y="295" class="txt b sm">M. Ortiz</text>
-  <text x="300" y="295" class="muted sm">3 cards</text>
+  <rect x="200" y="298" width="976" height="24" fill="#FAFBFC" stroke="#E1E4EA"/>
+  <text x="214" y="315" class="txt b sm">M. Ortiz</text>
+  <text x="300" y="315" class="muted sm">3 cards</text>
 
   <g class="sm">
-    <rect x="208" y="310" width="304" height="58" rx="6" class="surface"/>
-    <text x="220" y="330" class="accent-txt b">PLAT-409</text>
-    <rect x="288" y="318" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="295" y="329" fill="#1E40AF" class="xs b">Task</text>
-    <text x="220" y="350" class="txt">Rotate payment gateway API keys</text>
-    <text x="440" y="350" class="muted">2 pts</text>
+    <rect x="208" y="330" width="304" height="58" rx="6" class="surface"/>
+    <text x="220" y="350" class="accent-txt b">PLAT-409</text>
+    <rect x="288" y="338" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="295" y="349" fill="#1E40AF" class="xs b">Task</text>
+    <text x="220" y="370" class="txt">Rotate payment gateway API keys</text>
+    <text x="440" y="370" class="muted">2 pts</text>
 
-    <rect x="536" y="310" width="304" height="58" rx="6" class="surface"/>
-    <text x="548" y="330" class="accent-txt b">PLAT-401</text>
-    <rect x="616" y="318" width="34" height="14" rx="7" fill="#FECACA"/><text x="623" y="329" fill="#7F1D1D" class="xs b">Bug</text>
-    <text x="548" y="350" class="txt">Order total wrong when VAT changes</text>
-    <text x="768" y="350" class="muted">3 pts</text>
+    <rect x="536" y="330" width="304" height="58" rx="6" class="surface"/>
+    <text x="548" y="350" class="accent-txt b">PLAT-401</text>
+    <rect x="616" y="338" width="34" height="14" rx="7" fill="#FECACA"/><text x="623" y="349" fill="#7F1D1D" class="xs b">Bug</text>
+    <text x="548" y="370" class="txt">Order total wrong when VAT changes</text>
+    <text x="768" y="370" class="muted">3 pts</text>
 
-    <rect x="864" y="310" width="304" height="58" rx="6" class="surface"/>
-    <text x="876" y="330" class="accent-txt b">PLAT-385</text>
-    <rect x="944" y="318" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="951" y="329" fill="#1E40AF" class="xs b">Task</text>
-    <text x="876" y="350" class="txt">Add the promo code analytics event</text>
-    <text x="1096" y="350" class="muted">2 pts</text>
+    <rect x="864" y="330" width="304" height="58" rx="6" class="surface"/>
+    <text x="876" y="350" class="accent-txt b">PLAT-385</text>
+    <rect x="944" y="338" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="951" y="349" fill="#1E40AF" class="xs b">Task</text>
+    <text x="876" y="370" class="txt">Add the promo code analytics event</text>
+    <text x="1096" y="370" class="muted">2 pts</text>
   </g>
 
   <!-- swimlane 3 -->
-  <rect x="200" y="382" width="976" height="24" fill="#FAFBFC" stroke="#E1E4EA"/>
-  <text x="214" y="399" class="txt b sm">Unassigned</text>
-  <text x="316" y="399" class="muted sm">3 cards</text>
+  <rect x="200" y="402" width="976" height="24" fill="#FAFBFC" stroke="#E1E4EA"/>
+  <text x="214" y="419" class="txt b sm">Unassigned</text>
+  <text x="316" y="419" class="muted sm">3 cards</text>
 
   <g class="sm">
-    <rect x="208" y="414" width="304" height="58" rx="6" class="surface"/>
-    <text x="220" y="434" class="accent-txt b">PLAT-390</text>
-    <rect x="288" y="422" width="34" height="14" rx="7" fill="#FECACA"/><text x="295" y="433" fill="#7F1D1D" class="xs b">Bug</text>
-    <text x="220" y="454" class="txt">Promo code field accepts whitespace</text>
-    <text x="440" y="454" class="muted">1 pt</text>
+    <rect x="208" y="434" width="304" height="58" rx="6" class="surface"/>
+    <text x="220" y="454" class="accent-txt b">PLAT-390</text>
+    <rect x="288" y="442" width="34" height="14" rx="7" fill="#FECACA"/><text x="295" y="453" fill="#7F1D1D" class="xs b">Bug</text>
+    <text x="220" y="474" class="txt">Promo code field accepts whitespace</text>
+    <text x="440" y="474" class="muted">1 pt</text>
 
-    <rect x="208" y="480" width="304" height="58" rx="6" class="surface"/>
-    <text x="220" y="500" class="accent-txt b">TAM-NEW-1</text>
-    <rect x="300" y="488" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="307" y="499" fill="#1E40AF" class="xs b">Task</text>
-    <rect x="348" y="488" width="36" height="14" rx="3" fill="#FEF3C7"/><text x="354" y="499" fill="#92400E" class="xs b">Draft</text>
-    <circle cx="492" cy="495" r="3.5" fill="#F59E0B"/>
-    <text x="220" y="520" class="txt">Add a retry to the webhook consumer</text>
-    <text x="440" y="520" class="muted">3 pts</text>
+    <rect x="208" y="500" width="304" height="58" rx="6" class="surface"/>
+    <text x="220" y="520" class="accent-txt b">TAM-NEW-1</text>
+    <rect x="300" y="508" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="307" y="519" fill="#1E40AF" class="xs b">Task</text>
+    <rect x="348" y="508" width="36" height="14" rx="3" fill="#FEF3C7"/><text x="354" y="519" fill="#92400E" class="xs b">Draft</text>
+    <circle cx="492" cy="515" r="3.5" fill="#F59E0B"/>
+    <text x="220" y="540" class="txt">Add a retry to the webhook consumer</text>
+    <text x="440" y="540" class="muted">3 pts</text>
 
-    <rect x="864" y="414" width="304" height="58" rx="6" class="surface"/>
-    <text x="876" y="434" class="accent-txt b">PLAT-347</text>
-    <rect x="944" y="422" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="951" y="433" fill="#1E40AF" class="xs b">Task</text>
-    <text x="876" y="454" class="txt">Write retro notes template</text>
-    <text x="1096" y="454" class="muted">1 pt</text>
+    <rect x="864" y="434" width="304" height="58" rx="6" class="surface"/>
+    <text x="876" y="454" class="accent-txt b">PLAT-347</text>
+    <rect x="944" y="442" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="951" y="453" fill="#1E40AF" class="xs b">Task</text>
+    <text x="876" y="474" class="txt">Write retro notes template</text>
+    <text x="1096" y="474" class="muted">1 pt</text>
   </g>
 
-  <!-- not on the board -->
-  <rect x="200" y="560" width="976" height="34" rx="4" fill="#FFFBEB" stroke="#F59E0B"/>
-  <text x="214" y="582" class="txt sm">2 issues in this sprint have a status no column covers (Approved, Blocked). They are not on the board.</text>
+  <!-- not on the board: a plain note, not a warning banner, matching
+       BoardNotes' muted paragraph. It names the card count and the status
+       names, not the issues themselves. -->
+  <text x="200" y="584" class="muted sm">2 cards are not on the board (Approved, Blocked)</text>
 
-  <text x="200" y="626" class="muted sm">Cards come from the local cache. Dragging arrives with plan 3b, where a drop writes to Jira at once.</text>
+  <text x="200" y="608" class="muted sm">Columns and cards follow your board's configuration. Quick filters and the board's own swimlanes are not applied.</text>
 
   <!-- status bar -->
   <rect x="0" y="772" width="1240" height="28" fill="#FFFFFF" stroke="#E1E4EA"/>
