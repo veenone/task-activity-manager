@@ -13,10 +13,9 @@ import (
 // ReplaceBoard writes everything one board holds in a single transaction:
 // its row, its columns, its sprints, and the membership of every scope the
 // sync read for it, keyed by sprint id with "" for the board's own list.
-// The four Upsert methods each commit on their own, so a reader landing
-// between two of them could see new columns against old membership; here
-// there is no between. It is the sync pass's write step for exactly that
-// reason.
+// It is the only write path into the four board tables, and one
+// transaction is the reason: a reader must never catch a board with new
+// columns against old membership.
 //
 // Every one of the board's board_issue rows is deleted before the scopes
 // are inserted, not just the scopes being written, so a sprint that stopped
@@ -109,14 +108,6 @@ func writeIssueKeys(ctx context.Context, tx *sql.Tx, profileID string, boardID i
 			return fmt.Errorf("insert board key %s: %w", key, err)
 		}
 		position++
-	}
-	return nil
-}
-
-// deleteIssueKeyScope clears the membership of one board and sprint.
-func deleteIssueKeyScope(ctx context.Context, tx *sql.Tx, profileID string, boardID int, sprintID string) error {
-	if _, err := tx.ExecContext(ctx, `DELETE FROM board_issue WHERE profile_id = ? AND board_id = ? AND sprint_id = ?`, profileID, boardID, sprintID); err != nil {
-		return fmt.Errorf("clear issue keys of board %d: %w", boardID, err)
 	}
 	return nil
 }

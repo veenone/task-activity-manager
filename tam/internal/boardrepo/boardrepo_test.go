@@ -5,14 +5,11 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/tamstore"
 )
-
-var syncedAt = time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
 
 // newRepo opens a fresh tam.db and returns the repository with the handle
 // beside it, so a test can read board_issue directly: the membership table
@@ -53,17 +50,17 @@ func sampleSprints() []backend.Sprint {
 	}
 }
 
-func TestUpsertAndReadBackTheBoardAndItsShape(t *testing.T) {
+func TestReplaceAndReadBackTheBoardAndItsShape(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
-	if err := r.UpsertBoards(ctx, "p1", sampleBoards(), syncedAt); err != nil {
-		t.Fatalf("boards: %v", err)
-	}
-	if err := r.UpsertColumns(ctx, "p1", 1, sampleColumns()); err != nil {
-		t.Fatalf("columns: %v", err)
-	}
-	if err := r.UpsertSprints(ctx, "p1", 1, sampleSprints()); err != nil {
-		t.Fatalf("sprints: %v", err)
+	for _, b := range sampleBoards() {
+		sprints := []backend.Sprint{}
+		if b.ID == 1 {
+			sprints = sampleSprints()
+		}
+		if err := r.ReplaceBoard(ctx, "p1", b, sampleColumns(), sprints, nil); err != nil {
+			t.Fatalf("replace board %d: %v", b.ID, err)
+		}
 	}
 
 	boards, err := r.ListBoards(ctx, "p1")
@@ -123,39 +120,38 @@ func TestUpsertAndReadBackTheBoardAndItsShape(t *testing.T) {
 	}
 }
 
-func TestUpsertBoardsUpdatesInPlace(t *testing.T) {
+func TestReplaceBoardUpdatesTheRowInPlace(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
-	if err := r.UpsertBoards(ctx, "p1", sampleBoards(), syncedAt); err != nil {
-		t.Fatalf("boards: %v", err)
-	}
-	renamed := []backend.Board{{ID: 1, Name: "Platform Scrum", Type: backend.BoardTypeScrum}}
-	if err := r.UpsertBoards(ctx, "p1", renamed, syncedAt.Add(time.Hour)); err != nil {
-		t.Fatalf("second upsert: %v", err)
+	seedTwoBoards(t, r, "p1")
+
+	renamed := backend.Board{ID: 1, Name: "Platform Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", renamed, sampleColumns(), nil, nil); err != nil {
+		t.Fatalf("replace: %v", err)
 	}
 	boards, err := r.ListBoards(ctx, "p1")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
 	if len(boards) != 2 {
-		t.Fatalf("boards = %+v, want the rename not to drop the other board", boards)
+		t.Fatalf("boards = %+v, want the rename to update the row, not add one", boards)
 	}
 	if boards[0].Name != "PLAT Kanban" || boards[1].Name != "Platform Scrum" {
 		t.Errorf("boards = %+v", boards)
 	}
 }
 
-func TestUpsertColumnsReplacesTheBoardsColumns(t *testing.T) {
+func TestReplaceBoardReplacesTheBoardsColumns(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
-	if err := r.UpsertColumns(ctx, "p1", 1, sampleColumns()); err != nil {
-		t.Fatalf("columns: %v", err)
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), nil, nil); err != nil {
+		t.Fatalf("first replace: %v", err)
 	}
 	// The board went from five columns to three; the two Jira dropped must
-	// not survive, and an upsert alone would have left them.
-	shorter := sampleColumns()[:3]
-	if err := r.UpsertColumns(ctx, "p1", 1, shorter); err != nil {
-		t.Fatalf("second upsert: %v", err)
+	// not survive, and an insert alone would have left them.
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns()[:3], nil, nil); err != nil {
+		t.Fatalf("second replace: %v", err)
 	}
 	cols, err := r.Columns(ctx, "p1", 1)
 	if err != nil {
@@ -169,34 +165,12 @@ func TestUpsertColumnsReplacesTheBoardsColumns(t *testing.T) {
 	}
 }
 
-func TestUpsertIssueKeysReplacesTheSprintsMembership(t *testing.T) {
-	r, db := newRepo(t)
-	ctx := context.Background()
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "12", []string{"PLAT-412", "PLAT-409", "PLAT-401"}); err != nil {
-		t.Fatalf("keys: %v", err)
-	}
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "", []string{"PLAT-412", "PLAT-347"}); err != nil {
-		t.Fatalf("board keys: %v", err)
-	}
-	// PLAT-409 was moved out of sprint 12; the sprint must forget it.
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "12", []string{"PLAT-412", "PLAT-401"}); err != nil {
-		t.Fatalf("second upsert: %v", err)
-	}
-	got := boardKeys(t, db, "p1", 1, "12")
-	if len(got) != 2 || got[0] != "PLAT-412" || got[1] != "PLAT-401" {
-		t.Errorf("sprint 12 = %v, want the card moved out to be gone", got)
-	}
-	// The board's own list is a different scope and is untouched.
-	if got := boardKeys(t, db, "p1", 1, ""); len(got) != 2 || got[1] != "PLAT-347" {
-		t.Errorf("whole board = %v", got)
-	}
-}
-
-func TestUpsertSprintsReplacesTheBoardsSprints(t *testing.T) {
+func TestReplaceBoardReplacesTheBoardsSprints(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
-	if err := r.UpsertSprints(ctx, "p1", 1, sampleSprints()); err != nil {
-		t.Fatalf("sprints: %v", err)
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), sampleSprints(), nil); err != nil {
+		t.Fatalf("first replace: %v", err)
 	}
 	// Sprint 14 was deleted in Jira; it must not stay in the picker.
 	left := []backend.Sprint{}
@@ -205,8 +179,8 @@ func TestUpsertSprintsReplacesTheBoardsSprints(t *testing.T) {
 			left = append(left, s)
 		}
 	}
-	if err := r.UpsertSprints(ctx, "p1", 1, left); err != nil {
-		t.Fatalf("second upsert: %v", err)
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), left, nil); err != nil {
+		t.Fatalf("second replace: %v", err)
 	}
 	sprints, err := r.ListSprints(ctx, "p1", 1)
 	if err != nil {
@@ -312,23 +286,19 @@ func TestPurgeProfileClearsTheFourBoardTables(t *testing.T) {
 }
 
 // seedTwoBoards writes both sample boards for a profile, with columns,
-// sprints, and one issue key each.
+// sprints, and one issue key each, the way one boards pass writes them.
 func seedTwoBoards(t *testing.T, r *boardrepo.Repository, profileID string) {
 	t.Helper()
 	ctx := context.Background()
-	if err := r.UpsertBoards(ctx, profileID, sampleBoards(), syncedAt); err != nil {
-		t.Fatalf("boards: %v", err)
-	}
-	for _, id := range []int{1, 2} {
-		if err := r.UpsertColumns(ctx, profileID, id, sampleColumns()); err != nil {
-			t.Fatalf("columns of %d: %v", id, err)
+	for _, b := range sampleBoards() {
+		sprints := []backend.Sprint{}
+		if b.ID == 1 {
+			sprints = sampleSprints()
 		}
-		if err := r.UpsertIssueKeys(ctx, profileID, id, "", []string{"PLAT-412"}); err != nil {
-			t.Fatalf("keys of %d: %v", id, err)
+		keys := map[string][]string{"": {"PLAT-412"}}
+		if err := r.ReplaceBoard(ctx, profileID, b, sampleColumns(), sprints, keys); err != nil {
+			t.Fatalf("seed board %d: %v", b.ID, err)
 		}
-	}
-	if err := r.UpsertSprints(ctx, profileID, 1, sampleSprints()); err != nil {
-		t.Fatalf("sprints: %v", err)
 	}
 }
 

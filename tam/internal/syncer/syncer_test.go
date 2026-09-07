@@ -503,8 +503,8 @@ func TestErrNoAgileMarksUnavailableAndRemovesNoBoards(t *testing.T) {
 	repo, boards := newBoardRepos(t)
 	// Seed a board from an earlier run when the instance still had an
 	// Agile API, so the test can prove ErrNoAgile leaves it alone.
-	if err := boards.UpsertBoards(context.Background(), "p1",
-		[]backend.Board{{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}}, time.Now()); err != nil {
+	if err := boards.ReplaceBoard(context.Background(), "p1",
+		backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}, nil, nil, nil); err != nil {
 		t.Fatalf("seed board: %v", err)
 	}
 

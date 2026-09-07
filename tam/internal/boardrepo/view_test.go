@@ -66,21 +66,25 @@ func draftCard(key string) backend.Issue {
 	return c
 }
 
+// seedScopes writes board 1 with the columns and the membership of each
+// scope given, the way one boards pass writes a board.
+func seedScopes(t *testing.T, r *boardrepo.Repository, cols []backend.BoardColumn, keys map[string][]string) {
+	t.Helper()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(context.Background(), "p1", board, cols, nil, keys); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+}
+
 // seedBoard writes the sample columns for board 1 and the keys in the order
 // given, and returns a source holding the cards.
 func seedBoard(t *testing.T, r *boardrepo.Repository, cols []backend.BoardColumn, cards []backend.Issue) staticIssues {
 	t.Helper()
-	ctx := context.Background()
-	if err := r.UpsertColumns(ctx, "p1", 1, cols); err != nil {
-		t.Fatalf("columns: %v", err)
-	}
 	keys := make([]string, 0, len(cards))
 	for _, c := range cards {
 		keys = append(keys, c.Key)
 	}
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "", keys); err != nil {
-		t.Fatalf("keys: %v", err)
-	}
+	seedScopes(t, r, cols, map[string][]string{"": keys})
 	return newIssues(cards...)
 }
 
@@ -183,18 +187,10 @@ func TestBoardCountsAStatusNoColumnCollects(t *testing.T) {
 func TestADraftLandsInTheFirstColumnThatHasStatusIDs(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
-	if err := r.UpsertColumns(ctx, "p1", 1, sampleColumns()); err != nil {
-		t.Fatalf("columns: %v", err)
-	}
 	// The scrum board's sprint and the kanban board's whole-board list are
 	// two different key lists, and neither of them names the draft: the
 	// draft is project-level and must appear on both.
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "12", []string{"PLAT-409"}); err != nil {
-		t.Fatalf("sprint keys: %v", err)
-	}
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "", []string{"PLAT-409"}); err != nil {
-		t.Fatalf("board keys: %v", err)
-	}
+	seedScopes(t, r, sampleColumns(), map[string][]string{"12": {"PLAT-409"}, "": {"PLAT-409"}})
 	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(draftCard("TAM-NEW-1"))
 
 	for _, tc := range []struct {
@@ -331,14 +327,9 @@ func TestNeedsStatusSyncOnlyWhenNoCardHasAStatusID(t *testing.T) {
 func TestBoardKeysWithNoCachedIssueCountAsNotSynced(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
-	if err := r.UpsertColumns(ctx, "p1", 1, sampleColumns()); err != nil {
-		t.Fatalf("columns: %v", err)
-	}
 	// The board's filter reaches into another project; those keys were
 	// never synced into this profile's cache.
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "", []string{"PLAT-409", "OPS-7", "OPS-9"}); err != nil {
-		t.Fatalf("keys: %v", err)
-	}
+	seedScopes(t, r, sampleColumns(), map[string][]string{"": {"PLAT-409", "OPS-7", "OPS-9"}})
 	src := newIssues(card("PLAT-409", "To Do", "1"))
 	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
@@ -552,15 +543,10 @@ func TestABoardWithNoColumnsIsAnEmptyViewNotAnError(t *testing.T) {
 func TestTheSprintScopeIsItsOwnMembership(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
-	if err := r.UpsertColumns(ctx, "p1", 1, sampleColumns()); err != nil {
-		t.Fatalf("columns: %v", err)
-	}
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "", []string{"PLAT-1", "PLAT-2", "PLAT-3"}); err != nil {
-		t.Fatalf("board keys: %v", err)
-	}
-	if err := r.UpsertIssueKeys(ctx, "p1", 1, "12", []string{"PLAT-3", "PLAT-1"}); err != nil {
-		t.Fatalf("sprint keys: %v", err)
-	}
+	seedScopes(t, r, sampleColumns(), map[string][]string{
+		"":   {"PLAT-1", "PLAT-2", "PLAT-3"},
+		"12": {"PLAT-3", "PLAT-1"},
+	})
 	src := newIssues(card("PLAT-1", "To Do", "1"), card("PLAT-2", "To Do", "1"), card("PLAT-3", "To Do", "1"))
 
 	whole, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)

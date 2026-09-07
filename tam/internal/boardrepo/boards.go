@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -41,53 +40,6 @@ const listSprintsSQL = `
 
 const boardKeysSQL = `
 	SELECT key FROM board_issue WHERE profile_id = ? AND board_id = ? AND sprint_id = ? ORDER BY position`
-
-// UpsertBoards writes the boards a sync found. It adds and updates but never
-// removes: a board that vanished from Jira is the sync's to spot, and
-// RemoveBoards takes it away with its children.
-func (r *Repository) UpsertBoards(ctx context.Context, profileID string, boards []backend.Board, syncedAt time.Time) error {
-	stamp := syncedAt.UTC().Format(time.RFC3339)
-	return r.inTx(ctx, func(tx *sql.Tx) error {
-		for _, b := range boards {
-			if err := writeBoardRow(ctx, tx, profileID, b, stamp); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-// UpsertColumns replaces one board's columns. It deletes before it inserts,
-// in one transaction, because a board whose columns went from five to three
-// would otherwise keep the two Jira no longer has, and position is the
-// primary key so nothing would even collide to reveal it.
-func (r *Repository) UpsertColumns(ctx context.Context, profileID string, boardID int, cols []backend.BoardColumn) error {
-	return r.inTx(ctx, func(tx *sql.Tx) error {
-		return writeColumns(ctx, tx, profileID, boardID, cols)
-	})
-}
-
-// UpsertSprints replaces one board's sprints, delete then insert in one
-// transaction: a sprint deleted in Jira would otherwise stay in the picker
-// forever, offering a sprint nobody can open.
-func (r *Repository) UpsertSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error {
-	return r.inTx(ctx, func(tx *sql.Tx) error {
-		return writeSprints(ctx, tx, profileID, boardID, sprints)
-	})
-}
-
-// UpsertIssueKeys replaces the membership of one board and sprint, delete
-// then insert in one transaction. An insert alone only ever adds, so a card
-// moved out of the sprint, or off the board, would keep being drawn in the
-// place it left.
-func (r *Repository) UpsertIssueKeys(ctx context.Context, profileID string, boardID int, sprintID string, keys []string) error {
-	return r.inTx(ctx, func(tx *sql.Tx) error {
-		if err := deleteIssueKeyScope(ctx, tx, profileID, boardID, sprintID); err != nil {
-			return err
-		}
-		return writeIssueKeys(ctx, tx, profileID, boardID, sprintID, keys)
-	})
-}
 
 // RemoveBoards drops the boards and everything hanging off them: their
 // columns, their issue keys, and their sprints, in one transaction.
