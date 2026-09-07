@@ -409,6 +409,9 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 			points = sql.NullFloat64{Float64: *d.StoryPoints, Valid: true}
 		}
 		detail, _ := json.Marshal(backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}})
+		// status_id is left at its default: a draft has no Jira status, and
+		// an empty status id is what puts it in the board's first real
+		// column instead of nowhere.
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
 				sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)

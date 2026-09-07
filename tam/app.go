@@ -17,6 +17,7 @@ import (
 	"agile-suite/core/shareddb"
 	"agile-suite/core/store"
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/tamstore"
 )
@@ -32,6 +33,7 @@ type App struct {
 	creds     profile.CredentialStore
 	settings  *settings.Manager
 	repo      *issuerepo.Repository
+	boards    *boardrepo.Repository
 	backendMu sync.Mutex
 	backends  map[string]backend.IssueBackend
 	// busy names the operation running for a profile ("sync", "commit", or
@@ -98,6 +100,7 @@ func (a *App) initStore() error {
 	a.local = local
 	a.dbPath = dbPath
 	a.repo = issuerepo.New(local.DB())
+	a.boards = boardrepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
 

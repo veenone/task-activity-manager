@@ -1,10 +1,13 @@
 // Package tamstore is Task Activity Manager's own database: everything that
 // is not a profile, connection, or global setting, because those live in the
 // shared profiles.db. Version 1 carries no app tables. Version 2 adds the
-// issue tables.
+// issue tables, version 3 the shared journal tables, version 4 the
+// cached Jira user list, and version 5 the board tables and the issue's
+// status id.
 package tamstore
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 
@@ -12,12 +15,43 @@ import (
 	"agile-suite/core/store"
 )
 
-// Schema is TAM's local schema. Version 4 adds the cached Jira user list
-// behind the assignee picker. Every statement is idempotent, so an older
-// database picks the new tables up on its next open without a migration step.
+// Schema is TAM's local schema. Version 3 adds the shared journal tables
+// and version 4 the cached Jira user list behind the assignee picker;
+// both are plain CREATE TABLE IF NOT EXISTS, so an older database picks
+// them up on its next open. Version 5 adds the board tables and the
+// issue's status id, and that one needs the migration below, because
+// CREATE TABLE IF NOT EXISTS cannot add a column to a table that is
+// already there.
 var Schema = store.Schema{
-	Version: 4,
+	Version: 5,
 	Base:    baseDDL + journal.DDL,
+	Migrations: []store.Migration{{
+		Version: 5,
+		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
+		// fresh at version 5 already has the column from baseDDL, so a
+		// duplicate-column error here is the expected no-op.
+		Apply: func(db *sql.DB) error {
+			// store.AddColumnIfMissing already treats "duplicate column" as
+			// success, which is what a fresh version 5 file needs, since
+			// baseDDL gave it the column a moment ago.
+			if err := store.AddColumnIfMissing(db, "issue", "status_id TEXT NOT NULL DEFAULT ''"); err != nil {
+				return err
+			}
+			// The board matches cards to columns by status id, and an
+			// incremental sync only re-reads issues Jira says changed, so
+			// rows cached before version 5 would never get one. Clearing
+			// the watermark drops the `updated >=` filter from the next
+			// sync, which refetches every issue and fills the column. It
+			// is not the same as a full sync: nothing is purged first,
+			// and nothing here should be made to purge.
+			//
+			// issuerepo.ResetSyncCursor does this for one profile and
+			// stays the way application code does it; a migration has no
+			// profile in hand, so it clears them all in one statement.
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
+	}},
 	Indexes: indexDDL,
 }
 
@@ -30,6 +64,7 @@ CREATE TABLE IF NOT EXISTS issue (
 	type              TEXT NOT NULL DEFAULT '',
 	summary           TEXT NOT NULL DEFAULT '',
 	status            TEXT NOT NULL DEFAULT '',
+	status_id         TEXT NOT NULL DEFAULT '',
 	assignee          TEXT NOT NULL DEFAULT '',
 	reporter          TEXT NOT NULL DEFAULT '',
 	priority          TEXT NOT NULL DEFAULT '',
@@ -78,12 +113,46 @@ CREATE TABLE IF NOT EXISTS jira_user (
 	display_name TEXT NOT NULL DEFAULT '',
 	cached_at    TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, name)
-);`
+);
+CREATE TABLE IF NOT EXISTS board (
+	profile_id TEXT NOT NULL,
+	id         INTEGER NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	type       TEXT NOT NULL DEFAULT '',
+	synced_at  TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, id)
+);
+CREATE TABLE IF NOT EXISTS board_column (
+	profile_id TEXT NOT NULL,
+	board_id   INTEGER NOT NULL,
+	position   INTEGER NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	status_ids TEXT NOT NULL DEFAULT '[]',
+	PRIMARY KEY (profile_id, board_id, position)
+);
+CREATE TABLE IF NOT EXISTS board_issue (
+	profile_id TEXT NOT NULL,
+	board_id   INTEGER NOT NULL,
+	sprint_id  TEXT NOT NULL DEFAULT '',
+	key        TEXT NOT NULL,
+	position   INTEGER NOT NULL,
+	PRIMARY KEY (profile_id, board_id, sprint_id, key)
+);
+CREATE TABLE IF NOT EXISTS sprint (
+	profile_id TEXT NOT NULL,
+	id         INTEGER NOT NULL,
+	board_id   INTEGER NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	state      TEXT NOT NULL DEFAULT '',
+	start_date TEXT NOT NULL DEFAULT '',
+	end_date   TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, id));`
 
 const indexDDL = `
 CREATE INDEX IF NOT EXISTS issue_profile_type   ON issue (profile_id, type);
 CREATE INDEX IF NOT EXISTS issue_profile_sprint ON issue (profile_id, sprint_id);
-CREATE INDEX IF NOT EXISTS jira_user_profile_display ON jira_user (profile_id, display_name);`
+CREATE INDEX IF NOT EXISTS jira_user_profile_display ON jira_user (profile_id, display_name);
+CREATE INDEX IF NOT EXISTS board_issue_lookup    ON board_issue (profile_id, board_id, sprint_id);`
 
 // Open opens (or creates) TAM's database at path.
 func Open(path string) (*store.DB, error) { return store.Open(path, Schema) }

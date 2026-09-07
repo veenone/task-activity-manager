@@ -193,3 +193,146 @@ func TestDemoBackendLinks(t *testing.T) {
 		t.Error("unknown target must fail")
 	}
 }
+
+func TestDemoIssuesAllCarryAStatusID(t *testing.T) {
+	b := demobackend.New("PLAT")
+	page, total, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 100)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if total != 60 {
+		t.Fatalf("total = %d, want the whole dataset", total)
+	}
+	for _, iss := range page {
+		if iss.StatusID == "" {
+			t.Errorf("%s (%s) has no status id; the board could not place it", iss.Key, iss.Status)
+		}
+		if iss.StatusID != demobackend.StatusID(iss.Status) {
+			t.Errorf("%s status id = %q, want the helper's %q", iss.Key, iss.StatusID, demobackend.StatusID(iss.Status))
+		}
+	}
+}
+
+func TestDemoBoardsAreDerivedFromTheProjectKey(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+	boards, err := b.Boards(ctx, "ACME")
+	if err != nil {
+		t.Fatalf("boards: %v", err)
+	}
+	if len(boards) != 2 {
+		t.Fatalf("boards = %+v, want 2", boards)
+	}
+	if boards[0].ID != 1 || boards[0].Name != "ACME Scrum" || boards[0].Type != backend.BoardTypeScrum {
+		t.Errorf("board 0 = %+v", boards[0])
+	}
+	if boards[1].ID != 2 || boards[1].Name != "ACME Kanban" || boards[1].Type != backend.BoardTypeKanban {
+		t.Errorf("board 1 = %+v", boards[1])
+	}
+}
+
+func TestDemoBoardColumnsUseTheStatusIDHelper(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	for _, boardID := range []int{1, 2} {
+		cols, err := b.BoardColumns(ctx, boardID)
+		if err != nil {
+			t.Fatalf("columns of board %d: %v", boardID, err)
+		}
+		want := []struct{ name, id string }{
+			{"To Do", demobackend.StatusID("To Do")},
+			{"In Progress", demobackend.StatusID("In Progress")},
+			{"Done", demobackend.StatusID("Done")},
+		}
+		if len(cols) != len(want) {
+			t.Fatalf("board %d columns = %+v", boardID, cols)
+		}
+		for i, w := range want {
+			if cols[i].Name != w.name || len(cols[i].StatusIDs) != 1 || cols[i].StatusIDs[0] != w.id {
+				t.Errorf("board %d column %d = %+v, want %s/%s", boardID, i, cols[i], w.name, w.id)
+			}
+		}
+	}
+	if _, err := b.BoardColumns(ctx, 9); err == nil {
+		t.Error("columns of an unknown board must fail")
+	}
+}
+
+func TestDemoSprintsAreOnTheScrumBoardOnly(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	if len(sprints) != 3 {
+		t.Fatalf("sprints = %+v, want 3", sprints)
+	}
+	states := map[int]string{}
+	for _, s := range sprints {
+		if s.BoardID != 1 {
+			t.Errorf("sprint %d is on board %d", s.ID, s.BoardID)
+		}
+		states[s.ID] = s.State
+	}
+	if states[11] != "closed" || states[12] != "active" || states[13] != "future" {
+		t.Errorf("states = %v, want lowercase closed, active, future", states)
+	}
+	kanban, err := b.BoardSprints(ctx, 2)
+	if err != nil || len(kanban) != 0 {
+		t.Errorf("kanban sprints = %+v, %v; want none", kanban, err)
+	}
+}
+
+func TestDemoBoardIssueKeys(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	inSprint, err := b.BoardIssueKeys(ctx, 1, "12")
+	if err != nil {
+		t.Fatalf("sprint keys: %v", err)
+	}
+	if len(inSprint) == 0 {
+		t.Fatal("sprint 12 has no keys")
+	}
+	all, err := b.BoardIssueKeys(ctx, 1, "")
+	if err != nil {
+		t.Fatalf("board keys: %v", err)
+	}
+	kanban, err := b.BoardIssueKeys(ctx, 2, "")
+	if err != nil {
+		t.Fatalf("kanban keys: %v", err)
+	}
+	if len(all) != len(kanban) {
+		t.Errorf("board 1 has %d keys and board 2 has %d, want the same list", len(all), len(kanban))
+	}
+	// Every whole-board key is a non-requirement issue, and every sprint 12
+	// key is one of them.
+	page, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 100)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	byKey := map[string]backend.Issue{}
+	wantAll := 0
+	for _, iss := range page {
+		byKey[iss.Key] = iss
+		if iss.Type != backend.TypeRequirement {
+			wantAll++
+		}
+	}
+	if len(all) != wantAll {
+		t.Errorf("whole board = %d keys, want the %d non-requirement issues", len(all), wantAll)
+	}
+	for _, k := range all {
+		if byKey[k].Type == backend.TypeRequirement {
+			t.Errorf("%s is a requirement and is not on a board", k)
+		}
+	}
+	for _, k := range inSprint {
+		if byKey[k].SprintID != "12" {
+			t.Errorf("%s is in sprint %q, not 12", k, byKey[k].SprintID)
+		}
+	}
+	if _, err := b.BoardIssueKeys(ctx, 9, ""); err == nil {
+		t.Error("keys of an unknown board must fail")
+	}
+}

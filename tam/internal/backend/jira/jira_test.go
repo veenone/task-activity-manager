@@ -93,6 +93,8 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			// A project whose task level is called "Todo", the shape seen on
 			// a real instance.
 			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10000","name":"Todo"},{"id":"18","name":"Story"},{"id":"19","name":"Technical task","subtask":true}]}`))
+		case strings.HasPrefix(r.URL.Path, "/rest/agile/1.0/"):
+			f.agile(w, r)
 		case r.URL.Path == "/rest/api/2/project/PLAT":
 			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"1","name":"Task"},{"id":"7","name":"Business Requirement"},{"id":"19","name":"Technical task","subtask":true}]}`))
 		default:
@@ -100,6 +102,46 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
+}
+
+// agile answers the Agile 1.0 paths the boards backend reads: one project
+// with a scrum board, a kanban board, and a board type TAM does not draw.
+func (f *fakeJira) agile(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/rest/agile/1.0/board":
+		_, _ = w.Write([]byte(`{"isLast":true,"values":[
+			{"id":1,"name":"PLAT Scrum","type":"scrum"},
+			{"id":2,"name":"PLAT Kanban","type":"kanban"},
+			{"id":3,"name":"PLAT Plans","type":"simple"}
+		]}`))
+	case "/rest/agile/1.0/board/1/configuration":
+		_, _ = w.Write([]byte(`{"id":1,"columnConfig":{"columns":[
+			{"name":"Backlog","statuses":[]},
+			{"name":"To Do","statuses":[{"id":"1"}]},
+			{"name":"In Progress","statuses":[{"id":"3"},{"id":"4"}]},
+			{"name":"Done","statuses":[{"id":"5"}]}
+		]}}`))
+	case "/rest/agile/1.0/board/1/sprint":
+		// originBoardId is board 7, not the board being read: the mapping
+		// must take the board from the request, not from the payload.
+		_, _ = w.Write([]byte(`{"isLast":true,"values":[
+			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z"},
+			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z"}
+		]}`))
+	case "/rest/agile/1.0/board/2/sprint":
+		// Jira's way of saying a kanban board has no sprints.
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"errorMessages":["The board does not support sprints"]}`))
+	case "/rest/agile/1.0/board/1/issue":
+		_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":3,"issues":[
+			{"key":"PLAT-412"},{"key":"PLAT-409"},{"key":"OPS-7"}
+		]}`))
+	case "/rest/agile/1.0/board/1/sprint/12/issue":
+		_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":1,"issues":[{"key":"PLAT-412"}]}`))
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errorMessages":["no such board"]}`))
+	}
 }
 
 func newBackend(t *testing.T, fields string) (*jirabackend.Backend, *fakeJira) {
@@ -184,5 +226,88 @@ func TestGetIssueDetailAndIssueTypes(t *testing.T) {
 	types, err := b.IssueTypes(ctx, "PLAT")
 	if err != nil || len(types) != 3 || types[1].Name != "Business Requirement" {
 		t.Errorf("types = %+v, %v", types, err)
+	}
+}
+
+func TestBoardsDropTheTypesTamCannotDraw(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	boards, err := b.Boards(context.Background(), "PLAT")
+	if err != nil {
+		t.Fatalf("boards: %v", err)
+	}
+	if len(boards) != 2 {
+		t.Fatalf("boards = %+v, want the scrum and the kanban one only", boards)
+	}
+	if boards[0].ID != 1 || boards[0].Name != "PLAT Scrum" || boards[0].Type != backend.BoardTypeScrum {
+		t.Errorf("board 0 = %+v", boards[0])
+	}
+	if boards[1].ID != 2 || boards[1].Type != backend.BoardTypeKanban {
+		t.Errorf("board 1 = %+v", boards[1])
+	}
+}
+
+func TestBoardColumnsFlattenTheStatusObjects(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	cols, err := b.BoardColumns(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("columns: %v", err)
+	}
+	if len(cols) != 4 {
+		t.Fatalf("columns = %+v, want 4", cols)
+	}
+	if cols[0].Name != "Backlog" || len(cols[0].StatusIDs) != 0 {
+		t.Errorf("a column with no statuses keeps an empty list: %+v", cols[0])
+	}
+	if cols[2].Name != "In Progress" || len(cols[2].StatusIDs) != 2 || cols[2].StatusIDs[0] != "3" || cols[2].StatusIDs[1] != "4" {
+		t.Errorf("column 2 = %+v", cols[2])
+	}
+}
+
+func TestBoardSprintsTakeTheBoardFromTheRequestAndKanbanHasNone(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	ctx := context.Background()
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	if len(sprints) != 2 {
+		t.Fatalf("sprints = %+v, want 2", sprints)
+	}
+	for _, s := range sprints {
+		if s.BoardID != 1 {
+			t.Errorf("sprint %d filed under board %d, want the board that was read (originBoardId is 7)", s.ID, s.BoardID)
+		}
+	}
+	if sprints[0].State != "closed" || sprints[1].State != "active" || sprints[1].Name != "Sprint 12" {
+		t.Errorf("sprints = %+v", sprints)
+	}
+	if sprints[1].StartDate == "" || sprints[1].EndDate == "" {
+		t.Errorf("sprint dates dropped: %+v", sprints[1])
+	}
+	none, err := b.BoardSprints(ctx, 2)
+	if err != nil {
+		t.Fatalf("a kanban board with no sprints must not fail: %v", err)
+	}
+	if len(none) != 0 {
+		t.Errorf("kanban sprints = %+v, want none", none)
+	}
+}
+
+func TestBoardIssueKeysPassThroughForTheBoardAndForOneSprint(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	ctx := context.Background()
+	keys, err := b.BoardIssueKeys(ctx, 1, "")
+	if err != nil {
+		t.Fatalf("board keys: %v", err)
+	}
+	if len(keys) != 3 || keys[0] != "PLAT-412" || keys[2] != "OPS-7" {
+		t.Errorf("board keys = %v, want the board's own order including the key outside the project", keys)
+	}
+	keys, err = b.BoardIssueKeys(ctx, 1, "12")
+	if err != nil {
+		t.Fatalf("sprint keys: %v", err)
+	}
+	if len(keys) != 1 || keys[0] != "PLAT-412" {
+		t.Errorf("sprint keys = %v", keys)
 	}
 }

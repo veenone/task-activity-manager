@@ -2,6 +2,8 @@
 // that holds its issues. IssueBackend carries the read path and the write
 // path plan 1b added: version checks, edits, and issue creation. The Jira
 // implementation lives in backend/jira, the offline one in backend/demo.
+// BoardBackend is the read-only board capability the Boards view needs, on
+// its own interface so a backend that cannot answer it does not have to.
 package backend
 
 import (
@@ -39,6 +41,7 @@ type Issue struct {
 	Type        string   `json:"type"`
 	Summary     string   `json:"summary"`
 	Status      string   `json:"status"`
+	StatusID    string   `json:"statusId"`
 	Assignee    string   `json:"assignee"`
 	Reporter    string   `json:"reporter"`
 	Priority    string   `json:"priority"`
@@ -181,6 +184,61 @@ type IssueType struct {
 type User struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"displayName"`
+}
+
+// Board types TAM draws. Jira has more (simple boards, for one); the
+// backend filters the rest out rather than caching a board the Boards view
+// could not lay out.
+const (
+	BoardTypeScrum  = "scrum"
+	BoardTypeKanban = "kanban"
+)
+
+// Board is one Jira Agile board of a project.
+type Board struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// BoardColumn is one column of a board's configuration. StatusIDs are the
+// Jira status ids the column collects; a column may have none, which is
+// how a Backlog column Jira never fills is described.
+type BoardColumn struct {
+	Name      string   `json:"name"`
+	StatusIDs []string `json:"statusIds"`
+}
+
+// Sprint is one sprint of a board. State is Jira's own lowercase value
+// (active, future, closed), and BoardID is the board the sprint was read
+// from, not the board it was created on.
+type Sprint struct {
+	ID        int    `json:"id"`
+	BoardID   int    `json:"boardId"`
+	Name      string `json:"name"`
+	State     string `json:"state"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+}
+
+// BoardBackend is the read-only board capability, kept off IssueBackend so
+// only the backends that speak Jira's Agile API have to answer for it. The
+// boards sync pass asks for it with a type assertion and skips itself when
+// a backend does not have it.
+type BoardBackend interface {
+	// Boards lists the project's boards from Jira's Agile API, scrum and
+	// kanban only. It never writes.
+	Boards(ctx context.Context, projectKey string) ([]Board, error)
+	// BoardColumns reads one board's column configuration from Jira's
+	// Agile API. It never writes.
+	BoardColumns(ctx context.Context, boardID int) ([]BoardColumn, error)
+	// BoardSprints lists one board's sprints from Jira's Agile API, empty
+	// for a board that has none. It never writes.
+	BoardSprints(ctx context.Context, boardID int) ([]Sprint, error)
+	// BoardIssueKeys lists the keys the board holds, for one sprint when
+	// sprintID is set and for the whole board when it is empty. It reads
+	// Jira's Agile API and never writes.
+	BoardIssueKeys(ctx context.Context, boardID int, sprintID string) ([]string, error)
 }
 
 // IssueBackend is what the read path needs from the issue system.

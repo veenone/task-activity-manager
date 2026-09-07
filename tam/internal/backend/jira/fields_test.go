@@ -149,3 +149,30 @@ func TestParseLinksSeesBothDirections(t *testing.T) {
 		t.Errorf("nil raw should give an empty slice, got %#v", got)
 	}
 }
+
+func TestParseIssueCarriesTheStatusNameAndItsID(t *testing.T) {
+	raw := corejira.RawIssue{ID: "1", Key: "PLAT-412", Fields: map[string]json.RawMessage{
+		"summary":   json.RawMessage(`"Checkout: apply promo code"`),
+		"status":    json.RawMessage(`{"id":"3","name":"In Progress"}`),
+		"issuetype": json.RawMessage(`{"id":"7","name":"Story"}`),
+		"project":   json.RawMessage(`{"key":"PLAT"}`),
+		"labels":    json.RawMessage(`["promo"]`),
+	}}
+	iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{task: "Task", subtask: "Technical task"})
+	if iss.Status != "In Progress" {
+		t.Errorf("status = %q, want In Progress", iss.Status)
+	}
+	if iss.StatusID != "3" {
+		t.Errorf("status id = %q, want 3: the board's whole join is by status id", iss.StatusID)
+	}
+	if iss.Type != backend.TypeStory {
+		t.Errorf("type = %q", iss.Type)
+	}
+
+	// A status Jira sent without an id leaves the column empty rather than
+	// failing the parse.
+	raw.Fields["status"] = json.RawMessage(`{"name":"In Progress"}`)
+	if iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{task: "Task", subtask: "Technical task"}); iss.StatusID != "" || iss.Status != "In Progress" {
+		t.Errorf("status without an id = %q, %q", iss.Status, iss.StatusID)
+	}
+}

@@ -1,0 +1,68 @@
+// Package boardrepo is the store layer over tam.db for the Boards view: the
+// boards a profile has synced, their columns, their sprints, and which issue
+// keys each board holds. The cards themselves stay in the issue cache;
+// boardrepo reads them through IssueSource so it never has to import
+// issuerepo, and composes the view in view.go.
+//
+// Every method takes the profile id, because every table is scoped by it.
+package boardrepo
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	"agile-suite/tam/internal/backend"
+)
+
+// Repository runs the queries. It holds no state beyond the handle.
+type Repository struct {
+	db *sql.DB
+}
+
+// New wraps an open tam.db handle.
+func New(db *sql.DB) *Repository { return &Repository{db: db} }
+
+// Board is one cached board.
+type Board struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// Sprint is one cached sprint. State is Jira's own lowercase value: active,
+// future, or closed.
+type Sprint struct {
+	ID        int    `json:"id"`
+	BoardID   int    `json:"boardId"`
+	Name      string `json:"name"`
+	State     string `json:"state"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+}
+
+// IssueSource is the one thing the view needs from the issue cache. Keeping
+// it an interface is what lets boardrepo compose a board without importing
+// issuerepo; app.go passes the issue repository, which already has the
+// method.
+type IssueSource interface {
+	IssuesByKeys(ctx context.Context, profileID string, keys []string) ([]backend.Issue, error)
+}
+
+// PurgeProfile drops everything the board tables hold for a profile. The
+// issue cache is issuerepo's to purge: two purges naming the same tables is
+// the drift that leaves one behind when a fifth table arrives.
+func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, table := range []string{"board", "board_column", "board_issue", "sprint"} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
+			return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
+		}
+	}
+	return tx.Commit()
+}
