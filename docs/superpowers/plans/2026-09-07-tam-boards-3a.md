@@ -44,7 +44,7 @@
 
 **Created:** `core/jira/agile.go`, `agile_test.go`; `tam/internal/boardrepo/boardrepo.go`, `boards.go`, `view.go`, `boardrepo_test.go`, `view_test.go`; `tam/internal/syncer/boards.go`, `boards_test.go`; `tam/frontend/src/queries/boards.ts`, `components/BoardsView.tsx`, `BoardCard.tsx`, `BoardsView.test.tsx`.
 
-**Modified:** `tam/internal/tamstore/tamstore.go`, `tamstore_test.go`; `tam/internal/backend/backend.go`; `tam/internal/backend/jira/boards.go` (new file in the existing package), `fields.go` (the status id), `jira_test.go`, `fields_test.go`; `tam/internal/backend/demo/demo.go`, `demo_test.go`; `tam/internal/issuerepo/state.go` (purge), `issues.go` (the status id and a keyed read), `issues_test.go`; `tam/internal/syncer/syncer.go`, `syncer_test.go`; `tam/app.go`, `app_boards.go` (new); `tam/frontend/wailsjs/**` (regenerated); `frontend/core/styles/primitives.css`; `tam/frontend/src/api.ts`, `queries/keys.ts`, `queries/invalidate.ts`, `nav.ts`, `App.tsx`, `App.test.tsx`, `App.css`; `tam/CLAUDE.md`, `README.md`; `docs/superpowers/specs/2026-09-07-tam-boards-design.md` (reconciled with this plan in Task 5).
+**Modified:** `tam/app_issues.go` (hands the boards repository to the engine); `tam/internal/tamstore/tamstore.go`, `tamstore_test.go`; `tam/internal/backend/backend.go`; `tam/internal/backend/jira/boards.go` (new file in the existing package), `fields.go` (the status id), `jira_test.go`, `fields_test.go`; `tam/internal/backend/demo/demo.go`, `demo_test.go`; `tam/internal/issuerepo/state.go` (purge), `issues.go` (the status id and a keyed read), `issues_test.go`; `tam/internal/syncer/syncer.go`, `syncer_test.go`; `tam/app.go`, `app_boards.go` (new); `tam/frontend/wailsjs/**` (regenerated); `frontend/core/styles/primitives.css`; `tam/frontend/src/api.ts`, `queries/keys.ts`, `queries/invalidate.ts`, `nav.ts`, `App.tsx`, `App.test.tsx`, `App.css`; `tam/CLAUDE.md`, `README.md`; `docs/superpowers/specs/2026-09-07-tam-boards-design.md` (reconciled with this plan in Task 5).
 
 ---
 
@@ -52,7 +52,35 @@
 
 **Files:** create `core/jira/agile.go`, `core/jira/agile_test.go`.
 
-**Produces:** `jira.RawBoard{ID int, Name, Type string}`, `jira.RawColumn{Name string, StatusIDs []string}`, `jira.RawBoardConfig{Columns []RawColumn}`, `jira.RawSprint{ID int, Name, State, StartDate, EndDate string}`; `(*Client).Boards(ctx, projectKey string) ([]RawBoard, error)`, `(*Client).BoardConfiguration(ctx, boardID int) (RawBoardConfig, error)`, `(*Client).Sprints(ctx, boardID int) ([]RawSprint, error)`, `(*Client).BoardIssueKeys(ctx, boardID int, sprintID string) ([]string, error)`; `jira.ErrNoSprints`; `jira.ErrNoAgile`.
+**Produces:** `jira.RawBoard{ID int, Name, Type string}`, `jira.RawSprint{ID int, Name, State, StartDate, EndDate string}`, and the configuration shaped the way Jira actually sends it, nested and with its own field names:
+
+```go
+// RawBoardConfig is /board/{id}/configuration. Jira nests the columns under
+// columnConfig and gives each column a list of status objects, not a list of
+// ids; flattening that here would mean this package quietly disagreeing with
+// the API it exists to speak.
+type RawBoardConfig struct {
+	ID           int `json:"id"`
+	ColumnConfig struct {
+		Columns []RawColumn `json:"columns"`
+	} `json:"columnConfig"`
+}
+
+type RawColumn struct {
+	Name     string `json:"name"`
+	Statuses []struct {
+		ID string `json:"id"`
+	} `json:"statuses"`
+}
+
+// StatusIDs is the flattening every caller wants, kept beside the raw shape
+// rather than inside it.
+func (c RawColumn) StatusIDs() []string
+```
+
+Decoding a nested payload into a flat struct is not an error in Go: it succeeds and leaves the slice empty, so every board on the instance would render with no columns and nothing would say why. The httptest fixtures in Step 1 are the contract, and they must carry Jira's real envelopes, not a convenient shape.
+
+Also produces: `(*Client).Boards(ctx, projectKey string) ([]RawBoard, error)`, `(*Client).BoardConfiguration(ctx, boardID int) (RawBoardConfig, error)`, `(*Client).Sprints(ctx, boardID int) ([]RawSprint, error)`, `(*Client).BoardIssueKeys(ctx, boardID int, sprintID string) ([]string, error)`; `jira.ErrNoSprints`; `jira.ErrNoAgile`.
 
 `ErrNoAgile` is what `Boards` returns when the instance answers 404 on `/rest/agile/1.0/board`: a Jira Data Center without Jira Software has no Agile API at all, and that is a fact about the instance, not a failure of the sync.
 
@@ -103,7 +131,22 @@ func pageAgile[T any](ctx context.Context, c *Client, path string, query url.Val
 }
 ```
 
-`Boards` calls it with `projectKeyOrId`; `Sprints` calls it and maps a 400 to `ErrNoSprints` by checking `errors.As` for the client's `*HTTPError` with `Code == 400`; `BoardIssueKeys` pages `{"fields": {"key"}}` over the right path and pulls `key` from each value; `BoardConfiguration` is a single `Get` decoding only the column config. Doc comments say which endpoint each one calls and that they are transport only.
+`Boards` calls it with `projectKeyOrId`; `Sprints` calls it and maps a 400 to `ErrNoSprints` by checking `errors.As` for the client's `*HTTPError` with `Code == 400`, and `Boards` maps a 404 to `ErrNoAgile` the same way; `BoardConfiguration` is a single `Get` into the nested shape above.
+
+`BoardIssueKeys` cannot use `pageAgile`. `/board/{id}/issue` and `/board/{id}/sprint/{sprintId}/issue` do not answer with the `values` and `isLast` envelope the board and sprint lists use; they answer with the search envelope, `{"startAt": 0, "maxResults": 50, "total": 231, "issues": [{"key": "PLAT-412", ...}]}`. Decoding that into `agilePage[T]` finds no `values`, returns an empty page, ends the loop on the first request, and hands back zero keys for every board with no error anywhere. It gets its own small pager:
+
+```go
+type agileIssuePage struct {
+	Issues []struct {
+		Key string `json:"key"`
+	} `json:"issues"`
+	StartAt    int `json:"startAt"`
+	MaxResults int `json:"maxResults"`
+	Total      int `json:"total"`
+}
+```
+
+It asks for `fields=key` and pages until `startAt + len(issues) >= total`, or until a page comes back empty, which is the guard against an instance that reports a total it will not serve. Doc comments say which endpoint each one calls and that they are transport only.
 
 - [ ] **Step 3: Commit** as `feat(core): the Jira Agile client for boards, sprints, and board issues`.
 
@@ -172,7 +215,10 @@ Migrations: []store.Migration{{
 		// The board matches cards to columns by status id, and an
 		// incremental sync only re-reads issues Jira says changed, so
 		// rows cached before version 4 would never get one. Clearing
-		// the watermark makes the next sync full.
+		// the watermark drops the `updated >=` filter from the next
+		// sync, which refetches every issue and fills the column. It
+		// is not the same as a full sync: nothing is purged first,
+		// and nothing here should be made to purge.
 		_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 		return err
 	},
@@ -209,7 +255,7 @@ Four rules the view has to get right, each with its own test in Step 8:
 - **A board key the cache does not hold counts into `BoardView.NotSynced`.** Board filters routinely reach outside the profile's project; those cards cannot be drawn, and a silent absence is how a board quietly lies. `NotSynced` is an `int` beside `Unmapped`.
 - **Each cell renders at most `MaxCardsPerCell = 200` cards** and reports the rest in `LaneView.Overflow [][]int` (parallel to `Cells`), so a kanban Done column of nine hundred issues cannot decide how the view performs. `ColumnView.Total` and `Points` still count every card, capped or not.
 
-- [ ] **Step 6: `IssuesByKeys`.** In `tam/internal/issuerepo/issues.go`, add a read that returns the cached issues for a key list in the list's own order, chunked at 500 keys per statement, with the same `pendingFlag` and `scanIssue` the other reads use. Test it in `issues_test.go` for order, a missing key (skipped), an empty list (empty result, no query), and a chunk boundary.
+- [ ] **Step 6: `IssuesByKeys`.** In `tam/internal/issuerepo/issues.go`, add a read that returns the cached issues for a key list in the list's own order, chunked at 500 keys per statement, with the same `pendingFlag` and `scanIssue` the other reads use. SQL will not return an `IN` list in the list's order and no `ORDER BY` can ask it to, so scan into a `map[string]backend.Issue` and then walk the caller's slice to build the result; a key with no row is skipped rather than yielding a zero issue. Test it in `issues_test.go` for order, a missing key (skipped), an empty list (empty result, no query), and a chunk boundary.
 
 - [ ] **Step 7: Purge.** Add `board`, `board_column`, `board_issue`, and `sprint` to `issuerepo.PurgeProfile`'s table list (it already runs in one transaction) so deleting a profile clears them, and extend its test.
 
@@ -225,13 +271,21 @@ Four rules the view has to get right, each with its own test in Step 8:
 
 **Produces:** `syncer.BoardSummary{Boards, Columns, Sprints, Cards int; Dropped []string; Unavailable bool; Elapsed string}`, `(*Engine).SyncBoards(ctx, profileID, projectKey string, onProgress func(Progress)) (BoardSummary, error)`; the four bound methods from the Global Constraints.
 
-- [ ] **Step 1: The pass.** `boards.go` holds `SyncBoards`: list the boards; for each, read the configuration, the sprints, and the issue keys (for a scrum board, the keys of every sprint plus the board's own list; for a kanban board, the board's list); upsert each part; then `RemoveBoards` for the boards the profile had that Jira no longer returns. A board whose configuration or keys fail is recorded in `Dropped` with its name and the reason, and the pass continues; the summary counts what landed. An instance with no Agile API (the backend reporting `ErrNoAgile`) is not a failure: the pass returns a summary with `Unavailable: true` and no error, the existing boards are left alone, and the view says this Jira has no boards rather than showing an error line. `BoardSummary` therefore carries `Unavailable bool` alongside its counts. Progress frames use phase `"boards"` with the board name as `Stage`. The engine gains a `boards` field (the `boardrepo` repository) set by a new constructor `NewWithBoards(b backend.IssueBackend, repo *issuerepo.Repository, boards *boardrepo.Repository) *Engine`; the existing `New` stays for the issue-only tests.
+- [ ] **Step 1: The pass.** `boards.go` holds `SyncBoards`: list the boards; for each, read the configuration, the sprints, and the issue keys (for a scrum board, the keys of every sprint plus the board's own list; for a kanban board, the board's list); upsert each part; then `RemoveBoards` for the boards the profile had that Jira no longer returns. Each board's parts land in one transaction per board (its row, its columns, its sprints, its issue keys), so a reader on the WAL never sees a board half rewritten, and a board that fails halfway leaves the previous good copy in place.
+
+The keys are a replace, not an upsert: `UpsertIssueKeys` deletes the `(profile_id, board_id, sprint_id)` scope inside that transaction and then inserts. An upsert alone only ever adds, so a card moved out of a sprint in Jira would sit on TAM's board until the profile was deleted. Columns are the same shape: delete the board's columns, then insert the new positions, or a board that loses its fifth column keeps drawing it.
+
+A board whose configuration or keys fail is recorded in `Dropped` with its name and the reason, and the pass continues; the summary counts what landed. An instance with no Agile API (the backend reporting `ErrNoAgile`) is not a failure: the pass returns a summary with `Unavailable: true` and no error, the existing boards are left alone, and the view says this Jira has no boards rather than showing an error line. `BoardSummary` therefore carries `Unavailable bool` alongside its counts. Progress frames use phase `"boards"` with the board name as `Stage`. The engine gains an exported `Boards *boardrepo.Repository` field, left nil by `New` and set by the caller, which is the shape `PageSize` and `Now` already use; a second constructor would multiply with the next optional dependency. A nil `Boards` means the pass does not run, which is what every existing syncer test wants.
+
+`tam/app_issues.go:136` builds its engine per call as `syncer.New(b, a.repo)`, so that line becomes three: build it, set `eng.Boards = a.boards`, call `Sync`. Without that edit the boards pass compiles, tests green, and never runs on a real sync, which is the worst kind of passing build.
 
 - [ ] **Step 2: Wire it into `Sync`.** At the end of `Sync`, after the sync state is written and before the done frame, call `SyncBoards` when the engine has a boards repository; its failure does not fail the issue sync (log it, put it in the summary's new `Boards *BoardSummary` field, which is nil when the pass did not run).
 
 - [ ] **Step 3: Tests.** `boards_test.go` with the existing test fake extended: a scrum and a kanban board land with their columns, sprints, and keys; a board Jira stops returning is removed; a configuration failure drops one board and keeps the other; the summary counts. Extend `syncer_test.go` for the composed run (issues then boards) and for a boards failure leaving the issue sync successful.
 
-- [ ] **Step 4: The app.** `tam/app.go` constructs `boardrepo.New(...)` beside the issue repository in `initStore` and holds it as `a.boards`. Create `tam/app_boards.go` with the four bound methods: `ListBoards`, `ListBoardSprints`, `GetBoard` (passing `a.repo` as the `IssueSource`), and `SyncBoards` (under `a.acquire(p.ID, "sync")`, emitting progress, logging the summary). Each returns non-nil slices.
+- [ ] **Step 4: The app.** `tam/app.go` constructs `boardrepo.New(...)` beside the issue repository in `initStore` and holds it as `a.boards`. `tam/app_issues.go` hands it to the engine (Step 1). Create `tam/app_boards.go` with the four bound methods: `ListBoards`, `ListBoardSprints`, `GetBoard` (passing `a.repo` as the `IssueSource`), and `SyncBoards` (under `a.acquire(p.ID, "sync")`, logging the summary). Each returns non-nil slices.
+
+The standalone `SyncBoards` does not emit progress frames. The frontend's sync reducer only knows about a run that began with its own `SYNC_START`, and frames arriving outside one would be a second, undeclared entry point into shared state; the Refresh button owns its own pending label instead. Inside `Sync` the frames are welcome, because the issues pass has already opened the run.
 
 - [ ] **Step 5: Generate.** `go build ./... && go vet ./...` inside `tam/`, then `wails generate module`; check `App.d.ts` for the four methods and `models.ts` for the `boardrepo` namespace with `Board`, `Sprint`, `BoardView`, `ColumnView`, `LaneView`; revert the runtime and md5 churn and keep `go.mod` unchanged. Commit as `feat(tam): sync boards and sprints, bind the board reads`.
 
@@ -344,6 +398,16 @@ Record each result, fix what fails, rerun only what failed, and report each fail
 ## Deferred
 
 Everything that writes (plan 3b: drag to transition, drag to rank, move to sprint, start and complete a sprint), the board's own swimlane and quick-filter configuration, sub-filters, board creation, and non-project boards. Card virtualisation is out until a real board proves it slow.
+
+Added by the `/autoplan` review, and deferred with a reason rather than silently:
+
+- **Syncing the cards a board's filter reaches outside the profile's project.** 3a counts them (`NotSynced`) and says so. Fetching them would mean a second sync scope and a second project's issue types, which is a Phase 4 conversation, not a line in this plan.
+- **The sprint goal.** Jira carries one on the sprint and it belongs on the summary line, but the sprint endpoint's `goal` field is not in this plan's fixtures and it is not worth a fifth field on `Sprint` before a real instance has been read.
+- **The board's days-to-show rule for the Done column.** The 200-per-cell cap bounds the render honestly; matching Jira's own rule needs the column configuration's `max` and a date filter, which is board-fidelity work that belongs with the quick filters.
+- **A live contract test for the Agile envelopes.** The httptest fixtures encode them from documentation; the Task 5 walk-through is what confronts them with a real Data Center.
+- **Board counts in the shell's status bar.** The mockup draws "2 boards" there; the status bar belongs to the sync summary and changing it is out of this plan's blast radius.
+
+This repository has no `TODOS.md` and does not use one: deferred work lives in the plan's Deferred section and the spec's "Out of scope", where the next plan's author reads it. That convention wins over the review tool's default of writing a root-level TODO file.
 
 ---
 
