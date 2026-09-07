@@ -49,8 +49,8 @@ func (r *Repository) UpsertBoards(ctx context.Context, profileID string, boards 
 	stamp := syncedAt.UTC().Format(time.RFC3339)
 	return r.inTx(ctx, func(tx *sql.Tx) error {
 		for _, b := range boards {
-			if _, err := tx.ExecContext(ctx, upsertBoardSQL, profileID, b.ID, b.Name, b.Type, stamp); err != nil {
-				return fmt.Errorf("upsert board %d: %w", b.ID, err)
+			if err := writeBoardRow(ctx, tx, profileID, b, stamp); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -63,19 +63,7 @@ func (r *Repository) UpsertBoards(ctx context.Context, profileID string, boards 
 // primary key so nothing would even collide to reveal it.
 func (r *Repository) UpsertColumns(ctx context.Context, profileID string, boardID int, cols []backend.BoardColumn) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM board_column WHERE profile_id = ? AND board_id = ?`, profileID, boardID); err != nil {
-			return fmt.Errorf("clear columns of board %d: %w", boardID, err)
-		}
-		for i, c := range cols {
-			ids, err := json.Marshal(backend.NonNil(c.StatusIDs))
-			if err != nil {
-				return fmt.Errorf("status ids of column %q: %w", c.Name, err)
-			}
-			if _, err := tx.ExecContext(ctx, insertColumnSQL, profileID, boardID, i, c.Name, string(ids)); err != nil {
-				return fmt.Errorf("insert column %q: %w", c.Name, err)
-			}
-		}
-		return nil
+		return writeColumns(ctx, tx, profileID, boardID, cols)
 	})
 }
 
@@ -84,15 +72,7 @@ func (r *Repository) UpsertColumns(ctx context.Context, profileID string, boardI
 // forever, offering a sprint nobody can open.
 func (r *Repository) UpsertSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM sprint WHERE profile_id = ? AND board_id = ?`, profileID, boardID); err != nil {
-			return fmt.Errorf("clear sprints of board %d: %w", boardID, err)
-		}
-		for _, s := range sprints {
-			if _, err := tx.ExecContext(ctx, insertSprintSQL, profileID, s.ID, boardID, s.Name, s.State, s.StartDate, s.EndDate); err != nil {
-				return fmt.Errorf("insert sprint %d: %w", s.ID, err)
-			}
-		}
-		return nil
+		return writeSprints(ctx, tx, profileID, boardID, sprints)
 	})
 }
 
@@ -102,15 +82,10 @@ func (r *Repository) UpsertSprints(ctx context.Context, profileID string, boardI
 // place it left.
 func (r *Repository) UpsertIssueKeys(ctx context.Context, profileID string, boardID int, sprintID string, keys []string) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM board_issue WHERE profile_id = ? AND board_id = ? AND sprint_id = ?`, profileID, boardID, sprintID); err != nil {
-			return fmt.Errorf("clear issue keys of board %d: %w", boardID, err)
+		if err := deleteIssueKeyScope(ctx, tx, profileID, boardID, sprintID); err != nil {
+			return err
 		}
-		for i, key := range keys {
-			if _, err := tx.ExecContext(ctx, insertIssueKeySQL, profileID, boardID, sprintID, key, i); err != nil {
-				return fmt.Errorf("insert board key %s: %w", key, err)
-			}
-		}
-		return nil
+		return writeIssueKeys(ctx, tx, profileID, boardID, sprintID, keys)
 	})
 }
 

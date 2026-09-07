@@ -420,7 +420,10 @@ func TestSyncRunsIssuesThenBoards(t *testing.T) {
 	e := syncer.New(fb, repo)
 	e.Boards = boards
 
-	sum, err := e.Sync(context.Background(), "p1", "PLAT", "", false, nil)
+	var frames []syncer.Progress
+	sum, err := e.Sync(context.Background(), "p1", "PLAT", "", false, func(p syncer.Progress) {
+		frames = append(frames, p)
+	})
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
@@ -429,6 +432,28 @@ func TestSyncRunsIssuesThenBoards(t *testing.T) {
 	}
 	if sum.Boards == nil {
 		t.Fatal("summary.Boards is nil, want the boards pass to have run")
+	}
+	// The frames say the order: every issue frame the pass emits lands
+	// before the first board frame, and the terminal frame closes the run
+	// after both passes.
+	firstBoard := -1
+	for i, f := range frames {
+		if f.Phase == "boards" {
+			firstBoard = i
+			break
+		}
+	}
+	if firstBoard < 1 {
+		t.Fatalf("frames = %+v, want issue frames before the first board frame", frames)
+	}
+	for _, f := range frames[:firstBoard] {
+		if f.Phase != "issues" || f.Done {
+			t.Errorf("frame before the boards phase = %+v, want an unfinished issues frame", f)
+		}
+	}
+	last := frames[len(frames)-1]
+	if last.Phase != "issues" || !last.Done {
+		t.Errorf("last frame = %+v, want the terminal issues frame", last)
 	}
 	if sum.Boards.Boards != 1 || sum.Boards.Unavailable {
 		t.Errorf("boards summary = %+v", sum.Boards)
@@ -457,15 +482,20 @@ func TestBoardsFailureDoesNotFailTheIssueSyncAndKeepsLastSynced(t *testing.T) {
 	if sum.Upserted != 1 {
 		t.Errorf("issues upserted = %d, want 1", sum.Upserted)
 	}
-	if sum.Boards == nil || sum.Boards.Boards != 0 {
-		t.Errorf("boards summary = %+v, want a zero-value summary carrying the failed pass", sum.Boards)
+	if sum.Boards == nil {
+		t.Fatal("summary.Boards is nil, want the failed pass carried in the summary")
 	}
 	st, err := repo.SyncState(context.Background(), "p1")
 	if err != nil {
 		t.Fatalf("sync state: %v", err)
 	}
-	if st.LastSynced == "" {
-		t.Error("last_synced must still be written: the issues landed even though the boards pass failed")
+	// The watermark is this run's own start: the issues landed, so the
+	// next sync must not refetch the world because the boards failed.
+	if st.LastSynced != start.Format(time.RFC3339) {
+		t.Errorf("last_synced = %q, want this run's start %q", st.LastSynced, start.Format(time.RFC3339))
+	}
+	if st.LastError != "" {
+		t.Errorf("last error = %q, want the issue sync recorded as successful", st.LastError)
 	}
 }
 

@@ -75,14 +75,12 @@ func (a *App) SyncBoards(profileID string) (syncer.BoardSummary, error) {
 	eng := syncer.New(b, a.repo)
 	eng.Boards = a.boards
 	sum, err := eng.SyncBoards(a.ctx, p.ID, p.ProjectKey, nil)
-	if sum.Dropped == nil {
-		sum.Dropped = []string{}
-	}
+	sum.EnsureDropped()
 	if err != nil {
 		log.Printf("tam: sync boards %s (%s) failed: %v", p.Name, p.ProjectKey, err)
 		return sum, err
 	}
-	log.Printf("tam: synced boards %s (%s): %d boards, %d columns, %d sprints, %d cards, %d dropped in %s",
+	log.Printf("tam: synced boards %s (%s): %d boards, %d columns, %d sprints, %d distinct cards, %d dropped in %s",
 		p.Name, p.ProjectKey, sum.Boards, sum.Columns, sum.Sprints, sum.Cards, len(sum.Dropped), sum.Elapsed)
 	return sum, nil
 }

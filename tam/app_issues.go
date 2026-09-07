@@ -115,10 +115,16 @@ func tlsOptionsFor(caCert string, allowUntrustedTLS bool) []corejira.Option {
 	return opts
 }
 
+// emitProgress forwards one frame to the frontend. A context with no Wails
+// runtime behind it, which is what a unit test holds, has nothing to
+// forward to, and Wails answers that case with log.Fatal rather than an
+// error, so the frame is dropped instead. "events" is the key Wails' own
+// runtime reads the emitter from.
 func (a *App) emitProgress(p syncer.Progress) {
-	if a.ctx != nil {
-		runtime.EventsEmit(a.ctx, syncProgressEvent, p)
+	if a.ctx == nil || a.ctx.Value("events") == nil {
+		return
 	}
+	runtime.EventsEmit(a.ctx, syncProgressEvent, p)
 }
 
 // SyncIssues pulls the profile's issues, incrementally or in full, and
@@ -142,8 +148,8 @@ func (a *App) SyncIssues(profileID string, full bool) (syncer.Summary, error) {
 	eng := syncer.New(b, a.repo)
 	eng.Boards = a.boards
 	sum, err := eng.Sync(a.ctx, p.ID, p.ProjectKey, p.ScopeJQL, full, a.emitProgress)
-	if sum.Boards != nil && sum.Boards.Dropped == nil {
-		sum.Boards.Dropped = []string{}
+	if sum.Boards != nil {
+		sum.Boards.EnsureDropped()
 	}
 	if err != nil {
 		log.Printf("tam: sync %s (%s) failed: %v", p.Name, p.ProjectKey, err)

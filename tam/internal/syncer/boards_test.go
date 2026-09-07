@@ -2,10 +2,12 @@ package syncer_test
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	corejira "agile-suite/core/jira"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
@@ -66,10 +68,12 @@ func TestSyncBoardsLandsScrumAndKanbanBoardsWithColumnsSprintsAndKeys(t *testing
 	if sum.Boards != 2 || sum.Columns != 4 || sum.Sprints != 3 {
 		t.Errorf("summary = %+v, want 2 boards, 4 columns, 3 sprints", sum)
 	}
-	// Cards: board 1's own list (2) + sprint 12 (1) + sprint 13 (1), plus
-	// board 2's own list (1). Closed sprint 11 is never asked for.
-	if sum.Cards != 5 {
-		t.Errorf("cards = %d, want 5", sum.Cards)
+	// Cards counts distinct keys per board: board 1 holds PLAT-1 and
+	// PLAT-2 whether they are counted from its own list or from sprints 12
+	// and 13, so it contributes 2, and board 2 contributes PLAT-3. Closed
+	// sprint 11 is never asked for.
+	if sum.Cards != 3 {
+		t.Errorf("cards = %d, want 3 distinct keys", sum.Cards)
 	}
 	if len(sum.Dropped) != 0 {
 		t.Errorf("dropped = %v, want none", sum.Dropped)
@@ -182,8 +186,16 @@ func TestSyncBoardsConfigFailureDropsOneBoardAndKeepsThePreviousCopyOfTheOther(t
 		t.Fatalf("seed sync: %v", err)
 	}
 
-	// Board 1's configuration now fails, board 2's does not.
-	fb.columnsErr = map[int]error{1: errors.New("jira: 403 Forbidden: Login required")}
+	// Board 1's configuration now fails the way a Data Center behind a
+	// login page fails it: a 403 whose body is the login form, several
+	// kilobytes of markup over many lines. Board 2's does not.
+	fb.columnsErr = map[int]error{1: &corejira.HTTPError{
+		Method:  "GET",
+		Path:    "/rest/agile/1.0/board/1/configuration",
+		Code:    403,
+		Status:  "403 Forbidden",
+		Message: loginPageBody(),
+	}}
 	sum, err := e.SyncBoards(context.Background(), "p1", "PLAT", nil)
 	if err != nil {
 		t.Fatalf("second sync: %v", err)
@@ -191,8 +203,20 @@ func TestSyncBoardsConfigFailureDropsOneBoardAndKeepsThePreviousCopyOfTheOther(t
 	if sum.Boards != 1 {
 		t.Errorf("boards landed = %d, want 1 (board 2 only)", sum.Boards)
 	}
-	if len(sum.Dropped) != 1 || sum.Dropped[0] != "PLAT Scrum: jira: 403 Forbidden: Login required" {
-		t.Errorf("dropped = %v", sum.Dropped)
+	if len(sum.Dropped) != 1 {
+		t.Fatalf("dropped = %v, want the one board whose configuration failed", sum.Dropped)
+	}
+	// The reason reaches a summary line the view renders, so the login
+	// page must not: one line, no markup, short enough to read.
+	reason := sum.Dropped[0]
+	if strings.ContainsAny(reason, "<>\n\r") {
+		t.Errorf("dropped reason = %q, want no markup and no line break", reason)
+	}
+	if len([]rune(reason)) > 140 {
+		t.Errorf("dropped reason is %d characters: %q", len([]rune(reason)), reason)
+	}
+	if !strings.HasPrefix(reason, "PLAT Scrum: ") || !strings.Contains(reason, "403") {
+		t.Errorf("dropped reason = %q, want the board name and what Jira said", reason)
 	}
 
 	// Board 1's previous good copy (from the seed sync) must be untouched.
@@ -209,26 +233,52 @@ func TestSyncBoardsConfigFailureDropsOneBoardAndKeepsThePreviousCopyOfTheOther(t
 func TestSyncBoardsWritesUnavailableSettingOnEveryRunAndClearsIt(t *testing.T) {
 	repo, boards := newBoardRepos(t)
 	ctx := context.Background()
-	// Simulate a previous run against an instance with no Agile API: the
-	// setting is already "true" before this run starts.
-	if err := repo.SetProfileSetting(ctx, "p1", "boards_unavailable", "true"); err != nil {
-		t.Fatalf("seed setting: %v", err)
-	}
-
 	fb := &fake{
 		boards:    []backend.Board{{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}},
 		columns:   map[int][]backend.BoardColumn{1: {{Name: "To Do", StatusIDs: []string{"1"}}}},
 		sprints:   map[int][]backend.Sprint{1: {}},
 		issueKeys: map[int]map[string][]string{1: {"": {}}},
+		boardsErr: fmt.Errorf("project PLAT boards: %w", corejira.ErrNoAgile),
 	}
 	e := syncer.New(fb, repo)
 	e.Boards = boards
 
+	// The instance has no Agile API: the run records it.
 	if _, err := e.SyncBoards(ctx, "p1", "PLAT", nil); err != nil {
-		t.Fatalf("sync boards: %v", err)
+		t.Fatalf("first sync: %v", err)
 	}
 	v, err := repo.ProfileSetting(ctx, "p1", "boards_unavailable")
+	if err != nil || v != "true" {
+		t.Fatalf("boards_unavailable after ErrNoAgile = %q, %v, want it recorded", v, err)
+	}
+
+	// The profile is repointed at a Jira Software instance: the next run
+	// clears it, or the view keeps claiming there are no boards.
+	fb.boardsErr = nil
+	if _, err := e.SyncBoards(ctx, "p1", "PLAT", nil); err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+	v, err = repo.ProfileSetting(ctx, "p1", "boards_unavailable")
 	if err != nil || v != "" {
 		t.Errorf("boards_unavailable = %q, %v, want cleared now that boards are answerable again", v, err)
 	}
+}
+
+// loginPageBody is what a Data Center sitting behind SSO answers a 403
+// with: an HTML login page rather than a Jira error message.
+func loginPageBody() string {
+	return strings.Join([]string{
+		"<!DOCTYPE html>",
+		"<html lang=\"en\">",
+		"<head><title>Log in - Jira</title></head>",
+		"<body>",
+		"  <div id=\"login\">",
+		"    <form action=\"/login.jsp\" method=\"post\">",
+		"      <input name=\"os_username\" type=\"text\">",
+		"      <input name=\"os_password\" type=\"password\">",
+		"    </form>",
+		"  </div>",
+		"</body>",
+		"</html>",
+	}, "\n")
 }

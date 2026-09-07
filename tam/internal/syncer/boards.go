@@ -10,33 +10,47 @@ import (
 
 	corejira "agile-suite/core/jira"
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/errtext"
 )
 
-// settingBoardsUnavailable is the profile setting the pass writes on every
-// run: "true" when the instance answered ErrNoAgile, cleared the moment
-// boards come back, so a profile repointed at a Jira Software instance
-// stops claiming there are none.
+// settingBoardsUnavailable is the profile setting the pass writes whenever
+// the boards call answers at all: "true" when the instance answered
+// ErrNoAgile, cleared the moment boards come back, so a profile repointed
+// at a Jira Software instance stops claiming there are none.
 const settingBoardsUnavailable = "boards_unavailable"
 
 // BoardSummary is what one boards pass reports.
 type BoardSummary struct {
-	Boards      int      `json:"boards"`
-	Columns     int      `json:"columns"`
-	Sprints     int      `json:"sprints"`
+	Boards  int `json:"boards"`
+	Columns int `json:"columns"`
+	Sprints int `json:"sprints"`
+	// Cards is how many distinct issue keys the boards that landed hold: a
+	// key that is both on a board's own list and in one of its sprints is
+	// one card, counted once. A key on two boards is two cards, because it
+	// is drawn on both.
 	Cards       int      `json:"cards"`
 	Dropped     []string `json:"dropped"`
 	Unavailable bool     `json:"unavailable"`
 	Elapsed     string   `json:"elapsed"`
 }
 
+// EnsureDropped makes Dropped a non-nil slice, which is what the frontend
+// wants: a nil slice marshals to null and every reader would need its own
+// guard. The bound methods call it on the way out, so the engine itself can
+// keep the idiomatic zero value.
+func (s *BoardSummary) EnsureDropped() {
+	if s.Dropped == nil {
+		s.Dropped = []string{}
+	}
+}
+
 // boardParts is what one board's read step gathers before anything is
-// written for it: its columns, its sprints, its own issue list, and the
-// issue keys of its active and future sprints, keyed by sprint id.
+// written for it: its columns, its sprints, and the issue keys of every
+// scope, keyed by sprint id with "" for the board's own list.
 type boardParts struct {
-	columns    []backend.BoardColumn
-	sprints    []backend.Sprint
-	ownKeys    []string
-	sprintKeys map[string][]string
+	columns []backend.BoardColumn
+	sprints []backend.Sprint
+	keys    map[string][]string
 }
 
 // SyncBoards pulls a project's boards, their columns, their sprints, and
@@ -48,18 +62,22 @@ type boardParts struct {
 // Every board is read in full before anything is written for it: its
 // columns, its sprints, its own issue list, and its active and future
 // sprints' issue keys. A board whose read fails at any point is recorded
-// in Dropped with its name and the trimmed reason, and whatever that board
-// held before this run is left exactly as it was. Only once every read for
-// a board has succeeded does the pass write it, so a reader never catches
-// a board with some of its parts replaced and the rest still old.
+// in Dropped with its name and one readable line of the reason, and
+// whatever that board held before this run is left exactly as it was. Once
+// every read for a board has succeeded, ReplaceBoard writes all of it in
+// one transaction, so a reader never catches a board with some of its
+// parts replaced and the rest still old.
 //
 // An instance with no Agile API at all answers Boards with ErrNoAgile,
 // which is not a failure: the summary comes back with Unavailable true and
 // no error, the boards already cached are left alone, and the
 // boards_unavailable profile setting records the fact for the view. That
-// setting is written on every run, cleared as soon as boards are found
-// again, so a profile repointed at a Jira Software instance stops claiming
-// there are none.
+// setting is written whenever the boards call answers, either way: "true"
+// on ErrNoAgile, cleared as soon as boards are found again, so a profile
+// repointed at a Jira Software instance stops claiming there are none. A
+// pass that never ran, and a Boards call that failed for some other
+// reason, leave the setting alone: a 500 says nothing about whether the
+// instance has an Agile API.
 func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, onProgress func(Progress)) (BoardSummary, error) {
 	emit := func(p Progress) {
 		if onProgress != nil {
@@ -77,25 +95,30 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 	}
 
 	start := e.Now().UTC()
+	// elapsed goes on every return, not just the happy one: the frontend
+	// shows the summary beside the error.
+	elapsed := func() string { return e.Now().Sub(start).Round(time.Millisecond).String() }
 
 	boards, err := bb.Boards(ctx, projectKey)
 	if err != nil {
+		sum.Elapsed = elapsed()
 		if errors.Is(err, corejira.ErrNoAgile) {
 			if serr := e.repo.SetProfileSetting(ctx, profileID, settingBoardsUnavailable, "true"); serr != nil {
 				return sum, serr
 			}
 			sum.Unavailable = true
-			sum.Elapsed = e.Now().Sub(start).Round(time.Millisecond).String()
 			return sum, nil
 		}
 		return sum, err
 	}
 	if err := e.repo.SetProfileSetting(ctx, profileID, settingBoardsUnavailable, ""); err != nil {
+		sum.Elapsed = elapsed()
 		return sum, err
 	}
 
 	existing, err := e.Boards.ListBoards(ctx, profileID)
 	if err != nil {
+		sum.Elapsed = elapsed()
 		return sum, err
 	}
 	jiraIDs := make(map[int]bool, len(boards))
@@ -107,19 +130,17 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 		emit(Progress{Phase: "boards", Stage: b.Name})
 		parts, err := e.readBoard(ctx, bb, b)
 		if err != nil {
-			sum.Dropped = append(sum.Dropped, fmt.Sprintf("%s: %s", b.Name, err.Error()))
+			sum.Dropped = append(sum.Dropped, fmt.Sprintf("%s: %s", b.Name, errtext.Line(err)))
 			continue
 		}
-		if err := e.writeBoard(ctx, profileID, b, start, parts); err != nil {
+		if err := e.Boards.ReplaceBoard(ctx, profileID, b, parts.columns, parts.sprints, parts.keys); err != nil {
+			sum.Elapsed = elapsed()
 			return sum, err
 		}
 		sum.Boards++
 		sum.Columns += len(parts.columns)
 		sum.Sprints += len(parts.sprints)
-		sum.Cards += len(parts.ownKeys)
-		for _, keys := range parts.sprintKeys {
-			sum.Cards += len(keys)
-		}
+		sum.Cards += distinctKeys(parts.keys)
 	}
 
 	var toRemove []int
@@ -129,10 +150,11 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 		}
 	}
 	if err := e.Boards.RemoveBoards(ctx, profileID, toRemove); err != nil {
+		sum.Elapsed = elapsed()
 		return sum, err
 	}
 
-	sum.Elapsed = e.Now().Sub(start).Round(time.Millisecond).String()
+	sum.Elapsed = elapsed()
 	return sum, nil
 }
 
@@ -156,42 +178,30 @@ func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backe
 	if err != nil {
 		return boardParts{}, err
 	}
-	sprintKeys := map[string][]string{}
+	keys := map[string][]string{"": ownKeys}
 	for _, s := range sprints {
 		if s.State != "active" && s.State != "future" {
 			continue
 		}
 		sid := strconv.Itoa(s.ID)
-		keys, err := bb.BoardIssueKeys(ctx, b.ID, sid)
+		sprintKeys, err := bb.BoardIssueKeys(ctx, b.ID, sid)
 		if err != nil {
 			return boardParts{}, err
 		}
-		sprintKeys[sid] = keys
+		keys[sid] = sprintKeys
 	}
-	return boardParts{columns: cols, sprints: sprints, ownKeys: ownKeys, sprintKeys: sprintKeys}, nil
+	return boardParts{columns: cols, sprints: sprints, keys: keys}, nil
 }
 
-// writeBoard replaces one board's row, columns, sprints, and issue keys.
-// It is only ever called once readBoard has succeeded in full, so a write
-// failure here is a real store error, not a board Jira could not answer
-// for; the caller aborts the pass rather than guess at a partial state.
-func (e *Engine) writeBoard(ctx context.Context, profileID string, b backend.Board, syncedAt time.Time, parts boardParts) error {
-	if err := e.Boards.UpsertBoards(ctx, profileID, []backend.Board{b}, syncedAt); err != nil {
-		return err
-	}
-	if err := e.Boards.UpsertColumns(ctx, profileID, b.ID, parts.columns); err != nil {
-		return err
-	}
-	if err := e.Boards.UpsertSprints(ctx, profileID, b.ID, parts.sprints); err != nil {
-		return err
-	}
-	if err := e.Boards.UpsertIssueKeys(ctx, profileID, b.ID, "", parts.ownKeys); err != nil {
-		return err
-	}
-	for sprintID, keys := range parts.sprintKeys {
-		if err := e.Boards.UpsertIssueKeys(ctx, profileID, b.ID, sprintID, keys); err != nil {
-			return err
+// distinctKeys counts the issue keys one board holds across all its scopes,
+// counting a card that is both on the board's own list and in one of its
+// sprints once.
+func distinctKeys(keys map[string][]string) int {
+	seen := make(map[string]bool)
+	for _, scope := range keys {
+		for _, key := range scope {
+			seen[key] = true
 		}
 	}
-	return nil
+	return len(seen)
 }
