@@ -67,11 +67,13 @@ type RawBoardConfig struct {
 	} `json:"columnConfig"`
 }
 
+type RawStatus struct {
+	ID string `json:"id"`
+}
+
 type RawColumn struct {
-	Name     string `json:"name"`
-	Statuses []struct {
-		ID string `json:"id"`
-	} `json:"statuses"`
+	Name     string      `json:"name"`
+	Statuses []RawStatus `json:"statuses"`
 }
 
 // StatusIDs is the flattening every caller wants, kept beside the raw shape
