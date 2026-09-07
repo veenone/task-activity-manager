@@ -680,7 +680,9 @@
 .epic-row .folder-count {
   grid-column: 5 / span 2;
 }
+/* Two seconds on a row that just moved to another epic. The warn tint is
+   the same vocabulary the pending dot and the Commit chip use for a local
+   change, and it reads without touching the row's text color. */
 .epic-row-moved {
-  background: var(--row-hover);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--warn-soft);
 }
