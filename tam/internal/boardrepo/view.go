@@ -47,6 +47,16 @@ type BoardView struct {
 	Columns []ColumnView `json:"columns"`
 	Lanes   []LaneView   `json:"lanes"`
 
+	// DonePoints is the story points of the mapped cards whose status is
+	// done, summed here where every card is in hand rather than over the
+	// cells the view drew. A Done column of nine hundred cards renders two
+	// hundred of them, so a summary line that walked the cells would read
+	// "200 of 900 points done" against column heads that say otherwise.
+	// The definition of done is backend.IsDone, the same one the grid's
+	// chip and the Epics tree count by, because a board's rightmost column
+	// is as often Blocked or Won't Do as it is Done.
+	DonePoints float64 `json:"donePoints"`
+
 	// Unmapped counts the cards whose status no column collects, and
 	// UnmappedStatuses names those statuses, deduplicated and sorted, so
 	// the view can say which ones rather than print a bare number.
@@ -159,6 +169,9 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 		view.Columns[col].Total++
 		if card.StoryPoints != nil {
 			view.Columns[col].Points += *card.StoryPoints
+			if backend.IsDone(card.Status) {
+				view.DonePoints += *card.StoryPoints
+			}
 		}
 		l := lanes.get(card, lane)
 		l.Count++

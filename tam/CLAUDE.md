@@ -64,7 +64,11 @@ chosen swimlane (none, assignee, epic) asks for. A card whose status is
 in no column is counted into `Unmapped`, and its status name into
 `UnmappedStatuses`, not listed card by card. A cell caps at 200 cards and
 the whole view at 2,000; past either cap a card is only counted, in
-`Overflow` and `Capped`. `NeedsStatusSync` is true when every cached card
+`Overflow` and `Capped`. `DonePoints` is summed in the same walk, over
+every mapped card rather than the ones a capped cell drew, by
+`backend.IsDone`: the definition lives in `internal/backend` because both
+`boardrepo` and `issuerepo` count by it and `boardrepo` may not import
+`issuerepo`. `NeedsStatusSync` is true when every cached card
 still carries an empty status id, which is the state right after the
 version 5 migration and before the next sync; the view tells the user to
 sync rather than drawing an empty board and blaming them for it.

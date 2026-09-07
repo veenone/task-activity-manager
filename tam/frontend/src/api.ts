@@ -253,6 +253,10 @@ export interface BoardView {
   swimlane: string;
   columns: ColumnView[];
   lanes: LaneView[];
+  // donePoints is the story points of the mapped cards whose status is
+  // done, summed over every card the board holds rather than the ones a
+  // capped cell drew.
+  donePoints: number;
   unmapped: number;
   unmappedStatuses: string[];
   notSynced: number;

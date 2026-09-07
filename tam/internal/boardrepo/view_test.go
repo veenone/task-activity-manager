@@ -581,3 +581,62 @@ func TestTheSprintScopeIsItsOwnMembership(t *testing.T) {
 		t.Errorf("view sprint = %q", sprint.SprintID)
 	}
 }
+
+func TestDonePointsCountEveryCardInTheColumnNotJustTheDrawnOnes(t *testing.T) {
+	r, _ := newRepo(t)
+	cards := make([]backend.Issue, 0, 250)
+	for i := 0; i < 250; i++ {
+		c := card(fmt.Sprintf("PLAT-%d", 1000+i), "Done", "5")
+		c.StoryPoints = pts(2)
+		cards = append(cards, c)
+	}
+	src := seedBoard(t, r, sampleColumns(), cards)
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if len(view.Lanes[0].Cells[4]) != boardrepo.MaxCardsPerCell {
+		t.Fatalf("rendered %d cards, want the cell capped so the count is worth making", len(view.Lanes[0].Cells[4]))
+	}
+	// The column head reads 500 points, and the done half has to agree with
+	// it: a walk over the drawn cards would say 400.
+	if view.Columns[4].Points != 500 {
+		t.Errorf("Done column points = %v, want 500", view.Columns[4].Points)
+	}
+	if view.DonePoints != 500 {
+		t.Errorf("done points = %v, want 500: the cap decides what is drawn, not what is counted", view.DonePoints)
+	}
+}
+
+func TestDonePointsFollowTheStatusRatherThanTheLastColumn(t *testing.T) {
+	r, _ := newRepo(t)
+	cols := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "In Progress", StatusIDs: []string{"3"}},
+		{Name: "Blocked", StatusIDs: []string{"9"}},
+	}
+	todo := card("PLAT-1", "To Do", "1")
+	todo.StoryPoints = pts(3)
+	// A board's rightmost column is as often Blocked as it is Done, and a
+	// done card can sit anywhere: this one is still in the middle column.
+	done := card("PLAT-2", "Done", "3")
+	done.StoryPoints = pts(5)
+	blocked := card("PLAT-3", "Blocked", "9")
+	blocked.StoryPoints = pts(3)
+
+	src := seedBoard(t, r, cols, []backend.Issue{todo, done, blocked})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if view.DonePoints != 5 {
+		t.Errorf("done points = %v, want the 5 of the one card whose status is done", view.DonePoints)
+	}
+	total := 0.0
+	for _, c := range view.Columns {
+		total += c.Points
+	}
+	if total != 11 {
+		t.Errorf("column points total = %v, want 11", total)
+	}
+}

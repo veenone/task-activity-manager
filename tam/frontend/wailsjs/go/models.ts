@@ -322,6 +322,7 @@ export namespace boardrepo {
 	    swimlane: string;
 	    columns: ColumnView[];
 	    lanes: LaneView[];
+	    donePoints: number;
 	    unmapped: number;
 	    unmappedStatuses: string[];
 	    notSynced: number;
@@ -339,6 +340,7 @@ export namespace boardrepo {
 	        this.swimlane = source["swimlane"];
 	        this.columns = this.convertValues(source["columns"], ColumnView);
 	        this.lanes = this.convertValues(source["lanes"], LaneView);
+	        this.donePoints = source["donePoints"];
 	        this.unmapped = source["unmapped"];
 	        this.unmappedStatuses = source["unmappedStatuses"];
 	        this.notSynced = source["notSynced"];

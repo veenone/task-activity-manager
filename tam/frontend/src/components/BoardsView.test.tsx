@@ -55,6 +55,7 @@ function board(over: Partial<BoardView>): BoardView {
     swimlane: "none",
     columns: [],
     lanes: [],
+    donePoints: 0,
     unmapped: 0,
     unmappedStatuses: [],
     notSynced: 0,
@@ -164,10 +165,7 @@ describe("BoardsView toolbar", () => {
     await waitFor(() => expect(api.GetBoard).toHaveBeenCalledWith("p1", 2, "", "none"));
   });
 
-  it("reads the sprint dates and the point split in the summary line, by status rather than by column", async () => {
-    // The rightmost column here is "Blocked", not "Done", and the one done
-    // card sits in the middle column: the summary must still read 5 of 11,
-    // not the 3 the last column's points would give.
+  it("reads the sprint dates and the backend's point split in the summary line", async () => {
     const done = issue({ key: "PLAT-501", summary: "Ship the changelog", status: "Done", storyPoints: 5 });
     const blocked = issue({ key: "PLAT-502", summary: "Vendor migration", status: "Blocked", storyPoints: 3 });
     vi.mocked(api.GetBoard).mockResolvedValue(
@@ -177,12 +175,32 @@ describe("BoardsView toolbar", () => {
           { name: "In Progress", total: 1, points: 5 },
           { name: "Blocked", total: 1, points: 3 },
         ],
+        donePoints: 5,
         lanes: [{ id: "", label: "All issues", count: 2, cells: [[], [done], [blocked]], overflow: [0, 0, 0] }],
       }),
     );
     renderView();
     expect(
       await screen.findByText(/^Sprint 12, active, ends .+\. 5 of 11 points done\. Synced today/),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the summary's done half whole when a cell is capped", async () => {
+    // The Done column holds 900 points and the cell drew a fraction of
+    // them. The line reads the backend's count, so it says 900 of 900
+    // rather than counting the cards that happened to be rendered.
+    const drawn = issue({ key: "PLAT-601", summary: "Ship the changelog", status: "Done", storyPoints: 2 });
+    vi.mocked(api.GetBoard).mockResolvedValue(
+      board({
+        columns: [{ name: "To Do", total: 0, points: 0 }, { name: "Done", total: 450, points: 900 }],
+        donePoints: 900,
+        capped: true,
+        lanes: [{ id: "", label: "All issues", count: 450, cells: [[], [drawn]], overflow: [0, 449] }],
+      }),
+    );
+    renderView();
+    expect(
+      await screen.findByText(/^Sprint 12, active, ends .+\. 900 of 900 points done\./),
     ).toBeInTheDocument();
   });
 });

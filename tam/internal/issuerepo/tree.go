@@ -37,17 +37,6 @@ type Tree struct {
 	Truncated bool            `json:"truncated"`
 }
 
-// IsDone is the status bucket the grid, the tree's progress counts, and the
-// Show done filter all call done. It is the one definition: the frontend's
-// statusClass mirrors it rather than keeping its own list.
-func IsDone(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "done", "closed", "resolved":
-		return true
-	}
-	return false
-}
-
 // treeCap bounds how many non-epic rows one EpicTree call reads. A profile
 // past it still gets a tree, just a truncated one; Total and Done are
 // computed over the rows the cap let through, not the whole cache.
@@ -134,7 +123,7 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 			if c.StoryPoints != nil {
 				node.Points += *c.StoryPoints
 			}
-			if IsDone(c.Status) {
+			if backend.IsDone(c.Status) {
 				node.Done++
 				if c.StoryPoints != nil {
 					node.DonePoints += *c.StoryPoints
@@ -144,7 +133,7 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		epicMatches := matches(e, text)
 		anyChild := false
 		for _, c := range all {
-			if !q.ShowDone && IsDone(c.Status) {
+			if !q.ShowDone && backend.IsDone(c.Status) {
 				continue
 			}
 			if !epicMatches && !matches(c, text) {
@@ -168,7 +157,7 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		if c.ParentKey != "" && isEpic[c.ParentKey] {
 			continue
 		}
-		if !q.ShowDone && IsDone(c.Status) {
+		if !q.ShowDone && backend.IsDone(c.Status) {
 			continue
 		}
 		if !matches(c, text) {
