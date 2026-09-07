@@ -4,6 +4,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createQueryClient } from "@agile-suite/core";
 import * as api from "../api";
+import type { IssueQuery } from "../api";
 import { useIssues, useSyncState } from "./issues";
 import { invalidateProfileData } from "./invalidate";
 import { keys } from "./keys";
@@ -17,7 +18,7 @@ vi.mock("../api", async () => {
   };
 });
 
-const query = { text: "", types: [], sprintId: "", offset: 0, limit: 25 };
+const query: IssueQuery = { text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false };
 
 beforeEach(() => {
   vi.clearAllMocks();

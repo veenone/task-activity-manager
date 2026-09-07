@@ -8,8 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
-	"strings"
 	"sync"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"agile-suite/core/profile"
 	"agile-suite/core/settings"
@@ -17,7 +18,6 @@ import (
 	"agile-suite/core/store"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
-	"agile-suite/tam/internal/suiteprofiles"
 	"agile-suite/tam/internal/tamstore"
 )
 
@@ -81,7 +81,9 @@ func (a *App) startup(ctx context.Context) {
 	if err := a.initStore(); err != nil {
 		a.startupErr = err.Error()
 		log.Printf("tam: startup failed: %v", err)
+		return
 	}
+	a.refreshMenu()
 }
 
 func (a *App) initStore() error {
@@ -177,77 +179,6 @@ func (a *App) GetDiagnostics() Diagnostics {
 	return d
 }
 
-// ListProfiles returns the shared profiles TAM can use.
-func (a *App) ListProfiles() ([]profile.Profile, error) {
-	if err := a.requireStore(); err != nil {
-		return nil, err
-	}
-	ps, err := a.profiles.List()
-	if err != nil {
-		return nil, err
-	}
-	return suiteprofiles.Visible(ps), nil
-}
-
-// CreateProfile adds a profile to the shared store and saves its token in the
-// OS credential manager. A demo profile ("demo" as the URL) needs no token.
-func (a *App) CreateProfile(name, jiraURL, projectKey, token string, makeDefault bool) (profile.Profile, error) {
-	if err := a.requireStore(); err != nil {
-		return profile.Profile{}, err
-	}
-	if err := suiteprofiles.ValidateNew(name, jiraURL, projectKey, token); err != nil {
-		return profile.Profile{}, err
-	}
-	p, err := a.profiles.Create(
-		strings.TrimSpace(name), strings.TrimSpace(jiraURL), strings.TrimSpace(projectKey),
-		"", "", "", "", "", false, suiteprofiles.Backend,
-	)
-	if err != nil {
-		return profile.Profile{}, err
-	}
-	if strings.TrimSpace(token) != "" {
-		if err := a.creds.Save(p.ID, strings.TrimSpace(token)); err != nil {
-			if delErr := a.profiles.Delete(p.ID); delErr != nil {
-				log.Printf("tam: rollback profile %s after credential save failure: %v", p.ID, delErr)
-			}
-			return profile.Profile{}, fmt.Errorf("save credentials: %w", err)
-		}
-	}
-	if makeDefault {
-		if err := a.settings.SetDefaultProfileID(p.ID); err != nil {
-			log.Printf("tam: set default profile after create: %v", err)
-		}
-	}
-	return p, nil
-}
-
-// DeleteProfile removes a profile from the shared store, so it disappears
-// from XTM as well, drops its credential, and purges the rows TAM cached
-// for it locally.
-func (a *App) DeleteProfile(id string) error {
-	if err := a.requireStore(); err != nil {
-		return err
-	}
-	if err := a.profiles.Delete(id); err != nil {
-		return err
-	}
-	a.forgetBackend(id)
-	if err := a.repo.PurgeProfile(a.ctx, id); err != nil {
-		// The shared profile row is already gone, so a failed purge leaves
-		// stale local rows rather than a half-deleted profile. Log it.
-		log.Printf("tam: purge local rows for %s: %v", id, err)
-	}
-	if err := a.creds.Delete(id); err != nil {
-		log.Printf("tam: delete credentials for %s: %v", id, err)
-	}
-	if s, err := a.settings.Get(); err == nil && s.DefaultProfileID == id {
-		if err := a.settings.SetDefaultProfileID(""); err != nil {
-			log.Printf("tam: clear default profile after delete: %v", err)
-		}
-	}
-	return nil
-}
-
 // GetSettings returns the shared preferences.
 func (a *App) GetSettings() (settings.Settings, error) {
 	if err := a.requireStore(); err != nil {
@@ -267,6 +198,59 @@ func (a *App) SetTheme(theme string) error {
 		return a.settings.SetTheme(theme)
 	}
 	return fmt.Errorf("unknown theme %q", theme)
+}
+
+// showNavRail reads the stored nav-rail preference, defaulting to hidden when
+// the store is not up yet. main() builds the menu before startup runs, so the
+// first menu is built on that default and startup rebuilds it once the real
+// value is readable.
+func (a *App) showNavRail() bool {
+	if a.settings == nil {
+		return false
+	}
+	s, err := a.settings.Get()
+	if err != nil {
+		return false
+	}
+	return s.ShowNavRail
+}
+
+// setShowNavRail persists the nav-rail preference and tells the frontend, so
+// the View menu's checkbox and the rail itself never disagree.
+func (a *App) setShowNavRail(v bool) {
+	if a.settings != nil {
+		if err := a.settings.SetShowNavRail(v); err != nil {
+			log.Printf("tam: save nav rail preference: %v", err)
+		}
+	}
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "menu:nav-rail", v)
+	}
+}
+
+// SetNavRailVisible is the bound counterpart of the menu's checkbox, for the
+// in-app control. It persists the preference and rebuilds the menu so the tick
+// follows a toggle made from either side.
+func (a *App) SetNavRailVisible(v bool) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if err := a.settings.SetShowNavRail(v); err != nil {
+		return err
+	}
+	a.refreshMenu()
+	return nil
+}
+
+// refreshMenu rebuilds the native menu from the current settings. Wails renders
+// a checkbox's tick from the value the item was built with, so a preference
+// change has to rebuild rather than mutate.
+func (a *App) refreshMenu() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.MenuSetApplicationMenu(a.ctx, appMenu(a))
+	runtime.MenuUpdateApplicationMenu(a.ctx)
 }
 
 // SetDefaultProfile records which profile opens on launch. An empty id clears

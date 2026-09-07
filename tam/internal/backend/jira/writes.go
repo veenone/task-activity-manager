@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -22,7 +23,7 @@ func (b *Backend) GetIssue(ctx context.Context, key string) (backend.Issue, erro
 	if err != nil {
 		return backend.Issue{}, err
 	}
-	return parseIssue(raw, ids, b.requirementType), nil
+	return parseIssue(raw, ids, b.requirementType, b.typesOrEmpty(ctx, projectOf(key))), nil
 }
 
 // jiraFields turns the journal's text values into Jira's field shapes. An
@@ -88,14 +89,26 @@ func (b *Backend) UpdateIssue(ctx context.Context, key string, fields map[string
 	return b.c.Put(ctx, "/rest/api/2/issue/"+url.PathEscape(key), map[string]any{"fields": jf})
 }
 
+// projectOf is the project key an issue key belongs to: everything before the
+// last hyphen, since a project key may itself contain hyphens.
+func projectOf(issueKey string) string {
+	if i := strings.LastIndex(issueKey, "-"); i > 0 {
+		return issueKey[:i]
+	}
+	return issueKey
+}
+
 // CreateIssue POSTs the draft. Extra values are shaped from the type's
 // create-meta: option fields as {"id"}, arrays as [{"id"}], numbers as
 // numbers, everything else as the text entered. If the meta cannot be read
 // the values go as text and Jira's own validation decides.
 func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.IssueDraft) (string, error) {
 	ids := b.discover(ctx)
-	names := jiraTypeNames([]string{d.Type}, b.requirementType)
+	names := jiraTypeNames([]string{d.Type}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
 	if len(names) == 0 {
+		if d.Type == backend.TypeSubtask {
+			return "", fmt.Errorf("%s has no sub-task issue type", projectKey)
+		}
 		return "", fmt.Errorf("unknown issue type %q", d.Type)
 	}
 	fields := map[string]any{
@@ -118,7 +131,14 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	if d.StoryPoints != nil && ids.Points != "" {
 		fields[ids.Points] = *d.StoryPoints
 	}
-	if d.ParentKey != "" && d.Type != backend.TypeEpic {
+	// A sub-task hangs off its parent through Jira's own parent field, not
+	// through the Epic Link, and cannot exist without one.
+	if d.Type == backend.TypeSubtask {
+		if d.ParentKey == "" {
+			return "", errors.New("a sub-task needs a parent issue")
+		}
+		fields["parent"] = map[string]string{"key": d.ParentKey}
+	} else if d.ParentKey != "" && d.Type != backend.TypeEpic {
 		if ids.EpicLink != "" {
 			fields[ids.EpicLink] = d.ParentKey
 		} else {
@@ -127,16 +147,22 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	}
 	if len(d.Extra) > 0 {
 		kinds := map[string]string{}
+		// Whether the field's create-meta listed allowed values, which is what
+		// decides between sending an option's id and sending the text the user
+		// typed. Without it a field whose options Jira did not expand was sent
+		// as {"id": "<what they typed>"}, which is never a valid id.
+		options := map[string]bool{}
 		if specs, err := b.CreateFields(ctx, projectKey, d.Type); err == nil {
 			for _, s := range specs {
 				kinds[s.ID] = s.Type
+				options[s.ID] = len(s.AllowedValues) > 0
 			}
 		}
 		for id, v := range d.Extra {
 			if v == "" {
 				continue
 			}
-			fields[id] = shapeExtra(kinds[id], v)
+			fields[id] = shapeExtra(kinds[id], options[id], v)
 		}
 	}
 	if d.Type == backend.TypeEpic && ids.EpicName != "" {
@@ -156,18 +182,46 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	return resp.Key, nil
 }
 
-func shapeExtra(kind, v string) any {
+// shapeExtra turns the text the form holds into the JSON Jira wants for one
+// create-meta field. hasOptions says the field's create-meta listed allowed
+// values, so the text is an option id; without it the text is the value the
+// user typed and has to go as a name, not an id. An array field carries a
+// comma list, because a Jira array (components, fix versions, a multi-select)
+// takes more than one value and the form sends them joined.
+func shapeExtra(kind string, hasOptions bool, v string) any {
 	switch kind {
 	case "option":
-		return map[string]string{"id": v}
+		if hasOptions {
+			return map[string]string{"id": v}
+		}
+		return map[string]string{"value": v}
 	case "array":
-		return []map[string]string{{"id": v}}
+		parts := splitList(v)
+		if hasOptions {
+			out := make([]map[string]string, 0, len(parts))
+			for _, p := range parts {
+				out = append(out, map[string]string{"id": p})
+			}
+			return out
+		}
+		return parts
 	case "number":
 		if n, err := strconv.ParseFloat(v, 64); err == nil {
 			return n
 		}
 	}
 	return v
+}
+
+// splitList turns the form's comma list into its non-empty parts.
+func splitList(v string) []string {
+	out := []string{}
+	for _, p := range strings.Split(v, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // createMeta is the slice of Jira's createmeta answer the form needs.
@@ -203,7 +257,7 @@ var formFields = map[string]bool{
 // own, sorted by name, with their options when they have any.
 func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType string) ([]backend.FieldSpec, error) {
 	ids := b.discover(ctx)
-	names := jiraTypeNames([]string{logicalType}, b.requirementType)
+	names := jiraTypeNames([]string{logicalType}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
 	if len(names) == 0 {
 		return nil, fmt.Errorf("unknown issue type %q", logicalType)
 	}

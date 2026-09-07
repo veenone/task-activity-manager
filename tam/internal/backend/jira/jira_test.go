@@ -73,13 +73,28 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				"issuetype":{"required":true,"name":"Issue Type","schema":{"type":"issuetype"}},
 				"customfield_10016":{"required":true,"name":"Story Points","schema":{"type":"number"}},
 				"customfield_10050":{"required":true,"name":"Severity","schema":{"type":"option"},"allowedValues":[{"id":"1","value":"Minor"},{"id":"3","value":"Critical"}]},
-				"components":{"required":true,"name":"Component/s","schema":{"type":"array","items":"component"},"allowedValues":[{"id":"100","name":"Checkout"}]},
+				"components":{"required":true,"name":"Component/s","schema":{"type":"array","items":"component"},"allowedValues":[{"id":"100","name":"Checkout"},{"id":"101","name":"Payments"}]},
+				"customfield_10070":{"required":true,"name":"Release Note","schema":{"type":"option"}},
+				"customfield_10071":{"required":true,"name":"Keywords","schema":{"type":"array","items":"string"}},
 				"environment":{"required":false,"name":"Environment","schema":{"type":"string"}}
 			}}]}]}`))
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/PLAT-412"):
 			_, _ = w.Write([]byte(`{"id":"1","key":"PLAT-412","fields":{"description":"As a shopper","issuelinks":[{"type":{"name":"Tested By"},"inwardIssue":{"key":"XT-1018","fields":{"summary":"Applies discount","issuetype":{"name":"Test"}}}}],"customfield_10016":5}}`))
+		case r.URL.Path == "/rest/api/2/user/assignable/search":
+			f.searches = append(f.searches, "users "+r.URL.RawQuery)
+			_, _ = w.Write([]byte(`[
+				{"name":"ranand","displayName":"R. Anand","active":true},
+				{"name":"gone","displayName":"Left The Company","active":false},
+				{"name":"nodisplay","displayName":"","active":true}
+			]`))
+		case r.URL.Path == "/rest/api/2/priority":
+			_, _ = w.Write([]byte(`[{"name":"Highest"},{"name":"High"},{"name":""},{"name":"Low"}]`))
+		case r.URL.Path == "/rest/api/2/project/TODOP":
+			// A project whose task level is called "Todo", the shape seen on
+			// a real instance.
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10000","name":"Todo"},{"id":"18","name":"Story"},{"id":"19","name":"Technical task","subtask":true}]}`))
 		case r.URL.Path == "/rest/api/2/project/PLAT":
-			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"1","name":"Task"},{"id":"7","name":"Business Requirement"}]}`))
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"1","name":"Task"},{"id":"7","name":"Business Requirement"},{"id":"19","name":"Technical task","subtask":true}]}`))
 		default:
 			t.Errorf("unexpected request %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -119,7 +134,9 @@ func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	if total != 2 || len(page) != 2 {
 		t.Fatalf("total %d rows %d", total, len(page))
 	}
-	wantJQL := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Business Requirement") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
+	// The sub-task type is in the scope under the name the project gives it,
+	// which is where "Technical task" comes from.
+	wantJQL := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Business Requirement", "Technical task") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
 	if len(f.searches) != 1 || !strings.HasPrefix(f.searches[0], wantJQL+" | fields=") {
 		t.Errorf("search request = %q", f.searches)
 	}
@@ -165,7 +182,7 @@ func TestGetIssueDetailAndIssueTypes(t *testing.T) {
 		t.Errorf("custom fields = %+v", d.Fields)
 	}
 	types, err := b.IssueTypes(ctx, "PLAT")
-	if err != nil || len(types) != 2 || types[1].Name != "Business Requirement" {
+	if err != nil || len(types) != 3 || types[1].Name != "Business Requirement" {
 		t.Errorf("types = %+v, %v", types, err)
 	}
 }

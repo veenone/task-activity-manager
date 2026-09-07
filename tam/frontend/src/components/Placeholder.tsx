@@ -4,10 +4,10 @@ import type { ViewInfo } from "../nav";
 // names the phase so nobody mistakes the empty state for a bug.
 export function Placeholder({ view }: { view: ViewInfo }) {
   return (
-    <section className="placeholder" aria-labelledby="view-title">
+    <section className="placeholder" aria-labelledby="placeholder-title">
       <div className="placeholder-card">
         <div className="placeholder-glyph" aria-hidden="true" />
-        <h2 className="placeholder-title">
+        <h2 id="placeholder-title" className="placeholder-title">
           The {view.label} view arrives in {view.phase}
         </h2>
         <p className="placeholder-blurb">{view.blurb}</p>

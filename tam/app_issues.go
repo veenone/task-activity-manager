@@ -99,11 +99,17 @@ func (a *App) forgetBackend(profileID string) {
 
 // tlsOptions derives the client options from a profile's TLS settings.
 func tlsOptions(p profile.Profile) []corejira.Option {
+	return tlsOptionsFor(p.CACert, p.AllowUntrustedTLS)
+}
+
+// tlsOptionsFor is tlsOptions over the two values alone, so the connection
+// test can apply the settings a form is still holding, before they are saved.
+func tlsOptionsFor(caCert string, allowUntrustedTLS bool) []corejira.Option {
 	var opts []corejira.Option
-	if strings.TrimSpace(p.CACert) != "" {
-		opts = append(opts, corejira.WithCACert(p.CACert))
+	if strings.TrimSpace(caCert) != "" {
+		opts = append(opts, corejira.WithCACert(caCert))
 	}
-	if p.AllowUntrustedTLS {
+	if allowUntrustedTLS {
 		opts = append(opts, corejira.WithInsecureTLS(true))
 	}
 	return opts

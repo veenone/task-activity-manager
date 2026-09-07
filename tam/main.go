@@ -58,13 +58,28 @@ func main() {
 	}
 }
 
-// appMenu is the native menu bar. Items emit events the frontend listens for,
-// so the menu and the in-app buttons share one code path.
+// menuViews is the View menu's list of views, in the order the menu shows
+// them. It has to agree with VIEWS in frontend/src/nav.ts: the id is what the
+// menu:view event carries and what the frontend routes on. Adding a view means
+// adding it in both places, which is the cost of the menu bar being native.
+var menuViews = []struct{ id, label, accelerator string }{
+	{"backlog", "Backlog", "1"},
+	{"epics", "Epics", "2"},
+	{"boards", "Boards", "3"},
+	{"reports", "Reports", "4"},
+	{"rituals", "Rituals", "5"},
+}
+
+// appMenu is the native menu bar, and TAM's primary navigation: the View menu
+// switches views the way XTM's does. The left nav rail is a second, optional
+// way to do the same thing, toggled from the same menu. Items emit events the
+// frontend listens for, so the menu and the in-app controls share one code
+// path.
 func appMenu(app *App) *menu.Menu {
-	emit := func(event string) func(*menu.CallbackData) {
+	emit := func(event string, data ...any) func(*menu.CallbackData) {
 		return func(*menu.CallbackData) {
 			if app.ctx != nil {
-				runtime.EventsEmit(app.ctx, event)
+				runtime.EventsEmit(app.ctx, event, data...)
 			}
 		}
 	}
@@ -72,11 +87,27 @@ func appMenu(app *App) *menu.Menu {
 	file := m.AddSubmenu("File")
 	file.AddText("Profiles…", nil, emit("menu:profiles"))
 	file.AddSeparator()
+	file.AddText("Sync", keys.CmdOrCtrl("r"), emit("menu:sync"))
+	file.AddText("Full Sync", keys.Combo("r", keys.CmdOrCtrlKey, keys.ShiftKey), emit("menu:full-sync"))
+	file.AddSeparator()
 	file.AddText("Quit", keys.CmdOrCtrl("q"), func(*menu.CallbackData) {
 		if app.ctx != nil {
 			runtime.Quit(app.ctx)
 		}
 	})
+
+	view := m.AddSubmenu("View")
+	for _, v := range menuViews {
+		view.AddText(v.label, keys.CmdOrCtrl(v.accelerator), emit("menu:view", v.id))
+	}
+	view.AddSeparator()
+	// The checkbox owns the rail's state: Wails renders the tick from the
+	// value passed here, so the app reads the stored preference when it builds
+	// the menu and writes it back on every toggle.
+	view.AddCheckbox("Navigation Rail", app.showNavRail(), keys.CmdOrCtrl("b"), func(d *menu.CallbackData) {
+		app.setShowNavRail(d.MenuItem.Checked)
+	})
+
 	help := m.AddSubmenu("Help")
 	help.AddText("About Task Activity Manager", nil, emit("menu:about"))
 	return m

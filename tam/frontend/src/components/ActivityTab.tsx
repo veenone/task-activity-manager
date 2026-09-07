@@ -58,13 +58,14 @@ export function describe(a: AuditEntry): string {
 export function ActivityTab({ profileId, issueKey }: Props) {
   const activity = useActivity(profileId, issueKey);
   return (
-    <div role="tabpanel" id="panel-activity" aria-labelledby="tab-activity" className="tab-panel">
-      <div className="detail-section-head">
-        <h3>Local activity</h3>
+    // The detail panel owns the section heading now, so this renders the
+    // body alone rather than a tab panel with a title of its own.
+    <div>
+      <p className="detail-activity-head">
         <button type="button" className="btn btn-ghost" onClick={() => void activity.refetch()} disabled={activity.isFetching}>
           {activity.isFetching ? "Refreshing" : "Refresh"}
         </button>
-      </div>
+      </p>
       {activity.isPending ? (
         <p className="muted">Loading activity</p>
       ) : activity.isError ? (
@@ -85,7 +86,6 @@ export function ActivityTab({ profileId, issueKey }: Props) {
           ))}
         </ul>
       )}
-      <p className="muted small detail-note">This is TAM's own trail, not Jira's history.</p>
     </div>
   );
 }

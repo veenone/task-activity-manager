@@ -40,6 +40,12 @@ var curated = []backend.Issue{
 	{Key: "PLAT-395", Type: backend.TypeRequirement, Summary: "Every payment request must carry an idempotency key", Status: "Approved", Assignee: "PO", Reporter: "M. Ortiz", Priority: "Highest", Labels: []string{"payments"}, ParentKey: "PLAT-310"},
 	{Key: "PLAT-390", Type: backend.TypeBug, Summary: "Promo code field accepts whitespace-only input", Status: "To Do", Reporter: "J. Park", Priority: "Low", Labels: []string{"promo"}, SprintID: "13", SprintName: "Sprint 13", ParentKey: "PLAT-350", StoryPoints: pts(1)},
 	{Key: "PLAT-385", Type: backend.TypeTask, Summary: "Add the promo code analytics event", Status: "Done", Assignee: "M. Ortiz", Reporter: "PO", Priority: "Medium", Labels: []string{"promo", "analytics"}, SprintID: "11", SprintName: "Sprint 11", ParentKey: "PLAT-350", StoryPoints: pts(2)},
+	// Sub-tasks hang off an issue, not an epic: their ParentKey is a story
+	// or a bug, which is what the Epics tree and the create form both have to
+	// cope with.
+	{Key: "PLAT-414", Type: backend.TypeSubtask, Summary: "Add the promo code input to the payment form", Status: "In Progress", Assignee: "R. Anand", Reporter: "R. Anand", Priority: "Medium", Labels: []string{"checkout"}, SprintID: "12", SprintName: "Sprint 12", ParentKey: "PLAT-412"},
+	{Key: "PLAT-415", Type: backend.TypeSubtask, Summary: "Validate the promo code against the pricing service", Status: "To Do", Assignee: "M. Ortiz", Reporter: "R. Anand", Priority: "Medium", Labels: []string{"checkout", "promo"}, SprintID: "12", SprintName: "Sprint 12", ParentKey: "PLAT-412"},
+	{Key: "PLAT-402", Type: backend.TypeSubtask, Summary: "Reproduce the VAT rounding on a staging cart", Status: "Done", Assignee: "S. Kim", Reporter: "M. Ortiz", Priority: "High", Labels: []string{"checkout"}, SprintID: "12", SprintName: "Sprint 12", ParentKey: "PLAT-401"},
 	{Key: "PLAT-320", Type: backend.TypeEpic, Summary: "Checkout experience", Status: "In Progress", Assignee: "PO", Reporter: "PO", Priority: "High", Labels: []string{"checkout"}, StoryPoints: pts(34)},
 	{Key: "PLAT-310", Type: backend.TypeEpic, Summary: "Payments platform hardening", Status: "To Do", Assignee: "PO", Reporter: "M. Ortiz", Priority: "Medium", Labels: []string{"payments", "security"}, StoryPoints: pts(13)},
 	{Key: "PLAT-305", Type: backend.TypeEpic, Summary: "Team rituals and process", Status: "Done", Assignee: "S. Kim", Reporter: "S. Kim", Priority: "Low", Labels: []string{"process"}, StoryPoints: pts(5)},

@@ -225,6 +225,20 @@ export namespace backend {
 	        this.outward = source["outward"];
 	    }
 	}
+	export class User {
+	    name: string;
+	    displayName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new User(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	    }
+	}
 
 }
 
@@ -552,6 +566,8 @@ export namespace issuerepo {
 	    sprintId: string;
 	    offset: number;
 	    limit: number;
+	    sort: string;
+	    desc: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new IssueQuery(source);
@@ -564,6 +580,8 @@ export namespace issuerepo {
 	        this.sprintId = source["sprintId"];
 	        this.offset = source["offset"];
 	        this.limit = source["limit"];
+	        this.sort = source["sort"];
+	        this.desc = source["desc"];
 	    }
 	}
 	export class LinkedTest {
@@ -851,6 +869,7 @@ export namespace settings {
 	    requirementLinkType: string;
 	    showCoverage: boolean;
 	    tourSeenVersion: number;
+	    showNavRail: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -863,6 +882,7 @@ export namespace settings {
 	        this.requirementLinkType = source["requirementLinkType"];
 	        this.showCoverage = source["showCoverage"];
 	        this.tourSeenVersion = source["tourSeenVersion"];
+	        this.showNavRail = source["showNavRail"];
 	    }
 	}
 

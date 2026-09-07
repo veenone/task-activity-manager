@@ -90,6 +90,45 @@ func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 	}
 }
 
+// An extra value's JSON shape comes from its create-meta: an id when Jira
+// listed allowed values, the typed text as a name when it did not, and a
+// comma list split into the array Jira wants.
+func TestCreateIssueShapesExtraFromCreateMeta(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.createKey = "PLAT-502"
+	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+		Type: backend.TypeBug, Summary: "Promo field accepts spaces",
+		Extra: map[string]string{
+			"components":        "100,101",
+			"customfield_10070": "Needs docs",
+			"customfield_10071": "alpha, beta",
+			"customfield_10050": "3",
+		},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	var post string
+	for _, w := range f.writes {
+		if strings.HasPrefix(w, "POST /rest/api/2/issue ") {
+			post = w
+		}
+	}
+	for _, want := range []string{
+		// An array with options takes every id chosen, not only the first.
+		`"components":[{"id":"100"},{"id":"101"}]`,
+		// An option with no listed values goes by name; {"id": <typed text>}
+		// was never a valid id.
+		`"customfield_10070":{"value":"Needs docs"}`,
+		// A free-string array is a plain list, not a list of ids.
+		`"customfield_10071":["alpha","beta"]`,
+		`"customfield_10050":{"id":"3"}`,
+	} {
+		if !strings.Contains(post, want) {
+			t.Errorf("POST lacks %s: %s", want, post)
+		}
+	}
+}
+
 func TestUpdateIssuePushesTheEpicLink(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	if err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"parentKey": "PLAT-320"}); err != nil {
@@ -157,14 +196,20 @@ func TestCreateFieldsKeepsOnlyRequiredUnknownFields(t *testing.T) {
 	for _, s := range specs {
 		seen = append(seen, s.ID+":"+s.Type)
 	}
-	if strings.Join(seen, ",") != "components:array,customfield_10050:option" {
+	// Sorted by name: Component/s, Keywords, Release Note, Severity.
+	if strings.Join(seen, ",") != "components:array,customfield_10071:array,customfield_10070:option,customfield_10050:option" {
 		t.Errorf("specs = %v", seen)
 	}
-	if specs[1].Name != "Severity" || len(specs[1].AllowedValues) != 2 || specs[1].AllowedValues[1].Value != "Critical" {
-		t.Errorf("severity = %+v", specs[1])
+	if specs[3].Name != "Severity" || len(specs[3].AllowedValues) != 2 || specs[3].AllowedValues[1].Value != "Critical" {
+		t.Errorf("severity = %+v", specs[3])
 	}
 	if specs[0].AllowedValues[0].Value != "Checkout" {
 		t.Errorf("array options take name when value is empty: %+v", specs[0])
+	}
+	// A field whose create-meta lists no allowed values is what tells the form
+	// to offer free text and the create to send a name rather than an id.
+	if len(specs[1].AllowedValues) != 0 || len(specs[2].AllowedValues) != 0 {
+		t.Errorf("fields without options must report none: %+v %+v", specs[1], specs[2])
 	}
 	found := false
 	for _, s := range f.searches {

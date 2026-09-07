@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Menu, LiveRegion, useProfile, errMsg } from "@agile-suite/core";
-import { Health, EventsOn, isDemoUrl } from "./api";
+import { Health, EventsOn, SetNavRailVisible, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings } from "./api";
 import { VIEWS, useView } from "./nav";
+import type { View } from "./nav";
 import { useModal } from "./modals";
 import { Placeholder } from "./components/Placeholder";
 import { BacklogView } from "./components/BacklogView";
@@ -37,12 +38,17 @@ export default function App() {
   const pending = usePendingChanges(activeId);
   const pendingCount = pending.data?.length ?? 0;
   const [health, setHealth] = useState<HealthInfo | null>(null);
+  // Views are switched from the native View menu, the way XTM's are, so the
+  // rail is a second and optional way to reach the same places. Its state
+  // lives in the shared settings so the menu's tick and the rail agree
+  // across restarts; the menu owns the toggle and tells us through an event.
+  const [navRail, setNavRail] = useState(false);
 
   useEffect(() => {
     Health()
       .then((h) => {
         setHealth(h);
-        if (h.ok) void reload();
+        if (h.ok) void reload().then((s) => setNavRail(s?.showNavRail ?? false));
       })
       .catch((e) =>
         setHealth({ ok: false, error: errMsg(e), dbPath: "", sharedPath: "", logPath: "" }),
@@ -52,11 +58,24 @@ export default function App() {
   useEffect(() => {
     const offProfiles = EventsOn("menu:profiles", () => openModal("profiles"));
     const offAbout = EventsOn("menu:about", () => openModal("about"));
+    // The View menu is TAM's primary navigation. It sends the view id the
+    // menu was built with, which is why menuViews in main.go has to stay in
+    // step with VIEWS in nav.ts.
+    const offView = EventsOn("menu:view", (id: string) => {
+      if (VIEWS.some((v) => v.id === id)) setView(id as View);
+    });
+    const offRail = EventsOn("menu:nav-rail", (visible: boolean) => setNavRail(visible));
+    const offSync = EventsOn("menu:sync", () => void runSync(false));
+    const offFullSync = EventsOn("menu:full-sync", () => void runSync(true));
     return () => {
       offProfiles();
       offAbout();
+      offView();
+      offRail();
+      offSync();
+      offFullSync();
     };
-  }, [openModal]);
+  }, [openModal, setView, runSync]);
 
   const current = VIEWS.find((v) => v.id === view) ?? VIEWS[0];
   const demo = isDemoUrl(activeProfile?.jiraUrl);
@@ -124,25 +143,64 @@ export default function App() {
         </div>
       </header>
 
-      <div className="app-body">
-        <nav className="nav-rail" aria-label="Views">
+      {/* The view tabs XTM carries under its topbar. The View menu and the
+          optional rail reach the same places; this is the one that is always
+          visible, so it is the one that says where you are. */}
+      <nav className="view-tabs-bar" aria-label="Views">
+        <div className="view-tabs">
           {VIEWS.map((v) => (
             <button
               key={v.id}
-              className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
+              type="button"
+              className={`view-tab${v.id === view ? " view-tab-active" : ""}`}
               aria-current={v.id === view ? "page" : undefined}
               onClick={() => setView(v.id)}
             >
               {v.label}
             </button>
           ))}
-          <div className="nav-divider" />
-          <div className="nav-section">Suite</div>
-          <button className="nav-item" disabled title="The launcher arrives in Phase 6">
-            Tests (XTM)
-          </button>
-          <div className="nav-hint">opens Xray Test Manager</div>
-        </nav>
+        </div>
+      </nav>
+
+      <div className="app-body">
+        {navRail && (
+          <nav className="nav-rail" aria-label="Navigation rail">
+            <div className="nav-rail-head">
+              <span className="nav-section">Views</span>
+              <button
+                type="button"
+                className="btn btn-ghost nav-rail-hide"
+                title="Hide the navigation rail (View menu, Ctrl+B)"
+                aria-label="Hide the navigation rail"
+                onClick={() => {
+                  setNavRail(false);
+                  // Persisting through the bound method rebuilds the native
+                  // menu, so the View menu's tick follows a rail hidden from
+                  // here rather than going stale.
+                  void SetNavRailVisible(false).catch(() => {});
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            {VIEWS.map((v) => (
+              <button
+                key={v.id}
+                className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
+                aria-current={v.id === view ? "page" : undefined}
+                onClick={() => setView(v.id)}
+              >
+                {v.label}
+              </button>
+            ))}
+            <div className="nav-divider" />
+            <div className="nav-section">Suite</div>
+            <button className="nav-item" disabled title="The launcher arrives in Phase 6">
+              Tests (XTM)
+            </button>
+            <div className="nav-hint">opens Xray Test Manager</div>
+          </nav>
+        )}
 
         <main className="main">
           {startupFailed ? (
@@ -152,17 +210,12 @@ export default function App() {
               {health.logPath && <p>Log: {health.logPath}</p>}
             </div>
           ) : (
-            <>
-              <div className="view-head">
-                <h2 id="view-title">{current.label}</h2>
-                {activeProfile && (
-                  <span className="muted">
-                    {activeProfile.name} · {activeProfile.projectKey}
-                  </span>
-                )}
-              </div>
-              {current.id === "backlog" ? <BacklogView /> : current.id === "epics" ? <EpicsView /> : <Placeholder view={current} />}
-            </>
+            // No per-view title bar, the way XTM has none: the active tab
+            // already names the view and the topbar's profile select already
+            // names the project, so a heading repeating both only cost the
+            // content 16px of height. Each view names its own landmark
+            // instead of borrowing an id from a heading that is gone.
+            current.id === "backlog" ? <BacklogView /> : current.id === "epics" ? <EpicsView /> : <Placeholder view={current} />
           )}
         </main>
       </div>

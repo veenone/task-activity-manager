@@ -19,6 +19,7 @@ const (
 	keyShowCoverage        = "show_coverage"
 	keySpellcheckIgnore    = "spellcheck_ignore_words"
 	keyTourSeenVersion     = "tour_seen_version"
+	keyShowNavRail         = "show_nav_rail"
 )
 
 // Settings holds the global application preferences.
@@ -34,6 +35,11 @@ type Settings struct {
 	// than a bool lets a later release re-offer a rewritten tour by bumping
 	// the frontend's TOUR_VERSION constant.
 	TourSeenVersion int `json:"tourSeenVersion"`
+	// ShowNavRail reveals TAM's left navigation rail. Views are switched from
+	// the View menu, so the rail is a second, optional way to do the same
+	// thing and stays hidden until asked for; the zero value is that default.
+	// XTM does not render a rail and ignores this.
+	ShowNavRail bool `json:"showNavRail"`
 }
 
 // Manager reads and writes global settings.
@@ -76,6 +82,10 @@ func (m *Manager) Get() (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
+	navRail, err := m.value(keyShowNavRail)
+	if err != nil {
+		return Settings{}, err
+	}
 	s.DefaultProfileID = def
 	s.Theme = theme
 	// An unset value means "auto-resolve": the backend picks the instance's
@@ -89,12 +99,18 @@ func (m *Manager) Get() (Settings, error) {
 	// Default 0 (never seen) when unset or unparsable. A corrupted value must
 	// not fail the whole settings load, which runs at startup.
 	s.TourSeenVersion, _ = strconv.Atoi(tourSeen)
+	s.ShowNavRail, _ = strconv.ParseBool(navRail)
 	return s, nil
 }
 
 // SetShowCoverage records whether the Coverage top-nav tab is shown.
 func (m *Manager) SetShowCoverage(v bool) error {
 	return m.setValue(keyShowCoverage, strconv.FormatBool(v))
+}
+
+// SetShowNavRail records whether TAM's left navigation rail is shown.
+func (m *Manager) SetShowNavRail(v bool) error {
+	return m.setValue(keyShowNavRail, strconv.FormatBool(v))
 }
 
 // SetTourSeenVersion records which version of the onboarding tour the user has

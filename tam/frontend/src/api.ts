@@ -21,11 +21,22 @@ export interface Profile {
   projectKey: string;
   backend: string;
   createdAt: string;
+  // The three the Manage Profiles form edits beyond the four above. Optional
+  // for the same reason Issue.pending is: the backend always sends them, but
+  // fixtures written before the form existed do not spell them out.
+  scopeJql?: string;
+  caCert?: string;
+  allowUntrustedTls?: boolean;
 }
 
 export interface Settings {
   defaultProfileId: string;
   theme: string;
+  // Whether the left nav rail is shown. Views are switched from the View
+  // menu, so the rail is optional and off unless asked for; older settings
+  // rows have no value, which reads as off. Optional here for the fixtures
+  // that predate it.
+  showNavRail?: boolean;
 }
 
 export interface HealthInfo {
@@ -49,16 +60,19 @@ export interface Diagnostics {
   startupError: string;
 }
 
-export type IssueType = "task" | "epic" | "story" | "bug" | "requirement";
+export type IssueType = "task" | "epic" | "story" | "bug" | "requirement" | "subtask";
 
-// ISSUE_TYPES is the five logical types in display order, with the chip
-// label the grid and filter bar use.
+// ISSUE_TYPES is the six logical types in display order, with the chip
+// label the grid and filter bar use. "Sub-task" is what TAM calls the level;
+// what the instance calls it is discovered per project (GetSubtaskTypeName),
+// so the label here is the concept, not the Jira type name.
 export const ISSUE_TYPES: { id: IssueType; label: string; short: string }[] = [
   { id: "task", label: "Task", short: "Task" },
   { id: "epic", label: "Epic", short: "Epic" },
   { id: "story", label: "Story", short: "Story" },
   { id: "bug", label: "Bug", short: "Bug" },
   { id: "requirement", label: "Requirement", short: "Req" },
+  { id: "subtask", label: "Sub-task", short: "Sub" },
 ];
 
 export interface Issue {
@@ -108,7 +122,42 @@ export interface IssueQuery {
   sprintId: string;
   offset: number;
   limit: number;
+  // "" is the store's default rank order. Sorting is a backend concern
+  // because the grid is paged: the frontend holds one page, so sorting here
+  // would order 25 rows out of a project's thousands.
+  sort: SortColumn | "";
+  desc: boolean;
 }
+
+// SortColumn is the set issuerepo.SortColumns accepts. A value outside it
+// falls back to rank order rather than erroring, but the union keeps the
+// header list and the store's whitelist from drifting apart.
+export type SortColumn =
+  | "key"
+  | "type"
+  | "summary"
+  | "status"
+  | "assignee"
+  | "sprint"
+  | "storyPoints";
+
+// GRID_COLUMNS is the Backlog's seven columns in display order: the header
+// label, whether the column can be sorted by, and which way a first click
+// takes it. Text reads best ascending; a number or a status the user is
+// hunting for reads best with the largest first.
+export const GRID_COLUMNS: {
+  id: SortColumn;
+  label: string;
+  firstClickDesc: boolean;
+}[] = [
+  { id: "key", label: "Key", firstClickDesc: false },
+  { id: "type", label: "Type", firstClickDesc: false },
+  { id: "summary", label: "Summary", firstClickDesc: false },
+  { id: "status", label: "Status", firstClickDesc: false },
+  { id: "assignee", label: "Assignee", firstClickDesc: false },
+  { id: "sprint", label: "Sprint", firstClickDesc: true },
+  { id: "storyPoints", label: "Pts", firstClickDesc: true },
+];
 
 export interface IssuePage {
   issues: Issue[];
@@ -217,7 +266,19 @@ export interface IssueDraft {
   labels: string[];
   assignee: string;
   storyPoints: number | null;
+  // The epic the draft is created under, "" for none and always "" for an
+  // epic. The Go draft has carried this since Phase 2 and both the Jira
+  // backend and the repository validate it; only the form was missing it, so
+  // a story could not be born under its epic.
+  parentKey: string;
   extra: Record<string, string>;
+}
+
+// JiraUser is one person the assignee picker can offer. name is the username
+// the write path sends; displayName is what the reader sees.
+export interface JiraUser {
+  name: string;
+  displayName: string;
 }
 
 export interface FieldOption {
@@ -331,14 +392,51 @@ export const CreateProfile: (
   name: string,
   jiraUrl: string,
   projectKey: string,
+  scopeJql: string,
   token: string,
-  makeDefault: boolean,
+  caCert: string,
+  allowUntrustedTls: boolean,
 ) => Promise<Profile> = App.CreateProfile;
+export const CreateProfileReusingToken: (
+  name: string,
+  jiraUrl: string,
+  projectKey: string,
+  scopeJql: string,
+  sourceProfileId: string,
+) => Promise<Profile> = App.CreateProfileReusingToken;
+export const UpdateProfile: (
+  id: string,
+  name: string,
+  jiraUrl: string,
+  projectKey: string,
+  scopeJql: string,
+  token: string,
+  caCert: string,
+  allowUntrustedTls: boolean,
+) => Promise<Profile> = App.UpdateProfile;
 export const DeleteProfile: (id: string) => Promise<void> = App.DeleteProfile;
+export const TestConnection: (
+  jiraUrl: string,
+  token: string,
+  caCert: string,
+  allowUntrustedTls: boolean,
+) => Promise<string> = App.TestConnection;
+export const TestProfileConnection: (
+  profileId: string,
+  jiraUrl: string,
+  caCert: string,
+  allowUntrustedTls: boolean,
+) => Promise<string> = App.TestProfileConnection;
+// ExportProfile resolves to the path written, or "" when the save dialog was
+// cancelled. ImportProfile resolves to a profile with an empty id on cancel.
+export const ExportProfile: (id: string) => Promise<string> = App.ExportProfile;
+export const ImportProfile: () => Promise<Profile> = App.ImportProfile;
 export const GetSettings: () => Promise<Settings> = App.GetSettings;
 export const SetTheme: (theme: string) => Promise<void> = App.SetTheme;
 export const SetDefaultProfile: (id: string) => Promise<void> =
   App.SetDefaultProfile;
+export const SetNavRailVisible: (visible: boolean) => Promise<void> =
+  App.SetNavRailVisible;
 
 export const SyncIssues: (profileId: string, full: boolean) => Promise<SyncSummary> =
   App.SyncIssues;
@@ -397,6 +495,15 @@ export const ImportIssues = (
 ): Promise<ImportResult> =>
   App.ImportIssues(profileId, contentB64, isXlsx, fileName, importer.Mapping.createFrom(mapping), dryRun) as Promise<ImportResult>;
 export const SaveImportTemplate: () => Promise<string> = App.SaveImportTemplate;
+
+export const SearchUsers: (profileId: string, query: string) => Promise<JiraUser[]> =
+  App.SearchUsers;
+export const ListPriorities: (profileId: string) => Promise<string[]> = App.ListPriorities;
+// The Jira name of this profile's sub-task type, "" when the project has
+// none. TAM's own word for the level is "Sub-task"; the instance may call it
+// anything, and this is how the forms say which.
+export const GetSubtaskTypeName: (profileId: string) => Promise<string> =
+  App.GetSubtaskTypeName;
 
 export const GetLinkTypes: (profileId: string) => Promise<LinkType[]> = App.GetLinkTypes;
 // LookupIssue is cast the same way ListIssues is above: the generated

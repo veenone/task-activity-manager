@@ -19,7 +19,9 @@ export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
 export function CreateIssue(arg1:string,arg2:backend.IssueDraft):Promise<string>;
 
-export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<profile.Profile>;
+export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean):Promise<profile.Profile>;
+
+export function CreateProfileReusingToken(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
 
@@ -28,6 +30,8 @@ export function DiscardAllPendingChanges(arg1:string):Promise<number>;
 export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
 
 export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function ExportProfile(arg1:string):Promise<string>;
 
 export function GetCreateFields(arg1:string,arg2:string):Promise<Array<backend.FieldSpec>>;
 
@@ -43,11 +47,15 @@ export function GetProfileSetting(arg1:string,arg2:string):Promise<string>;
 
 export function GetSettings():Promise<settings.Settings>;
 
+export function GetSubtaskTypeName(arg1:string):Promise<string>;
+
 export function GetSyncState(arg1:string):Promise<issuerepo.SyncState>;
 
 export function Health():Promise<main.HealthInfo>;
 
 export function ImportIssues(arg1:string,arg2:string,arg3:boolean,arg4:string,arg5:importer.Mapping,arg6:boolean):Promise<importer.Result>;
+
+export function ImportProfile():Promise<profile.Profile>;
 
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
 
@@ -58,6 +66,8 @@ export function ListIssues(arg1:string,arg2:issuerepo.IssueQuery):Promise<issuer
 export function ListLinkedTests(arg1:string,arg2:string):Promise<Array<issuerepo.LinkedTest>>;
 
 export function ListPendingChanges(arg1:string):Promise<Array<journal.PendingChange>>;
+
+export function ListPriorities(arg1:string):Promise<Array<string>>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;
 
@@ -73,10 +83,20 @@ export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Pro
 
 export function SaveImportTemplate():Promise<string>;
 
+export function SearchUsers(arg1:string,arg2:string):Promise<Array<backend.User>>;
+
 export function SetDefaultProfile(arg1:string):Promise<void>;
+
+export function SetNavRailVisible(arg1:boolean):Promise<void>;
 
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 
 export function SyncIssues(arg1:string,arg2:boolean):Promise<syncer.Summary>;
+
+export function TestConnection(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<string>;
+
+export function TestProfileConnection(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<string>;
+
+export function UpdateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<profile.Profile>;

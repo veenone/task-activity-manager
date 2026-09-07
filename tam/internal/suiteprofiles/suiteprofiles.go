@@ -37,9 +37,11 @@ func IsDemoURL(url string) bool {
 	return u == "demo" || strings.HasPrefix(u, "demo:") || strings.HasPrefix(u, "demo-")
 }
 
-// ValidateNew checks the fields of a profile about to be created. A demo
-// profile needs no token; a live one does.
-func ValidateNew(name, jiraURL, projectKey, token string) error {
+// ValidateFields checks the three fields every profile needs, whether it is
+// being created, edited, or read out of an import file. The credential is not
+// among them: an edit keeps the stored one when the field is left blank, and
+// an imported profile has none yet.
+func ValidateFields(name, jiraURL, projectKey string) error {
 	if strings.TrimSpace(name) == "" {
 		return errors.New("a profile needs a name")
 	}
@@ -48,6 +50,15 @@ func ValidateNew(name, jiraURL, projectKey, token string) error {
 	}
 	if strings.TrimSpace(projectKey) == "" {
 		return errors.New("a profile needs a project key")
+	}
+	return nil
+}
+
+// ValidateNew checks the fields of a profile about to be created. A demo
+// profile needs no token; a live one does.
+func ValidateNew(name, jiraURL, projectKey, token string) error {
+	if err := ValidateFields(name, jiraURL, projectKey); err != nil {
+		return err
 	}
 	if !IsDemoURL(jiraURL) && strings.TrimSpace(token) == "" {
 		return errors.New("a live Jira profile needs a personal access token")

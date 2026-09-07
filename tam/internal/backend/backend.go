@@ -19,10 +19,16 @@ const (
 	TypeStory       = "story"
 	TypeBug         = "bug"
 	TypeRequirement = "requirement"
+	// TypeSubtask is Jira's sub-task level: an issue that hangs off another
+	// issue through the parent field rather than off an epic through the Epic
+	// Link. Its Jira name is per-instance ("Sub-task" by default, "Technical
+	// task" on some), so it is discovered from the project rather than
+	// hardcoded.
+	TypeSubtask = "subtask"
 )
 
-// AllTypes is the five logical types in display order.
-var AllTypes = []string{TypeTask, TypeEpic, TypeStory, TypeBug, TypeRequirement}
+// AllTypes is the six logical types in display order.
+var AllTypes = []string{TypeTask, TypeEpic, TypeStory, TypeBug, TypeRequirement, TypeSubtask}
 
 // Issue is one row of the Backlog: the columns the grid shows plus what sync
 // needs to keep it current. StoryPoints is nil when the issue has none.
@@ -189,6 +195,10 @@ type IssueBackend interface {
 	// links, and the custom fields.
 	GetIssueDetail(ctx context.Context, key string) (IssueDetail, error)
 	IssueTypes(ctx context.Context, projectKey string) ([]IssueType, error)
+	// SubtaskTypeName is the Jira name of this project's sub-task type, ""
+	// when the project has none. The forms need it to say what they are
+	// creating, since the instance chooses the word.
+	SubtaskTypeName(ctx context.Context, projectKey string) (string, error)
 	// GetIssue reads one issue's row fields, for the version check before a
 	// commit and the refresh after it.
 	GetIssue(ctx context.Context, key string) (Issue, error)
@@ -206,4 +216,12 @@ type IssueBackend interface {
 	// CreateLink links fromKey to the draft's target with the draft's type
 	// and direction.
 	CreateLink(ctx context.Context, fromKey string, d LinkDraft) error
+	// SearchUsers lists the people who can be assigned an issue in
+	// projectKey whose name or display name matches query. A blank query
+	// asks for the first page of anyone assignable, which is what seeds the
+	// local cache.
+	SearchUsers(ctx context.Context, projectKey, query string) ([]User, error)
+	// Priorities lists the instance's priority names, highest first, so the
+	// forms can offer them instead of asking the user to remember them.
+	Priorities(ctx context.Context) ([]string, error)
 }

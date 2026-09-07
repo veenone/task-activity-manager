@@ -5,6 +5,8 @@ import { EDITABLE_FIELDS } from "../api";
 import type { EditableField, Issue } from "../api";
 import { useEditIssue } from "../queries/pending";
 import { useEpics } from "../queries/tree";
+import { AssigneePicker } from "./AssigneePicker";
+import { PriorityPicker } from "./PriorityPicker";
 
 // EPIC_SUMMARY_MAX is how much of an epic's summary shows in its option
 // label before it is cut off with a single ellipsis character.
@@ -104,10 +106,11 @@ export function EditableFields({ profileId, issue, description, descriptionReady
   return (
     <form className="edit-form" onSubmit={(e) => void onSubmit(e)} aria-label="Edit fields">
       {EDITABLE_FIELDS.filter((f) => f.id !== "parentKey" || issue.type !== "epic").map((f) => (
-        <label key={f.id} className="edit-row">
-          <span className="muted small">{f.label}</span>
+        <div key={f.id} className="edit-row">
+          <label className="muted small" htmlFor={`edit-${f.id}`}>{f.label}</label>
           {f.id === "description" ? (
             <textarea
+              id={`edit-${f.id}`}
               className="detail-input"
               rows={5}
               value={values.description}
@@ -115,16 +118,40 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               placeholder={descriptionReady ? "" : "Loading the description"}
               onChange={(e) => set("description", e.target.value)}
             />
+          ) : f.id === "assignee" ? (
+            // The grid holds the display name a sync wrote, but the write
+            // path sends {"assignee": {"name": …}}, so what this control
+            // stores has to be the username. It seeds the input with the
+            // display name it already has, and replaces it the moment a
+            // person is picked.
+            <AssigneePicker
+              profileId={profileId}
+              id={`edit-${f.id}`}
+              value={values.assignee}
+              fallbackLabel={issue.assignee}
+              onChange={(v) => set("assignee", v)}
+              disabled={busy}
+            />
+          ) : f.id === "priority" ? (
+            <PriorityPicker
+              profileId={profileId}
+              id={`edit-${f.id}`}
+              value={values.priority}
+              onChange={(v) => set("priority", v)}
+              disabled={busy}
+              emptyLabel="(none)"
+            />
           ) : f.id === "parentKey" ? (
             // Gated on isLoading, not isFetching: the epic list is stable, so a
             // background refetch should leave the select showing its current
             // options rather than blanking the control mid-edit.
             epics.isLoading ? (
-              <select className="detail-input" disabled value="">
+              <select id={`edit-${f.id}`} className="detail-input" disabled value="">
                 <option value="">(loading)</option>
               </select>
             ) : (
               <select
+                id={`edit-${f.id}`}
                 className="detail-input"
                 value={values.parentKey}
                 onChange={(e) => set("parentKey", e.target.value)}
@@ -137,6 +164,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
             )
           ) : (
             <input
+              id={`edit-${f.id}`}
               className="detail-input"
               type="text"
               inputMode={f.id === "storyPoints" ? "decimal" : undefined}
@@ -144,7 +172,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               onChange={(e) => set(f.id, e.target.value)}
             />
           )}
-        </label>
+        </div>
       ))}
       <div className="edit-actions">
         <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || edit.isPending || busy}>

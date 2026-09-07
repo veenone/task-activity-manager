@@ -10,6 +10,7 @@ function progressText(done: number, total: number, points: number): string {
 
 interface EpicRowProps {
   kind: "epic" | "noepic";
+  subtaskLabel?: string;
   rowKey: string;
   node?: EpicNode;
   count?: number;
@@ -27,17 +28,10 @@ interface EpicRowProps {
 // orphans group: same caret, expand state, and selection wiring, with the
 // icon, name, count, and pending dot filled in from whichever kind it is.
 export function EpicRow({
-  kind, rowKey, node, count, index, open, selected, focused, flashed, onActivate, onToggle, onKeyDown,
+  kind, subtaskLabel, rowKey, node, count, index, open, selected, focused, flashed, onActivate, onToggle, onKeyDown,
 }: EpicRowProps) {
   const isEpic = kind === "epic" && node;
-  const typeIcon: ReactNode = isEpic ? <TypeChip type={node.issue.type} /> : <span />;
-  const name: ReactNode = isEpic ? (
-    <>
-      <span className="accent-text">{rowKey}</span> {node.issue.summary}
-    </>
-  ) : (
-    "No epic"
-  );
+  const typeIcon: ReactNode = isEpic ? <TypeChip type={node.issue.type} subtaskLabel={subtaskLabel} /> : <span />;
   const countText = isEpic ? progressText(node.done, node.total, node.points) : String(count ?? 0);
   const ariaLabel = isEpic ? `${rowKey} ${node.issue.summary}` : undefined;
   const pending = isEpic && node.issue.pending;
@@ -58,8 +52,13 @@ export function EpicRow({
         {open ? "▾" : "▸"}
       </span>
       {typeIcon}
-      <span className="folder-name">{name}</span>
-      <span className="folder-count">{countText}</span>
+      <span className="epic-cell epic-cell-key accent-text" title={isEpic ? rowKey : undefined}>
+        {isEpic ? rowKey : "No epic"}
+      </span>
+      <span className="epic-cell epic-cell-summary" title={isEpic ? node.issue.summary : undefined}>
+        {isEpic ? node.issue.summary : ""}
+      </span>
+      <span className="epic-cell folder-count epic-cell-progress">{countText}</span>
       {pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}
     </div>
   );
@@ -67,6 +66,7 @@ export function EpicRow({
 
 interface EpicChildRowProps {
   child: Issue;
+  subtaskLabel?: string;
   ownerKey: string;
   index: number | undefined;
   selected: boolean;
@@ -78,7 +78,7 @@ interface EpicChildRowProps {
 
 // EpicChildRow renders one leaf row, whether it hangs off an epic or off
 // the orphans group; ownerKey tells the keyboard model which it is.
-export function EpicChildRow({ child, ownerKey, index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
+export function EpicChildRow({ child, subtaskLabel, ownerKey, index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
   const row: Row = { id: child.key, kind: "child", ownerKey };
   return (
     <div
@@ -92,11 +92,13 @@ export function EpicChildRow({ child, ownerKey, index, selected, focused, flashe
       onKeyDown={(e) => onKeyDown(e, row)}
     >
       <span className="folder-caret" />
-      <TypeChip type={child.type} />
-      <span>{child.key}</span>
-      <span>{child.summary}</span>
-      <span className={`chip chip-status chip-status-${statusClass(child.status)}`}>{child.status}</span>
-      <span>{child.storyPoints ?? "-"}</span>
+      <TypeChip type={child.type} subtaskLabel={subtaskLabel} />
+      <span className="epic-cell epic-cell-key" title={child.key}>{child.key}</span>
+      <span className="epic-cell epic-cell-summary" title={child.summary}>{child.summary}</span>
+      <span className="epic-cell epic-cell-status">
+        <span className={`chip chip-status chip-status-${statusClass(child.status)}`} title={child.status}>{child.status}</span>
+      </span>
+      <span className="epic-cell epic-cell-points">{child.storyPoints ?? "-"}</span>
       {child.pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}
     </div>
   );

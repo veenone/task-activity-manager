@@ -18,8 +18,12 @@ export function CreateIssue(arg1, arg2) {
   return window['go']['main']['App']['CreateIssue'](arg1, arg2);
 }
 
-export function CreateProfile(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3, arg4, arg5);
+export function CreateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['CreateProfile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function CreateProfileReusingToken(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateProfileReusingToken'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function DeleteProfile(arg1) {
@@ -36,6 +40,10 @@ export function DiscardPendingChange(arg1, arg2) {
 
 export function EditIssue(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditIssue'](arg1, arg2, arg3, arg4);
+}
+
+export function ExportProfile(arg1) {
+  return window['go']['main']['App']['ExportProfile'](arg1);
 }
 
 export function GetCreateFields(arg1, arg2) {
@@ -66,6 +74,10 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
+export function GetSubtaskTypeName(arg1) {
+  return window['go']['main']['App']['GetSubtaskTypeName'](arg1);
+}
+
 export function GetSyncState(arg1) {
   return window['go']['main']['App']['GetSyncState'](arg1);
 }
@@ -76,6 +88,10 @@ export function Health() {
 
 export function ImportIssues(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['ImportIssues'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function ImportProfile() {
+  return window['go']['main']['App']['ImportProfile']();
 }
 
 export function ListActivity(arg1, arg2, arg3) {
@@ -96,6 +112,10 @@ export function ListLinkedTests(arg1, arg2) {
 
 export function ListPendingChanges(arg1) {
   return window['go']['main']['App']['ListPendingChanges'](arg1);
+}
+
+export function ListPriorities(arg1) {
+  return window['go']['main']['App']['ListPriorities'](arg1);
 }
 
 export function ListProfiles() {
@@ -126,8 +146,16 @@ export function SaveImportTemplate() {
   return window['go']['main']['App']['SaveImportTemplate']();
 }
 
+export function SearchUsers(arg1, arg2) {
+  return window['go']['main']['App']['SearchUsers'](arg1, arg2);
+}
+
 export function SetDefaultProfile(arg1) {
   return window['go']['main']['App']['SetDefaultProfile'](arg1);
+}
+
+export function SetNavRailVisible(arg1) {
+  return window['go']['main']['App']['SetNavRailVisible'](arg1);
 }
 
 export function SetProfileSetting(arg1, arg2, arg3) {
@@ -140,4 +168,16 @@ export function SetTheme(arg1) {
 
 export function SyncIssues(arg1, arg2) {
   return window['go']['main']['App']['SyncIssues'](arg1, arg2);
+}
+
+export function TestConnection(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['TestConnection'](arg1, arg2, arg3, arg4);
+}
+
+export function TestProfileConnection(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['TestProfileConnection'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['UpdateProfile'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }

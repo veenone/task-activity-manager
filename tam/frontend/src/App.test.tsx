@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient } from "@agile-suite/core";
@@ -10,6 +10,30 @@ import { profileBackend } from "./profileBackend";
 import { ViewProvider } from "./nav";
 import { ModalProvider } from "./modals";
 import { SyncProvider } from "./contexts/SyncContext";
+
+// The native menu is TAM's primary navigation, and it reaches the frontend
+// only as Wails events. This stands in for the Wails event bus so a test can
+// fire what the menu fires. vi.hoisted, because the vi.mock factory below is
+// hoisted above every other binding in the file.
+const menuBus = vi.hoisted(() => {
+  const listeners = new Map<string, Set<(...args: never[]) => void>>();
+  return {
+    on(name: string, cb: (...args: never[]) => void) {
+      const set = listeners.get(name) ?? new Set();
+      set.add(cb);
+      listeners.set(name, set);
+      return () => set.delete(cb);
+    },
+    async emit(name: string, ...args: never[]) {
+      await act(async () => {
+        for (const cb of [...(listeners.get(name) ?? [])]) cb(...args);
+      });
+    },
+    reset() {
+      listeners.clear();
+    },
+  };
+});
 
 vi.mock("./api", async () => {
   const actual = await vi.importActual<typeof import("./api")>("./api");
@@ -23,6 +47,7 @@ vi.mock("./api", async () => {
     GetSettings: vi.fn(),
     SetTheme: vi.fn(),
     SetDefaultProfile: vi.fn(),
+    SetNavRailVisible: vi.fn(),
     SyncIssues: vi.fn(),
     GetSyncState: vi.fn(),
     ListIssues: vi.fn(),
@@ -33,7 +58,7 @@ vi.mock("./api", async () => {
     ListEpics: vi.fn(),
     GetProfileSetting: vi.fn(),
     SetProfileSetting: vi.fn(),
-    EventsOn: vi.fn(() => () => {}),
+    EventsOn: vi.fn(menuBus.on),
     BrowserOpenURL: vi.fn(),
     ListPendingChanges: vi.fn(),
     DiscardPendingChange: vi.fn(),
@@ -65,13 +90,15 @@ function renderApp() {
 }
 
 beforeEach(() => {
+  menuBus.reset();
+  vi.mocked(api.SetNavRailVisible).mockResolvedValue();
   vi.mocked(api.Health).mockResolvedValue({
     ok: true, error: "", dbPath: "C:/tam.db", sharedPath: "C:/profiles.db", logPath: "C:/tam.log",
   });
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Demo team", jiraUrl: "demo", projectKey: "DEMO", backend: "jira", createdAt: "" },
   ]);
-  vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
+  vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: false });
   vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0 });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
   vi.mocked(api.ListSprints).mockResolvedValue([]);
@@ -89,14 +116,77 @@ describe("App shell", () => {
     expect(screen.getByRole("combobox", { name: /profile/i })).toHaveValue("p1");
   });
 
-  it("switches views from the nav rail and names the phase", async () => {
+  it("hides the nav rail until the stored setting asks for it", async () => {
     renderApp();
-    await userEvent.click(screen.getByRole("button", { name: "Boards" }));
-    expect(screen.getByRole("heading", { name: "Boards" })).toBeInTheDocument();
-    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    expect(screen.queryByRole("navigation", { name: "Navigation rail" })).not.toBeInTheDocument();
+    // The view tabs still offer every view; only the rail is gone.
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" })).toBeInTheDocument();
   });
 
-  it("renders the epic tree from the nav rail", async () => {
+  it("shows the nav rail when the stored setting asks for it", async () => {
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+    renderApp();
+    expect(await screen.findByRole("navigation", { name: "Navigation rail" })).toBeInTheDocument();
+  });
+
+  it("switches views from the View menu", async () => {
+    renderApp();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    await menuBus.emit("menu:view", "boards" as never);
+    expect(screen.getByRole("region", { name: /Boards/ })).toBeInTheDocument();
+    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("ignores a view id the frontend does not know", async () => {
+    renderApp();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    await menuBus.emit("menu:view", "nonesuch" as never);
+    expect(screen.getByRole("region", { name: "Backlog" })).toBeInTheDocument();
+  });
+
+  it("shows and hides the nav rail from the View menu's checkbox", async () => {
+    renderApp();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    await menuBus.emit("menu:nav-rail", true as never);
+    expect(screen.getByRole("navigation", { name: "Navigation rail" })).toBeInTheDocument();
+    await menuBus.emit("menu:nav-rail", false as never);
+    expect(screen.queryByRole("navigation", { name: "Navigation rail" })).not.toBeInTheDocument();
+  });
+
+  it("hides the rail from its own close button and persists that", async () => {
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+    renderApp();
+    await userEvent.click(await screen.findByRole("button", { name: "Hide the navigation rail" }));
+    expect(screen.queryByRole("navigation", { name: "Navigation rail" })).not.toBeInTheDocument();
+    // Persisting rebuilds the native menu, so the View menu's tick follows.
+    await waitFor(() => expect(api.SetNavRailVisible).toHaveBeenCalledWith(false));
+  });
+
+  it("switches views from the view tabs", async () => {
+    renderApp();
+    const tabs = screen.getByRole("navigation", { name: "Views" });
+    await userEvent.click(within(tabs).getByRole("button", { name: "Boards" }));
+    expect(screen.getByRole("region", { name: /Boards/ })).toBeInTheDocument();
+    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("switches views from the nav rail and names the phase", async () => {
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+    renderApp();
+    const rail = await screen.findByRole("navigation", { name: "Navigation rail" });
+    await userEvent.click(within(rail).getByRole("button", { name: "Boards" }));
+    expect(screen.getByRole("region", { name: /Boards/ })).toBeInTheDocument();
+    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("renders the epic tree when the View menu opens Epics", async () => {
     vi.mocked(api.GetEpicTree).mockResolvedValue({
       epics: [
         {
@@ -112,8 +202,9 @@ describe("App shell", () => {
       truncated: false,
     });
     renderApp();
-    await userEvent.click(screen.getByRole("button", { name: "Epics" }));
-    expect(screen.getByRole("heading", { name: "Epics" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    await menuBus.emit("menu:view", "epics" as never);
+    expect(screen.getByRole("region", { name: "Epics" })).toBeInTheDocument();
     expect(await screen.findByText("Checkout revamp")).toBeInTheDocument();
     expect(screen.getByRole("tree", { name: "Epics" })).toBeInTheDocument();
   });

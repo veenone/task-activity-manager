@@ -35,29 +35,48 @@ func TestParseSprintHandlesBothShapes(t *testing.T) {
 func TestLogicalTypeIsCaseInsensitiveAndUsesTheRequirementName(t *testing.T) {
 	cases := map[string]string{
 		"Task": "task", "task": "task", "EPIC": "epic", "Story": "story", "Bug": "bug",
-		"Business Requirement": "requirement", "Requirement": "", "Sub-task": "",
+		"Business Requirement": "requirement", "Requirement": "",
+		// The sub-task type is whatever the project calls it, so the generic
+		// name is not one unless the project says so.
+		"Technical task": "subtask", "TECHNICAL TASK": "subtask", "Sub-task": "",
+		// The project's own word for the task level, alongside the built-in.
+		"Todo": "task", "TODO": "task",
 	}
 	for name, want := range cases {
-		if got := logicalType(name, "Business Requirement"); got != want {
+		if got := logicalType(name, "Business Requirement", projectTypes{task: "Todo", subtask: "Technical task"}); got != want {
 			t.Errorf("logicalType(%q) = %q, want %q", name, got, want)
 		}
+	}
+	// A project with no sub-task type maps nothing to one.
+	if got := logicalType("Technical task", "Requirement", projectTypes{}); got != "" {
+		t.Errorf("no sub-task type = %q, want empty", got)
+	}
+	// A built-in name keeps its meaning even if the instance reuses it.
+	if got := logicalType("Bug", "Requirement", projectTypes{subtask: "Bug"}); got != backend.TypeBug {
+		t.Errorf("a built-in name keeps its meaning: %q", got)
 	}
 }
 
 func TestBuildJQL(t *testing.T) {
-	names := jiraTypeNames(backend.AllTypes, "Requirement")
+	names := jiraTypeNames(backend.AllTypes, "Requirement", projectTypes{task: "Task", subtask: "Technical task"})
 	got := buildJQL("PLAT", " labels = promo ", "2026-09-05T10:42:00Z", names)
-	want := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
+	want := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement", "Technical task") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
 	if got != want {
 		t.Errorf("jql =\n%s\nwant\n%s", got, want)
 	}
-	got = buildJQL("PLAT", "", "", jiraTypeNames([]string{backend.TypeBug}, "Requirement"))
+	got = buildJQL("PLAT", "", "", jiraTypeNames([]string{backend.TypeBug}, "Requirement", projectTypes{task: "Task", subtask: "Technical task"}))
 	want = `project = "PLAT" AND issuetype in ("Bug") ORDER BY key ASC`
 	if got != want {
 		t.Errorf("minimal jql = %s", got)
 	}
-	if got := buildJQL("PLAT", "", "not a time", names); got != `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") ORDER BY key ASC` {
+	if got := buildJQL("PLAT", "", "not a time", names); got != `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement", "Technical task") ORDER BY key ASC` {
 		t.Errorf("an unparseable since is dropped: %s", got)
+	}
+	// Jira rejects a whole query naming an issuetype the instance lacks, so a
+	// project without sub-tasks must not have one quoted into its scope.
+	noSub := jiraTypeNames(backend.AllTypes, "Requirement", projectTypes{task: "Task"})
+	if got := buildJQL("PLAT", "", "", noSub); got != `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") ORDER BY key ASC` {
+		t.Errorf("a project without sub-tasks: %s", got)
 	}
 }
 
@@ -79,7 +98,7 @@ func TestParseIssueMapsEveryColumn(t *testing.T) {
 		"customfield_10019": json.RawMessage(`"0|i0002:"`),
 	}}
 	ids := fieldIDs{Sprint: "customfield_10020", Points: "customfield_10016", EpicLink: "customfield_10014", Rank: "customfield_10019"}
-	iss := parseIssue(raw, ids, "Requirement")
+	iss := parseIssue(raw, ids, "Requirement", projectTypes{task: "Task", subtask: "Technical task"})
 	if iss.Key != "PLAT-412" || iss.ID != "10412" || iss.Project != "PLAT" || iss.Type != "story" ||
 		iss.Summary != "Checkout: apply promo code at payment step" || iss.Status != "In Progress" ||
 		iss.Assignee != "R. Anand" || iss.Reporter != "Product Owner" || iss.Priority != "High" ||
@@ -99,7 +118,7 @@ func TestParseIssuePrefersParentOverEpicLinkAndToleratesMissingFields(t *testing
 		"assignee":          json.RawMessage(`null`),
 		"labels":            json.RawMessage(`null`),
 	}}
-	iss := parseIssue(raw, fieldIDs{EpicLink: "customfield_10014"}, "Requirement")
+	iss := parseIssue(raw, fieldIDs{EpicLink: "customfield_10014"}, "Requirement", projectTypes{task: "Task", subtask: "Technical task"})
 	if iss.ParentKey != "PLAT-412" {
 		t.Errorf("parent = %q, want the parent field to win", iss.ParentKey)
 	}
