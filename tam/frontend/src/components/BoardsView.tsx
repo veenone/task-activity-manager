@@ -24,7 +24,7 @@ function cardAtPos(view: BoardView, p: Pos | undefined): Issue | undefined {
 // showing. Phase 3a draws; nothing here writes.
 export function BoardsView() {
   const { activeId } = useProfile<Profile, Settings>();
-  const { canSync } = useSync();
+  const { canSync, lastBoards, lastBoardsAt } = useSync();
   const [boardId, setBoardId] = useState(0);
   const [sprintId, setSprintId] = useState("");
   const [swimlane, setSwimlane] = useState<Swimlane>("none");
@@ -102,6 +102,10 @@ export function BoardsView() {
   }
 
   const refreshing = sync.isPending || (view.isFetching && !view.isLoading);
+  // Two passes can have written these boards: this view's own Refresh and
+  // the boards half of an ordinary sync. The banner reports whichever ran
+  // last, so a Refresh's stale result never hides what a later sync found.
+  const pass = sync.data && sync.submittedAt >= lastBoardsAt ? sync.data : lastBoards;
 
   return (
     <section className="backlog" aria-label="Boards">
@@ -133,7 +137,9 @@ export function BoardsView() {
 
       <BoardsBanner
         error={sync.isError ? errMsg(sync.error) : ""}
-        dropped={sync.data?.dropped ?? []}
+        dropped={pass?.dropped ?? []}
+        unavailable={!!pass?.unavailable}
+        hasBoards={boardList.length > 0}
         canRetry={canSync && !sync.isPending}
         onRetry={() => sync.mutate()}
       />

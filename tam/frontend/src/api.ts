@@ -206,6 +206,11 @@ export interface SyncSummary {
   skipped: number;
   full: boolean;
   elapsed: string;
+  // boards is the boards pass's own summary, absent when the pass did not
+  // run at all (syncer.Summary marks it omitempty). It is the only way a
+  // dropped board, or a Jira with no Agile API, reaches the user from an
+  // automatic sync, which is the sync most users ever run.
+  boards?: BoardSummary;
 }
 
 // Board, Sprint, ColumnView, LaneView, and BoardView mirror the Go shapes in

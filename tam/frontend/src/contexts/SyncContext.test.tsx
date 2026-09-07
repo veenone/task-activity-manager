@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 
 function Probe() {
-  const { status, progress, syncError, canSync, runSync } = useSync();
+  const { status, progress, syncError, canSync, runSync, lastBoards } = useSync();
   const state = useSyncState("p1");
   return (
     <div>
@@ -49,6 +49,7 @@ function Probe() {
       <span data-testid="progress">{progress ? `${progress.fetched}/${progress.total}` : "none"}</span>
       <span data-testid="error">{syncError}</span>
       <span data-testid="count">{state.data?.issueCount ?? "?"}</span>
+      <span data-testid="boards">{lastBoards ? lastBoards.dropped.join(", ") || "none dropped" : "no pass"}</span>
       <button onClick={() => void runSync(false)} disabled={!canSync}>Sync</button>
       <button onClick={() => void runSync(true)}>Full sync</button>
     </div>
@@ -96,6 +97,27 @@ describe("SyncProvider", () => {
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
     await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("60"));
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
+  });
+
+  it("keeps the boards pass of the sync that just finished", async () => {
+    vi.mocked(api.SyncIssues).mockResolvedValue({
+      fetched: 60, upserted: 60, skipped: 0, full: false, elapsed: "1s",
+      boards: { boards: 1, columns: 3, sprints: 2, cards: 12, dropped: ["Ops Kanban: 403 Forbidden"], unavailable: false, elapsed: "2s" },
+    });
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    expect(screen.getByTestId("boards")).toHaveTextContent("no pass");
+    await userEvent.click(screen.getByRole("button", { name: "Sync" }));
+    await waitFor(() => expect(screen.getByTestId("boards")).toHaveTextContent("Ops Kanban: 403 Forbidden"));
+  });
+
+  it("has no boards pass to report when the sync did not run one", async () => {
+    vi.mocked(api.SyncIssues).mockResolvedValue({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" });
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "Sync" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+    expect(screen.getByTestId("boards")).toHaveTextContent("no pass");
   });
 
   it("runs one sync when the button is clicked twice in the same tick", async () => {

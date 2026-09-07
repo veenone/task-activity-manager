@@ -36,7 +36,12 @@ vi.mock("../api", async () => {
 // The shared sync state gates Refresh, and a selected card's
 // IssueDetailPanel reads it to hold Save. Both come from one hoisted object
 // so a test can put the shell into "a sync is running" before it renders.
-const sync = vi.hoisted(() => ({ status: "idle", canSync: true }));
+const sync = vi.hoisted(() => ({
+  status: "idle",
+  canSync: true,
+  lastBoards: null as api.BoardSummary | null,
+  lastBoardsAt: 0,
+}));
 vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
 
 function issue(over: Partial<Issue>): Issue {
@@ -114,6 +119,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   sync.status = "idle";
   sync.canSync = true;
+  sync.lastBoards = null;
+  sync.lastBoardsAt = 0;
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Acme Platform", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
   ]);
@@ -326,6 +333,39 @@ describe("BoardsView refresh", () => {
     await waitFor(() =>
       expect(screen.queryByText(/Could not refresh the boards/)).not.toBeInTheDocument(),
     );
+  });
+
+  it("names the boards an ordinary sync skipped, without a Refresh being pressed", async () => {
+    sync.lastBoards = {
+      boards: 1, columns: 3, sprints: 2, cards: 12, dropped: ["Ops Kanban: 403 Forbidden"], unavailable: false, elapsed: "2s",
+    };
+    sync.lastBoardsAt = Date.now();
+    renderView();
+    expect(await screen.findByText("1 board was skipped: Ops Kanban: 403 Forbidden")).toBeInTheDocument();
+    expect(api.SyncBoards).not.toHaveBeenCalled();
+  });
+
+  it("says a sync found no Agile API while earlier boards are still on screen", async () => {
+    sync.lastBoards = {
+      boards: 0, columns: 0, sprints: 0, cards: 0, dropped: [], unavailable: true, elapsed: "1s",
+    };
+    sync.lastBoardsAt = Date.now();
+    renderView();
+    expect(
+      await screen.findByText("This Jira answered with no boards, so nothing below was refreshed."),
+    ).toBeInTheDocument();
+  });
+
+  it("lets a Refresh replace what an earlier sync reported", async () => {
+    const user = userEvent.setup();
+    sync.lastBoards = {
+      boards: 1, columns: 3, sprints: 2, cards: 12, dropped: ["Ops Kanban: 403 Forbidden"], unavailable: false, elapsed: "2s",
+    };
+    sync.lastBoardsAt = Date.now() - 60_000;
+    renderView();
+    await screen.findByText("1 board was skipped: Ops Kanban: 403 Forbidden");
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.queryByText(/was skipped/)).not.toBeInTheDocument());
   });
 
   it("is disabled while the shared sync is running", async () => {

@@ -14,7 +14,7 @@ import {
 } from "@agile-suite/core";
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
 import { CommitPendingChanges, EventsOn, SyncIssues } from "../api";
-import type { CommitResult, Profile, Settings } from "../api";
+import type { BoardSummary, CommitResult, Profile, Settings } from "../api";
 import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
 // SyncProvider owns the one reducer that keeps sync and commit from
@@ -42,6 +42,13 @@ interface SyncApi {
   // resolved, so the dialog shows it as an ordinary group (override) or
   // not at all (keep remote).
   dismissConflict: (key: string) => void;
+  // lastBoards is the boards pass of the most recent sync for the active
+  // profile, null when that sync had none. The Boards view reports on it:
+  // a board the pass had to skip is otherwise never mentioned, since most
+  // users never press the board's own Refresh. lastBoardsAt stamps it, so
+  // the view can tell which of the two passes ran last.
+  lastBoards: BoardSummary | null;
+  lastBoardsAt: number;
 }
 
 const SyncContext = createContext<SyncApi | null>(null);
@@ -61,6 +68,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const { notice } = useNotice();
   const statusRef = useRef<SyncStatus>("idle");
   const [lastCommit, setLastCommit] = useState<CommitResult | null>(null);
+  const [boards, setBoards] = useState<{ summary: BoardSummary | null; at: number }>({ summary: null, at: 0 });
 
   useEffect(
     () =>
@@ -72,6 +80,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setLastCommit(null);
+    setBoards({ summary: null, at: 0 });
   }, [activeId]);
 
   const runSync = useCallback(
@@ -84,7 +93,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         initialProgress: { phase: "issues", fetched: 0, total: 0, done: false, stage: "Starting" },
       });
       try {
-        await call(() => SyncIssues(activeId, full));
+        const sum = await call(() => SyncIssues(activeId, full));
+        setBoards({ summary: sum.boards ?? null, at: Date.now() });
       } catch (e) {
         const message = errMsg(e);
         dispatch({ type: "SYNC_ERROR", message });
@@ -133,8 +143,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       runCommit,
       lastCommit,
       dismissConflict,
+      lastBoards: boards.summary,
+      lastBoardsAt: boards.at,
     }),
-    [state, activeId, runSync, runCommit, lastCommit, dismissConflict],
+    [state, activeId, runSync, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;
