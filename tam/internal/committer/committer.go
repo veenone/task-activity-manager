@@ -110,6 +110,12 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 	for _, tempKey := range creates {
 		e.commitCreate(ctx, profileID, projectKey, tempKey, byKey[tempKey], &res)
 	}
+	if len(creates) > 0 && len(edits) > 0 {
+		// A create rekeys its draft, and Rekey repoints rows that named the
+		// temporary key, so the edits pass reads the journal again rather
+		// than the snapshot taken before the creates ran.
+		byKey, edits = e.regroupEdits(ctx, profileID, byKey, edits, &res)
+	}
 	for _, key := range edits {
 		e.commitEdit(ctx, profileID, key, byKey[key], &res)
 	}
@@ -180,6 +186,12 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 		res.Conflicts = append(res.Conflicts, e.conflict(ctx, key, remote, rows))
 		return
 	}
+	for _, p := range rows {
+		if strings.HasPrefix(p.AfterVal, issuerepo.DraftPrefix) {
+			res.Failures = append(res.Failures, Failure{Key: key, Error: fmt.Sprintf("the epic %s has not been created in Jira yet, so this change waits for the next commit", p.AfterVal)})
+			return
+		}
+	}
 	fields := make(map[string]string, len(rows))
 	for _, p := range rows {
 		fields[p.Field] = p.AfterVal
@@ -234,6 +246,37 @@ func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result)
 		}
 		res.Linked = append(res.Linked, Linked{Key: p.EntityKey, ToKey: d.ToKey, Type: d.Type})
 	}
+}
+
+// regroupEdits re-lists the pending changes after the creates pass, in
+// case a create's Rekey repointed a pending parentKey edit at the real
+// key, and regroups the non-link, non-create rows by key (oldest first per
+// key, keys sorted). On a read error it records a Failure and returns
+// orig and edits unchanged, so a transient read problem does not drop
+// edits already known from the pre-create snapshot.
+func (e *Engine) regroupEdits(ctx context.Context, profileID string, orig map[string][]journal.PendingChange, edits []string, res *Result) (map[string][]journal.PendingChange, []string) {
+	all, err := e.repo.ListPendingChanges(ctx, profileID)
+	if err != nil {
+		res.Failures = append(res.Failures, Failure{Key: "edits", Error: "the journal could not be reread after the creates pass: " + err.Error()})
+		return orig, edits
+	}
+	byKey := map[string][]journal.PendingChange{}
+	var keys []string
+	for _, p := range all {
+		if p.EntityType == issuerepo.EntityLink || p.EntityType == issuerepo.EntityIssueCreate {
+			continue
+		}
+		if _, seen := byKey[p.EntityKey]; !seen {
+			keys = append(keys, p.EntityKey)
+		}
+		byKey[p.EntityKey] = append(byKey[p.EntityKey], p)
+	}
+	sort.Strings(keys)
+	for k := range byKey {
+		rows := byKey[k]
+		sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+	}
+	return byKey, keys
 }
 
 // conflict builds the three-way view. The remote description is fetched

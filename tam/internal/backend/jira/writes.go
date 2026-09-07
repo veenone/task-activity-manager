@@ -54,6 +54,15 @@ func jiraFields(fields map[string]string, ids fieldIDs) (map[string]any, error) 
 			} else {
 				out[ids.Points] = *p
 			}
+		case "parentKey":
+			if ids.EpicLink == "" {
+				return nil, errors.New("this Jira has no Epic Link field, so the epic cannot be pushed")
+			}
+			if v == "" {
+				out[ids.EpicLink] = nil
+			} else {
+				out[ids.EpicLink] = v
+			}
 		default:
 			return nil, fmt.Errorf("field %q cannot be sent to Jira", name)
 		}
@@ -109,8 +118,8 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	if d.StoryPoints != nil && ids.Points != "" {
 		fields[ids.Points] = *d.StoryPoints
 	}
-	if d.ParentKey != "" {
-		if ids.EpicLink != "" && d.Type != backend.TypeEpic {
+	if d.ParentKey != "" && d.Type != backend.TypeEpic {
+		if ids.EpicLink != "" {
 			fields[ids.EpicLink] = d.ParentKey
 		} else {
 			log.Printf("tam: %s has no Epic Link field; parent %s dropped from the create of %q", b.c.BaseURL(), d.ParentKey, d.Summary)
@@ -128,6 +137,11 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 				continue
 			}
 			fields[id] = shapeExtra(kinds[id], v)
+		}
+	}
+	if d.Type == backend.TypeEpic && ids.EpicName != "" {
+		if _, set := fields[ids.EpicName]; !set {
+			fields[ids.EpicName] = d.Summary
 		}
 	}
 	var resp struct {
@@ -205,7 +219,7 @@ func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType stri
 	for _, p := range meta.Projects {
 		for _, t := range p.IssueTypes {
 			for id, f := range t.Fields {
-				if !f.Required || formFields[id] || id == ids.Points {
+				if !f.Required || formFields[id] || id == ids.Points || id == ids.EpicName {
 					continue
 				}
 				spec := backend.FieldSpec{ID: id, Name: f.Name, Type: fieldKind(f.Schema.Type), Required: true, AllowedValues: []backend.FieldOption{}}

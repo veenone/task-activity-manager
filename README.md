@@ -10,7 +10,9 @@ Desktop tools for Jira Data Center that share one code spine:
   issues into a local cache, and shows them in a Backlog grid with a
   read-only detail panel. Plan 1b adds local edits and drafts, a journal,
   Commit with conflict detection, and an Activity tab. Plan 1c adds Excel
-  import to drafts, cross-project links, and requirement creation.
+  import to drafts, cross-project links, and requirement creation. Phase 2
+  adds an Epics view showing each epic with its stories, tasks, bugs, and
+  requirements, and lets an issue be moved under one.
 
 Both are Go + Wails + React apps that sync Jira into a local SQLite cache and
 push edits back on commit.

@@ -27,13 +27,13 @@ function Loader() {
   return null;
 }
 
-function renderModal(onCreated = vi.fn(), onClose = vi.fn()) {
+function renderModal(onCreated = vi.fn(), onClose = vi.fn(), initialType?: api.IssueType) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
           <Loader />
-          <NewIssueModal onClose={onClose} onCreated={onCreated} />
+          <NewIssueModal onClose={onClose} onCreated={onCreated} initialType={initialType} />
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
@@ -125,6 +125,20 @@ describe("NewIssueModal", () => {
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
     const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
     expect(draft.type).toBe("requirement");
+    expect(draft.storyPoints).toBeNull();
+  });
+
+  it("preselects Epic and hides Story points when initialType is epic", async () => {
+    const user = userEvent.setup();
+    renderModal(vi.fn(), vi.fn(), "epic");
+    const dialog = await screen.findByRole("dialog", { name: "New issue" });
+    expect(within(dialog).getByLabelText("Type")).toHaveValue("epic");
+    expect(within(dialog).queryByLabelText("Story points")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Summary"), "Checkout revamp");
+    await user.click(within(dialog).getByRole("button", { name: "Create draft" }));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.type).toBe("epic");
     expect(draft.storyPoints).toBeNull();
   });
 });

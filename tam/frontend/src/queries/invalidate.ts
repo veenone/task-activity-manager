@@ -11,6 +11,8 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     keys.sprints(profileId),
     keys.syncState(profileId),
     keys.pending(profileId),
+    [profileId, "tree"] as const,
+    keys.epics(profileId),
   ]) {
     qc.invalidateQueries({ queryKey });
   }
@@ -24,4 +26,6 @@ export function invalidateWrites(qc: QueryClient, profileId: string, key?: strin
   qc.invalidateQueries({ queryKey: [profileId, "issues"] });
   qc.invalidateQueries({ queryKey: keys.pending(profileId) });
   qc.invalidateQueries({ queryKey: key ? [profileId, "issue", key] : [profileId, "issue"] });
+  qc.invalidateQueries({ queryKey: [profileId, "tree"] });
+  qc.invalidateQueries({ queryKey: keys.epics(profileId) });
 }

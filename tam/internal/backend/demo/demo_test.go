@@ -149,6 +149,18 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 	if got, _ := b.GetIssue(ctx, withParent); got.ParentKey != "ACME-350" {
 		t.Errorf("parent stored: %+v", got)
 	}
+	epic, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "ACME-320"})
+	if got, _ := b.GetIssue(ctx, epic); got.ParentKey != "" {
+		t.Errorf("an epic ignores a parent on create: %+v", got)
+	}
+
+	if err := b.UpdateIssue(ctx, "ACME-409", map[string]string{"parentKey": "ACME-320"}); err != nil {
+		t.Fatalf("UpdateIssue parentKey: %v", err)
+	}
+	moved, _ := b.GetIssue(ctx, "ACME-409")
+	if moved.ParentKey != "ACME-320" {
+		t.Errorf("parentKey updated and read back: %+v", moved)
+	}
 }
 
 func pts(v float64) *float64 { return &v }

@@ -115,6 +115,30 @@ export interface IssuePage {
   total: number;
 }
 
+export interface TreeQuery {
+  text: string;
+  sprintId: string;
+  showDone: boolean;
+}
+
+export interface EpicNode {
+  issue: Issue;
+  children: Issue[];
+  total: number;
+  done: number;
+  points: number;
+  donePoints: number;
+}
+
+// EpicTreeData is named to avoid clashing with the EpicTree component;
+// truncated mirrors issuerepo.Tree.truncated, set when the cache holds more
+// issues than the tree will render.
+export interface EpicTreeData {
+  epics: EpicNode[];
+  orphans: Issue[];
+  truncated: boolean;
+}
+
 export interface SprintRef {
   id: string;
   name: string;
@@ -145,7 +169,7 @@ export interface LinkedTest {
 // not yet committed. It matches issuerepo.DraftPrefix.
 export const DRAFT_PREFIX = "TAM-NEW-";
 
-export type EditableField = "summary" | "description" | "priority" | "labels" | "storyPoints" | "assignee";
+export type EditableField = "summary" | "description" | "priority" | "labels" | "storyPoints" | "assignee" | "parentKey";
 
 export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "summary", label: "Summary" },
@@ -154,6 +178,7 @@ export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "labels", label: "Labels" },
   { id: "storyPoints", label: "Story points" },
   { id: "assignee", label: "Assignee" },
+  { id: "parentKey", label: "Epic" },
 ];
 
 export function fieldLabel(field: string): string {
@@ -329,6 +354,9 @@ export const GetIssueDetail: (profileId: string, key: string) => Promise<IssueDe
 export const ListLinkedTests: (profileId: string, key: string) => Promise<LinkedTest[]> =
   App.ListLinkedTests;
 export const ListSprints: (profileId: string) => Promise<SprintRef[]> = App.ListSprints;
+export const GetEpicTree = (profileId: string, q: TreeQuery): Promise<EpicTreeData> =>
+  App.GetEpicTree(profileId, issuerepo.TreeQuery.createFrom(q)) as Promise<EpicTreeData>;
+export const ListEpics: (profileId: string) => Promise<Issue[]> = App.ListEpics as (profileId: string) => Promise<Issue[]>;
 export const GetProfileSetting: (profileId: string, key: string) => Promise<string> =
   App.GetProfileSetting;
 export const SetProfileSetting: (

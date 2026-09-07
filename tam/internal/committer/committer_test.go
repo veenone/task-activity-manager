@@ -82,6 +82,8 @@ func (f *fake) UpdateIssue(_ context.Context, key string, fields map[string]stri
 			iss.StoryPoints, _ = backend.ParsePoints(v)
 		case "description":
 			f.desc[key] = v
+		case "parentKey":
+			iss.ParentKey = v
 		}
 	}
 	iss.Updated = "2026-09-07T00:00:00Z"
@@ -315,6 +317,84 @@ func TestCommitAuditsAFailedRekeySoARetryDoesNotDuplicate(t *testing.T) {
 	}
 	if len(f.creates) != 1 {
 		t.Errorf("a retry must not post the draft again: %d", len(f.creates))
+	}
+}
+
+func TestCommitPushesTheRealParentAfterADraftEpicIsCreated(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	temp, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-2", "parentKey", temp); err != nil {
+		t.Fatalf("parent PLAT-2 to the draft epic: %v", err)
+	}
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Created) != 1 || res.Created[0].Key != "PLAT-501" || strings.Join(res.Committed, ",") != "PLAT-2" {
+		t.Fatalf("result: %+v", res)
+	}
+	found := false
+	for _, u := range f.updates {
+		if u == "PLAT-2 parentKey=PLAT-501" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the story's parentKey must push the real key, not the temp one: %v", f.updates)
+	}
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-2")
+	if iss.ParentKey != "PLAT-501" {
+		t.Errorf("row: %+v", iss)
+	}
+	pend, _ := repo.ListPendingChanges(ctx, "p1")
+	for _, p := range pend {
+		if p.AfterVal == temp {
+			t.Errorf("no pending row still names the temp key: %+v", p)
+		}
+	}
+}
+
+func TestAnEditNamingAnUncreatedDraftWaits(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	temp, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-2", "parentKey", temp); err != nil {
+		t.Fatalf("parent PLAT-2 to the draft epic: %v", err)
+	}
+	f.createErr = errors.New("POST failed: 400 Severity is required")
+
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range f.updates {
+		if strings.HasPrefix(u, "PLAT-2") {
+			t.Errorf("the story must not be pushed while its epic is still a draft: %v", f.updates)
+		}
+	}
+	if len(res.Failures) != 2 {
+		t.Fatalf("two failures, the create's and the story's: %+v", res.Failures)
+	}
+	keys := map[string]string{}
+	for _, fl := range res.Failures {
+		keys[fl.Key] = fl.Error
+	}
+	if !strings.Contains(keys[temp], "Severity") {
+		t.Errorf("the create's failure: %v", keys)
+	}
+	if !strings.Contains(keys["PLAT-2"], temp) {
+		t.Errorf("the story's failure names the temp key: %v", keys)
+	}
+	pend, err := repo.PendingForKey(ctx, "p1", "PLAT-2")
+	if err != nil || len(pend) != 1 {
+		t.Errorf("the story's pending row is still there: %+v %v", pend, err)
 	}
 }
 

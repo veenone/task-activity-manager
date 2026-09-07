@@ -227,6 +227,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-import { margin-left: auto; }
 .filter-import + .filter-new { margin-left: 8px; }
 
+/* Phase 2: Epics */
+.epics-body { display: flex; min-height: 0; flex: 1; }
+.epics-tree-pane { flex: 1; min-width: 0; overflow: auto; }
+.epics-summary { margin-bottom: 4px; }
+
 /* Plan 1c: links */
 .add-link { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
 .add-link h3 { margin: 0; font-size: 13px; }

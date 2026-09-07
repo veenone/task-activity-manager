@@ -4,6 +4,16 @@ import { errMsg } from "@agile-suite/core";
 import { EDITABLE_FIELDS } from "../api";
 import type { EditableField, Issue } from "../api";
 import { useEditIssue } from "../queries/pending";
+import { useEpics } from "../queries/tree";
+
+// EPIC_SUMMARY_MAX is how much of an epic's summary shows in its option
+// label before it is cut off with a single ellipsis character.
+const EPIC_SUMMARY_MAX = 60;
+
+function epicOptionLabel(key: string, summary: string): string {
+  const cut = summary.length > EPIC_SUMMARY_MAX ? `${summary.slice(0, EPIC_SUMMARY_MAX)}…` : summary;
+  return `${key} ${cut}`;
+}
 
 interface Props {
   profileId: string;
@@ -27,6 +37,7 @@ function valuesOf(issue: Issue, description: string): Values {
     labels: issue.labels.join(", "),
     storyPoints: issue.storyPoints === null || issue.storyPoints === undefined ? "" : String(issue.storyPoints),
     assignee: issue.assignee,
+    parentKey: issue.parentKey,
   };
 }
 
@@ -41,6 +52,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const edit = useEditIssue(profileId);
+  const epics = useEpics(profileId);
 
   // A fresh row from the backend (after save, sync, or commit) resets the
   // fields the user has not touched; dirty ones keep their text.
@@ -91,7 +103,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
 
   return (
     <form className="edit-form" onSubmit={(e) => void onSubmit(e)} aria-label="Edit fields">
-      {EDITABLE_FIELDS.map((f) => (
+      {EDITABLE_FIELDS.filter((f) => f.id !== "parentKey" || issue.type !== "epic").map((f) => (
         <label key={f.id} className="edit-row">
           <span className="muted small">{f.label}</span>
           {f.id === "description" ? (
@@ -103,6 +115,26 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               placeholder={descriptionReady ? "" : "Loading the description"}
               onChange={(e) => set("description", e.target.value)}
             />
+          ) : f.id === "parentKey" ? (
+            // Gated on isLoading, not isFetching: the epic list is stable, so a
+            // background refetch should leave the select showing its current
+            // options rather than blanking the control mid-edit.
+            epics.isLoading ? (
+              <select className="detail-input" disabled value="">
+                <option value="">(loading)</option>
+              </select>
+            ) : (
+              <select
+                className="detail-input"
+                value={values.parentKey}
+                onChange={(e) => set("parentKey", e.target.value)}
+              >
+                <option value="">(none)</option>
+                {(epics.data ?? []).map((epic) => (
+                  <option key={epic.key} value={epic.key}>{epicOptionLabel(epic.key, epic.summary)}</option>
+                ))}
+              </select>
+            )
           ) : (
             <input
               className="detail-input"

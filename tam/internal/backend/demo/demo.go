@@ -184,6 +184,8 @@ func (b *Backend) UpdateIssue(_ context.Context, key string, fields map[string]s
 			iss.StoryPoints = p
 		case "description":
 			b.desc[key] = v
+		case "parentKey":
+			iss.ParentKey = v
 		default:
 			return fmt.Errorf("field %q cannot be sent to Jira", name)
 		}
@@ -207,10 +209,14 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 	if labels == nil {
 		labels = []string{}
 	}
+	parentKey := d.ParentKey
+	if d.Type == backend.TypeEpic {
+		parentKey = ""
+	}
 	b.over[key] = backend.Issue{
 		Key: key, ID: fmt.Sprintf("%d", 30000+b.nextKey), Project: projectKey, Type: d.Type, Summary: d.Summary,
 		Status: "To Do", Assignee: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
-		ParentKey: d.ParentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
+		ParentKey: parentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
 	}
 	b.desc[key] = d.Description
 	return key, nil

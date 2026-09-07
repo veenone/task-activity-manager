@@ -90,6 +90,63 @@ func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 	}
 }
 
+func TestUpdateIssuePushesTheEpicLink(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	if err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"parentKey": "PLAT-320"}); err != nil {
+		t.Fatalf("UpdateIssue: %v", err)
+	}
+	if !strings.Contains(f.writes[0], `"customfield_10014":"PLAT-320"`) {
+		t.Errorf("epic link set: %s", f.writes[0])
+	}
+	f.writes = nil
+	if err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"parentKey": ""}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f.writes[0], `"customfield_10014":null`) {
+		t.Errorf("clear: %s", f.writes[0])
+	}
+	noEpic, _ := newBackend(t, twoFields)
+	if err := noEpic.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"parentKey": "PLAT-320"}); err == nil {
+		t.Error("no Epic Link field must be refused")
+	}
+}
+
+func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
+	b, f := newBackend(t, fourFields)
+	f.createKey = "PLAT-600"
+	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "PLAT-350"}); err != nil {
+		t.Fatal(err)
+	}
+	post := f.writes[len(f.writes)-1]
+	if strings.Contains(post, "customfield_10014") {
+		t.Errorf("an epic sends no Epic Link: %s", post)
+	}
+	if !strings.Contains(post, `"customfield_10011":"New epic"`) {
+		t.Errorf("Epic Name defaults to the summary: %s", post)
+	}
+	f.createKey = "PLAT-601"
+	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+		Type: backend.TypeEpic, Summary: "Another epic", Extra: map[string]string{"customfield_10011": "Custom name"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	post = f.writes[len(f.writes)-1]
+	if !strings.Contains(post, `"customfield_10011":"Custom name"`) {
+		t.Errorf("Extra's Epic Name wins: %s", post)
+	}
+}
+
+func TestCreateFieldsHidesEpicName(t *testing.T) {
+	b, _ := newBackend(t, fourFields)
+	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeEpic)
+	if err != nil {
+		t.Fatalf("CreateFields: %v", err)
+	}
+	if len(specs) != 0 {
+		t.Errorf("Epic Name is hidden: %+v", specs)
+	}
+}
+
 func TestCreateFieldsKeepsOnlyRequiredUnknownFields(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeBug)

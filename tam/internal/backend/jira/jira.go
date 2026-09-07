@@ -70,6 +70,7 @@ func (b *Backend) discover(ctx context.Context) fieldIDs {
 		{"Story Points", &ids.Points},
 		{"Epic Link", &ids.EpicLink},
 		{"Rank", &ids.Rank},
+		{"Epic Name", &ids.EpicName},
 	} {
 		id, err := b.c.CustomFieldID(ctx, want.name)
 		switch {

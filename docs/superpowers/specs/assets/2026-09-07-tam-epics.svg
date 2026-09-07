@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="800" viewBox="0 0 1240 800" font-family="Segoe UI, system-ui, sans-serif" font-size="13">
+  <defs>
+    <style>
+      .txt{fill:#1F2937}.muted{fill:#6B7280}.sm{font-size:11px}.xs{font-size:10px}.b{font-weight:600}
+      .surface{fill:#FFFFFF;stroke:#E1E4EA}.row-alt{fill:#FAFBFC}.row-sel{fill:#E8ECFB}
+      .accent{fill:#3B5BDB}.accent-txt{fill:#3B5BDB}
+    </style>
+  </defs>
+
+  <!-- Phase 2: the Epics view. Left, the epic tree in XTM's folder-tree
+       style with one epic expanded and a story selected; right, the detail
+       panel's Details tab with the Epic field. -->
+
+  <rect width="1240" height="800" fill="#F7F8FA"/>
+
+  <!-- topbar -->
+  <rect x="0" y="0" width="1240" height="48" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="20" y="30" class="txt b" font-size="15">Task Activity Manager</text>
+  <rect x="212" y="15" width="48" height="18" rx="9" fill="#FEF3C7" stroke="#F59E0B"/>
+  <text x="222" y="28" class="xs b" fill="#92400E">DEMO</text>
+  <rect x="284" y="11" width="232" height="26" rx="4" class="surface"/>
+  <text x="294" y="28" class="txt">Acme Platform (PLAT)</text>
+  <rect x="986" y="11" width="88" height="26" rx="4" class="surface"/>
+  <text x="998" y="28" class="txt">Manage</text>
+  <rect x="1086" y="11" width="66" height="26" rx="4" class="accent"/>
+  <text x="1105" y="28" fill="#FFFFFF" class="b">Sync</text>
+  <rect x="1164" y="11" width="56" height="26" rx="4" class="surface"/>
+  <text x="1180" y="28" class="txt">Help</text>
+
+  <!-- nav rail -->
+  <rect x="0" y="48" width="180" height="724" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="22" y="85" class="txt">Backlog</text>
+  <rect x="8" y="104" width="164" height="32" rx="6" class="row-sel"/>
+  <text x="22" y="125" class="accent-txt b">Epics</text>
+  <text x="22" y="165" class="txt">Boards</text>
+  <text x="22" y="205" class="txt">Reports</text>
+  <text x="22" y="245" class="txt">Rituals</text>
+
+  <!-- view head and toolbar -->
+  <text x="200" y="80" class="txt b" font-size="17">Epics</text>
+  <text x="256" y="80" class="muted">PLAT · 4 epics, 61 issues</text>
+  <rect x="200" y="96" width="260" height="28" rx="4" class="surface"/>
+  <text x="212" y="114" class="muted">Search epics and issues</text>
+  <rect x="472" y="96" width="150" height="28" rx="4" class="surface"/>
+  <text x="484" y="114" class="txt">All sprints</text>
+  <rect x="636" y="103" width="14" height="14" rx="2" class="surface"/>
+  <text x="656" y="114" class="txt">Show done</text>
+  <rect x="740" y="96" width="92" height="28" rx="4" class="accent"/>
+  <text x="754" y="114" fill="#FFFFFF" class="b">+ New epic</text>
+
+  <!-- tree -->
+  <rect x="200" y="136" width="632" height="620" class="surface"/>
+  <g class="sm">
+    <text x="216" y="162" class="txt b">All epics</text>
+    <text x="290" y="162" class="muted">4</text>
+
+    <!-- epic: Promotions and discounts, expanded -->
+    <rect x="200" y="174" width="632" height="30" class="row-alt"/>
+    <text x="216" y="194" class="txt">▾</text>
+    <rect x="234" y="184" width="34" height="14" rx="7" fill="#EDE9FE"/><text x="241" y="195" fill="#5B21B6" class="xs b">Epic</text>
+    <text x="278" y="194" class="txt b">PLAT-350</text>
+    <text x="344" y="194" class="txt">Promotions and discounts</text>
+    <text x="640" y="194" class="muted">2 of 5 done, 21 pts</text>
+    <circle cx="816" cy="189" r="3.5" fill="#F59E0B"/>
+
+    <!-- children -->
+    <rect x="200" y="204" width="632" height="28" class="row-sel"/>
+    <rect x="252" y="212" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="259" y="223" fill="#166534" class="xs b">Story</text>
+    <text x="300" y="222" class="txt b">PLAT-412</text>
+    <text x="366" y="222" class="txt">Checkout: apply promo code at payment step</text>
+    <rect x="660" y="212" width="72" height="14" rx="3" fill="#DBEAFE"/><text x="666" y="223" fill="#1E40AF" class="xs b">In Progress</text>
+    <text x="760" y="222" class="txt">8</text>
+    <circle cx="816" cy="218" r="3.5" fill="#F59E0B"/>
+
+    <rect x="200" y="232" width="632" height="28" fill="#FFFFFF"/>
+    <rect x="252" y="240" width="48" height="14" rx="7" fill="#FEE2E2"/><text x="259" y="251" fill="#991B1B" class="xs b">Req</text>
+    <text x="308" y="250" class="txt">PLAT-388</text>
+    <text x="374" y="250" class="txt">Promo codes must be single-use per customer</text>
+    <rect x="660" y="240" width="60" height="14" rx="3" fill="#DCFCE7"/><text x="666" y="251" fill="#166534" class="xs b">Approved</text>
+    <text x="760" y="250" class="txt">-</text>
+
+    <rect x="200" y="260" width="632" height="28" class="row-alt"/>
+    <rect x="252" y="268" width="40" height="14" rx="7" fill="#DCFCE7"/><text x="259" y="279" fill="#166534" class="xs b">Story</text>
+    <text x="300" y="278" class="txt">PLAT-398</text>
+    <text x="366" y="278" class="txt">Show the discount breakdown on the order summary</text>
+    <rect x="660" y="268" width="44" height="14" rx="3" fill="#F3F4F6"/><text x="666" y="279" fill="#374151" class="xs b">To Do</text>
+    <text x="760" y="278" class="txt">3</text>
+
+    <rect x="200" y="288" width="632" height="28" fill="#FFFFFF"/>
+    <rect x="252" y="296" width="34" height="14" rx="7" fill="#FECACA"/><text x="259" y="307" fill="#7F1D1D" class="xs b">Bug</text>
+    <text x="294" y="306" class="txt">PLAT-390</text>
+    <text x="360" y="306" class="txt">Promo code field accepts whitespace-only input</text>
+    <rect x="660" y="296" width="44" height="14" rx="3" fill="#F3F4F6"/><text x="666" y="307" fill="#374151" class="xs b">To Do</text>
+    <text x="760" y="306" class="txt">1</text>
+
+    <rect x="200" y="316" width="632" height="28" class="row-alt"/>
+    <rect x="252" y="324" width="36" height="14" rx="7" fill="#DBEAFE"/><text x="259" y="335" fill="#1E40AF" class="xs b">Task</text>
+    <text x="296" y="334" class="txt">PLAT-385</text>
+    <text x="362" y="334" class="txt">Add the promo code analytics event</text>
+    <rect x="660" y="324" width="40" height="14" rx="3" fill="#DCFCE7"/><text x="666" y="335" fill="#166534" class="xs b">Done</text>
+    <text x="760" y="334" class="txt">2</text>
+
+    <!-- collapsed epics -->
+    <rect x="200" y="348" width="632" height="30" fill="#FFFFFF"/>
+    <text x="216" y="368" class="txt">▸</text>
+    <rect x="234" y="358" width="34" height="14" rx="7" fill="#EDE9FE"/><text x="241" y="369" fill="#5B21B6" class="xs b">Epic</text>
+    <text x="278" y="368" class="txt b">PLAT-320</text>
+    <text x="344" y="368" class="txt">Checkout experience</text>
+    <text x="640" y="368" class="muted">6 of 14 done, 34 pts</text>
+
+    <rect x="200" y="378" width="632" height="30" class="row-alt"/>
+    <text x="216" y="398" class="txt">▸</text>
+    <rect x="234" y="388" width="34" height="14" rx="7" fill="#EDE9FE"/><text x="241" y="399" fill="#5B21B6" class="xs b">Epic</text>
+    <text x="278" y="398" class="txt b">PLAT-310</text>
+    <text x="344" y="398" class="txt">Payments platform hardening</text>
+    <text x="640" y="398" class="muted">1 of 9 done, 13 pts</text>
+
+    <rect x="200" y="408" width="632" height="30" fill="#FFFFFF"/>
+    <text x="216" y="428" class="txt">▸</text>
+    <rect x="234" y="418" width="34" height="14" rx="7" fill="#EDE9FE"/><text x="241" y="429" fill="#5B21B6" class="xs b">Epic</text>
+    <text x="278" y="428" class="txt b">PLAT-305</text>
+    <text x="344" y="428" class="txt">Team rituals and process</text>
+    <text x="640" y="428" class="muted">3 of 3 done, 5 pts</text>
+
+    <rect x="200" y="438" width="632" height="30" class="row-alt"/>
+    <text x="216" y="458" class="txt">▸</text>
+    <text x="278" y="458" class="txt b">No epic</text>
+    <text x="640" y="458" class="muted">18 issues</text>
+  </g>
+
+  <!-- detail panel -->
+  <rect x="848" y="136" width="372" height="620" class="surface"/>
+  <text x="864" y="164" class="txt b" font-size="15">PLAT-412</text>
+  <rect x="938" y="150" width="40" height="16" rx="8" fill="#DCFCE7"/><text x="945" y="162" fill="#166534" class="xs b">Story</text>
+  <circle cx="990" cy="158" r="3.5" fill="#F59E0B"/>
+  <text x="1196" y="164" class="muted">x</text>
+  <text x="864" y="188" class="txt">Checkout: apply promo code at payment step</text>
+  <g class="sm">
+    <text x="864" y="218" class="accent-txt b">Details</text>
+    <text x="920" y="218" class="muted">Links</text>
+    <text x="964" y="218" class="muted">Tests</text>
+    <text x="1010" y="218" class="muted">Activity</text>
+  </g>
+  <line x1="864" y1="224" x2="908" y2="224" stroke="#3B5BDB" stroke-width="2"/>
+  <line x1="848" y1="228" x2="1220" y2="228" stroke="#E1E4EA"/>
+  <g class="sm">
+    <text x="864" y="254" class="muted">Status</text><text x="960" y="254" class="txt">In Progress</text>
+    <text x="864" y="276" class="muted">Sprint</text><text x="960" y="276" class="txt">Sprint 12</text>
+    <text x="864" y="298" class="muted">Updated</text><text x="960" y="298" class="txt">today 09:58</text>
+  </g>
+  <text x="864" y="330" class="txt b">Fields</text>
+  <g class="sm">
+    <text x="864" y="358" class="muted">Summary</text>
+    <rect x="960" y="344" width="244" height="22" rx="3" class="surface"/><text x="968" y="359" class="txt">Checkout: apply promo code at payment step</text>
+    <text x="864" y="388" class="muted">Epic</text>
+    <rect x="960" y="374" width="244" height="22" rx="3" fill="#FFFBEB" stroke="#F59E0B"/><text x="968" y="389" class="txt">PLAT-320 Checkout experience</text>
+    <text x="864" y="418" class="muted">Priority</text>
+    <rect x="960" y="404" width="244" height="22" rx="3" class="surface"/><text x="968" y="419" class="txt">High</text>
+    <text x="864" y="448" class="muted">Story points</text>
+    <rect x="960" y="434" width="244" height="22" rx="3" class="surface"/><text x="968" y="449" class="txt">8</text>
+    <text x="864" y="478" class="muted">Assignee</text>
+    <rect x="960" y="464" width="244" height="22" rx="3" class="surface"/><text x="968" y="479" class="txt">R. Anand</text>
+  </g>
+  <rect x="864" y="500" width="84" height="26" rx="4" class="accent"/>
+  <text x="878" y="517" fill="#FFFFFF" class="b sm">Save edit</text>
+  <text x="960" y="517" class="muted sm">Moving to PLAT-320 is journaled; Commit pushes it.</text>
+
+  <!-- status bar -->
+  <rect x="0" y="772" width="1240" height="28" fill="#FFFFFF" stroke="#E1E4EA"/>
+  <text x="196" y="790" class="muted sm">61 issues, last synced today 10:42</text>
+  <rect x="1000" y="777" width="154" height="18" rx="9" fill="#FEF3C7" stroke="#F59E0B"/>
+  <text x="1010" y="790" class="xs b" fill="#92400E">2 pending changes: Commit</text>
+</svg>

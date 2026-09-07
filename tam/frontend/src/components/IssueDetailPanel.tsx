@@ -74,7 +74,6 @@ export function IssueDetailPanel({ profileId, issue, onClose }: Props) {
           <dl className="field-list">
             <dt>Status</dt><dd>{issue.status || "-"}</dd>
             <dt>Sprint</dt><dd>{issue.sprintName || "-"}</dd>
-            <dt>{issue.type === "epic" ? "Parent" : "Epic"}</dt><dd>{issue.parentKey ? <span className="accent-text">{issue.parentKey}</span> : "-"}</dd>
             <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>
           </dl>
           <div className="detail-section-head">

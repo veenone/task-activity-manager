@@ -26,6 +26,7 @@ vi.mock("../api", async () => {
     AutoMapImport: vi.fn(),
     ImportIssues: vi.fn(),
     SaveImportTemplate: vi.fn(),
+    ListEpics: vi.fn(),
   };
 });
 
@@ -110,6 +111,7 @@ beforeEach(() => {
   vi.mocked(api.ListSprints).mockResolvedValue([{ id: "12", name: "Sprint 12" }, { id: "13", name: "Sprint 13" }]);
   vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
+  vi.mocked(api.ListEpics).mockResolvedValue([]);
 });
 
 const lastQuery = () => vi.mocked(api.ListIssues).mock.calls.at(-1)?.[1];

@@ -12,8 +12,10 @@ collection "Task Activity Manager" mirrors it.
 
 Plan 1a (issues, read path): sync by project into `tam.db`, the Backlog
 grid, and a read-only detail panel, on the demo dataset or a live Jira DC.
-Plan 1b (this branch) adds the journal, create and edit, and Commit.
-Requirements, Excel import, and cross-project links are plan 1c.
+Plan 1b adds the journal, create and edit, and Commit. Plan 1c adds Excel
+import, cross-project links, and requirement creation. Phase 2 (this
+branch) adds the epic and story hierarchy: the Epics view, `parentKey` as
+the seventh editable field, and epic creation.
 
 ## The write path (plan 1b)
 
@@ -50,6 +52,31 @@ Source field on them and answers lookups for the `XT-` keys its curated
 details reference. Link removal, links in the bulk sync, epics, and
 subtask parents are not in scope.
 
+## Phase 2: epics
+
+The Epics view groups the cache by parent: `issuerepo.EpicTree` reads a
+profile's epics and their children from `tam.db` in one call, in rank
+order, with per-epic progress counts (done count, points, done points),
+truncating past a 5,000-row cap. `parentKey` (label "Epic") is the seventh
+editable field, riding the same edit, journal, conflict, and commit
+machinery as the other six; the Jira backend maps it to the discovered
+Epic Link field. Creating an epic defaults its Epic Name to the summary
+when the draft leaves the field blank, so the user never has to know Epic
+Name exists. The two bound methods are `GetEpicTree` and `ListEpics`, both
+in `app_writes.go`. The tree's own styling is XTM's folder tree, reused
+class for class (`folder-tree`, `folder-item`, `folder-caret`, and the
+rest) out of `frontend/core/styles/primitives.css` rather than a second
+tree style.
+
+An incremental sync does not remove an epic that was deleted in Jira, so a
+stale epic keeps showing its children in the tree until a full sync clears
+it.
+
+A CSV import's epic rows must come before the rows of any child that
+names them: a child's row is checked against the epics the file has
+defined so far, in the order the rows appear, not against the whole file
+or the cache.
+
 ## Layout
 
     main.go              Wails entry point, window, menu
@@ -62,7 +89,8 @@ subtask parents are not in scope.
     internal/backend/    IssueBackend seam and DTOs; backend/jira on core/jira, backend/demo on internal/demo
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile
     internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile
-                          settings, the pending-change journal, and drafts
+                          settings, the pending-change journal, and drafts; tree.go groups the
+                          cache into the Epics view's tree
     internal/committer/  pushes the journal to Jira and resolves conflicts
     internal/importer/   maps import columns to draft fields and validates rows
     internal/syncer/     the paging engine; emits tam:sync-progress through app_issues.go
@@ -73,7 +101,7 @@ subtask parents are not in scope.
       src/contexts/      SyncContext on the shared sync reducer
       src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
                           PendingChangesModal, ConflictCard, NewIssueModal, ProfilesModal, AboutModal,
-                          ImportIssuesModal, AddLinkForm
+                          ImportIssuesModal, AddLinkForm, EpicsView, EpicTree, EpicRow
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands

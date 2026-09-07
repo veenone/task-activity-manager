@@ -10,10 +10,13 @@ import { invalidateWrites } from "../queries/invalidate";
 interface Props {
   onClose: () => void;
   onCreated: (key: string) => void;
+  // initialType seeds the type select; EpicsView's "+ New epic" opens the
+  // dialog with it set to "epic" so drafting an epic is one click away.
+  initialType?: IssueType;
 }
 
-// CREATABLE are the types this app can draft. Epics arrive later.
-const CREATABLE: IssueType[] = ["task", "story", "bug", "requirement"];
+// CREATABLE are the types this app can draft.
+const CREATABLE: IssueType[] = ["task", "epic", "story", "bug", "requirement"];
 
 // MetaField renders one create-meta field by its schema type: a select for
 // option and array fields with values, a date or number input, or text.
@@ -47,10 +50,10 @@ function MetaField({ spec, value, onChange }: { spec: FieldSpec; value: string; 
   );
 }
 
-export function NewIssueModal({ onClose, onCreated }: Props) {
+export function NewIssueModal({ onClose, onCreated, initialType = "task" }: Props) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const qc = useQueryClient();
-  const [type, setType] = useState<IssueType>("task");
+  const [type, setType] = useState<IssueType>(initialType);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("");
@@ -91,7 +94,7 @@ export function NewIssueModal({ onClose, onCreated }: Props) {
       priority: priority.trim(),
       labels: labels.split(",").map((l) => l.trim()).filter(Boolean),
       assignee: assignee.trim(),
-      storyPoints: type === "requirement" || points.trim() === "" ? null : Number(points.trim()),
+      storyPoints: type === "requirement" || type === "epic" || points.trim() === "" ? null : Number(points.trim()),
       extra: Object.fromEntries(Object.entries(extra).filter(([, v]) => v.trim() !== "")),
     };
     setError("");
@@ -144,7 +147,7 @@ export function NewIssueModal({ onClose, onCreated }: Props) {
           <span className="muted small">Assignee</span>
           <input id="new-assignee" className="detail-input" type="text" placeholder="Jira username" value={assignee} onChange={(e) => setAssignee(e.target.value)} />
         </label>
-        {type !== "requirement" && (
+        {type !== "requirement" && type !== "epic" && (
           <label className="edit-row" htmlFor="new-points">
             <span className="muted small">Story points</span>
             <input id="new-points" className="detail-input" type="text" inputMode="decimal" value={points} onChange={(e) => setPoints(e.target.value)} />

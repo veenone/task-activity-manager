@@ -21,6 +21,11 @@ const (
 const issueColumns = `key, id, project, type, summary, status, assignee, reporter, priority, labels,
 	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
+// issueOrder puts drafts first, then ranked rows by rank with unranked rows
+// last, then key. ListIssues and the tree share it so the grid and the
+// Epics view agree on one row order.
+const issueOrder = ` ORDER BY CASE WHEN key LIKE '` + DraftPrefix + `%' THEN 0 WHEN rank = '' THEN 2 ELSE 1 END, rank, key`
+
 const upsertIssueSQL = `
 	INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
 		sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
@@ -101,8 +106,7 @@ func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQu
 		offset = 0
 	}
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT `+issueColumns+` FROM issue WHERE `+where+
-			` ORDER BY CASE WHEN key LIKE '`+DraftPrefix+`%' THEN 0 WHEN rank = '' THEN 2 ELSE 1 END, rank, key LIMIT ? OFFSET ?`,
+		`SELECT `+issueColumns+` FROM issue WHERE `+where+issueOrder+` LIMIT ? OFFSET ?`,
 		append(args, limit, offset)...)
 	if err != nil {
 		return IssuePage{}, fmt.Errorf("list issues: %w", err)

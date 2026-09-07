@@ -22,7 +22,10 @@ func newRepo(t *testing.T) *issuerepo.Repository {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	repo := issuerepo.New(db.DB())
-	rows := []backend.Issue{{Key: "PLAT-350", Type: backend.TypeEpic, Summary: "Promotions", Labels: []string{}, Updated: "2026-09-01T00:00:00Z"}}
+	rows := []backend.Issue{
+		{Key: "PLAT-350", Type: backend.TypeEpic, Summary: "Promotions", Labels: []string{}, Updated: "2026-09-01T00:00:00Z"},
+		{Key: "PLAT-412", Type: backend.TypeStory, Summary: "Apply promo code", Labels: []string{}, Updated: "2026-09-01T00:00:00Z"},
+	}
 	if err := repo.UpsertPage(context.Background(), "p1", rows, time.Now(), false); err != nil {
 		t.Fatal(err)
 	}
@@ -47,9 +50,11 @@ func records() [][]string {
 		{"Story", "Apply promo at payment", "As a shopper", "High", "checkout, promo", "ranand", "5", "PLAT-350"},
 		{"", "Rotate keys", "", "", "security", "", "", ""},
 		{"Bug", "", "no summary", "", "", "", "", ""},
-		{"Epic", "Not creatable", "", "", "", "", "", ""},
+		{"Epic", "Promo overhaul", "", "", "", "", "", ""},
 		{"Task", "Bad points", "", "", "", "", "eight", ""},
 		{"Task", "Unknown parent", "", "", "", "", "", "PLAT-999"},
+		{"Task", "Story as parent", "", "", "", "", "", "PLAT-412"},
+		{"Epic", "Epic with a parent", "", "", "", "", "", "PLAT-350"},
 		{"Business Requirement", "Single-use promo codes", "", "", "promo", "", "", ""},
 		{"", "", "", "", "", "", "", ""},
 	}
@@ -64,19 +69,25 @@ func TestRunDryRunValidatesEveryRuleAndCreatesNothing(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 	// The trailing blank row is not counted in Rows and produces no error.
-	if res.Rows != 7 || len(res.Created) != 0 || len(res.Errors) != 4 {
+	if res.Rows != 9 || len(res.Created) != 0 || len(res.Errors) != 5 {
 		t.Fatalf("result: %+v", res)
 	}
 	got := map[int]string{}
 	for _, e := range res.Errors {
 		got[e.Row] = e.Message
 	}
-	for row, want := range map[int]string{4: "Summary is empty", 5: `Type "Epic" cannot be created`, 6: `Story points "eight" is not a number`, 7: "Parent PLAT-999 is not in the cache"} {
+	for row, want := range map[int]string{
+		4: "Summary is empty",
+		6: `Story points "eight" is not a number`,
+		7: "Parent PLAT-999 is not in the cache",
+		8: "Parent PLAT-412 is not an epic",
+		9: "An epic cannot have a parent",
+	} {
 		if !strings.Contains(got[row], want) {
 			t.Errorf("row %d: %q lacks %q", row, got[row], want)
 		}
 	}
-	if page, _ := repo.ListIssues(ctx, "p1", issuerepo.IssueQuery{}); page.Total != 1 {
+	if page, _ := repo.ListIssues(ctx, "p1", issuerepo.IssueQuery{}); page.Total != 2 {
 		t.Errorf("dry run created rows: %d", page.Total)
 	}
 }
@@ -89,7 +100,7 @@ func TestRunImportsTheValidRowsAsDrafts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if strings.Join(res.Created, ",") != "TAM-NEW-1,TAM-NEW-2,TAM-NEW-3" || len(res.Errors) != 4 {
+	if strings.Join(res.Created, ",") != "TAM-NEW-1,TAM-NEW-2,TAM-NEW-3,TAM-NEW-4" || len(res.Errors) != 5 {
 		t.Fatalf("result: %+v", res)
 	}
 	first, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-1")
@@ -101,8 +112,12 @@ func TestRunImportsTheValidRowsAsDrafts(t *testing.T) {
 		t.Errorf("blank type means task, blank points mean none: %+v", second)
 	}
 	third, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-3")
-	if third.Type != backend.TypeRequirement {
-		t.Errorf("the profile's requirement type name maps to requirement: %+v", third)
+	if third.Type != backend.TypeEpic || third.Summary != "Promo overhaul" {
+		t.Errorf("an epic row imports as a draft of type epic: %+v", third)
+	}
+	fourth, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-4")
+	if fourth.Type != backend.TypeRequirement {
+		t.Errorf("the profile's requirement type name maps to requirement: %+v", fourth)
 	}
 	d, _, _, _ := repo.ReadDetail(ctx, "p1", "TAM-NEW-1")
 	if d.Description != "As a shopper" {
@@ -111,6 +126,46 @@ func TestRunImportsTheValidRowsAsDrafts(t *testing.T) {
 	act, _ := repo.ListActivity(ctx, "p1", "TAM-NEW-1", 0)
 	if len(act) != 1 || act[0].Note != "imported from backlog.csv" {
 		t.Errorf("audit note: %+v", act)
+	}
+}
+
+func TestRunOnlyResolvesAnInFileEpicWhenItComesFirst(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	header := []string{"Type", "Summary", "Parent"}
+	m := importer.AutoMap(header)
+
+	childFirst := [][]string{
+		header,
+		{"Task", "Child of a new epic", "TAM-NEW-1"},
+		{"Epic", "New team epic", ""},
+	}
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", childFirst, m, "f.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 1 || !strings.Contains(res.Errors[0].Message, "TAM-NEW-1 is not in the cache") {
+		t.Fatalf("a child before its new epic fails with the usual message: %+v", res.Errors)
+	}
+	if strings.Join(res.Created, ",") != "TAM-NEW-1" {
+		t.Fatalf("the epic row still imports, under the key the child guessed too late: %+v", res)
+	}
+
+	epicFirst := [][]string{
+		header,
+		{"Epic", "Another new epic", ""},
+		{"Task", "Second child", "TAM-NEW-2"},
+	}
+	res2, err := importer.Run(ctx, repo, "p1", "PLAT", "", epicFirst, m, "f.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if strings.Join(res2.Created, ",") != "TAM-NEW-2,TAM-NEW-3" || len(res2.Errors) != 0 {
+		t.Fatalf("epic first creates both: %+v", res2)
+	}
+	child, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-3")
+	if child.ParentKey != "TAM-NEW-2" {
+		t.Errorf("the child's parent is the epic's predicted key: %+v", child)
 	}
 }
 
@@ -151,7 +206,7 @@ func TestRunRefusesAMappingWithoutSummaryOrWithAMissingColumn(t *testing.T) {
 func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 	data := importer.TemplateCSV()
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 5 || !strings.HasPrefix(lines[0], "Type,Summary,Description,Priority,Labels,Assignee,Story Points,Parent") {
+	if len(lines) != 6 || !strings.HasPrefix(lines[0], "Type,Summary,Description,Priority,Labels,Assignee,Story Points,Parent") {
 		t.Errorf("template: %q", string(data))
 	}
 	records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
@@ -177,7 +232,7 @@ func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if res.Rows != 4 || len(res.Errors) != 0 {
+	if res.Rows != 5 || len(res.Errors) != 0 {
 		t.Errorf("template dry run against a fresh repo: %+v", res)
 	}
 }

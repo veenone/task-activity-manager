@@ -580,3 +580,109 @@
   border-radius: 6px;
   text-align: left;
 }
+
+/* Folder tree, mirrored from XTM's App.css (around lines 2765 to 2870), for
+   TAM's Epics tree. The tokens it uses (--surface-3, --row-hover,
+   --border-strong, --accent-hover, --text-muted) already exist here with the
+   same values XTM's :root carries. */
+.folder-tree {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--surface-3);
+  border-right: 1px solid var(--border);
+  overflow: auto;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.folder-actions {
+  display: none;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.folder-item:hover .folder-actions {
+  display: inline-flex;
+  gap: 1px;
+}
+.folder-action {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 0 3px;
+  line-height: 1;
+}
+.folder-action:hover {
+  color: #2563eb;
+}
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  width: max-content;
+  min-width: 100%;
+}
+.folder-item:hover {
+  background: var(--row-hover);
+}
+.folder-selected {
+  background: #e1e8ff !important;
+  color: var(--accent-hover);
+  font-weight: 500;
+}
+.folder-caret {
+  width: 12px;
+  display: inline-block;
+  color: var(--text-muted);
+  text-align: center;
+  flex-shrink: 0;
+}
+.folder-caret-toggle {
+  cursor: pointer;
+}
+.folder-name {
+  flex: 1;
+  white-space: nowrap;
+}
+.folder-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.folder-children {
+  margin-left: 17px;
+  padding-left: 9px;
+  border-left: 1px dotted var(--border-strong);
+}
+
+/* The Epics tree's shared row grid: an epic's own row and a child's row both
+   carry it alongside folder-item, so the caret, type chip, key, summary,
+   status or progress, points, and pending dot line up across the two kinds
+   of row. An epic (or the orphans header) folds its key+summary into one
+   folder-name cell and its progress into one folder-count cell, each
+   spanning the two tracks a child spreads its key/summary and status/points
+   across, so the two row shapes still line up column for column. */
+.epic-row {
+  display: grid;
+  grid-template-columns: 12px 44px 92px 1fr auto auto 12px;
+  gap: 6px;
+  align-items: center;
+}
+.epic-row .folder-name {
+  grid-column: 3 / span 2;
+}
+.epic-row .folder-count {
+  grid-column: 5 / span 2;
+}
+/* Two seconds on a row that just moved to another epic. The warn tint is
+   the same vocabulary the pending dot and the Commit chip use for a local
+   change, and it reads without touching the row's text color. */
+.epic-row-moved {
+  background: var(--warn-soft);
+}

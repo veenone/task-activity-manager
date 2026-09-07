@@ -5,8 +5,8 @@ import {importer} from '../models';
 import {committer} from '../models';
 import {profile} from '../models';
 import {main} from '../models';
-import {settings} from '../models';
 import {issuerepo} from '../models';
+import {settings} from '../models';
 import {journal} from '../models';
 import {importfile} from '../models';
 import {syncer} from '../models';
@@ -33,6 +33,8 @@ export function GetCreateFields(arg1:string,arg2:string):Promise<Array<backend.F
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
+export function GetEpicTree(arg1:string,arg2:issuerepo.TreeQuery):Promise<issuerepo.Tree>;
+
 export function GetIssueDetail(arg1:string,arg2:string):Promise<backend.IssueDetail>;
 
 export function GetLinkTypes(arg1:string):Promise<Array<backend.LinkType>>;
@@ -48,6 +50,8 @@ export function Health():Promise<main.HealthInfo>;
 export function ImportIssues(arg1:string,arg2:string,arg3:boolean,arg4:string,arg5:importer.Mapping,arg6:boolean):Promise<importer.Result>;
 
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
+
+export function ListEpics(arg1:string):Promise<Array<backend.Issue>>;
 
 export function ListIssues(arg1:string,arg2:issuerepo.IssueQuery):Promise<issuerepo.IssuePage>;
 

@@ -58,6 +58,15 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 		case r.URL.Path == "/rest/api/2/issue/createmeta":
 			f.searches = append(f.searches, "createmeta "+r.URL.RawQuery)
+			if r.URL.Query().Get("issuetypeNames") == "Epic" {
+				_, _ = w.Write([]byte(`{"projects":[{"key":"PLAT","issuetypes":[{"name":"Epic","fields":{
+					"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},
+					"project":{"required":true,"name":"Project","schema":{"type":"project"}},
+					"issuetype":{"required":true,"name":"Issue Type","schema":{"type":"issuetype"}},
+					"customfield_10011":{"required":true,"name":"Epic Name","schema":{"type":"string"}}
+				}}]}]}`))
+				return
+			}
 			_, _ = w.Write([]byte(`{"projects":[{"key":"PLAT","issuetypes":[{"name":"Bug","fields":{
 				"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},
 				"project":{"required":true,"name":"Project","schema":{"type":"project"}},
@@ -90,6 +99,8 @@ func newBackend(t *testing.T, fields string) (*jirabackend.Backend, *fakeJira) {
 const twoFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true}]`
 
 const threeFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true}]`
+
+const fourFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true},{"id":"customfield_10011","name":"Epic Name","custom":true}]`
 
 func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	b, f := newBackend(t, twoFields)

@@ -26,11 +26,12 @@ type fieldIDs struct {
 	Points   string
 	EpicLink string
 	Rank     string
+	EpicName string
 }
 
 func (f fieldIDs) list() []string {
 	var out []string
-	for _, id := range []string{f.Sprint, f.Points, f.EpicLink, f.Rank} {
+	for _, id := range []string{f.Sprint, f.Points, f.EpicLink, f.Rank, f.EpicName} {
 		if id != "" {
 			out = append(out, id)
 		}
