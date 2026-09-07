@@ -242,3 +242,39 @@ Record each result, fix what fails, rerun only what failed, and report each fail
 Sprint start and complete, and moving several cards to a sprint at once, both in **3c**, which follows this plan directly and lands before Phase 4 rather than at some unnamed later date: sprint planning is where multi-select earns its keep, and it is the same surface that starts and completes a sprint. Also deferred: the board's own quick filters and swimlane rules, dragging between boards, and dragging an epic.
 
 Not deferred any more: warning about an impossible drop before Commit. It was deferred in the first draft of this plan as a transitions cache, which would have cost a request per card on every sync; Decision 8 gets the same answer from one request per drop, and only when the app is online.
+
+---
+
+## Review report
+
+Run 2026-09-08 on branch `feat/phase-3b-board-writes`, three phases, each an independent voice that had not seen the others, with every claim checked against the code before it was adopted. Codex is not installed, so every voice ran as a Claude subagent and each phase is single-voice.
+
+### What the review changed, worst first
+
+**A transition into Done needs a resolution, and the plan could not send one.** Most Data Center workflows put a resolution screen on the way into Done, so a push carrying only a transition id gets a 400 from every one of them. The spec asked for `?expand=transitions.fields` and the plan then never used it, `DoTransition` had no parameter to carry a field, and the demo backend cannot reproduce the failure, so this would have passed every offline test and failed on the first real board. The transition now reads its own required fields, sends a resolution when that is all that is wanted, and refuses with the field named when more is.
+
+**The three new entity types would have broken the edits that already work.** `Commit` sorts every row that is not a link and not a create into the edits pass, so a journaled transition would reach `commitEdit`, be turned into a Jira field, and fail with "field statusId cannot be sent to Jira", taking the issue's real edits down with it and holding the key back as a conflict off a board row's base version. Naming the three types in `Commit` and `regroupEdits` is now the first thing Task 3 does.
+
+**A refused rank would have been recorded as a success.** The Agile bulk endpoints answer 207 Multi-Status with the rejections inside the body, and the client's write helper only fails at 300 and above. The journal row would have been deleted for a move Jira never made.
+
+**The rank pass had no board to derive an order from.** The engine holds a backend and the issue repository; `Commit` knows nothing about boards. The rank row now carries its board id and the committer takes a `BoardOrder` interface, the same shape `boardrepo` already uses to avoid importing `issuerepo`.
+
+**A card moved into the sprint being viewed could never be drawn.** The cards of a sprint view come from that sprint's membership rows, so a card moved in was not in the list and no placing logic could have saved it. The pending moves' keys are now unioned in before the cards are read.
+
+**Three ways a sync or a rekey silently undid a move.** `reapplyPending` replays only field edits after a full sync, so the card would go back to its old column while the journal still said it moved. `Rekey` repoints only `parentKey`, so a rank against a draft neighbour would push a temporary key to Jira, the same bug Phase 2 fixed for parents. And a discard would write a stale value over a fresher remote.
+
+**The keyboard model would have moved the wrong card.** Focus in this board is a slot, `lane-col-index`, not a card: after a move the focused id names a slot now holding someone else, so a second Ctrl and Right moves that card instead. Enter and Space were both already taken by selection, and the column stepper deliberately skips empty columns, which for a move would teleport a card past the one the user was aiming at.
+
+**A card that will never land looked exactly like one about to land.** Both wore the same pending dot, and the failure lived only in a modal. `Failure` could not have supported the undo the plan promised either: it is `{key, error}`, and one card can fail a transition and drop a rank in the same commit.
+
+### Rejected, with the reason
+
+Pushing board moves straight to Jira when online, which is what most tools do and would answer in a second rather than at Commit. It forks TAM's model: every other write is journaled, and a board that pushed on drop would be the one surface where Discard means nothing and the pending count lies. Verifying the drop against Jira in the background buys most of the same benefit without the fork.
+
+### Carried into 3c rather than 3b
+
+Moving several cards to a sprint at once. Sprint planning is where multi-select earns its keep, and 3c is the plan that starts and completes sprints; 3b moves one card at a time.
+
+### Known limits, written down rather than discovered later
+
+An issue that belongs to a closed sprint and an active one collapses to a single `sprint_id` in the cache, so the sprint conflict check sees one of them. Two hundred pending moves is roughly a thousand requests with no progress bar and no cancellation; sprint moves batch by target, which is the largest part of it, and the rest waits for a Commit that reports progress.
