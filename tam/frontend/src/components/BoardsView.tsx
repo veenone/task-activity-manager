@@ -153,6 +153,7 @@ export function BoardsView() {
             view={view}
             unavailable={!!unavailable.data}
             hasBoards={boardList.length > 0}
+            hasSprint={!!effectiveSprintId}
             swimlane={swimlane}
             selectedKey={selectedKey}
             focusId={focus}

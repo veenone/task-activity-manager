@@ -12,6 +12,10 @@ interface Props {
   // sync would fill.
   unavailable: boolean;
   hasBoards: boolean;
+  // hasSprint says a sprint is in scope. A kanban board has none, and
+  // neither does a scrum board with no open sprint, so the empty state
+  // must not call the board's own list a sprint.
+  hasSprint: boolean;
   swimlane: Swimlane;
   selectedKey: string;
   focusId: string;
@@ -27,7 +31,7 @@ interface Props {
 // board. Each state says what is missing and, where a sync would fix it,
 // offers one.
 export function BoardBody({
-  boards, view, unavailable, hasBoards, swimlane, selectedKey, focusId, canSync,
+  boards, view, unavailable, hasBoards, hasSprint, swimlane, selectedKey, focusId, canSync,
   onSync, onSelect, onFocusCard, onKeyDown,
 }: Props) {
   if (boards.isError) {
@@ -71,22 +75,31 @@ export function BoardBody({
       </p>
     );
   }
+  // A board's row and its columns are written in one transaction, so no
+  // columns is Jira's own answer rather than a half-written board.
   if (data.columns.length === 0) {
     return (
       <div className="pending-banner pending-banner-warn">
-        <p>This board's configuration could not be read, so it has no columns.</p>
+        <p>Jira reports no columns for this board, so there is nothing to draw.</p>
       </div>
     );
   }
 
   const cards = data.lanes.reduce((sum, lane) => sum + lane.count, 0);
+  // The cache is all the empty state knows about: a key with no cached row
+  // may be in another project, or simply not synced yet, and saying which
+  // would be a guess.
+  const nothing = hasSprint ? "No cards in this sprint" : "No cards on this board";
+  const nothingSynced = hasSprint
+    ? "No cards in this sprint have been synced."
+    : "No cards on this board have been synced.";
   return (
     <>
       {cards === 0 ? (
         <p className="muted">
           {data.notSynced > 0
-            ? `No cards in this sprint have been synced. ${data.notSynced} sit outside this project.`
-            : "No cards in this sprint"}
+            ? `${nothingSynced} ${data.notSynced} ${data.notSynced === 1 ? "card is" : "cards are"} on it but not in this cache.`
+            : nothing}
         </p>
       ) : (
         <BoardGrid

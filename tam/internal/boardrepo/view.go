@@ -121,8 +121,9 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 		return BoardView{}, err
 	}
 	if len(cols) == 0 {
-		// A board with no cached configuration has no shape to draw yet.
-		// That is a board waiting for its first sync, not a failure.
+		// The board's row and its columns are written in one transaction,
+		// so no columns is what Jira's configuration answered with, not a
+		// board caught half written. There is no shape to draw either way.
 		return view, nil
 	}
 	for _, c := range cols {

@@ -1156,7 +1156,9 @@
 }
 
 /* ===== Board toolbar, mirrored from XTM's App.css ===== */
-/* Only the member table scrolls; the pager stays pinned beneath it. */
+/* Only the board itself scrolls, in both directions: its column strip is
+   wider than the pane and its cells are taller. The toolbar above it and
+   the summary and notes below it stay where they are. */
 .board-scroll {
   flex: 1;
   min-height: 0;
@@ -1179,11 +1181,6 @@
 .board-picker select {
   min-width: 280px;
 }
-.board-counts {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
 .board-head-actions {
   display: flex;
   gap: 6px;
@@ -1198,7 +1195,6 @@
 /* Column heads and the cells under them take their width from one custom
    property, so the two rows cannot drift apart. */
 .board-columns { --board-col-w: 320px; display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
-.board-column { flex: 0 0 var(--board-col-w); display: flex; flex-direction: column; gap: 8px; }
 .board-cell, .board-column-head { width: var(--board-col-w); }
 .board-column-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
 .board-column-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }

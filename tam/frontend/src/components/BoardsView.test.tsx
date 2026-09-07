@@ -412,10 +412,10 @@ describe("BoardsView states", () => {
     expect(screen.queryByText(/the sync has not run/)).not.toBeInTheDocument();
   });
 
-  it("warns when the board's configuration gave it no columns", async () => {
+  it("warns when Jira gave the board no columns", async () => {
     vi.mocked(api.GetBoard).mockResolvedValue(board({ columns: [], lanes: [] }));
     renderView();
-    const banner = await screen.findByText("This board's configuration could not be read, so it has no columns.");
+    const banner = await screen.findByText("Jira reports no columns for this board, so there is nothing to draw.");
     expect(banner.closest(".pending-banner-warn")).toBeInTheDocument();
   });
 
@@ -432,11 +432,21 @@ describe("BoardsView states", () => {
     expect(await screen.findByText("No cards in this sprint")).toBeInTheDocument();
   });
 
-  it("does not call an unsynced sprint empty", async () => {
+  it("names no sprint on a board that has none", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetBoard).mockResolvedValue(board({ columns: COLUMNS, lanes: [] }));
+    renderView();
+    await screen.findByText("No cards in this sprint");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Board" }), "2");
+    expect(await screen.findByText("No cards on this board")).toBeInTheDocument();
+    expect(screen.queryByText(/this sprint/)).not.toBeInTheDocument();
+  });
+
+  it("says the uncached cards are uncached, not that they are elsewhere", async () => {
     vi.mocked(api.GetBoard).mockResolvedValue(board({ columns: COLUMNS, lanes: [], notSynced: 14 }));
     renderView();
     expect(
-      await screen.findByText("No cards in this sprint have been synced. 14 sit outside this project."),
+      await screen.findByText("No cards in this sprint have been synced. 14 cards are on it but not in this cache."),
     ).toBeInTheDocument();
     expect(screen.queryByText("No cards in this sprint")).not.toBeInTheDocument();
   });
