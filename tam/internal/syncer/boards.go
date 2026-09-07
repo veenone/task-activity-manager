@@ -61,12 +61,13 @@ type boardParts struct {
 //
 // Every board is read in full before anything is written for it: its
 // columns, its sprints, its own issue list, and its active and future
-// sprints' issue keys. A board whose read fails at any point is recorded
-// in Dropped with its name and one readable line of the reason, and
-// whatever that board held before this run is left exactly as it was. Once
-// every read for a board has succeeded, ReplaceBoard writes all of it in
-// one transaction, so a reader never catches a board with some of its
-// parts replaced and the rest still old.
+// sprints' issue keys. A board whose read or write fails at any point is
+// recorded in Dropped with its name and one readable line of the reason,
+// the pass carries on with the next board, and whatever that board held
+// before this run is left exactly as it was. Once every read for a board
+// has succeeded, ReplaceBoard writes all of it in one transaction, so a
+// reader never catches a board with some of its parts replaced and the
+// rest still old.
 //
 // An instance with no Agile API at all answers Boards with ErrNoAgile,
 // which is not a failure: the summary comes back with Unavailable true and
@@ -134,8 +135,12 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 			continue
 		}
 		if err := e.Boards.ReplaceBoard(ctx, profileID, b, parts.columns, parts.sprints, parts.keys); err != nil {
-			sum.Elapsed = elapsed()
-			return sum, err
+			// A write that fails is the same kind of trouble as a read that
+			// fails: this board is dropped with its reason and the pass
+			// carries on, so one bad board never costs every board after
+			// it its sync, and RemoveBoards below still runs.
+			sum.Dropped = append(sum.Dropped, fmt.Sprintf("%s: %s", b.Name, errtext.Line(err)))
+			continue
 		}
 		sum.Boards++
 		sum.Columns += len(parts.columns)

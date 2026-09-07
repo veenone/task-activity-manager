@@ -2,6 +2,7 @@ package syncer_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -21,12 +22,20 @@ import (
 // themselves.
 func newBoardRepos(t *testing.T) (*issuerepo.Repository, *boardrepo.Repository) {
 	t.Helper()
+	repo, boards, _ := newBoardReposWithDB(t)
+	return repo, boards
+}
+
+// newBoardReposWithDB is newBoardRepos with the handle beside it, for a
+// test that has to reach past the repositories into the file itself.
+func newBoardReposWithDB(t *testing.T) (*issuerepo.Repository, *boardrepo.Repository, *sql.DB) {
+	t.Helper()
 	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return issuerepo.New(db.DB()), boardrepo.New(db.DB())
+	return issuerepo.New(db.DB()), boardrepo.New(db.DB()), db.DB()
 }
 
 func scrumAndKanban() []backend.Board {
@@ -281,4 +290,75 @@ func loginPageBody() string {
 		"</body>",
 		"</html>",
 	}, "\n")
+}
+
+// failBoardWrites makes every write of one board's row fail, which is how a
+// disk that filled up, or a file another process has locked, reaches the
+// pass: the board reads fine and ReplaceBoard is what cannot land.
+func failBoardWrites(t *testing.T, db *sql.DB, name string) {
+	t.Helper()
+	for _, stmt := range []string{
+		`CREATE TRIGGER board_insert_fails BEFORE INSERT ON board WHEN NEW.name = ?
+			BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END`,
+		`CREATE TRIGGER board_update_fails BEFORE UPDATE ON board WHEN NEW.name = ?
+			BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END`,
+	} {
+		if _, err := db.Exec(strings.Replace(stmt, "?", "'"+name+"'", 1)); err != nil {
+			t.Fatalf("arm the failing write: %v", err)
+		}
+	}
+}
+
+func TestSyncBoardsWriteFailureDropsOneBoardAndFinishesThePass(t *testing.T) {
+	repo, boards, db := newBoardReposWithDB(t)
+	ctx := context.Background()
+	stale := backend.Board{ID: 3, Name: "PLAT Retired", Type: backend.BoardTypeKanban}
+	fb := &fake{
+		boards: append(scrumAndKanban(), stale),
+		columns: map[int][]backend.BoardColumn{
+			1: {{Name: "To Do", StatusIDs: []string{"1"}}},
+			2: {{Name: "To Do", StatusIDs: []string{"1"}}},
+			3: {{Name: "To Do", StatusIDs: []string{"1"}}},
+		},
+		sprints:   map[int][]backend.Sprint{1: {}, 2: {}, 3: {}},
+		issueKeys: map[int]map[string][]string{1: {"": {"PLAT-1"}}, 2: {"": {"PLAT-3"}}, 3: {"": {}}},
+	}
+	e := syncer.New(fb, repo)
+	e.Boards = boards
+	if _, err := e.SyncBoards(ctx, "p1", "PLAT", nil); err != nil {
+		t.Fatalf("seed sync: %v", err)
+	}
+
+	// Board 1 can no longer be written, and Jira has stopped returning
+	// board 3. The pass has to drop board 1, land board 2 (which comes
+	// after it), and still reach the removal step.
+	failBoardWrites(t, db, "PLAT Scrum")
+	fb.boards = scrumAndKanban()
+	sum, err := e.SyncBoards(ctx, "p1", "PLAT", nil)
+	if err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+	if len(sum.Dropped) != 1 || !strings.HasPrefix(sum.Dropped[0], "PLAT Scrum: ") {
+		t.Fatalf("dropped = %v, want the board whose write failed, named", sum.Dropped)
+	}
+	if sum.Boards != 1 {
+		t.Errorf("boards landed = %d, want board 2 to have synced after board 1 failed", sum.Boards)
+	}
+	got, err := boards.ListBoards(ctx, "p1")
+	if err != nil {
+		t.Fatalf("list boards: %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("boards = %+v, want board 3 removed and the other two kept", got)
+	}
+	for _, b := range got {
+		if b.ID == 3 {
+			t.Error("board 3 is gone from Jira and RemoveBoards never ran")
+		}
+	}
+	// Board 1 keeps the copy the seed sync gave it: nothing was written
+	// for it this run.
+	if cols, _ := boards.Columns(ctx, "p1", 1); len(cols) != 1 {
+		t.Errorf("board 1 columns = %+v, want the seed copy kept", cols)
+	}
 }

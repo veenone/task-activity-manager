@@ -170,3 +170,28 @@ func TestReplaceBoardKeepsEachBoardsCopyOfASharedSprint(t *testing.T) {
 		}
 	}
 }
+
+// TestReplaceBoardWritesADuplicatedKeyOnce covers the other duplicate the
+// key made fatal: a startAt walk over a board whose ranks move mid-walk
+// hands the same issue back on two pages, and one collision used to abort
+// the board's whole write.
+func TestReplaceBoardWritesADuplicatedKeyOnce(t *testing.T) {
+	r, db := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	keys := map[string][]string{"": {"PLAT-1", "PLAT-2", "PLAT-1", "PLAT-3"}}
+
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), nil, keys); err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	got := boardKeys(t, db, "p1", 1, "")
+	want := []string{"PLAT-1", "PLAT-2", "PLAT-3"}
+	if len(got) != len(want) {
+		t.Fatalf("membership = %v, want the repeat written once", got)
+	}
+	for i, key := range want {
+		if got[i] != key {
+			t.Errorf("membership = %v, want %v in the order the pages arrived", got, want)
+		}
+	}
+}

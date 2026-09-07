@@ -88,14 +88,27 @@ func writeSprints(ctx context.Context, tx *sql.Tx, profileID string, boardID int
 	return nil
 }
 
-// writeIssueKeys inserts one scope's membership in board order. Clearing
-// what was there is the caller's: UpsertIssueKeys drops the single scope,
-// ReplaceBoard drops the whole board first.
+// writeIssueKeys inserts one scope's membership in board order, keeping the
+// first sighting of a key and skipping any repeat. Clearing what was there
+// is the caller's: ReplaceBoard drops the whole board first.
+//
+// A repeat is ordinary rather than exceptional: the board endpoints are
+// walked with startAt, and a card whose rank changes between two pages
+// comes back on both. The scope's key is (profile_id, board_id, sprint_id,
+// key), so inserting the repeat would abort the board's whole write over a
+// card that is already there.
 func writeIssueKeys(ctx context.Context, tx *sql.Tx, profileID string, boardID int, sprintID string, keys []string) error {
-	for i, key := range keys {
-		if _, err := tx.ExecContext(ctx, insertIssueKeySQL, profileID, boardID, sprintID, key, i); err != nil {
+	seen := make(map[string]bool, len(keys))
+	position := 0
+	for _, key := range keys {
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		if _, err := tx.ExecContext(ctx, insertIssueKeySQL, profileID, boardID, sprintID, key, position); err != nil {
 			return fmt.Errorf("insert board key %s: %w", key, err)
 		}
+		position++
 	}
 	return nil
 }
