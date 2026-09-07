@@ -2,8 +2,8 @@
 // is not a profile, connection, or global setting, because those live in the
 // shared profiles.db. Version 1 carries no app tables. Version 2 adds the
 // issue tables, version 3 the shared journal tables, version 4 the
-// cached Jira user list, and version 5 the board tables and the issue's
-// status id.
+// cached Jira user list, version 5 the board tables and the issue's status
+// id, and version 6 re-keys the sprint table by board.
 package tamstore
 
 import (
@@ -21,10 +21,12 @@ import (
 // them up on its next open. Version 5 adds the board tables and the
 // issue's status id, and that one needs the migration below, because
 // CREATE TABLE IF NOT EXISTS cannot add a column to a table that is
-// already there.
+// already there. Version 6 re-keys sprint by board, which needs a
+// migration for the same reason: CREATE TABLE IF NOT EXISTS leaves a table
+// that already exists exactly as it is, primary key included.
 var Schema = store.Schema{
-	Version: 5,
-	Base:    baseDDL + journal.DDL,
+	Version: 6,
+	Base:    baseDDL + sprintDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -49,6 +51,25 @@ var Schema = store.Schema{
 			// stays the way application code does it; a migration has no
 			// profile in hand, so it clears them all in one statement.
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
+	}, {
+		Version: 6,
+		// sprint was keyed (profile_id, id) through version 5, but the
+		// boards sync clears and writes sprints one board at a time and
+		// Jira Data Center hands the same sprint to every board whose
+		// filter reaches it. Two scrum boards over one project therefore
+		// collided on the second board's insert and took the whole pass
+		// down. SQLite cannot change a primary key in place, and the table
+		// is a cache the next sync refills with nothing joining to its
+		// rows, so dropping it costs one sync and nothing else. A database
+		// created fresh at version 6 gets the new key from baseDDL and
+		// drops an empty table here.
+		Apply: func(db *sql.DB) error {
+			if _, err := db.Exec(`DROP TABLE IF EXISTS sprint`); err != nil {
+				return err
+			}
+			_, err := db.Exec(sprintDDL)
 			return err
 		},
 	}},
@@ -137,7 +158,13 @@ CREATE TABLE IF NOT EXISTS board_issue (
 	key        TEXT NOT NULL,
 	position   INTEGER NOT NULL,
 	PRIMARY KEY (profile_id, board_id, sprint_id, key)
-);
+);`
+
+// sprintDDL is its own statement because the version 6 migration recreates
+// the table with it, and a second copy of the columns is how the two would
+// drift apart. The key carries board_id: one Jira sprint belongs to every
+// board whose filter reaches it, and each board caches its own copy.
+const sprintDDL = `
 CREATE TABLE IF NOT EXISTS sprint (
 	profile_id TEXT NOT NULL,
 	id         INTEGER NOT NULL,
@@ -146,7 +173,8 @@ CREATE TABLE IF NOT EXISTS sprint (
 	state      TEXT NOT NULL DEFAULT '',
 	start_date TEXT NOT NULL DEFAULT '',
 	end_date   TEXT NOT NULL DEFAULT '',
-	PRIMARY KEY (profile_id, id));`
+	PRIMARY KEY (profile_id, board_id, id)
+);`
 
 const indexDDL = `
 CREATE INDEX IF NOT EXISTS issue_profile_type   ON issue (profile_id, type);

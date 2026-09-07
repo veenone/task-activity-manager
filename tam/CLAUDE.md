@@ -43,6 +43,15 @@ would never get a status id filled in on its own; clearing the watermark
 is what makes the next sync for each profile re-read every issue and fill
 the column in, without purging anything first.**
 
+Schema version 6 re-keys `sprint` from `(profile_id, id)` to
+`(profile_id, board_id, id)`. Jira Data Center hands the same sprint to
+every board whose filter reaches it, and the sync clears and writes
+sprints one board at a time, so two scrum boards over one project used to
+collide on the second board's insert and take the whole pass down. SQLite
+cannot change a primary key in place, so the migration drops the table and
+recreates it: it is a cache the next sync refills, and nothing joins to
+its rows.
+
 `internal/boardrepo` is the store layer over the four tables, beside
 `issuerepo` since boards are their own concern. It never imports
 `issuerepo`: what it needs from the issue cache is the two-method
@@ -382,7 +391,7 @@ until one is entered. A Kiwi profile file is refused.
     app_writes.go        the write methods: edit, create, commit, and conflict resolution
     app_imports.go       the import methods: preview, mapping, and creating drafts from a file
     app_boards.go        the board methods: list boards, list sprints, get a board's view, sync boards
-    internal/tamstore/   TAM's own SQLite file (schema version 5: issue (with status_id), issue_link,
+    internal/tamstore/   TAM's own SQLite file (schema version 6: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
                           sprint, plus the shared journal tables pending_change and audit_log)
     internal/backend/    IssueBackend and BoardBackend seams and DTOs; backend/jira on core/jira,

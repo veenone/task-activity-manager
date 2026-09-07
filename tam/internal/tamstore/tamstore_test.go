@@ -1,6 +1,7 @@
 package tamstore_test
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -243,5 +244,96 @@ func TestVersionFiveMigrationIsIdempotent(t *testing.T) {
 			t.Fatalf("run %d: status_id = %q, last_synced = %q; want both empty", i+1, statusID, lastSynced)
 		}
 		rewindToVersionThree(t, path)
+	}
+}
+
+// oldSprintDDL is the sprint table as version 4 created it, keyed by the
+// sprint id alone. A developer database built from that version still
+// carries it, which is what the version 5 migration is for.
+const oldSprintDDL = `CREATE TABLE sprint (
+	profile_id TEXT NOT NULL,
+	id         INTEGER NOT NULL,
+	board_id   INTEGER NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	state      TEXT NOT NULL DEFAULT '',
+	start_date TEXT NOT NULL DEFAULT '',
+	end_date   TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, id)
+)`
+
+// openAtVersionFour writes a version 4 database at path: the sprint table
+// with its old key, holding one board's copy of sprint 12.
+func openAtVersionFour(t *testing.T, path string) {
+	t.Helper()
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE sprint`,
+		oldSprintDDL,
+		`INSERT INTO sprint (profile_id, id, board_id, name, state) VALUES ('p1', 12, 1, 'Sprint 12', 'active')`,
+		`UPDATE meta SET value = '4' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+}
+
+// insertSprintForBoard writes one board's copy of a sprint, the way the
+// boards sync does.
+func insertSprintForBoard(db *sql.DB, boardID int) error {
+	_, err := db.Exec(
+		`INSERT INTO sprint (profile_id, id, board_id, name, state) VALUES ('p1', 12, ?, 'Sprint 12', 'active')`,
+		boardID)
+	return err
+}
+
+func TestVersionFiveMigrationRekeysSprintByBoard(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	openAtVersionFour(t, path)
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+	// The table is a cache: the migration drops what it held, and the next
+	// sync refills it.
+	var rows int
+	if err := db.DB().QueryRow(`SELECT count(*) FROM sprint`).Scan(&rows); err != nil {
+		t.Fatalf("count sprints: %v", err)
+	}
+	if rows != 0 {
+		t.Errorf("sprint rows after the migration = %d, want the cache emptied", rows)
+	}
+	// Two boards sharing sprint 12 is what the old key made impossible.
+	for _, boardID := range []int{1, 2} {
+		if err := insertSprintForBoard(db.DB(), boardID); err != nil {
+			t.Fatalf("board %d's copy of sprint 12: %v", boardID, err)
+		}
+	}
+	if err := insertSprintForBoard(db.DB(), 1); err == nil {
+		t.Error("one board's second copy of the same sprint was accepted; the key still has to hold")
+	}
+}
+
+func TestFreshDatabaseKeysSprintByBoard(t *testing.T) {
+	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	for _, boardID := range []int{1, 2} {
+		if err := insertSprintForBoard(db.DB(), boardID); err != nil {
+			t.Fatalf("board %d's copy of sprint 12: %v", boardID, err)
+		}
 	}
 }

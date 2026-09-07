@@ -142,3 +142,31 @@ func TestReplaceBoardForgetsTheMembershipOfASprintItNoLongerCarries(t *testing.T
 		t.Fatalf("sprints = %+v, %v, want only sprint 12 left", sp, err)
 	}
 }
+
+// TestReplaceBoardKeepsEachBoardsCopyOfASharedSprint covers the ordinary
+// configuration that used to take the whole boards pass down: two scrum
+// boards over one project filter, so Jira hands both of them sprint 12.
+// Sprints are cleared and written a board at a time, so the second board's
+// insert collided with the first while the key was (profile_id, id).
+func TestReplaceBoardKeepsEachBoardsCopyOfASharedSprint(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	shared := backend.Sprint{ID: 12, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z"}
+
+	for _, b := range sampleBoards() {
+		sprints := []backend.Sprint{{ID: shared.ID, BoardID: b.ID, Name: shared.Name, State: shared.State, StartDate: shared.StartDate}}
+		if err := r.ReplaceBoard(ctx, "p1", b, oneColumn(), sprints, nil); err != nil {
+			t.Fatalf("replace board %d: %v", b.ID, err)
+		}
+	}
+
+	for _, b := range sampleBoards() {
+		got, err := r.ListSprints(ctx, "p1", b.ID)
+		if err != nil {
+			t.Fatalf("board %d sprints: %v", b.ID, err)
+		}
+		if len(got) != 1 || got[0].ID != 12 || got[0].BoardID != b.ID {
+			t.Errorf("board %d sprints = %+v, want its own copy of sprint 12", b.ID, got)
+		}
+	}
+}
