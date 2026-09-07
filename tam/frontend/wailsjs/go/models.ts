@@ -59,6 +59,7 @@ export namespace backend {
 	    type: string;
 	    summary: string;
 	    status: string;
+	    statusId: string;
 	    assignee: string;
 	    reporter: string;
 	    priority: string;
@@ -85,6 +86,7 @@ export namespace backend {
 	        this.type = source["type"];
 	        this.summary = source["summary"];
 	        this.status = source["status"];
+	        this.statusId = source["statusId"];
 	        this.assignee = source["assignee"];
 	        this.reporter = source["reporter"];
 	        this.priority = source["priority"];
@@ -237,6 +239,153 @@ export namespace backend {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
+	    }
+	}
+
+}
+
+export namespace boardrepo {
+	
+	export class Board {
+	    id: number;
+	    name: string;
+	    type: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Board(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	    }
+	}
+	export class LaneView {
+	    id: string;
+	    label: string;
+	    count: number;
+	    cells: backend.Issue[][];
+	    overflow: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new LaneView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.count = source["count"];
+	        this.cells = this.convertValues(source["cells"], backend.Issue);
+	        this.overflow = source["overflow"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ColumnView {
+	    name: string;
+	    total: number;
+	    points: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ColumnView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.total = source["total"];
+	        this.points = source["points"];
+	    }
+	}
+	export class BoardView {
+	    boardId: number;
+	    sprintId: string;
+	    swimlane: string;
+	    columns: ColumnView[];
+	    lanes: LaneView[];
+	    unmapped: number;
+	    unmappedStatuses: string[];
+	    notSynced: number;
+	    capped: boolean;
+	    needsStatusSync: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new BoardView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.boardId = source["boardId"];
+	        this.sprintId = source["sprintId"];
+	        this.swimlane = source["swimlane"];
+	        this.columns = this.convertValues(source["columns"], ColumnView);
+	        this.lanes = this.convertValues(source["lanes"], LaneView);
+	        this.unmapped = source["unmapped"];
+	        this.unmappedStatuses = source["unmappedStatuses"];
+	        this.notSynced = source["notSynced"];
+	        this.capped = source["capped"];
+	        this.needsStatusSync = source["needsStatusSync"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	export class Sprint {
+	    id: number;
+	    boardId: number;
+	    name: string;
+	    state: string;
+	    startDate: string;
+	    endDate: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Sprint(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.boardId = source["boardId"];
+	        this.name = source["name"];
+	        this.state = source["state"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
 	    }
 	}
 
@@ -890,12 +1039,37 @@ export namespace settings {
 
 export namespace syncer {
 	
+	export class BoardSummary {
+	    boards: number;
+	    columns: number;
+	    sprints: number;
+	    cards: number;
+	    dropped: string[];
+	    unavailable: boolean;
+	    elapsed: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BoardSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.boards = source["boards"];
+	        this.columns = source["columns"];
+	        this.sprints = source["sprints"];
+	        this.cards = source["cards"];
+	        this.dropped = source["dropped"];
+	        this.unavailable = source["unavailable"];
+	        this.elapsed = source["elapsed"];
+	    }
+	}
 	export class Summary {
 	    fetched: number;
 	    upserted: number;
 	    skipped: number;
 	    full: boolean;
 	    elapsed: string;
+	    boards?: BoardSummary;
 	
 	    static createFrom(source: any = {}) {
 	        return new Summary(source);
@@ -908,7 +1082,26 @@ export namespace syncer {
 	        this.skipped = source["skipped"];
 	        this.full = source["full"];
 	        this.elapsed = source["elapsed"];
+	        this.boards = this.convertValues(source["boards"], BoardSummary);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

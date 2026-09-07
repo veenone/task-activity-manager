@@ -46,6 +46,10 @@ export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
 }
 
+export function GetBoard(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetBoard'](arg1, arg2, arg3, arg4);
+}
+
 export function GetCreateFields(arg1, arg2) {
   return window['go']['main']['App']['GetCreateFields'](arg1, arg2);
 }
@@ -96,6 +100,14 @@ export function ImportProfile() {
 
 export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
+}
+
+export function ListBoardSprints(arg1, arg2) {
+  return window['go']['main']['App']['ListBoardSprints'](arg1, arg2);
+}
+
+export function ListBoards(arg1) {
+  return window['go']['main']['App']['ListBoards'](arg1);
 }
 
 export function ListEpics(arg1) {
@@ -164,6 +176,10 @@ export function SetProfileSetting(arg1, arg2, arg3) {
 
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
+}
+
+export function SyncBoards(arg1) {
+  return window['go']['main']['App']['SyncBoards'](arg1);
 }
 
 export function SyncIssues(arg1, arg2) {

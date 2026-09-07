@@ -139,7 +139,12 @@ func (a *App) SyncIssues(profileID string, full bool) (syncer.Summary, error) {
 	if err != nil {
 		return syncer.Summary{}, err
 	}
-	sum, err := syncer.New(b, a.repo).Sync(a.ctx, p.ID, p.ProjectKey, p.ScopeJQL, full, a.emitProgress)
+	eng := syncer.New(b, a.repo)
+	eng.Boards = a.boards
+	sum, err := eng.Sync(a.ctx, p.ID, p.ProjectKey, p.ScopeJQL, full, a.emitProgress)
+	if sum.Boards != nil && sum.Boards.Dropped == nil {
+		sum.Boards.Dropped = []string{}
+	}
 	if err != nil {
 		log.Printf("tam: sync %s (%s) failed: %v", p.Name, p.ProjectKey, err)
 		return sum, err

@@ -6,9 +6,11 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
 )
 
@@ -29,6 +31,11 @@ type Summary struct {
 	Skipped  int    `json:"skipped"`
 	Full     bool   `json:"full"`
 	Elapsed  string `json:"elapsed"`
+	// Boards is the boards pass's own summary. It is nil when the engine
+	// has no Boards repository, which is what "the pass did not run"
+	// means; a failed pass still fills it in, since the issues it landed
+	// are real even when the boards afterward were not.
+	Boards *BoardSummary `json:"boards,omitempty"`
 }
 
 // PartialSyncError says a sync stopped after some pages had already been
@@ -53,6 +60,11 @@ type Engine struct {
 	PageSize int
 	// Now is the clock, replaceable in tests.
 	Now func() time.Time
+	// Boards is the board repository the boards pass writes into. New
+	// leaves it nil, and a nil Boards means the pass does not run: every
+	// issue-only test builds an engine without touching it, and a second
+	// constructor would only multiply with the next optional dependency.
+	Boards *boardrepo.Repository
 }
 
 // New builds an engine with the default page size and clock.
@@ -121,6 +133,20 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 	if err := e.repo.SetSyncState(ctx, profileID, next); err != nil {
 		return e.fail(ctx, profileID, state, pages, sum, err, emit)
 	}
+
+	// The boards pass runs after the issues have landed and their
+	// watermark is written, so a boards failure never costs the sync its
+	// last_synced and never refetches the world next time. Its own
+	// failure does not fail this sync: it is logged and carried in the
+	// summary instead.
+	if e.Boards != nil {
+		bsum, err := e.SyncBoards(ctx, profileID, projectKey, emit)
+		if err != nil {
+			log.Printf("tam: sync boards for %s: %v", profileID, err)
+		}
+		sum.Boards = &bsum
+	}
+
 	sum.Elapsed = e.Now().Sub(start).Round(time.Millisecond).String()
 	emit(Progress{Phase: "issues", Fetched: sum.Fetched, Total: total, Done: true, Stage: "Done"})
 	return sum, nil

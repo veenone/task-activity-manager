@@ -22,6 +22,12 @@ import (
 	"agile-suite/tam/internal/tamstore"
 )
 
+// The issue repository satisfies boardrepo's read seam: this is the one
+// place that imports both packages, so it is where the check belongs.
+// Drift here would surface as the boards view compiling against a
+// different repository than the one app_boards.go actually passes it.
+var _ boardrepo.IssueSource = (*issuerepo.Repository)(nil)
+
 // App is the backend bound to the React frontend. Every exported method here
 // is callable from JavaScript, so it only validates and delegates; the rules
 // live in internal/.
