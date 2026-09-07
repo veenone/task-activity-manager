@@ -130,6 +130,49 @@ describe("PendingChangesModal", () => {
     expect(within(dialog).getByText("PLAT-409: PUT failed: 400 priority is invalid")).toBeInTheDocument();
     expect(within(dialog).getByText("TAM-NEW-1: Severity is required")).toBeInTheDocument();
     expect(within(dialog).getAllByRole("group")).toHaveLength(2);
+    expect(within(dialog).getByText("Commit again to retry the failures.")).toBeInTheDocument();
+  });
+
+  it("shows the retry line only when a commit reported failures", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(rows);
+    vi.mocked(api.CommitPendingChanges)
+      .mockResolvedValueOnce({
+        committed: ["PLAT-409"], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501" }], linked: [], conflicts: [], failures: [], remaining: 0,
+      })
+      .mockResolvedValueOnce({
+        committed: [], created: [], linked: [], conflicts: [],
+        failures: [{ key: "PLAT-409", error: "PUT failed: 400 priority is invalid" }],
+        remaining: 1,
+      });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501).");
+    expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
+
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    expect(await within(dialog).findByText("Commit again to retry the failures.")).toBeInTheDocument();
+  });
+
+  it("orders a conflict group before a draft group", async () => {
+    const user = userEvent.setup();
+    const draftAndEditRows: PendingChange[] = [
+      { id: 6, entityType: "issue", entityKey: "PLAT-412", field: "storyPoints", beforeVal: "5", afterVal: "8", baseVersion: "v1", createdAt: "2026-09-06T09:00:00Z" },
+      rows[0],
+    ];
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(draftAndEditRows);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], linked: [],
+      conflicts: [{ key: "PLAT-412", summary: "Promo", remoteVersion: "v2", fields: [{ field: "storyPoints", base: "5", mine: "8", remote: "13" }] }],
+      failures: [], remaining: 2,
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await within(dialog).findByText("Last commit: nothing pushed, 1 held back.");
+    const cards = within(dialog).getAllByRole("group");
+    expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["PLAT-412", "TAM-NEW-1"]);
   });
 
   it("shows a held issue with base, mine, and remote and resolves it either way", async () => {
