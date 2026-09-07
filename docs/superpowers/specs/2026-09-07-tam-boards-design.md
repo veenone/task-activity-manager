@@ -38,20 +38,22 @@ Transport only, four calls, each returning Jira's shape with fields left raw whe
 
 Jira's paging on these endpoints uses `startAt`, `maxResults`, and `isLast`; the helper honours `isLast` and falls back to a short page.
 
-## 4. TAM's store, schema version 4
+## 4. TAM's store, schema versions 5 and 6
 
-Four tables, all keyed by profile:
+Version 4 on main is the cached Jira user list behind the assignee picker, so the board tables land at version 5. Four tables, all keyed by profile:
 
 ```
 board(profile_id, id, name, type, synced_at, PRIMARY KEY (profile_id, id))
 board_column(profile_id, board_id, position, name, status_ids, PRIMARY KEY (profile_id, board_id, position))
 board_issue(profile_id, board_id, sprint_id, key, position, PRIMARY KEY (profile_id, board_id, sprint_id, key))
-sprint(profile_id, id, board_id, name, state, start_date, end_date, PRIMARY KEY (profile_id, id))
+sprint(profile_id, id, board_id, name, state, start_date, end_date, PRIMARY KEY (profile_id, board_id, id))
 ```
 
 `status_ids` is a JSON array of strings, the same shape the configuration returns. `board_issue` holds one board's membership per scope, `sprint_id` empty for the board's own list and a sprint id otherwise; a sync replaces a board's rows whole, so a card that left a board or sprint since the last sync does not linger.
 
-Version 4 also adds a `status_id` column to `issue`, which is how a card is matched to a column. `CREATE TABLE IF NOT EXISTS` cannot add a column to a table that already exists, so this is the plan's first store migration: it adds the column with `store.AddColumnIfMissing` (a no-op on a database created fresh at version 4, which already has the column from the base DDL) and then clears every profile's sync watermark with `UPDATE sync_state SET last_synced = ''`. That second step exists because an incremental sync only re-reads issues Jira reports changed since the watermark, so a row cached before version 4 would never get a status id filled in on its own; clearing the watermark makes each profile's next sync re-read every issue for this column, without purging anything first.
+Version 5 also adds a `status_id` column to `issue`, which is how a card is matched to a column. `CREATE TABLE IF NOT EXISTS` cannot add a column to a table that already exists, so this is the plan's first store migration: it adds the column with `store.AddColumnIfMissing` (a no-op on a database created fresh at version 5, which already has the column from the base DDL) and then clears every profile's sync watermark with `UPDATE sync_state SET last_synced = ''`. That second step exists because an incremental sync only re-reads issues Jira reports changed since the watermark, so a row cached before version 5 would never get a status id filled in on its own; clearing the watermark makes each profile's next sync re-read every issue for this column, without purging anything first.
+
+Version 6 re-keys `sprint`. The first cut keyed it `(profile_id, id)`, which reads as obvious until you remember that Jira returns a sprint from every board whose filter reaches it: two scrum boards over one project would collide on the second board's write, and because a write failure ended the pass rather than dropping the board, every board after it went unsynced. The key is now `(profile_id, board_id, id)`, and because a database already at version 5 never re-runs version 5's migration, the fix needed its own version, which drops and recreates the table. Nothing is lost: the sprint table is a cache and the next sync refills it.
 
 `boardrepo` (a new package beside `issuerepo`, since boards are their own concern) owns the four tables: `UpsertBoards`, `UpsertColumns`, `UpsertSprints`, `UpsertIssueKeys`, `ReplaceBoard` (all four writes for one board in a single transaction, the sync pass's own write step), `ListBoards`, `Columns`, `ListSprints` (by board, ordered active, future, closed, then by start date), `RemoveBoards`, and `PurgeProfile` joins the existing purge. The issue table keeps its `sprint_id`, which the Sprint custom field already fills.
 
@@ -65,7 +67,7 @@ ColumnView{Name string, Total int, Points float64}
 LaneView{ID, Label string, Count int, Cells [][]backend.Issue, Overflow []int}
 ```
 
-One lane when the swimlane is none, one per assignee or epic otherwise (an empty value groups under "Unassigned" or "No epic", last). `Cells[i]` holds the issues of column `i` in that lane. A cell caps at `MaxCardsPerCell` (200 cards) and the whole view caps at `MaxCardsPerView` (2,000); past either cap a card is only counted, in `Overflow` and `Capped`, not rendered. An issue whose status is in no column counts into `Unmapped`, and its status name (deduplicated, sorted) into `UnmappedStatuses`; the "Not on the board" note draws that count and those names, not the issues themselves, so nothing disappears silently without naming a number the count on the note can be checked against. `NotSynced` counts the board's keys the issue cache does not hold, which is how a board's filter reaching outside the profile's project is reported rather than silently dropped. `NeedsStatusSync` is true when every cached card carries an empty status id, which is the state right after the version 4 migration and before the sync that fills the column back in; the view tells the user to sync rather than drawing an empty board and blaming them for it. Cards come from the cache with the same `pending` and `draft` flags every other view uses; a draft is matched to the first column that collects any status at all, since Jira has never assigned one a status.
+One lane when the swimlane is none, one per assignee or epic otherwise (an empty value groups under "Unassigned" or "No epic", last). `Cells[i]` holds the issues of column `i` in that lane. A cell caps at `MaxCardsPerCell` (200 cards) and the whole view caps at `MaxCardsPerView` (2,000); past either cap a card is only counted, in `Overflow` and `Capped`, not rendered. An issue whose status is in no column counts into `Unmapped`, and its status name (deduplicated, sorted) into `UnmappedStatuses`; the "Not on the board" note draws that count and those names, not the issues themselves, so nothing disappears silently without naming a number the count on the note can be checked against. `NotSynced` counts the board's keys the issue cache does not hold, which is how a board's filter reaching outside the profile's project is reported rather than silently dropped. `NeedsStatusSync` is true when every cached card carries an empty status id, which is the state right after the version 5 migration and before the sync that fills the column back in; the view tells the user to sync rather than drawing an empty board and blaming them for it. Cards come from the cache with the same `pending` and `draft` flags every other view uses; a draft is matched to the first column that collects any status at all, since Jira has never assigned one a status.
 
 ## 6. Sync
 
