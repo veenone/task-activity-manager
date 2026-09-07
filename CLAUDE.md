@@ -25,13 +25,17 @@ Three remotes hold this repository and all three are equal:
 (github.com/veenone/xray-testcase-manager, XTM's original home) and `gitea`
 (the home Gitea, `achmarah/xray-test-manager`). `origin` pushes to all three,
 so a plain `git push` lands everywhere; `.\scripts\sync-remotes.ps1 -Setup`
-writes that configuration on a fresh clone.
+writes that configuration on a fresh clone (it also points `origin`'s fetch
+URL at task-activity-manager, whichever repository the clone came from).
 
 A pull request merged on GitHub lands on that one remote only. Run
 `.\scripts\sync-remotes.ps1` afterwards: it fast-forwards `main` and tags on
-whichever remotes are behind and stops, without pushing, if two remotes have
-diverged. Feature branches are not synchronised; they are pushed through the
-fan-out and deleted where they were merged.
+whichever remotes are behind. It stops before pushing anything if the `main`
+branches have diverged, and stops before touching tags if two remotes disagree
+on one. Feature branches are not synchronised; they are pushed through the
+fan-out and deleted where they were merged. Dependabot opens the same bump on
+both GitHub repositories: merge it on task-activity-manager only and close the
+copy on xray-testcase-manager, so the two `main` branches never diverge.
 
 Release tags carry the app name: `xtm/v1.10.0` for XTM, `tam/v0.1.0` for TAM
 once it ships. The release workflow filters on `xtm/v*`.

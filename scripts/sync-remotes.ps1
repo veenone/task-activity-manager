@@ -75,8 +75,12 @@ $dirty = @(Invoke-Git @("status", "--porcelain", "--untracked-files=no"))
 if ($dirty.Count -gt 0) { Fail "The working tree has uncommitted changes. Commit or stash them first." }
 
 $existing = @(Invoke-Git @("remote"))
+$urls = @{}
 foreach ($n in $names) {
     if ($existing -notcontains $n) { Fail "Remote '$n' is missing. Run .\scripts\sync-remotes.ps1 -Setup first." }
+    # Pushes below go to the remote's URL, not its name: after -Setup a push
+    # to "origin" would fan out to all three remotes at once.
+    $urls[$n] = (Invoke-Git @("remote", "get-url", $n))
 }
 
 # 2. Fetch main and every tag from each remote into a private namespace, so
@@ -115,7 +119,7 @@ $newestSha = $before[$newest]
 #    an ordinary push, so a non-fast-forward is rejected by the remote.
 foreach ($n in $names) {
     if ($before[$n] -ne $newestSha) {
-        Invoke-Git @("push", "--quiet", $n, "${newestSha}:refs/heads/$Branch") | Out-Null
+        Invoke-Git @("push", "--quiet", $urls[$n], "${newestSha}:refs/heads/$Branch") | Out-Null
     }
 }
 
@@ -149,7 +153,7 @@ foreach ($t in $tags.Keys) {
     $source = @($tags[$t].Keys)[0]
     foreach ($n in $names) {
         if (-not $tags[$t].ContainsKey($n)) {
-            Invoke-Git @("push", "--quiet", $n, "${syncNs}/${source}/${t}:refs/tags/$t") | Out-Null
+            Invoke-Git @("push", "--quiet", $urls[$n], "${syncNs}/${source}/${t}:refs/tags/$t") | Out-Null
         }
     }
 }
@@ -162,10 +166,17 @@ if ($local -and ($local -ne $newestSha)) {
         $current = (& git rev-parse --abbrev-ref HEAD)
         if ($current -eq $Branch) {
             Invoke-Git @("merge", "--ff-only", "--quiet", $newestSha) | Out-Null
+            Write-Host "local $Branch fast-forwarded to $($newestSha.Substring(0,7))"
         } else {
-            Invoke-Git @("branch", "-f", $Branch, $newestSha) | Out-Null
+            # Refused when main is checked out in another worktree; the remotes
+            # are already in step, so that is not a failure.
+            & git branch -f $Branch $newestSha | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "local $Branch fast-forwarded to $($newestSha.Substring(0,7))"
+            } else {
+                Write-Host "local $Branch is checked out in another worktree; left alone"
+            }
         }
-        Write-Host "local $Branch fast-forwarded to $($newestSha.Substring(0,7))"
     } else {
         Write-Host "local $Branch has commits the remotes do not; left alone"
     }

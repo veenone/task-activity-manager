@@ -145,6 +145,21 @@ $code = Run-Script $f.Work
 Check ($code -eq 0) "exit code 0"
 Check ((Invoke-Git $f.Work @("rev-parse", "main")) -eq $b) "local main fast-forwarded"
 
+Write-Host "7. syncs by remote url, so the origin fan-out does not double-push"
+$f = New-Fixture
+$setupArgs = @{ Setup = $true; OriginUrl = (Join-Path $f.Root "origin"); XtmUrl = (Join-Path $f.Root "xtm"); GiteaUrl = (Join-Path $f.Root "gitea") }
+$code = Run-Script $f.Work $setupArgs
+Invoke-Git $f.Work @("config", "--add", "remote.origin.pushurl", (Join-Path $f.Root "does-not-exist")) | Out-Null
+Set-Content (Join-Path $f.Work "b.txt") "b"
+Invoke-Git $f.Work @("add", "b.txt") | Out-Null
+Invoke-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "xtm-origin", "main") | Out-Null
+$b = Invoke-Git $f.Work @("rev-parse", "HEAD")
+$code = Run-Script $f.Work
+Check ($code -eq 0) "exit code 0 with a broken pushurl on origin"
+Check ((Tip (Join-Path $f.Root "origin")) -eq $b) "origin main moved to B"
+Check ((Tip (Join-Path $f.Root "gitea")) -eq $b) "gitea main moved to B"
+
 foreach ($r in $roots) { Remove-Item -Recurse -Force $r -ErrorAction SilentlyContinue }
 if ($failures -eq 0) { Write-Host "all checks passed"; exit 0 }
 Write-Host "$failures check(s) failed"

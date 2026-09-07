@@ -170,4 +170,4 @@ try {
 Write-Host ""
 Step "Done - artifacts in dist/"
 Get-ChildItem $dist | Select-Object Name, @{ N = "Size"; E = { "{0:N1} MB" -f ($_.Length / 1MB) } } | Format-Table -AutoSize
-Write-Host "Next: tag the release ->  git tag v$Version && git push origin v$Version" -ForegroundColor Green
+Write-Host "Next: tag the release ->  git tag xtm/v$Version && git push origin xtm/v$Version" -ForegroundColor Green
