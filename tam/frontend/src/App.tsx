@@ -6,6 +6,7 @@ import { VIEWS, useView } from "./nav";
 import { useModal } from "./modals";
 import { Placeholder } from "./components/Placeholder";
 import { BacklogView } from "./components/BacklogView";
+import { EpicsView } from "./components/EpicsView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { PendingChangesModal } from "./components/PendingChangesModal";
@@ -149,7 +150,7 @@ export default function App() {
                   </span>
                 )}
               </div>
-              {current.id === "backlog" ? <BacklogView /> : <Placeholder view={current} />}
+              {current.id === "backlog" ? <BacklogView /> : current.id === "epics" ? <EpicsView /> : <Placeholder view={current} />}
             </>
           )}
         </main>

@@ -27,6 +27,7 @@ function valuesOf(issue: Issue, description: string): Values {
     labels: issue.labels.join(", "),
     storyPoints: issue.storyPoints === null || issue.storyPoints === undefined ? "" : String(issue.storyPoints),
     assignee: issue.assignee,
+    parentKey: issue.parentKey,
   };
 }
 

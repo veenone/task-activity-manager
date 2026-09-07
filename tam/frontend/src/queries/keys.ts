@@ -1,4 +1,4 @@
-import type { IssueQuery } from "../api";
+import type { IssueQuery, TreeQuery } from "../api";
 
 // keys is the single source of query keys, so an invalidation can never
 // drift from the read it must refresh. Every key starts with the profile id.
@@ -13,4 +13,6 @@ export const keys = {
   activity: (profileId: string, key: string) => [profileId, "issue", key, "activity"] as const,
   createFields: (profileId: string, type: string) => [profileId, "createFields", type] as const,
   linkTypes: (profileId: string) => [profileId, "linkTypes"] as const,
+  tree: (profileId: string, q: TreeQuery) => [profileId, "tree", q] as const,
+  epics: (profileId: string) => [profileId, "epics"] as const,
 };

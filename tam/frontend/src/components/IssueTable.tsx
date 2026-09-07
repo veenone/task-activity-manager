@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Issue } from "../api";
 import { TypeChip } from "./TypeChip";
+import { statusClass } from "../lib/statusClass";
 
 const ROW_HEIGHT = 34;
 
@@ -98,13 +99,4 @@ export function IssueTable({ issues, selectedKey, onSelect }: Props) {
       </div>
     </div>
   );
-}
-
-// statusClass buckets a Jira status name into the three colours the
-// mockup uses: done, in progress, and everything else.
-function statusClass(status: string): "done" | "active" | "todo" {
-  const s = status.toLowerCase();
-  if (s === "done" || s === "closed" || s === "resolved" || s === "approved") return "done";
-  if (s.includes("progress") || s === "in review") return "active";
-  return "todo";
 }

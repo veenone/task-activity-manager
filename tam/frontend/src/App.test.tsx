@@ -29,6 +29,8 @@ vi.mock("./api", async () => {
     GetIssueDetail: vi.fn(),
     ListLinkedTests: vi.fn(),
     ListSprints: vi.fn(),
+    GetEpicTree: vi.fn(),
+    ListEpics: vi.fn(),
     GetProfileSetting: vi.fn(),
     SetProfileSetting: vi.fn(),
     EventsOn: vi.fn(() => () => {}),
@@ -73,6 +75,8 @@ beforeEach(() => {
   vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0 });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
   vi.mocked(api.ListSprints).mockResolvedValue([]);
+  vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
+  vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
   vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
 });
@@ -87,9 +91,31 @@ describe("App shell", () => {
 
   it("switches views from the nav rail and names the phase", async () => {
     renderApp();
+    await userEvent.click(screen.getByRole("button", { name: "Boards" }));
+    expect(screen.getByRole("heading", { name: "Boards" })).toBeInTheDocument();
+    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
+  });
+
+  it("renders the epic tree from the nav rail", async () => {
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [
+        {
+          issue: { key: "PLAT-1", id: "1", project: "PLAT", type: "epic", summary: "Checkout revamp", status: "In Progress", assignee: "", reporter: "", priority: "", labels: [], sprintId: "", sprintName: "", parentKey: "", storyPoints: null, rank: "", created: "", updated: "" },
+          children: [],
+          total: 0,
+          done: 0,
+          points: 0,
+          donePoints: 0,
+        },
+      ],
+      orphans: [],
+      truncated: false,
+    });
+    renderApp();
     await userEvent.click(screen.getByRole("button", { name: "Epics" }));
     expect(screen.getByRole("heading", { name: "Epics" })).toBeInTheDocument();
-    expect(screen.getByText(/arrives in Phase 2/)).toBeInTheDocument();
+    expect(await screen.findByText("Checkout revamp")).toBeInTheDocument();
+    expect(screen.getByRole("tree", { name: "Epics" })).toBeInTheDocument();
   });
 
   it("says so when the profiles cannot be loaded", async () => {
