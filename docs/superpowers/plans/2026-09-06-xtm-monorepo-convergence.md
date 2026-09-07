@@ -275,12 +275,13 @@ Exit code 0 when every check passes, 1 otherwise.
 $ErrorActionPreference = "Stop"
 $script = Join-Path $PSScriptRoot "sync-remotes.ps1"
 $failures = 0
+$roots = @()
 
 function Check([bool]$cond, [string]$what) {
     if ($cond) { Write-Host "  ok   $what" } else { Write-Host "  FAIL $what"; $script:failures++ }
 }
 
-function Git([string]$dir, [string[]]$gitArgs) {
+function Invoke-Git([string]$dir, [string[]]$gitArgs) {
     $out = & git -C $dir @gitArgs
     if ($LASTEXITCODE -ne 0) { throw "git -C $dir $($gitArgs -join ' ') failed" }
     return $out
@@ -289,24 +290,25 @@ function Git([string]$dir, [string[]]$gitArgs) {
 function New-Fixture {
     $root = Join-Path ([IO.Path]::GetTempPath()) ("sync-remotes-" + [Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory $root | Out-Null
-    foreach ($n in "origin", "xtm", "gitea") { Git $root @("init", "-q", "--bare", "-b", "main", $n) | Out-Null }
+    $script:roots += $root
+    foreach ($n in "origin", "xtm", "gitea") { Invoke-Git $root @("init", "-q", "--bare", "-b", "main", $n) | Out-Null }
     $work = Join-Path $root "work"
-    Git $root @("init", "-q", "-b", "main", "work") | Out-Null
-    Git $work @("config", "user.email", "t@example.com") | Out-Null
-    Git $work @("config", "user.name", "t") | Out-Null
+    Invoke-Git $root @("init", "-q", "-b", "main", "work") | Out-Null
+    Invoke-Git $work @("config", "user.email", "t@example.com") | Out-Null
+    Invoke-Git $work @("config", "user.name", "t") | Out-Null
     Set-Content (Join-Path $work "a.txt") "a"
-    Git $work @("add", "a.txt") | Out-Null
-    Git $work @("commit", "-q", "-m", "A") | Out-Null
-    Git $work @("remote", "add", "origin", (Join-Path $root "origin")) | Out-Null
-    Git $work @("remote", "add", "xtm-origin", (Join-Path $root "xtm")) | Out-Null
-    Git $work @("remote", "add", "gitea", (Join-Path $root "gitea")) | Out-Null
-    foreach ($r in "origin", "xtm-origin", "gitea") { Git $work @("push", "-q", $r, "main") | Out-Null }
+    Invoke-Git $work @("add", "a.txt") | Out-Null
+    Invoke-Git $work @("commit", "-q", "-m", "A") | Out-Null
+    Invoke-Git $work @("remote", "add", "origin", (Join-Path $root "origin")) | Out-Null
+    Invoke-Git $work @("remote", "add", "xtm-origin", (Join-Path $root "xtm")) | Out-Null
+    Invoke-Git $work @("remote", "add", "gitea", (Join-Path $root "gitea")) | Out-Null
+    foreach ($r in "origin", "xtm-origin", "gitea") { Invoke-Git $work @("push", "-q", $r, "main") | Out-Null }
     return @{ Root = $root; Work = $work }
 }
 
-function Tip([string]$bare) { return (Git $bare @("rev-parse", "main")) }
+function Tip([string]$bare) { return (Invoke-Git $bare @("rev-parse", "main")) }
 
-function Run-Script([string]$work, [string[]]$scriptArgs) {
+function Run-Script([string]$work, [hashtable]$scriptArgs = @{}) {
     Push-Location $work
     try {
         & $script @scriptArgs | Out-Host
@@ -317,39 +319,39 @@ function Run-Script([string]$work, [string[]]$scriptArgs) {
 Write-Host "1. fast-forwards the laggards and spreads a tag"
 $f = New-Fixture
 Set-Content (Join-Path $f.Work "b.txt") "b"
-Git $f.Work @("add", "b.txt") | Out-Null
-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
-Git $f.Work @("push", "-q", "origin", "main") | Out-Null
-Git $f.Work @("tag", "-a", "t1", "-m", "t1", "HEAD~1") | Out-Null
-Git $f.Work @("push", "-q", "gitea", "t1") | Out-Null
-Git $f.Work @("tag", "-d", "t1") | Out-Null
-$b = Git $f.Work @("rev-parse", "HEAD")
-$code = Run-Script $f.Work @()
+Invoke-Git $f.Work @("add", "b.txt") | Out-Null
+Invoke-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "origin", "main") | Out-Null
+Invoke-Git $f.Work @("tag", "-a", "t1", "-m", "t1", "HEAD~1") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "gitea", "t1") | Out-Null
+Invoke-Git $f.Work @("tag", "-d", "t1") | Out-Null
+$b = Invoke-Git $f.Work @("rev-parse", "HEAD")
+$code = Run-Script $f.Work
 Check ($code -eq 0) "exit code 0"
 Check ((Tip (Join-Path $f.Root "xtm")) -eq $b) "xtm main moved to B"
 Check ((Tip (Join-Path $f.Root "gitea")) -eq $b) "gitea main moved to B"
-$originTags = Git (Join-Path $f.Root "origin") @("tag")
-$xtmTags = Git (Join-Path $f.Root "xtm") @("tag")
+$originTags = Invoke-Git (Join-Path $f.Root "origin") @("tag")
+$xtmTags = Invoke-Git (Join-Path $f.Root "xtm") @("tag")
 Check (($originTags -contains "t1") -and ($xtmTags -contains "t1")) "t1 pushed to origin and xtm"
-$leftover = @(Git $f.Work @("for-each-ref", "refs/synctags/"))
+$leftover = @(Invoke-Git $f.Work @("for-each-ref", "refs/synctags/"))
 Check ($leftover.Count -eq 0) "private ref namespace cleaned up"
 
 Write-Host "2. refuses when mains have diverged and pushes nothing"
 $f = New-Fixture
-$a = Git $f.Work @("rev-parse", "HEAD")
+$a = Invoke-Git $f.Work @("rev-parse", "HEAD")
 Set-Content (Join-Path $f.Work "b.txt") "b"
-Git $f.Work @("add", "b.txt") | Out-Null
-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
-Git $f.Work @("push", "-q", "origin", "main") | Out-Null
-$b = Git $f.Work @("rev-parse", "HEAD")
-Git $f.Work @("checkout", "-q", "-b", "other", $a) | Out-Null
+Invoke-Git $f.Work @("add", "b.txt") | Out-Null
+Invoke-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "origin", "main") | Out-Null
+$b = Invoke-Git $f.Work @("rev-parse", "HEAD")
+Invoke-Git $f.Work @("checkout", "-q", "-b", "other", $a) | Out-Null
 Set-Content (Join-Path $f.Work "d.txt") "d"
-Git $f.Work @("add", "d.txt") | Out-Null
-Git $f.Work @("commit", "-q", "-m", "D") | Out-Null
-Git $f.Work @("push", "-q", "xtm-origin", "other:main") | Out-Null
-$d = Git $f.Work @("rev-parse", "HEAD")
-Git $f.Work @("checkout", "-q", "main") | Out-Null
-$code = Run-Script $f.Work @()
+Invoke-Git $f.Work @("add", "d.txt") | Out-Null
+Invoke-Git $f.Work @("commit", "-q", "-m", "D") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "xtm-origin", "other:main") | Out-Null
+$d = Invoke-Git $f.Work @("rev-parse", "HEAD")
+Invoke-Git $f.Work @("checkout", "-q", "main") | Out-Null
+$code = Run-Script $f.Work
 Check ($code -eq 1) "exit code 1 on divergence"
 Check ((Tip (Join-Path $f.Root "origin")) -eq $b) "origin untouched"
 Check ((Tip (Join-Path $f.Root "xtm")) -eq $d) "xtm untouched"
@@ -357,56 +359,57 @@ Check ((Tip (Join-Path $f.Root "gitea")) -eq $a) "gitea untouched"
 
 Write-Host "3. refuses when the same tag points at different commits"
 $f = New-Fixture
-Git $f.Work @("tag", "t2") | Out-Null
-Git $f.Work @("push", "-q", "origin", "t2") | Out-Null
-Git $f.Work @("tag", "-d", "t2") | Out-Null
+Invoke-Git $f.Work @("tag", "t2") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "origin", "t2") | Out-Null
+Invoke-Git $f.Work @("tag", "-d", "t2") | Out-Null
 Set-Content (Join-Path $f.Work "b.txt") "b"
-Git $f.Work @("add", "b.txt") | Out-Null
-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
-Git $f.Work @("tag", "t2") | Out-Null
-Git $f.Work @("push", "-q", "xtm-origin", "t2") | Out-Null
-Git $f.Work @("tag", "-d", "t2") | Out-Null
-$code = Run-Script $f.Work @()
+Invoke-Git $f.Work @("add", "b.txt") | Out-Null
+Invoke-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
+Invoke-Git $f.Work @("tag", "t2") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "xtm-origin", "t2") | Out-Null
+Invoke-Git $f.Work @("tag", "-d", "t2") | Out-Null
+$code = Run-Script $f.Work
 Check ($code -eq 1) "exit code 1 on tag conflict"
-$giteaTags = Git (Join-Path $f.Root "gitea") @("tag")
+$giteaTags = Invoke-Git (Join-Path $f.Root "gitea") @("tag")
 Check (-not ($giteaTags -contains "t2")) "t2 not pushed to gitea"
 
 Write-Host "4. refuses on a dirty tree"
 $f = New-Fixture
 Set-Content (Join-Path $f.Work "a.txt") "changed"
-$code = Run-Script $f.Work @()
+$code = Run-Script $f.Work
 Check ($code -eq 1) "exit code 1 on dirty tree"
 
 Write-Host "5. -Setup writes the fan-out and is idempotent"
 $f = New-Fixture
-Git $f.Work @("remote", "remove", "xtm-origin") | Out-Null
-Git $f.Work @("remote", "remove", "gitea") | Out-Null
-$setupArgs = @("-Setup", "-OriginUrl", (Join-Path $f.Root "origin"), "-XtmUrl", (Join-Path $f.Root "xtm"), "-GiteaUrl", (Join-Path $f.Root "gitea"))
+Invoke-Git $f.Work @("remote", "remove", "xtm-origin") | Out-Null
+Invoke-Git $f.Work @("remote", "remove", "gitea") | Out-Null
+$setupArgs = @{ Setup = $true; OriginUrl = (Join-Path $f.Root "origin"); XtmUrl = (Join-Path $f.Root "xtm"); GiteaUrl = (Join-Path $f.Root "gitea") }
 $code = Run-Script $f.Work $setupArgs
 Check ($code -eq 0) "exit code 0"
-$push = @(Git $f.Work @("config", "--get-all", "remote.origin.pushurl"))
+$push = @(Invoke-Git $f.Work @("config", "--get-all", "remote.origin.pushurl"))
 Check ($push.Count -eq 3) "three push urls"
 Check ($push[1] -eq (Join-Path $f.Root "xtm")) "second push url is xtm"
-$remotes = @(Git $f.Work @("remote"))
+$remotes = @(Invoke-Git $f.Work @("remote"))
 Check (($remotes -contains "xtm-origin") -and ($remotes -contains "gitea")) "named remotes created"
 $code = Run-Script $f.Work $setupArgs
-$push = @(Git $f.Work @("config", "--get-all", "remote.origin.pushurl"))
+$push = @(Invoke-Git $f.Work @("config", "--get-all", "remote.origin.pushurl"))
 Check ($push.Count -eq 3) "still three push urls after a second run"
 
 Write-Host "6. fast-forwards a checked-out local main"
 $f = New-Fixture
-$a = Git $f.Work @("rev-parse", "HEAD")
-Git $f.Work @("checkout", "-q", "-b", "side") | Out-Null
+$a = Invoke-Git $f.Work @("rev-parse", "HEAD")
+Invoke-Git $f.Work @("checkout", "-q", "-b", "side") | Out-Null
 Set-Content (Join-Path $f.Work "b.txt") "b"
-Git $f.Work @("add", "b.txt") | Out-Null
-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
-Git $f.Work @("push", "-q", "origin", "side:main") | Out-Null
-$b = Git $f.Work @("rev-parse", "HEAD")
-Git $f.Work @("checkout", "-q", "main") | Out-Null
-$code = Run-Script $f.Work @()
+Invoke-Git $f.Work @("add", "b.txt") | Out-Null
+Invoke-Git $f.Work @("commit", "-q", "-m", "B") | Out-Null
+Invoke-Git $f.Work @("push", "-q", "origin", "side:main") | Out-Null
+$b = Invoke-Git $f.Work @("rev-parse", "HEAD")
+Invoke-Git $f.Work @("checkout", "-q", "main") | Out-Null
+$code = Run-Script $f.Work
 Check ($code -eq 0) "exit code 0"
-Check ((Git $f.Work @("rev-parse", "main")) -eq $b) "local main fast-forwarded"
+Check ((Invoke-Git $f.Work @("rev-parse", "main")) -eq $b) "local main fast-forwarded"
 
+foreach ($r in $roots) { Remove-Item -Recurse -Force $r -ErrorAction SilentlyContinue }
 if ($failures -eq 0) { Write-Host "all checks passed"; exit 0 }
 Write-Host "$failures check(s) failed"
 exit 1
@@ -452,7 +455,7 @@ $remoteUrls = [ordered]@{ "origin" = $OriginUrl; "xtm-origin" = $XtmUrl; "gitea"
 $names = @($remoteUrls.Keys)
 $syncNs = "refs/synctags"
 
-function Git([string[]]$gitArgs) {
+function Invoke-Git([string[]]$gitArgs) {
     # stdout is returned; stderr stays on the console so fetch/push progress and
     # errors are visible. 5.1 must not redirect a native command's stderr.
     $out = & git @gitArgs
@@ -474,17 +477,17 @@ function Clear-SyncRefs {
 }
 
 if ($Setup) {
-    $existing = @(Git @("remote"))
+    $existing = @(Invoke-Git @("remote"))
     foreach ($n in $names) {
         if ($existing -contains $n) {
-            Git @("remote", "set-url", $n, $remoteUrls[$n]) | Out-Null
+            Invoke-Git @("remote", "set-url", $n, $remoteUrls[$n]) | Out-Null
         } else {
-            Git @("remote", "add", $n, $remoteUrls[$n]) | Out-Null
+            Invoke-Git @("remote", "add", $n, $remoteUrls[$n]) | Out-Null
         }
     }
     # Rewrite the push list from scratch so a second run leaves exactly three.
     & git config --unset-all remote.origin.pushurl | Out-Null
-    foreach ($n in $names) { Git @("config", "--add", "remote.origin.pushurl", $remoteUrls[$n]) | Out-Null }
+    foreach ($n in $names) { Invoke-Git @("config", "--add", "remote.origin.pushurl", $remoteUrls[$n]) | Out-Null }
     Write-Host "origin fetches from $OriginUrl and pushes to:"
     foreach ($n in $names) { Write-Host "  $($remoteUrls[$n])" }
     exit 0
@@ -495,7 +498,7 @@ if ($Setup) {
 $dirty = @(& git status --porcelain --untracked-files=no)
 if ($dirty.Count -gt 0) { Fail "The working tree has uncommitted changes. Commit or stash them first." }
 
-$existing = @(Git @("remote"))
+$existing = @(Invoke-Git @("remote"))
 foreach ($n in $names) {
     if ($existing -notcontains $n) { Fail "Remote '$n' is missing. Run .\scripts\sync-remotes.ps1 -Setup first." }
 }
@@ -506,7 +509,7 @@ foreach ($n in $names) {
 Clear-SyncRefs
 $before = [ordered]@{}
 foreach ($n in $names) {
-    Git @("fetch", "--quiet", "--no-tags", $n,
+    Invoke-Git @("fetch", "--quiet", "--no-tags", $n,
         "+refs/heads/${Branch}:refs/remotes/$n/$Branch",
         "+refs/tags/*:$syncNs/$n/*") | Out-Null
     $before[$n] = (& git rev-parse --verify --quiet "refs/remotes/$n/$Branch")
@@ -536,7 +539,7 @@ $newestSha = $before[$newest]
 #    an ordinary push, so a non-fast-forward is rejected by the remote.
 foreach ($n in $names) {
     if ($before[$n] -ne $newestSha) {
-        Git @("push", "--quiet", $n, "${newestSha}:refs/heads/$Branch") | Out-Null
+        Invoke-Git @("push", "--quiet", $n, "${newestSha}:refs/heads/$Branch") | Out-Null
     }
 }
 
@@ -570,7 +573,7 @@ foreach ($t in $tags.Keys) {
     $source = @($tags[$t].Keys)[0]
     foreach ($n in $names) {
         if (-not $tags[$t].ContainsKey($n)) {
-            Git @("push", "--quiet", $n, "${syncNs}/${source}/${t}:refs/tags/$t") | Out-Null
+            Invoke-Git @("push", "--quiet", $n, "${syncNs}/${source}/${t}:refs/tags/$t") | Out-Null
         }
     }
 }
@@ -582,9 +585,9 @@ if ($local -and ($local -ne $newestSha)) {
     if ($LASTEXITCODE -eq 0) {
         $current = (& git rev-parse --abbrev-ref HEAD)
         if ($current -eq $Branch) {
-            Git @("merge", "--ff-only", "--quiet", $newestSha) | Out-Null
+            Invoke-Git @("merge", "--ff-only", "--quiet", $newestSha) | Out-Null
         } else {
-            Git @("branch", "-f", $Branch, $newestSha) | Out-Null
+            Invoke-Git @("branch", "-f", $Branch, $newestSha) | Out-Null
         }
         Write-Host "local $Branch fast-forwarded to $($newestSha.Substring(0,7))"
     } else {
