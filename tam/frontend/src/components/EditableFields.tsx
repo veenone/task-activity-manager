@@ -116,6 +116,9 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               onChange={(e) => set("description", e.target.value)}
             />
           ) : f.id === "parentKey" ? (
+            // Gated on isLoading, not isFetching: the epic list is stable, so a
+            // background refetch should leave the select showing its current
+            // options rather than blanking the control mid-edit.
             epics.isLoading ? (
               <select className="detail-input" disabled value="">
                 <option value="">(loading)</option>
