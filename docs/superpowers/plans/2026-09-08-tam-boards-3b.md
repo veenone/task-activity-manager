@@ -17,9 +17,12 @@
 - Go modules stay `agile-suite/core`, `agile-suite/xtm`, `agile-suite/tam`; run Go commands from inside the module directory. Nothing under `xtm/` changes.
 - Every board write goes through the journal and Commit. Nothing in this plan writes to Jira outside `internal/committer`.
 - A transition is not a field edit. It is journaled by target status id and resolved to a transition id at push time, from the transitions Jira offers for that issue at that moment.
+- A transition's own required fields are read with it (`?expand=transitions.fields`) and honoured. Most Data Center workflows put a Resolution screen on the transition into Done, and a push that sends only a transition id gets a 400 from every one of them. This is the single most likely way this feature fails on a real instance.
+- A board write is checked against the issue's remote **status**, not its `updated` stamp. A comment bumps `updated` without moving the card, and a status that moved does not always bump it in a way that helps. Remote status equal to the journaled target means the move already happened, which is satisfaction, not conflict.
+- Every board failure carries what the user can do next: the columns that were actually reachable, and a way to put the card back. "Commit again to retry" is the one thing that cannot help a transition with no path, and that line is already in the product.
 - No fabricated LexoRank. A rank is journaled as a neighbour and a side; the cache's `rank` column is only ever written by a sync.
 - One journal row per issue per entity: a second drag replaces the first, and a card dragged back to where it started deletes the row rather than journaling a move to itself.
-- The three writes are version-checked the way an edit is, except the rank, which has no version to check. A held-back write reuses 1b's conflict card and its two resolutions.
+- A held-back write reuses 1b's conflict card and its two resolutions. A rank is never held back: it has nothing to compare and nothing to rebase.
 - Native HTML5 drag and drop. No new frontend dependency.
 - Every move has a keyboard path on the focused card. The board shipped a keyboard model in 3a and must not lose it.
 - Bound method signatures are exactly: `MoveIssueToColumn(profileID, key, statusID string) error`, `RankIssue(profileID, key, neighbourKey string, before bool) error`, `MoveIssueToSprint(profileID, key, sprintID string) error`.
@@ -34,7 +37,10 @@
 3. **The backend resolves the transition id.** `core/jira` reports what Jira offers; `backend/jira` picks the transition whose `to.id` matches the journaled target and returns `ErrNoTransition` when none does. The store never holds a transition id, which would be stale the moment the issue moved.
 4. **A rank stays out of the cache.** The board read orders a pending rank by its neighbour. Writing a made-up LexoRank into `issue.rank` would be a second source of truth that the next sync silently overwrites.
 5. **A draft is dragged in place.** A `TAM-NEW-n` card has no Jira state, so a drag updates its draft JSON (status id, sprint) rather than journaling a transition against an issue that does not exist yet.
-6. **The sprint move is an action, not a drop target.** There is nowhere on the board to drop a card that means "the next sprint", so it lives on the card's menu and on the detail panel.
+6. **The sprint move is an action, not a drop target.** There is nowhere on the board to drop a card that means "the next sprint", so it lives on the card's menu and on the detail panel. Moving several at once is what sprint planning actually does, and it arrives with 3c, where planning lives; 3b moves one card at a time.
+7. **Ranks push last, all together, top to bottom.** Rank is the one write that is relative between issues: two cards ranked against each other have no meaning in isolation, and pushing them per issue can commit an order the screen never showed. The pass therefore re-derives each neighbour from the board's final local order at push time rather than trusting the neighbour that was journaled at drop time.
+8. **A drop is verified against Jira when the app is online.** One `transitions` call for the card that was just dropped, in the background, and an inline warning with a way to put it back when the target is not reachable. This is what turns "your commit failed an hour later" into "that column is not reachable from To Do", and it costs one request per drag. Offline, the drop is accepted and the answer waits for Commit, which is the case the journal exists for.
+9. **Pushing straight to Jira when online was rejected.** It would give a faster answer and it is what most tools do, but it forks TAM's model: every other write in the app is journaled and lands on Commit, and a board that pushed on drop would be the one surface where Discard means nothing and the pending count lies. Decision 8 buys most of the same benefit without the fork.
 
 ## File structure
 
@@ -48,9 +54,9 @@
 
 **Files:** create `core/jira/transitions.go`, `core/jira/transitions_test.go`; modify `core/jira/agile.go`, `core/jira/agile_test.go`.
 
-**Produces:** `jira.RawTransition{ID, Name string; To RawStatus}` (reusing 3a's `RawStatus`, which carries the id; add `Name` to it, which the configuration ignores and this needs); `(*Client).Transitions(ctx, key string) ([]RawTransition, error)`; `(*Client).DoTransition(ctx, key, transitionID string) error`; `(*Client).RankIssue(ctx, key, neighbourKey string, before bool) error`; `(*Client).MoveToSprint(ctx, sprintID string, keys []string) error`; `(*Client).MoveToBacklog(ctx, keys []string) error`.
+**Produces:** `jira.RawTransition{ID, Name string; To RawStatus; Fields map[string]RawTransitionField}` with `RawTransitionField{Required bool; AllowedValues []RawAllowedValue}` and `RawAllowedValue{ID, Name string}` (reusing 3a's `RawStatus`, which carries the id; add `Name` to it, which the configuration ignores and this needs); `(*Client).Transitions(ctx, key string) ([]RawTransition, error)`, which asks for `?expand=transitions.fields` so a caller can see what a transition demands before pushing it; `(*Client).DoTransition(ctx, key, transitionID string) error`; `(*Client).RankIssue(ctx, key, neighbourKey string, before bool) error`; `(*Client).MoveToSprint(ctx, sprintID string, keys []string) error`; `(*Client).MoveToBacklog(ctx, keys []string) error`.
 
-- [ ] **Step 1: The tests.** Extend the httptest server in the style of `agile_test.go` (read it first) with `/rest/api/2/issue/PLAT-412/transitions`, `/rest/agile/1.0/issue/rank`, `/rest/agile/1.0/sprint/12/issue`, and `/rest/agile/1.0/backlog/issue`. Cover: the transitions list decoding id, name, and `to.id`; a transition POST sending `{"transition":{"id":"31"}}` and nothing else; a rank PUT sending `{"issues":["PLAT-412"],"rankBeforeIssue":"PLAT-409"}` and the `rankAfterIssue` form; a sprint move POSTing `{"issues":["PLAT-412"]}` to the sprint path; a backlog move POSTing the same body to the backlog path; and a 404 on the rank path surfacing as an `*HTTPError` the caller can read. Assert on the request bodies, not only on the status: these calls are all side effect and a body that is silently wrong is the failure mode.
+- [ ] **Step 1: The tests.** Extend the httptest server in the style of `agile_test.go` (read it first) with `/rest/api/2/issue/PLAT-412/transitions`, `/rest/agile/1.0/issue/rank`, `/rest/agile/1.0/sprint/12/issue`, and `/rest/agile/1.0/backlog/issue`. Cover: the transitions list decoding id, name, `to.id`, and each transition's required fields with their allowed values (the fixture's Done transition requires `resolution` with two allowed values, which is what a Data Center workflow actually sends); a transition POST sending `{"transition":{"id":"31"}}` and nothing else; a rank PUT sending `{"issues":["PLAT-412"],"rankBeforeIssue":"PLAT-409"}` and the `rankAfterIssue` form; a sprint move POSTing `{"issues":["PLAT-412"]}` to the sprint path; a backlog move POSTing the same body to the backlog path; and a 404 on the rank path surfacing as an `*HTTPError` the caller can read. Assert on the request bodies, not only on the status: these calls are all side effect and a body that is silently wrong is the failure mode.
 
 - [ ] **Step 2: The calls.** `transitions.go` holds `Transitions` and `DoTransition` over `/rest/api/2/issue/{key}/transitions` (the GET decodes `{"transitions":[...]}`), with the key path-escaped. `agile.go` gains `RankIssue`, `MoveToSprint`, and `MoveToBacklog` over the existing `WriteJSON` helper. Doc comments name the endpoint and say these are the only four calls in `core/jira` that change anything on the instance.
 
@@ -65,6 +71,8 @@
 **Produces:** `issuerepo.EntityTransition = "issue_transition"`, `EntityRank = "issue_rank"`, `EntitySprintMove = "issue_sprint"`; `(*Repository).MoveToColumn(ctx, profileID, key, statusID string) error`, `RankIssue(ctx, profileID, key, neighbourKey string, before bool) error`, `MoveToSprint(ctx, profileID, key, sprintID string) error`; `(*Repository).PendingMoves(ctx, profileID string) ([]backend.PendingMove, error)`; `backend.PendingMove{Key, StatusID, SprintID, RankNeighbour string; RankBefore bool; HasTransition, HasSprint, HasRank bool}`; `boardrepo.IssueSource` grows `PendingMoves`.
 
 - [ ] **Step 1: The entity constants and the writes.** `boardwrites.go` holds the three writes, each one transaction: read the issue's current value and `updated`, refuse a key the cache does not hold, journal with `before_val` set to the current value and `base_version` to `updated`, audit the change, and write the local column so the view repaints (status and `status_id` for a transition, `sprint_id` and `sprint_name` for a sprint move; a rank writes no column, by Decision 4).
+
+`before_val` and `after_val` on a transition and a sprint move carry `id|Name`, the same shape the link row already uses for its three parts. The committer splits on the pipe and pushes the id; the Pending changes dialog and the Activity tab read the name. Without it a user reads "statusId: 3 to 5", which is a row only a developer can act on, and no dialog has the board's columns in hand to translate it.
 
 Two rules every one of them shares, and both need their own test:
 - A move back to the value the row already had deletes the journal row and audits the undo, rather than writing a change to nothing.
@@ -90,13 +98,27 @@ A draft key (`DraftPrefix`) takes a different path: update the draft's JSON and 
 
 **Produces:** on `IssueBackend`: `Transition(ctx, key, targetStatusID string) error`; on `BoardBackend`: `RankIssue(ctx, key, neighbourKey string, before bool) error`, `MoveIssuesToSprint(ctx, sprintID string, keys []string) error`; `backend.ErrNoTransition`; `(*Engine).commitBoardMoves(...)` and the `Result` growing `Moved []Moved`.
 
-- [ ] **Step 1: The backends.** The Jira backend's `Transition` lists the issue's transitions, picks the one whose `To.ID` equals the target, pushes it, and returns `ErrNoTransition` naming the target status when nothing matches. `RankIssue` and `MoveIssuesToSprint` pass through, with an empty sprint id meaning the backlog. The demo backend applies all three to its in-memory dataset and refuses one transition on the curated story (`<project>-412`), so the offline walk-through can see a failure without a real Jira.
+- [ ] **Step 1: The backends.** The Jira backend's `Transition` lists the issue's transitions (with their fields), picks the one whose `To.ID` equals the target, and pushes it. Three answers, not one:
+- No transition reaches the target: return `ErrNoTransition`, and carry the names of the statuses that **are** reachable, so the failure can tell the user where the card can actually go.
+- The transition requires only a resolution: send it, taking the profile setting `transition_resolution` when it names one of the transition's allowed values, and the first allowed value otherwise. A Data Center workflow almost always puts a resolution screen on the way into Done, and refusing every such move would make this feature useless on most real instances. `CreateFields` in the same package is the precedent for reading what Jira demands before writing.
+- The transition requires anything else: return an error naming the fields, because guessing a value for someone else's custom field is worse than saying it has to be done in Jira.
 
-- [ ] **Step 2: The pass.** `committer/boards.go` runs after the edits pass and before links. For each issue with board rows, in the order sprint, transition, rank: version-check the transition and the sprint move against `base_version` the way `commitEdit` does, hold the issue back as a conflict when the remote moved, push what is left, delete each row as it lands, and record a `Moved` per successful write. A failure is per write and per issue: it stays in the journal, is reported with its reason, and does not stop the pass. A row whose key is still a draft waits for the next Commit, the same rule the link pass already uses.
+`ErrNoTransition` and the required-field error both name the issue and the target. `RankIssue` and `MoveIssuesToSprint` pass through, with an empty sprint id meaning the backlog. The demo backend applies all three to its in-memory dataset and refuses one transition on the curated story (`<project>-412`), so the offline walk-through can see a failure without a real Jira.
+
+- [ ] **Step 2: The pass.** `committer/boards.go` runs after the edits pass and before links. Per issue, in the order sprint then transition; the ranks of every issue go last, in one group (Step 2b).
+
+The check is against the issue's remote state, read fresh, not against `updated`:
+- Remote status equals the journaled target: the move already happened, on the web or by someone else. Delete the row as satisfied and count it, do not raise a conflict over an outcome the user wanted.
+- Remote status equals the journaled `before_val`: nothing moved under us, push it.
+- Remote status is something else: hold the issue back as a conflict carrying before, target, and remote, in the card 1b built.
+
+The same three answers apply to a sprint move against the issue's remote sprint. Push what is left, delete each row as it lands, and record a `Moved` per successful write. A failure is per write and per issue: it stays in the journal, is reported with its reason and with what the user can do next, and does not stop the pass. A row whose key is still a draft waits for the next Commit, the same rule the link pass already uses.
+
+- [ ] **Step 2b: The rank group.** Ranks push after every transition and sprint move has landed, because both change where a card sits. They push in the board's final local order, top to bottom, each neighbour re-derived at push time from that order rather than from the key journaled at drop time: a neighbour that moved or left makes the journaled key meaningless, and pushing per issue in journal order can commit a sequence the screen never showed. A rank whose re-derived neighbour has gone from the cell is dropped with a reported reason rather than pushed against a card that is not there.
 
 - [ ] **Step 3: Wire it in.** `Commit` calls the board pass between edits and links, and `Result.Remaining` counts the board rows that stayed.
 
-- [ ] **Step 4: Tests.** `boards_test.go` with the existing committer fake extended: the three writes land in order for one issue; a transition with no path fails and leaves the rank alone; a conflict holds the issue and reports base, mine, and remote; a rank whose neighbour Jira rejects fails alone; a draft's rows wait; and `Remaining` counts what stayed.
+- [ ] **Step 4: Tests.** `boards_test.go` with the existing committer fake extended: the writes land in order for one issue and the ranks land after all of them; a transition with no path fails, names the reachable statuses, and leaves the rank alone; a transition needing only a resolution sends one; a transition needing another field fails naming it; a remote status already at the target deletes the row as satisfied instead of conflicting; a remote status somewhere else holds the issue as a conflict; two cards ranked against each other commit in the board's order; a rank whose neighbour has left the cell is dropped with a reason; a draft's rows wait; and `Remaining` counts what stayed.
 
 - [ ] **Step 5: The one Go suite run.** Inside `tam/`: `go build ./... && go vet ./... && go test ./... -count=1`, and inside `core/`: `go test ./jira/ -count=1`. Fix what fails, rerun at most twice, and report. Commit as `feat(tam): push board moves on Commit`.
 
@@ -108,7 +130,9 @@ A draft key (`DraftPrefix`) takes a different path: update the draft's JSON and 
 
 **Produces:** the three bound methods from the Global Constraints; `useMoveToColumn`, `useRankIssue`, `useMoveToSprint`; `cardMove.ts` holding the drop-target arithmetic (which column, which neighbour, which side) as pure functions.
 
-- [ ] **Step 1: The bindings.** `app_boards.go` gains the three methods, each under `a.acquire(p.ID, "commit")` so a move cannot land while a commit is pushing, each invalidating nothing itself (the frontend does that). Regenerate with `wails generate module`, check `App.d.ts`, and revert the runtime churn.
+- [ ] **Step 1: The bindings.** `app_boards.go` gains the three methods, shaped exactly like `EditIssue` in `app_writes.go`: check the store, check the profile and key, call the repository, and return. **No busy guard.** `acquire` is used in exactly one place in this app, the Commit binding, and no local journal write takes it; giving the board moves one would refuse a drag while a commit runs, which no other write does. If journalling during a commit is a hazard it is a hazard for every write, and it belongs in its own change rather than being invented for one surface.
+
+Add a fourth, `CanTransition(profileID, key, statusID string) (backend.TransitionCheck, error)`, which asks the backend what the card can reach right now. It is the only board binding that touches the network, it is best-effort, and an error from it means "we could not check", never "the move is illegal". Regenerate with `wails generate module`, check `App.d.ts`, and revert the runtime churn.
 
 - [ ] **Step 2: `cardMove.ts`.** Pure functions, no React: `columnDrop(cards, clientY, rects)` returning the neighbour key and side for a drop inside a cell, and `isSameCell(from, to)` so a drop that changes nothing journals nothing. Its own module because both the drag handlers and the keyboard handlers use it, and because arithmetic with no DOM in it is the part worth testing directly.
 
@@ -120,9 +144,17 @@ A draft key (`DraftPrefix`) takes a different path: update the draft's JSON and 
 
 - [ ] **Step 6: The view.** Remove the read-only caveat line and the "Read only" chip; a moved card wears the pending dot the moment its mutation settles, and the column heads recount. Keep the honesty line, which is about cards the board cannot show, not about writing.
 
-- [ ] **Step 7: Tests.** `BoardsView.test.tsx`: a drop on another column calls `MoveIssueToColumn` and repaints the card there; a drop inside a cell calls `RankIssue` with the neighbour and side; a drop that changes nothing calls neither; Ctrl and an arrow does what the drop does; the menu moves a card to a sprint; a pending card wears the dot; and the caveat is gone. `cardMove.test.ts` for the arithmetic, including the top and bottom edges of a cell.
+Two things the review of this plan insisted on, both about what happens when a move is wrong:
+- **After a drop, verify it.** Call `CanTransition` in the background for the card just dropped. If it answers that the target is not reachable, show an inline warning naming the statuses that are, with a button that puts the card back (discarding the pending row). If the call fails, say nothing: the app is offline, which is the case the journal is for.
+- **A failed board move offers a way out.** In the commit result, a board failure gets an "Undo this move" action that discards that row, beside its reason. The existing "Commit again to retry the failures" line stays for the failures that can be retried and must not be shown for a transition with no path, which will fail identically forever.
 
-- [ ] **Step 8: Commit** as `feat(tam): move a card by drag or by keyboard`.
+A Commit that moved cards ends with a boards sync, so the board's own membership catches up with what was just pushed; without it a card can jump back to where the last sync saw it.
+
+- [ ] **Step 7: The two dialogs that already show pending work.** `PendingChangesModal` renders a row through `fieldLabel`, which falls back to the raw field name, and `ActivityTab.describe` branches on entity type for links and creates and then does the same. Neither knows a board move, so today a journaled transition reads "statusId: 3 to 5". Give both the three entity types: the pending row reads "Status: To Do to In Progress", "Sprint: Sprint 12 to Sprint 13", and "Rank: before PLAT-409", each with its own Discard; the activity entry reads as a sentence the way a link's does. The `id|Name` encoding from Task 2 is what makes this possible without either dialog knowing the board.
+
+- [ ] **Step 8: Tests.** `BoardsView.test.tsx`: a drop on another column calls `MoveIssueToColumn` and repaints the card there; a drop inside a cell calls `RankIssue` with the neighbour and side; a drop that changes nothing calls neither; Ctrl and an arrow does what the drop does; the menu moves a card to a sprint; a pending card wears the dot; and the caveat is gone; a drop whose target is unreachable shows the warning and its put-it-back button; a board failure in the commit result offers Undo; and the pending dialog and the activity tab read a move in words rather than in ids. `cardMove.test.ts` for the arithmetic, including the top and bottom edges of a cell.
+
+- [ ] **Step 9: Commit** as `feat(tam): move a card by drag or by keyboard`.
 
 ---
 
@@ -150,4 +182,6 @@ Record each result, fix what fails, rerun only what failed, and report each fail
 
 ## Deferred
 
-Sprint start and complete (3c, with the sprint report Phase 4 wants), the board's own quick filters and swimlane rules, bulk moves, dragging between boards, dragging an epic, and the transitions cache that would let the view grey out an impossible drop before Commit rather than reporting it at one.
+Sprint start and complete, and moving several cards to a sprint at once, both in **3c**, which follows this plan directly and lands before Phase 4 rather than at some unnamed later date: sprint planning is where multi-select earns its keep, and it is the same surface that starts and completes a sprint. Also deferred: the board's own quick filters and swimlane rules, dragging between boards, and dragging an epic.
+
+Not deferred any more: warning about an impossible drop before Commit. It was deferred in the first draft of this plan as a transitions cache, which would have cost a request per card on every sync; Decision 8 gets the same answer from one request per drop, and only when the app is online.
