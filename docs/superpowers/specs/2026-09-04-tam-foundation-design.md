@@ -49,7 +49,7 @@ Extraction is pull-based. XTM moves into the repo untouched. A `core` package is
 
 Each app keeps its own SQLite file. Only the profile store is shared, so a Jira connection set up once works in both apps and the two schemas cannot collide.
 
-The monorepo is hosted at `github.com/veenone/task-activity-manager`. The `agile-suite/` name in the layout above is the conceptual root; the GitHub repository can be renamed to match later, and the old `xray-testcase-manager` repository is archived with a pointer once the suite lands here.
+The monorepo is hosted at `github.com/veenone/task-activity-manager`. The `agile-suite/` name in the layout above is the conceptual root; the GitHub repository can be renamed to match later. (Superseded on 2026-09-06: the old `xray-testcase-manager` repository is not archived; it holds the monorepo too. See `2026-09-06-xtm-monorepo-convergence-design.md`.)
 
 ## 4. Shared vs. app-specific
 

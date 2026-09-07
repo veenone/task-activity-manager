@@ -28,9 +28,14 @@ npm test --workspaces --if-present       # every Vitest suite
 npm run typecheck --workspaces --if-present   # every workspace's type check
 ```
 
-## Syncing XTM from upstream
+## Remotes
 
-XTM is still developed in `veenone/xray-testcase-manager`. Pull its commits
-in with `.\scripts\sync-xtm-upstream.ps1`, which merges upstream `main`
-into `xtm/` with a subtree-shifted merge and leaves the result uncommitted.
-Resolve conflicts, then run XTM's Go and Vitest suites before committing.
+The repository lives on three remotes, all equal: `veenone/task-activity-manager`
+and `veenone/xray-testcase-manager` on GitHub, and `achmarah/xray-test-manager`
+on the home Gitea. On a fresh clone, run `.\scripts\sync-remotes.ps1 -Setup`
+once (it points `origin` at task-activity-manager and makes it push to all
+three); from then on `git push` reaches every remote. After merging a pull
+request on GitHub, run `.\scripts\sync-remotes.ps1` to fast-forward the
+others. Merge Dependabot pull requests on task-activity-manager only.
+
+XTM releases are tagged `xtm/vX.Y.Z` (see `xtm/README.md`).

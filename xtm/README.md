@@ -95,15 +95,17 @@ Releases ship Windows and macOS artifacts plus checksums:
 The version is the single source of truth in `wails.json` (`info.productVersion`);
 the script stamps it and Wails bakes it into the installer and the exe metadata.
 
-**Cut a GitHub release** — push a tag and CI (`.github/workflows/release.yml`)
-runs two jobs: `release-windows` (on `windows-latest`) builds the installer and
-portable exe, and `release-macos` (on `macos-latest`) builds the universal `.app`.
-Both publish to the same GitHub Release. (`scripts/release.ps1` is Windows-only;
-the macOS `.app` is built directly with `wails build`.)
+**Cut a GitHub release**: push an `xtm/v*` tag and CI (`.github/workflows/release.yml`
+at the repository root) runs two jobs: `release-windows` (on `windows-latest`)
+builds the installer and portable exe, and `release-macos` (on `macos-latest`)
+builds the universal `.app`. Both publish to the same GitHub Release. The
+prefix says which app the tag belongs to; a bare `v1.10.0` builds nothing.
+(`scripts/release.ps1` is Windows-only; the macOS `.app` is built directly with
+`wails build`.)
 
 ```powershell
-git tag v0.2.0
-git push origin v0.2.0
+git tag xtm/v1.10.0
+git push origin xtm/v1.10.0
 ```
 
 ## Demo mode
