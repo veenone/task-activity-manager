@@ -53,10 +53,13 @@ type RawBoardConfig struct {
 // RawColumn is one column of a board's configuration, statuses left in
 // Jira's nested shape: a list of status objects, not a list of ids.
 type RawColumn struct {
-	Name     string `json:"name"`
-	Statuses []struct {
-		ID string `json:"id"`
-	} `json:"statuses"`
+	Name     string      `json:"name"`
+	Statuses []RawStatus `json:"statuses"`
+}
+
+// RawStatus is one status entry under a column, transport only.
+type RawStatus struct {
+	ID string `json:"id"`
 }
 
 // StatusIDs is the flattening every caller wants, kept beside the raw shape
@@ -70,7 +73,10 @@ func (c RawColumn) StatusIDs() []string {
 }
 
 // agilePage is the envelope the board and sprint collections return. The
-// board issue endpoints do not use it; see agileIssuePage below.
+// board issue endpoints do not use it; see agileIssuePage below. MaxResults
+// and StartAt are decoded so the envelope is captured in full, but they are
+// deliberately not used for paging: the loop counts start and page size
+// locally instead.
 type agilePage[T any] struct {
 	Values     []T  `json:"values"`
 	IsLast     bool `json:"isLast"`

@@ -30,7 +30,8 @@ func TestBoardsPageUntilIsLast(t *testing.T) {
 				{"id":3,"name":"Odd board","type":"simple"}
 			]}`))
 		default:
-			t.Fatalf("unexpected startAt %q", q.Get("startAt"))
+			t.Errorf("unexpected startAt %q", q.Get("startAt"))
+			return
 		}
 	}))
 	defer srv.Close()
@@ -142,13 +143,15 @@ func TestSprintsPageAndAKanbanBoardHasNone(t *testing.T) {
 					{"id":12,"name":"Sprint 12","state":"active","startDate":"2024-01-31T00:00:00.000Z","endDate":"2024-02-14T00:00:00.000Z"}
 				]}`))
 			default:
-				t.Fatalf("unexpected startAt %q", q.Get("startAt"))
+				t.Errorf("unexpected startAt %q", q.Get("startAt"))
+				return
 			}
 		case "/rest/agile/1.0/board/2/sprint":
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(`<html><body>The board does not support sprints.</body></html>`))
+			_, _ = w.Write([]byte(`{"errorMessages":["The board does not support sprints"],"errors":{}}`))
 		default:
-			t.Fatalf("unexpected path %s", r.URL.Path)
+			t.Errorf("unexpected path %s", r.URL.Path)
+			return
 		}
 	}))
 	defer srv.Close()
@@ -175,6 +178,47 @@ func TestSprintsPageAndAKanbanBoardHasNone(t *testing.T) {
 	}
 }
 
+// TestSprintsOnlyRemapsTheFirstPageError pins down the guard in pageAgile
+// that hands an error to onFirstPageErr only when start == 0. A board whose
+// first page is fine but whose second page 400s is a real failure, not a
+// kanban board reporting it has no sprints, so it must come back as the raw
+// *HTTPError and not ErrNoSprints.
+func TestSprintsOnlyRemapsTheFirstPageError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/agile/1.0/board/3/sprint" {
+			t.Errorf("path = %s", r.URL.Path)
+			return
+		}
+		switch r.URL.Query().Get("startAt") {
+		case "0":
+			_, _ = w.Write([]byte(`{"isLast":false,"maxResults":2,"startAt":0,"values":[
+				{"id":20,"name":"Sprint 20","state":"closed","startDate":"2024-01-01T00:00:00.000Z","endDate":"2024-01-15T00:00:00.000Z"},
+				{"id":21,"name":"Sprint 21","state":"closed","startDate":"2024-01-16T00:00:00.000Z","endDate":"2024-01-30T00:00:00.000Z"}
+			]}`))
+		case "2":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"errorMessages":["Internal server error"],"errors":{}}`))
+		default:
+			t.Errorf("unexpected startAt %q", r.URL.Query().Get("startAt"))
+			return
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	sprints, err := c.Sprints(context.Background(), 3)
+	if err == nil {
+		t.Fatalf("sprints = %+v, want an error from the second page's 400", sprints)
+	}
+	if errors.Is(err, ErrNoSprints) {
+		t.Fatalf("err = %v, want the real error, not ErrNoSprints: a 400 past the first page is not a kanban board", err)
+	}
+	var httpErr *HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusBadRequest {
+		t.Fatalf("err = %v, want *HTTPError with Code 400", err)
+	}
+}
+
 func TestBoardIssueKeysPageTheSearchEnvelope(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("fields") != "key" {
@@ -188,12 +232,14 @@ func TestBoardIssueKeysPageTheSearchEnvelope(t *testing.T) {
 			case "2":
 				_, _ = w.Write([]byte(`{"startAt":2,"maxResults":2,"total":3,"issues":[{"key":"PLAT-3"}]}`))
 			default:
-				t.Fatalf("unexpected startAt %q", r.URL.Query().Get("startAt"))
+				t.Errorf("unexpected startAt %q", r.URL.Query().Get("startAt"))
+				return
 			}
 		case "/rest/agile/1.0/board/1/sprint/12/issue":
 			_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":1,"issues":[{"key":"PLAT-12"}]}`))
 		default:
-			t.Fatalf("unexpected path %s", r.URL.Path)
+			t.Errorf("unexpected path %s", r.URL.Path)
+			return
 		}
 	}))
 	defer srv.Close()
@@ -214,5 +260,31 @@ func TestBoardIssueKeysPageTheSearchEnvelope(t *testing.T) {
 	}
 	if want := []string{"PLAT-12"}; !reflect.DeepEqual(keys, want) {
 		t.Fatalf("keys = %v, want %v", keys, want)
+	}
+}
+
+// TestBoardIssueKeysEscapesSprintID pins down url.PathEscape on the sprint
+// id. "12" escapes to itself, which is why every other test in this file
+// cannot catch a dropped escape; this one uses an id that actually changes
+// under escaping, and compares the escaped path the handler received, not
+// just the request outcome.
+func TestBoardIssueKeysEscapesSprintID(t *testing.T) {
+	var gotEscapedPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotEscapedPath = r.URL.EscapedPath()
+		_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":1,"issues":[{"key":"PLAT-9"}]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	keys, err := c.BoardIssueKeys(context.Background(), 1, "12 a/b")
+	if err != nil {
+		t.Fatalf("sprint issue keys: %v", err)
+	}
+	if want := []string{"PLAT-9"}; !reflect.DeepEqual(keys, want) {
+		t.Fatalf("keys = %v, want %v", keys, want)
+	}
+	if want := "/rest/agile/1.0/board/1/sprint/12%20a%2Fb/issue"; gotEscapedPath != want {
+		t.Errorf("escaped path = %q, want %q", gotEscapedPath, want)
 	}
 }
