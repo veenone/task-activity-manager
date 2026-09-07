@@ -306,3 +306,101 @@ describe("EpicsView", () => {
     expect(await screen.findByText("Showing the first 5,000 issues. Narrow the filter.")).toBeInTheDocument();
   });
 });
+
+describe("EpicTree keyboard", () => {
+  function singleEpicTree(): EpicTreeData {
+    return {
+      epics: [
+        epicNode({
+          issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }),
+          children: [issue({ key: "PLAT-101", summary: "Apply promo code" })],
+          total: 1, done: 0, points: 0, donePoints: 0,
+        }),
+      ],
+      orphans: [],
+      truncated: false,
+    };
+  }
+
+  it("moves focus to the next visible row on ArrowDown", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue(singleEpicTree());
+    renderView();
+    const treeNav = await screen.findByRole("tree", { name: "Epics" });
+    await screen.findByText("Apply promo code");
+    const allEpicsRow = within(treeNav).getByText("All epics").closest('[role="treeitem"]') as HTMLElement;
+    await user.click(allEpicsRow);
+    expect(document.activeElement).toBe(allEpicsRow);
+
+    await user.keyboard("{ArrowDown}");
+    const epicRow = screen.getByRole("treeitem", { name: "PLAT-100 Checkout revamp" });
+    expect(document.activeElement).toBe(epicRow);
+  });
+
+  it("expands a collapsed epic on ArrowRight and collapses it on ArrowLeft", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue(singleEpicTree());
+    renderView();
+    await screen.findByText("Apply promo code");
+    await user.click(screen.getByRole("button", { name: "Collapse all" }));
+    expect(screen.queryByText("Apply promo code")).not.toBeInTheDocument();
+
+    const epicRow = screen.getByRole("treeitem", { name: "PLAT-100 Checkout revamp" });
+    await user.click(epicRow);
+    await user.keyboard("{ArrowRight}");
+    expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.queryByText("Apply promo code")).not.toBeInTheDocument();
+  });
+
+  it("moves focus from a child to its epic on ArrowLeft", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue(singleEpicTree());
+    renderView();
+    const childRow = (await screen.findByText("Apply promo code")).closest('[role="treeitem"]') as HTMLElement;
+    await user.click(childRow);
+    expect(document.activeElement).toBe(childRow);
+
+    await user.keyboard("{ArrowLeft}");
+    const epicRow = screen.getByRole("treeitem", { name: "PLAT-100 Checkout revamp" });
+    expect(document.activeElement).toBe(epicRow);
+  });
+
+  it("selects a focused child on Enter", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue(singleEpicTree());
+    renderView();
+    const treeNav = await screen.findByRole("tree", { name: "Epics" });
+    await screen.findByText("Apply promo code");
+    const allEpicsRow = within(treeNav).getByText("All epics").closest('[role="treeitem"]') as HTMLElement;
+    await user.click(allEpicsRow);
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    const childRow = screen.getByText("Apply promo code").closest('[role="treeitem"]') as HTMLElement;
+    expect(document.activeElement).toBe(childRow);
+
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "PLAT-101" })).toBeInTheDocument();
+  });
+
+  it("keeps exactly one focusable row after collapsing the selected child's epic", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue(singleEpicTree());
+    const { container } = renderView();
+    const treeNav = await screen.findByRole("tree", { name: "Epics" });
+    const childRow = within(treeNav).getByText("Apply promo code").closest('[role="treeitem"]') as HTMLElement;
+    await user.click(childRow);
+    expect(await screen.findByRole("heading", { name: "PLAT-101" })).toBeInTheDocument();
+
+    await user.click(within(treeNav).getByText("▾"));
+    expect(within(treeNav).queryByText("Apply promo code")).not.toBeInTheDocument();
+
+    const focusable = container.querySelectorAll('[tabindex="0"]');
+    expect(focusable.length).toBe(1);
+
+    (focusable[0] as HTMLElement).focus();
+    await user.keyboard("{ArrowDown}");
+    const epicRow = screen.getByRole("treeitem", { name: "PLAT-100 Checkout revamp" });
+    expect(document.activeElement).toBe(epicRow);
+  });
+});

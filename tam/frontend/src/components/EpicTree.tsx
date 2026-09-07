@@ -1,16 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import type { EpicTreeData, Issue } from "../api";
-import { TypeChip } from "./TypeChip";
-import { statusClass } from "../lib/statusClass";
+import type { EpicNode, EpicTreeData, Issue } from "../api";
 import { MAX_ORPHAN_ROWS, NO_EPIC_KEY, ownerOf, visibleRows } from "../lib/epicTreeItems";
 import type { Row } from "../lib/epicTreeItems";
+import { EpicChildRow, EpicRow } from "./EpicRow";
 
-const MOVED_FLASH_MS = 2000;
-
-function progressText(done: number, total: number, points: number): string {
-  return `${done} of ${total} done` + (points > 0 ? `, ${points} pts` : "");
-}
+export const MOVED_FLASH_MS = 2000;
 
 interface Props {
   tree: EpicTreeData;
@@ -25,10 +20,11 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
   const rootRef = useRef<HTMLElement>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const [flashKey, setFlashKey] = useState("");
+  const [focusKey, setFocusKey] = useState(selectedKey);
 
   // A newly seen epic (or the orphans group) opens by default, and so does
-  // the branch holding whichever key is selected, so a freshly loaded tree
-  // (or a selection made elsewhere) never hides what it should show.
+  // the branch holding the selected key, so nothing loads, or gets
+  // selected, hidden behind a collapsed row.
   useEffect(() => {
     const toOpen: string[] = [];
     for (const node of tree.epics) {
@@ -67,27 +63,47 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
   const rows = visibleRows(tree, expanded);
   const indexOf = new Map(rows.map((r, i) => [r.id, i] as const));
 
-  function focusIndex(index: number) {
+  // Exactly one row keeps tabIndex 0: it defaults to the selection, and
+  // falls back to the first visible row whenever a collapse, a filter, or a
+  // selection change hides whichever row currently owns it.
+  useEffect(() => {
+    setFocusKey((prev) => {
+      if (indexOf.has(prev)) return prev;
+      if (indexOf.has(selectedKey)) return selectedKey;
+      return rows[0]?.id ?? "";
+    });
+  }, [tree, expanded, selectedKey]);
+
+  function moveFocus(index: number) {
+    const target = rows[index];
+    if (!target) return;
+    setFocusKey(target.id);
     rootRef.current?.querySelector<HTMLElement>(`[data-tree-index="${index}"]`)?.focus();
   }
 
-  function toggle(key: string) {
+  function selectAndFocus(key: string) {
+    onSelect(key);
+    setFocusKey(key);
+  }
+
+  function toggle(key: string, focus?: boolean) {
     onExpandedChange((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
+    if (focus) setFocusKey(key);
   }
 
   function onKeyDown(e: KeyboardEvent, row: Row) {
     const index = indexOf.get(row.id) ?? 0;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      focusIndex(Math.min(rows.length - 1, index + 1));
+      moveFocus(Math.min(rows.length - 1, index + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      focusIndex(Math.max(0, index - 1));
+      moveFocus(Math.max(0, index - 1));
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       if (row.kind === "epic" || row.kind === "noepic") onExpandedChange((prev) => new Set(prev).add(row.id));
@@ -100,38 +116,59 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
           return next;
         });
       } else if (row.kind === "child") {
-        focusIndex(indexOf.get(row.ownerKey) ?? index);
+        moveFocus(indexOf.get(row.ownerKey) ?? index);
       }
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      if (row.kind === "all") onSelect("");
-      else if (row.kind === "epic" || row.kind === "child") onSelect(row.id);
-      else toggle(row.id);
+      if (row.kind === "all") selectAndFocus("");
+      else if (row.kind === "epic" || row.kind === "child") selectAndFocus(row.id);
+      else toggle(row.id, true);
     }
   }
 
-  function childRow(child: Issue, ownerKey: string) {
-    const row: Row = { id: child.key, kind: "child", ownerKey };
-    const selected = child.key === selectedKey;
-    return (
-      <div
+  function renderChildren(children: Issue[], ownerKey: string) {
+    return children.map((child) => (
+      <EpicChildRow
         key={child.key}
-        role="treeitem"
-        aria-selected={selected}
-        tabIndex={selected ? 0 : -1}
-        data-tree-index={indexOf.get(child.key)}
-        data-tree-key={child.key}
-        className={`folder-item epic-row${selected ? " folder-selected" : ""}${flashKey === child.key ? " epic-row-moved" : ""}`}
-        onClick={() => onSelect(child.key)}
-        onKeyDown={(e) => onKeyDown(e, row)}
-      >
-        <span className="folder-caret" />
-        <TypeChip type={child.type} />
-        <span>{child.key}</span>
-        <span>{child.summary}</span>
-        <span className={`chip chip-status chip-status-${statusClass(child.status)}`}>{child.status}</span>
-        <span>{child.storyPoints ?? "-"}</span>
-        {child.pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}
+        child={child}
+        ownerKey={ownerKey}
+        index={indexOf.get(child.key)}
+        selected={child.key === selectedKey}
+        focused={child.key === focusKey}
+        flashed={flashKey === child.key}
+        onActivate={selectAndFocus}
+        onKeyDown={onKeyDown}
+      />
+    ));
+  }
+
+  // A branch is one epic (or the orphans group) plus its children when
+  // open: both render the same header-and-group shape, so they share it.
+  function branch(kind: "epic" | "noepic", rowKey: string, open: boolean, children: Issue[], node?: EpicNode, count?: number) {
+    return (
+      <div className="folder-node" key={rowKey}>
+        <EpicRow
+          kind={kind}
+          rowKey={rowKey}
+          node={node}
+          count={count}
+          index={indexOf.get(rowKey)}
+          open={open}
+          selected={rowKey === selectedKey}
+          focused={rowKey === focusKey}
+          flashed={flashKey === rowKey}
+          onActivate={() => (kind === "epic" ? selectAndFocus(rowKey) : toggle(rowKey, true))}
+          onToggle={() => toggle(rowKey)}
+          onKeyDown={(e) => onKeyDown(e, { id: rowKey, kind, ownerKey: rowKey })}
+        />
+        {open && (
+          <div className="folder-children" role="group">
+            {renderChildren(children, rowKey)}
+            {kind === "noepic" && tree.orphans.length > MAX_ORPHAN_ROWS && (
+              <p className="muted small">{`and ${tree.orphans.length - MAX_ORPHAN_ROWS} more. Use the search to narrow.`}</p>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -141,10 +178,10 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
       <div
         role="treeitem"
         aria-selected={selectedKey === ""}
-        tabIndex={selectedKey === "" ? 0 : -1}
+        tabIndex={focusKey === "" ? 0 : -1}
         data-tree-index={0}
         className={`folder-item epic-row${selectedKey === "" ? " folder-selected" : ""}`}
-        onClick={() => onSelect("")}
+        onClick={() => selectAndFocus("")}
         onKeyDown={(e) => onKeyDown(e, { id: "", kind: "all", ownerKey: "" })}
       >
         <span className="folder-caret" />
@@ -153,72 +190,10 @@ export function EpicTree({ tree, selectedKey, onSelect, expanded, onExpandedChan
         <span className="folder-count">{tree.epics.length}</span>
       </div>
 
-      {tree.epics.map((node) => {
-        const key = node.issue.key;
-        const open = expanded.has(key);
-        const selected = key === selectedKey;
-        const row: Row = { id: key, kind: "epic", ownerKey: key };
-        return (
-          <div className="folder-node" key={key}>
-            <div
-              role="treeitem"
-              aria-expanded={open}
-              aria-selected={selected}
-              tabIndex={selected ? 0 : -1}
-              aria-label={`${key} ${node.issue.summary}`}
-              data-tree-index={indexOf.get(key)}
-              data-tree-key={key}
-              className={`folder-item epic-row${selected ? " folder-selected" : ""}${flashKey === key ? " epic-row-moved" : ""}`}
-              onClick={() => onSelect(key)}
-              onKeyDown={(e) => onKeyDown(e, row)}
-            >
-              <span className="folder-caret folder-caret-toggle" onClick={(e) => { e.stopPropagation(); toggle(key); }}>
-                {open ? "▾" : "▸"}
-              </span>
-              <TypeChip type={node.issue.type} />
-              <span className="folder-name">
-                <span className="accent-text">{key}</span> {node.issue.summary}
-              </span>
-              <span className="folder-count">{progressText(node.done, node.total, node.points)}</span>
-              {node.issue.pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}
-            </div>
-            {open && (
-              <div className="folder-children" role="group">
-                {node.children.map((child) => childRow(child, key))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {tree.epics.map((node) => branch("epic", node.issue.key, expanded.has(node.issue.key), node.children, node))}
 
-      {tree.orphans.length > 0 && (
-        <div className="folder-node">
-          <div
-            role="treeitem"
-            aria-expanded={expanded.has(NO_EPIC_KEY)}
-            tabIndex={NO_EPIC_KEY === selectedKey ? 0 : -1}
-            data-tree-index={indexOf.get(NO_EPIC_KEY)}
-            className="folder-item epic-row"
-            onClick={() => toggle(NO_EPIC_KEY)}
-            onKeyDown={(e) => onKeyDown(e, { id: NO_EPIC_KEY, kind: "noepic", ownerKey: NO_EPIC_KEY })}
-          >
-            <span className="folder-caret folder-caret-toggle" onClick={(e) => { e.stopPropagation(); toggle(NO_EPIC_KEY); }}>
-              {expanded.has(NO_EPIC_KEY) ? "▾" : "▸"}
-            </span>
-            <span />
-            <span className="folder-name">No epic</span>
-            <span className="folder-count">{tree.orphans.length}</span>
-          </div>
-          {expanded.has(NO_EPIC_KEY) && (
-            <div className="folder-children" role="group">
-              {tree.orphans.slice(0, MAX_ORPHAN_ROWS).map((child) => childRow(child, NO_EPIC_KEY))}
-              {tree.orphans.length > MAX_ORPHAN_ROWS && (
-                <p className="muted small">{`and ${tree.orphans.length - MAX_ORPHAN_ROWS} more. Use the search to narrow.`}</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      {tree.orphans.length > 0 &&
+        branch("noepic", NO_EPIC_KEY, expanded.has(NO_EPIC_KEY), tree.orphans.slice(0, MAX_ORPHAN_ROWS), undefined, tree.orphans.length)}
     </nav>
   );
 }

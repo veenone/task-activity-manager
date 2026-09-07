@@ -3,14 +3,13 @@ import { useProfile } from "@agile-suite/core";
 import type { EpicTreeData, Issue, Profile, Settings, TreeQuery } from "../api";
 import { useEpicTree } from "../queries/tree";
 import { useSprints } from "../queries/issues";
-import { EpicTree } from "./EpicTree";
+import { EpicTree, MOVED_FLASH_MS } from "./EpicTree";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useModal } from "../modals";
 import { NewIssueModal } from "./NewIssueModal";
 import { useDebounced } from "../lib/useDebounced";
 
 const SEARCH_DELAY_MS = 250;
-const MOVED_FLASH_MS = 2000;
 
 // findIssue looks an issue up in the tree by key, whichever branch holds it:
 // an epic itself, one of its children, or an orphan.
@@ -35,6 +34,12 @@ export function EpicsView() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [movedKey, setMovedKey] = useState("");
 
+  // A parentKey edit made in the detail panel journals the change and the
+  // tree query is invalidated with it, so the freshly loaded tree carries
+  // the issue's new parent. Watching that value for the selected issue is
+  // how EpicsView notices the move without the panel needing to say so.
+  const lastParentRef = useRef<Map<string, string>>(new Map());
+
   // Filters, selection, and the expanded set all belong to the profile they
   // were set for, so a switch clears them in the render that first sees the
   // new id, the same way BacklogView resets its own filters.
@@ -47,6 +52,7 @@ export function EpicsView() {
     setSelectedKey("");
     setExpanded(new Set());
     setMovedKey("");
+    lastParentRef.current.clear();
   }
 
   const search = useDebounced(text, SEARCH_DELAY_MS, activeId);
@@ -55,11 +61,6 @@ export function EpicsView() {
   const sprints = useSprints(activeId);
   const { isOpen, openModal, closeModal } = useModal();
 
-  // A parentKey edit made in the detail panel journals the change and the
-  // tree query is invalidated with it, so the freshly loaded tree carries
-  // the issue's new parent. Watching that value for the selected issue is
-  // how EpicsView notices the move without the panel needing to say so.
-  const lastParentRef = useRef<Map<string, string>>(new Map());
   useEffect(() => {
     if (!tree.data) return;
     const issue = findIssue(tree.data, selectedKey);
