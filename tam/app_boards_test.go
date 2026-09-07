@@ -129,6 +129,18 @@ func (stubIssueBackend) CreateLink(context.Context, string, backend.LinkDraft) e
 	return errors.New("not used")
 }
 
+// The three lookups the forms use. A board test never reaches them, but
+// IssueBackend carries them, so the stub has to answer.
+func (stubIssueBackend) SubtaskTypeName(context.Context, string) (string, error) {
+	return "", errors.New("not used")
+}
+func (stubIssueBackend) SearchUsers(context.Context, string, string) ([]backend.User, error) {
+	return nil, errors.New("not used")
+}
+func (stubIssueBackend) Priorities(context.Context) ([]string, error) {
+	return nil, errors.New("not used")
+}
+
 // simpleBoardBackend answers the board calls straight away, for seeding a
 // previous good copy before a test swaps in a slower backend. Its columns
 // are per board id, since the boards it answers with are too.

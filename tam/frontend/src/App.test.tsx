@@ -178,7 +178,9 @@ describe("App shell", () => {
     const tabs = screen.getByRole("navigation", { name: "Views" });
     await userEvent.click(within(tabs).getByRole("button", { name: "Boards" }));
     expect(screen.getByRole("region", { name: /Boards/ })).toBeInTheDocument();
-    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
+    expect(
+      await screen.findByText("This project has no boards in Jira, or the sync has not run"),
+    ).toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" }))
       .toHaveAttribute("aria-current", "page");
   });
@@ -187,10 +189,10 @@ describe("App shell", () => {
     vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
     renderApp();
     const rail = await screen.findByRole("navigation", { name: "Navigation rail" });
-    await userEvent.click(within(rail).getByRole("button", { name: "Boards" }));
-    expect(screen.getByRole("region", { name: /Boards/ })).toBeInTheDocument();
-    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
-    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" }))
+    await userEvent.click(within(rail).getByRole("button", { name: "Reports" }));
+    expect(screen.getByRole("region", { name: /Reports/ })).toBeInTheDocument();
+    expect(screen.getByText(/arrives in Phase 4/)).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Reports" }))
       .toHaveAttribute("aria-current", "page");
   });
 
