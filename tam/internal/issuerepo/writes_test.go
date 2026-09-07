@@ -158,8 +158,11 @@ func TestCreateDraftNumbersPerProfileAndEditsUpdateItsJSON(t *testing.T) {
 	if len(pend) != 1 || stored.Summary != "Add a retry to the consumer" {
 		t.Errorf("editing a draft rewrites its JSON instead of adding a row: %+v", pend)
 	}
-	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "x"}); err == nil {
-		t.Error("an epic draft must be refused")
+	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic"}); err != nil {
+		t.Errorf("an epic draft with no parent is creatable: %v", err)
+	}
+	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "x", ParentKey: "PLAT-1"}); err == nil {
+		t.Error("an epic draft with a parent must be refused")
 	}
 	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask}); err == nil {
 		t.Error("a draft needs a summary")
@@ -419,8 +422,12 @@ func TestCreateDraftsIsOneTransactionWithParentsAndANote(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()
 	seedOne(t, repo, "p1")
+	epic := []backend.Issue{{Key: "PLAT-2", Type: backend.TypeEpic, Summary: "Epic", Labels: []string{}, Updated: v1}}
+	if err := repo.UpsertPage(ctx, "p1", epic, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
 	drafts := []backend.IssueDraft{
-		{Type: backend.TypeTask, Summary: "First", ParentKey: "PLAT-1", Labels: []string{"a"}},
+		{Type: backend.TypeTask, Summary: "First", ParentKey: "PLAT-2", Labels: []string{"a"}},
 		{Type: backend.TypeRequirement, Summary: "Second", Priority: "High"},
 		{Type: backend.TypeBug, Summary: "Third", StoryPoints: pts(2)},
 	}
@@ -432,7 +439,7 @@ func TestCreateDraftsIsOneTransactionWithParentsAndANote(t *testing.T) {
 		t.Errorf("keys = %v", keys)
 	}
 	first, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-1")
-	if first.ParentKey != "PLAT-1" || !first.Draft || !first.Pending {
+	if first.ParentKey != "PLAT-2" || !first.Draft || !first.Pending {
 		t.Errorf("first: %+v", first)
 	}
 	second, _ := repo.GetIssue(ctx, "p1", "TAM-NEW-2")
@@ -446,14 +453,15 @@ func TestCreateDraftsIsOneTransactionWithParentsAndANote(t *testing.T) {
 	pend, _ := repo.PendingForKey(ctx, "p1", "TAM-NEW-1")
 	var stored backend.IssueDraft
 	_ = json.Unmarshal([]byte(pend[0].AfterVal), &stored)
-	if stored.ParentKey != "PLAT-1" {
+	if stored.ParentKey != "PLAT-2" {
 		t.Errorf("create JSON keeps the parent: %s", pend[0].AfterVal)
 	}
 
-	// One bad draft fails the whole call and leaves nothing behind.
-	bad := []backend.IssueDraft{{Type: backend.TypeTask, Summary: "Ok"}, {Type: backend.TypeEpic, Summary: "Nope"}}
+	// One bad draft (a non-epic parent) fails the whole call and leaves
+	// nothing behind.
+	bad := []backend.IssueDraft{{Type: backend.TypeTask, Summary: "Ok"}, {Type: backend.TypeTask, Summary: "Bad parent", ParentKey: "PLAT-1"}}
 	if _, err := repo.CreateDrafts(ctx, "p1", "PLAT", bad, ""); err == nil {
-		t.Fatal("an epic draft must be refused")
+		t.Fatal("a non-epic parent must be refused")
 	}
 	if _, err := repo.GetIssue(ctx, "p1", "TAM-NEW-4"); !errors.Is(err, issuerepo.ErrNotFound) {
 		t.Errorf("nothing from the failed batch: %v", err)
@@ -465,6 +473,76 @@ func TestCreateDraftsIsOneTransactionWithParentsAndANote(t *testing.T) {
 	k, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeRequirement, Summary: "Req"})
 	if err != nil || k != "TAM-NEW-4" {
 		t.Errorf("CreateDraft requirement: %q %v", k, err)
+	}
+}
+
+func TestEditFieldParentKeyKeepsTheHierarchy(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	rows := []backend.Issue{
+		{Key: "PLAT-350", Type: backend.TypeEpic, Summary: "Promo", Labels: []string{}, Updated: v1},
+		{Key: "PLAT-320", Type: backend.TypeEpic, Summary: "Checkout", Labels: []string{}, Updated: v1},
+		{Key: "PLAT-412", Type: backend.TypeStory, Summary: "Story", ParentKey: "PLAT-350", Labels: []string{}, Updated: v1},
+	}
+	_ = repo.UpsertPage(ctx, "p1", rows, time.Now(), false)
+	if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", "PLAT-320"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-412")
+	pend, _ := repo.PendingForKey(ctx, "p1", "PLAT-412")
+	if iss.ParentKey != "PLAT-320" || len(pend) != 1 || pend[0].Field != "parentKey" || pend[0].BeforeVal != "PLAT-350" || pend[0].AfterVal != "PLAT-320" {
+		t.Errorf("row %+v pending %+v", iss, pend)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", ""); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	for name, target := range map[string]string{"story as parent": "PLAT-412", "unknown": "PLAT-999"} {
+		if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", target); err == nil {
+			t.Errorf("%s must be refused", name)
+		}
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-350", "parentKey", "PLAT-320"); err == nil {
+		t.Error("an epic cannot take a parent")
+	}
+	if _, err := repo.CreateDrafts(ctx, "p1", "PLAT", []backend.IssueDraft{{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "PLAT-350"}}, ""); err == nil {
+		t.Error("an epic draft with a parent must be refused")
+	}
+	if _, err := repo.CreateDrafts(ctx, "p1", "PLAT", []backend.IssueDraft{{Type: backend.TypeEpic, Summary: "New epic"}}, ""); err != nil {
+		t.Errorf("epic drafts are creatable: %v", err)
+	}
+}
+
+func TestRekeyRepointsChildrenAndPendingParentEdits(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	rows := []backend.Issue{
+		{Key: "PLAT-320", Type: backend.TypeEpic, Summary: "Checkout", Labels: []string{}, Updated: v1},
+		{Key: "PLAT-412", Type: backend.TypeStory, Summary: "Story", Labels: []string{}, Updated: v1},
+	}
+	_ = repo.UpsertPage(ctx, "p1", rows, time.Now(), false)
+	temp, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", temp); err != nil {
+		t.Fatalf("parent the story to the draft epic: %v", err)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", "PLAT-320"); err != nil {
+		t.Fatalf("re-parent so a second pending row also names the temp key later: %v", err)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", temp); err != nil {
+		t.Fatalf("back to the draft epic: %v", err)
+	}
+	if err := repo.Rekey(ctx, "p1", temp, "PLAT-501"); err != nil {
+		t.Fatalf("rekey: %v", err)
+	}
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-412")
+	if iss.ParentKey != "PLAT-501" {
+		t.Errorf("the child's parent_key follows the rekey: %+v", iss)
+	}
+	pend, _ := repo.PendingForKey(ctx, "p1", "PLAT-412")
+	if len(pend) != 1 || pend[0].AfterVal != "PLAT-501" {
+		t.Errorf("the pending parentKey edit's after_val follows the rekey: %+v", pend)
 	}
 }
 

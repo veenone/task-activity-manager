@@ -10,7 +10,8 @@ import (
 )
 
 // Rekey moves a draft to the key Jira assigned, across the row, its links,
-// its journal rows, and its audit trail, and audits the creation.
+// its journal rows, and its audit trail, and repoints any issue or pending
+// edit that named the temporary key, and audits the creation.
 func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -22,6 +23,8 @@ func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey stri
 		`UPDATE issue_link SET from_key = ? WHERE profile_id = ? AND from_key = ?`,
 		`UPDATE pending_change SET entity_key = ? WHERE profile_id = ? AND entity_key = ?`,
 		`UPDATE audit_log SET entity_key = ? WHERE profile_id = ? AND entity_key = ?`,
+		`UPDATE issue SET parent_key = ? WHERE profile_id = ? AND parent_key = ?`,
+		`UPDATE pending_change SET after_val = ? WHERE profile_id = ? AND field = 'parentKey' AND after_val = ?`,
 	} {
 		if _, err := tx.ExecContext(ctx, stmt, realKey, profileID, tempKey); err != nil {
 			return fmt.Errorf("rekey %s to %s: %w", tempKey, realKey, err)

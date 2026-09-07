@@ -149,13 +149,13 @@ func logicalType(raw, requirementType string) (string, error) {
 	switch n {
 	case "", backend.TypeTask:
 		return backend.TypeTask, nil
-	case backend.TypeStory, backend.TypeBug, backend.TypeRequirement:
+	case backend.TypeStory, backend.TypeBug, backend.TypeRequirement, backend.TypeEpic:
 		return n, nil
 	}
 	if requirementType != "" && n == strings.ToLower(strings.TrimSpace(requirementType)) {
 		return backend.TypeRequirement, nil
 	}
-	return "", fmt.Errorf("Type %q cannot be created; use Task, Story, Bug, or %s", strings.TrimSpace(raw), requirementLabel(requirementType))
+	return "", fmt.Errorf("Type %q cannot be created; use Task, Story, Bug, Epic, or %s", strings.TrimSpace(raw), requirementLabel(requirementType))
 }
 
 func requirementLabel(requirementType string) string {
@@ -170,6 +170,11 @@ func requirementLabel(requirementType string) string {
 // row whose type and summary already match a draft from an earlier import,
 // or repeat an earlier row of this same file, are skipped too, so a second
 // pass over a partly-imported file never duplicates.
+//
+// A row's Parent cell can name an epic created earlier in the same file:
+// epic rows must come before the children that point at them, since a
+// child's row is checked against the file's own epics in the order they
+// appear, not the order they are typed.
 func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey, requirementType string, records [][]string, m Mapping, fileName string, dryRun bool) (Result, error) {
 	if len(records) < 2 {
 		return Result{}, errors.New("the file has a header row but no data rows")
@@ -182,6 +187,11 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 	if err != nil {
 		return Result{}, err
 	}
+	nextNum, err := repo.NextDraftNumber(ctx, profileID)
+	if err != nil {
+		return Result{}, err
+	}
+	newEpics := map[string]bool{}
 	seen := map[string]int{}
 	res := Result{Created: []string{}, Errors: []RowError{}}
 	var drafts []backend.IssueDraft
@@ -220,7 +230,11 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 			continue
 		}
 		parent := cell(row, c.parent)
-		if parent != "" {
+		if typ == backend.TypeEpic && parent != "" {
+			fail("An epic cannot have a parent.")
+			continue
+		}
+		if parent != "" && !newEpics[parent] {
 			msg, seen := parents[parent]
 			if !seen {
 				iss, err := repo.GetIssue(ctx, profileID, parent)
@@ -231,6 +245,8 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 					return Result{}, err
 				case iss.Draft:
 					msg = fmt.Sprintf("Parent %s is a draft; commit it first.", parent)
+				case iss.Type != backend.TypeEpic:
+					msg = fmt.Sprintf("Parent %s is not an epic.", parent)
 				default:
 					msg = ""
 				}
@@ -252,6 +268,9 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 			ParentKey:   parent,
 			Extra:       map[string]string{},
 		})
+		if typ == backend.TypeEpic {
+			newEpics[fmt.Sprintf("%s%d", issuerepo.DraftPrefix, nextNum+len(drafts))] = true
+		}
 	}
 	if dryRun || len(drafts) == 0 {
 		return res, nil
@@ -274,5 +293,6 @@ func TemplateCSV() []byte {
 		"Task,Rotate the payment gateway keys,Rotate before the audit,Medium,security,,2,\n" +
 		"Story,Apply promo code at payment step,As a shopper I can enter a promo code,High,\"checkout, promo\",,5,\n" +
 		"Bug,Promo code field accepts whitespace,Trim the input before validating,Low,promo,,1,\n" +
-		"Requirement,Promo codes are single-use per customer,Enforced at redemption,High,promo,,,\n")
+		"Requirement,Promo codes are single-use per customer,Enforced at redemption,High,promo,,,\n" +
+		"Epic,Promotions and discounts,Everything about promo codes,High,promo,,,\n")
 }

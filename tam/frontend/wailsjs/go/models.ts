@@ -474,6 +474,46 @@ export namespace importfile {
 
 export namespace issuerepo {
 	
+	export class EpicNode {
+	    issue: backend.Issue;
+	    children: backend.Issue[];
+	    total: number;
+	    done: number;
+	    points: number;
+	    donePoints: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new EpicNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.issue = this.convertValues(source["issue"], backend.Issue);
+	        this.children = this.convertValues(source["children"], backend.Issue);
+	        this.total = source["total"];
+	        this.done = source["done"];
+	        this.points = source["points"];
+	        this.donePoints = source["donePoints"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class IssuePage {
 	    issues: backend.Issue[];
 	    total: number;
@@ -572,6 +612,56 @@ export namespace issuerepo {
 	        this.lastFull = source["lastFull"];
 	        this.lastError = source["lastError"];
 	        this.issueCount = source["issueCount"];
+	    }
+	}
+	export class Tree {
+	    epics: EpicNode[];
+	    orphans: backend.Issue[];
+	    truncated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Tree(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.epics = this.convertValues(source["epics"], EpicNode);
+	        this.orphans = this.convertValues(source["orphans"], backend.Issue);
+	        this.truncated = source["truncated"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TreeQuery {
+	    text: string;
+	    sprintId: string;
+	    showDone: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TreeQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.sprintId = source["sprintId"];
+	        this.showDone = source["showDone"];
 	    }
 	}
 

@@ -16,16 +16,16 @@ import (
 // EditableFields are the fields EditField accepts, in the order the panel
 // shows them. Their names are the JSON names on backend.Issue, plus
 // description, which lives in the detail cache.
-var EditableFields = []string{"summary", "description", "priority", "labels", "storyPoints", "assignee"}
+var EditableFields = []string{"summary", "description", "priority", "labels", "storyPoints", "assignee", "parentKey"}
 
 // fieldColumns maps a field name to its issue column; description has none.
 var fieldColumns = map[string]string{
 	"summary": "summary", "description": "", "priority": "priority",
-	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee",
+	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee", "parentKey": "parent_key",
 }
 
 // draftTypes are the logical types a draft may have.
-var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true}
+var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true, backend.TypeEpic: true}
 
 // staleDetailStamp backdates a fabricated detail cache (one writeField built
 // from nothing, rather than a real fetch) so it reads as stale at once.
@@ -55,6 +55,8 @@ func FieldValue(iss backend.Issue, description, field string) string {
 		return strings.Join(iss.Labels, ", ")
 	case "storyPoints":
 		return backend.FormatPoints(iss.StoryPoints)
+	case "parentKey":
+		return iss.ParentKey
 	}
 	return ""
 }
@@ -76,24 +78,24 @@ func validateField(field, value string) error {
 	return nil
 }
 
-// readField returns the current text form of a field and the row's
-// updated stamp, which is the base version of any edit made now.
-func readField(ctx context.Context, q execer, profileID, key, field string) (string, string, error) {
+// readField returns the current text form of a field, the row's updated
+// stamp (the base version of any edit made now), and the row's own type,
+// which a parentKey edit needs to enforce the hierarchy.
+func readField(ctx context.Context, q execer, profileID, key, field string) (value, updated, ownType string, err error) {
 	var (
-		iss     backend.Issue
-		labels  string
-		points  sql.NullFloat64
-		detail  sql.NullString
-		updated string
+		iss    backend.Issue
+		labels string
+		points sql.NullFloat64
+		detail sql.NullString
 	)
-	err := q.QueryRowContext(ctx,
-		`SELECT summary, priority, assignee, labels, story_points, detail_json, updated FROM issue WHERE profile_id = ? AND key = ?`,
-		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &labels, &points, &detail, &updated)
+	err = q.QueryRowContext(ctx,
+		`SELECT summary, priority, assignee, labels, story_points, detail_json, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
+		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &labels, &points, &detail, &updated, &iss.ParentKey, &iss.Type)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", ErrNotFound
+		return "", "", "", ErrNotFound
 	}
 	if err != nil {
-		return "", "", fmt.Errorf("read %s: %w", key, err)
+		return "", "", "", fmt.Errorf("read %s: %w", key, err)
 	}
 	_ = json.Unmarshal([]byte(labels), &iss.Labels)
 	if points.Valid {
@@ -107,7 +109,35 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (str
 			description = d.Description
 		}
 	}
-	return FieldValue(iss, description, field), updated, nil
+	return FieldValue(iss, description, field), updated, iss.Type, nil
+}
+
+// validateParent enforces the two-level hierarchy: an epic takes no parent,
+// and a parent must be an epic in the profile's cache and not the issue
+// itself. An empty value takes the issue out of its epic.
+func validateParent(ctx context.Context, q execer, profileID, key, ownType, value string) error {
+	value = strings.TrimSpace(value)
+	if ownType == backend.TypeEpic && value != "" {
+		return errors.New("an epic cannot be placed under another epic")
+	}
+	if value == "" {
+		return nil
+	}
+	if strings.EqualFold(value, key) {
+		return errors.New("an issue cannot be its own epic")
+	}
+	var typ string
+	err := q.QueryRowContext(ctx, `SELECT type FROM issue WHERE profile_id = ? AND key = ?`, profileID, value).Scan(&typ)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("%s is not in the cache; sync first", value)
+	}
+	if err != nil {
+		return fmt.Errorf("check epic %s: %w", value, err)
+	}
+	if typ != backend.TypeEpic {
+		return fmt.Errorf("%s is not an epic", value)
+	}
+	return nil
 }
 
 // writeField stores the text form of a field on the row. Description goes
@@ -217,12 +247,18 @@ func (r *Repository) EditField(ctx context.Context, profileID, key, field, value
 	}
 	defer tx.Rollback()
 
-	current, updated, err := readField(ctx, tx, profileID, key, field)
+	current, updated, ownType, err := readField(ctx, tx, profileID, key, field)
 	if err != nil {
 		return err
 	}
 	if current == value {
 		return nil
+	}
+	if field == "parentKey" {
+		value = strings.TrimSpace(value)
+		if err := validateParent(ctx, tx, profileID, key, ownType, value); err != nil {
+			return err
+		}
 	}
 	if err := writeField(ctx, tx, profileID, key, field, value); err != nil {
 		return err
@@ -265,6 +301,8 @@ func updateDraftJSON(ctx context.Context, tx *sql.Tx, profileID, key, field, val
 		d.Labels = backend.SplitLabels(value)
 	case "storyPoints":
 		d.StoryPoints, _ = backend.ParsePoints(value)
+	case "parentKey":
+		d.ParentKey = strings.TrimSpace(value)
 	}
 	encoded, err := json.Marshal(d)
 	if err != nil {
@@ -297,13 +335,16 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 	for i := range drafts {
 		d := &drafts[i]
 		if !draftTypes[d.Type] {
-			return nil, fmt.Errorf("type %q cannot be created here; tasks, stories, bugs, and requirements can", d.Type)
+			return nil, fmt.Errorf("type %q cannot be created here; tasks, stories, bugs, requirements, and epics can", d.Type)
 		}
 		if strings.TrimSpace(d.Summary) == "" {
 			return nil, errors.New("summary cannot be empty")
 		}
 		d.Summary = strings.TrimSpace(d.Summary)
 		d.ParentKey = strings.TrimSpace(d.ParentKey)
+		if d.Type == backend.TypeEpic && d.ParentKey != "" {
+			return nil, errors.New("an epic cannot be placed under another epic")
+		}
 		if d.Labels == nil {
 			d.Labels = []string{}
 		}
@@ -311,23 +352,26 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 			d.Extra = map[string]string{}
 		}
 	}
+	last, err := r.NextDraftNumber(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	var last int
-	if err := tx.QueryRowContext(ctx,
-		`SELECT COALESCE(MAX(CAST(SUBSTR(key, ?) AS INTEGER)), 0) FROM issue WHERE profile_id = ? AND key LIKE ?`,
-		len(DraftPrefix)+1, profileID, DraftPrefix+"%").Scan(&last); err != nil {
-		return nil, fmt.Errorf("next draft key: %w", err)
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	keys := make([]string, 0, len(drafts))
 	for _, d := range drafts {
 		last++
 		key := fmt.Sprintf("%s%d", DraftPrefix, last)
+		if d.ParentKey != "" {
+			if err := validateParent(ctx, tx, profileID, key, d.Type, d.ParentKey); err != nil {
+				return nil, err
+			}
+		}
 		encoded, err := json.Marshal(d)
 		if err != nil {
 			return nil, fmt.Errorf("encode draft: %w", err)
@@ -358,4 +402,18 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 		return nil, err
 	}
 	return keys, nil
+}
+
+// NextDraftNumber returns the suffix the next TAM-NEW-n key would get. The
+// importer calls it once so a file's own Epic rows can predict the key a
+// later row's Parent cell names, before any of the batch exists in the
+// cache.
+func (r *Repository) NextDraftNumber(ctx context.Context, profileID string) (int, error) {
+	var last int
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(CAST(SUBSTR(key, ?) AS INTEGER)), 0) FROM issue WHERE profile_id = ? AND key LIKE ?`,
+		len(DraftPrefix)+1, profileID, DraftPrefix+"%").Scan(&last); err != nil {
+		return 0, fmt.Errorf("next draft key: %w", err)
+	}
+	return last, nil
 }

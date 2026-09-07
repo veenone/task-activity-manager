@@ -46,6 +46,10 @@ export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
 
+export function GetEpicTree(arg1, arg2) {
+  return window['go']['main']['App']['GetEpicTree'](arg1, arg2);
+}
+
 export function GetIssueDetail(arg1, arg2) {
   return window['go']['main']['App']['GetIssueDetail'](arg1, arg2);
 }
@@ -76,6 +80,10 @@ export function ImportIssues(arg1, arg2, arg3, arg4, arg5, arg6) {
 
 export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
+}
+
+export function ListEpics(arg1) {
+  return window['go']['main']['App']['ListEpics'](arg1);
 }
 
 export function ListIssues(arg1, arg2) {

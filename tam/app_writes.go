@@ -9,6 +9,7 @@ import (
 	"agile-suite/core/journal"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/committer"
+	"agile-suite/tam/internal/issuerepo"
 )
 
 // acquire marks the profile as running what ("sync", "commit", or "import")
@@ -196,4 +197,27 @@ func (a *App) AddLink(profileID, key string, link backend.LinkDraft) error {
 		return err
 	}
 	return a.repo.AddLink(a.ctx, p.ID, strings.TrimSpace(key), link)
+}
+
+// GetEpicTree returns the Epics view's data from the cache.
+func (a *App) GetEpicTree(profileID string, q issuerepo.TreeQuery) (issuerepo.Tree, error) {
+	if err := a.requireStore(); err != nil {
+		return issuerepo.Tree{}, err
+	}
+	return a.repo.EpicTree(a.ctx, profileID, q)
+}
+
+// ListEpics returns the cached epics for the Epic picker.
+func (a *App) ListEpics(profileID string) ([]backend.Issue, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	epics, err := a.repo.ListEpics(a.ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+	if epics == nil {
+		epics = []backend.Issue{}
+	}
+	return epics, nil
 }
