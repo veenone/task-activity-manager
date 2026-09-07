@@ -205,6 +205,7 @@ Four rules the view has to get right, each with its own test in Step 8:
 
 - **The join is by status id.** A card lands in the first column whose `StatusIDs` contains the issue's `StatusID`. A card whose status id matches no column counts into `BoardView.Unmapped` and is drawn nowhere.
 - **A draft has no status id, so it lands in the first column**, not in `Unmapped`. It is the reason this board exists, and hiding it would be the worst outcome of the phase. A board with no columns has nowhere to put it, so it counts as unmapped there.
+- **`BoardView.UnmappedStatuses []string` names the statuses that had no column**, deduplicated and sorted, and `LaneView.Count int` carries the lane's card total. Both exist so the view can say something actionable instead of a bare number, which is what the mockup already draws.
 - **A board key the cache does not hold counts into `BoardView.NotSynced`.** Board filters routinely reach outside the profile's project; those cards cannot be drawn, and a silent absence is how a board quietly lies. `NotSynced` is an `int` beside `Unmapped`.
 - **Each cell renders at most `MaxCardsPerCell = 200` cards** and reports the rest in `LaneView.Overflow [][]int` (parallel to `Cells`), so a kanban Done column of nine hundred issues cannot decide how the view performs. `ColumnView.Total` and `Points` still count every card, capped or not.
 
@@ -242,42 +243,77 @@ Four rules the view has to get right, each with its own test in Step 8:
 
 **Produces:** `api.ts` types `Board`, `Sprint`, `ColumnView`, `LaneView`, `BoardView`, the four bindings; `keys.boards(profileId)`, `keys.boardSprints(profileId, boardId)`, `keys.board(profileId, boardId, sprintId, swimlane)`; `useBoards`, `useBoardSprints`, `useBoard`, `useSyncBoards`; `BoardCard({ issue, selected, onSelect })`, `BoardsView()`.
 
-- [ ] **Step 1: Shared styles.** Copy XTM's `.board-head`, `.board-picker`, `.board-picker select`, `.board-head-actions`, `.board-counts`, and `.board-scroll` from `xtm/frontend/src/App.css` verbatim into `primitives.css` under "Board toolbar, mirrored from XTM's App.css". Add the new board rules there too, since both apps may take a kanban later:
+- [ ] **Step 1: Shared styles.** Copy XTM's `.board-head`, `.board-picker`, `.board-picker select`, `.board-head-actions`, `.board-head-actions .btn`, `.board-counts`, and `.board-scroll` from `xtm/frontend/src/App.css` verbatim into `primitives.css` under "Board toolbar, mirrored from XTM's App.css". Copy those six and nothing else: the `.board-picker select.container-filter-select` and `.container-type-select` rules beside them size XTM's Test Set and Plan pickers and have no meaning outside XTM, so they stay where they are. Add the new board rules there too, since both apps may take a kanban later:
 
 ```css
-.board-columns { display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
-.board-column { flex: 0 0 320px; display: flex; flex-direction: column; gap: 8px; }
-.board-column-head { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 4px; }
+.board-columns { --board-col-w: 320px; display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
+.board-column { flex: 0 0 var(--board-col-w); display: flex; flex-direction: column; gap: 8px; }
+.board-cell, .board-column-head { width: var(--board-col-w); }
+.board-column-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
 .board-column-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .board-lane { display: flex; flex-direction: column; gap: 6px; }
 .board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
 .board-cell { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
-.board-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface-1); cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.board-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface); cursor: pointer; user-select: none; display: flex; flex-direction: column; gap: 6px; }
 .board-card:hover { background: var(--row-hover); }
-.board-card-selected { border-color: var(--accent); }
+.board-card-selected, .board-card-selected:hover { background: var(--accent-soft); border-color: var(--accent); }
+.board-card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.board-summary { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+.board-picker select.board-select-narrow { min-width: 0; width: auto; }
 .board-card-head { display: flex; align-items: center; gap: 6px; }
 .board-card-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
 .board-unmapped { margin-top: 12px; }
+.board-overflow { font-size: 11px; color: var(--text-muted); padding: 2px 4px; }
+.boards-body { display: flex; gap: 12px; align-items: flex-start; min-height: 0; flex: 1; }
 ```
 
-Check every token against `frontend/core/styles/tokens.css` first and use the ones that exist (`--surface-1`, `--surface-3`, `--row-hover`, `--border`, `--text-muted`, `--accent`); if one is missing, take XTM's `:root` value for it.
+Every token above exists in `frontend/core/styles/tokens.css` and was checked against it: `--surface`, `--surface-3`, `--row-hover`, `--border`, `--text-muted`, `--accent`. There is no `--surface-1` in this design system (the scale is `--surface`, `--surface-2`, `--surface-3`, `--surface-sunken`); do not invent one. The sticky column head needs an opaque background, which is why it takes `--surface-3` rather than a tint.
 
-- [ ] **Step 2: `api.ts`, keys, hooks.** Types mirroring the Go shapes (`Board`, `Sprint`, `ColumnView` with `name`, `statusIds`, `total`, `points`; `LaneView` with `key`, `label`, `cells`; `BoardView` with `board`, `columns`, `lanes`, `unmapped`), the four bindings (`GetBoard` wrapping its arguments plainly, no class needed since they are scalars), the three keys, and `queries/boards.ts` with `useBoards`, `useBoardSprints`, `useBoard` (with the same `placeholderData` profile guard the tree uses), and `useSyncBoards` (a mutation invalidating all three keys plus the sync state). `invalidateWrites` also invalidates `[profileId, "board"]` so a pending edit repaints its card.
+`.boards-body` is the same shape `.epics-body` uses: the scroller takes `flex: 1; min-width: 0` so it stretches to the detail panel and never pushes it off, and the panel keeps the `.detail-panel` width of 352px. `min-width: 0` is not optional on a horizontal scroller inside a flex row; without it the board's own width wins and the panel is pushed out of the window. If PR #24 (the epic tree width fix) has landed on `main` by the time this task runs, rebase before editing `App.css`: it touches `.epics-body` a few lines above.
 
-- [ ] **Step 3: `BoardCard.tsx`.** A card: `board-card` (plus `board-card-selected`), head with `TypeChip`, the key in `accent-text`, the Draft chip when `issue.draft`, and the pending dot when `issue.pending`; the summary; the foot with the assignee or "Unassigned" and the points or nothing. `role="button"`, `tabIndex={0}`, Enter and Space select, `aria-pressed` for the selected state, `aria-label` of key and summary.
+- [ ] **Step 2: `api.ts`, keys, hooks.** Types mirroring the Go shapes, all of them: `Board`; `Sprint`; `ColumnView` with `name`, `statusIds`, `total`, `points`; `LaneView` with `key`, `label`, `count`, `cells`, `overflow`; `BoardView` with `board`, `columns`, `lanes`, `unmapped`, `unmappedStatuses`, `notSynced`. A type that quietly omits a field the view needs is how a shape drifts from its Go original, so mirror every one. The four bindings (`GetBoard` wrapping its arguments plainly, no class needed since they are scalars), the three keys, and `queries/boards.ts` with `useBoards`, `useBoardSprints`, `useBoard` (with the same `placeholderData` profile guard the tree uses), and `useSyncBoards` (a mutation invalidating all three keys plus the sync state). `invalidateWrites` also invalidates `[profileId, "board"]` so a pending edit repaints its card, and `invalidateProfileData` (the one `runSync` calls when a sync ends) invalidates the boards, the sprint lists, and the board view too, or the board stays stale after the very sync that refreshed it.
 
-- [ ] **Step 4: `BoardsView.tsx`.** Toolbar in `board-head`: the board picker (`board-picker`, a select of `useBoards`), the sprint picker (only when the chosen board is `scrum`, from `useBoardSprints`, defaulting to the active sprint, labelled `Name (state)`), the swimlane select (None, Assignee, Epic), and `board-head-actions` with Refresh calling `useSyncBoards`. Body in `board-scroll`: the column heads row, then one band per lane (the lane head hidden when the swimlane is none), each band a row of `board-cell`s aligned to the columns. Under the board, one honesty line carrying whichever of the three counts is non-zero: "3 cards are not on the board" (`unmapped`, a status no column covers), "2 cards on this board have not been synced" (`notSynced`, keys outside the profile's project), and per cell, when a cell overflows, a "+41 more" line at its foot. A cell that overflows still shows the true total in its column head. The detail panel opens beside the board for the selected card, as the Backlog does. States: "Loading the board", "This project has no boards in Jira, or the sync has not run", "No cards in this sprint", and the error line with a Retry. The board, sprint, and swimlane choices reset on a profile switch.
+Read the "no Agile API" fact here too: `SyncBoards` records it as the profile setting `boards_unavailable`, so a small `useBoardsUnavailable` hook over the existing `GetProfileSetting` binding lets the view know on a cold start, before it has run a sync of its own, that this Jira has no boards to offer.
 
-Two more toolbar facts, both of which decide whether the board can be trusted at standup:
+- [ ] **Step 3: `BoardCard.tsx`.** A card: `board-card` (plus `board-card-selected`), head with `TypeChip`, the key in `accent-text`, the Draft chip when `issue.draft`, and the pending dot when `issue.pending`; the summary; the foot with the assignee or "Unassigned" and the points or nothing.
 
-- **The age.** `board-counts` carries "synced 12 min ago" from `useSyncState(profileId).lastSynced`, formatted by a small `src/lib/relativeTime.ts` helper (its own module, since the Backlog's status bar will want it too), and reading "never synced" when the state is empty. A board silently forty minutes stale is worse than no board.
-- **The read-only caveat**, one line under the toolbar: "Read only for now. Columns and cards follow your board's configuration; quick filters and the board's own swimlanes are not applied." It is the difference between a user who understands the surface and one who drags a card and thinks TAM is broken.
+The card is one cell of a grid, not a lone button, so its semantics say so: the props are `{ issue, selected, focused, columnName, onSelect, onFocus }`, the element takes `role="gridcell"`, `aria-selected={selected}`, `tabIndex={focused ? 0 : -1}`, and an `aria-label` of key, summary, and column name. The column name matters here more than anywhere else in TAM: Decision 5 took the status chip off the card, so the column is the only thing carrying the status, and a screen reader that never hears it is reading a list of summaries.
 
-When the sync reports the instance has no Agile API (`unavailable`), the empty state reads "This Jira has no boards" instead of suggesting a sync that will never help.
+It also refuses a drag honestly, because 3a cannot perform one: `draggable={false}`, and an `onDragStart` that calls `preventDefault` and then `announce("Read only for now. Dragging arrives in the next release.")` (`announce` is exported from `@agile-suite/core`). The caveat line at the top of the view is prevention; this is the answer at the moment the user actually asks the question. `.board-card` takes `user-select: none` so a failed drag does not leave text smeared across three cards.
+
+- [ ] **Step 4: `BoardsView.tsx`.** Toolbar in `board-head`: the board picker (`board-picker`, a select of `useBoards`), the sprint picker (only when the chosen board is `scrum`, from `useBoardSprints`, defaulting to the active sprint, labelled `Name (state)`), the swimlane select (None, Assignee, Epic), and `board-head-actions` with a "Read only" chip and Refresh calling `useSyncBoards`. XTM's `.board-picker select` is 280px wide, which is right for a board name and absurd for three swimlane options, so the sprint and swimlane selects take a `board-select-narrow` modifier (`min-width: 0; width: auto`), the same escape hatch XTM gives its own short pickers.
+
+Under the toolbar, the line that orients a standup, because orientation is a read-only board's whole job and the sprint is the frame the conversation sits in: `.board-summary` reads "Sprint 12, active, ends 12 Sep. 27 of 47 points done." from the selected sprint's `startDate` and `endDate` and the summed `ColumnView.Points`, then "synced 12 min ago" from `useSyncState(profileId).lastSynced`. Format the age with `formatWhen` from `src/lib/format.ts`, which the status bar already uses; a second time helper in the same window would give one fact two different wordings.
+
+Body in `board-scroll`: the column heads row, then one band per lane (the lane head hidden when the swimlane is none, and carrying the lane's label and `count` when it is not), each band a row of `board-cell`s aligned to the columns. Heads and cells take their width from one custom property, `--board-col-w`, so the two rows cannot drift apart.
+
+Under the board, the honesty line, carrying whichever counts are not zero: "3 cards are not on the board (Approved, Blocked)" from `unmapped` and `unmappedStatuses`, naming the statuses so the user can act on it; "2 cards on this board have not been synced" from `notSynced`; and, per cell, a `board-overflow` "+41 more" line at its foot. A capped cell still shows the true total in its column head. Beside them, the second half of the caveat: "Columns and cards follow your board's configuration. Quick filters and the board's own swimlanes are not applied."
+
+The detail panel opens beside the board for the selected card, in a `boards-body` flex row: the scroller takes `flex: 1; min-width: 0` and the panel keeps its 352px.
+
+States, each written out, because an unstated state is a state the implementer invents:
+
+| State | What the view shows |
+|---|---|
+| Loading | "Loading the board" |
+| Refetching after the first load | "Refreshing" beside the toolbar, the previous board still drawn, the way the Backlog and Epics do it |
+| No boards, never synced | "This project has no boards in Jira, or the sync has not run" |
+| No boards, no Agile API (`boards_unavailable`) | "This Jira has no boards", with no suggestion to sync, because syncing will not help |
+| The board has no columns | A `pending-banner pending-banner-warn`: "This board's configuration could not be read, so it has no columns." |
+| Boards the last sync dropped (`summary.dropped`) | A `pending-banner` naming them: "2 boards were skipped: Ops, Platform". A board silently missing from a picker is a support ticket |
+| No cards, nothing outside the project | "No cards in this sprint" |
+| No cards but `notSynced > 0` | "No cards in this sprint have been synced. 14 sit outside this project." A plain empty state here would be a lie |
+| Error | The error line with a Retry |
+
+Refresh is disabled while the shared sync or a commit is running, since `App.acquire` would otherwise answer with an error the user did not cause, and while its own mutation is in flight. The board, sprint, and swimlane choices reset on a profile switch through the render-time `filtersFor` pattern both other views use, not an effect, which resets one render too late.
+
+Keyboard, lifted from `EpicTree.tsx` rather than invented: one tab stop for the whole board, a `focusKey` in `BoardsView` deciding which card is focusable, Left and Right across columns keeping the row, Up and Down within a cell and then into the next lane, Enter and Space to select, Home and End to the first and last card of the cell. Six hundred tab stops, which is what `tabIndex={0}` on every card gives at this plan's own cap, is not a keyboard model. The scroller takes `role="grid"`, each lane band a `role="row"` labelled with the lane, and each cell a `role="gridcell"` with `aria-colindex`.
+
+Selection matches the rest of TAM: `.board-card-selected` fills with `--accent-soft` the way `.issue-row-selected` and `.folder-selected` do, and `.board-card:focus-visible` takes the same 2px accent outline `.issue-row` has. A border colour alone is not a selection anywhere else in this app.
 
 - [ ] **Step 5: Wire the view.** `App.tsx`'s switch gains `current.id === "boards" ? <BoardsView /> : ...`. `App.test.tsx` mocks the four new bindings (`ListBoards` returning `[]` by default) and gains a test that clicking Boards renders the empty state. `nav.ts`'s Boards blurb still promises "Kanban and the active sprint, with live drag"; 3a has no drag, so it becomes "The board's own columns, the active sprint, and the cards in them." A nav that promises a verb the view does not have is the same lie as a draggable-looking card.
 
-- [ ] **Step 6: Tests.** `BoardsView.test.tsx` mocking `../api` and `../contexts/SyncContext`: the toolbar renders both boards and picks the first; choosing the kanban board hides the sprint picker; the columns render with their counts and point sums; cards land in the right columns; the swimlane select switches to assignee and renders lane heads with "Unassigned" last; clicking a card opens the panel with its key; the unmapped note shows its count; Refresh calls `SyncBoards` and refetches; the empty and error states. Commit as `feat(tam): the Boards view`.
+- [ ] **Step 6: Tests.** `BoardsView.test.tsx` mocking `../api` and `../contexts/SyncContext`: the toolbar renders both boards and picks the first; choosing the kanban board hides the sprint picker; the columns render with their counts and point sums; cards land in the right columns; the swimlane select switches to assignee and renders lane heads with "Unassigned" last, each carrying its count; clicking a card opens the panel with its key; the honesty line names the unmapped statuses and the not-synced count; a cell over the cap shows its "+N more" line while its column head still reads the true total; Refresh calls `SyncBoards` and is disabled while the shared sync is running; the summary line reads the sprint dates and the point split; every one of the nine states in the table above, the no-columns banner, the dropped-boards banner, and the "no cards synced" wording among them; and the keyboard block, the way `EpicsView.test.tsx` tests the tree: one tab stop, Right moves a column, Down moves within a cell and then into the next lane, Enter selects, and no reachable state leaves the board with nothing focusable. Commit as `feat(tam): the Boards view`.
 
 ---
 
@@ -285,7 +321,7 @@ When the sync reports the instance has no Agile API (`unavailable`), the empty s
 
 - [ ] **Step 1: Docs.** `tam/CLAUDE.md` gains a "Phase 3a: boards" section (the agile client in `core/jira`, the four tables at schema version 4, the status id column and the first store migration, the boards pass in the syncer, the four bound methods, the view, and the fact that nothing writes yet), its Layout section lists `internal/boardrepo/`, `app_boards.go`, `BoardsView`, and `BoardCard`, and its Status section says Phase 3a is on this branch. Note the two facts a future reader will otherwise learn the hard way: an incremental sync cannot backfill `status_id`, which is why version 4 clears the sync watermark; and a board's membership is whatever Jira's board endpoint returned at sync time, so a card moved on the web board moves in TAM only after the next sync. `README.md` gains one sentence.
 
-Reconcile the spec with the plan in the same commit: `docs/superpowers/specs/2026-09-07-tam-boards-design.md` section 4 says "Three tables" where the plan builds four (`board_issue` joined them), and section 5 says unmapped issues are "listed" where both the plan and the mockup only count them. Fix both, and add the status id to section 4's schema.
+Reconcile the spec with the plan in the same commit: `docs/superpowers/specs/2026-09-07-tam-boards-design.md` section 4 says "Three tables" where the plan builds four (`board_issue` joined them), and section 5 says unmapped issues are "listed" where both the plan and the mockup only count them. Fix both, add the status id to section 4's schema, and record the version 4 migration there. Check the mockup in the same pass: `assets/2026-09-07-tam-boards.svg` draws the sprint summary line, the lane counts, and the unmapped note with its status names, so the spec, the plan, and the mockup now say one thing. If the mockup and the shipped view disagree at Task 4's end, the mockup is the one that gets corrected, and Task 5 is where that happens.
 
 - [ ] **Step 2: Every gate, once.**
 
@@ -420,3 +456,61 @@ Dimension                              Claude    Codex   Consensus
 **Considered and not adopted (2).** A second sprint-membership model was rejected because one sync writes both the membership rows and `issue.sprint_id`, so they cannot disagree within a pass; the drift the voice describes is a 3b problem and 3b will own it. A schema change for LexoRank was rejected because the cache already stores `rank`, which is what 3b will compute drop targets from; `board_issue.position` only preserves the order Jira's board returned.
 
 **Phase 1 complete.** Codex: unavailable. Claude subagent: 12 findings. Consensus: single-voice, no dimension confirmable; 1 challenge rejected on evidence and carried to the gate. Passing to Phase 2.
+
+### Phase 2: design review (UI scope detected) [subagent-only]
+
+**Step 0, design scope: 6/10 before the review.** The plan specified its CSS in
+detail and its layout, hierarchy, states, and keyboard barely at all. There is
+no `DESIGN.md` in this repo; the design system is `frontend/core/styles/tokens.css`
+and `primitives.css` plus XTM's `App.css` as the reference implementation, and
+the standing rule is that TAM mirrors XTM wherever XTM has a counterpart. The
+existing patterns this view had to match: `.filter-bar` toolbars, `.backlog-body`
+and `.epics-body` flex rows with a fixed 352px `.detail-panel`, `.issue-row-selected`
+and `.folder-selected` filling with `--accent-soft`, `EpicTree`'s roving-tabindex
+keyboard model, and `formatWhen` for every timestamp in the window.
+
+**The seven passes.**
+
+| Pass | Before | After | What changed |
+|---|---|---|---|
+| 1. Information hierarchy | 5 | 9 | The sprint was a value inside a dropdown. A read-only board exists to orient a standup, and the sprint is the frame the conversation sits in, so `.board-summary` now carries the sprint, its dates, the point split, and the sync age above the columns. |
+| 2. States | 4 | 9 | Four states named, nine needed. The five that were missing: refetching, a board with no columns, boards the sync dropped, no Agile API on a cold start, and the empty board that is empty only because nothing was synced. |
+| 3. Journey | 6 | 9 | The whole answer to "why can I not drag this" was one line at the top of a view the user has scrolled past. The card now refuses the drag where it happens, announcing why. |
+| 4. Specificity | 5 | 9 | Head-to-cell alignment, the panel beside a horizontal scroller, the lane head's content, the column head's format, and the selection style were all left to the implementer. Named, each of them. |
+| 5. Accessibility | 3 | 9 | Six hundred tab stops, no arrow model, `role="button"` on a grid cell, and a card whose only status carrier, the column name, was never spoken. Now the grid roles and `EpicTree`'s roving focus, with the same keyboard tests. |
+| 6. Consistency | 6 | 9 | 280px selects for three-option pickers, an effect-based profile reset where both other views reset at render time, and a second time helper beside `formatWhen`. |
+| 7. Design system | 4 | 10 | `var(--surface-1)` does not exist in `tokens.css`; the plan told the implementer to check every token against that file and then named the one token that fails the check. Fixed, along with a column head two shades off the mockup and XTM's Test Set picker rules riding into shared primitives. |
+
+**Design litmus scorecard** (single voice: no Codex, so nothing can read CONFIRMED).
+
+```
+Dimension                       Claude   Codex   Consensus
+1. Hierarchy serves the user?   no       n/a     single-voice, fixed
+2. States specified?            no       n/a     single-voice, 5 added
+3. Journey sound?               no       n/a     single-voice, drag answered at the card
+4. Specific, not generic?       no       n/a     single-voice, 5 gaps named
+5. Accessibility real?          no       n/a     single-voice, grid model adopted
+6. Consistent with TAM?         partly   n/a     single-voice, 3 fixed
+7. Design system honoured?      no       n/a     single-voice, token fixed
+```
+
+**Phase 2 amendments (16).** The sprint summary line; the sync age through
+`formatWhen` rather than a new module; the "Read only" chip and the caveat split
+between toolbar and foot; `draggable={false}` with an announcement; grid roles
+and roving focus lifted from `EpicTree`; `aria-label` carrying the column name;
+selection filling with `--accent-soft` and a `:focus-visible` outline;
+`--board-col-w` binding heads to cells; `boards-body` with `min-width: 0`;
+sticky column heads; the `board-select-narrow` modifier; the nine-state table;
+Refresh disabled under the busy guard; the render-time profile reset;
+`UnmappedStatuses` and `LaneView.Count` so the notes say something actionable;
+and the `--surface-1` correction with the column head moved to `--surface-2`.
+
+**Considered and not adopted (1).** Replacing XTM's `board-head` family with
+TAM's own `.filter-bar` would make the Boards toolbar consistent with the
+Backlog and the Epics view but inconsistent with XTM's board, and the standing
+rule is that TAM mirrors XTM where XTM has a counterpart. The `board-select-narrow`
+modifier fixes the one thing that was actually wrong, the 280px width.
+
+**Phase 2 complete.** Codex: unavailable. Claude subagent: 17 findings, all
+verified against the code before adoption. Consensus: single-voice, no dimension
+confirmable. Passing to Phase 3.
