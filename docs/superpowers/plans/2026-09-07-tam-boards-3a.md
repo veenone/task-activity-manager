@@ -23,6 +23,7 @@
 - The board is read only in 3a and says so on screen. No card is draggable, and nothing hints that it is.
 - Bound method signatures are exactly: `ListBoards(profileID string) ([]boardrepo.Board, error)`, `ListBoardSprints(profileID string, boardID int) ([]boardrepo.Sprint, error)`, `GetBoard(profileID string, boardID int, sprintID, swimlane string) (boardrepo.BoardView, error)`, `SyncBoards(profileID string) (syncer.BoardSummary, error)`.
 - `SyncBoards` runs under the app's `busy` guard as `"sync"`, so it and a full sync and a commit exclude each other.
+- Board membership is fetched for the active and future sprints of a scrum board, plus the board's own issue list. Closed sprints are stored (they are cheap) but their cards are not, and the picker offers only what the sync fetched.
 - The PAT stays in the Jira client's Authorization header only.
 - Files stay small and single-purpose; a helper used from two places lives in its own module. TAM mirrors XTM's design language where XTM has a counterpart.
 - UI text uses no em dashes. No AI attribution or mentions anywhere. Conventional commit prefixes, no trailers. Never add, commit, or delete untracked local tooling files; revert Wails line-ending churn under `tam/frontend/wailsjs/runtime`, `tam/frontend/package.json.md5`, and `tam/go.mod` with `git checkout --`.
@@ -88,9 +89,10 @@ Also produces: `(*Client).Boards(ctx, projectKey string) ([]RawBoard, error)`, `
 
 ```go
 func TestBoardsPageUntilIsLast(t *testing.T) { ... }
-func TestBoardConfigurationMapsColumnsToStatusIDs(t *testing.T) { ... }
+func TestBoardsReturnErrNoAgileOn404(t *testing.T) { ... }
+func TestBoardConfigurationDecodesNestedColumnConfig(t *testing.T) { ... }
 func TestSprintsPageAndAKanbanBoardHasNone(t *testing.T) { ... }
-func TestBoardIssueKeysAskForKeysOnly(t *testing.T) { ... }
+func TestBoardIssueKeysPageTheSearchEnvelope(t *testing.T) { ... }
 ```
 
 Write them fully in the style of `core/jira/issues_test.go` (read it first; it builds a client with `NewClientWithHTTP(srv.URL, "tok", srv.Client())`).
@@ -98,7 +100,8 @@ Write them fully in the style of `core/jira/issues_test.go` (read it first; it b
 - [ ] **Step 2: `agile.go`.** Implement the four calls over the existing `Client.Get`. One unexported helper does the paging:
 
 ```go
-// agilePage is the envelope every paged Agile endpoint returns.
+// agilePage is the envelope the board and sprint collections return. The
+// board issue endpoint does not use it; see agileIssuePage below.
 type agilePage[T any] struct {
 	Values     []T  `json:"values"`
 	IsLast     bool `json:"isLast"`
@@ -123,7 +126,11 @@ func pageAgile[T any](ctx context.Context, c *Client, path string, query url.Val
 			return nil, err
 		}
 		out = append(out, page.Values...)
-		if page.IsLast || len(page.Values) == 0 || len(page.Values) < size {
+		// End on isLast or on an empty page, never on a short one: a Jira
+		// that clamps maxResults below what we asked for answers every
+		// page short, and treating that as the end would silently drop
+		// every board after the first page.
+		if page.IsLast || len(page.Values) == 0 {
 			return out, nil
 		}
 		start += len(page.Values)
@@ -131,7 +138,7 @@ func pageAgile[T any](ctx context.Context, c *Client, path string, query url.Val
 }
 ```
 
-`Boards` calls it with `projectKeyOrId`; `Sprints` calls it and maps a 400 to `ErrNoSprints` by checking `errors.As` for the client's `*HTTPError` with `Code == 400`, and `Boards` maps a 404 to `ErrNoAgile` the same way; `BoardConfiguration` is a single `Get` into the nested shape above.
+`Boards` calls it with `projectKeyOrId`; `Sprints` calls it and maps a 400 to `ErrNoSprints` by checking `errors.As` for the client's `*HTTPError` with `Code == 400`, but only on the first page: a 400 on page one is Jira saying this board has no sprints, while a 400 on page three is a real failure and must not be swallowed as an empty list. Matching Jira's English message instead would break on a localised instance. `Boards` maps a 404 to `ErrNoAgile` the same way. Both calls that take a sprint id put it through `url.PathEscape` before it reaches a path; `BoardConfiguration` is a single `Get` into the nested shape above.
 
 `BoardIssueKeys` cannot use `pageAgile`. `/board/{id}/issue` and `/board/{id}/sprint/{sprintId}/issue` do not answer with the `values` and `isLast` envelope the board and sprint lists use; they answer with the search envelope, `{"startAt": 0, "maxResults": 50, "total": 231, "issues": [{"key": "PLAT-412", ...}]}`. Decoding that into `agilePage[T]` finds no `values`, returns an empty page, ends the loop on the first request, and hands back zero keys for every board with no error anywhere. It gets its own small pager:
 
@@ -156,7 +163,7 @@ It asks for `fields=key` and pages until `startAt + len(issues) >= total`, or un
 
 **Files:** create `tam/internal/boardrepo/{boardrepo.go,boards.go,view.go,boardrepo_test.go,view_test.go}`; modify `tam/internal/tamstore/tamstore.go` and its test, `tam/internal/backend/backend.go`, create `tam/internal/backend/jira/boards.go`, modify `tam/internal/backend/jira/jira_test.go`, `tam/internal/backend/demo/demo.go` and its test, `tam/internal/issuerepo/state.go`, `tam/internal/issuerepo/issues.go`.
 
-**Produces:** schema version 4 with `board`, `board_column`, `board_issue`, `sprint`; `backend.Board{ID int, Name, Type string}`, `backend.BoardColumn{Name string, StatusIDs []string}`, `backend.Sprint{ID int, BoardID int, Name, State, StartDate, EndDate string}`; on `IssueBackend`: `Boards(ctx, projectKey string) ([]Board, error)`, `BoardColumns(ctx, boardID int) ([]BoardColumn, error)`, `BoardSprints(ctx, boardID int) ([]Sprint, error)`, `BoardIssueKeys(ctx, boardID int, sprintID string) ([]string, error)`; `boardrepo.New(db *sql.DB) *Repository` with `UpsertBoards`, `UpsertColumns`, `UpsertSprints`, `UpsertIssueKeys`, `RemoveBoards`, `ListBoards`, `Columns`, `ListSprints`, `PurgeProfile`; `boardrepo.Board`, `Sprint`, `BoardView`, `ColumnView`, `LaneView`; `boardrepo.Board(ctx, ...)` the view read; `issuerepo.IssuesByKeys(ctx, profileID string, keys []string) ([]backend.Issue, error)`.
+**Produces:** schema version 4 with `board`, `board_column`, `board_issue`, `sprint`; `backend.Board{ID int, Name, Type string}`, `backend.BoardColumn{Name string, StatusIDs []string}`, `backend.Sprint{ID int, BoardID int, Name, State, StartDate, EndDate string}`; a new `backend.BoardBackend` interface with `Boards(ctx, projectKey string) ([]Board, error)`, `BoardColumns(ctx, boardID int) ([]BoardColumn, error)`, `BoardSprints(ctx, boardID int) ([]Sprint, error)`, `BoardIssueKeys(ctx, boardID int, sprintID string) ([]string, error)`; `boardrepo.New(db *sql.DB) *Repository` with `UpsertBoards`, `UpsertColumns`, `UpsertSprints`, `UpsertIssueKeys`, `RemoveBoards`, `ListBoards`, `Columns`, `ListSprints`, `PurgeProfile`; `boardrepo.Board`, `Sprint`, `BoardView`, `ColumnView`, `LaneView`; `boardrepo.Board(ctx, ...)` the view read; `issuerepo.IssuesByKeys(ctx, profileID string, keys []string) ([]backend.Issue, error)`.
 
 - [ ] **Step 1: Schema and the version 4 migration.** In `tam/internal/tamstore/tamstore.go`, bump `Version` to 4, add `status_id TEXT NOT NULL DEFAULT ''` to the `issue` table in `baseDDL` (right after `status`), and append to `baseDDL`:
 
@@ -208,8 +215,10 @@ Migrations: []store.Migration{{
 	// fresh at version 4 already has the column from baseDDL, so a
 	// duplicate-column error here is the expected no-op.
 	Apply: func(db *sql.DB) error {
-		if _, err := db.Exec(`ALTER TABLE issue ADD COLUMN status_id TEXT NOT NULL DEFAULT ''`); err != nil &&
-			!strings.Contains(err.Error(), "duplicate column name") {
+		// store.AddColumnIfMissing already treats "duplicate column" as
+		// success, which is what a fresh version 4 file needs, since
+		// baseDDL gave it the column a moment ago.
+		if err := store.AddColumnIfMissing(db, "issue", "status_id TEXT NOT NULL DEFAULT ''"); err != nil {
 			return err
 		}
 		// The board matches cards to columns by status id, and an
@@ -219,6 +228,10 @@ Migrations: []store.Migration{{
 		// sync, which refetches every issue and fills the column. It
 		// is not the same as a full sync: nothing is purged first,
 		// and nothing here should be made to purge.
+		//
+		// issuerepo.ResetSyncCursor does this for one profile and
+		// stays the way application code does it; a migration has no
+		// profile in hand, so it clears them all in one statement.
 		_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 		return err
 	},
@@ -229,9 +242,11 @@ Extend the store test the way the version 3 test does: open, drop the four table
 
 - [ ] **Step 2: The status id, end to end, and the backend seam.** The board's whole join depends on it, so carry it first. In `tam/internal/backend/backend.go` add `StatusID string` with the JSON tag `statusId` to `Issue`, directly after `Status`. In `tam/internal/backend/jira/fields.go` the `named` helper decodes only `Name`; give it `ID string` with the tag `id` and set `iss.StatusID = status.ID` beside the existing `iss.Status = status.Name` (Jira returns both in the same object, so no extra field is requested and no extra call is made). In `tam/internal/issuerepo/issues.go` add `status_id` to the upsert's column list, its `VALUES`, and its `DO UPDATE SET`, and to `scanIssue`'s column list and destinations; the draft insert in `writes.go` leaves it empty on purpose, which is what puts a draft in the first column later. In `tam/internal/backend/demo/demo.go` fill `StatusID` from the `StatusID(name)` helper of Step 4 wherever the demo returns an `Issue`. Tests: `fields_test.go` asserts a parsed issue carries both the status name and its id; `issues_test.go` asserts an upserted issue reads its status id back; `demo_test.go` asserts every dataset issue has a non-empty status id.
 
-Then add the three board types (JSON tags `id`, `name`, `type`, `statusIds`, `boardId`, `state`, `startDate`, `endDate`) and the four interface methods with doc comments saying they read Jira's Agile API and never write. Add the four stubs returning `errors.New("not used")` to both fakes in `tam/internal/syncer/syncer_test.go` and to the fake in `tam/internal/committer/committer_test.go`, so the packages still compile.
+`IssueBackend` does not grow: the four board calls go on their own `BoardBackend` interface in the same file, which `backend/jira` and `backend/demo` both satisfy and nothing else has to. Bolting them onto the 14-method `IssueBackend` would force `errors.New("not used")` stubs into the committer's fake, which will never call one. The syncer asks for the capability where it needs it, `bb, ok := e.b.(backend.BoardBackend)`, and skips the pass with a logged line when a backend does not have it.
 
-- [ ] **Step 3: The Jira implementation.** Create `tam/internal/backend/jira/boards.go` mapping the client's raw shapes to the DTOs: `Boards` filters to `scrum` and `kanban` and drops anything else with a log line, and passes `jira.ErrNoAgile` through unwrapped so the sync can tell "this Jira has no boards" from "this call failed"; `BoardColumns` maps the configuration; `BoardSprints` returns an empty slice when the client reports `ErrNoSprints`; `BoardIssueKeys` passes through. Test in `jira_test.go` by extending the fake server with the agile paths (a board list of one scrum, one kanban, one `simple`; a configuration; sprints; issue keys) and asserting the filtering, the kanban's empty sprints, and the key pass-through.
+Then add the three board types (JSON tags `id`, `name`, `type`, `statusIds`, `boardId`, `state`, `startDate`, `endDate`) and the four `BoardBackend` methods with doc comments saying they read Jira's Agile API and never write. Because the methods live on their own interface, no existing fake has to grow: `committer_test.go` and the issue-only fakes in `syncer_test.go` compile untouched, and only the boards pass's own fake in `boards_test.go` implements them. A fake that implements four methods it never calls is a fake that stops telling you what its subject actually needs.
+
+- [ ] **Step 3: The Jira implementation.** Create `tam/internal/backend/jira/boards.go` mapping the client's raw shapes to the DTOs: `Boards` filters to `scrum` and `kanban` and drops anything else with a log line, and passes `jira.ErrNoAgile` through unwrapped so the sync can tell "this Jira has no boards" from "this call failed"; `BoardColumns` maps the configuration; `BoardSprints` returns an empty slice when the client reports `ErrNoSprints` and sets each `Sprint.BoardID` from its own `boardID` argument: the wire field is `originBoardId`, the board a sprint was created on, which is not always the board being read, and decoding a `boardId` that is not there would file every sprint under board 0. Jira sends `state` lowercase (`active`, `future`, `closed`), so the ordering and the picker's label both work in lowercase and the view capitalises for display, rather than comparing against `Active` and silently never matching. `BoardIssueKeys` passes through. Test in `jira_test.go` by extending the fake server with the agile paths (a board list of one scrum, one kanban, one `simple`; a configuration; sprints; issue keys) and asserting the filtering, the kanban's empty sprints, and the key pass-through.
 
 - [ ] **Step 4: The demo implementation.** In `tam/internal/backend/demo/demo.go`, derive the boards from the dataset so a rekeyed project works: board 1 `"<project> Scrum"` type `scrum` with columns To Do (status ids `1`), In Progress (`3`), Done (`5`); board 2 `"<project> Kanban"` type `kanban` with the same three columns; sprints 11 (closed), 12 (active), 13 (future) on board 1 only; `BoardIssueKeys(1, "12")` returns the dataset's issues whose `SprintID` is `12`, `BoardIssueKeys(1, "")` returns every non-requirement issue, `BoardIssueKeys(2, "")` the same. The demo's issue statuses are names, not ids, so the demo also maps its status names to those ids in one small exported helper `demo.StatusID(name string) string` used by both the column definition and the tests. Extend `demo_test.go` for each.
 
@@ -250,16 +265,17 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 Four rules the view has to get right, each with its own test in Step 8:
 
 - **The join is by status id.** A card lands in the first column whose `StatusIDs` contains the issue's `StatusID`. A card whose status id matches no column counts into `BoardView.Unmapped` and is drawn nowhere.
-- **A draft has no status id, so it lands in the first column**, not in `Unmapped`. It is the reason this board exists, and hiding it would be the worst outcome of the phase. A board with no columns has nowhere to put it, so it counts as unmapped there.
+- **A draft has no status id, so it lands in the first column that has at least one status id**, not in `Unmapped`. It is the reason this board exists, and hiding it would be the worst outcome of the phase. The qualifier matters: a board's first column is often a Backlog column with no statuses mapped to it, and dropping every draft into a column Jira itself never fills would be a different kind of wrong. A board with no such column has nowhere to put a draft, so it counts as unmapped there.
 - **`BoardView.UnmappedStatuses []string` names the statuses that had no column**, deduplicated and sorted, and `LaneView.Count int` carries the lane's card total. Both exist so the view can say something actionable instead of a bare number, which is what the mockup already draws.
 - **A board key the cache does not hold counts into `BoardView.NotSynced`.** Board filters routinely reach outside the profile's project; those cards cannot be drawn, and a silent absence is how a board quietly lies. `NotSynced` is an `int` beside `Unmapped`.
-- **Each cell renders at most `MaxCardsPerCell = 200` cards** and reports the rest in `LaneView.Overflow [][]int` (parallel to `Cells`), so a kanban Done column of nine hundred issues cannot decide how the view performs. `ColumnView.Total` and `Points` still count every card, capped or not.
+- **Each cell renders at most `MaxCardsPerCell = 200` cards** and reports the rest in `LaneView.Overflow [][]int` (parallel to `Cells`), so a kanban Done column of nine hundred issues cannot decide how the view performs. `ColumnView.Total` and `Points` still count every card, capped or not. A second cap, `MaxCardsPerView = 2000`, bounds the whole payload: twenty assignee lanes across six columns would otherwise multiply the per-cell cap into twenty-four thousand cards. Once the view cap is reached the remaining cards only count, and `BoardView.Capped bool` tells the view to say so.
+- **`BoardView.NeedsStatusSync bool`** is true when the board's cached issues all carry an empty status id and there is at least one of them. That is the state right after the version 4 migration, before any sync has run, and without the flag the board would draw nothing and blame the user with "N cards are not on the board". With it the view says "Sync to draw this board".
 
 - [ ] **Step 6: `IssuesByKeys`.** In `tam/internal/issuerepo/issues.go`, add a read that returns the cached issues for a key list in the list's own order, chunked at 500 keys per statement, with the same `pendingFlag` and `scanIssue` the other reads use. SQL will not return an `IN` list in the list's order and no `ORDER BY` can ask it to, so scan into a `map[string]backend.Issue` and then walk the caller's slice to build the result; a key with no row is skipped rather than yielding a zero issue. Test it in `issues_test.go` for order, a missing key (skipped), an empty list (empty result, no query), and a chunk boundary.
 
-- [ ] **Step 7: Purge.** Add `board`, `board_column`, `board_issue`, and `sprint` to `issuerepo.PurgeProfile`'s table list (it already runs in one transaction) so deleting a profile clears them, and extend its test.
+- [ ] **Step 7: Purge.** `boardrepo.PurgeProfile` clears the four board tables in one transaction, and `tam/app.go:235` calls it beside `a.repo.PurgeProfile` when a profile is deleted. `issuerepo.PurgeProfile` is left alone: it should not know another package's schema, and two purges naming the same four tables is exactly the drift that leaves a table behind when a fifth one arrives. Test `boardrepo.PurgeProfile` for the four tables and for profile isolation, and extend the app-level test that deletes a profile.
 
-- [ ] **Step 8: Tests for the repository and the view.** `boardrepo_test.go`: upsert and read back boards, columns in position order, sprints ordered active, future, closed, then start date; `RemoveBoards` taking the children; profile isolation. `view_test.go` (with a small in-test `IssueSource`): cards land in the right columns by status id; an issue whose status id is in no column counts in `Unmapped` and appears nowhere else; a draft (empty status id) lands in the first column, and in `Unmapped` when the board has no columns; a board key with no cached issue counts in `NotSynced`; a cell of 250 cards renders 200 and reports 50 overflow while the column total still reads 250; the three swimlanes, including the empty-value lane last; column totals and point sums; an unknown swimlane errors; a board with no columns returns an empty view rather than an error.
+- [ ] **Step 8: Tests for the repository and the view.** `boardrepo_test.go`: upsert and read back boards, columns in position order, sprints ordered active then future, then by start date; `RemoveBoards` taking the children; profile isolation; and the three replace behaviours, each of which is a bug the day it regresses: a board that goes from five columns to three keeps three, an issue removed from a sprint leaves that sprint's membership, and a deleted sprint leaves the table. `view_test.go` (with a small in-test `IssueSource`): cards land in the right columns by status id; an issue whose status id is in no column counts in `Unmapped` and appears nowhere else; a draft (empty status id) lands in the first column that has status ids, skipping a leading Backlog column that has none, and counts in `Unmapped` when the board has no such column; `NeedsStatusSync` is true when every cached issue has an empty status id and false as soon as one has it; the view cap stops at 2000 cards and sets `Capped`; a board key with no cached issue counts in `NotSynced`; a cell of 250 cards renders 200 and reports 50 overflow while the column total still reads 250; the three swimlanes, including the empty-value lane last; column totals and point sums; an unknown swimlane errors; a board with no columns returns an empty view rather than an error.
 
 - [ ] **Step 9: The one Go suite run.** Inside `tam/`: `go build ./... && go vet ./... && go test ./... -count=1`, and inside `core/`: `go test ./jira/ -count=1`. Fix what fails, rerun at most twice, and report. Commit as `feat(tam): the board store, the board view, and the backend seam`.
 
@@ -271,17 +287,17 @@ Four rules the view has to get right, each with its own test in Step 8:
 
 **Produces:** `syncer.BoardSummary{Boards, Columns, Sprints, Cards int; Dropped []string; Unavailable bool; Elapsed string}`, `(*Engine).SyncBoards(ctx, profileID, projectKey string, onProgress func(Progress)) (BoardSummary, error)`; the four bound methods from the Global Constraints.
 
-- [ ] **Step 1: The pass.** `boards.go` holds `SyncBoards`: list the boards; for each, read the configuration, the sprints, and the issue keys (for a scrum board, the keys of every sprint plus the board's own list; for a kanban board, the board's list); upsert each part; then `RemoveBoards` for the boards the profile had that Jira no longer returns. Each board's parts land in one transaction per board (its row, its columns, its sprints, its issue keys), so a reader on the WAL never sees a board half rewritten, and a board that fails halfway leaves the previous good copy in place.
+- [ ] **Step 1: The pass.** `boards.go` holds `SyncBoards`: list the boards; for each, read the configuration, the sprints, and the issue keys (for a scrum board, the keys of the **active and future** sprints plus the board's own list; for a kanban board, the board's list); upsert each part; then `RemoveBoards` for the boards the profile had that Jira no longer returns. Each board's parts land in one transaction per board (its row, its columns, its sprints, its issue keys), so a reader on the WAL never sees a board half rewritten, and a board that fails halfway leaves the previous good copy in place.
 
-The keys are a replace, not an upsert: `UpsertIssueKeys` deletes the `(profile_id, board_id, sprint_id)` scope inside that transaction and then inserts. An upsert alone only ever adds, so a card moved out of a sprint in Jira would sit on TAM's board until the profile was deleted. Columns are the same shape: delete the board's columns, then insert the new positions, or a board that loses its fifth column keeps drawing it.
+Every one of the three is a replace, not an upsert, because an upsert only ever adds. `UpsertIssueKeys` deletes the `(profile_id, board_id, sprint_id)` scope inside that transaction and then inserts, or a card moved out of a sprint sits on TAM's board until the profile is deleted, and shows in both its old sprint and its new one. `UpsertColumns` deletes the board's columns first, or a board that goes from five columns to three keeps drawing the two it lost. `UpsertSprints` deletes the board's sprints first, or a deleted sprint stays in the picker for good. The names keep the `Upsert` prefix because that is what they do from the caller's point of view; the doc comment on each says it replaces the scope.
 
-A board whose configuration or keys fail is recorded in `Dropped` with its name and the reason, and the pass continues; the summary counts what landed. An instance with no Agile API (the backend reporting `ErrNoAgile`) is not a failure: the pass returns a summary with `Unavailable: true` and no error, the existing boards are left alone, and the view says this Jira has no boards rather than showing an error line. `BoardSummary` therefore carries `Unavailable bool` alongside its counts. Progress frames use phase `"boards"` with the board name as `Stage`. The engine gains an exported `Boards *boardrepo.Repository` field, left nil by `New` and set by the caller, which is the shape `PageSize` and `Now` already use; a second constructor would multiply with the next optional dependency. A nil `Boards` means the pass does not run, which is what every existing syncer test wants.
+A board whose configuration or keys fail is recorded in `Dropped` with its name and the reason, and the pass continues; the summary counts what landed. An instance with no Agile API (the backend reporting `ErrNoAgile`) is not a failure: the pass returns a summary with `Unavailable: true` and no error, the existing boards are left alone, and the view says this Jira has no boards rather than showing an error line. `BoardSummary` therefore carries `Unavailable bool` alongside its counts. The pass writes the `boards_unavailable` profile setting on **every** run, clearing it when boards come back, so a profile repointed from a Jira without Jira Software to one with it stops claiming there are no boards. A dropped board's reason is the same trimmed message Task 1 requires elsewhere: a Data Center 403 sometimes answers with an HTML login page, and that never reaches a banner. Progress frames use phase `"boards"` with the board name as `Stage`. The engine gains an exported `Boards *boardrepo.Repository` field, left nil by `New` and set by the caller, which is the shape `PageSize` and `Now` already use; a second constructor would multiply with the next optional dependency. A nil `Boards` means the pass does not run, which is what every existing syncer test wants.
 
 `tam/app_issues.go:136` builds its engine per call as `syncer.New(b, a.repo)`, so that line becomes three: build it, set `eng.Boards = a.boards`, call `Sync`. Without that edit the boards pass compiles, tests green, and never runs on a real sync, which is the worst kind of passing build.
 
 - [ ] **Step 2: Wire it into `Sync`.** At the end of `Sync`, after the sync state is written and before the done frame, call `SyncBoards` when the engine has a boards repository; its failure does not fail the issue sync (log it, put it in the summary's new `Boards *BoardSummary` field, which is nil when the pass did not run).
 
-- [ ] **Step 3: Tests.** `boards_test.go` with the existing test fake extended: a scrum and a kanban board land with their columns, sprints, and keys; a board Jira stops returning is removed; a configuration failure drops one board and keeps the other; the summary counts. Extend `syncer_test.go` for the composed run (issues then boards) and for a boards failure leaving the issue sync successful.
+- [ ] **Step 3: Tests.** `boards_test.go` with the existing test fake extended: a scrum and a kanban board land with their columns, sprints, and keys; a board Jira stops returning is removed; a configuration failure drops one board and keeps the other; the summary counts. Extend `syncer_test.go` for the composed run (issues then boards); for a boards failure leaving the issue sync successful **with `last_synced` still written**, since the issues did land and losing the watermark would refetch the world on the next run; for `ErrNoAgile` producing `Unavailable` with no error and no board removed; for a nil `Boards` field running no pass at all, which is what every existing syncer test relies on; and for only the active and future sprints having their keys fetched. At the app level, one test that `SyncBoards` refuses while a sync holds the busy guard and one that a board read during a sync returns the previous board rather than a half-written one.
 
 - [ ] **Step 4: The app.** `tam/app.go` constructs `boardrepo.New(...)` beside the issue repository in `initStore` and holds it as `a.boards`. `tam/app_issues.go` hands it to the engine (Step 1). Create `tam/app_boards.go` with the four bound methods: `ListBoards`, `ListBoardSprints`, `GetBoard` (passing `a.repo` as the `IssueSource`), and `SyncBoards` (under `a.acquire(p.ID, "sync")`, logging the summary). Each returns non-nil slices.
 
@@ -325,7 +341,7 @@ Every token above exists in `frontend/core/styles/tokens.css` and was checked ag
 
 `.boards-body` is the same shape `.epics-body` uses: the scroller takes `flex: 1; min-width: 0` so it stretches to the detail panel and never pushes it off, and the panel keeps the `.detail-panel` width of 352px. `min-width: 0` is not optional on a horizontal scroller inside a flex row; without it the board's own width wins and the panel is pushed out of the window. If PR #24 (the epic tree width fix) has landed on `main` by the time this task runs, rebase before editing `App.css`: it touches `.epics-body` a few lines above.
 
-- [ ] **Step 2: `api.ts`, keys, hooks.** Types mirroring the Go shapes, all of them: `Board`; `Sprint`; `ColumnView` with `name`, `statusIds`, `total`, `points`; `LaneView` with `key`, `label`, `count`, `cells`, `overflow`; `BoardView` with `board`, `columns`, `lanes`, `unmapped`, `unmappedStatuses`, `notSynced`. A type that quietly omits a field the view needs is how a shape drifts from its Go original, so mirror every one. The four bindings (`GetBoard` wrapping its arguments plainly, no class needed since they are scalars), the three keys, and `queries/boards.ts` with `useBoards`, `useBoardSprints`, `useBoard` (with the same `placeholderData` profile guard the tree uses), and `useSyncBoards` (a mutation invalidating all three keys plus the sync state). `invalidateWrites` also invalidates `[profileId, "board"]` so a pending edit repaints its card, and `invalidateProfileData` (the one `runSync` calls when a sync ends) invalidates the boards, the sprint lists, and the board view too, or the board stays stale after the very sync that refreshed it.
+- [ ] **Step 2: `api.ts`, keys, hooks.** Types mirroring the Go shapes, all of them: `Board`; `Sprint`; `ColumnView` with `name`, `statusIds`, `total`, `points`; `LaneView` with `key`, `label`, `count`, `cells`, `overflow`; `BoardView` with `board`, `columns`, `lanes`, `unmapped`, `unmappedStatuses`, `notSynced`, `capped`, `needsStatusSync`. A type that quietly omits a field the view needs is how a shape drifts from its Go original, so mirror every one. The four bindings (`GetBoard` wrapping its arguments plainly, no class needed since they are scalars), the three keys, and `queries/boards.ts` with `useBoards`, `useBoardSprints`, `useBoard` (with the same `placeholderData` profile guard the tree uses), and `useSyncBoards` (a mutation invalidating all three keys plus the sync state). `invalidateWrites` also invalidates `[profileId, "board"]` so a pending edit repaints its card, and `invalidateProfileData` (the one `runSync` calls when a sync ends) invalidates the boards, the sprint lists, and the board view too, or the board stays stale after the very sync that refreshed it.
 
 Read the "no Agile API" fact here too: `SyncBoards` records it as the profile setting `boards_unavailable`, so a small `useBoardsUnavailable` hook over the existing `GetProfileSetting` binding lets the view know on a cold start, before it has run a sync of its own, that this Jira has no boards to offer.
 
@@ -335,7 +351,7 @@ The card is one cell of a grid, not a lone button, so its semantics say so: the 
 
 It also refuses a drag honestly, because 3a cannot perform one: `draggable={false}`, and an `onDragStart` that calls `preventDefault` and then `announce("Read only for now. Dragging arrives in the next release.")` (`announce` is exported from `@agile-suite/core`). The caveat line at the top of the view is prevention; this is the answer at the moment the user actually asks the question. `.board-card` takes `user-select: none` so a failed drag does not leave text smeared across three cards.
 
-- [ ] **Step 4: `BoardsView.tsx`.** Toolbar in `board-head`: the board picker (`board-picker`, a select of `useBoards`), the sprint picker (only when the chosen board is `scrum`, from `useBoardSprints`, defaulting to the active sprint, labelled `Name (state)`), the swimlane select (None, Assignee, Epic), and `board-head-actions` with a "Read only" chip and Refresh calling `useSyncBoards`. XTM's `.board-picker select` is 280px wide, which is right for a board name and absurd for three swimlane options, so the sprint and swimlane selects take a `board-select-narrow` modifier (`min-width: 0; width: auto`), the same escape hatch XTM gives its own short pickers.
+- [ ] **Step 4: `BoardsView.tsx`.** Toolbar in `board-head`: the board picker (`board-picker`, a select of `useBoards`), the sprint picker (only when the chosen board is `scrum`, from `useBoardSprints`, defaulting to the active sprint, labelled `Name (state)` with the state capitalised for display, since Jira sends it lowercase). It offers the active and future sprints only, which is exactly what the sync fetches membership for: sixty closed sprints on an old board would be sixty paged calls per sync for cards nobody opens at standup, and a picker offering a sprint whose cards were never fetched is a promise the view cannot keep. Closed sprints belong to Reports, in Phase 4, the swimlane select (None, Assignee, Epic), and `board-head-actions` with a "Read only" chip and Refresh calling `useSyncBoards`. XTM's `.board-picker select` is 280px wide, which is right for a board name and absurd for three swimlane options, so the sprint and swimlane selects take a `board-select-narrow` modifier (`min-width: 0; width: auto`), the same escape hatch XTM gives its own short pickers.
 
 Under the toolbar, the line that orients a standup, because orientation is a read-only board's whole job and the sprint is the frame the conversation sits in: `.board-summary` reads "Sprint 12, active, ends 12 Sep. 27 of 47 points done." from the selected sprint's `startDate` and `endDate` and the summed `ColumnView.Points`, then "synced 12 min ago" from `useSyncState(profileId).lastSynced`. Format the age with `formatWhen` from `src/lib/format.ts`, which the status bar already uses; a second time helper in the same window would give one fact two different wordings.
 
@@ -354,6 +370,8 @@ States, each written out, because an unstated state is a state the implementer i
 | No boards, never synced | "This project has no boards in Jira, or the sync has not run" |
 | No boards, no Agile API (`boards_unavailable`) | "This Jira has no boards", with no suggestion to sync, because syncing will not help |
 | The board has no columns | A `pending-banner pending-banner-warn`: "This board's configuration could not be read, so it has no columns." |
+| `needsStatusSync` | "Sync to draw this board", with the Sync button as the next step. Right after the version 4 upgrade no cached issue has a status id yet, and a board that drew nothing while blaming the user for it would be the worst first impression this feature could make |
+| `capped` | "Showing the first 2000 cards of this board", beside the honesty line |
 | Boards the last sync dropped (`summary.dropped`) | A `pending-banner` naming them: "2 boards were skipped: Ops, Platform". A board silently missing from a picker is a support ticket |
 | No cards, nothing outside the project | "No cards in this sprint" |
 | No cards but `notSynced > 0` | "No cards in this sprint have been synced. 14 sit outside this project." A plain empty state here would be a lie |
@@ -391,7 +409,9 @@ git status --short --untracked-files=no
 
 Record each result, fix what fails, rerun only what failed, and report each failure and its fix. Do not lower an assertion to make a test pass.
 
-- [ ] **Step 3: The walk-through for the user** (not run by agents): on the demo profile open Boards, see the scrum board with three columns and the active sprint, switch the swimlane to Assignee, click a card and read its detail panel, switch to the kanban board and see the sprint picker go, then Refresh. On a real Jira DC, confirm the board list, the columns, and that a status outside the columns lands in the note.
+- [ ] **Step 3: The walk-through for the user** (not run by agents): on the demo profile open Boards, see the scrum board with three columns and the active sprint, switch the swimlane to Assignee, click a card and read its detail panel, switch to the kanban board and see the sprint picker go, then Refresh.
+
+Then the part no test in this plan can do for itself. Every Agile fixture in Task 1 is written from documentation, so the suite proves the client matches what this plan believes, not what Jira sends. On a real Jira Data Center: confirm the board list, that each column holds the cards Jira's own board shows in it, that the counts agree with the web board, that a status outside the columns lands in the note, and that a database upgraded to version 4 draws a full board after one sync. If an envelope differs, the fixture is what changes, and that fix belongs in Task 1's tests before anything else moves.
 
 - [ ] **Step 4: Commit** as `docs(tam): Phase 3a notes for boards and sprints`, then push and open the PR against `main` titled "Task Activity Manager Phase 3a: boards and sprints, the read path" with the tasks, the gates, and the walk-through. No AI attribution anywhere.
 
@@ -578,3 +598,160 @@ modifier fixes the one thing that was actually wrong, the 280px width.
 **Phase 2 complete.** Codex: unavailable. Claude subagent: 17 findings, all
 verified against the code before adoption. Consensus: single-voice, no dimension
 confirmable. Passing to Phase 3.
+
+### Phase 3: engineering review [subagent-only]
+
+**Step 0, scope challenge.** Every claim the plan makes about the existing code
+was checked against the code, not against memory. Five were wrong, and each one
+would have shipped:
+
+| The plan assumed | The code says |
+|---|---|
+| Cards can be matched to columns by status | `issue` stores the status name only; `parseIssue` reads `status.Name` and drops the id that arrives beside it |
+| New schema needs no migration | `CREATE TABLE IF NOT EXISTS` never adds a column; `store.Schema.Migrations` exists and version 4 is its first production user |
+| A migration must hand-roll its ALTER | `store.AddColumnIfMissing` (`core/store/store.go:126`) already exists and already treats a duplicate column as success |
+| Setting the boards repository on the engine is a Task 3 concern | `tam/app_issues.go:136` builds the engine per call, and without that line the pass never runs on a real sync |
+| Purge belongs in `issuerepo` | `tam/app.go:235` is the single call site, so `boardrepo` can own its own tables and be called beside it |
+
+**Section 1, architecture.**
+
+```
+   Wails bindings          tam/app_boards.go  ListBoards, ListBoardSprints,
+   (busy guard "sync")     tam/app_issues.go  GetBoard, SyncBoards
+            |                      |
+            v                      v
+   internal/syncer  ------>  internal/boardrepo  ----IssueSource---->  internal/issuerepo
+   Sync + boards pass        tables, view                              issue cache, journal
+            |                      |
+            v                      v
+   internal/backend    IssueBackend  +  BoardBackend
+     backend/jira            backend/demo
+            |
+            v
+   core/jira   client.go (transport, HTTPError)  +  agile.go (Agile 1.0)
+```
+
+Two edges are new and both point the right way. `syncer` gains a dependency on
+`boardrepo`, which it already has on `issuerepo`. `boardrepo` does **not** import
+`issuerepo`: it declares the one-method `IssueSource` it needs and the app passes
+the repository in, so there is no cycle and `boardrepo`'s tests need no issue
+cache. The four board calls sit on their own `BoardBackend` rather than swelling
+`IssueBackend`, which keeps four dead stubs out of the committer's fake. Nothing
+new reaches for the credential: the PAT stays where `core/jira` puts it, in one
+Authorization header.
+
+**Section 2, code quality.** Two duplications caught and removed before they
+existed: a hand-rolled ALTER that `store.AddColumnIfMissing` already does, and a
+second time formatter beside `formatWhen`. One duplication left in place with a
+reason: the migration clears every profile's sync watermark in a single
+statement rather than looping `issuerepo.ResetSyncCursor`, because a migration
+holds a database, not a profile.
+
+**Section 3, test review.** The test diagram is 56 rows, one per new codepath,
+written to `~/.gstack/projects/veenone-task-activity-manager/veenone-feat-phase-3a-boards-test-plan-20260907-102002.md`.
+Twenty of those rows are tests this review added. The gap it cannot close is
+named there and again in Task 5: every Agile fixture is written from
+documentation, so the suite proves the client matches what this plan believes.
+Three of the findings below are exactly that kind of belief, which is why the
+walk-through now confronts them with a real Data Center before this ships.
+
+**Section 4, performance.** Two unbounded reads found. A scrum board with sixty
+closed sprints would have paged sixty issue lists per sync, per board, for cards
+nobody opens at standup: membership is now fetched for the active and future
+sprints only. And a per-cell cap alone does not bound a view, since twenty
+assignee lanes across six columns multiply it into twenty-four thousand cards:
+`MaxCardsPerView` bounds the payload and the view says when it bit. `IssuesByKeys`
+chunks at 500 keys, well under SQLite's parameter limit, and reads on WAL do not
+queue behind the sync's writes.
+
+**Eng consensus table** (single voice: no Codex, so nothing can read CONFIRMED).
+
+```
+Dimension                          Claude   Codex   Consensus
+1. Architecture sound?             partly   n/a     single-voice, 2 boundaries fixed
+2. Test coverage sufficient?       no       n/a     single-voice, 20 tests added
+3. Performance risks addressed?    no       n/a     single-voice, 2 unbounded reads fixed
+4. Security threats covered?       partly   n/a     single-voice, escaping and HTML fixed
+5. Error paths handled?            no       n/a     single-voice, 4 paths added
+6. Deployment risk manageable?     no       n/a     single-voice, the migration was the risk
+```
+
+**Phase 3 amendments (18).** The board issue endpoint gets its own pager, since
+it answers with the search envelope and `pageAgile` would have returned zero
+cards for every board with no error anywhere; the configuration's raw shape
+mirrors Jira's nesting, since a flat struct decodes a nested payload into
+nothing; paging ends on `isLast` or an empty page, never on a short one; a 400
+means "no sprints" only on the first page; sprint ids are path-escaped; a
+sprint's board comes from the argument, not from the absent `boardId` field, and
+its state is compared lowercase; `store.AddColumnIfMissing` replaces the
+hand-rolled ALTER; all three board writes replace their scope instead of only
+adding, so a lost column, a moved card, and a deleted sprint actually disappear;
+each board writes in one transaction; `BoardBackend` splits from `IssueBackend`;
+`boardrepo` owns its own purge and `app.go` calls it; membership covers the
+active and future sprints only; `MaxCardsPerView` bounds the whole payload;
+`NeedsStatusSync` gives the freshly migrated database a state that says "Sync to
+draw this board" instead of blaming the user for empty columns; drafts land in
+the first column that actually has statuses, not a leading Backlog column that
+has none; `boards_unavailable` is rewritten every pass so a repointed profile
+stops lying; a dropped board's reason never carries an HTML error body; and the
+engine's boards repository is set where the engine is actually built.
+
+**Considered and not adopted (2).** Moving swimlane grouping to the client would
+drop a Go round trip on every swimlane toggle, but the grouping is specified,
+tested, and cheap over local SQLite, and `MaxCardsPerView` closes the load
+argument that motivated it. Capturing a live Data Center response before writing
+`agile.go` is the right instinct and there is no instance to capture from; the
+walk-through carries that risk explicitly instead of pretending the fixtures
+settle it.
+
+**Phase 3 complete.** Codex: unavailable. Claude subagent: 16 findings, 14
+adopted, 2 logged with reasons. Consensus: single-voice, no dimension
+confirmable. Passing to the final gate.
+
+### Decision audit trail
+
+| # | Phase | Decision | Class | Principle | Rejected alternative |
+|---|---|---|---|---|---|
+| 1 | CEO | Mode: selective expansion | Mechanical | P2 | Full expansion (nothing outside the blast radius needed it) |
+| 2 | CEO | Add `status_id` to the cache and join on it | Mechanical | P1 | Matching status names (two workflows can share a name) |
+| 3 | CEO | Version 4 migration, this repo's first | Mechanical | P1 | Leaving old rows unfilled |
+| 4 | CEO | Drafts land in a real column | Mechanical | P1 | Letting them count as unmapped |
+| 5 | CEO | Count board keys the cache lacks | Mechanical | P1 | Silent absence |
+| 6 | CEO | Sync age in the toolbar | Mechanical | P1 | Trusting the user to remember |
+| 7 | CEO | Cap the cards per cell | Mechanical | P2 | Rendering a whole kanban history |
+| 8 | CEO | 404 means no Jira Software, not a failure | Mechanical | P1 | An error line the user cannot act on |
+| 9 | CEO | Say the board is read only, on screen | Taste | P1 | Silence, and a user who thinks TAM is broken |
+| 10 | CEO | Keep 3a and 3b split | **Taste** | P3 | Collapsing them: rejected, no transition machinery exists |
+| 11 | CEO | Keep `board_issue` membership | Mechanical | P4 | A second sprint model from `issue.sprint_id` |
+| 12 | CEO | Keep `position`, no LexoRank column | Mechanical | P4 | A schema change 3b does not need |
+| 13 | Design | Sprint summary line above the columns | Mechanical | P1 | The sprint hidden inside a dropdown |
+| 14 | Design | `formatWhen`, not a new time module | Mechanical | P4 | Two clocks in one window |
+| 15 | Design | Refuse the drag at the card, and say why | Mechanical | P1 | A caveat the user has scrolled past |
+| 16 | Design | Grid roles and roving focus from `EpicTree` | Mechanical | P4 | Six hundred tab stops |
+| 17 | Design | Nine states written out | Mechanical | P1 | Four states and six inventions |
+| 18 | Design | XTM's `board-head` with a narrow-select modifier | **Taste** | P5 | TAM's own `filter-bar` (would break the XTM mirror rule) |
+| 19 | Design | `--surface` and `--surface-2`, no `--surface-1` | Mechanical | P5 | A token that does not exist |
+| 20 | Design | Selection fills with `--accent-soft` | Mechanical | P4 | A border colour nothing else in TAM uses |
+| 21 | Eng | Own pager for the board issue envelope | Mechanical | P1 | `pageAgile`, which returns zero cards |
+| 22 | Eng | Raw shapes mirror Jira's nesting | Mechanical | P5 | A flat struct that decodes to nothing |
+| 23 | Eng | End paging on `isLast` or empty only | Mechanical | P1 | Short-page truncation |
+| 24 | Eng | 400 means no sprints only on page one | Mechanical | P1 | Swallowing every 400; or matching English text |
+| 25 | Eng | Replace, do not upsert, all three board writes | Mechanical | P1 | Ghost columns, cards, and sprints forever |
+| 26 | Eng | `store.AddColumnIfMissing` | Mechanical | P4 | A second copy of the same check |
+| 27 | Eng | `BoardBackend` separate from `IssueBackend` | Mechanical | P5 | Four dead stubs in the committer's fake |
+| 28 | Eng | `boardrepo` owns its purge | Mechanical | P5 | `issuerepo` knowing another package's tables |
+| 29 | Eng | Active and future sprint membership only | **Taste** | P3 | Sixty paged calls a sync for closed sprints |
+| 30 | Eng | `MaxCardsPerView` on top of the cell cap | Mechanical | P2 | Twenty-four thousand cards |
+| 31 | Eng | `NeedsStatusSync` state after the migration | Mechanical | P1 | A blank board that blames the user |
+| 32 | Eng | Swimlane grouping stays in Go | **Taste** | P3 | Client-side regrouping (a bigger change, no longer needed) |
+| 33 | Eng | Set the engine's boards repository in `app_issues.go` | Mechanical | P1 | A pass that compiles, tests green, and never runs |
+| 34 | Eng | Rewrite `boards_unavailable` every pass | Mechanical | P1 | A repointed profile claiming there are no boards forever |
+| 35 | Eng | Deferrals in the plan, not a new `TODOS.md` | Mechanical | P5 | A root file this repo does not use |
+
+### Gate
+
+Approved as-is under the user's standing instruction to take the recommended
+option at every decision point. Five taste decisions are marked in the trail
+above and reported with the run; the one challenge to the plan's own direction,
+collapsing 3a into 3b, was rejected on the evidence that TAM has no transition
+machinery for a drag to ride on.
