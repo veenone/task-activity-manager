@@ -18,15 +18,23 @@ that share a Go core.
 `go.work` at the root ties the modules together, so `go build ./...` and
 `go test ./...` work from any module directory.
 
-## Keeping xtm/ in step with its upstream
+## Remotes
 
-XTM is still developed in `veenone/xray-testcase-manager`. Pull its commits
-in with `.\scripts\sync-xtm-upstream.ps1`, which merges upstream `main`
-into `xtm/` with a subtree-shifted merge and leaves the result uncommitted.
-Resolve conflicts (the shared-profile wiring in `xtm/app.go` is the usual
-spot), run XTM's Go and Vitest suites, then commit. Changes upstream made
-under its `docs/` or `.github/` land under `xtm/` and have to be moved to
-the root by hand; the script warns when that happens.
+Three remotes hold this repository and all three are equal:
+`origin` (github.com/veenone/task-activity-manager), `xtm-origin`
+(github.com/veenone/xray-testcase-manager, XTM's original home) and `gitea`
+(the home Gitea, `achmarah/xray-test-manager`). `origin` pushes to all three,
+so a plain `git push` lands everywhere; `.\scripts\sync-remotes.ps1 -Setup`
+writes that configuration on a fresh clone.
+
+A pull request merged on GitHub lands on that one remote only. Run
+`.\scripts\sync-remotes.ps1` afterwards: it fast-forwards `main` and tags on
+whichever remotes are behind and stops, without pushing, if two remotes have
+diverged. Feature branches are not synchronised; they are pushed through the
+fan-out and deleted where they were merged.
+
+Release tags carry the app name: `xtm/v1.10.0` for XTM, `tam/v0.1.0` for TAM
+once it ships. The release workflow filters on `xtm/v*`.
 
 ## Frontends
 
@@ -34,3 +42,16 @@ The three React packages are npm workspaces. Run `npm install` once at the
 repo root; `npm test --workspaces --if-present` runs every Vitest suite and
 `npm run typecheck --workspaces --if-present` type-checks them. Wails does the
 root install itself through each app's `frontend:install`.
+
+## gstack (recommended)
+
+This project uses [gstack](https://github.com/garrytan/gstack) for AI-assisted workflows.
+Install it for the best experience:
+
+```bash
+git clone --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
+cd ~/.claude/skills/gstack && ./setup --team
+```
+
+Skills like /qa, /ship, /review, /investigate, and /browse become available after install.
+Use /browse for all web browsing. Use ~/.claude/skills/gstack/... for gstack file paths.
