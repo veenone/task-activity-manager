@@ -681,5 +681,6 @@
   grid-column: 5 / span 2;
 }
 .epic-row-moved {
-  background: var(--accent-hover);
+  background: var(--row-hover);
+  box-shadow: inset 3px 0 0 var(--accent);
 }

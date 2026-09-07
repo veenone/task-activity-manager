@@ -358,6 +358,46 @@ func TestCommitPushesTheRealParentAfterADraftEpicIsCreated(t *testing.T) {
 	}
 }
 
+func TestAnEditNamingAnUncreatedDraftWaits(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	temp, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.EditField(ctx, "p1", "PLAT-2", "parentKey", temp); err != nil {
+		t.Fatalf("parent PLAT-2 to the draft epic: %v", err)
+	}
+	f.createErr = errors.New("POST failed: 400 Severity is required")
+
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range f.updates {
+		if strings.HasPrefix(u, "PLAT-2") {
+			t.Errorf("the story must not be pushed while its epic is still a draft: %v", f.updates)
+		}
+	}
+	if len(res.Failures) != 2 {
+		t.Fatalf("two failures, the create's and the story's: %+v", res.Failures)
+	}
+	keys := map[string]string{}
+	for _, fl := range res.Failures {
+		keys[fl.Key] = fl.Error
+	}
+	if !strings.Contains(keys[temp], "Severity") {
+		t.Errorf("the create's failure: %v", keys)
+	}
+	if !strings.Contains(keys["PLAT-2"], temp) {
+		t.Errorf("the story's failure names the temp key: %v", keys)
+	}
+	pend, err := repo.PendingForKey(ctx, "p1", "PLAT-2")
+	if err != nil || len(pend) != 1 {
+		t.Errorf("the story's pending row is still there: %+v %v", pend, err)
+	}
+}
+
 func TestFailuresKeepTheRowsForNextTime(t *testing.T) {
 	eng, repo, f := setup(t)
 	ctx := context.Background()

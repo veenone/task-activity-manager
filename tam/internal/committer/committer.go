@@ -186,6 +186,12 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 		res.Conflicts = append(res.Conflicts, e.conflict(ctx, key, remote, rows))
 		return
 	}
+	for _, p := range rows {
+		if strings.HasPrefix(p.AfterVal, issuerepo.DraftPrefix) {
+			res.Failures = append(res.Failures, Failure{Key: key, Error: fmt.Sprintf("the epic %s has not been created in Jira yet, so this change waits for the next commit", p.AfterVal)})
+			return
+		}
+	}
 	fields := make(map[string]string, len(rows))
 	for _, p := range rows {
 		fields[p.Field] = p.AfterVal
