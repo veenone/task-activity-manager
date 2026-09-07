@@ -46,7 +46,9 @@
 
 **Created:** `core/jira/transitions.go`, `transitions_test.go`; `tam/internal/issuerepo/boardwrites.go`, `boardwrites_test.go`; `tam/internal/committer/boards.go`, `boards_test.go`; `tam/frontend/src/lib/cardMove.ts`; `tam/frontend/src/components/CardMoveMenu.tsx`.
 
-**Modified:** `core/jira/agile.go`, `agile_test.go`; `tam/internal/backend/backend.go`; `tam/internal/backend/jira/boards.go`, `writes.go`, `jira_test.go`; `tam/internal/backend/demo/boards.go`, `demo.go`, `demo_test.go`; `tam/internal/issuerepo/pending.go` (the entity constants), `discard.go`, `issues.go` (the pending-intent read); `tam/internal/boardrepo/view.go`, `view_test.go`; `tam/internal/committer/committer.go`, `committer_test.go`; `tam/app_boards.go`, `app_boards_test.go`; `tam/frontend/wailsjs/**` (regenerated); `tam/frontend/src/api.ts`, `queries/boards.ts`, `queries/invalidate.ts`, `components/BoardCard.tsx`, `BoardGrid.tsx`, `BoardBody.tsx`, `BoardsView.tsx`, `BoardsToolbar.tsx`, `BoardsView.test.tsx`, `App.css`; `frontend/core/styles/primitives.css`; `tam/CLAUDE.md`, `README.md`.
+**Modified:** `core/jira/agile.go`, `agile_test.go`; `tam/internal/backend/backend.go`; `tam/internal/backend/jira/boards.go`, `writes.go`, `jira_test.go`; `tam/internal/backend/demo/boards.go`, `demo.go`, `demo_test.go`; `tam/internal/issuerepo/pending.go` (the entity constants), `discard.go`, `issues.go` (the pending-intent read); `tam/internal/boardrepo/view.go`, `view_test.go`; `tam/internal/committer/committer.go`, `committer_test.go`; `tam/app_boards.go`, `app_boards_test.go`; `tam/frontend/wailsjs/**` (regenerated); `tam/frontend/src/api.ts`, `queries/boards.ts`, `queries/invalidate.ts`, `components/BoardCard.tsx`, `BoardGrid.tsx`, `BoardBody.tsx`, `BoardsView.tsx`, `BoardsToolbar.tsx`, `BoardsView.test.tsx`, `PendingChangesModal.tsx`, `PendingChangesModal.test.tsx`, `ActivityTab.tsx`, `App.css`; `frontend/core/styles/primitives.css`; `tam/CLAUDE.md`, `README.md`.
+
+**New CSS**, all beside the 3a board rules: `.board-drop-line`, `.board-cell-over`, `.board-card-dragging`, `.board-card-checking`, `.board-card-warn`, `.board-card-failed`, `.board-card-conflict`, `.pending-dot-move`, and `.pending-row-move`. Check every token against `frontend/core/styles/tokens.css` before using it; there is no `--surface-1` in this design system, and the failure and conflict markers take the danger and warn palettes the conflict card already uses.
 
 ---
 
@@ -96,7 +98,9 @@ A draft key (`DraftPrefix`) takes a different path: update the draft's JSON and 
 
 **Files:** create `tam/internal/committer/boards.go`, `boards_test.go`; modify `tam/internal/backend/backend.go`, `backend/jira/boards.go`, `backend/jira/writes.go`, `backend/jira/jira_test.go`, `backend/demo/boards.go`, `backend/demo/demo.go`, `backend/demo/demo_test.go`, `tam/internal/committer/committer.go`, `committer_test.go`.
 
-**Produces:** on `IssueBackend`: `Transition(ctx, key, targetStatusID string) error`; on `BoardBackend`: `RankIssue(ctx, key, neighbourKey string, before bool) error`, `MoveIssuesToSprint(ctx, sprintID string, keys []string) error`; `backend.ErrNoTransition`; `(*Engine).commitBoardMoves(...)` and the `Result` growing `Moved []Moved`.
+**Produces:** on `IssueBackend`: `Transition(ctx, key, targetStatusID string) error`; on `BoardBackend`: `RankIssue(ctx, key, neighbourKey string, before bool) error`, `MoveIssuesToSprint(ctx, sprintID string, keys []string) error`; `backend.ErrNoTransition` and `backend.TransitionCheck{Reachable []string; Allowed bool}`; `(*Engine).commitBoardMoves(...)` and the `Result` growing `Moved []Moved`.
+
+`committer.Failure` also grows, and this is not optional: today it is `{Key, Error string}`, which cannot support either promise this plan makes. One card can fail a transition and drop a rank in the same Commit, so a per-failure Undo has no way to know which journal row to discard; and nothing distinguishes a transition with no path, which will fail identically forever, from a rank whose neighbour moved, which will not. It becomes `Failure{Key, EntityType string; RowID int64; Error string; Retryable bool; Reachable []string}`, and the dialog's "Commit again to retry the failures" line shows only when some failure is actually retryable.
 
 - [ ] **Step 1: The backends.** The Jira backend's `Transition` lists the issue's transitions (with their fields), picks the one whose `To.ID` equals the target, and pushes it. Three answers, not one:
 - No transition reaches the target: return `ErrNoTransition`, and carry the names of the statuses that **are** reachable, so the failure can tell the user where the card can actually go.
@@ -126,7 +130,7 @@ The same three answers apply to a sprint move against the issue's remote sprint.
 
 ### Task 4: Drag, drop, and the keyboard
 
-**Files:** create `tam/frontend/src/lib/cardMove.ts`, `components/CardMoveMenu.tsx`; modify `tam/app_boards.go`, `app_boards_test.go`, `tam/frontend/wailsjs/**` (regenerated), `api.ts`, `queries/boards.ts`, `queries/invalidate.ts`, `components/BoardCard.tsx`, `BoardGrid.tsx`, `BoardBody.tsx`, `BoardsView.tsx`, `BoardsToolbar.tsx`, `BoardsView.test.tsx`, `App.css`, `frontend/core/styles/primitives.css`.
+**Files:** create `tam/frontend/src/lib/cardMove.ts`, `cardMove.test.ts`, `components/CardMoveMenu.tsx`; modify `tam/app_boards.go`, `app_boards_test.go`, `tam/frontend/wailsjs/**` (regenerated), `api.ts`, `queries/boards.ts`, `queries/invalidate.ts`, `components/BoardCard.tsx`, `BoardGrid.tsx`, `BoardBody.tsx`, `BoardsView.tsx`, `BoardsToolbar.tsx`, `BoardsView.test.tsx`, `PendingChangesModal.tsx`, `PendingChangesModal.test.tsx`, `ActivityTab.tsx`, `App.css`, `frontend/core/styles/primitives.css`.
 
 **Produces:** the three bound methods from the Global Constraints; `useMoveToColumn`, `useRankIssue`, `useMoveToSprint`; `cardMove.ts` holding the drop-target arithmetic (which column, which neighbour, which side) as pure functions.
 
@@ -138,19 +142,48 @@ Add a fourth, `CanTransition(profileID, key, statusID string) (backend.Transitio
 
 - [ ] **Step 3: The card.** `BoardCard` becomes `draggable`, sets `dataTransfer` to its key on drag start, and drops the 3a refusal handler with the announcement that went with it. It keeps `aria-grabbed` off: the keyboard path is a menu, not a simulated drag.
 
-- [ ] **Step 4: The cell.** `BoardGrid`'s cells take `onDragOver` (preventing default so a drop is allowed), `onDrop` (reading the key, computing the target with `cardMove.ts`, calling the right mutation), and a `board-cell-over` class while a card is above them. A drop in the same cell at the same place calls nothing.
+- [ ] **Step 4: The cell, and what a drag looks like.** `BoardGrid`'s cells take `onDragOver`, `onDrop`, and the states a drag needs. A cell highlight alone is not enough: `columnDrop` computes a position *within* the cell from the cursor, and nothing on screen would say which gap the card is about to land in, so reordering would be a precision act performed blind.
 
-- [ ] **Step 5: The keyboard and the menu.** With a card focused, Ctrl and Left or Right moves it a column, Ctrl and Up or Down moves it within the cell, and each announces what happened through the live region. `CardMoveMenu` opens on Enter and lists the columns and the sprints, which is the path for a screen reader and for anyone who would rather not drag. Both call the same mutations the drop does.
+- **The drop line.** During `onDragOver`, render `.board-drop-line` (a 2px `var(--accent)` rule) at the index `columnDrop` returns, driven by the same call the drop will make. The line is the feature; `.board-cell-over` is the backdrop.
+- **Drop forbidden.** When the target is the card's own place (`isSameCell` and the index unchanged), set `e.dataTransfer.dropEffect = "none"` and withhold both the line and the highlight. Preventing default unconditionally makes the cursor promise a move and then do nothing, which reads as a bug rather than as a no-op.
+- **The card in flight.** `.board-card-dragging` (half opacity, dashed border) from `onDragStart` to `onDragEnd`.
+- **Empty cells.** `.board-cell` gets `flex: 1` inside its lane row so a column's whole height is a drop target. A 40px strip is not something a person can aim at once the last card leaves a column.
+- **Off-screen columns.** `.board-scroll` scrolls horizontally and native drag and drop does not auto-scroll a custom container, so a seven-column board would have columns a mouse cannot reach. `onDragOver` scrolls the container when the pointer is within 48px of either edge.
+- **Capped cells.** A cell that hit `MaxCardsPerCell` is showing "+N more", so a drop below the last visible card cannot know its real neighbour. That drop journals nothing and announces why.
 
-- [ ] **Step 6: The view.** Remove the read-only caveat line and the "Read only" chip; a moved card wears the pending dot the moment its mutation settles, and the column heads recount. Keep the honesty line, which is about cards the board cannot show, not about writing.
+- [ ] **Step 5: The keyboard and the menu.** Three things about 3a's keyboard model that the first draft of this plan got wrong; read `BoardsView.tsx`'s `onKeyDown` and `lib/boardCells.ts` before writing any of it.
 
-Two things the review of this plan insisted on, both about what happens when a move is wrong:
-- **After a drop, verify it.** Call `CanTransition` in the background for the card just dropped. If it answers that the target is not reachable, show an inline warning naming the statuses that are, with a button that puts the card back (discarding the pending row). If the call fails, say nothing: the app is offline, which is the case the journal is for.
-- **A failed board move offers a way out.** In the commit result, a board failure gets an "Undo this move" action that discards that row, beside its reason. The existing "Commit again to retry the failures" line stays for the failures that can be retried and must not be shown for a transition with no path, which will fail identically forever.
+- **Enter is taken.** Enter and Space both select a card and open the detail panel. The move menu opens from a trigger in `board-card-head` (`aria-haspopup="menu"`, reusing `Menu` from `@agile-suite/core` rather than inventing a panel), reachable with the menu key or Shift and F10, and the card must not swallow that trigger's own Enter.
+- **A move must not reuse `nextColumn`.** That helper deliberately skips columns whose cell is empty, so focus never strands in one. Reusing it for a move would teleport a card past the empty column the user was aiming at, which is exactly where a card usually goes. `cardMove.ts` gets its own stepper that stops at the adjacent column, empty or not, and refuses to step past the last.
+- **Focus follows the slot, not the card.** `posId` is `lane-col-index`: after a move the focused id still names the slot, which now holds a different card, so a second Ctrl and Right would move that one instead. Track the moved key and, once the board query settles, set focus to wherever that key landed. `EpicTree.tsx` already does this with its moved-row flash, and the same flash marks the moved card.
+
+With that settled: Ctrl and Left or Right moves a card a column, Ctrl and Up or Down moves it within its cell, and each one announces itself. Write the strings, do not leave them to the implementer: "PLAT-412 moved to In Progress, 3 of 7", "PLAT-412 moved up, 2 of 5", "PLAT-412 is already in the first column". A column head that recounts silently tells a screen reader nothing. The grid also carries an `aria-describedby` naming the move keys and the menu, since nothing else on screen says they exist.
+
+- [ ] **Step 6: The view, and every state a move can be in.** Remove the read-only caveat line and the "Read only" chip, and put nothing in their place. Keep the honesty line, which is about cards the board cannot show, not about writing. A moved card wears its marker the moment its mutation settles, and the column heads recount.
+
+The card is where the user made the move, so the card is where its state has to show. `BoardsView` already holds `lastCommit` through `useSync()`; pass a per-key status down through `BoardBody` and `BoardGrid` to `BoardCard`:
+
+| State | On the card |
+|---|---|
+| Pending move | `.pending-dot-move`, labelled "Pending move", not the plain pending dot: a moved card's **position** is what is provisional, and a card carrying a pending summary edit is not making that claim |
+| Verifying | `.board-card-checking`, a quiet marker while `CanTransition` is in flight, so a card that is being checked does not look settled |
+| Warned | `.board-card-warn` plus the banner below |
+| Failed | `.board-card-failed`, with the reason in the card's `aria-label` |
+| Conflicted | `.board-card-conflict`, in the warn palette the conflict card already uses |
+
+Today a card that will never land looks exactly like one that is about to: both wear the same amber pending dot. That is the single worst outcome this phase can ship, because the board is the surface the user will look at, and the failure only exists in a modal they may never open.
+
+**The verification warning, fully located.** `BoardsView` keeps `warnings: Map<key, string[]>`. A `CanTransition` answer is written only if it is the newest request for that key (a standup is ten drags and the answers do not return in order), it is cleared when that key is moved again or its row is discarded, and it renders in two places: the marker on the card, and one `pending-banner pending-banner-warn` above the grid naming the reachable statuses with a "Put it back" button that discards the row. One banner, not a stack.
+
+**A failed move offers a way out.** In the commit result, a board failure gets an "Undo this move" action that discards exactly that journal row, which is what `Failure.RowID` is for. The existing "Commit again to retry the failures" line shows only when some failure is retryable, and a transition with no path is not.
+
+**During a commit.** This plan deliberately gives the move bindings no busy guard, matching every other local write, so a card can be dragged while the committer is pushing. `BoardCard` renders `draggable={false}` while a commit is in flight, which is the honest way to say "not now" without inventing a guard no other write has.
 
 A Commit that moved cards ends with a boards sync, so the board's own membership catches up with what was just pushed; without it a card can jump back to where the last sync saw it.
 
-- [ ] **Step 7: The two dialogs that already show pending work.** `PendingChangesModal` renders a row through `fieldLabel`, which falls back to the raw field name, and `ActivityTab.describe` branches on entity type for links and creates and then does the same. Neither knows a board move, so today a journaled transition reads "statusId: 3 to 5". Give both the three entity types: the pending row reads "Status: To Do to In Progress", "Sprint: Sprint 12 to Sprint 13", and "Rank: before PLAT-409", each with its own Discard; the activity entry reads as a sentence the way a link's does. The `id|Name` encoding from Task 2 is what makes this possible without either dialog knowing the board.
+- [ ] **Step 7: The two dialogs that already show pending work.** `PendingChangesModal` renders a row through `fieldLabel`, which falls back to the raw field name, and `ActivityTab.describe` branches on entity type for links and creates and then does the same. Neither knows a board move, so today a journaled transition reads "statusId: 3 to 5". Give both the three entity types: the pending row reads "Status: To Do to In Progress", "Sprint: Sprint 12 to Sprint 13", and "Rank: before PLAT-409", each with its own Discard and its own `.pending-row-move` grid template beside the `.pending-row-link` one; the activity entry reads as a sentence the way a link's does. The `id|Name` encoding from Task 2 is what makes this possible without either dialog knowing the board.
+
+Two lines in that dialog also go stale the moment this ships. `bannerLine` enumerates what a Commit did (committed, created, linked, conflicts, failures) and would report "nothing pushed" after a standup of twelve drags, so it gains the moves. And the footer's "Edits are pushed with Jira's own field update; a conflict holds only that issue back" is now wrong for three of the six entity types, so it says what is true of each group or moves into the edits group where it still holds.
 
 - [ ] **Step 8: Tests.** `BoardsView.test.tsx`: a drop on another column calls `MoveIssueToColumn` and repaints the card there; a drop inside a cell calls `RankIssue` with the neighbour and side; a drop that changes nothing calls neither; Ctrl and an arrow does what the drop does; the menu moves a card to a sprint; a pending card wears the dot; and the caveat is gone; a drop whose target is unreachable shows the warning and its put-it-back button; a board failure in the commit result offers Undo; and the pending dialog and the activity tab read a move in words rather than in ids. `cardMove.test.ts` for the arithmetic, including the top and bottom edges of a cell.
 
