@@ -11,7 +11,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -25,6 +25,13 @@ const story: Issue = {
   sprintId: "12", sprintName: "Sprint 12 - Checkout polish", parentKey: "PLAT-350", storyPoints: 5, rank: "",
   created: "2026-08-01T09:00:00Z", updated: "2026-09-05T09:58:00Z",
 };
+
+const longEpicSummary = "Modernize the checkout experience across web, mobile, and every partner integration";
+
+const epics: Issue[] = [
+  { ...story, key: "PLAT-350", id: "2", type: "epic", summary: longEpicSummary, parentKey: "" },
+  { ...story, key: "PLAT-320", id: "3", type: "epic", summary: "Search relevance rework", parentKey: "" },
+];
 
 function renderPanel(onClose = vi.fn()) {
   render(
@@ -56,6 +63,7 @@ beforeEach(() => {
   ]);
   vi.mocked(api.EditIssue).mockResolvedValue();
   vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
+  vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([
     { id: 5, occurredAt: "2026-09-06T10:10:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "commit", field: "create", beforeVal: "", afterVal: "{\"summary\":\"x\"}", note: "" },
     { id: 4, occurredAt: "2026-09-06T10:07:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "discard", field: "create", beforeVal: "{\"summary\":\"x\"}", afterVal: "", note: "" },
@@ -75,7 +83,6 @@ describe("IssueDetailPanel", () => {
     expect(within(details).getByLabelText("Assignee")).toHaveValue("R. Anand");
     expect(within(details).getByText("Sprint 12 - Checkout polish")).toBeInTheDocument();
     expect(within(details).getByLabelText("Story points")).toHaveValue("5");
-    expect(within(details).getByText("PLAT-350")).toBeInTheDocument();
     expect(within(details).getByLabelText("Labels")).toHaveValue("checkout, promo");
     await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue("As a shopper I can enter a promo code on the payment step."));
     expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412");
@@ -260,5 +267,48 @@ describe("IssueDetailPanel write path", () => {
     await user.click(within(row).getByRole("button", { name: "Discard link to XT-1031" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 41));
     expect(await screen.findByText(/row is gone/)).toBeInTheDocument();
+  });
+});
+
+describe("IssueDetailPanel Epic field", () => {
+  it("offers the epics preselected to the story's parent, with a long summary truncated", async () => {
+    vi.mocked(api.ListEpics).mockResolvedValue(epics);
+    renderPanel();
+    // getByLabelText throws on more than one match, so this alone proves
+    // there is exactly one element labelled Epic.
+    const select = await screen.findByLabelText("Epic");
+    expect(select.tagName).toBe("SELECT");
+    await waitFor(() => expect(within(select).getAllByRole("option")).toHaveLength(3));
+    expect(select).toHaveValue("PLAT-350");
+    const options = within(select).getAllByRole("option");
+    expect(options[0]).toHaveTextContent("(none)");
+    expect(options[1]).toHaveTextContent(`PLAT-350 ${longEpicSummary.slice(0, 60)}…`);
+    expect(options[2]).toHaveTextContent("PLAT-320 Search relevance rework");
+  });
+
+  it("saves the chosen epic through the same edit path as every other field", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListEpics).mockResolvedValue(epics);
+    renderPanel();
+    const select = await screen.findByLabelText("Epic");
+    await waitFor(() => expect(within(select).getAllByRole("option")).toHaveLength(3));
+    await user.selectOptions(select, "PLAT-320");
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    await waitFor(() => expect(api.EditIssue).toHaveBeenCalledWith("p1", "PLAT-412", "parentKey", "PLAT-320"));
+  });
+
+  it("hides the Epic select entirely when the issue is an epic", async () => {
+    vi.mocked(api.ListEpics).mockResolvedValue(epics);
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <DialogProvider>
+          <IssueDetailPanel profileId="p1" issue={{ ...story, type: "epic" }} onClose={vi.fn()} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+    const details = await screen.findByRole("tabpanel", { name: "Details" });
+    expect(screen.queryByLabelText("Epic")).not.toBeInTheDocument();
+    expect(within(details).queryByText("Epic")).not.toBeInTheDocument();
+    expect(within(details).queryByText("Parent")).not.toBeInTheDocument();
   });
 });

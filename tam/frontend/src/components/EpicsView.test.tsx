@@ -210,13 +210,16 @@ describe("EpicsView", () => {
     vi.mocked(api.GetEpicTree)
       .mockResolvedValueOnce(treeWith(childV1))
       .mockResolvedValue(treeWith({ ...childV1, parentKey: "PLAT-200" }));
+    vi.mocked(api.ListEpics).mockResolvedValue([
+      issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }),
+      issue({ key: "PLAT-200", type: "epic", summary: "Search relevance rework" }),
+    ]);
 
     renderView();
     const treeNav = await screen.findByRole("tree", { name: "Epics" });
     await user.click(within(treeNav).getByText("Apply promo code"));
-    const epicInput = await screen.findByLabelText("Epic");
-    await user.clear(epicInput);
-    await user.type(epicInput, "PLAT-200");
+    const epicSelect = await screen.findByLabelText("Epic");
+    await user.selectOptions(epicSelect, "PLAT-200");
     await user.click(screen.getByRole("button", { name: "Save edit" }));
 
     const row = () => within(treeNav).getByText("Apply promo code").closest('[role="treeitem"]') as HTMLElement;
@@ -380,6 +383,22 @@ describe("EpicTree keyboard", () => {
     expect(document.activeElement).toBe(childRow);
 
     await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "PLAT-101" })).toBeInTheDocument();
+  });
+
+  it("selects a focused child on Space", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue(singleEpicTree());
+    renderView();
+    const treeNav = await screen.findByRole("tree", { name: "Epics" });
+    await screen.findByText("Apply promo code");
+    const allEpicsRow = within(treeNav).getByText("All epics").closest('[role="treeitem"]') as HTMLElement;
+    await user.click(allEpicsRow);
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    const childRow = screen.getByText("Apply promo code").closest('[role="treeitem"]') as HTMLElement;
+    expect(document.activeElement).toBe(childRow);
+
+    await user.keyboard(" ");
     expect(await screen.findByRole("heading", { name: "PLAT-101" })).toBeInTheDocument();
   });
 

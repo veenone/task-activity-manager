@@ -163,6 +163,7 @@ export function EpicsView() {
       {isOpen("newIssue") && (
         <NewIssueModal
           onClose={closeModal}
+          initialType="epic"
           onCreated={(key) => {
             setSelectedKey(key);
             setExpanded((prev) => new Set(prev).add(key));
