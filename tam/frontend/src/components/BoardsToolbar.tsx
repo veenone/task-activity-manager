@@ -57,7 +57,7 @@ export function BoardsToolbar({
             value={sprint ? String(sprint.id) : ""}
             onChange={(e) => onSprint(e.target.value)}
           >
-            {sprints.length === 0 && <option value="">No open sprint</option>}
+            {sprints.length === 0 && <option value="" disabled>No open sprint</option>}
             {sprints.map((s) => (
               <option key={s.id} value={String(s.id)}>{sprintOption(s)}</option>
             ))}

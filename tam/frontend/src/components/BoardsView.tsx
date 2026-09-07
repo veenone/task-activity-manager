@@ -58,8 +58,13 @@ export function BoardsView() {
     ?? openSprints.find((s) => s.state === "active")
     ?? openSprints[0];
   const effectiveSprintId = scrum && sprint ? String(sprint.id) : "";
+  // A scrum board's real query waits for the sprint list to settle, so
+  // exactly one correctly scoped board query fires per board: none of the
+  // throwaway "" sprintId round trips a mount or a board switch used to
+  // send while useBoardSprints was still loading.
+  const sprintsReady = !scrum || sprints.isSuccess || sprints.isError;
 
-  const view = useBoard(activeId, board?.id ?? 0, effectiveSprintId, swimlane);
+  const view = useBoard(activeId, board?.id ?? 0, effectiveSprintId, swimlane, sprintsReady);
   const unavailable = useBoardsUnavailable(activeId);
   const syncState = useSyncState(activeId);
   const sync = useSyncBoards(activeId);

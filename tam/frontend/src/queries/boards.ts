@@ -33,11 +33,15 @@ export function useBoardSprints(profileId: string, boardId: number) {
 // on screen while a swimlane or sprint change refetches, the same way the
 // tree keeps its rows, but falls back to the pending state on a profile
 // switch so one profile's cards are never shown under another's name.
-export function useBoard(profileId: string, boardId: number, sprintId: string, swimlane: string) {
+// ready gates a scrum board on its sprint list: until useBoardSprints
+// settles, sprintId is not the real one yet, and firing the query anyway is
+// a wasted round trip with a real risk of the whole board flashing before
+// the sprint-scoped one replaces it.
+export function useBoard(profileId: string, boardId: number, sprintId: string, swimlane: string, ready: boolean) {
   return useQuery({
     queryKey: keys.board(profileId, boardId, sprintId, swimlane),
     queryFn: () => call(() => GetBoard(profileId, boardId, sprintId, swimlane)),
-    enabled: !!profileId && boardId > 0,
+    enabled: !!profileId && boardId > 0 && ready,
     placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[0] === profileId ? prev : undefined),
   });
 }

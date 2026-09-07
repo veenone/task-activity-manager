@@ -164,10 +164,25 @@ describe("BoardsView toolbar", () => {
     await waitFor(() => expect(api.GetBoard).toHaveBeenCalledWith("p1", 2, "", "none"));
   });
 
-  it("reads the sprint dates and the point split in the summary line", async () => {
+  it("reads the sprint dates and the point split in the summary line, by status rather than by column", async () => {
+    // The rightmost column here is "Blocked", not "Done", and the one done
+    // card sits in the middle column: the summary must still read 5 of 11,
+    // not the 3 the last column's points would give.
+    const done = issue({ key: "PLAT-501", summary: "Ship the changelog", status: "Done", storyPoints: 5 });
+    const blocked = issue({ key: "PLAT-502", summary: "Vendor migration", status: "Blocked", storyPoints: 3 });
+    vi.mocked(api.GetBoard).mockResolvedValue(
+      board({
+        columns: [
+          { name: "To Do", total: 1, points: 3 },
+          { name: "In Progress", total: 1, points: 5 },
+          { name: "Blocked", total: 1, points: 3 },
+        ],
+        lanes: [{ id: "", label: "All issues", count: 2, cells: [[], [done], [blocked]], overflow: [0, 0, 0] }],
+      }),
+    );
     renderView();
     expect(
-      await screen.findByText(/^Sprint 12, active, ends .+\. 27 of 47 points done\. Synced today/),
+      await screen.findByText(/^Sprint 12, active, ends .+\. 5 of 11 points done\. Synced today/),
     ).toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 import type { BoardView, Sprint } from "../api";
 import { formatWhen, plural } from "../lib/format";
+import { statusClass } from "../lib/statusClass";
 
 // MAX_CARDS_PER_VIEW mirrors boardrepo.MaxCardsPerView, so the capped line
 // names the same number the backend stopped at.
@@ -27,10 +28,25 @@ interface SummaryProps {
   lastSynced: string;
 }
 
+// donePoints sums storyPoints over the cards whose status is done by TAM's
+// one definition of done, statusClass(status) === "done" (the same call the
+// grid's chips and the epic tree's progress counts use, mirroring
+// issuerepo.IsDone in Go). A board's rightmost column is as often Blocked or
+// Won't Do as it is Done, so it cannot stand in for the definition.
+function donePoints(view: BoardView): number {
+  let sum = 0;
+  for (const lane of view.lanes) {
+    for (const cell of lane.cells) {
+      for (const issue of cell) {
+        if (statusClass(issue.status) === "done") sum += issue.storyPoints ?? 0;
+      }
+    }
+  }
+  return sum;
+}
+
 // BoardSummaryLine is the line that orients a standup: which sprint, how far
-// through it, and how fresh the cards under it are. The done points are the
-// last column's, which is the board's own definition of done: whatever its
-// rightmost column collects.
+// through it, and how fresh the cards under it are.
 export function BoardSummaryLine({ view, sprint, lastSynced }: SummaryProps) {
   const sentences: string[] = [];
   if (sprint) {
@@ -40,8 +56,7 @@ export function BoardSummaryLine({ view, sprint, lastSynced }: SummaryProps) {
   }
   const total = view.columns.reduce((sum, c) => sum + c.points, 0);
   if (total > 0) {
-    const done = view.columns.length > 0 ? view.columns[view.columns.length - 1].points : 0;
-    sentences.push(`${points(done)} of ${points(total)} points done.`);
+    sentences.push(`${points(donePoints(view))} of ${points(total)} points done.`);
   }
   const synced = formatWhen(lastSynced);
   if (synced) sentences.push(`Synced ${synced}.`);

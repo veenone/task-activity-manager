@@ -1200,7 +1200,7 @@
 .board-columns { --board-col-w: 320px; display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
 .board-column { flex: 0 0 var(--board-col-w); display: flex; flex-direction: column; gap: 8px; }
 .board-cell, .board-column-head { width: var(--board-col-w); }
-.board-column-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 4px; }
+.board-column-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
 .board-column-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .board-lane { display: flex; flex-direction: column; gap: 6px; }
 .board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
