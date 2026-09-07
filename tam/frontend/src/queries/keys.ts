@@ -15,4 +15,12 @@ export const keys = {
   linkTypes: (profileId: string) => [profileId, "linkTypes"] as const,
   tree: (profileId: string, q: TreeQuery) => [profileId, "tree", q] as const,
   epics: (profileId: string) => [profileId, "epics"] as const,
+  boards: (profileId: string) => [profileId, "boards"] as const,
+  boardSprints: (profileId: string, boardId: number) =>
+    [profileId, "boardSprints", boardId] as const,
+  board: (profileId: string, boardId: number, sprintId: string, swimlane: string) =>
+    [profileId, "board", boardId, sprintId, swimlane] as const,
+  // The one profile setting the Boards view reads: whether this Jira
+  // answered the boards call with no Agile API at all.
+  boardsUnavailable: (profileId: string) => [profileId, "boardsUnavailable"] as const,
 };

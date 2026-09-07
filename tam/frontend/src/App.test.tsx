@@ -57,6 +57,10 @@ vi.mock("./api", async () => {
     GetEpicTree: vi.fn(),
     ListEpics: vi.fn(),
     GetProfileSetting: vi.fn(),
+    ListBoards: vi.fn(),
+    ListBoardSprints: vi.fn(),
+    GetBoard: vi.fn(),
+    SyncBoards: vi.fn(),
     SetProfileSetting: vi.fn(),
     EventsOn: vi.fn(menuBus.on),
     BrowserOpenURL: vi.fn(),
@@ -105,6 +109,8 @@ beforeEach(() => {
   vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
+  vi.mocked(api.ListBoards).mockResolvedValue([]);
+  vi.mocked(api.ListBoardSprints).mockResolvedValue([]);
   vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
 });
 
@@ -135,7 +141,9 @@ describe("App shell", () => {
     await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
     await menuBus.emit("menu:view", "boards" as never);
     expect(screen.getByRole("region", { name: /Boards/ })).toBeInTheDocument();
-    expect(screen.getByText(/arrives in Phase 3/)).toBeInTheDocument();
+    expect(
+      await screen.findByText("This project has no boards in Jira, or the sync has not run"),
+    ).toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" }))
       .toHaveAttribute("aria-current", "page");
   });

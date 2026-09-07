@@ -208,6 +208,83 @@ export interface SyncSummary {
   elapsed: string;
 }
 
+// Board, Sprint, ColumnView, LaneView, and BoardView mirror the Go shapes in
+// internal/boardrepo field for field. A type that quietly omits a field the
+// view needs is how a shape drifts from its Go original.
+export interface Board {
+  id: number;
+  name: string;
+  // Jira's own board type: "scrum" or "kanban".
+  type: string;
+}
+
+export interface Sprint {
+  id: number;
+  boardId: number;
+  name: string;
+  // Jira's own lowercase value: active, future, or closed.
+  state: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface ColumnView {
+  name: string;
+  total: number;
+  points: number;
+}
+
+export interface LaneView {
+  // id is the raw grouping value (the assignee, the epic key, empty for the
+  // catch-all lane); label is what the view prints.
+  id: string;
+  label: string;
+  // count is every card in the lane, whether it was rendered or not.
+  count: number;
+  // cells holds one card list per column, and overflow is parallel to it:
+  // overflow[c] is how many cards cell c holds beyond the ones it rendered.
+  cells: Issue[][];
+  overflow: number[];
+}
+
+export interface BoardView {
+  boardId: number;
+  sprintId: string;
+  swimlane: string;
+  columns: ColumnView[];
+  lanes: LaneView[];
+  unmapped: number;
+  unmappedStatuses: string[];
+  notSynced: number;
+  capped: boolean;
+  needsStatusSync: boolean;
+}
+
+export interface BoardSummary {
+  boards: number;
+  columns: number;
+  sprints: number;
+  cards: number;
+  dropped: string[];
+  unavailable: boolean;
+  elapsed: string;
+}
+
+export type Swimlane = "none" | "assignee" | "epic";
+
+// SWIMLANES is the grouping the board offers, in picker order. The ids match
+// boardrepo's SwimlaneNone, SwimlaneAssignee, and SwimlaneEpic.
+export const SWIMLANES: { id: Swimlane; label: string }[] = [
+  { id: "none", label: "None" },
+  { id: "assignee", label: "Assignee" },
+  { id: "epic", label: "Epic" },
+];
+
+// SETTING_BOARDS_UNAVAILABLE is the profile setting the boards sync writes
+// when the instance answered with no Agile API at all. It matches
+// syncer.settingBoardsUnavailable.
+export const SETTING_BOARDS_UNAVAILABLE = "boards_unavailable";
+
 export interface LinkedTest {
   key: string;
   summary: string;
@@ -457,6 +534,22 @@ export const GetEpicTree = (profileId: string, q: TreeQuery): Promise<EpicTreeDa
 export const ListEpics: (profileId: string) => Promise<Issue[]> = App.ListEpics as (profileId: string) => Promise<Issue[]>;
 export const GetProfileSetting: (profileId: string, key: string) => Promise<string> =
   App.GetProfileSetting;
+
+// The board bindings. GetBoard takes its arguments plainly: all four are
+// scalars, so nothing has to go through a generated class's createFrom. The
+// view is cast for the same reason ListIssues is: the generated cards type
+// their issue type as a plain string.
+export const ListBoards: (profileId: string) => Promise<Board[]> = App.ListBoards;
+export const ListBoardSprints: (profileId: string, boardId: number) => Promise<Sprint[]> =
+  App.ListBoardSprints;
+export const GetBoard = (
+  profileId: string,
+  boardId: number,
+  sprintId: string,
+  swimlane: string,
+): Promise<BoardView> =>
+  App.GetBoard(profileId, boardId, sprintId, swimlane) as Promise<BoardView>;
+export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.SyncBoards;
 export const SetProfileSetting: (
   profileId: string,
   key: string,

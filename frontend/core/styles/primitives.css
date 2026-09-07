@@ -1154,3 +1154,65 @@
 .epic-row-moved {
   background: var(--warn-soft);
 }
+
+/* ===== Board toolbar, mirrored from XTM's App.css ===== */
+/* Only the member table scrolls; the pager stays pinned beneath it. */
+.board-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.board-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.board-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+.board-picker select {
+  min-width: 280px;
+}
+.board-counts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.board-head-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.board-head-actions .btn {
+  font-size: 12px;
+}
+
+/* ===== The board itself ===== */
+/* Column heads and the cells under them take their width from one custom
+   property, so the two rows cannot drift apart. */
+.board-columns { --board-col-w: 320px; display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
+.board-column { flex: 0 0 var(--board-col-w); display: flex; flex-direction: column; gap: 8px; }
+.board-cell, .board-column-head { width: var(--board-col-w); }
+.board-column-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-3); border: 1px solid var(--border); border-radius: 4px; }
+.board-column-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.board-lane { display: flex; flex-direction: column; gap: 6px; }
+.board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
+.board-cell { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+.board-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface); cursor: pointer; user-select: none; display: flex; flex-direction: column; gap: 6px; }
+.board-card:hover { background: var(--row-hover); }
+.board-card-selected, .board-card-selected:hover { background: var(--accent-soft); border-color: var(--accent); }
+.board-card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.board-summary { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+.board-picker select.board-select-narrow { min-width: 0; width: auto; }
+.board-card-head { display: flex; align-items: center; gap: 6px; }
+.board-card-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+.board-unmapped { margin-top: 12px; }
+.board-overflow { font-size: 11px; color: var(--text-muted); padding: 2px 4px; }
+.boards-body { display: flex; gap: 12px; align-items: flex-start; min-height: 0; flex: 1; }

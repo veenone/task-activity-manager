@@ -8,6 +8,7 @@ import { useModal } from "./modals";
 import { Placeholder } from "./components/Placeholder";
 import { BacklogView } from "./components/BacklogView";
 import { EpicsView } from "./components/EpicsView";
+import { BoardsView } from "./components/BoardsView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { PendingChangesModal } from "./components/PendingChangesModal";
@@ -215,7 +216,15 @@ export default function App() {
             // names the project, so a heading repeating both only cost the
             // content 16px of height. Each view names its own landmark
             // instead of borrowing an id from a heading that is gone.
-            current.id === "backlog" ? <BacklogView /> : current.id === "epics" ? <EpicsView /> : <Placeholder view={current} />
+            current.id === "backlog" ? (
+              <BacklogView />
+            ) : current.id === "epics" ? (
+              <EpicsView />
+            ) : current.id === "boards" ? (
+              <BoardsView />
+            ) : (
+              <Placeholder view={current} />
+            )
           )}
         </main>
       </div>
