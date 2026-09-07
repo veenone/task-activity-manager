@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -476,6 +477,75 @@ func TestCreateDraftsIsOneTransactionWithParentsAndANote(t *testing.T) {
 	}
 }
 
+func TestCreateDraftsNumbersFromInsideItsTransaction(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	if _, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "Seed"}); err != nil {
+		t.Fatalf("seed draft: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	var keys [2][]string
+	var errs [2]error
+	drafts := [2]backend.IssueDraft{
+		{Type: backend.TypeTask, Summary: "A"},
+		{Type: backend.TypeTask, Summary: "B"},
+	}
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			keys[i], errs[i] = repo.CreateDrafts(ctx, "p1", "PLAT", []backend.IssueDraft{drafts[i]}, "")
+		}(i)
+	}
+	wg.Wait()
+
+	locked := func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "database is locked")
+	}
+
+	draftKeys := func() []string {
+		page, err := repo.ListIssues(ctx, "p1", issuerepo.IssueQuery{})
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		var ks []string
+		for _, iss := range page.Issues {
+			if iss.Draft {
+				ks = append(ks, iss.Key)
+			}
+		}
+		return ks
+	}
+
+	switch {
+	case errs[0] == nil && errs[1] == nil:
+		if keys[0][0] == keys[1][0] {
+			t.Fatalf("both concurrent creates got the same key: %v", keys)
+		}
+		want := map[string]bool{"TAM-NEW-1": true, "TAM-NEW-2": true, "TAM-NEW-3": true}
+		got := draftKeys()
+		if len(got) != 3 {
+			t.Fatalf("expected three drafts, got %v", got)
+		}
+		for _, k := range got {
+			if !want[k] {
+				t.Errorf("unexpected draft key %q, want one of TAM-NEW-1..3", k)
+			}
+			delete(want, k)
+		}
+		if len(want) != 0 {
+			t.Errorf("missing draft keys: %v", want)
+		}
+	case locked(errs[0]) != locked(errs[1]):
+		if got := draftKeys(); len(got) != 2 {
+			t.Errorf("one failed creation must leave exactly two drafts, got %v", got)
+		}
+	default:
+		t.Fatalf("unexpected outcome: err0=%v err1=%v", errs[0], errs[1])
+	}
+}
+
 func TestEditFieldParentKeyKeepsTheHierarchy(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()
@@ -492,6 +562,14 @@ func TestEditFieldParentKeyKeepsTheHierarchy(t *testing.T) {
 	pend, _ := repo.PendingForKey(ctx, "p1", "PLAT-412")
 	if iss.ParentKey != "PLAT-320" || len(pend) != 1 || pend[0].Field != "parentKey" || pend[0].BeforeVal != "PLAT-350" || pend[0].AfterVal != "PLAT-320" {
 		t.Errorf("row %+v pending %+v", iss, pend)
+	}
+	// Setting the same parent again, with stray whitespace, is a no-op: the
+	// trim has to happen before the current-value comparison, not after.
+	if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", "  PLAT-320  "); err != nil {
+		t.Fatalf("no-op reparent: %v", err)
+	}
+	if pend, _ := repo.PendingForKey(ctx, "p1", "PLAT-412"); len(pend) != 1 {
+		t.Errorf("whitespace-only reparent must not add a pending row: %+v", pend)
 	}
 	if err := repo.EditField(ctx, "p1", "PLAT-412", "parentKey", ""); err != nil {
 		t.Fatalf("clear: %v", err)

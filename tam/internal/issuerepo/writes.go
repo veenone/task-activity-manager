@@ -251,11 +251,13 @@ func (r *Repository) EditField(ctx context.Context, profileID, key, field, value
 	if err != nil {
 		return err
 	}
+	if field == "parentKey" {
+		value = strings.TrimSpace(value)
+	}
 	if current == value {
 		return nil
 	}
 	if field == "parentKey" {
-		value = strings.TrimSpace(value)
 		if err := validateParent(ctx, tx, profileID, key, ownType, value); err != nil {
 			return err
 		}
@@ -352,15 +354,16 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 			d.Extra = map[string]string{}
 		}
 	}
-	last, err := r.NextDraftNumber(ctx, profileID)
-	if err != nil {
-		return nil, err
-	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
+
+	last, err := nextDraftNumberTx(ctx, tx, profileID)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	keys := make([]string, 0, len(drafts))
@@ -404,13 +407,24 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 	return keys, nil
 }
 
-// NextDraftNumber returns the suffix the next TAM-NEW-n key would get. The
-// importer calls it once so a file's own Epic rows can predict the key a
-// later row's Parent cell names, before any of the batch exists in the
-// cache.
+// NextDraftNumber returns the suffix the next TAM-NEW-n key would get. This
+// is a preview only, for the importer's own file: it lets a file's Epic rows
+// predict the key a later row's Parent cell names, before any of the batch
+// exists in the cache. It reads outside any transaction, so a concurrent
+// CreateDrafts call can claim the number this returns; CreateDrafts re-reads
+// the same query inside its own transaction rather than trusting this value.
 func (r *Repository) NextDraftNumber(ctx context.Context, profileID string) (int, error) {
+	return nextDraftNumberTx(ctx, r.db, profileID)
+}
+
+// nextDraftNumberTx runs the next-draft-number query against the given
+// handle. CreateDrafts calls it inside its transaction, after BeginTx, so
+// the read and the insert commit together: SQLite serialises writers, so
+// that is enough to keep two concurrent creates from landing on the same
+// number.
+func nextDraftNumberTx(ctx context.Context, q execer, profileID string) (int, error) {
 	var last int
-	if err := r.db.QueryRowContext(ctx,
+	if err := q.QueryRowContext(ctx,
 		`SELECT COALESCE(MAX(CAST(SUBSTR(key, ?) AS INTEGER)), 0) FROM issue WHERE profile_id = ? AND key LIKE ?`,
 		len(DraftPrefix)+1, profileID, DraftPrefix+"%").Scan(&last); err != nil {
 		return 0, fmt.Errorf("next draft key: %w", err)
