@@ -31,6 +31,7 @@ function Invoke-Git([string[]]$gitArgs) {
     $out = & git @gitArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "git $($gitArgs -join ' ') failed"
+        Clear-SyncRefs
         exit 2
     }
     return $out
@@ -38,9 +39,12 @@ function Invoke-Git([string[]]$gitArgs) {
 
 function Fail([string]$msg) {
     Write-Host $msg
+    Clear-SyncRefs
     exit 1
 }
 
+# Every exit path goes through here, so a failed run never leaves fetched
+# refs behind under refs/synctags.
 function Clear-SyncRefs {
     $refs = @(& git for-each-ref --format="%(refname)" "$syncNs/")
     foreach ($r in $refs) { & git update-ref -d $r | Out-Null }
@@ -56,6 +60,8 @@ if ($Setup) {
         }
     }
     # Rewrite the push list from scratch so a second run leaves exactly three.
+    # --unset-all exits 5 when the key does not exist yet, which is the normal
+    # first run, so this call is the one git call whose exit code is ignored.
     & git config --unset-all remote.origin.pushurl | Out-Null
     foreach ($n in $names) { Invoke-Git @("config", "--add", "remote.origin.pushurl", $remoteUrls[$n]) | Out-Null }
     Write-Host "origin fetches from $OriginUrl and pushes to:"
@@ -65,7 +71,7 @@ if ($Setup) {
 
 # 1. Clean tree only. A merge or a stash in flight would make the local
 #    fast-forward below ambiguous.
-$dirty = @(& git status --porcelain --untracked-files=no)
+$dirty = @(Invoke-Git @("status", "--porcelain", "--untracked-files=no"))
 if ($dirty.Count -gt 0) { Fail "The working tree has uncommitted changes. Commit or stash them first." }
 
 $existing = @(Invoke-Git @("remote"))
