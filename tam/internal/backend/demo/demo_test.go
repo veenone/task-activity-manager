@@ -327,9 +327,21 @@ func TestDemoBoardIssueKeys(t *testing.T) {
 			t.Errorf("%s is a requirement and is not on a board", k)
 		}
 	}
+	returned := map[string]bool{}
 	for _, k := range inSprint {
+		returned[k] = true
 		if byKey[k].SprintID != "12" {
 			t.Errorf("%s is in sprint %q, not 12", k, byKey[k].SprintID)
+		}
+	}
+	// The other direction: a sprint 12 issue the board left out would be a
+	// card missing from the sprint, which no assertion above would catch.
+	for _, iss := range page {
+		if iss.Type == backend.TypeRequirement || iss.SprintID != "12" {
+			continue
+		}
+		if !returned[iss.Key] {
+			t.Errorf("%s is in sprint 12 and the board's key list left it out", iss.Key)
 		}
 	}
 	if _, err := b.BoardIssueKeys(ctx, 9, ""); err == nil {

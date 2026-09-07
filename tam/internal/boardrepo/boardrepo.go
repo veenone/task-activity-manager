@@ -41,28 +41,30 @@ type Sprint struct {
 	EndDate   string `json:"endDate"`
 }
 
-// IssueSource is the one thing the view needs from the issue cache. Keeping
-// it an interface is what lets boardrepo compose a board without importing
-// issuerepo; app.go passes the issue repository, which already has the
-// method.
+// IssueSource is what the view needs from the issue cache. Keeping it an
+// interface is what lets boardrepo compose a board without importing
+// issuerepo; app.go passes the issue repository, which already has both
+// methods.
 type IssueSource interface {
+	// IssuesByKeys returns the cached rows for the board's own keys, in the
+	// order they were asked for.
 	IssuesByKeys(ctx context.Context, profileID string, keys []string) ([]backend.Issue, error)
+	// DraftIssues returns the profile's local drafts. Jira's board issue
+	// list can never name a draft key, so the board reads them separately
+	// or they never reach a board at all.
+	DraftIssues(ctx context.Context, profileID string) ([]backend.Issue, error)
 }
 
 // PurgeProfile drops everything the board tables hold for a profile. The
 // issue cache is issuerepo's to purge: two purges naming the same tables is
 // the drift that leaves one behind when a fifth table arrives.
 func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	for _, table := range []string{"board", "board_column", "board_issue", "sprint"} {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
-			return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		for _, table := range []string{"board", "board_column", "board_issue", "sprint"} {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
+				return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
+			}
 		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }

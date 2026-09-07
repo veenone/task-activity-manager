@@ -12,20 +12,32 @@ import (
 
 // staticIssues is the issue cache the view reads through: a fixed set of
 // rows, answering in the caller's order and skipping what it does not hold,
-// exactly as issuerepo.IssuesByKeys does.
+// exactly as issuerepo.IssuesByKeys does, plus the profile's drafts, which
+// issuerepo answers from the cache and not from any key list. asked records
+// every key the board looked up, so a test can prove where a card came
+// from.
 type staticIssues struct {
-	byKey map[string]backend.Issue
+	byKey  map[string]backend.Issue
+	drafts []backend.Issue
+	asked  *[]string
 }
 
 func newIssues(issues ...backend.Issue) staticIssues {
-	s := staticIssues{byKey: map[string]backend.Issue{}}
+	s := staticIssues{byKey: map[string]backend.Issue{}, asked: &[]string{}}
 	for _, iss := range issues {
 		s.byKey[iss.Key] = iss
 	}
 	return s
 }
 
+// withDrafts hands the source the profile's local drafts.
+func (s staticIssues) withDrafts(drafts ...backend.Issue) staticIssues {
+	s.drafts = drafts
+	return s
+}
+
 func (s staticIssues) IssuesByKeys(_ context.Context, _ string, keys []string) ([]backend.Issue, error) {
+	*s.asked = append(*s.asked, keys...)
 	out := []backend.Issue{}
 	for _, k := range keys {
 		if iss, ok := s.byKey[k]; ok {
@@ -35,11 +47,23 @@ func (s staticIssues) IssuesByKeys(_ context.Context, _ string, keys []string) (
 	return out, nil
 }
 
+func (s staticIssues) DraftIssues(_ context.Context, _ string) ([]backend.Issue, error) {
+	return s.drafts, nil
+}
+
 func pts(v float64) *float64 { return &v }
 
 // card is one board card: key, status id, and whatever else a test needs.
 func card(key, statusName, statusID string) backend.Issue {
 	return backend.Issue{Key: key, Summary: key, Status: statusName, StatusID: statusID, Labels: []string{}}
+}
+
+// draftCard is one local draft: the status a draft row shows, no status id,
+// and the flag scanIssue sets from the key prefix.
+func draftCard(key string) backend.Issue {
+	c := card(key, "Draft", "")
+	c.Draft = true
+	return c
 }
 
 // seedBoard writes the sample columns for board 1 and the keys in the order
@@ -158,33 +182,79 @@ func TestBoardCountsAStatusNoColumnCollects(t *testing.T) {
 
 func TestADraftLandsInTheFirstColumnThatHasStatusIDs(t *testing.T) {
 	r, _ := newRepo(t)
-	draft := card("TAM-NEW-1", "Draft", "")
-	draft.Draft = true
-	cards := []backend.Issue{draft, card("PLAT-409", "To Do", "1")}
-	src := seedBoard(t, r, sampleColumns(), cards)
+	ctx := context.Background()
+	if err := r.UpsertColumns(ctx, "p1", 1, sampleColumns()); err != nil {
+		t.Fatalf("columns: %v", err)
+	}
+	// The scrum board's sprint and the kanban board's whole-board list are
+	// two different key lists, and neither of them names the draft: the
+	// draft is project-level and must appear on both.
+	if err := r.UpsertIssueKeys(ctx, "p1", 1, "12", []string{"PLAT-409"}); err != nil {
+		t.Fatalf("sprint keys: %v", err)
+	}
+	if err := r.UpsertIssueKeys(ctx, "p1", 1, "", []string{"PLAT-409"}); err != nil {
+		t.Fatalf("board keys: %v", err)
+	}
+	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(draftCard("TAM-NEW-1"))
+
+	for _, tc := range []struct {
+		name     string
+		sprintID string
+	}{
+		{"scrum sprint", "12"},
+		{"kanban board", ""},
+	} {
+		view, err := r.Board(ctx, src, "p1", 1, tc.sprintID, boardrepo.SwimlaneNone)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		lane := view.Lanes[0]
+		if len(lane.Cells[0]) != 0 {
+			t.Errorf("%s: the leading Backlog column has no statuses and must not take the draft: %v", tc.name, cellKeys(lane.Cells[0]))
+		}
+		if got := cellKeys(lane.Cells[1]); len(got) != 2 || got[1] != "TAM-NEW-1" {
+			t.Errorf("%s: To Do = %v, want the draft in the first column that has status ids", tc.name, got)
+		}
+		if view.Unmapped != 0 {
+			t.Errorf("%s: unmapped = %d, want the draft drawn rather than hidden", tc.name, view.Unmapped)
+		}
+		if view.Columns[1].Total != 2 {
+			t.Errorf("%s: To Do total = %d, want the draft counted with the card", tc.name, view.Columns[1].Total)
+		}
+		if lane.Count != 2 {
+			t.Errorf("%s: lane count = %d, want the draft in the lane too", tc.name, lane.Count)
+		}
+	}
+}
+
+func TestADraftDoesNotArriveThroughIssuesByKeys(t *testing.T) {
+	r, _ := newRepo(t)
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
+		withDrafts(draftCard("TAM-NEW-1"))
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
 	}
-	lane := view.Lanes[0]
-	if len(lane.Cells[0]) != 0 {
-		t.Errorf("the leading Backlog column has no statuses and must not take the draft: %v", cellKeys(lane.Cells[0]))
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Fatalf("To Do = %v, want the card and the draft", got)
 	}
-	if got := cellKeys(lane.Cells[1]); len(got) != 2 || got[0] != "TAM-NEW-1" {
-		t.Errorf("To Do = %v, want the draft in the first column that has status ids", got)
+	// board_issue is filled from Jira's board issue list, so a draft key can
+	// never be in it. The draft reached the board anyway, and not by being
+	// looked up as one of the board's keys.
+	for _, k := range *src.asked {
+		if strings.HasPrefix(k, "TAM-NEW-") {
+			t.Errorf("the board asked IssuesByKeys for %s; drafts come from DraftIssues", k)
+		}
 	}
-	if view.Unmapped != 0 {
-		t.Errorf("unmapped = %d, want the draft drawn rather than hidden", view.Unmapped)
-	}
-	if view.Columns[1].Total != 2 {
-		t.Errorf("To Do total = %d, want 2", view.Columns[1].Total)
+	if view.NotSynced != 0 {
+		t.Errorf("not synced = %d, want the draft not to count as a key with no row", view.NotSynced)
 	}
 }
 
 func TestADraftIsUnmappedWhenNoColumnHasAStatus(t *testing.T) {
 	r, _ := newRepo(t)
 	cols := []backend.BoardColumn{{Name: "Backlog", StatusIDs: []string{}}, {Name: "Later", StatusIDs: []string{}}}
-	src := seedBoard(t, r, cols, []backend.Issue{card("TAM-NEW-1", "Draft", "")})
+	src := seedBoard(t, r, cols, nil).withDrafts(draftCard("TAM-NEW-1"))
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
@@ -194,6 +264,35 @@ func TestADraftIsUnmappedWhenNoColumnHasAStatus(t *testing.T) {
 	}
 	if len(view.UnmappedStatuses) != 1 || view.UnmappedStatuses[0] != "Draft" {
 		t.Errorf("unmapped statuses = %v", view.UnmappedStatuses)
+	}
+}
+
+func TestACardWithNoStatusIDIsUnmappedUnlessItIsADraft(t *testing.T) {
+	r, _ := newRepo(t)
+	// Right after the version 4 migration every cached row carries an empty
+	// status id. None of them is a draft, and reading them as drafts would
+	// pile the whole backlog into the first column.
+	cards := []backend.Issue{card("PLAT-409", "", ""), card("PLAT-412", "To Do", "1")}
+	src := seedBoard(t, r, sampleColumns(), cards)
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if view.Unmapped != 1 {
+		t.Errorf("unmapped = %d, want the card with no status id counted", view.Unmapped)
+	}
+	if len(view.UnmappedStatuses) != 0 {
+		t.Errorf("unmapped statuses = %v, want an empty status to name nothing", view.UnmappedStatuses)
+	}
+	lane := view.Lanes[0]
+	if got := cellKeys(lane.Cells[1]); len(got) != 1 || got[0] != "PLAT-412" {
+		t.Errorf("To Do = %v, want only the card a column collects", got)
+	}
+	if view.Columns[0].Total != 0 || view.Columns[1].Total != 1 {
+		t.Errorf("column totals = %d and %d, want the unplaced card in neither", view.Columns[0].Total, view.Columns[1].Total)
+	}
+	if lane.Count != 1 {
+		t.Errorf("lane count = %d, want only the placed card", lane.Count)
 	}
 }
 

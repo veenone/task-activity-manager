@@ -11,17 +11,21 @@ import (
 	"agile-suite/tam/internal/backend"
 )
 
+// The only consumer is a type assertion, so drift would skip the sync silently; this fails the build.
+var _ backend.BoardBackend = (*Backend)(nil)
+
 // Boards lists the project's boards, scrum and kanban only. Jira also
 // serves simple boards and whatever a plugin adds; those have no column
 // configuration TAM can lay out, so they are dropped with a log line rather
 // than cached as a board that draws nothing.
 //
-// jira.ErrNoAgile passes through unwrapped, so the sync can tell "this Jira
-// has no Agile API" from "this call failed". It never writes.
+// The error is wrapped with %w, so errors.Is still finds jira.ErrNoAgile and
+// the sync can tell "this Jira has no Agile API" from "this call failed",
+// while the message names the project it was reading. It never writes.
 func (b *Backend) Boards(ctx context.Context, projectKey string) ([]backend.Board, error) {
 	raw, err := b.c.Boards(ctx, projectKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("project %s boards: %w", projectKey, err)
 	}
 	out := []backend.Board{}
 	for _, rb := range raw {

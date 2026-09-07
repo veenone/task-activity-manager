@@ -209,13 +209,39 @@ func TestVersionFiveMigrationAddsStatusIDAndClearsEveryWatermark(t *testing.T) {
 	}
 }
 
+// rewindToVersionThree puts the database back where the version 5 migration
+// has work to do again: the recorded version at 3 and a watermark to clear.
+// The status_id column stays, because that is the half of the migration
+// that has to be a no-op the second time round.
+func rewindToVersionThree(t *testing.T, path string) {
+	t.Helper()
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("rewind: %v", err)
+	}
+	for _, stmt := range []string{
+		`UPDATE sync_state SET last_synced = '2026-09-06T09:00:00Z'`,
+		`UPDATE meta SET value = '3' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+}
+
 func TestVersionFiveMigrationIsIdempotent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tam.db")
 	openAtVersionThree(t, path)
+	// Without the rewind the second open would record version 5 and skip
+	// the body, which proves nothing about running it twice.
 	for i := 0; i < 3; i++ {
 		statusID, lastSynced, _ := readMigrated(t, path)
 		if statusID != "" || lastSynced != "" {
-			t.Fatalf("open %d: status_id = %q, last_synced = %q; want both empty", i+1, statusID, lastSynced)
+			t.Fatalf("run %d: status_id = %q, last_synced = %q; want both empty", i+1, statusID, lastSynced)
 		}
+		rewindToVersionThree(t, path)
 	}
 }

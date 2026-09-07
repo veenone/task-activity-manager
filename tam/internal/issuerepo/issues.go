@@ -100,7 +100,7 @@ const upsertIssueSQL = `
 		updated = excluded.updated, synced_at = excluded.synced_at`
 
 func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Issue, syncedAt time.Time) error {
-	labels, err := json.Marshal(nonNil(iss.Labels))
+	labels, err := json.Marshal(backend.NonNil(iss.Labels))
 	if err != nil {
 		return fmt.Errorf("labels for %s: %w", iss.Key, err)
 	}
@@ -267,6 +267,34 @@ func (r *Repository) IssuesByKeys(ctx context.Context, profileID string, keys []
 	return out, nil
 }
 
+// draftsSQL reads the profile's drafts. It matches them the way every other
+// read in the package does, by the DraftPrefix key, so there is one
+// definition of what a draft is and scanIssue's Draft flag agrees with it.
+const draftsSQL = `SELECT ` + issueColumns + ` FROM issue WHERE profile_id = ? AND key LIKE ? ORDER BY key`
+
+// DraftIssues returns the profile's local drafts in key order. The board
+// asks for these separately from the board's own keys: Jira's board issue
+// list is where those come from and it can never name a draft key, so
+// without this a draft would never reach a board at all. Drafts are
+// project-level, which is why every board and every sprint of the profile
+// gets the same ones.
+func (r *Repository) DraftIssues(ctx context.Context, profileID string) ([]backend.Issue, error) {
+	rows, err := r.db.QueryContext(ctx, draftsSQL, profileID, DraftPrefix+"%")
+	if err != nil {
+		return nil, fmt.Errorf("draft issues: %w", err)
+	}
+	defer rows.Close()
+	out := []backend.Issue{}
+	for rows.Next() {
+		iss, err := scanIssue(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, iss)
+	}
+	return out, rows.Err()
+}
+
 // scanIssuesInto runs one row read and files every row under its key.
 func (r *Repository) scanIssuesInto(ctx context.Context, into map[string]backend.Issue, query string, args []any) error {
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -334,7 +362,7 @@ func scanIssue(s scanner) (backend.Issue, error) {
 	if err := json.Unmarshal([]byte(labels), &iss.Labels); err != nil {
 		return backend.Issue{}, fmt.Errorf("labels for %s: %w", iss.Key, err)
 	}
-	iss.Labels = nonNil(iss.Labels)
+	iss.Labels = backend.NonNil(iss.Labels)
 	if points.Valid {
 		v := points.Float64
 		iss.StoryPoints = &v
@@ -342,11 +370,4 @@ func scanIssue(s scanner) (backend.Issue, error) {
 	iss.Pending = pending != 0
 	iss.Draft = strings.HasPrefix(iss.Key, DraftPrefix)
 	return iss, nil
-}
-
-func nonNil(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return s
 }

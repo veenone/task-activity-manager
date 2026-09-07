@@ -7,6 +7,9 @@ import (
 	"agile-suite/tam/internal/backend"
 )
 
+// The only consumer is a type assertion, so drift would skip the sync silently; this fails the build.
+var _ backend.BoardBackend = (*Backend)(nil)
+
 // The demo's boards. Board 1 is the scrum board the sprints hang off,
 // board 2 the kanban board that has none. Both are derived from the
 // profile's project key, so a demo profile with any key gets boards named

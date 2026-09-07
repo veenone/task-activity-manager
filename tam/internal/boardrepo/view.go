@@ -90,8 +90,9 @@ type LaneView struct {
 
 // Board composes what the Boards view draws: the columns in order, the
 // cards bucketed into them, and the lanes the swimlane asked for. Cards
-// come from the issue cache; a status no column covers is counted in
-// Unmapped so nothing disappears silently.
+// come from the issue cache, the board's own keys plus the profile's
+// drafts; a status no column covers is counted in Unmapped so nothing
+// disappears silently.
 func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID string, boardID int, sprintID, swimlane string) (BoardView, error) {
 	lane, err := normalizeSwimlane(swimlane)
 	if err != nil {
@@ -129,12 +130,24 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 	view.NotSynced = len(keys) - len(cards)
 	view.NeedsStatusSync = needsStatusSync(cards)
 
+	// The drafts come from the cache rather than from the board's key list,
+	// which is Jira's and can never name one. They are project-level, so
+	// every board and every sprint of the profile draws the same ones and
+	// the Draft chip on the card is what says so.
+	drafts, err := issues.DraftIssues(ctx, profileID)
+	if err != nil {
+		return BoardView{}, err
+	}
+	all := make([]backend.Issue, 0, len(cards)+len(drafts))
+	all = append(all, cards...)
+	all = append(all, drafts...)
+
 	byStatus, draftColumn := columnIndex(cols)
 	lanes := newLaneSet(lane, len(cols))
 	unmapped := map[string]bool{}
 	rendered := 0
 
-	for _, card := range cards {
+	for _, card := range all {
 		col, ok := placeCard(card, byStatus, draftColumn)
 		if !ok {
 			view.Unmapped++
@@ -203,12 +216,17 @@ func columnIndex(cols []backend.BoardColumn) (byStatus map[string]int, draftColu
 	return byStatus, draftColumn
 }
 
-// placeCard picks the column a card belongs in. A card with no status id is
-// a local draft, which Jira has never seen and so no column names; it goes
-// in the first column that collects anything. A board with no such column
-// has nowhere to put it, and it counts as unmapped there.
+// placeCard picks the column a card belongs in. A draft is the one card
+// Jira has never seen, so no column names its status; it goes in the first
+// column that collects anything, and a board with no such column has
+// nowhere to put it. The Draft flag is what says so, not an empty status
+// id: right after the version 4 migration every cached row carries an empty
+// status id, and reading those as drafts would pile a whole backlog into
+// the first column. They go through the status id like every other card,
+// which no column collects, so they count as unmapped until the next sync
+// fills the column in.
 func placeCard(card backend.Issue, byStatus map[string]int, draftColumn int) (int, bool) {
-	if card.StatusID == "" {
+	if card.Draft {
 		if draftColumn < 0 {
 			return 0, false
 		}
@@ -220,7 +238,9 @@ func placeCard(card backend.Issue, byStatus map[string]int, draftColumn int) (in
 
 // unmappedName is what UnmappedStatuses lists for a card no column took:
 // the status name when there is one, otherwise the raw id, so the message
-// still names something the user can look up.
+// still names something the user can look up. A card with neither, which is
+// what a row cached before the version 4 migration looks like, names
+// nothing and the caller leaves it out of the list.
 func unmappedName(card backend.Issue) string {
 	if name := strings.TrimSpace(card.Status); name != "" {
 		return name

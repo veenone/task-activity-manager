@@ -242,6 +242,62 @@ func TestIssuesByKeysWithNoKeys(t *testing.T) {
 	}
 }
 
+func TestDraftIssuesReadsTheProfilesDraftsInKeyOrder(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
+	if err := r.UpsertPage(ctx, "p1", sample(), now, false); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	first, err := r.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "Draft one"})
+	if err != nil {
+		t.Fatalf("first draft: %v", err)
+	}
+	second, err := r.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Draft two"})
+	if err != nil {
+		t.Fatalf("second draft: %v", err)
+	}
+	if _, err := r.CreateDraft(ctx, "p2", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "Another profile"}); err != nil {
+		t.Fatalf("other profile draft: %v", err)
+	}
+
+	got, err := r.DraftIssues(ctx, "p1")
+	if err != nil {
+		t.Fatalf("drafts: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("drafts = %+v, want the two of this profile and no synced row", got)
+	}
+	if got[0].Key != first || got[1].Key != second {
+		t.Errorf("drafts = %s, %s; want %s, %s in key order", got[0].Key, got[1].Key, first, second)
+	}
+	for _, iss := range got {
+		if !iss.Draft {
+			t.Errorf("%s came back without the Draft flag", iss.Key)
+		}
+		if iss.StatusID != "" {
+			t.Errorf("%s has status id %q; a draft Jira has never seen has none", iss.Key, iss.StatusID)
+		}
+		if iss.Labels == nil {
+			t.Errorf("%s came back with nil labels; the rows are whole", iss.Key)
+		}
+	}
+	if got[0].Summary != "Draft one" {
+		t.Errorf("first draft = %+v", got[0])
+	}
+}
+
+func TestDraftIssuesWithNoDrafts(t *testing.T) {
+	r := newRepo(t)
+	got, err := r.DraftIssues(context.Background(), "p1")
+	if err != nil {
+		t.Fatalf("drafts: %v", err)
+	}
+	if got == nil || len(got) != 0 {
+		t.Errorf("drafts = %+v, want an empty slice", got)
+	}
+}
+
 func TestIssuesByKeysReadsPastTheChunkBoundary(t *testing.T) {
 	r := newRepo(t)
 	ctx := context.Background()

@@ -67,7 +67,7 @@ func (r *Repository) UpsertColumns(ctx context.Context, profileID string, boardI
 			return fmt.Errorf("clear columns of board %d: %w", boardID, err)
 		}
 		for i, c := range cols {
-			ids, err := json.Marshal(nonNil(c.StatusIDs))
+			ids, err := json.Marshal(backend.NonNil(c.StatusIDs))
 			if err != nil {
 				return fmt.Errorf("status ids of column %q: %w", c.Name, err)
 			}
@@ -173,7 +173,7 @@ func (r *Repository) Columns(ctx context.Context, profileID string, boardID int)
 		if err := json.Unmarshal([]byte(ids), &c.StatusIDs); err != nil {
 			return nil, fmt.Errorf("status ids of column %q: %w", c.Name, err)
 		}
-		c.StatusIDs = nonNil(c.StatusIDs)
+		c.StatusIDs = backend.NonNil(c.StatusIDs)
 		out = append(out, c)
 	}
 	return out, rows.Err()
@@ -229,11 +229,4 @@ func (r *Repository) inTx(ctx context.Context, fn func(tx *sql.Tx) error) error 
 		return err
 	}
 	return tx.Commit()
-}
-
-func nonNil(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return s
 }

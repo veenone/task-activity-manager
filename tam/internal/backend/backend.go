@@ -93,6 +93,17 @@ func SplitLabels(s string) []string {
 	return out
 }
 
+// NonNil returns s, or an empty slice when s is nil. A nil slice encodes as
+// JSON null, and null is what makes a label list or a column's status ids
+// read as "missing" rather than "none"; the store layers all go through
+// here so none of them has to carry a copy of the same three lines.
+func NonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
 // FormatPoints renders story points the way the journal and the forms
 // show them: a plain number, or empty for none.
 func FormatPoints(p *float64) string {
