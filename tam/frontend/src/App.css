@@ -355,7 +355,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-conflict { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); text-transform: uppercase; font-size: 10px; }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }
-.pending-banner-warn { background: var(--warn-bg, #fef3c7); border-color: var(--warn-border, #f59e0b); }
+/* --warn-soft is the token; the --warn-bg this used to name is defined
+   nowhere, so in dark mode a warned card and this banner disagreed. */
+.pending-banner-warn { background: var(--warn-soft); border-color: var(--warn-border); }
 .pending-list { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
 .pending-card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
 .pending-card-conflict { background: #fff7ed; border-color: #f59e0b; }

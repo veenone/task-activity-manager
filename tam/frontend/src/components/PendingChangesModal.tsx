@@ -28,6 +28,12 @@ function draftLine(d: IssueDraft, project: string): string {
   if (d.priority) bits.push(`priority ${d.priority}`);
   if (d.assignee) bits.push(`assignee ${d.assignee}`);
   if (d.storyPoints !== null && d.storyPoints !== undefined) bits.push(`${d.storyPoints} points`);
+  // A draft dragged into a sprint journals nothing, since Commit sends the
+  // draft rather than the move, so the draft's own sprint is the only place
+  // that move shows up. Its column cannot be named the same way: a draft
+  // carries the status id it was dropped on and no status name, since Jira
+  // has never granted it one.
+  if (d.sprintName) bits.push(`sprint ${d.sprintName}`);
   return bits.join(", ");
 }
 

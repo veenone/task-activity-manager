@@ -26,6 +26,11 @@ interface Props {
 // to, and every sprint. Enter and Space are taken on a card, by the
 // selection that opens the detail panel, so the menu has a trigger of its
 // own rather than an activation key.
+//
+// It is labelled and styled as every other row menu in the suite is,
+// "Actions" on a plain button, rather than as a menu of its own kind: the
+// items say what they do, and a card is not the place to teach a second
+// vocabulary for the same control.
 export function CardMoveMenu({ issueKey, columns, col, sprints, sprintId, disabled, onColumn, onSprint }: Props) {
   const items: MenuItem[] = [];
   columns.forEach((column, i) => {
@@ -60,12 +65,12 @@ export function CardMoveMenu({ issueKey, columns, col, sprints, sprintId, disabl
       onKeyDown={(e) => e.stopPropagation()}
     >
       <Menu
-        label="Move"
+        label="Actions"
         items={items}
         align="right"
-        title={`Move ${issueKey}`}
-        triggerLabel={`Move ${issueKey}`}
-        triggerClassName={`btn btn-ghost ${CARD_MENU_CLASS}`}
+        title={`Actions on ${issueKey}`}
+        triggerLabel={`Actions on ${issueKey}`}
+        triggerClassName={`btn ${CARD_MENU_CLASS}`}
         triggerTabIndex={-1}
       />
     </span>

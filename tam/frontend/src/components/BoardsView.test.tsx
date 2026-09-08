@@ -762,7 +762,7 @@ describe("BoardsView moves", () => {
     const user = userEvent.setup();
     renderView();
     const card = await screen.findByRole("gridcell", { name: /PLAT-412/ });
-    await user.click(within(card).getByRole("button", { name: "Move PLAT-412" }));
+    await user.click(within(card).getByRole("button", { name: "Actions on PLAT-412" }));
     await user.click(await within(card).findByRole("menuitem", { name: "Move to Sprint 13" }));
     await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-412", "13"));
     // The menu is not the card: opening it must not open the detail panel.
