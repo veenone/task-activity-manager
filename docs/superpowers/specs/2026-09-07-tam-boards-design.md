@@ -211,3 +211,69 @@ Deferred to 3c after the fact:
 Known limits of what shipped:
 
 - **A 207 fails the whole batch.** Jira's Agile bulk endpoints answer 207 Multi-Status when they reject even one issue of a request, and `core/jira` treats a 207 as a failure by its status alone. A sprint move of fifty cards that Jira refuses for one of them therefore reports all fifty as failed and leaves all fifty journal rows in place. Nothing is lost and the next Commit retries, but the report names more cards than actually failed. Splitting a 207 back into per-issue outcomes means trusting a body schema Atlassian documents loosely, which is the trade this phase declined to make.
+
+## 14. Plan 3c: the sprint lifecycle
+
+Decided 2026-09-09, after 3b merged and after the boards polish pass (#31) landed a faster sync, a shared grid template, and a drop that asks for a column rather than a status. This closes Phase 3.
+
+### 14.1 What 3c delivers
+
+Three things 3b deferred, plus one bug it inherited:
+
+- **Starting and completing a sprint**, from the Boards toolbar.
+- **Moving several cards to a sprint at once**, which is what sprint planning actually does.
+- **The sprint move from the detail panel**, so an issue can leave the Backlog for a sprint without going to the board first.
+- **The `ReplaceBoard` atomicity gap**, which two independent sessions have now hit as a flaky test asserting that a concurrent read never sees a half-applied board. It is a real gap and it belongs here rather than smuggled into a feature.
+
+### 14.2 The decision that shapes this plan
+
+**A sprint start or complete goes to Jira immediately. It is not journaled.** Every other write in TAM is journaled and lands on Commit, and 3b argued hard for keeping that rule; this is the one place it should not hold, for three reasons.
+
+A sprint's start is a fact with a timestamp that a whole team reads. Journaling it means TAM decides when the sprint started and tells Jira an hour later, so the burndown that Phase 4 will draw is computed from a lie. A completion is worse: Jira decides what happens to the issues that did not finish, and that answer depends on the sprint's contents at the moment it closes, not at the moment someone pressed a button on a train.
+
+And unlike a card move, there is nothing to reconcile. A transition can be rebased onto a status that moved; a sprint that someone else already started cannot be started again, and the only sensible answer is to say so and refresh.
+
+So the two lifecycle actions are online-only: the buttons say what they will do, they are disabled with a reason when the app has no connection, and they report Jira's answer directly. The card moves they sit beside stay journaled, exactly as 3b built them. This is the only place in TAM where a button talks to Jira without Commit, and the plan says so out loud rather than letting a future reader discover it.
+
+### 14.3 Decisions
+
+| Question | Decision | Why |
+|---|---|---|
+| Where a sprint's lifecycle lives | The Boards toolbar, beside the sprint picker | It acts on the sprint that is already selected, and nowhere else in the app knows about sprints |
+| Starting a sprint | A dialog: name (prefilled), goal, start and end dates, defaulting to today and today plus the board's usual sprint length | Jira requires the dates; a length guessed from the board's last three sprints is right far more often than a blank field |
+| Completing a sprint | A dialog naming how many issues are incomplete and where they go: the backlog, or a named future sprint | This is Jira's own question, and answering it in TAM rather than sending the user to the web is the point |
+| What happens to the incomplete issues | TAM moves them first, with the sprint move it already has, then closes the sprint | The move is a normal Agile call TAM already makes, and doing it first means a failure leaves the sprint open rather than half closed |
+| Multi-select | Click, then shift-click for a range and control-click to add, on the board only, cleared by any board or sprint change | The board is the only place with more than one card on screen at once |
+| What multi-select can do | Move to a sprint, and nothing else in 3c | It is what planning needs; a bulk transition would need every card's workflow checked and belongs with its own design |
+| The detail panel's sprint | A select of the board's open sprints plus the backlog, journaled exactly like the card menu's | One write path, already built and reviewed in 3b |
+| Permissions | A 403 on a lifecycle call says the account cannot manage sprints on this board, and the buttons stay | Guessing at permissions before trying is how tools hide capability from people who have it |
+
+### 14.4 The wire
+
+Three calls in `core/jira/agile.go`, beside the four 3b added:
+
+- `CreateSprint(ctx, boardID int, name, goal, start, end string) (RawSprint, error)` over `POST /rest/agile/1.0/sprint`.
+- `StartSprint(ctx, sprintID int, name, goal, start, end string) error` over `POST /rest/agile/1.0/sprint/{id}` with `state: "active"`.
+- `CompleteSprint(ctx, sprintID int) error` over the same endpoint with `state: "closed"`.
+
+Jira answers 400 when a sprint cannot start (another is already active on that board, the dates are wrong) and 403 without the Manage Sprints permission; both come back as the message Jira gave, not as a TAM guess.
+
+### 14.5 The store
+
+No new tables. `sprint` already holds what the pickers need, and a lifecycle action ends with a boards sync so the row matches Jira. `boardrepo` gains one read: `SprintLength(profileID, boardID)` returning the median length of that board's last three closed sprints, for the dialog's default end date, and nothing when there are none.
+
+### 14.6 `ReplaceBoard`
+
+The gap is real: the four writes of a board land in one transaction, but a reader on another connection can still observe the moment between the delete and the insert of a scope, because SQLite in WAL gives a reader a consistent snapshot only inside a transaction and `boardrepo.Board` reads with four separate statements. The fix is on the read side: `Board` and `CellOrder` take their reads in one deferred transaction, which is what makes the snapshot they already assume. The flaky test then asserts what it was written to assert.
+
+### 14.7 Errors
+
+A sprint that cannot start because another is active names the active one. A 403 says the account cannot manage sprints on this board. A completion whose issue move fails leaves the sprint open and says so, because a half-completed sprint is worse than an uncompleted one. A lifecycle call attempted with no connection is refused before it is made, with the same sentence the disabled button carries.
+
+### 14.8 Verification
+
+Go: the three client calls against the httptest server, including the 400 and the 403; `SprintLength` over three closed sprints and over none; the lifecycle methods on both backends, with the demo refusing a second active sprint; the read-transaction fix proving a concurrent reader never sees a half-applied board. Vitest: the start dialog's defaults, the complete dialog's count and destination, multi-select by click, shift-click and control-click, a bulk move journaling one row per card, the detail panel's sprint select, and the disabled buttons offline. Offline: on the demo profile, select the future sprint, start it, move three cards into it, complete it, and read where the incomplete ones went.
+
+### 14.9 Out of scope
+
+Creating a board, editing a sprint's dates after it starts, a bulk transition, a bulk rank, sprint reports and burndown (Phase 4, which is what the completed sprints feed), and the board's own quick filters.
