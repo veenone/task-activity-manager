@@ -295,6 +295,50 @@ func (r *Repository) DraftIssues(ctx context.Context, profileID string) ([]backe
 	return out, rows.Err()
 }
 
+// PendingMoves returns every pending board intent of the profile, one value
+// per issue, in key order. The three entity types come back in one
+// statement and are folded together here, so the board read applies them in
+// memory rather than asking the journal once per card.
+func (r *Repository) PendingMoves(ctx context.Context, profileID string) ([]backend.PendingMove, error) {
+	args := make([]any, 0, len(BoardEntities)+1)
+	args = append(args, profileID)
+	for _, t := range BoardEntities {
+		args = append(args, t)
+	}
+	marks := strings.TrimSuffix(strings.Repeat("?, ", len(BoardEntities)), ", ")
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT entity_type, entity_key, after_val FROM pending_change
+		 WHERE profile_id = ? AND entity_type IN (`+marks+`) ORDER BY entity_key, id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("pending moves: %w", err)
+	}
+	defer rows.Close()
+	out := []backend.PendingMove{}
+	at := map[string]int{}
+	for rows.Next() {
+		var entityType, key, value string
+		if err := rows.Scan(&entityType, &key, &value); err != nil {
+			return nil, err
+		}
+		i, ok := at[key]
+		if !ok {
+			i = len(out)
+			at[key] = i
+			out = append(out, backend.PendingMove{Key: key})
+		}
+		switch entityType {
+		case EntityTransition:
+			out[i].StatusID, out[i].HasTransition = MoveID(value), true
+		case EntitySprintMove:
+			out[i].SprintID, out[i].HasSprint = MoveID(value), true
+		case EntityRank:
+			out[i].RankNeighbour, out[i].RankBefore = ParseRank(value)
+			out[i].HasRank = true
+		}
+	}
+	return out, rows.Err()
+}
+
 // scanIssuesInto runs one row read and files every row under its key.
 func (r *Repository) scanIssuesInto(ctx context.Context, into map[string]backend.Issue, query string, args []any) error {
 	rows, err := r.db.QueryContext(ctx, query, args...)

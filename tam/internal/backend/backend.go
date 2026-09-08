@@ -78,7 +78,37 @@ type IssueDraft struct {
 	// backend sends it through the Epic Link field when it exists.
 	ParentKey string `json:"parentKey"`
 
+	// StatusID, SprintID, and SprintName are where a draft was last dropped
+	// on a board. A draft has no Jira state, so a drag moves it in place
+	// rather than journalling a transition against an issue Jira has never
+	// seen; the create sends none of the three, since a new issue lands in
+	// its workflow's first status whatever the board showed.
+	StatusID   string `json:"statusId"`
+	SprintID   string `json:"sprintId"`
+	SprintName string `json:"sprintName"`
+
 	Extra map[string]string `json:"extra"`
+}
+
+// PendingMove is every board intent the journal holds for one issue, folded
+// into one value so the board read can apply them in memory instead of
+// asking per card. The three Has flags are what say a field is set: an
+// empty SprintID is the backlog, which is a destination and not an absence,
+// and reading it as "no sprint move" is how a card moved off a board would
+// quietly stay on it.
+type PendingMove struct {
+	Key      string `json:"key"`
+	StatusID string `json:"statusId"`
+	SprintID string `json:"sprintId"`
+	// RankNeighbour is the key the card was dropped against and RankBefore
+	// which side of it. The rank itself is never cached: a made-up LexoRank
+	// would be a second source of truth the next sync overwrites.
+	RankNeighbour string `json:"rankNeighbour"`
+	RankBefore    bool   `json:"rankBefore"`
+
+	HasTransition bool `json:"hasTransition"`
+	HasSprint     bool `json:"hasSprint"`
+	HasRank       bool `json:"hasRank"`
 }
 
 // SplitLabels turns the comma list the form and the journal use back into

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"agile-suite/tam/internal/backend"
@@ -130,15 +131,19 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 		view.Columns = append(view.Columns, ColumnView{Name: c.Name})
 	}
 
-	keys, err := r.issueKeys(ctx, profileID, boardID, sprintID)
+	boardKeys, err := r.issueKeys(ctx, profileID, boardID, sprintID)
 	if err != nil {
 		return BoardView{}, err
 	}
-	cards, err := issues.IssuesByKeys(ctx, profileID, keys)
+	moves, err := issues.PendingMoves(ctx, profileID)
 	if err != nil {
 		return BoardView{}, err
 	}
-	view.NotSynced = len(keys) - len(cards)
+	cards, err := issues.IssuesByKeys(ctx, profileID, withMovedIn(boardKeys, moves, sprintID))
+	if err != nil {
+		return BoardView{}, err
+	}
+	view.NotSynced = countNotSynced(boardKeys, cards)
 	view.NeedsStatusSync = needsStatusSync(cards)
 
 	// The drafts come from the cache rather than from the board's key list,
@@ -154,6 +159,8 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 	all = append(all, drafts...)
 
 	byStatus, draftColumn := columnIndex(cols)
+	all = applyMoves(all, moves, sprintID)
+	all = rankCards(all, moves, byStatus, draftColumn, lane)
 	lanes := newLaneSet(lane, len(cols))
 	unmapped := map[string]bool{}
 	rendered := 0
@@ -241,6 +248,12 @@ func columnIndex(cols []backend.BoardColumn) (byStatus map[string]int, draftColu
 // fills the column in.
 func placeCard(card backend.Issue, byStatus map[string]int, draftColumn int) (int, bool) {
 	if card.Draft {
+		// A draft that has been dragged carries the status id of the column
+		// it was dropped in, written on the row rather than journaled, since
+		// there is no issue in Jira to journal a transition against.
+		if col, ok := byStatus[card.StatusID]; ok {
+			return col, true
+		}
 		if draftColumn < 0 {
 			return 0, false
 		}
@@ -248,6 +261,144 @@ func placeCard(card backend.Issue, byStatus map[string]int, draftColumn int) (in
 	}
 	col, ok := byStatus[card.StatusID]
 	return col, ok
+}
+
+// withMovedIn adds the keys of every card a pending sprint move has brought
+// into the sprint being viewed. A sprint's cards come from its own
+// board_issue rows, which are Jira's from the last sync, so a card that just
+// moved in is not among them and no placing logic further down can rescue
+// it: the key has to be in the list before the cards are read.
+func withMovedIn(boardKeys []string, moves []backend.PendingMove, sprintID string) []string {
+	if sprintID == "" {
+		return boardKeys
+	}
+	have := make(map[string]bool, len(boardKeys))
+	for _, k := range boardKeys {
+		have[k] = true
+	}
+	keys := boardKeys
+	for _, m := range moves {
+		if !m.HasSprint || m.SprintID != sprintID || have[m.Key] {
+			continue
+		}
+		if len(keys) == len(boardKeys) {
+			keys = append([]string(nil), boardKeys...)
+		}
+		have[m.Key] = true
+		keys = append(keys, m.Key)
+	}
+	return keys
+}
+
+// countNotSynced is how many of the board's own keys the issue cache does
+// not hold. It counts against the board's list rather than the list that was
+// fetched, so a key added because a pending move brought that card into this
+// sprint is never mistaken for a board key with no row behind it.
+func countNotSynced(boardKeys []string, cards []backend.Issue) int {
+	found := make(map[string]bool, len(cards))
+	for _, c := range cards {
+		found[c.Key] = true
+	}
+	n := 0
+	for _, k := range boardKeys {
+		if !found[k] {
+			n++
+		}
+	}
+	return n
+}
+
+// applyMoves overrides each card with the intent the journal holds for it,
+// and drops the cards a pending sprint move has taken out of the sprint
+// being viewed. A whole-board view has no sprint to leave, so it drops
+// nothing.
+func applyMoves(cards []backend.Issue, moves []backend.PendingMove, sprintID string) []backend.Issue {
+	if len(moves) == 0 {
+		return cards
+	}
+	byKey := make(map[string]backend.PendingMove, len(moves))
+	for _, m := range moves {
+		byKey[m.Key] = m
+	}
+	out := make([]backend.Issue, 0, len(cards))
+	for _, c := range cards {
+		if m, ok := byKey[c.Key]; ok {
+			if m.HasTransition {
+				c.StatusID = m.StatusID
+			}
+			if m.HasSprint {
+				if sprintID != "" && m.SprintID != sprintID {
+					continue
+				}
+				c.SprintID = m.SprintID
+			}
+		}
+		out = append(out, c)
+	}
+	return out
+}
+
+// rankCards puts every card with a pending rank immediately before or after
+// the card it was dropped against. A cell renders the cards in the order
+// they arrive in, so reordering the slice is the only way to honour a rank
+// that was never written to the cache. A neighbour that is not in the same
+// cell leaves the order alone: a rank measured against a card the user
+// cannot see would move this one somewhere nobody asked for.
+func rankCards(cards []backend.Issue, moves []backend.PendingMove, byStatus map[string]int, draftColumn int, swimlane string) []backend.Issue {
+	ranked := false
+	for _, m := range moves {
+		if m.HasRank {
+			ranked = true
+			break
+		}
+	}
+	if !ranked {
+		return cards
+	}
+	// A cell is a column and a lane. The column index cannot contain a
+	// slash, so joining the two on one is unambiguous whatever the lane's
+	// own value is.
+	cellOf := func(c backend.Issue) (string, bool) {
+		col, ok := placeCard(c, byStatus, draftColumn)
+		if !ok {
+			return "", false
+		}
+		id, _ := laneOf(c, swimlane)
+		return strconv.Itoa(col) + "/" + id, true
+	}
+	out := append([]backend.Issue(nil), cards...)
+	for _, m := range moves {
+		if !m.HasRank {
+			continue
+		}
+		i, j := indexOfKey(out, m.Key), indexOfKey(out, m.RankNeighbour)
+		if i < 0 || j < 0 || i == j {
+			continue
+		}
+		here, okHere := cellOf(out[i])
+		there, okThere := cellOf(out[j])
+		if !okHere || !okThere || here != there {
+			continue
+		}
+		card := out[i]
+		out = append(out[:i], out[i+1:]...)
+		at := indexOfKey(out, m.RankNeighbour)
+		if !m.RankBefore {
+			at++
+		}
+		out = append(out[:at], append([]backend.Issue{card}, out[at:]...)...)
+	}
+	return out
+}
+
+// indexOfKey is where a key sits in the card order, or -1.
+func indexOfKey(cards []backend.Issue, key string) int {
+	for i, c := range cards {
+		if c.Key == key {
+			return i
+		}
+	}
+	return -1
 }
 
 // unmappedName is what UnmappedStatuses lists for a card no column took:

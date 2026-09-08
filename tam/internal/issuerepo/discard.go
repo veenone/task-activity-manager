@@ -10,7 +10,8 @@ import (
 )
 
 // DiscardPendingChange reverts one journal row: a field edit goes back to
-// its before value, a create row takes its draft row with it.
+// its before value, a board move puts the card back where it was, and a
+// create row takes its draft row with it.
 func (r *Repository) DiscardPendingChange(ctx context.Context, profileID string, id int64) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -84,6 +85,10 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		}
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
+	case p.EntityType == EntityTransition, p.EntityType == EntitySprintMove, p.EntityType == EntityRank:
+		if err := revertMove(ctx, tx, profileID, p); err != nil {
+			return err
+		}
 	default:
 		var exists int
 		err := tx.QueryRowContext(ctx, `SELECT 1 FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey).Scan(&exists)
