@@ -343,4 +343,29 @@ describe("PendingChangesModal board moves", () => {
     await user.click(within(dialog).getByRole("button", { name: "Undo this move" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 12));
   });
+
+  it("drops a failed move's line once the Undo has taken its journal row", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], linked: [], moved: [], conflicts: [], remaining: 3,
+      failures: [{
+        key: "PLAT-412", entityType: "issue_transition", rowId: 12, retryable: true,
+        error: "PLAT-412 cannot move to In Progress: Jira said no",
+      }],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    expect(await within(dialog).findByText(/Jira said no/)).toBeInTheDocument();
+
+    // lastCommit stands until the next Commit, so the row going is the only
+    // thing that can tell the banner the failure has been answered.
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows.filter((r) => r.id !== 12));
+    await user.click(within(dialog).getByRole("button", { name: "Undo this move" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 12));
+    await waitFor(() => expect(within(dialog).queryByText(/Jira said no/)).not.toBeInTheDocument());
+    expect(within(dialog).queryByRole("button", { name: "Undo this move" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
+  });
 });

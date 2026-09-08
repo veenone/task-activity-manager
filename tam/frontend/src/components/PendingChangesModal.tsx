@@ -85,6 +85,7 @@ export function PendingChangesModal({ onClose }: Props) {
           <CommitBanner
             result={lastCommit}
             heldKeys={conflictKeys}
+            pendingRowIds={new Set(rows.map((r) => r.id))}
             busy={busy}
             onUndo={(id, key) => discardRow.mutate({ id, key }, { onError: onDiscardError })}
           />

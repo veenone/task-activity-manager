@@ -57,7 +57,12 @@ export function cardMoves({ pending, commit, warnings, checking }: MoveInputs): 
     if (moves.has(conflict.key)) moves.set(conflict.key, { state: "conflicted", reason: "" });
   }
   for (const failure of commit?.failures ?? []) {
-    if (!isMoveEntity(failure.entityType ?? "")) continue;
+    // The journaled set is the guard every other branch here uses, and a
+    // failure needs it most: the last commit's result outlives the journal
+    // row it names, so an Undo that discards the row would otherwise leave
+    // the card wearing the old reason and offering an Undo that has
+    // nothing left to discard.
+    if (!isMoveEntity(failure.entityType ?? "") || !moves.has(failure.key)) continue;
     moves.set(failure.key, { state: "failed", reason: failure.error });
   }
   return moves;
