@@ -137,8 +137,8 @@ Section 1 promised sprint start and complete in 3b as well. They move to 3c. The
 
 All three are `core/jira` transport, beside the Agile client 3a added:
 
-- `Transitions(ctx, key string) ([]RawTransition, error)` over `GET /rest/api/2/issue/{key}/transitions?expand=transitions.fields`, returning `RawTransition{ID, Name string; To struct{ ID, Name string }}`.
-- `DoTransition(ctx, key, transitionID string) error` over `POST /rest/api/2/issue/{key}/transitions`.
+- `Transitions(ctx, key string) ([]RawTransition, error)` over `GET /rest/api/2/issue/{key}/transitions?expand=transitions.fields`, returning `RawTransition{ID, Name string; To RawStatus; Fields map[string]RawTransitionField}`. `Fields` is what the expand was asked for: it is keyed by field id exactly as Jira sends it and carries each field's name, whether it is required, and its allowed values, so a caller can both fill a field in and name it in an error rather than saying "customfield_11400 is required".
+- `DoTransition(ctx, key, transitionID string, fields map[string]any) error` over `POST /rest/api/2/issue/{key}/transitions`, sending the fields object only when the caller supplies one. Almost every Data Center workflow's way into Done puts a resolution on the transition's screen, so a transition call that could not carry a field would fail on the commonest board move there is; what to put in the resolution is the backend's decision, not the client's.
 - `RankIssue(ctx, key, neighbourKey string, before bool) error` over `PUT /rest/agile/1.0/issue/rank`, sending `rankBeforeIssue` or `rankAfterIssue`.
 - `MoveToSprint(ctx, sprintID string, keys []string) error` over `POST /rest/agile/1.0/sprint/{id}/issue`, and `MoveToBacklog(ctx, keys []string) error` over `POST /rest/agile/1.0/backlog/issue` when the target is the backlog.
 
@@ -184,11 +184,11 @@ Ranks push last, one board at a time, in that board's final local order re-deriv
 
 ### 13.7 The view
 
-A card is draggable. Dropping it on another column journals a transition; dropping it between two cards in a cell journals a rank; dropping it on a different sprint's picker is not a thing, so the sprint move is an action on the card and on the detail panel, not a drag. Every drop is optimistic: the card moves, takes the pending dot, and the counts in the column heads move with it.
+A card is draggable. Dropping it on another column journals a transition; dropping it between two cards in a cell journals a rank; dropping it on a different sprint's picker is not a thing, so the sprint move is an action on the card, not a drag. This section originally promised it on the detail panel as well; only the card's menu shipped in 3b, and the panel's copy is in 13.10. Every drop is optimistic: the card moves, takes the pending dot, and the counts in the column heads move with it.
 
 The two kinds of drop draw different cues, because they promise different things. A drop inside the card's own cell (a rank) draws a drop line at the cursor, exactly where the card will land. A drop on another column (a transition) draws a full-cell outline instead, never a line: the card lands wherever its own rank puts it, not at the cursor, so a line would promise a placement the transition does not make.
 
-The keyboard path is the same set of moves, on the focused card: the arrow keys already move focus, so a move takes a modifier (Ctrl with an arrow), announced through the live region that 3a's drag refusal already uses. A card also carries a "Move to" menu reachable by Enter, which is what a screen reader user and a trackpad-averse user both get.
+The keyboard path is the same set of moves, on the focused card: the arrow keys already move focus, so a move takes a modifier (Ctrl with an arrow), announced through the live region that 3a's drag refusal already uses. A card also carries an Actions menu, which is what a screen reader user and a trackpad-averse user both get, and it is opened with the menu key or Shift with F10 rather than with Enter: Enter and Space are already the card's selection, which opens the detail panel, so the menu needs a trigger of its own instead of an activation key.
 
 The read-only caveat line 3a shipped comes out, and the "Read only" chip with it.
 
@@ -198,8 +198,16 @@ A transition with no legal path, a rank whose neighbour Jira no longer has, and 
 
 ### 13.9 Verification
 
-Go: the three client calls against the httptest server, including a transitions list that offers nothing matching; `EditTransition`, `EditRank`, and `EditSprint` writing and replacing their journal rows, and deleting the row when a card comes home; the board read placing a card by each of the three intents; the committer's board pass with a conflict, a missing transition, and a rank whose neighbour is gone. Vitest: a drag between columns journals and repaints, a drag within a column reorders, the keyboard move does the same thing as the drag, a pending card wears the dot, and Commit's failures read per issue. Offline: on the demo profile, drag a card across two columns, reorder it, move it to another sprint, then Commit.
+Go: the three client calls against the httptest server, including a transitions list that offers nothing matching; `issuerepo.MoveToColumn`, `RankIssue`, and `MoveToSprint` writing and replacing their journal rows, and deleting the row when a card comes home; the board read placing a card by each of the three intents; the committer's board pass with a conflict, a missing transition, and a rank whose neighbour is gone. Vitest: a drag between columns journals and repaints, a drag within a column reorders, the keyboard move does the same thing as the drag, a pending card wears the dot, and Commit's failures read per issue. Offline: on the demo profile, drag a card across two columns, reorder it, move it to another sprint, then Commit.
 
 ### 13.10 Out of scope for 3b
 
 Sprint start and complete (3c), the board's own quick filters and swimlane rules, bulk moves, dragging between boards, dragging an epic, and the transitions cache that would let the view grey out an impossible drop before Commit.
+
+Deferred to 3c after the fact:
+
+- **The sprint move on the detail panel.** The card's Actions menu shipped and reaches every sprint, so the move exists on the board; the panel's copy of it did not, and it goes with 3c's sprint work rather than being bolted on afterwards.
+
+Known limits of what shipped:
+
+- **A 207 fails the whole batch.** Jira's Agile bulk endpoints answer 207 Multi-Status when they reject even one issue of a request, and `core/jira` treats a 207 as a failure by its status alone. A sprint move of fifty cards that Jira refuses for one of them therefore reports all fifty as failed and leaves all fifty journal rows in place. Nothing is lost and the next Commit retries, but the report names more cards than actually failed. Splitting a 207 back into per-issue outcomes means trusting a body schema Atlassian documents loosely, which is the trade this phase declined to make.
