@@ -15,8 +15,11 @@ grid, and a read-only detail panel, on the demo dataset or a live Jira DC.
 Plan 1b adds the journal, create and edit, and Commit. Plan 1c adds Excel
 import, cross-project links, and requirement creation. Phase 2 adds the
 epic and story hierarchy: the Epics view, `parentKey` as the seventh
-editable field, and epic creation. Phase 3a (this branch) adds the Boards
-view: boards, columns, and sprints synced from Jira's Agile API, read only.
+editable field, and epic creation. Phase 3a adds the Boards view: boards,
+columns, and sprints synced from Jira's Agile API, read only. Phase 3b
+(this branch) makes the board writable: a card dragged or keyboard-moved
+across columns, within a column, or into another sprint journals the same
+way every other TAM write does, and Commit pushes it.
 
 ## Phase 3a: boards
 
@@ -84,10 +87,9 @@ recorded in the summary's `Dropped` with a one-line reason from
 `internal/errtext` (added during review: it strips HTML tags and
 collapses whitespace, since a 403 answered with an HTML login page hands
 the transport a kilobyte of markup) and is left exactly as it was. The
-four bound methods are `ListBoards`, `ListBoardSprints`, `GetBoard`, and
-`SyncBoards`, all in `app_boards.go`. Nothing in Phase 3a writes to Jira;
-`BoardCard` refuses a drag and announces that dragging arrives in the
-next release.
+four read methods are `ListBoards`, `ListBoardSprints`, `GetBoard`, and
+`SyncBoards`, all in `app_boards.go`. Phase 3a wrote nothing to Jira;
+Phase 3b, directly below, adds the writes.
 
 Two facts worth knowing before they cost you a debugging session:
 
@@ -105,6 +107,110 @@ Two facts worth knowing before they cost you a debugging session:
   closed sprint stays in the sprint list, for history, but its membership
   is never pulled, so the sprint picker offers only active and future
   sprints and no others.
+
+## Phase 3b: board writes
+
+A card dropped or keyboard-moved on the board makes one of three moves,
+each its own journal entity beside `issue`, `issue_create`, and `link`:
+`issue_transition` (field `statusId`) for a drag across columns,
+`issue_sprint` (field `sprintId`) for a move to another sprint or to the
+backlog, and `issue_rank` (field `rank`) for a reorder within a column.
+The three writes, the packing, and the reverts are `internal/issuerepo`'s
+`boardwrites.go`, `movevalue.go`, and `movecolumns.go`; `rebasemoves.go`
+is what Override does to a held one. Nothing here talks to Jira directly;
+the journal is what Commit pushes, exactly as it does for a field edit.
+
+A transition is journaled by the target status id, never by a transition
+id: which transitions Jira offers depends on the issue's status at that
+exact moment, so an id read at drag time would be stale before Commit
+ever runs. `internal/backend/jira/transitions.go`'s `Transition` is where
+the target status id becomes a real transition at push time: it lists the
+issue's transitions, picks the one whose `to.id` matches the journaled
+target (the lowest transition id when two reach it, so the same drop
+resolves the same way on every run), and fills whatever that transition's
+own screen requires. Almost every Data Center workflow's way into Done
+puts a resolution on that screen; TAM reads it from the transition's own
+`fields.resolution.allowedValues` and fills it from the profile's
+`transition_resolution` setting when the transition allows that value,
+from the transition's first allowed value otherwise, and refuses (naming
+every required field by name) when the screen asks for anything else.
+
+A rank is never journaled as a LexoRank: Jira owns that value, and a
+client-made one would be a second, wrong source of truth the next sync
+would silently overwrite. It is journaled as a neighbour, a side, and the
+board the drop was made on (`before|KEY|BOARD` or `after|KEY|BOARD`), and
+the commit pass re-derives the neighbour from that board's final local
+order at push time (`boardrepo.CellOrder`) rather than trusting the key
+that was journaled at drop time, which a busy board can easily have moved
+on from. The board rides along because one key can sit on two boards
+whose orders disagree, and nothing else says which board's order a rank
+was measured against. Every card but the one at the very top of the
+board's order anchors with `rankAfterIssue` against the card that landed
+above it; the top card has nothing above it, so it anchors with
+`rankBeforeIssue` against the card below it instead. "X before Y" and "X
+after W" place X in exactly the same spot in Jira's one global rank, so
+two cards ranked against each other can never disagree about the pair,
+and only the first card of the board's first non-empty column can ever
+take the `before` branch.
+
+A board write is classified against the issue's remote status or sprint
+id at Commit, never against its `updated` stamp: a comment left on the
+issue in Jira bumps `updated` without moving the card, and reading that
+as a conflict would hold back a card nobody touched. Remote already at
+the journaled target is satisfaction, not a conflict, and the row is
+dropped as a `Moved{Satisfied: true}` rather than raised as one; remote
+at the journaled before value is pushed; anything else holds the whole
+issue back, both board rows together if both are pending, so half an
+intent is never committed against a card that is not where the user left
+it. `internal/committer/boards.go` (the sprint and transition passes),
+`ranks.go` (the rank pass, last, since it is the one write that can be
+redone harmlessly), and `boardvalues.go` (the three-way classification
+and the labels a conflict card prints) are the board pass, which runs
+after the edits and before the links, because a transition on a draft has
+to wait for the create that gives the draft a real key.
+
+`Commit`'s own loop and `regroupEdits` both name the three board entity
+types through `boardRow`; missing either spot sorts a board row into
+`commitEdit`, which sends `statusId` to Jira as an ordinary field, fails
+on it, and fails the issue's real edits along with it. Overriding a held
+board row is not the same operation as overriding a held edit: an edit is
+held on the issue's `updated` stamp, which `ResolveOverride` rebases by
+writing a new `base_version`, but a board row is held on its `before_val`
+against the remote status or sprint id, which has no base version to
+rewrite. `RebaseMoves` is the other half: it rewrites the held row's
+`before_val` to what Jira holds now and leaves `after_val`, the user's
+move, untouched. Skip it and Override on a board conflict would meet the
+identical conflict on every following Commit; a key with only edits
+pending still overrides with no network call.
+
+A journal row for a board move is deleted only while its `after_val` is
+still the value that was pushed (`MarkMoveCommitted`), because none of
+the three move bindings take TAM's busy guard the way editing a field
+does: a card dragged again while Commit is mid-push updates that row in
+place, and a delete by row id would throw away an intent Jira was never
+told about. The commit is still audited, since the push did happen; the
+newer intent stays in the journal for the next Commit to find.
+
+Jira's Agile bulk endpoints (`PUT /issue/rank`, `POST /sprint/{id}/issue`,
+`POST /backlog/issue`) answer 207 Multi-Status when at least one issue in
+the request was rejected and 204 when every one landed, so
+`core/jira/bulkwrite.go` treats a 207 as a failure by its HTTP status
+alone, never by trying to recognise a body schema: there is no successful
+Multi-Status to accommodate. The body is decoded only to say why, trying
+Atlassian's documented `entries` array first, then the shapes
+`jiraErrorMessage` already knows, then a raw excerpt as a last resort.
+
+The keyboard path is not a convenience beside the drag; it is the
+accessible path a screen reader user and a trackpad-averse user actually
+get the feature through. Ctrl with an arrow moves the card that already
+holds focus (left and right transition a column, up and down rank within
+the cell), refusing with an announced sentence at either edge, and every
+card's "Move to" menu reaches a sprint move without a pointer at all. A
+drag draws two different cues for the same reason the two moves are
+different writes: a drop line at the cursor inside the card's own cell,
+exactly where a rank will land, and a full-cell outline for a drop on
+another column, never a line there, since a transition lands the card by
+its own rank rather than at the cursor.
 
 ## The write path (plan 1b)
 
@@ -403,10 +509,14 @@ until one is entered. A Kiwi profile file is refused.
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile
     internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile
                           settings, the pending-change journal, and drafts; tree.go groups the
-                          cache into the Epics view's tree
+                          cache into the Epics view's tree; boardwrites.go, movevalue.go,
+                          movecolumns.go, and rebasemoves.go are the three board moves, their
+                          before_val/after_val packing, and what Override does to a held one
     internal/boardrepo/  the store layer over board, board_column, board_issue, and sprint; view.go
-                          composes the Boards view's data over the issue cache through IssueSource
-    internal/committer/  pushes the journal to Jira and resolves conflicts
+                          composes the Boards view's data over the issue cache through IssueSource;
+                          cellorder.go is the board's final local order the commit pass ranks against
+    internal/committer/  pushes the journal to Jira and resolves conflicts; boards.go, ranks.go,
+                          and boardvalues.go are the board pass, after the edits and before the links
     internal/importer/   maps import columns to draft fields and validates rows
     internal/syncer/     the paging engine; emits tam:sync-progress through app_issues.go; boards.go
                           is the boards pass, reached through backend.BoardBackend
@@ -420,12 +530,19 @@ until one is entered. A Kiwi profile file is refused.
       src/contexts/      SyncContext on the shared sync reducer
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
+      src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands
+                          in a cell, which column a key press steps to, whether either changes
+                          anything; cardMoveState.ts folds a card's pending row, warnings, and
+                          commit failures into one state; moveValue.ts reads a journaled board
+                          value back for the Pending changes dialog and the Activity tab
       src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
                           AssigneePicker, PriorityPicker,
                           PendingChangesModal, ConflictCard, NewIssueModal, ProfilesModal,
                           ProfileForm, AboutModal, ImportIssuesModal, AddLinkForm, EpicsView,
                           EpicTree, EpicRow, BoardsView, BoardsToolbar, BoardBody, BoardGrid,
-                          BoardCard, BoardNotes
+                          BoardCard, BoardNotes, useBoardMoves (the three writes, the drag state,
+                          the keyboard moves), useMovedCard, CardMoveMenu, BoardMoveBanner,
+                          PendingMoveRow, CommitBanner
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands

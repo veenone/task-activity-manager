@@ -120,13 +120,14 @@ Section 1 promised sprint start and complete in 3b as well. They move to 3c. The
 | Question | Decision | Why |
 |---|---|---|
 | Where a board write goes | The journal, like every other TAM write, then Commit | The offline journal is the reason TAM's board exists rather than a browser tab; a board that wrote straight through would be the one surface that breaks the promise |
-| A transition's journal shape | Its own entity, `issue_transition`, keyed by issue, field `statusId`, `after_val` the target status id | A transition is not a field edit: Jira takes a transition id from a workflow that depends on the issue's current status, so `PUT /issue` cannot express it |
+| A transition's journal shape | Its own entity, `issue_transition`, keyed by issue, field `statusId`, `before_val`/`after_val` `id\|Name` (the status id and its display name) | A transition is not a field edit: Jira takes a transition id from a workflow that depends on the issue's current status, so `PUT /issue` cannot express it. The name rides beside the id so the Pending changes dialog and the Activity tab can read it offline; the committer and every comparison split on the pipe and use the id alone |
 | How the transition id is found | At Commit, from `GET /issue/{key}/transitions`, matching `to.id` against the journaled target status id | The available transitions depend on the issue's status at push time, which is the only moment the answer is true |
 | A drop with no legal transition | Accepted at drag time, reported per issue at Commit | TAM cannot know offline which transitions exist. Refusing the drop would mean refusing every drop offline, which is the case the app is for |
-| A rank's journal shape | Entity `issue_rank`, field `rank`, `after_val` `before\|KEY` or `after\|KEY` | Jira ranks with LexoRank and owns the value; a neighbour is the only thing a client can state truthfully offline |
+| A rank's journal shape | Entity `issue_rank`, field `rank`, `after_val` `before\|KEY\|BOARD` or `after\|KEY\|BOARD` | Jira ranks with LexoRank and owns the value; a neighbour is the only thing a client can state truthfully offline. The board rides as a third segment because one key can sit on two boards whose orders disagree, and the commit pass has to know which board's order to re-derive the neighbour from |
 | The rank a pending card shows | The board read places the card beside its named neighbour; nothing writes a made-up LexoRank into the cache | A fabricated rank would be a second, wrong source of truth the next sync would silently overwrite |
-| A sprint move's journal shape | Entity `issue_sprint`, field `sprintId`, `after_val` the sprint id, empty for the backlog | The board's own semantics live on the Agile endpoint, not on the issue's Sprint custom field |
+| A sprint move's journal shape | Entity `issue_sprint`, field `sprintId`, `before_val`/`after_val` `id\|Name`, empty for the backlog | The board's own semantics live on the Agile endpoint, not on the issue's Sprint custom field; the name rides beside the id for the same offline-reading reason a transition's does |
 | Conflicts | A transition and a sprint move are version-checked like an edit, and hold back with base, mine, and remote; a rank is not | A rank has no version to check and no meaning to rebase: the neighbour either still exists or the push fails |
+| Override on a held board row | Rewrites the row's `before_val` to what Jira holds now, leaving `after_val` (the user's move) untouched | A board row is held on `before_val` against the remote status or sprint id, which carries no base version to rewrite the way an edit's does; without rebasing `before_val` the user would meet the identical conflict on every Commit from here on |
 | Drag | Native HTML5 drag and drop, no library | The reuse ladder: a platform feature beats a dependency, and the board's needs are one draggable and one drop target |
 | Keyboard | Every move has a keyboard path, on the card that already holds focus | The board shipped a full keyboard model in 3a; a drag-only write would take it away again |
 | What a moved card looks like | It sits where it was dropped, wearing the pending dot, until Commit | The same vocabulary every other pending change in TAM already uses |
@@ -148,12 +149,12 @@ All three are `core/jira` transport, beside the Agile client 3a added:
 Three new entity types beside `issue`, `issue_create`, and `link`:
 
 ```
-issue_transition  entity_key = issue key, field = "statusId", after_val = target status id
-issue_rank        entity_key = issue key, field = "rank",     after_val = "before|KEY" or "after|KEY"
-issue_sprint      entity_key = issue key, field = "sprintId", after_val = sprint id, or "" for the backlog
+issue_transition  entity_key = issue key, field = "statusId", after_val = "id|Name" (target status)
+issue_rank        entity_key = issue key, field = "rank",     after_val = "before|KEY|BOARD" or "after|KEY|BOARD"
+issue_sprint      entity_key = issue key, field = "sprintId", after_val = "id|Name", or "" for the backlog
 ```
 
-`before_val` carries what the card had, so a discard can put it back and the Activity tab can say what changed. `base_version` is the issue's `updated` at the moment of the move, for the two entities that are version-checked.
+`before_val` carries what the card had, in the same `id|Name` packing for a transition and a sprint move, so a discard can put it back and the Activity tab can say what changed; a rank's `before_val` is empty, since Decision 4 keeps a rank out of the cache and there is nothing to restore. `base_version` is the issue's `updated` at the moment of the move, for the two entities that are version-checked. Every comparison between two board values, including the undo check that deletes a row when a card is dragged home, goes through the id half alone: a status or sprint name that differs between the board configuration and the cached row must never make an unmoved card look like a move to somewhere new.
 
 One row per issue per entity, which the journal's own unique key already enforces: dragging a card twice before committing replaces the intent rather than queueing two. A card dragged back to where it started deletes the row instead of journaling a move to itself, so an undone drag leaves no pending change and no audit entry beyond the one already written.
 
@@ -173,13 +174,19 @@ A draft (`TAM-NEW-n`) can be dragged: its column, rank, and sprint update the dr
 
 The committer gains a board pass, after edits and before links, because a transition on a draft has to wait for the create that gives it a key. Per issue, in this order: sprint move, then transition, then rank. That order is deliberate. A sprint move can change which board columns apply, a transition changes the status the rank is relative to, and a rank is the one that can be redone harmlessly.
 
-Version checks match the edit path: the issue's remote `updated` against the journaled `base_version`. A held-back board write reuses the conflict card 1b built, with the field reading Status or Sprint, so the two resolutions stay Override and Keep remote.
+A row is classified against the issue's remote status or sprint id, never its `updated` stamp, because a comment on the issue in Jira bumps `updated` without moving the card: remote already at the journaled target is satisfaction, not a conflict, and is dropped without a push; remote at the journaled before value is pushed; anything else holds the whole issue back, both board rows if both are pending, so half an intent is never committed against a card that is not where the user left it.
 
-Failures are per issue and per write, so a transition that has no path leaves its rank alone, and both stay in the journal for the next Commit rather than being dropped.
+Version checks match the edit path: the issue's remote `updated` against the journaled `base_version`. A held-back board write reuses the conflict card 1b built, with the field reading Status or Sprint, so the two resolutions stay Override and Keep remote, though Override does more work for a board row than for an edit: see the Decisions table above.
+
+Failures are per issue and per write, carrying `{Key, EntityType, RowID, Error, Retryable, Reachable}`: `RowID` is what a per-row Undo discards (one card can fail a transition and drop a rank in the same Commit), `Retryable` is false for a failure that will recur identically (no legal transition, a backend or instance that cannot write to boards at all), and `Reachable` names the statuses a refused transition could have reached instead. A transition that has no path leaves its rank alone, and both stay in the journal for the next Commit rather than being dropped.
+
+Ranks push last, one board at a time, in that board's final local order re-derived at push time, each card anchored with `rankAfterIssue` against the card that landed above it. The one exception is the card at the top of the board's order, which has nothing above it: it anchors with `rankBeforeIssue` against the card below it instead. "X before Y" and "X after W" place X in exactly the same spot in Jira's one global rank, so two cards ranked against each other can never disagree about the pair, and only the first card of the board's first non-empty column can take the `before` branch.
 
 ### 13.7 The view
 
 A card is draggable. Dropping it on another column journals a transition; dropping it between two cards in a cell journals a rank; dropping it on a different sprint's picker is not a thing, so the sprint move is an action on the card and on the detail panel, not a drag. Every drop is optimistic: the card moves, takes the pending dot, and the counts in the column heads move with it.
+
+The two kinds of drop draw different cues, because they promise different things. A drop inside the card's own cell (a rank) draws a drop line at the cursor, exactly where the card will land. A drop on another column (a transition) draws a full-cell outline instead, never a line: the card lands wherever its own rank puts it, not at the cursor, so a line would promise a placement the transition does not make.
 
 The keyboard path is the same set of moves, on the focused card: the arrow keys already move focus, so a move takes a modifier (Ctrl with an arrow), announced through the live region that 3a's drag refusal already uses. A card also carries a "Move to" menu reachable by Enter, which is what a screen reader user and a trackpad-averse user both get.
 
