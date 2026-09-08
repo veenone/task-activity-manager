@@ -98,3 +98,37 @@ func (b *Backend) BoardIssueKeys(ctx context.Context, boardID int, sprintID stri
 	}
 	return keys, nil
 }
+
+// RankIssue ranks key immediately before or after neighbourKey. It passes
+// straight through to the Agile call, which fails on the 207 the endpoint
+// answers with when it refused the move, so a rank Jira rejected is never
+// reported as landed.
+func (b *Backend) RankIssue(ctx context.Context, key, neighbourKey string, before bool) error {
+	if err := b.c.RankIssue(ctx, key, neighbourKey, before); err != nil {
+		side := "after"
+		if before {
+			side = "before"
+		}
+		return fmt.Errorf("rank %s %s %s: %w", key, side, neighbourKey, err)
+	}
+	return nil
+}
+
+// MoveIssuesToSprint moves keys onto sprintID, or onto the backlog when it
+// is empty: leaving every sprint is a destination of its own and Jira gives
+// it its own endpoint. An empty batch asks Jira nothing.
+func (b *Backend) MoveIssuesToSprint(ctx context.Context, sprintID string, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	if strings.TrimSpace(sprintID) == "" {
+		if err := b.c.MoveToBacklog(ctx, keys); err != nil {
+			return fmt.Errorf("move %s to the backlog: %w", strings.Join(keys, ", "), err)
+		}
+		return nil
+	}
+	if err := b.c.MoveToSprint(ctx, sprintID, keys); err != nil {
+		return fmt.Errorf("move %s to sprint %s: %w", strings.Join(keys, ", "), sprintID, err)
+	}
+	return nil
+}

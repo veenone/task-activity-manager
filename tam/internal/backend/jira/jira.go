@@ -25,6 +25,11 @@ type Backend struct {
 	ids        fieldIDs
 	discovered bool
 
+	// transitionResolution is the profile's `transition_resolution`
+	// setting: the resolution name a transition into Done is given when it
+	// asks for one and allows it. See transitions.go.
+	transitionResolution string
+
 	linkTypes       []backend.LinkType
 	linkTypesLoaded bool
 

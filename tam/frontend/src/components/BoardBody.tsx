@@ -1,8 +1,9 @@
 import type { KeyboardEvent } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import type { Board, BoardView, Issue, Swimlane } from "../api";
+import type { Board, BoardView, Issue, Sprint, Swimlane } from "../api";
 import { BoardGrid } from "./BoardGrid";
 import { BoardNotes } from "./BoardNotes";
+import type { BoardMoves } from "./useBoardMoves";
 
 interface Props {
   boards: UseQueryResult<Board[], Error>;
@@ -19,6 +20,13 @@ interface Props {
   swimlane: Swimlane;
   selectedKey: string;
   focusId: string;
+  // The move half of the board: the writes, the drag state, and what each
+  // card's move is doing, plus the key of the card that has just landed.
+  moves: BoardMoves;
+  flashKey: string;
+  sprints: Sprint[];
+  sprintId: string;
+  committing: boolean;
   canSync: boolean;
   onSync: () => void;
   onSelect: (issue: Issue) => void;
@@ -31,8 +39,8 @@ interface Props {
 // board. Each state says what is missing and, where a sync would fix it,
 // offers one.
 export function BoardBody({
-  boards, view, unavailable, hasBoards, hasSprint, swimlane, selectedKey, focusId, canSync,
-  onSync, onSelect, onFocusCard, onKeyDown,
+  boards, view, unavailable, hasBoards, hasSprint, swimlane, selectedKey, focusId, moves, flashKey,
+  sprints, sprintId, committing, canSync, onSync, onSelect, onFocusCard, onKeyDown,
 }: Props) {
   if (boards.isError) {
     return (
@@ -102,15 +110,27 @@ export function BoardBody({
             : nothing}
         </p>
       ) : (
-        <BoardGrid
-          view={data}
-          swimlane={swimlane}
-          selectedKey={selectedKey}
-          focusId={focusId}
-          onSelect={onSelect}
-          onFocusCard={onFocusCard}
-          onKeyDown={onKeyDown}
-        />
+        <>
+          {/* Nothing else on screen says the moves exist, and the grid
+              names this line in its aria-describedby. */}
+          <p className="muted small board-move-keys" id="board-move-keys">
+            Drag a card to move it, or focus one and hold Ctrl with an arrow key. Shift and F10 open its move menu.
+          </p>
+          <BoardGrid
+            view={data}
+            swimlane={swimlane}
+            selectedKey={selectedKey}
+            focusId={focusId}
+            moves={moves}
+            flashKey={flashKey}
+            sprints={sprints}
+            sprintId={sprintId}
+            committing={committing}
+            onSelect={onSelect}
+            onFocusCard={onFocusCard}
+            onKeyDown={onKeyDown}
+          />
+        </>
       )}
       <BoardNotes view={data} />
     </>

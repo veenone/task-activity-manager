@@ -23,7 +23,39 @@ const (
 	// EntityLink is the journal entity type of a link to create. The row's
 	// field is LinkField(d) and its after_val the LinkDraft as JSON.
 	EntityLink = "link"
+
+	// The three board moves are three entity types and not one because they
+	// fail separately, are checked separately, and are pushed in a fixed
+	// order. One combined move row would make a failed transition drag its
+	// innocent rank down with it.
+	//
+	// EntityTransition is a card dragged across columns. Its before_val and
+	// after_val carry "id|Name", so the committer pushes the id while the
+	// Pending changes dialog and the Activity tab read the name.
+	EntityTransition = "issue_transition"
+	// EntityRank is a card reordered inside its cell. Its after_val is
+	// RankValue's "side|neighbour|board", where the board is the one the
+	// drop was made on, since one key can sit on two boards whose orders
+	// disagree; its before_val is empty, because a rank
+	// has no cached value to go back to (a made-up LexoRank would be a
+	// second source of truth the next sync overwrites).
+	EntityRank = "issue_rank"
+	// EntitySprintMove is a card moved to another sprint, or to the backlog
+	// when the id is empty. Its values carry "id|Name" like a transition.
+	EntitySprintMove = "issue_sprint"
+
+	// The field of each board row. The journal is unique on
+	// (profile, entity type, entity key, field), so one fixed field per type
+	// is what keeps a second drag replacing the first rather than piling up.
+	// The names are the JSON names on backend.Issue, as EditableFields are.
+	FieldStatusID = "statusId"
+	FieldSprintID = "sprintId"
+	FieldRank     = "rank"
 )
+
+// BoardEntities are the three board move entity types, for the reads that
+// have to name all of them in one statement.
+var BoardEntities = []string{EntityTransition, EntityRank, EntitySprintMove}
 
 // pendingFlag is the computed column every issue read carries.
 const pendingFlag = `EXISTS (SELECT 1 FROM pending_change p WHERE p.profile_id = issue.profile_id AND p.entity_key = issue.key)`

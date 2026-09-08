@@ -4,9 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/dbtx"
 )
 
 const upsertBoardSQL = `
@@ -40,6 +43,9 @@ const listSprintsSQL = `
 
 const boardKeysSQL = `
 	SELECT key FROM board_issue WHERE profile_id = ? AND board_id = ? AND sprint_id = ? ORDER BY position`
+
+const sprintNameSQL = `
+	SELECT name FROM sprint WHERE profile_id = ? AND id = ? AND name <> '' LIMIT 1`
 
 // RemoveBoards drops the boards and everything hanging off them: their
 // columns, their issue keys, and their sprints, in one transaction.
@@ -125,6 +131,28 @@ func (r *Repository) ListSprints(ctx context.Context, profileID string, boardID 
 	return out, rows.Err()
 }
 
+// SprintName is the name of one sprint id, empty when no board of the
+// profile holds it. It is what a caller journaling a move to that sprint
+// names the destination with: the sprint list is this package's table, and
+// a future sprint holds no issues to borrow a name from, so the issue cache
+// cannot answer for it. Jira hands the same sprint to every board whose
+// filter reaches it, under one name, so which board it is read from does
+// not change the answer.
+func (r *Repository) SprintName(ctx context.Context, profileID, sprintID string) (string, error) {
+	if strings.TrimSpace(sprintID) == "" {
+		return "", nil
+	}
+	var name string
+	err := r.db.QueryRowContext(ctx, sprintNameSQL, profileID, sprintID).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("name of sprint %s: %w", sprintID, err)
+	}
+	return name, nil
+}
+
 // issueKeys returns the keys one board holds for a sprint, in board order.
 // An empty sprintID reads the board's own list, the way the sync stored it.
 func (r *Repository) issueKeys(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error) {
@@ -144,16 +172,8 @@ func (r *Repository) issueKeys(ctx context.Context, profileID string, boardID in
 	return out, rows.Err()
 }
 
-// inTx runs fn inside one transaction, so a replace never leaves the table
-// holding a delete without its inserts.
+// inTx runs fn inside one transaction, through the helper issuerepo shares,
+// so a replace never leaves the table holding a delete without its inserts.
 func (r *Repository) inTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return dbtx.In(ctx, r.db, fn)
 }

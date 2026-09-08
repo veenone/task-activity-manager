@@ -10,67 +10,62 @@ import (
 )
 
 // DiscardPendingChange reverts one journal row: a field edit goes back to
-// its before value, a create row takes its draft row with it.
+// its before value, a board move puts the card back where it was, and a
+// create row takes its draft row with it.
 func (r *Repository) DiscardPendingChange(ctx context.Context, profileID string, id int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	p, err := journal.Get(tx, profileID, id)
-	if err != nil {
-		return err
-	}
-	if err := discardOne(ctx, tx, profileID, p); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		p, err := journal.Get(tx, profileID, id)
+		if err != nil {
+			return err
+		}
+		return discardOne(ctx, tx, profileID, p)
+	})
 }
 
 // DiscardAllPendingChanges reverts every journal row of the profile and
 // returns how many it reverted.
 func (r *Repository) DiscardAllPendingChanges(ctx context.Context, profileID string) (int, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-	all, err := journal.List(tx, profileID)
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range all {
-		if err := discardOne(ctx, tx, profileID, p); err != nil {
-			return 0, err
+	n := 0
+	err := r.inTx(ctx, func(tx *sql.Tx) error {
+		all, err := journal.List(tx, profileID)
+		if err != nil {
+			return err
 		}
-	}
-	if err := tx.Commit(); err != nil {
+		for _, p := range all {
+			if err := discardOne(ctx, tx, profileID, p); err != nil {
+				return err
+			}
+		}
+		n = len(all)
+		return nil
+	})
+	if err != nil {
 		return 0, err
 	}
-	return len(all), nil
+	return n, nil
 }
 
 // DiscardKey reverts every pending change of one issue, which is what a
 // keep-remote resolution does before it replaces the row.
 func (r *Repository) DiscardKey(ctx context.Context, profileID, key string) (int, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-	rows, err := journal.ListForKey(tx, profileID, key)
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range rows {
-		if err := discardOne(ctx, tx, profileID, p); err != nil {
-			return 0, err
+	n := 0
+	err := r.inTx(ctx, func(tx *sql.Tx) error {
+		rows, err := journal.ListForKey(tx, profileID, key)
+		if err != nil {
+			return err
 		}
-	}
-	if err := tx.Commit(); err != nil {
+		for _, p := range rows {
+			if err := discardOne(ctx, tx, profileID, p); err != nil {
+				return err
+			}
+		}
+		n = len(rows)
+		return nil
+	})
+	if err != nil {
 		return 0, err
 	}
-	return len(rows), nil
+	return n, nil
 }
 
 func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.PendingChange) error {
@@ -84,6 +79,10 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		}
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
+	case p.EntityType == EntityTransition, p.EntityType == EntitySprintMove, p.EntityType == EntityRank:
+		if err := revertMove(ctx, tx, profileID, p); err != nil {
+			return err
+		}
 	default:
 		var exists int
 		err := tx.QueryRowContext(ctx, `SELECT 1 FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey).Scan(&exists)
@@ -105,25 +104,51 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 	return journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "discard", p.Field, p.AfterVal, p.BeforeVal, "")
 }
 
+// MarkMoveCommitted clears one board row after its write landed in Jira.
+// The delete is conditional on after_val still being the value that was
+// pushed, which is the row's own after_val: the board's move bindings take
+// no busy guard, so a card dragged again while the commit pass is mid-push
+// updates that row in place, and a delete by id would throw away an intent
+// Jira has never been told about. A row that was overwritten that way
+// simply stays, for the next Commit to push. The commit is audited either
+// way, because the push did happen.
+func (r *Repository) MarkMoveCommitted(ctx context.Context, profileID string, p journal.PendingChange) error {
+	return r.clearMoveRow(ctx, profileID, p, "commit", "")
+}
+
+// MarkMoveSatisfied clears one board row that Jira had already agreed with:
+// the move was made on the web or by someone else, so the row is dropped
+// without a push. It audits "satisfied" rather than "commit", because a
+// trail reading "pushed the move to Sprint 13" for a move this app never
+// sent is a trail that cannot be trusted about the moves it did send.
+func (r *Repository) MarkMoveSatisfied(ctx context.Context, profileID string, p journal.PendingChange) error {
+	return r.clearMoveRow(ctx, profileID, p, "satisfied", "Jira already held this value, so nothing was pushed")
+}
+
+func (r *Repository) clearMoveRow(ctx context.Context, profileID string, p journal.PendingChange, action, note string) error {
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM pending_change WHERE profile_id = ? AND id = ? AND after_val = ?`,
+			profileID, p.ID, p.AfterVal); err != nil {
+			return fmt.Errorf("clear move %d of %s: %w", p.ID, p.EntityKey, err)
+		}
+		return journal.Audit(tx, profileID, p.EntityType, p.EntityKey, action, p.Field, p.BeforeVal, p.AfterVal, note)
+	})
+}
+
 // MarkCommitted deletes the journal rows a commit pushed and audits each.
 func (r *Repository) MarkCommitted(ctx context.Context, profileID string, changes []journal.PendingChange) error {
 	if len(changes) == 0 {
 		return nil
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	ids := make([]int64, 0, len(changes))
-	for _, p := range changes {
-		ids = append(ids, p.ID)
-		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, ""); err != nil {
-			return err
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		ids := make([]int64, 0, len(changes))
+		for _, p := range changes {
+			ids = append(ids, p.ID)
+			if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, ""); err != nil {
+				return err
+			}
 		}
-	}
-	if err := journal.Delete(tx, profileID, ids); err != nil {
-		return err
-	}
-	return tx.Commit()
+		return journal.Delete(tx, profileID, ids)
+	})
 }

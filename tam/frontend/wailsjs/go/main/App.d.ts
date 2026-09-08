@@ -16,6 +16,8 @@ export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<
 
 export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
 
+export function CanTransition(arg1:string,arg2:string,arg3:string):Promise<backend.TransitionCheck>;
+
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
 export function CreateIssue(arg1:string,arg2:backend.IssueDraft):Promise<string>;
@@ -82,7 +84,13 @@ export function ListSprints(arg1:string):Promise<Array<issuerepo.SprintRef>>;
 
 export function LookupIssue(arg1:string,arg2:string):Promise<backend.Issue>;
 
+export function MoveIssueToColumn(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function MoveIssueToSprint(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Preview>;
+
+export function RankIssue(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:number):Promise<void>;
 
 export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>;
 

@@ -8,6 +8,7 @@ import (
 
 	"agile-suite/core/journal"
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/committer"
 	"agile-suite/tam/internal/issuerepo"
 )
@@ -116,14 +117,22 @@ func (a *App) CommitPendingChanges(profileID string) (committer.Result, error) {
 	if err != nil {
 		return committer.Result{}, err
 	}
-	res, err := committer.New(b, a.repo).Commit(a.ctx, p.ID, p.ProjectKey)
+	res, err := a.commitEngine(b).Commit(a.ctx, p.ID, p.ProjectKey)
 	if err != nil {
 		log.Printf("tam: commit %s (%s) failed: %v", p.Name, p.ProjectKey, err)
 		return res, err
 	}
-	log.Printf("tam: committed %s (%s): %d pushed, %d created, %d conflicts, %d failures, %d left",
-		p.Name, p.ProjectKey, len(res.Committed), len(res.Created), len(res.Conflicts), len(res.Failures), res.Remaining)
+	log.Printf("tam: committed %s (%s): %d pushed, %d created, %d moved, %d conflicts, %d failures, %d left",
+		p.Name, p.ProjectKey, len(res.Committed), len(res.Created), len(res.Moved), len(res.Conflicts), len(res.Failures), res.Remaining)
 	return res, nil
+}
+
+// commitEngine builds the commit engine over the profile's backend. The
+// board order comes from boardrepo paired with the issue cache, which is
+// what the rank group re-derives each neighbour from; app.go is the one
+// place holding both repositories, so it is where they are joined.
+func (a *App) commitEngine(b backend.IssueBackend) *committer.Engine {
+	return committer.New(b, a.repo, boardrepo.Order{Boards: a.boards, Issues: a.repo})
 }
 
 // ResolveConflictOverride rebases a held issue's edits so the next Commit
@@ -133,7 +142,7 @@ func (a *App) ResolveConflictOverride(profileID, key, remoteVersion string) erro
 	if err != nil {
 		return err
 	}
-	return committer.New(b, a.repo).ResolveOverride(a.ctx, p.ID, key, remoteVersion)
+	return a.commitEngine(b).ResolveOverride(a.ctx, p.ID, key, remoteVersion)
 }
 
 // ResolveConflictKeepRemote drops a held issue's edits and takes Jira's row.
@@ -142,7 +151,7 @@ func (a *App) ResolveConflictKeepRemote(profileID, key string) error {
 	if err != nil {
 		return err
 	}
-	return committer.New(b, a.repo).ResolveKeepRemote(a.ctx, p.ID, key)
+	return a.commitEngine(b).ResolveKeepRemote(a.ctx, p.ID, key)
 }
 
 // ListActivity returns the local audit trail of one issue, newest first.

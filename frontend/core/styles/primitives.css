@@ -1201,6 +1201,11 @@
 .board-lane { display: flex; flex-direction: column; gap: 6px; }
 .board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
 .board-cell { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+/* A lane's cells stretch to the tallest of them, so a column emptied by a
+   drag is still a full-height drop target: a 40px strip is not something a
+   person can aim at with a card in hand. The heading row keeps its own
+   alignment, which is why this names the lane's row and not both. */
+.board-lane > .board-columns { align-items: stretch; }
 .board-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface); cursor: pointer; user-select: none; display: flex; flex-direction: column; gap: 6px; }
 .board-card:hover { background: var(--row-hover); }
 .board-card-selected, .board-card-selected:hover { background: var(--accent-soft); border-color: var(--accent); }
@@ -1208,6 +1213,39 @@
 .board-summary { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
 .board-picker select.board-select-narrow { min-width: 0; width: auto; }
 .board-card-head { display: flex; align-items: center; gap: 6px; }
+/* Phase 3b: a card is moved by dragging it, by the keyboard, or from its
+   own menu, and it says which of those is in flight and how it went. */
+.board-card-menu-wrap { margin-left: auto; position: relative; }
+.board-card-menu { padding: 0 6px; font-size: 11px; color: var(--text-muted); }
+.board-card-menu:hover:not(:disabled) { color: var(--text); }
+.board-card-dragging { opacity: 0.5; border-style: dashed; }
+/* The card the board has just moved, for the two seconds after it lands,
+   the way a reparented row flashes in the Epics tree. */
+.board-card-moved { animation: board-card-moved 2s ease-out; }
+@keyframes board-card-moved {
+  from { background: var(--accent-soft); border-color: var(--accent); }
+  to { background: var(--surface); }
+}
+/* The four states a move can be in on the card itself. A card that will
+   never land must not look like one that is about to. The check in flight
+   is dotted and accented rather than dashed: a dashed border is already
+   the card being carried, and two states wearing one mark is no mark. */
+.board-card-checking { border-style: dotted; border-color: var(--accent); }
+.board-card-warn, .board-card-conflict { background: var(--warn-soft); border-color: var(--warn-border); }
+.board-card-failed { border-color: var(--danger-text); }
+/* The slot is what the drop line is measured against, so a line appearing
+   between two cards moves nothing: a 2px item in the cell's own flex
+   column would reflow the whole column on every dragover. */
+.board-card-slot { position: relative; }
+.board-drop-line { position: absolute; top: -5px; left: 0; right: 0; height: 2px; background: var(--accent); border-radius: 1px; }
+/* The line below the last card of a cell: no slot to be measured against,
+   so it sits in the cell's own flex column and keeps only its colour. */
+.board-drop-line-end { position: static; height: 2px; }
+.board-cell-over { background: var(--row-hover); border-radius: 4px; }
+/* A cross-column drop takes the rank the card already has, so the target
+   is the cell and not a gap in it. */
+.board-cell-target { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+.board-move-keys { margin: 0 0 8px; }
 .board-card-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
 .board-unmapped { margin-top: 12px; }
 .board-overflow { font-size: 11px; color: var(--text-muted); padding: 2px 4px; }

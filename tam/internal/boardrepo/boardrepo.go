@@ -53,6 +53,10 @@ type IssueSource interface {
 	// list can never name a draft key, so the board reads them separately
 	// or they never reach a board at all.
 	DraftIssues(ctx context.Context, profileID string) ([]backend.Issue, error)
+	// PendingMoves returns the board intents the journal holds, one per
+	// issue. The view applies them as it places the cards, so a card is
+	// drawn where it was dropped and not where the last sync left it.
+	PendingMoves(ctx context.Context, profileID string) ([]backend.PendingMove, error)
 }
 
 // PurgeProfile drops everything the board tables hold for a profile. The

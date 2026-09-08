@@ -81,7 +81,6 @@ export function BoardsToolbar({
 
       <div className="board-head-actions">
         {refreshing && <span className="muted small">Refreshing</span>}
-        <span className="chip chip-label">Read only</span>
         <button type="button" className="btn" disabled={!canRefresh} onClick={onRefresh}>
           Refresh
         </button>

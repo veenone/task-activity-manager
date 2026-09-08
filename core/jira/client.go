@@ -261,19 +261,35 @@ func (c *Client) WriteJSON(ctx context.Context, method, path string, body any) e
 	return c.WriteJSONReturning(ctx, method, path, body, nil)
 }
 
-// WriteJSONReturning marshals body, sends it with method, and decodes a 2xx
-// response into out when out is non-nil and a body is present. A non-2xx
-// status returns an error carrying a short slice of the response body.
-func (c *Client) WriteJSONReturning(ctx context.Context, method, path string, body, out any) error {
+// WriteResponse is what WriteJSONRaw hands back: the status the instance
+// answered with and the response body, undecoded.
+type WriteResponse struct {
+	Code   int
+	Status string
+	Body   []byte
+}
+
+// writeBodyLimit caps how much of a write response body is read. Generous
+// enough for any Jira error or Multi-Status report, bounded so a runaway
+// response cannot be held in memory.
+const writeBodyLimit = 64 << 10
+
+// WriteJSONRaw marshals body, sends it with method, and hands back the
+// status and the response body without judging either. It reports an error
+// only when the request could not be made or its body could not be read; a
+// status of any kind, 207 and 4xx included, comes back as data for the
+// caller to decide on. Callers happy with the plain "anything under 300 is
+// a win" rule want WriteJSON or WriteJSONReturning instead.
+func (c *Client) WriteJSONRaw(ctx context.Context, method, path string, body any) (WriteResponse, error) {
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return WriteResponse{}, fmt.Errorf("marshal request: %w", err)
 	}
 	req, err := http.NewRequestWithContext(
 		ctx, method, c.baseURL+path, bytes.NewReader(payload),
 	)
 	if err != nil {
-		return err
+		return WriteResponse{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
@@ -281,22 +297,56 @@ func (c *Client) WriteJSONReturning(ctx context.Context, method, path string, bo
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return err
+		return WriteResponse{}, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf(
-			"jira: %s %s -> %s: %s",
-			method, path, resp.Status, strings.TrimSpace(string(respBody)),
-		)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, writeBodyLimit))
+	if err != nil {
+		return WriteResponse{}, fmt.Errorf("read response: %w", err)
+	}
+	return WriteResponse{Code: resp.StatusCode, Status: resp.Status, Body: respBody}, nil
+}
+
+// WriteJSONReturning marshals body, sends it with method, and decodes a 2xx
+// response into out when out is non-nil and a body is present. A non-2xx
+// status returns an error carrying a short slice of the response body.
+func (c *Client) WriteJSONReturning(ctx context.Context, method, path string, body, out any) error {
+	resp, err := c.WriteJSONRaw(ctx, method, path, body)
+	if err != nil {
+		return err
+	}
+	if resp.Code >= 300 {
+		return writeStatusError(method, path, resp)
 	}
 	if out == nil {
 		return nil
 	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil && err != io.EOF {
+	trimmed := bytes.TrimSpace(resp.Body)
+	if len(trimmed) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(trimmed, out); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
+}
+
+// writeStatusError is the error a write with a non-2xx status produces: the
+// method, the path, the status line, and a short slice of the body.
+func writeStatusError(method, path string, resp WriteResponse) error {
+	return fmt.Errorf(
+		"jira: %s %s -> %s: %s",
+		method, path, resp.Status, bodyExcerpt(resp.Body),
+	)
+}
+
+// bodyExcerpt is as much of a failed write's body as belongs in an error
+// message: a kilobyte at most, trimmed. Both the ordinary status error and
+// the Agile bulk writes quote a body, so the limit is defined once.
+func bodyExcerpt(body []byte) string {
+	if len(body) > 1024 {
+		body = body[:1024]
+	}
+	return strings.TrimSpace(string(body))
 }

@@ -19,6 +19,7 @@ import (
 type staticIssues struct {
 	byKey  map[string]backend.Issue
 	drafts []backend.Issue
+	moves  []backend.PendingMove
 	asked  *[]string
 }
 
@@ -49,6 +50,16 @@ func (s staticIssues) IssuesByKeys(_ context.Context, _ string, keys []string) (
 
 func (s staticIssues) DraftIssues(_ context.Context, _ string) ([]backend.Issue, error) {
 	return s.drafts, nil
+}
+
+// withMoves hands the source the board intents the journal holds.
+func (s staticIssues) withMoves(moves ...backend.PendingMove) staticIssues {
+	s.moves = moves
+	return s
+}
+
+func (s staticIssues) PendingMoves(_ context.Context, _ string) ([]backend.PendingMove, error) {
+	return s.moves, nil
 }
 
 func pts(v float64) *float64 { return &v }
@@ -624,5 +635,235 @@ func TestDonePointsFollowTheStatusRatherThanTheLastColumn(t *testing.T) {
 	}
 	if total != 11 {
 		t.Errorf("column points total = %v, want 11", total)
+	}
+}
+
+func TestAPendingTransitionDrawsTheCardInItsTargetColumn(t *testing.T) {
+	r, _ := newRepo(t)
+	cards := []backend.Issue{card("PLAT-409", "To Do", "1"), card("PLAT-412", "To Do", "1")}
+	src := seedBoard(t, r, sampleColumns(), cards).
+		withMoves(backend.PendingMove{Key: "PLAT-412", StatusID: "3", HasTransition: true})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	lane := view.Lanes[0]
+	if got := cellKeys(lane.Cells[1]); len(got) != 1 || got[0] != "PLAT-409" {
+		t.Errorf("To Do = %v, want only the card that did not move", got)
+	}
+	if got := cellKeys(lane.Cells[2]); len(got) != 1 || got[0] != "PLAT-412" {
+		t.Errorf("In Progress = %v, want the moved card drawn where it was dropped", got)
+	}
+	if view.Columns[1].Total != 1 || view.Columns[2].Total != 1 {
+		t.Errorf("column totals = %d and %d, want the move counted in the target", view.Columns[1].Total, view.Columns[2].Total)
+	}
+}
+
+func TestACardMovedIntoTheSprintIsDrawnThoughTheMembershipPredatesIt(t *testing.T) {
+	r, _ := newRepo(t)
+	// The sprint's membership is Jira's own from the last sync, so the card
+	// that just moved in is not in it. Unioning the pending move's key into
+	// the list before the cards are read is the only place this can be
+	// rescued.
+	seedScopes(t, r, sampleColumns(), map[string][]string{
+		"":   {"PLAT-1", "PLAT-2"},
+		"12": {"PLAT-1"},
+	})
+	src := newIssues(card("PLAT-1", "To Do", "1"), card("PLAT-2", "To Do", "1")).
+		withMoves(backend.PendingMove{Key: "PLAT-2", SprintID: "12", HasSprint: true})
+	view, err := r.Board(context.Background(), src, "p1", 1, "12", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	got := cellKeys(view.Lanes[0].Cells[1])
+	if len(got) != 2 || got[0] != "PLAT-1" || got[1] != "PLAT-2" {
+		t.Errorf("sprint 12 = %v, want the card that was moved into it as well", got)
+	}
+	if view.NotSynced != 0 {
+		t.Errorf("not synced = %d: a key added by a pending move is not a board key with no row", view.NotSynced)
+	}
+	if view.Columns[1].Total != 2 {
+		t.Errorf("To Do total = %d, want both cards", view.Columns[1].Total)
+	}
+}
+
+func TestACardMovedOutOfTheSprintLeavesIt(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	seedScopes(t, r, sampleColumns(), map[string][]string{
+		"":   {"PLAT-1", "PLAT-2"},
+		"12": {"PLAT-1", "PLAT-2"},
+	})
+	src := newIssues(card("PLAT-1", "To Do", "1"), card("PLAT-2", "To Do", "1")).
+		withMoves(backend.PendingMove{Key: "PLAT-1", SprintID: "13", HasSprint: true})
+
+	sprint, err := r.Board(ctx, src, "p1", 1, "12", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("sprint: %v", err)
+	}
+	if got := cellKeys(sprint.Lanes[0].Cells[1]); len(got) != 1 || got[0] != "PLAT-2" {
+		t.Errorf("sprint 12 = %v, want the card that was moved to sprint 13 gone", got)
+	}
+	if sprint.Columns[1].Total != 1 {
+		t.Errorf("To Do total = %d, want the card that left uncounted", sprint.Columns[1].Total)
+	}
+
+	// The whole board has no sprint to leave, so nothing is dropped from it.
+	whole, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("whole board: %v", err)
+	}
+	if got := cellKeys(whole.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Errorf("whole board = %v, want both cards", got)
+	}
+}
+
+func TestAPendingRankPlacesTheCardBesideItsNeighbour(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	cards := []backend.Issue{
+		card("PLAT-1", "To Do", "1"),
+		card("PLAT-2", "To Do", "1"),
+		card("PLAT-3", "To Do", "1"),
+	}
+	for _, tc := range []struct {
+		name   string
+		before bool
+		want   []string
+	}{
+		{"before", true, []string{"PLAT-3", "PLAT-1", "PLAT-2"}},
+		{"after", false, []string{"PLAT-1", "PLAT-3", "PLAT-2"}},
+	} {
+		src := seedBoard(t, r, sampleColumns(), cards).withMoves(backend.PendingMove{
+			Key: "PLAT-3", RankNeighbour: "PLAT-1", RankBefore: tc.before, HasRank: true,
+		})
+		view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		got := cellKeys(view.Lanes[0].Cells[1])
+		if strings.Join(got, "|") != strings.Join(tc.want, "|") {
+			t.Errorf("%s: To Do = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestARankAgainstANeighbourInAnotherCellLeavesTheOrderAlone(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	mk := func(key, statusID, assignee string) backend.Issue {
+		c := card(key, "status "+statusID, statusID)
+		c.Assignee = assignee
+		return c
+	}
+	cards := []backend.Issue{
+		mk("PLAT-1", "1", "S. Kim"),
+		mk("PLAT-2", "1", "S. Kim"),
+		mk("PLAT-9", "3", "S. Kim"), // another column
+		mk("PLAT-7", "1", "M. Ortiz"),
+	}
+	for _, tc := range []struct {
+		name      string
+		neighbour string
+		swimlane  string
+	}{
+		{"another column", "PLAT-9", boardrepo.SwimlaneNone},
+		{"another lane", "PLAT-7", boardrepo.SwimlaneAssignee},
+		{"a card the board does not hold", "PLAT-404", boardrepo.SwimlaneNone},
+	} {
+		src := seedBoard(t, r, sampleColumns(), cards).withMoves(backend.PendingMove{
+			Key: "PLAT-2", RankNeighbour: tc.neighbour, RankBefore: true, HasRank: true,
+		})
+		view, err := r.Board(ctx, src, "p1", 1, "", tc.swimlane)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		lane := view.Lanes[0]
+		if tc.swimlane == boardrepo.SwimlaneAssignee {
+			lane = laneByLabel(t, view, "M. Ortiz")
+			if got := cellKeys(lane.Cells[1]); len(got) != 1 || got[0] != "PLAT-7" {
+				t.Errorf("%s: the neighbour's lane = %v, want it untouched", tc.name, got)
+			}
+			lane = laneByLabel(t, view, "S. Kim")
+		}
+		got := cellKeys(lane.Cells[1])
+		if len(got) < 2 || got[0] != "PLAT-1" || got[1] != "PLAT-2" {
+			t.Errorf("%s: To Do = %v, want the board's own order kept", tc.name, got)
+		}
+	}
+}
+
+func TestAPendingMoveDoesNotDisturbACardWithoutOne(t *testing.T) {
+	r, _ := newRepo(t)
+	cards := []backend.Issue{card("PLAT-1", "To Do", "1"), card("PLAT-2", "Done", "5")}
+	src := seedBoard(t, r, sampleColumns(), cards).withMoves(
+		backend.PendingMove{Key: "PLAT-404", StatusID: "3", HasTransition: true})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	lane := view.Lanes[0]
+	if got := cellKeys(lane.Cells[1]); len(got) != 1 || got[0] != "PLAT-1" {
+		t.Errorf("To Do = %v", got)
+	}
+	if got := cellKeys(lane.Cells[4]); len(got) != 1 || got[0] != "PLAT-2" {
+		t.Errorf("Done = %v", got)
+	}
+}
+
+func TestADraggedDraftIsDrawnInTheColumnItsStatusIDNames(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	// A draft has no Jira status to journal a transition against, so a drag
+	// writes the dropped column's status id onto the draft's own row.
+	// Honouring it here is the only thing that makes the drag visible.
+	dragged := draftCard("TAM-NEW-1")
+	dragged.StatusID = "3"
+	// A status id no column collects degrades to where an undragged draft
+	// goes, rather than taking the card off the board.
+	unknown := draftCard("TAM-NEW-2")
+	unknown.StatusID = "99999"
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
+		withDrafts(dragged, unknown)
+
+	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	lane := view.Lanes[0]
+	if got := cellKeys(lane.Cells[2]); len(got) != 1 || got[0] != "TAM-NEW-1" {
+		t.Errorf("In Progress = %v, want the dragged draft where it was dropped", got)
+	}
+	if got := cellKeys(lane.Cells[1]); len(got) != 2 || got[1] != "TAM-NEW-2" {
+		t.Errorf("To Do = %v, want the card and the draft whose status id no column collects", got)
+	}
+	if view.Unmapped != 0 {
+		t.Errorf("unmapped = %d, want both drafts drawn", view.Unmapped)
+	}
+	if view.Columns[1].Total != 2 || view.Columns[2].Total != 1 {
+		t.Errorf("column totals = %d and %d, want the dragged draft counted in its target",
+			view.Columns[1].Total, view.Columns[2].Total)
+	}
+}
+
+func TestAPendingTransitionOverridesTheStatusNameWithTheID(t *testing.T) {
+	r, _ := newRepo(t)
+	moved := card("PLAT-412", "To Do", "1")
+	moved.StoryPoints = pts(5)
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{moved}).
+		withMoves(backend.PendingMove{Key: "PLAT-412", StatusID: "5", StatusName: "Done", HasTransition: true})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	cell := view.Lanes[0].Cells[4]
+	if len(cell) != 1 || cell[0].Status != "Done" {
+		t.Fatalf("Done = %+v, want the card carrying the name journaled beside the id", cell)
+	}
+	// DonePoints counts by the status name, so a card drawn in the Done
+	// column while its name still read To Do would leave the view's own
+	// total disagreeing with the column it drew.
+	if view.DonePoints != 5 {
+		t.Errorf("done points = %v, want the moved card counted where it is drawn", view.DonePoints)
 	}
 }

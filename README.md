@@ -14,7 +14,9 @@ Desktop tools for Jira Data Center that share one code spine:
   adds an Epics view showing each epic with its stories, tasks, bugs, and
   requirements, and lets an issue be moved under one. Phase 3a adds a
   read-only Boards view: a project's boards, their columns, and their
-  sprints, synced from Jira's Agile API.
+  sprints, synced from Jira's Agile API. Phase 3b makes the board
+  writable, journaling a dragged or keyboard-moved card offline and
+  pushing it on Commit like every other TAM write.
 
 Both are Go + Wails + React apps that sync Jira into a local SQLite cache and
 push edits back on commit.

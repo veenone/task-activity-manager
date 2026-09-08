@@ -23,6 +23,12 @@ const (
 	// settingRequirementType is the per-profile key for the Jira issue type
 	// name TAM treats as a requirement.
 	settingRequirementType = "requirement_issue_type"
+	// settingTransitionResolution is the per-profile key for the resolution
+	// name a board transition sends when the workflow asks for one. Most
+	// Data Center workflows put a resolution screen on the way into Done,
+	// and the backend falls back to the transition's first allowed value
+	// when this is unset or names something the transition does not offer.
+	settingTransitionResolution = "transition_resolution"
 	// detailFreshFor is how long a cached detail is served without asking
 	// Jira again.
 	detailFreshFor = 10 * time.Minute
@@ -68,8 +74,14 @@ func (a *App) backendFor(p profile.Profile) (backend.IssueBackend, error) {
 		if err != nil {
 			return nil, err
 		}
+		resolution, err := a.repo.ProfileSetting(a.ctx, p.ID, settingTransitionResolution)
+		if err != nil {
+			return nil, err
+		}
 		client := corejira.NewClient(p.JiraURL, token, tlsOptions(p)...)
-		b = jirabackend.New(client, reqType)
+		jb := jirabackend.New(client, reqType)
+		jb.SetTransitionResolution(resolution)
+		b = jb
 	}
 	a.backends[p.ID] = b
 	return b, nil
@@ -248,7 +260,8 @@ func (a *App) GetProfileSetting(profileID, key string) (string, error) {
 }
 
 // SetProfileSetting writes a per-profile TAM setting and drops the
-// profile's cached backend, since the requirement type feeds into it.
+// profile's cached backend, since the requirement type and the transition
+// resolution both feed into it.
 // Changing the requirement type also resets the sync cursor, so the next
 // sync pulls the whole scope again under the new type.
 func (a *App) SetProfileSetting(profileID, key, value string) error {

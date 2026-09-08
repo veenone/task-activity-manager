@@ -2,6 +2,7 @@ package jira_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -78,6 +79,9 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				"customfield_10071":{"required":true,"name":"Keywords","schema":{"type":"array","items":"string"}},
 				"environment":{"required":false,"name":"Environment","schema":{"type":"string"}}
 			}}]}]}`))
+		case r.URL.Path == "/rest/api/2/issue/PLAT-412/transitions":
+			f.searches = append(f.searches, "transitions "+r.URL.RawQuery)
+			_, _ = w.Write([]byte(transitionsBody))
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/PLAT-412"):
 			_, _ = w.Write([]byte(`{"id":"1","key":"PLAT-412","fields":{"description":"As a shopper","issuelinks":[{"type":{"name":"Tested By"},"inwardIssue":{"key":"XT-1018","fields":{"summary":"Applies discount","issuetype":{"name":"Test"}}}}],"customfield_10016":5}}`))
 		case r.URL.Path == "/rest/api/2/user/assignable/search":
@@ -152,6 +156,24 @@ func newBackend(t *testing.T, fields string) (*jirabackend.Backend, *fakeJira) {
 	c := corejira.NewClientWithHTTP(srv.URL, "tok", srv.Client())
 	return jirabackend.New(c, "Business Requirement"), f
 }
+
+// transitionsBody is what a Data Center workflow answers with: two
+// transitions reaching Done, the lower id of them carrying the resolution
+// screen almost every such workflow puts there, and one guarded by a custom
+// field nobody can fill in from here.
+const transitionsBody = `{"transitions":[
+	{"id":"11","name":"Back to To Do","to":{"id":"1","name":"To Do"},"fields":{}},
+	{"id":"31","name":"Done","to":{"id":"5","name":"Done"},"fields":{
+		"resolution":{"name":"Resolution","required":true,"allowedValues":[{"id":"10000","name":"Done"},{"id":"10001","name":"Won't Do"}]}
+	}},
+	{"id":"21","name":"Start Progress","to":{"id":"3","name":"In Progress"},"fields":{
+		"assignee":{"name":"Assignee","required":false}
+	}},
+	{"id":"41","name":"Close","to":{"id":"5","name":"Done"},"fields":{}},
+	{"id":"51","name":"Sign off","to":{"id":"6","name":"Signed off"},"fields":{
+		"customfield_11400":{"name":"Sign-off","required":true}
+	}}
+]}`
 
 const twoFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true}]`
 
@@ -309,5 +331,138 @@ func TestBoardIssueKeysPassThroughForTheBoardAndForOneSprint(t *testing.T) {
 	}
 	if len(keys) != 1 || keys[0] != "PLAT-412" {
 		t.Errorf("sprint keys = %v", keys)
+	}
+}
+
+func TestTransitionTakesTheLowestIdThatReachesTheTargetAndFillsTheResolution(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	if err := b.Transition(context.Background(), "PLAT-412", "5"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+	want := `POST /rest/api/2/issue/PLAT-412/transitions {"transition":{"id":"31"},"fields":{"resolution":{"id":"10000"}}}`
+	if len(f.writes) != 1 || f.writes[0] != want {
+		t.Errorf("wrote %v, want %s", f.writes, want)
+	}
+	if len(f.searches) == 0 || !strings.Contains(f.searches[0], "expand=transitions.fields") {
+		t.Errorf("the transitions are read with their fields: %v", f.searches)
+	}
+}
+
+func TestTransitionTakesTheProfilesResolutionWhenTheTransitionAllowsIt(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	b.SetTransitionResolution("won't do")
+	if err := b.Transition(context.Background(), "PLAT-412", "5"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+	if len(f.writes) != 1 || !strings.Contains(f.writes[0], `"resolution":{"id":"10001"}`) {
+		t.Errorf("wrote %v", f.writes)
+	}
+
+	// A setting the transition does not offer falls back to the first
+	// allowed value rather than sending a value Jira will reject.
+	b2, f2 := newBackend(t, twoFields)
+	b2.SetTransitionResolution("Abandoned")
+	if err := b2.Transition(context.Background(), "PLAT-412", "5"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+	if len(f2.writes) != 1 || !strings.Contains(f2.writes[0], `"resolution":{"id":"10000"}`) {
+		t.Errorf("wrote %v", f2.writes)
+	}
+}
+
+func TestATransitionThatNeedsNothingSendsNoFieldsAtAll(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	if err := b.Transition(context.Background(), "PLAT-412", "3"); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+	want := `POST /rest/api/2/issue/PLAT-412/transitions {"transition":{"id":"21"}}`
+	if len(f.writes) != 1 || f.writes[0] != want {
+		t.Errorf("wrote %v, want %s", f.writes, want)
+	}
+}
+
+func TestATransitionThatNeedsAnotherFieldIsRefusedByName(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	err := b.Transition(context.Background(), "PLAT-412", "6")
+	if err == nil {
+		t.Fatal("a transition asking for a custom field must be refused, not guessed at")
+	}
+	if !errors.Is(err, backend.ErrTransitionFields) {
+		t.Errorf("error kind: %v", err)
+	}
+	for _, want := range []string{"PLAT-412", "status 6", "Sign-off (customfield_11400)", "in Jira"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+	if len(f.writes) != 0 {
+		t.Errorf("nothing was pushed: %v", f.writes)
+	}
+}
+
+func TestATransitionWithNoPathNamesTheIssueTheTargetAndWhatIsReachable(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	err := b.Transition(context.Background(), "PLAT-412", "9")
+	if !errors.Is(err, backend.ErrNoTransition) {
+		t.Fatalf("error kind: %v", err)
+	}
+	var noPath *backend.NoTransition
+	if !errors.As(err, &noPath) {
+		t.Fatalf("the error carries the reachable statuses: %v", err)
+	}
+	if strings.Join(noPath.Reachable, ",") != "To Do,Done,In Progress,Signed off" {
+		t.Errorf("reachable: %v", noPath.Reachable)
+	}
+	for _, want := range []string{"PLAT-412", "status 9", "In Progress"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+	if len(f.writes) != 0 {
+		t.Errorf("nothing was pushed: %v", f.writes)
+	}
+}
+
+func TestCanTransitionAnswersWithoutWriting(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	ctx := context.Background()
+	check, err := b.CanTransition(ctx, "PLAT-412", "5")
+	if err != nil || !check.Allowed {
+		t.Fatalf("check = %+v, %v", check, err)
+	}
+	check, err = b.CanTransition(ctx, "PLAT-412", "9")
+	if err != nil || check.Allowed {
+		t.Fatalf("check = %+v, %v", check, err)
+	}
+	if strings.Join(check.Reachable, ",") != "To Do,Done,In Progress,Signed off" {
+		t.Errorf("reachable: %v", check.Reachable)
+	}
+	if len(f.writes) != 0 {
+		t.Errorf("a check never writes: %v", f.writes)
+	}
+}
+
+func TestTheBoardWritesPassThroughToTheAgileEndpoints(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	ctx := context.Background()
+	if err := b.RankIssue(ctx, "PLAT-412", "PLAT-409", true); err != nil {
+		t.Fatalf("rank: %v", err)
+	}
+	if err := b.MoveIssuesToSprint(ctx, "12", []string{"PLAT-412", "PLAT-409"}); err != nil {
+		t.Fatalf("sprint: %v", err)
+	}
+	if err := b.MoveIssuesToSprint(ctx, "", []string{"PLAT-412"}); err != nil {
+		t.Fatalf("backlog: %v", err)
+	}
+	if err := b.MoveIssuesToSprint(ctx, "13", nil); err != nil {
+		t.Fatalf("empty batch: %v", err)
+	}
+	want := []string{
+		`PUT /rest/agile/1.0/issue/rank {"issues":["PLAT-412"],"rankBeforeIssue":"PLAT-409"}`,
+		`POST /rest/agile/1.0/sprint/12/issue {"issues":["PLAT-412","PLAT-409"]}`,
+		`POST /rest/agile/1.0/backlog/issue {"issues":["PLAT-412"]}`,
+	}
+	if strings.Join(f.writes, " | ") != strings.Join(want, " | ") {
+		t.Errorf("wrote %v", f.writes)
 	}
 }

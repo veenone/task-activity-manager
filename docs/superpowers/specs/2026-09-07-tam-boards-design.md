@@ -8,7 +8,7 @@ The Boards view: the project's boards, the columns a board defines, and the issu
 
 **Plan 3a, the read path.** The agile client in `core/jira` (boards, board configuration, sprints, board issues), TAM's board and sprint tables, a sync that fills them, and the Boards view: board picker, sprint picker, columns from the board's own configuration, cards from the issue cache, and a swimlane toggle by assignee or epic. Nothing in 3a writes to Jira.
 
-**Plan 3b, the write path.** Dragging a card between columns (a transition), dragging within a column (a rank), moving an issue to a sprint, and starting or completing a sprint. Section 12 is its design, written when 3a merges.
+**Plan 3b, the write path.** Dragging a card between columns (a transition), dragging within a column (a rank), and moving an issue to a sprint. Section 13 is its design, written when 3a merged; it explains why starting and completing a sprint moved to a plan 3c of its own.
 
 ## 2. Decisions
 
@@ -100,3 +100,114 @@ Every write (3b), the board's own swimlane and quick-filter configuration, sub-f
 ## 12. Mockup
 
 [`assets/2026-09-07-tam-boards.svg`](assets/2026-09-07-tam-boards.svg): the Boards view with a scrum board, the active sprint, assignee swimlanes, a draft card, and the "not on the board" note.
+
+## 13. Plan 3b: the board write path
+
+Decided 2026-09-08, after 3a merged. The user pre-approves the recommended option at every decision point, so this records the choices and their reasons rather than the alternatives.
+
+### 13.1 What 3b delivers, and what moves to 3c
+
+The board becomes writable, and writes the way the rest of TAM writes: into the journal, offline, pushed on Commit. Three card moves:
+
+- **Across columns**, which is a workflow transition.
+- **Within a column**, which is a rank.
+- **Into a sprint**, or out to the backlog.
+
+Section 1 promised sprint start and complete in 3b as well. They move to 3c. They are not a card move but a sprint lifecycle: starting one needs dates, completing one has to answer Jira's question about the issues that did not finish, and both need permissions the other three do not. Folding that into this plan would double a phase that is already five tasks, and the three card moves are what a standup actually does. 3c is sprint lifecycle, and it is the natural home for the sprint report Phase 4 will want anyway.
+
+### 13.2 Decisions
+
+| Question | Decision | Why |
+|---|---|---|
+| Where a board write goes | The journal, like every other TAM write, then Commit | The offline journal is the reason TAM's board exists rather than a browser tab; a board that wrote straight through would be the one surface that breaks the promise |
+| A transition's journal shape | Its own entity, `issue_transition`, keyed by issue, field `statusId`, `before_val`/`after_val` `id\|Name` (the status id and its display name) | A transition is not a field edit: Jira takes a transition id from a workflow that depends on the issue's current status, so `PUT /issue` cannot express it. The name rides beside the id so the Pending changes dialog and the Activity tab can read it offline; the committer and every comparison split on the pipe and use the id alone |
+| How the transition id is found | At Commit, from `GET /issue/{key}/transitions`, matching `to.id` against the journaled target status id | The available transitions depend on the issue's status at push time, which is the only moment the answer is true |
+| A drop with no legal transition | Accepted at drag time, reported per issue at Commit | TAM cannot know offline which transitions exist. Refusing the drop would mean refusing every drop offline, which is the case the app is for |
+| A rank's journal shape | Entity `issue_rank`, field `rank`, `after_val` `before\|KEY\|BOARD` or `after\|KEY\|BOARD` | Jira ranks with LexoRank and owns the value; a neighbour is the only thing a client can state truthfully offline. The board rides as a third segment because one key can sit on two boards whose orders disagree, and the commit pass has to know which board's order to re-derive the neighbour from |
+| The rank a pending card shows | The board read places the card beside its named neighbour; nothing writes a made-up LexoRank into the cache | A fabricated rank would be a second, wrong source of truth the next sync would silently overwrite |
+| A sprint move's journal shape | Entity `issue_sprint`, field `sprintId`, `before_val`/`after_val` `id\|Name`, empty for the backlog | The board's own semantics live on the Agile endpoint, not on the issue's Sprint custom field; the name rides beside the id for the same offline-reading reason a transition's does |
+| Conflicts | A transition and a sprint move are version-checked like an edit, and hold back with base, mine, and remote; a rank is not | A rank has no version to check and no meaning to rebase: the neighbour either still exists or the push fails |
+| Override on a held board row | Rewrites the row's `before_val` to what Jira holds now, leaving `after_val` (the user's move) untouched | A board row is held on `before_val` against the remote status or sprint id, which carries no base version to rewrite the way an edit's does; without rebasing `before_val` the user would meet the identical conflict on every Commit from here on |
+| Drag | Native HTML5 drag and drop, no library | The reuse ladder: a platform feature beats a dependency, and the board's needs are one draggable and one drop target |
+| Keyboard | Every move has a keyboard path, on the card that already holds focus | The board shipped a full keyboard model in 3a; a drag-only write would take it away again |
+| What a moved card looks like | It sits where it was dropped, wearing the pending dot, until Commit | The same vocabulary every other pending change in TAM already uses |
+| Discard | Reverts the column, the rank, and the sprint the way discarding an edit reverts a field | One journal, one discard, no special cases |
+
+### 13.3 The three writes on the wire
+
+All three are `core/jira` transport, beside the Agile client 3a added:
+
+- `Transitions(ctx, key string) ([]RawTransition, error)` over `GET /rest/api/2/issue/{key}/transitions?expand=transitions.fields`, returning `RawTransition{ID, Name string; To RawStatus; Fields map[string]RawTransitionField}`. `Fields` is what the expand was asked for: it is keyed by field id exactly as Jira sends it and carries each field's name, whether it is required, and its allowed values, so a caller can both fill a field in and name it in an error rather than saying "customfield_11400 is required".
+- `DoTransition(ctx, key, transitionID string, fields map[string]any) error` over `POST /rest/api/2/issue/{key}/transitions`, sending the fields object only when the caller supplies one. Almost every Data Center workflow's way into Done puts a resolution on the transition's screen, so a transition call that could not carry a field would fail on the commonest board move there is; what to put in the resolution is the backend's decision, not the client's.
+- `RankIssue(ctx, key, neighbourKey string, before bool) error` over `PUT /rest/agile/1.0/issue/rank`, sending `rankBeforeIssue` or `rankAfterIssue`.
+- `MoveToSprint(ctx, sprintID string, keys []string) error` over `POST /rest/agile/1.0/sprint/{id}/issue`, and `MoveToBacklog(ctx, keys []string) error` over `POST /rest/agile/1.0/backlog/issue` when the target is the backlog.
+
+`ErrNoTransition` is returned by the backend, not the client, when no transition reaches the target status: the client reports what Jira offers and the backend decides that none of it matches.
+
+### 13.4 The journal
+
+Three new entity types beside `issue`, `issue_create`, and `link`:
+
+```
+issue_transition  entity_key = issue key, field = "statusId", after_val = "id|Name" (target status)
+issue_rank        entity_key = issue key, field = "rank",     after_val = "before|KEY|BOARD" or "after|KEY|BOARD"
+issue_sprint      entity_key = issue key, field = "sprintId", after_val = "id|Name", or "" for the backlog
+```
+
+`before_val` carries what the card had, in the same `id|Name` packing for a transition and a sprint move, so a discard can put it back and the Activity tab can say what changed; a rank's `before_val` is empty, since Decision 4 keeps a rank out of the cache and there is nothing to restore. `base_version` is the issue's `updated` at the moment of the move, for the two entities that are version-checked. Every comparison between two board values, including the undo check that deletes a row when a card is dragged home, goes through the id half alone: a status or sprint name that differs between the board configuration and the cached row must never make an unmoved card look like a move to somewhere new.
+
+One row per issue per entity, which the journal's own unique key already enforces: dragging a card twice before committing replaces the intent rather than queueing two. A card dragged back to where it started deletes the row instead of journaling a move to itself, so an undone drag leaves no pending change and no audit entry beyond the one already written.
+
+A draft (`TAM-NEW-n`) can be dragged: its column, rank, and sprint update the draft JSON rather than journaling a second row, since the create has not happened yet and there is nothing to transition.
+
+### 13.5 The board read, with pending writes on it
+
+`boardrepo.Board` already merges the journal's pending flags. It now also applies the three intents when it places a card:
+
+- A pending transition puts the card in the column that owns its target status id.
+- A pending sprint move takes the card out of a sprint it left and into one it joined, which on a sprint-scoped view means it appears or disappears.
+- A pending rank places the card immediately before or after its named neighbour in that cell. A neighbour that is not in the same cell any more leaves the card where the board's own order put it, rather than guessing.
+
+`IssueSource` grows one read for this, so `boardrepo` still never imports `issuerepo`.
+
+### 13.6 Commit
+
+The committer gains a board pass, after edits and before links, because a transition on a draft has to wait for the create that gives it a key. Per issue, in this order: sprint move, then transition, then rank. That order is deliberate. A sprint move can change which board columns apply, a transition changes the status the rank is relative to, and a rank is the one that can be redone harmlessly.
+
+A row is classified against the issue's remote status or sprint id, never its `updated` stamp, because a comment on the issue in Jira bumps `updated` without moving the card: remote already at the journaled target is satisfaction, not a conflict, and is dropped without a push; remote at the journaled before value is pushed; anything else holds the whole issue back, both board rows if both are pending, so half an intent is never committed against a card that is not where the user left it.
+
+Version checks match the edit path: the issue's remote `updated` against the journaled `base_version`. A held-back board write reuses the conflict card 1b built, with the field reading Status or Sprint, so the two resolutions stay Override and Keep remote, though Override does more work for a board row than for an edit: see the Decisions table above.
+
+Failures are per issue and per write, carrying `{Key, EntityType, RowID, Error, Retryable, Reachable}`: `RowID` is what a per-row Undo discards (one card can fail a transition and drop a rank in the same Commit), `Retryable` is false for a failure that will recur identically (no legal transition, a backend or instance that cannot write to boards at all), and `Reachable` names the statuses a refused transition could have reached instead. A transition that has no path leaves its rank alone, and both stay in the journal for the next Commit rather than being dropped.
+
+Ranks push last, one board at a time, in that board's final local order re-derived at push time, each card anchored with `rankAfterIssue` against the card that landed above it. The one exception is the card at the top of the board's order, which has nothing above it: it anchors with `rankBeforeIssue` against the card below it instead. "X before Y" and "X after W" place X in exactly the same spot in Jira's one global rank, so two cards ranked against each other can never disagree about the pair, and only the first card of the board's first non-empty column can take the `before` branch.
+
+### 13.7 The view
+
+A card is draggable. Dropping it on another column journals a transition; dropping it between two cards in a cell journals a rank; dropping it on a different sprint's picker is not a thing, so the sprint move is an action on the card, not a drag. This section originally promised it on the detail panel as well; only the card's menu shipped in 3b, and the panel's copy is in 13.10. Every drop is optimistic: the card moves, takes the pending dot, and the counts in the column heads move with it.
+
+The two kinds of drop draw different cues, because they promise different things. A drop inside the card's own cell (a rank) draws a drop line at the cursor, exactly where the card will land. A drop on another column (a transition) draws a full-cell outline instead, never a line: the card lands wherever its own rank puts it, not at the cursor, so a line would promise a placement the transition does not make.
+
+The keyboard path is the same set of moves, on the focused card: the arrow keys already move focus, so a move takes a modifier (Ctrl with an arrow), announced through the live region that 3a's drag refusal already uses. A card also carries an Actions menu, which is what a screen reader user and a trackpad-averse user both get, and it is opened with the menu key or Shift with F10 rather than with Enter: Enter and Space are already the card's selection, which opens the detail panel, so the menu needs a trigger of its own instead of an activation key.
+
+The read-only caveat line 3a shipped comes out, and the "Read only" chip with it.
+
+### 13.8 Errors
+
+A transition with no legal path, a rank whose neighbour Jira no longer has, and a sprint move Jira refuses are all per-issue failures at Commit, each naming the issue and what it wanted. A board write on an instance without Jira Software cannot happen, because there is no board to drag on. Everything else follows Phase 1's rules.
+
+### 13.9 Verification
+
+Go: the three client calls against the httptest server, including a transitions list that offers nothing matching; `issuerepo.MoveToColumn`, `RankIssue`, and `MoveToSprint` writing and replacing their journal rows, and deleting the row when a card comes home; the board read placing a card by each of the three intents; the committer's board pass with a conflict, a missing transition, and a rank whose neighbour is gone. Vitest: a drag between columns journals and repaints, a drag within a column reorders, the keyboard move does the same thing as the drag, a pending card wears the dot, and Commit's failures read per issue. Offline: on the demo profile, drag a card across two columns, reorder it, move it to another sprint, then Commit.
+
+### 13.10 Out of scope for 3b
+
+Sprint start and complete (3c), the board's own quick filters and swimlane rules, bulk moves, dragging between boards, dragging an epic, and the transitions cache that would let the view grey out an impossible drop before Commit.
+
+Deferred to 3c after the fact:
+
+- **The sprint move on the detail panel.** The card's Actions menu shipped and reaches every sprint, so the move exists on the board; the panel's copy of it did not, and it goes with 3c's sprint work rather than being bolted on afterwards.
+
+Known limits of what shipped:
+
+- **A 207 fails the whole batch.** Jira's Agile bulk endpoints answer 207 Multi-Status when they reject even one issue of a request, and `core/jira` treats a 207 as a failure by its status alone. A sprint move of fifty cards that Jira refuses for one of them therefore reports all fifty as failed and leaves all fifty journal rows in place. Nothing is lost and the next Commit retries, but the report names more cards than actually failed. Splitting a 207 back into per-issue outcomes means trusting a body schema Atlassian documents loosely, which is the trade this phase declined to make.

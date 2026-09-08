@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -286,5 +287,127 @@ func TestBoardIssueKeysEscapesSprintID(t *testing.T) {
 	}
 	if want := "/rest/agile/1.0/board/1/sprint/12%20a%2Fb/issue"; gotEscapedPath != want {
 		t.Errorf("escaped path = %q, want %q", gotEscapedPath, want)
+	}
+}
+
+func TestRankIssueSendsRankBeforeAndAfter(t *testing.T) {
+	var gotBodies []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/agile/1.0/issue/rank" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPut {
+			t.Errorf("method = %s", r.Method)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		gotBodies = append(gotBodies, body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if err := c.RankIssue(context.Background(), "PLAT-412", "PLAT-409", true); err != nil {
+		t.Fatalf("rank before: %v", err)
+	}
+	if err := c.RankIssue(context.Background(), "PLAT-412", "PLAT-409", false); err != nil {
+		t.Fatalf("rank after: %v", err)
+	}
+
+	wantBefore := map[string]any{"issues": []any{"PLAT-412"}, "rankBeforeIssue": "PLAT-409"}
+	wantAfter := map[string]any{"issues": []any{"PLAT-412"}, "rankAfterIssue": "PLAT-409"}
+	if len(gotBodies) != 2 {
+		t.Fatalf("gotBodies = %+v, want 2 requests", gotBodies)
+	}
+	if !reflect.DeepEqual(gotBodies[0], wantBefore) {
+		t.Errorf("rank before body = %+v, want %+v", gotBodies[0], wantBefore)
+	}
+	if !reflect.DeepEqual(gotBodies[1], wantAfter) {
+		t.Errorf("rank after body = %+v, want %+v", gotBodies[1], wantAfter)
+	}
+}
+
+// TestRankIssueSurfacesA404 pins down the other failure mode a Multi-Status
+// check can hide behind: a 404 on the rank path (the issue or the neighbour
+// gone) has to come back as an error the caller can read, not be swallowed.
+func TestRankIssueSurfacesA404(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errorMessages":["Issue does not exist"]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if err := c.RankIssue(context.Background(), "PLAT-412", "PLAT-409", true); err == nil {
+		t.Fatal("want an error for a 404 on the rank path")
+	}
+}
+
+func TestMoveToSprintSendsIssues(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/agile/1.0/sprint/12/issue" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s", r.Method)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if err := c.MoveToSprint(context.Background(), "12", []string{"PLAT-412"}); err != nil {
+		t.Fatalf("move to sprint: %v", err)
+	}
+	if want := (map[string]any{"issues": []any{"PLAT-412"}}); !reflect.DeepEqual(gotBody, want) {
+		t.Errorf("body = %+v, want %+v", gotBody, want)
+	}
+}
+
+func TestMoveToSprintEscapesSprintID(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if err := c.MoveToSprint(context.Background(), "12 a/b", []string{"PLAT-412"}); err != nil {
+		t.Fatalf("move to sprint: %v", err)
+	}
+	if want := "/rest/agile/1.0/sprint/12%20a%2Fb/issue"; gotPath != want {
+		t.Errorf("path = %q, want %q", gotPath, want)
+	}
+}
+
+func TestMoveToBacklogSendsIssues(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/agile/1.0/backlog/issue" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("method = %s", r.Method)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if err := c.MoveToBacklog(context.Background(), []string{"PLAT-412"}); err != nil {
+		t.Fatalf("move to backlog: %v", err)
+	}
+	if want := (map[string]any{"issues": []any{"PLAT-412"}}); !reflect.DeepEqual(gotBody, want) {
+		t.Errorf("body = %+v, want %+v", gotBody, want)
 	}
 }

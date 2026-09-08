@@ -2,13 +2,15 @@
 // that holds its issues. IssueBackend carries the read path and the write
 // path plan 1b added: version checks, edits, and issue creation. The Jira
 // implementation lives in backend/jira, the offline one in backend/demo.
-// BoardBackend is the read-only board capability the Boards view needs, on
-// its own interface so a backend that cannot answer it does not have to.
+// BoardBackend is the board capability the Boards view and the board writes
+// need, on its own interface so a backend that cannot answer it does not
+// have to.
 package backend
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -78,7 +80,45 @@ type IssueDraft struct {
 	// backend sends it through the Epic Link field when it exists.
 	ParentKey string `json:"parentKey"`
 
+	// StatusID, SprintID, and SprintName are where a draft was last dropped
+	// on a board. A draft has no Jira state, so a drag moves it in place
+	// rather than journalling a transition against an issue Jira has never
+	// seen; the create sends none of the three, since a new issue lands in
+	// its workflow's first status whatever the board showed.
+	StatusID   string `json:"statusId"`
+	SprintID   string `json:"sprintId"`
+	SprintName string `json:"sprintName"`
+
 	Extra map[string]string `json:"extra"`
+}
+
+// PendingMove is every board intent the journal holds for one issue, folded
+// into one value so the board read can apply them in memory instead of
+// asking per card. The three Has flags are what say a field is set: an
+// empty SprintID is the backlog, which is a destination and not an absence,
+// and reading it as "no sprint move" is how a card moved off a board would
+// quietly stay on it.
+type PendingMove struct {
+	Key      string `json:"key"`
+	StatusID string `json:"statusId"`
+	SprintID string `json:"sprintId"`
+	// StatusName and SprintName are the names journaled beside the two ids,
+	// empty when the cache never held one. The board read overrides them on
+	// the card together with the ids: IsDone reads the status name, so a
+	// card drawn in a Done column while its name still said In Progress
+	// would leave the view's own points total disagreeing with the column
+	// it drew.
+	StatusName string `json:"statusName"`
+	SprintName string `json:"sprintName"`
+	// RankNeighbour is the key the card was dropped against and RankBefore
+	// which side of it. The rank itself is never cached: a made-up LexoRank
+	// would be a second source of truth the next sync overwrites.
+	RankNeighbour string `json:"rankNeighbour"`
+	RankBefore    bool   `json:"rankBefore"`
+
+	HasTransition bool `json:"hasTransition"`
+	HasSprint     bool `json:"hasSprint"`
+	HasRank       bool `json:"hasRank"`
 }
 
 // SplitLabels turns the comma list the form and the journal use back into
@@ -232,10 +272,11 @@ type Sprint struct {
 	EndDate   string `json:"endDate"`
 }
 
-// BoardBackend is the read-only board capability, kept off IssueBackend so
-// only the backends that speak Jira's Agile API have to answer for it. The
-// boards sync pass asks for it with a type assertion and skips itself when
-// a backend does not have it.
+// BoardBackend is the board capability, kept off IssueBackend so only the
+// backends that speak Jira's Agile API have to answer for it. The boards
+// sync pass and the commit pass's rank and sprint group both ask for it
+// with a type assertion and skip themselves when a backend does not have
+// it. Everything above RankIssue reads; the last two write.
 type BoardBackend interface {
 	// Boards lists the project's boards from Jira's Agile API, scrum and
 	// kanban only. It never writes.
@@ -250,6 +291,69 @@ type BoardBackend interface {
 	// sprintID is set and for the whole board when it is empty. It reads
 	// Jira's Agile API and never writes.
 	BoardIssueKeys(ctx context.Context, boardID int, sprintID string) ([]string, error)
+	// RankIssue ranks key immediately before or after neighbourKey. Jira's
+	// rank is one order across the whole board, so the neighbour may sit in
+	// another column; the commit pass re-derives it from the board's own
+	// order at push time.
+	RankIssue(ctx context.Context, key, neighbourKey string, before bool) error
+	// MoveIssuesToSprint moves keys onto the sprint, or onto the backlog
+	// when sprintID is empty, which is a destination and not an absence.
+	// The endpoint takes a batch, so the commit pass groups a planning
+	// session's moves by target instead of paying a round trip per card.
+	MoveIssuesToSprint(ctx context.Context, sprintID string, keys []string) error
+}
+
+// ErrNoTransition is what Transition returns when no workflow transition of
+// the issue reaches the target status. It is the one board failure that
+// will fail identically on every retry, so the commit pass reports it as
+// not retryable and names where the card can actually go.
+var ErrNoTransition = errors.New("no workflow transition reaches that status")
+
+// NoTransition is the error ErrNoTransition travels in. It names the issue
+// and the target and carries the names of the statuses that are reachable,
+// so a failure can say where the card can go instead of only where it
+// cannot. errors.Is finds ErrNoTransition through it.
+//
+// TargetStatus is the target's display name, empty where nothing knew it.
+// The backend is handed a status id and has no name for a status its
+// workflow cannot reach, so the journal row, which carries "id|Name", is
+// what fills this in. Without it the sentence named the target by number
+// while naming the reachable ones by name, and it is shown verbatim in the
+// commit banner.
+type NoTransition struct {
+	Key            string
+	TargetStatusID string
+	TargetStatus   string
+	Reachable      []string
+}
+
+func (e *NoTransition) Error() string {
+	target := e.TargetStatus
+	if target == "" {
+		target = "status " + e.TargetStatusID
+	}
+	if len(e.Reachable) == 0 {
+		return fmt.Sprintf("%s cannot move to %s: its workflow offers no transition at all from where it is now", e.Key, target)
+	}
+	return fmt.Sprintf("%s cannot move to %s: no transition reaches it. From here it can move to %s", e.Key, target, strings.Join(e.Reachable, ", "))
+}
+
+// Unwrap is what makes errors.Is(err, ErrNoTransition) true.
+func (e *NoTransition) Unwrap() error { return ErrNoTransition }
+
+// ErrTransitionFields is what Transition returns when the transition asks
+// for a field beyond a resolution. Guessing a value for someone else's
+// custom field is worse than saying the move has to be made in Jira, and
+// like ErrNoTransition it fails the same way every time.
+var ErrTransitionFields = errors.New("the transition needs fields TAM cannot fill in")
+
+// TransitionCheck is what CanTransition answers with: whether the target
+// status is reachable from where the issue is right now, and the names of
+// the statuses that are. It is best effort, so a failed check means "we
+// could not ask", never "the move is illegal".
+type TransitionCheck struct {
+	Reachable []string `json:"reachable"`
+	Allowed   bool     `json:"allowed"`
 }
 
 // IssueBackend is what the read path needs from the issue system.
@@ -275,6 +379,16 @@ type IssueBackend interface {
 	// (summary, description, priority, labels, storyPoints, assignee) with
 	// the text form the journal holds.
 	UpdateIssue(ctx context.Context, key string, fields map[string]string) error
+	// Transition moves the issue into targetStatusID by firing the workflow
+	// transition that reaches it, resolved at push time from what Jira
+	// offers for that issue at that moment. It returns ErrNoTransition when
+	// none does and ErrTransitionFields when the transition asks for more
+	// than a resolution.
+	Transition(ctx context.Context, key, targetStatusID string) error
+	// CanTransition reports whether targetStatusID is reachable from where
+	// the issue sits now, and what it can reach instead. It is the check a
+	// drop makes while the app is online; it never writes.
+	CanTransition(ctx context.Context, key, targetStatusID string) (TransitionCheck, error)
 	// CreateIssue creates the draft and returns the key Jira assigned.
 	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, error)
 	// CreateFields lists the required create-meta fields of a logical type

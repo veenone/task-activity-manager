@@ -2,6 +2,8 @@ package demo_test
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"agile-suite/tam/internal/backend"
@@ -346,5 +348,91 @@ func TestDemoBoardIssueKeys(t *testing.T) {
 	}
 	if _, err := b.BoardIssueKeys(ctx, 9, ""); err == nil {
 		t.Error("keys of an unknown board must fail")
+	}
+}
+
+func TestDemoTransitionMovesTheCardAndRefusesTheCuratedStory(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+	// A card the demo lets through.
+	if err := b.Transition(ctx, "ACME-409", demobackend.StatusID("Done")); err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+	iss, err := b.GetIssue(ctx, "ACME-409")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iss.Status != "Done" || iss.StatusID != demobackend.StatusID("Done") {
+		t.Errorf("the card moved: %+v", iss)
+	}
+
+	// The curated story cannot reach Done, so the offline walk-through can
+	// see a failure without a real Jira.
+	err = b.Transition(ctx, b.ConflictKey(), demobackend.StatusID("Done"))
+	if !errors.Is(err, backend.ErrNoTransition) {
+		t.Fatalf("the curated story is refused: %v", err)
+	}
+	var noPath *backend.NoTransition
+	if !errors.As(err, &noPath) || strings.Join(noPath.Reachable, ",") != "To Do,In Progress" {
+		t.Errorf("the refusal names what is reachable: %v", err)
+	}
+	if err := b.Transition(ctx, b.ConflictKey(), demobackend.StatusID("To Do")); err != nil {
+		t.Errorf("only the one target is refused: %v", err)
+	}
+	check, err := b.CanTransition(ctx, b.ConflictKey(), demobackend.StatusID("Done"))
+	if err != nil || check.Allowed || len(check.Reachable) != 2 {
+		t.Errorf("check = %+v, %v", check, err)
+	}
+}
+
+func TestDemoSprintMovesAndRanksApplyToTheDataset(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+	if err := b.MoveIssuesToSprint(ctx, "13", []string{"ACME-412", "ACME-409"}); err != nil {
+		t.Fatalf("sprint move: %v", err)
+	}
+	for _, key := range []string{"ACME-412", "ACME-409"} {
+		iss, err := b.GetIssue(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if iss.SprintID != "13" || iss.SprintName != "Sprint 13" {
+			t.Errorf("%s = %+v", key, iss)
+		}
+	}
+	if err := b.MoveIssuesToSprint(ctx, "", []string{"ACME-412"}); err != nil {
+		t.Fatalf("backlog move: %v", err)
+	}
+	iss, _ := b.GetIssue(ctx, "ACME-412")
+	if iss.SprintID != "" || iss.SprintName != "" {
+		t.Errorf("the backlog is a destination: %+v", iss)
+	}
+	if err := b.MoveIssuesToSprint(ctx, "99", []string{"ACME-409"}); err == nil {
+		t.Error("a sprint the demo does not have is refused")
+	}
+	if err := b.RankIssue(ctx, "ACME-412", "ACME-409", true); err != nil {
+		t.Errorf("rank: %v", err)
+	}
+	if err := b.RankIssue(ctx, "ACME-412", "ACME-9999", true); err == nil {
+		t.Error("a rank against a card the demo does not hold is refused")
+	}
+}
+
+// TestARefusedSprintBatchMovesNothing is Jira's own rule: a sprint move
+// takes the whole batch or none of it. The demo used to write each card as
+// it walked the list and return on the first key it did not hold, leaving
+// the earlier ones moved.
+func TestARefusedSprintBatchMovesNothing(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+	if err := b.MoveIssuesToSprint(ctx, "13", []string{"ACME-412", "ACME-9999"}); err == nil {
+		t.Fatal("a batch naming a card the demo does not hold is refused")
+	}
+	iss, err := b.GetIssue(ctx, "ACME-412")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iss.SprintID == "13" {
+		t.Errorf("the first half of a refused batch was applied: %+v", iss)
 	}
 }

@@ -57,9 +57,12 @@ type RawColumn struct {
 	Statuses []RawStatus `json:"statuses"`
 }
 
-// RawStatus is one status entry under a column, transport only.
+// RawStatus is one status entry under a column, transport only. Name is
+// ignored by the board configuration (which the id alone is enough for) but
+// is needed when the same shape shows up as a transition's target status.
 type RawStatus struct {
-	ID string `json:"id"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // StatusIDs is the flattening every caller wants, kept beside the raw shape
@@ -221,4 +224,35 @@ func (c *Client) BoardIssueKeys(ctx context.Context, boardID int, sprintID strin
 		path = fmt.Sprintf("/rest/agile/1.0/board/%d/sprint/%s/issue", boardID, url.PathEscape(sprintID))
 	}
 	return pageAgileIssues(ctx, c, path)
+}
+
+// RankIssue ranks key immediately before or after neighbourKey via PUT
+// /rest/agile/1.0/issue/rank, one of the endpoint-specific write calls in
+// this package. The endpoint answers 204 when the rank landed and 207
+// Multi-Status when it did not, so bulkWrite fails on a 207 whatever body
+// came with it.
+func (c *Client) RankIssue(ctx context.Context, key, neighbourKey string, before bool) error {
+	body := map[string]any{"issues": []string{key}}
+	if before {
+		body["rankBeforeIssue"] = neighbourKey
+	} else {
+		body["rankAfterIssue"] = neighbourKey
+	}
+	return c.bulkWrite(ctx, "rank issue", http.MethodPut, "/rest/agile/1.0/issue/rank", body, []string{key})
+}
+
+// MoveToSprint moves keys onto sprintID via POST
+// /rest/agile/1.0/sprint/{sprintId}/issue, one of the endpoint-specific
+// write calls in this package. The sprint id is path-escaped. Same 207
+// handling as RankIssue.
+func (c *Client) MoveToSprint(ctx context.Context, sprintID string, keys []string) error {
+	path := fmt.Sprintf("/rest/agile/1.0/sprint/%s/issue", url.PathEscape(sprintID))
+	return c.bulkWrite(ctx, "move to sprint", http.MethodPost, path, map[string]any{"issues": keys}, keys)
+}
+
+// MoveToBacklog moves keys off any sprint and onto the backlog via POST
+// /rest/agile/1.0/backlog/issue, one of the endpoint-specific write calls in
+// this package. Same 207 handling as RankIssue.
+func (c *Client) MoveToBacklog(ctx context.Context, keys []string) error {
+	return c.bulkWrite(ctx, "move to backlog", http.MethodPost, "/rest/agile/1.0/backlog/issue", map[string]any{"issues": keys}, keys)
 }

@@ -78,9 +78,15 @@ type BoardView struct {
 // ColumnView is one column heading with the totals of everything that
 // landed in it, capped cards included.
 type ColumnView struct {
-	Name   string  `json:"name"`
-	Total  int     `json:"total"`
-	Points float64 `json:"points"`
+	Name string `json:"name"`
+	// StatusIDs are the statuses this column collects, in the board's own
+	// order. The view needs them to move a card: a drop journals the status
+	// the target column collects, and the first of these is the one a card
+	// dropped there takes, the way placeCard reads them coming the other
+	// way. A column with none collects nothing and is not a drop target.
+	StatusIDs []string `json:"statusIds"`
+	Total     int      `json:"total"`
+	Points    float64  `json:"points"`
 }
 
 // LaneView is one swimlane: a cell per column, in the same order as
@@ -127,18 +133,22 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 		return view, nil
 	}
 	for _, c := range cols {
-		view.Columns = append(view.Columns, ColumnView{Name: c.Name})
+		view.Columns = append(view.Columns, ColumnView{Name: c.Name, StatusIDs: backend.NonNil(c.StatusIDs)})
 	}
 
-	keys, err := r.issueKeys(ctx, profileID, boardID, sprintID)
+	boardKeys, err := r.issueKeys(ctx, profileID, boardID, sprintID)
 	if err != nil {
 		return BoardView{}, err
 	}
-	cards, err := issues.IssuesByKeys(ctx, profileID, keys)
+	moves, err := issues.PendingMoves(ctx, profileID)
 	if err != nil {
 		return BoardView{}, err
 	}
-	view.NotSynced = len(keys) - len(cards)
+	cards, err := issues.IssuesByKeys(ctx, profileID, withMovedIn(boardKeys, moves, sprintID))
+	if err != nil {
+		return BoardView{}, err
+	}
+	view.NotSynced = countNotSynced(boardKeys, cards)
 	view.NeedsStatusSync = needsStatusSync(cards)
 
 	// The drafts come from the cache rather than from the board's key list,
@@ -154,6 +164,8 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 	all = append(all, drafts...)
 
 	byStatus, draftColumn := columnIndex(cols)
+	all = applyMoves(all, moves, sprintID)
+	all = rankCards(all, moves, byStatus, draftColumn, lane)
 	lanes := newLaneSet(lane, len(cols))
 	unmapped := map[string]bool{}
 	rendered := 0
@@ -241,6 +253,12 @@ func columnIndex(cols []backend.BoardColumn) (byStatus map[string]int, draftColu
 // fills the column in.
 func placeCard(card backend.Issue, byStatus map[string]int, draftColumn int) (int, bool) {
 	if card.Draft {
+		// A draft that has been dragged carries the status id of the column
+		// it was dropped in, written on the row rather than journaled, since
+		// there is no issue in Jira to journal a transition against.
+		if col, ok := byStatus[card.StatusID]; ok {
+			return col, true
+		}
 		if draftColumn < 0 {
 			return 0, false
 		}
@@ -248,6 +266,24 @@ func placeCard(card backend.Issue, byStatus map[string]int, draftColumn int) (in
 	}
 	col, ok := byStatus[card.StatusID]
 	return col, ok
+}
+
+// countNotSynced is how many of the board's own keys the issue cache does
+// not hold. It counts against the board's list rather than the list that was
+// fetched, so a key added because a pending move brought that card into this
+// sprint is never mistaken for a board key with no row behind it.
+func countNotSynced(boardKeys []string, cards []backend.Issue) int {
+	found := make(map[string]bool, len(cards))
+	for _, c := range cards {
+		found[c.Key] = true
+	}
+	n := 0
+	for _, k := range boardKeys {
+		if !found[k] {
+			n++
+		}
+	}
+	return n
 }
 
 // unmappedName is what UnmappedStatuses lists for a card no column took:

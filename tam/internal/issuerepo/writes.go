@@ -223,25 +223,38 @@ func writeField(ctx context.Context, q execer, profileID, key, field, value stri
 	return err
 }
 
-// reapplyPending rewrites the columns of every pending field edit for the
-// given keys, so a sync that just refreshed those rows from Jira does not
-// hide a local edit. The journal's base version is left alone: if Jira did
-// change, the next Commit sees it.
+// reapplyPending rewrites the columns of every pending field edit and every
+// pending board move for the given keys, so a sync that just refreshed
+// those rows from Jira does not hide a local change. The journal's base
+// version is left alone: if Jira did change, the next Commit sees it.
+//
+// The board types are here for the same reason the field edits are, and the
+// omission would be quieter: a full sync deletes and reinserts every row, so
+// without them it would put a moved card back in its old column while the
+// journal still said it moved, and the Backlog and the board would then
+// disagree about the same issue.
 func reapplyPending(ctx context.Context, q execer, profileID string, keys map[string]bool) error {
 	if len(keys) == 0 {
 		return nil
 	}
+	types := append([]string{EntityIssue}, BoardEntities...)
+	args := make([]any, 0, len(types)+1)
+	args = append(args, profileID)
+	for _, t := range types {
+		args = append(args, t)
+	}
+	marks := strings.TrimSuffix(strings.Repeat("?, ", len(types)), ", ")
 	rows, err := q.QueryContext(ctx,
-		`SELECT entity_key, field, after_val FROM pending_change WHERE profile_id = ? AND entity_type = ? ORDER BY id`,
-		profileID, EntityIssue)
+		`SELECT entity_type, entity_key, field, after_val FROM pending_change
+		 WHERE profile_id = ? AND entity_type IN (`+marks+`) ORDER BY id`, args...)
 	if err != nil {
 		return fmt.Errorf("pending fields: %w", err)
 	}
-	type edit struct{ key, field, value string }
+	type edit struct{ entityType, key, field, value string }
 	var edits []edit
 	for rows.Next() {
 		var e edit
-		if err := rows.Scan(&e.key, &e.field, &e.value); err != nil {
+		if err := rows.Scan(&e.entityType, &e.key, &e.field, &e.value); err != nil {
 			rows.Close()
 			return err
 		}
@@ -250,9 +263,18 @@ func reapplyPending(ctx context.Context, q execer, profileID string, keys map[st
 		}
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	for _, e := range edits {
-		if err := writeField(ctx, q, profileID, e.key, e.field, e.value); err != nil {
-			return fmt.Errorf("reapply %s.%s: %w", e.key, e.field, err)
+		if e.entityType == EntityIssue {
+			if err := writeField(ctx, q, profileID, e.key, e.field, e.value); err != nil {
+				return fmt.Errorf("reapply %s.%s: %w", e.key, e.field, err)
+			}
+			continue
+		}
+		if err := applyMoveColumns(ctx, q, profileID, e.key, e.entityType, e.value); err != nil {
+			return fmt.Errorf("reapply the move of %s: %w", e.key, err)
 		}
 	}
 	return nil
@@ -303,6 +325,31 @@ func (r *Repository) EditField(ctx context.Context, profileID, key, field, value
 }
 
 func updateDraftJSON(ctx context.Context, tx *sql.Tx, profileID, key, field, value string) error {
+	return editDraft(ctx, tx, profileID, key, func(d *backend.IssueDraft) {
+		switch field {
+		case "summary":
+			d.Summary = value
+		case "description":
+			d.Description = value
+		case "priority":
+			d.Priority = value
+		case "assignee":
+			d.Assignee = value
+		case "labels":
+			d.Labels = backend.SplitLabels(value)
+		case "storyPoints":
+			d.StoryPoints, _ = backend.ParsePoints(value)
+		case "parentKey":
+			d.ParentKey = strings.TrimSpace(value)
+		}
+	})
+}
+
+// editDraft applies fn to the draft a create row carries and writes the
+// JSON back. Every local change to a draft goes through here, whether it is
+// a field edit or a board move, so there is one read, one decode, and one
+// encode of a draft rather than a copy per caller.
+func editDraft(ctx context.Context, tx *sql.Tx, profileID, key string, fn func(d *backend.IssueDraft)) error {
 	var raw string
 	err := tx.QueryRowContext(ctx,
 		`SELECT after_val FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
@@ -314,22 +361,7 @@ func updateDraftJSON(ctx context.Context, tx *sql.Tx, profileID, key, field, val
 	if err := json.Unmarshal([]byte(raw), &d); err != nil {
 		return fmt.Errorf("decode draft %s: %w", key, err)
 	}
-	switch field {
-	case "summary":
-		d.Summary = value
-	case "description":
-		d.Description = value
-	case "priority":
-		d.Priority = value
-	case "assignee":
-		d.Assignee = value
-	case "labels":
-		d.Labels = backend.SplitLabels(value)
-	case "storyPoints":
-		d.StoryPoints, _ = backend.ParsePoints(value)
-	case "parentKey":
-		d.ParentKey = strings.TrimSpace(value)
-	}
+	fn(&d)
 	encoded, err := json.Marshal(d)
 	if err != nil {
 		return err

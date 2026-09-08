@@ -133,6 +133,24 @@ func (f *fake) BoardIssueKeys(_ context.Context, boardID int, sprintID string) (
 	return f.issueKeys[boardID][sprintID], nil
 }
 
+// The two board writes and the two transition calls: a sync never makes
+// one, but the seams carry them, so the fake has to answer.
+func (f *fake) RankIssue(context.Context, string, string, bool) error {
+	return errors.New("not used")
+}
+
+func (f *fake) MoveIssuesToSprint(context.Context, string, []string) error {
+	return errors.New("not used")
+}
+
+func (f *fake) Transition(context.Context, string, string) error {
+	return errors.New("not used")
+}
+
+func (f *fake) CanTransition(context.Context, string, string) (backend.TransitionCheck, error) {
+	return backend.TransitionCheck{}, errors.New("not used")
+}
+
 var _ backend.BoardBackend = (*fake)(nil)
 
 func issue(key, typ string) backend.Issue {
@@ -332,6 +350,12 @@ func (c *cancelOnSearch) LinkTypes(context.Context) ([]backend.LinkType, error) 
 }
 func (c *cancelOnSearch) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
+}
+func (c *cancelOnSearch) Transition(context.Context, string, string) error {
+	return errors.New("not used")
+}
+func (c *cancelOnSearch) CanTransition(context.Context, string, string) (backend.TransitionCheck, error) {
+	return backend.TransitionCheck{}, errors.New("not used")
 }
 
 func TestCancelledSyncStillRecordsLastError(t *testing.T) {

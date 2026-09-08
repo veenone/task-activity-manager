@@ -18,12 +18,20 @@ interface Props {
   title?: string;
   align?: "left" | "right";
   triggerClassName?: string;
+  // triggerTabIndex takes the trigger out of the tab order, for a menu
+  // that lives inside a widget owning its own focus: a grid is one tab
+  // stop, so a menu on every cell would add one stop per cell. Such a
+  // trigger is opened from the widget's own keys instead.
+  triggerTabIndex?: number;
+  // triggerLabel names the trigger for a screen reader when the visible
+  // label is the same on every one of them.
+  triggerLabel?: string;
 }
 
 // Menu is a dark, bar-native dropdown: a trigger button that reveals a panel of
 // actions anchored beneath it. Closes on outside click or Escape. Used to
 // collapse the topbar's scattered buttons into grouped menus.
-export function Menu({ label, items, title, align = "left", triggerClassName }: Props) {
+export function Menu({ label, items, title, align = "left", triggerClassName, triggerTabIndex, triggerLabel }: Props) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -41,6 +49,8 @@ export function Menu({ label, items, title, align = "left", triggerClassName }: 
         className={triggerClassName ?? "topbar-btn"}
         onClick={() => setOpen((o) => !o)}
         title={title}
+        tabIndex={triggerTabIndex}
+        aria-label={triggerLabel}
         aria-haspopup="menu"
         aria-expanded={open}
       >

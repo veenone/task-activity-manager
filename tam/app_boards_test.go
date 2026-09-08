@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"agile-suite/core/profile"
 	"agile-suite/core/shareddb"
@@ -127,6 +128,22 @@ func (stubIssueBackend) LinkTypes(context.Context) ([]backend.LinkType, error) {
 }
 func (stubIssueBackend) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
+}
+func (stubIssueBackend) Transition(context.Context, string, string) error {
+	return errors.New("not used")
+}
+
+// The two board writes live on the issue stub rather than on each board
+// fake, so all three of them inherit a refusal: a boards sync never writes,
+// and a test that made one would rather see this than a silent success.
+func (stubIssueBackend) RankIssue(context.Context, string, string, bool) error {
+	return errors.New("not used")
+}
+func (stubIssueBackend) MoveIssuesToSprint(context.Context, string, []string) error {
+	return errors.New("not used")
+}
+func (stubIssueBackend) CanTransition(context.Context, string, string) (backend.TransitionCheck, error) {
+	return backend.TransitionCheck{}, errors.New("not used")
 }
 
 // The three lookups the forms use. A board test never reaches them, but
@@ -392,5 +409,167 @@ func TestSyncIssuesRunsTheBoardsPass(t *testing.T) {
 	}
 	if cached[0].Name != "PLAT Kanban" || cached[1].Name != "PLAT Scrum" {
 		t.Errorf("boards after a sync = %+v, want the pair the backend answered with", cached)
+	}
+}
+
+// checkingBackend answers CanTransition with a fixed check, or with an
+// error when refuse is set, so a test can prove which of the two the
+// binding passes on.
+type checkingBackend struct {
+	stubIssueBackend
+	check  backend.TransitionCheck
+	refuse error
+}
+
+func (b *checkingBackend) CanTransition(context.Context, string, string) (backend.TransitionCheck, error) {
+	if b.refuse != nil {
+		return backend.TransitionCheck{}, b.refuse
+	}
+	return b.check, nil
+}
+
+// seedCard puts one card in the cache so the board writes have a row to
+// read, journal against, and move.
+func seedCard(t *testing.T, a *App, profileID, key, statusID string) {
+	t.Helper()
+	rows := []backend.Issue{{
+		Key: key, ID: key, Project: "PLAT", Type: backend.TypeStory, Summary: key,
+		Status: "To Do", StatusID: statusID, SprintID: "12", SprintName: "Sprint 12",
+		Rank: "0|" + key, Updated: "2026-09-01T00:00:00Z",
+	}}
+	if err := a.repo.UpsertPage(context.Background(), profileID, rows, time.Now(), false); err != nil {
+		t.Fatalf("seed %s: %v", key, err)
+	}
+}
+
+// TestABoardWriteJournalsWhileACommitRuns is the busy guard's absence,
+// asserted rather than assumed. The board writes are local journal writes,
+// like EditIssue and CreateIssue, so a drag during a commit is allowed;
+// giving them acquire would refuse a drag no other write refuses.
+func TestABoardWriteJournalsWhileACommitRuns(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	seedCard(t, a, p.ID, "PLAT-1", "1")
+
+	if err := a.acquire(p.ID, "commit"); err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	defer a.release(p.ID)
+
+	if err := a.MoveIssueToColumn(p.ID, "PLAT-1", "3"); err != nil {
+		t.Fatalf("move a card while a commit runs: %v, want the write to go through", err)
+	}
+	rows, err := a.repo.PendingForKey(a.ctx, p.ID, "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EntityType != issuerepo.EntityTransition {
+		t.Errorf("pending rows = %+v, want the one transition row", rows)
+	}
+}
+
+// TestMoveIssueToColumnJournalsTheStatusAsIDAndName pins the value the
+// binding writes through. Commit pushes the id half and the Pending
+// changes dialog and the Activity tab read the name half, so a row
+// carrying one without the other is either a push with nothing to push or
+// a dialog printing "3".
+func TestMoveIssueToColumnJournalsTheStatusAsIDAndName(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	// Two cards, so the target column's status is named in the cache the
+	// way it is in the app: by an issue already sitting in it.
+	rows := []backend.Issue{
+		{Key: "PLAT-1", ID: "PLAT-1", Project: "PLAT", Type: backend.TypeStory, Summary: "one",
+			Status: "To Do", StatusID: "1", Rank: "0|a", Updated: "2026-09-01T00:00:00Z"},
+		{Key: "PLAT-2", ID: "PLAT-2", Project: "PLAT", Type: backend.TypeStory, Summary: "two",
+			Status: "In Progress", StatusID: "3", Rank: "0|b", Updated: "2026-09-01T00:00:00Z"},
+	}
+	if err := a.repo.UpsertPage(context.Background(), p.ID, rows, time.Now(), false); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := a.MoveIssueToColumn(p.ID, "PLAT-1", "3"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	pending, err := a.repo.PendingForKey(a.ctx, p.ID, "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("pending rows = %+v, want exactly one", pending)
+	}
+	if row := pending[0]; row.BeforeVal != "1|To Do" || row.AfterVal != "3|In Progress" {
+		t.Errorf("journal row = %+v, want id|Name on both sides of the move", row)
+	}
+}
+
+// TestMoveIssueToSprintRefusesASprintIdThatIsNotANumber keeps a value that
+// would end up in a URL path from reaching one. The backlog, which is the
+// empty id, is a destination and stays allowed.
+func TestMoveIssueToSprintRefusesASprintIdThatIsNotANumber(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	seedCard(t, a, p.ID, "PLAT-1", "1")
+
+	err := a.MoveIssueToSprint(p.ID, "PLAT-1", "fourteen")
+	if err == nil {
+		t.Fatal("a sprint id of \"fourteen\" was accepted, want a refusal")
+	}
+	if !strings.Contains(err.Error(), "not a number") {
+		t.Errorf("err = %v, want it to say the id is not a number", err)
+	}
+	if err := a.MoveIssueToSprint(p.ID, "PLAT-1", ""); err != nil {
+		t.Errorf("move to the backlog: %v, want the empty id to be a destination", err)
+	}
+}
+
+// TestRankIssueRefusesANeighbourTheCacheDoesNotHold keeps a rank from being
+// journaled against an issue nobody has seen, which Commit would then push
+// against a key Jira may not have.
+func TestRankIssueRefusesANeighbourTheCacheDoesNotHold(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	seedCard(t, a, p.ID, "PLAT-1", "1")
+
+	err := a.RankIssue(p.ID, "PLAT-1", "PLAT-404", true, 1)
+	if err == nil {
+		t.Fatal("a rank against an uncached neighbour was accepted, want a refusal")
+	}
+	if !strings.Contains(err.Error(), "sync first") {
+		t.Errorf("err = %v, want the cache's own refusal", err)
+	}
+	rows, err := a.repo.PendingForKey(a.ctx, p.ID, "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Errorf("pending rows = %+v, want nothing journaled", rows)
+	}
+}
+
+// TestCanTransitionPassesOnBothAnswers proves the check is best effort at
+// the boundary: an answer arrives with its reachable statuses filled in,
+// and a backend that could not answer arrives as an error rather than as a
+// check that says the move is illegal.
+func TestCanTransitionPassesOnBothAnswers(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	b := &checkingBackend{check: backend.TransitionCheck{Allowed: false}}
+	a.backends[p.ID] = b
+
+	check, err := a.CanTransition(p.ID, "PLAT-1", "3")
+	if err != nil {
+		t.Fatalf("can transition: %v", err)
+	}
+	if check.Allowed {
+		t.Error("check says the move is allowed, want the backend's own answer")
+	}
+	if check.Reachable == nil {
+		t.Error("reachable is nil, want the empty slice the frontend expects")
+	}
+
+	b.refuse = errors.New("503 Service Unavailable")
+	if _, err := a.CanTransition(p.ID, "PLAT-1", "3"); err == nil {
+		t.Fatal("a backend that could not answer returned no error, want the caller to hear it could not check")
 	}
 }

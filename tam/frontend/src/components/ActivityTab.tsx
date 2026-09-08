@@ -1,7 +1,8 @@
-import { fieldLabel } from "../api";
+import { fieldLabel, isMoveEntity } from "../api";
 import type { AuditEntry } from "../api";
 import { useActivity } from "../queries/pending";
 import { formatWhen } from "../lib/format";
+import { moveWords } from "../lib/moveValue";
 
 interface Props {
   profileId: string;
@@ -23,6 +24,36 @@ export function describe(a: AuditEntry): string {
         return `${a.actor} pushed the link ${what}`;
       case "discard":
         return `${a.actor} discarded the link ${what}`;
+    }
+  }
+  if (isMoveEntity(a.entityType)) {
+    // A move reads as a place, not as a field: "moved this card to In
+    // Progress" rather than "edited statusId: 3 to 5". The id and the name
+    // travel together in the journaled value, so this needs to know
+    // nothing about the board the move was made on.
+    //
+    // A discard and an undo audit the move backwards, the way every
+    // reverted row does: the value the card is going back to is the
+    // entry's after value, which is what moveWords reads as "to".
+    const { label, to } = moveWords(a.entityType, a.beforeVal, a.afterVal);
+    const rank = label === "Rank";
+    switch (a.action) {
+      case "move":
+        return rank ? `${a.actor} moved this card ${to}` : `${a.actor} moved this card to ${to}`;
+      case "commit":
+        return rank ? `${a.actor} pushed the rank ${to}` : `${a.actor} pushed the move to ${to}`;
+      // Nobody in TAM did this one: the card was already where the move
+      // asked for, so the row was dropped without a push. Naming an actor
+      // would credit the user with a move made somewhere else.
+      case "satisfied":
+        return rank
+          ? "Jira already had this card in that order, so nothing was pushed"
+          : `Jira already had this card in ${to}, so nothing was pushed`;
+      case "undo":
+      case "discard":
+        return rank ? `${a.actor} discarded the rank` : `${a.actor} put this card back in ${to}`;
+      case "override":
+        return `${a.actor} chose to push this move over Jira's version`;
     }
   }
   if (a.entityType === "issue_create") {

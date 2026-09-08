@@ -171,6 +171,9 @@ export namespace backend {
 	    assignee: string;
 	    storyPoints?: number;
 	    parentKey: string;
+	    statusId: string;
+	    sprintId: string;
+	    sprintName: string;
 	    extra: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
@@ -187,6 +190,9 @@ export namespace backend {
 	        this.assignee = source["assignee"];
 	        this.storyPoints = source["storyPoints"];
 	        this.parentKey = source["parentKey"];
+	        this.statusId = source["statusId"];
+	        this.sprintId = source["sprintId"];
+	        this.sprintName = source["sprintName"];
 	        this.extra = source["extra"];
 	    }
 	}
@@ -225,6 +231,20 @@ export namespace backend {
 	        this.name = source["name"];
 	        this.inward = source["inward"];
 	        this.outward = source["outward"];
+	    }
+	}
+	export class TransitionCheck {
+	    reachable: string[];
+	    allowed: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TransitionCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.reachable = source["reachable"];
+	        this.allowed = source["allowed"];
 	    }
 	}
 	export class User {
@@ -302,6 +322,7 @@ export namespace boardrepo {
 	}
 	export class ColumnView {
 	    name: string;
+	    statusIds: string[];
 	    total: number;
 	    points: number;
 	
@@ -312,6 +333,7 @@ export namespace boardrepo {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
+	        this.statusIds = source["statusIds"];
 	        this.total = source["total"];
 	        this.points = source["points"];
 	    }
@@ -465,7 +487,11 @@ export namespace committer {
 	}
 	export class Failure {
 	    key: string;
+	    entityType: string;
+	    rowId: number;
 	    error: string;
+	    retryable: boolean;
+	    reachable: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Failure(source);
@@ -474,7 +500,11 @@ export namespace committer {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.key = source["key"];
+	        this.entityType = source["entityType"];
+	        this.rowId = source["rowId"];
 	        this.error = source["error"];
+	        this.retryable = source["retryable"];
+	        this.reachable = source["reachable"];
 	    }
 	}
 	
@@ -494,10 +524,31 @@ export namespace committer {
 	        this.type = source["type"];
 	    }
 	}
+	export class Moved {
+	    key: string;
+	    entityType: string;
+	    target: string;
+	    side: string;
+	    satisfied: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Moved(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.entityType = source["entityType"];
+	        this.target = source["target"];
+	        this.side = source["side"];
+	        this.satisfied = source["satisfied"];
+	    }
+	}
 	export class Result {
 	    committed: string[];
 	    created: Created[];
 	    linked: Linked[];
+	    moved: Moved[];
 	    conflicts: Conflict[];
 	    failures: Failure[];
 	    remaining: number;
@@ -511,6 +562,7 @@ export namespace committer {
 	        this.committed = source["committed"];
 	        this.created = this.convertValues(source["created"], Created);
 	        this.linked = this.convertValues(source["linked"], Linked);
+	        this.moved = this.convertValues(source["moved"], Moved);
 	        this.conflicts = this.convertValues(source["conflicts"], Conflict);
 	        this.failures = this.convertValues(source["failures"], Failure);
 	        this.remaining = source["remaining"];
