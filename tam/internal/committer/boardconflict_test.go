@@ -2,6 +2,7 @@ package committer_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"agile-suite/tam/internal/issuerepo"
@@ -102,5 +103,55 @@ func TestKeepRemoteOnABoardConflictDropsTheMove(t *testing.T) {
 	}
 	if iss.Pending || iss.StatusID != "3" {
 		t.Errorf("the card sits where Jira has it: %+v", iss)
+	}
+}
+
+// TestOverrideAuditsOnlyTheBoardRowThatWasHeld covers the trail rather than
+// the outcome. An issue is held back whole, so an Override raised by an
+// edit alone reaches a board row that never disagreed with Jira. Rebasing
+// that row writes the value it already carried and audits an override that
+// overrode nothing, which reads in the Activity tab as a decision the user
+// never made.
+func TestOverrideAuditsOnlyTheBoardRowThatWasHeld(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	if err := h.repo.EditField(ctx, "p1", "PLAT-1", "summary", "mine"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.repo.MoveToColumn(ctx, "p1", "PLAT-1", "5"); err != nil {
+		t.Fatal(err)
+	}
+	// The card has not moved in Jira, so the transition is a push and not a
+	// conflict; only the edit is held, on the updated stamp. The push then
+	// fails, which is what leaves the board row for the Override to find.
+	moved := h.jira.rows["PLAT-1"]
+	moved.Summary, moved.Updated = "theirs", "2026-09-06T00:00:00Z"
+	h.jira.rows["PLAT-1"] = moved
+	h.jira.transitionErr["PLAT-1"] = errors.New("the gateway timed out")
+
+	res, err := h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Conflicts) != 1 || len(res.Failures) != 1 {
+		t.Fatalf("the edit is held and the transition failed: %+v", res)
+	}
+	for _, f := range res.Conflicts[0].Fields {
+		if f.Field != "summary" {
+			t.Fatalf("only the edit disagreed with Jira: %+v", res.Conflicts[0].Fields)
+		}
+	}
+	if err := h.eng.ResolveOverride(ctx, "p1", "PLAT-1", res.Conflicts[0].RemoteVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := h.repo.ListActivity(ctx, "p1", "PLAT-1", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range entries {
+		if a.Action == "override" && a.EntityType == issuerepo.EntityTransition {
+			t.Errorf("a board row that was never held must not be audited as overridden: %+v", a)
+		}
 	}
 }

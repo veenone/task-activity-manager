@@ -113,13 +113,26 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 // simply stays, for the next Commit to push. The commit is audited either
 // way, because the push did happen.
 func (r *Repository) MarkMoveCommitted(ctx context.Context, profileID string, p journal.PendingChange) error {
+	return r.clearMoveRow(ctx, profileID, p, "commit", "")
+}
+
+// MarkMoveSatisfied clears one board row that Jira had already agreed with:
+// the move was made on the web or by someone else, so the row is dropped
+// without a push. It audits "satisfied" rather than "commit", because a
+// trail reading "pushed the move to Sprint 13" for a move this app never
+// sent is a trail that cannot be trusted about the moves it did send.
+func (r *Repository) MarkMoveSatisfied(ctx context.Context, profileID string, p journal.PendingChange) error {
+	return r.clearMoveRow(ctx, profileID, p, "satisfied", "Jira already held this value, so nothing was pushed")
+}
+
+func (r *Repository) clearMoveRow(ctx context.Context, profileID string, p journal.PendingChange, action, note string) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,
 			`DELETE FROM pending_change WHERE profile_id = ? AND id = ? AND after_val = ?`,
 			profileID, p.ID, p.AfterVal); err != nil {
 			return fmt.Errorf("clear move %d of %s: %w", p.ID, p.EntityKey, err)
 		}
-		return journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, "")
+		return journal.Audit(tx, profileID, p.EntityType, p.EntityKey, action, p.Field, p.BeforeVal, p.AfterVal, note)
 	})
 }
 

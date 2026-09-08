@@ -187,7 +187,7 @@ func (e *Engine) planBoardMoves(ctx context.Context, profileID string, rows []jo
 		for _, p := range byKey[key] {
 			switch classifyMove(p, remoteValue(p.EntityType, remote)) {
 			case moveSatisfied:
-				e.clearMove(ctx, profileID, p, res)
+				e.clearSatisfied(ctx, profileID, p, res)
 				res.Moved = append(res.Moved, Moved{Key: key, EntityType: p.EntityType, Target: moveLabel(p.EntityType, p.AfterVal), Satisfied: true})
 			case movePush:
 				ready[p.EntityType] = p
@@ -298,6 +298,16 @@ func (e *Engine) pushTransitions(ctx context.Context, profileID string, plan mov
 func (e *Engine) clearMove(ctx context.Context, profileID string, p journal.PendingChange, res *Result) {
 	if err := e.repo.MarkMoveCommitted(ctx, profileID, p); err != nil {
 		res.Failures = append(res.Failures, boardFailure(p, fmt.Errorf("pushed to Jira but the journal could not be cleared: %w", err), true))
+	}
+}
+
+// clearSatisfied drops the row of a move Jira had already made. It is the
+// same delete with a different word in the trail: nothing was pushed, so
+// auditing it as a commit would have the Activity tab claim a push that
+// never happened.
+func (e *Engine) clearSatisfied(ctx context.Context, profileID string, p journal.PendingChange, res *Result) {
+	if err := e.repo.MarkMoveSatisfied(ctx, profileID, p); err != nil {
+		res.Failures = append(res.Failures, boardFailure(p, fmt.Errorf("Jira already held this value but the journal could not be cleared: %w", err), true))
 	}
 }
 

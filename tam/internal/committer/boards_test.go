@@ -324,6 +324,25 @@ func TestARemoteStatusAlreadyAtTheTargetDropsTheRowAsSatisfied(t *testing.T) {
 	if len(res.Moved) != 1 || !res.Moved[0].Satisfied || res.Moved[0].Target != "Done" {
 		t.Errorf("counted as satisfied: %+v", res.Moved)
 	}
+	// The trail has to say what happened. "commit" here would read as
+	// "pushed the move to Done" for a push this Commit never made.
+	entries, err := h.repo.ListActivity(ctx, "p1", "PLAT-1", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasAction(entries, "satisfied") || hasAction(entries, "commit") {
+		t.Errorf("audit of a satisfied move: %+v", entries)
+	}
+}
+
+// hasAction says whether any audit entry carries that action.
+func hasAction(entries []journal.AuditEntry, action string) bool {
+	for _, a := range entries {
+		if a.Action == action {
+			return true
+		}
+	}
+	return false
 }
 
 func TestARemoteStatusSomewhereElseHoldsTheIssueAsAConflict(t *testing.T) {

@@ -42,6 +42,13 @@ export function describe(a: AuditEntry): string {
         return rank ? `${a.actor} moved this card ${to}` : `${a.actor} moved this card to ${to}`;
       case "commit":
         return rank ? `${a.actor} pushed the rank ${to}` : `${a.actor} pushed the move to ${to}`;
+      // Nobody in TAM did this one: the card was already where the move
+      // asked for, so the row was dropped without a push. Naming an actor
+      // would credit the user with a move made somewhere else.
+      case "satisfied":
+        return rank
+          ? "Jira already had this card in that order, so nothing was pushed"
+          : `Jira already had this card in ${to}, so nothing was pushed`;
       case "undo":
       case "discard":
         return rank ? `${a.actor} discarded the rank` : `${a.actor} put this card back in ${to}`;
