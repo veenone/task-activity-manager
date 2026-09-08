@@ -329,6 +329,31 @@ export const ENTITY_SPRINT_MOVE = "issue_sprint";
 export const ENTITY_RANK = "issue_rank";
 export const MOVE_ENTITIES: string[] = [ENTITY_TRANSITION, ENTITY_SPRINT_MOVE, ENTITY_RANK];
 
+// The field each of those rows carries, mirroring issuerepo.FieldStatusID,
+// FieldSprintID, and FieldRank.
+export const FIELD_STATUS_ID = "statusId";
+export const FIELD_SPRINT_ID = "sprintId";
+export const FIELD_RANK = "rank";
+
+// MOVE_LABELS is the one word each board move goes by, in the Pending
+// changes dialog, the Activity tab, and the conflict table. One vocabulary
+// for the three moves: a surface that invented its own would have the same
+// card read "Status" in one dialog and "statusId" in the next.
+export const MOVE_LABELS: Record<string, string> = {
+  [ENTITY_TRANSITION]: "Status",
+  [ENTITY_SPRINT_MOVE]: "Sprint",
+  [ENTITY_RANK]: "Rank",
+};
+
+// MOVE_FIELDS names the entity behind a field, for the surfaces that hold
+// only the field: a held board write reaches the conflict card as
+// "statusId" or "sprintId" and has to read as Status or Sprint there too.
+export const MOVE_FIELDS: Record<string, string> = {
+  [FIELD_STATUS_ID]: ENTITY_TRANSITION,
+  [FIELD_SPRINT_ID]: ENTITY_SPRINT_MOVE,
+  [FIELD_RANK]: ENTITY_RANK,
+};
+
 // isMoveEntity says whether a journal row or an audit entry is a board
 // move rather than an edit, a link, or a create.
 export function isMoveEntity(entityType: string): boolean {
@@ -336,7 +361,7 @@ export function isMoveEntity(entityType: string): boolean {
 }
 
 export function fieldLabel(field: string): string {
-  return EDITABLE_FIELDS.find((f) => f.id === field)?.label ?? field;
+  return EDITABLE_FIELDS.find((f) => f.id === field)?.label ?? MOVE_LABELS[MOVE_FIELDS[field]] ?? field;
 }
 
 export interface PendingChange {

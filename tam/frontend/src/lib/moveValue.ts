@@ -1,4 +1,4 @@
-import { ENTITY_RANK, ENTITY_SPRINT_MOVE, ENTITY_TRANSITION } from "../api";
+import { ENTITY_RANK, ENTITY_SPRINT_MOVE, ENTITY_TRANSITION, MOVE_LABELS } from "../api";
 
 // moveValue reads the values a board move journals. issuerepo packs a
 // transition and a sprint move as "id|Name" and a rank as
@@ -50,16 +50,20 @@ const BACKLOG = "Backlog";
 export function moveWords(entityType: string, beforeVal: string, afterVal: string): MoveWords {
   switch (entityType) {
     case ENTITY_TRANSITION:
-      return { label: "Status", from: moveName(beforeVal), to: moveName(afterVal) };
+      return { label: MOVE_LABELS[entityType], from: moveName(beforeVal), to: moveName(afterVal) };
     case ENTITY_SPRINT_MOVE:
       return {
-        label: "Sprint",
+        label: MOVE_LABELS[entityType],
         from: beforeVal ? moveName(beforeVal) : BACKLOG,
         to: afterVal ? moveName(afterVal) : BACKLOG,
       };
     case ENTITY_RANK: {
       const rank = parseRank(afterVal);
-      return { label: "Rank", from: "", to: `${rank.before ? "before" : "after"} ${rank.neighbourKey}` };
+      return {
+        label: MOVE_LABELS[entityType],
+        from: "",
+        to: `${rank.before ? "before" : "after"} ${rank.neighbourKey}`,
+      };
     }
     default:
       return { label: entityType, from: beforeVal, to: afterVal };

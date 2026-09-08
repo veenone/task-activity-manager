@@ -180,18 +180,20 @@ describe("PendingChangesModal", () => {
     const conflictRows: PendingChange[] = [
       { id: 5, entityType: "issue", entityKey: "PLAT-412", field: "storyPoints", beforeVal: "5", afterVal: "8", baseVersion: "v1", createdAt: "" },
       { id: 4, entityType: "issue", entityKey: "PLAT-412", field: "labels", beforeVal: "checkout, promo", afterVal: "checkout, promo, q3", baseVersion: "v1", createdAt: "" },
+      { id: 3, entityType: "issue_transition", entityKey: "PLAT-412", field: "statusId", beforeVal: "1|To Do", afterVal: "3|In Progress", baseVersion: "v1", createdAt: "" },
       ...rows,
     ];
     // The first read shows every row; every read after the commit shows only
     // the held issue's rows, as the store would.
-    vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(conflictRows).mockResolvedValue(conflictRows.slice(0, 2));
+    vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(conflictRows).mockResolvedValue(conflictRows.slice(0, 3));
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({
       committed: ["PLAT-409"], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501" }], linked: [],
       conflicts: [{ key: "PLAT-412", summary: "Checkout: apply promo code at payment step", remoteVersion: "2026-09-06T11:00:00Z", fields: [
         { field: "storyPoints", base: "5", mine: "8", remote: "13" },
         { field: "labels", base: "checkout, promo", mine: "checkout, promo, q3", remote: "checkout, promo" },
+        { field: "statusId", base: "To Do", mine: "In Progress", remote: "Done" },
       ] }],
-      failures: [], remaining: 2,
+      failures: [], remaining: 3,
     });
     vi.mocked(api.ResolveConflictOverride).mockResolvedValue();
     vi.mocked(api.ResolveConflictKeepRemote).mockResolvedValue();
@@ -207,6 +209,9 @@ describe("PendingChangesModal", () => {
     const bodyRows = within(table).getAllByRole("row").slice(1);
     expect(within(bodyRows[0]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Story points", "5", "8", "13"]);
     expect(within(bodyRows[1]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Labels", "checkout, promo", "checkout, promo, q3", "checkout, promo"]);
+    // A held board write reads as the move it is. Without a label of its
+    // own the row printed the journal's raw field name, "statusId".
+    expect(within(bodyRows[2]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["Status", "To Do", "In Progress", "Done"]);
     expect(within(dialog).getByRole("button", { name: "Commit (0)" })).toBeDisabled();
 
     await user.click(within(card).getByRole("button", { name: "Override" }));

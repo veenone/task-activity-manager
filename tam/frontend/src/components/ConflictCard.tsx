@@ -15,6 +15,11 @@ interface Props {
 // ConflictCard is a held issue inside the Pending changes dialog: the
 // three-way table and the two resolutions. Override rebases the edits so
 // the next Commit pushes them; Keep remote drops them and takes Jira's row.
+//
+// A held board write is the same card, with the field reading Status or
+// Sprint: the committer holds the whole issue back, so one card can carry
+// an edited field and a moved card at once, and either resolution answers
+// for both.
 export function ConflictCard({ profileId, conflict, disabled }: Props) {
   const qc = useQueryClient();
   const { dismissConflict } = useSync();
@@ -61,7 +66,7 @@ export function ConflictCard({ profileId, conflict, disabled }: Props) {
           ))}
         </tbody>
       </table>
-      <p className="muted small">Base is the value when you edited. Remote is Jira now. Override pushes Mine over Remote; Keep remote drops your edits.</p>
+      <p className="muted small">Base is the value when you edited. Remote is Jira now. Override pushes Mine over Remote; Keep remote drops what you did here, a move on this card included.</p>
       <div className="edit-actions">
         <button type="button" className="btn btn-primary" disabled={disabled || busy} onClick={() => void resolve("override")}>Override</button>
         <button type="button" className="btn" disabled={disabled || busy} onClick={() => void resolve("keep")}>Keep remote</button>
