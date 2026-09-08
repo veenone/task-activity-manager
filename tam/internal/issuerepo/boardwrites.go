@@ -109,6 +109,14 @@ func (r *Repository) RankIssue(ctx context.Context, profileID, key, neighbourKey
 	if neighbourKey == key {
 		return errors.New("an issue cannot be ranked against itself")
 	}
+	// A draft is in the cache, so the view will happily place a card beside
+	// one, but CellOrder is built from board_issue, which is Jira's own key
+	// list and can never name a draft. The push would then anchor from the
+	// card's stale cached position and send an order the board never drew,
+	// so the neighbour is refused here rather than silently re-derived.
+	if strings.HasPrefix(neighbourKey, DraftPrefix) {
+		return fmt.Errorf("%s cannot be ranked against %s: a card cannot be ranked against a draft until it is created", key, neighbourKey)
+	}
 	return r.inTx(ctx, func(tx *sql.Tx) error {
 		row, err := readBoardRow(ctx, tx, profileID, key)
 		if err != nil {

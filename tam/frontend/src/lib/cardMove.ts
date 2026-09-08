@@ -14,10 +14,20 @@ export interface Rect {
   bottom: number;
 }
 
+// DropCard is what a cell's card list means to a drop: the key a rank can
+// be measured against, and whether the card is a draft. Jira has never seen
+// a draft, so the board's committed order can never name one and the
+// repository refuses a rank anchored on one.
+export interface DropCard {
+  key: string;
+  draft: boolean;
+}
+
 // Drop is where a cursor landed inside a cell: the gap it points at, and
 // the card it is measured against. index is 0 for the top of the cell and
-// cards.length for below the last one. neighbourKey is "" only when the
-// cell holds no cards at all, which is a column move and not a rank.
+// cards.length for below the last one. neighbourKey is "" when the cell
+// holds no card a rank can be measured against: no cards at all, which is
+// a column move and not a rank, or nothing but drafts.
 export interface Drop {
   index: number;
   neighbourKey: string;
@@ -26,11 +36,11 @@ export interface Drop {
 
 // columnDrop reads a drop position out of the cursor. A card's own
 // midpoint is the line: above it the drop goes before that card, below it
-// after. rects is parallel to keys; a key with no rect (a card the browser
+// after. rects is parallel to cards; a card with no rect (one the browser
 // has not laid out) is skipped rather than measured against zero.
-export function columnDrop(keys: string[], clientY: number, rects: Rect[]): Drop {
-  let index = keys.length;
-  for (let i = 0; i < keys.length; i++) {
+export function columnDrop(cards: DropCard[], clientY: number, rects: Rect[]): Drop {
+  let index = cards.length;
+  for (let i = 0; i < cards.length; i++) {
     const r = rects[i];
     if (!r) continue;
     if (clientY < (r.top + r.bottom) / 2) {
@@ -38,9 +48,21 @@ export function columnDrop(keys: string[], clientY: number, rects: Rect[]): Drop
       break;
     }
   }
-  if (keys.length === 0) return { index: 0, neighbourKey: "", before: false };
-  if (index === 0) return { index: 0, neighbourKey: keys[0], before: true };
-  return { index, neighbourKey: keys[index - 1], before: false };
+  return { index, ...anchorFor(cards, index) };
+}
+
+// anchorFor is the card a drop at one gap is ranked against: the nearest
+// real card above the gap, and failing that the nearest below it. A draft
+// is stepped over rather than offered, so the gesture never asks for a rank
+// the repository will refuse.
+function anchorFor(cards: DropCard[], index: number): { neighbourKey: string; before: boolean } {
+  for (let i = index - 1; i >= 0; i--) {
+    if (!cards[i].draft) return { neighbourKey: cards[i].key, before: false };
+  }
+  for (let i = index; i < cards.length; i++) {
+    if (!cards[i].draft) return { neighbourKey: cards[i].key, before: true };
+  }
+  return { neighbourKey: "", before: false };
 }
 
 // isSameCell says whether a position is in the cell a drop is over. A move
@@ -106,7 +128,10 @@ function columnStep(view: BoardView, p: Pos, issueKey: string, step: number): Ke
 
 function rankStep(view: BoardView, p: Pos, issueKey: string, step: number): KeyMove {
   const cards = cardsIn(view, p.lane, p.col);
-  const index = p.index + step;
+  // A draft is stepped over rather than ranked against, for the reason
+  // anchorFor skips one: the board's committed order can never name it.
+  let index = p.index + step;
+  while (index >= 0 && index < cards.length && cards[index].draft) index += step;
   if (index < 0) return { kind: "refused", message: `${issueKey} is already at the top of this column` };
   if (index >= cards.length) {
     const hidden = view.lanes[p.lane]?.overflow[p.col] ?? 0;

@@ -9,12 +9,18 @@ function rects(n: number) {
   return Array.from({ length: n }, (_, i) => ({ top: i * 40, bottom: i * 40 + 40 }));
 }
 
-function issue(key: string): Issue {
+function issue(key: string, draft = false): Issue {
   return {
     key, id: key, project: "PLAT", type: "task", summary: key, status: "To Do", assignee: "", reporter: "",
     priority: "", labels: [], sprintId: "", sprintName: "", parentKey: "", storyPoints: null, rank: "",
-    created: "", updated: "",
+    created: "", updated: "", draft,
   };
+}
+
+// cards is the shape a cell hands columnDrop: a key and whether it is a
+// draft.
+function cards(...keys: string[]) {
+  return keys.map((key) => ({ key, draft: key.startsWith("TAM-NEW-") }));
 }
 
 function view(cells: Issue[][], overflow = [0, 0, 0]): BoardView {
@@ -37,7 +43,7 @@ function view(cells: Issue[][], overflow = [0, 0, 0]): BoardView {
   };
 }
 
-const KEYS = ["PLAT-409", "PLAT-412", "PLAT-347"];
+const KEYS = cards("PLAT-409", "PLAT-412", "PLAT-347");
 
 describe("columnDrop", () => {
   it("puts a drop above the first card's middle before that card", () => {
@@ -63,6 +69,27 @@ describe("columnDrop", () => {
   it("skips a card the browser has not laid out rather than measuring it against zero", () => {
     expect(columnDrop(KEYS, 50, [undefined as never, ...rects(3).slice(1)])).toEqual({
       index: 1, neighbourKey: "PLAT-409", before: false,
+    });
+  });
+
+  it("ranks against the nearest card Jira has, never against a draft", () => {
+    // The board draws the draft where it was dropped, but the committed
+    // order can never name it, so a rank anchored on it would be pushed
+    // from the card's stale position instead.
+    const withDraft = cards("PLAT-350", "TAM-NEW-1", "PLAT-409");
+    expect(columnDrop(withDraft, 90, rects(3))).toEqual({ index: 2, neighbourKey: "PLAT-350", before: false });
+    expect(columnDrop(withDraft, 50, rects(3))).toEqual({ index: 1, neighbourKey: "PLAT-350", before: false });
+  });
+
+  it("looks below the gap when every card above it is a draft", () => {
+    expect(columnDrop(cards("TAM-NEW-1", "PLAT-409"), 50, rects(2))).toEqual({
+      index: 1, neighbourKey: "PLAT-409", before: true,
+    });
+  });
+
+  it("has no neighbour in a cell of nothing but drafts", () => {
+    expect(columnDrop(cards("TAM-NEW-1", "TAM-NEW-2"), 50, rects(2))).toEqual({
+      index: 1, neighbourKey: "", before: false,
     });
   });
 });
@@ -128,6 +155,23 @@ describe("keyboardMove", () => {
     const capped = view([[issue("PLAT-409"), issue("PLAT-347")], [], []], [41, 0, 0]);
     expect(keyboardMove(capped, { lane: 0, col: 0, index: 1 }, "PLAT-347", "ArrowDown")).toEqual({
       kind: "refused", message: "PLAT-347 cannot move past the cards this column is not showing",
+    });
+  });
+
+  it("steps over a draft rather than offering it as a neighbour", () => {
+    const withDraft = view([[issue("PLAT-409"), issue("TAM-NEW-1", true), issue("PLAT-347")], [], []]);
+    expect(keyboardMove(withDraft, { lane: 0, col: 0, index: 0 }, "PLAT-409", "ArrowDown")).toEqual({
+      kind: "rank", index: 2, neighbourKey: "PLAT-347", before: false,
+    });
+    expect(keyboardMove(withDraft, { lane: 0, col: 0, index: 2 }, "PLAT-347", "ArrowUp")).toEqual({
+      kind: "rank", index: 0, neighbourKey: "PLAT-409", before: true,
+    });
+  });
+
+  it("refuses the step when a draft is all there is in that direction", () => {
+    const withDraft = view([[issue("TAM-NEW-1", true), issue("PLAT-409")], [], []]);
+    expect(keyboardMove(withDraft, { lane: 0, col: 0, index: 1 }, "PLAT-409", "ArrowUp")).toEqual({
+      kind: "refused", message: "PLAT-409 is already at the top of this column",
     });
   });
 

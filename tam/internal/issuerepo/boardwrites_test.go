@@ -317,6 +317,32 @@ func TestABoardMoveRefusesAKeyTheCacheDoesNotHold(t *testing.T) {
 	}
 }
 
+// A draft is in the issue cache, so a rank against one passes the cache
+// check, but CellOrder is built from board_issue and can never name a
+// draft: the push would anchor from the card's stale cached position and
+// send Jira an order the board never drew.
+func TestARankAgainstADraftIsRefused(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+	draft, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "drafted"})
+	if err != nil {
+		t.Fatalf("draft: %v", err)
+	}
+
+	err = repo.RankIssue(ctx, "p1", "PLAT-1", draft, true, 1)
+	if err == nil || !strings.Contains(err.Error(), "until it is created") {
+		t.Fatalf("rank against a draft = %v, want it refused by name", err)
+	}
+	rows, err := repo.PendingForKey(ctx, "p1", "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Errorf("pending rows after a refused rank = %+v, want none", rows)
+	}
+}
+
 func TestADraftIsMovedInPlaceAndJournalsNothingNew(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()
@@ -579,16 +605,20 @@ func TestAFullSyncKeepsAPendingMoveOnScreen(t *testing.T) {
 	}
 }
 
+// RankIssue refuses a draft neighbour, so the only rank that can still name
+// one was journaled by a build before that guard and is sitting in an
+// upgraded journal. The repoint has to keep working for it.
 func TestRekeyRepointsARankJournaledAgainstADraftAndKeepsItsBoard(t *testing.T) {
-	repo := newRepo(t)
+	repo, db := newRepoDB(t)
 	ctx := context.Background()
 	seedBoardCards(t, repo)
 	draft, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "drafted"})
 	if err != nil {
 		t.Fatalf("draft: %v", err)
 	}
-	if err := repo.RankIssue(ctx, "p1", "PLAT-1", draft, true, 7); err != nil {
-		t.Fatalf("rank: %v", err)
+	if err := journal.Put(db, "p1", issuerepo.EntityRank, "PLAT-1", issuerepo.FieldRank,
+		"", issuerepo.RankValue(draft, true, 7), v1); err != nil {
+		t.Fatalf("journal the older rank: %v", err)
 	}
 	// The draft gets the key Jira assigned. A rank still naming TAM-NEW-n
 	// would push a temporary key, which is the bug Phase 2 fixed for parents.

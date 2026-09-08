@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { announce, errMsg, useNotice } from "@agile-suite/core";
-import { ENTITY_TRANSITION } from "../api";
+import { DRAFT_PREFIX, ENTITY_TRANSITION } from "../api";
 import type { BoardView, CommitResult, Issue, Sprint } from "../api";
 import { findCard } from "../lib/boardCells";
 import type { Pos } from "../lib/boardCells";
@@ -26,6 +26,13 @@ export interface DropTarget {
   lane: number;
   col: number;
   index: number | null;
+}
+
+// isDraft is a locally created card, one Jira has never seen. It can be
+// dragged across columns and into a sprint, both of which rewrite its own
+// draft, but it can neither be ranked nor anchor another card's rank.
+function isDraft(key: string): boolean {
+  return key.startsWith(DRAFT_PREFIX);
 }
 
 interface Args {
@@ -147,6 +154,14 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
   }
 
   function rankTo(key: string, neighbourKey: string, before: boolean, kind: "up" | "down") {
+    // A draft's own rank journals nothing: it has no Jira state to reorder,
+    // and Commit sends the draft rather than the move. Letting the binding
+    // report success would announce "moved up, 2 of 5" and flash a card
+    // that did not move, which is the opposite of the truth.
+    if (isDraft(key)) {
+      announce(`${key} cannot be reordered until it is created`);
+      return;
+    }
     rank.mutate(
       { key, neighbourKey, before, boardId },
       {
@@ -212,9 +227,9 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
   // dropIn reads the cursor's place in the cell it is over, from the cards
   // the cell has actually laid out.
   function dropIn(e: DragEvent<HTMLElement>, lane: number, col: number): Drop {
-    const keys = (view?.lanes[lane]?.cells[col] ?? []).map((c) => c.key);
-    const cards = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-board-pos]")];
-    return columnDrop(keys, e.clientY, cards.map((el) => el.getBoundingClientRect()));
+    const cards = (view?.lanes[lane]?.cells[col] ?? []).map((c) => ({ key: c.key, draft: !!c.draft }));
+    const els = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-board-pos]")];
+    return columnDrop(cards, e.clientY, els.map((el) => el.getBoundingClientRect()));
   }
 
   function from(): Pos | undefined {
@@ -237,6 +252,10 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
     if (!same && (start.lane !== lane || (view.columns[col]?.statusIds ?? []).length === 0)) return refuse(e);
     if (same && isNoMove(start, lane, col, drop.index)) return refuse(e);
     if (same && belowHidden(lane, col, drop.index)) return refuse(e);
+    // A rank the drop is going to refuse must not draw a line first: a
+    // draft cannot be reordered, and a cell of nothing but drafts has no
+    // card left to rank against.
+    if (same && (isDraft(dragKey) || !drop.neighbourKey)) return refuse(e);
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setTarget({ lane, col, index: same ? drop.index : null });
@@ -257,6 +276,10 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
     if (isNoMove(start, lane, col, drop.index)) return;
     if (belowHidden(lane, col, drop.index)) {
       announce(`${key} cannot be placed below the cards this column is not showing`);
+      return;
+    }
+    if (!drop.neighbourKey) {
+      announce(`${key} has no card to be ranked against here: a draft has to be created first`);
       return;
     }
     rankTo(key, drop.neighbourKey, drop.before, drop.index < start.index ? "up" : "down");

@@ -836,6 +836,31 @@ describe("BoardsView moves", () => {
     await waitFor(() => expect(api.MoveIssueToColumn).toHaveBeenCalledWith("p1", "PLAT-409", "5"));
   });
 
+  it("refuses to reorder a draft, rather than announcing a move it never made", async () => {
+    const user = userEvent.setup();
+    const draft = issue({ key: "TAM-NEW-3", summary: "drafted", draft: true });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, draft, RETRO], [PROMO], []]));
+    renderView();
+    await user.click(await screen.findByRole("gridcell", { name: /TAM-NEW-3/ }));
+    await user.keyboard("{Control>}{ArrowUp}{/Control}");
+    expect(
+      await screen.findByText("TAM-NEW-3 cannot be reordered until it is created"),
+    ).toBeInTheDocument();
+    expect(api.RankIssue).not.toHaveBeenCalled();
+  });
+
+  it("ranks a card past a draft rather than against it", async () => {
+    const user = userEvent.setup();
+    const draft = issue({ key: "TAM-NEW-3", summary: "drafted", draft: true });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, draft, RETRO], [PROMO], []]));
+    renderView();
+    await user.click(await screen.findByRole("gridcell", { name: /PLAT-347/ }));
+    await user.keyboard("{Control>}{ArrowUp}{/Control}");
+    await waitFor(() =>
+      expect(api.RankIssue).toHaveBeenCalledWith("p1", "PLAT-347", "PLAT-409", true, 1),
+    );
+  });
+
   it("announces where a moved card landed", async () => {
     renderView();
     await screen.findByRole("gridcell", { name: /PLAT-409/ });
