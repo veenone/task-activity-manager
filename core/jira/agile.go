@@ -288,10 +288,19 @@ func (c *Client) MoveToBacklog(ctx context.Context, keys []string) error {
 }
 
 // StartSprint starts sprintID via POST /rest/agile/1.0/sprint/{sprintId},
-// sending state: "active" with name, goal, and the start and end dates.
-// start and end must already be in the Agile API's own datetime format,
-// 2026-09-09T09:00:00.000+0000; a bare date is rejected, and turning one
-// into the other is sprints.Service's job, not this transport's.
+// sending state: "active" with the start and end dates, and name and goal
+// when either is given. start and end must already be in the Agile API's
+// own datetime format, 2026-09-09T09:00:00.000+0000; a bare date is
+// rejected, and turning one into the other is sprints.Service's job, not
+// this transport's.
+//
+// name and goal are left out of the body when empty rather than sent as
+// "": this endpoint is a partial update, so a key that is present
+// overwrites and one that is absent is left alone, and sending "" would
+// clear whatever name or goal the sprint already had. This is the same
+// rule CompleteSprint's own comment states for the dates: a start with an
+// empty goal box must not silently wipe out a goal typed in on an earlier
+// start.
 //
 // Starting a sprint, moving its unfinished issues at completion (through
 // MoveToSprint or MoveToBacklog above), and completing it below are the
@@ -303,10 +312,14 @@ func (c *Client) StartSprint(ctx context.Context, sprintID int, name, goal, star
 	path := fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID)
 	body := map[string]any{
 		"state":     "active",
-		"name":      name,
-		"goal":      goal,
 		"startDate": start,
 		"endDate":   end,
+	}
+	if name != "" {
+		body["name"] = name
+	}
+	if goal != "" {
+		body["goal"] = goal
 	}
 	return c.WriteJSON(ctx, http.MethodPost, path, body)
 }

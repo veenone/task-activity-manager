@@ -118,7 +118,10 @@ func findDemoSprint(sprintID int) (backend.Sprint, bool) {
 }
 
 // sprintsOverlay is demoSprints with StartSprint's and CompleteSprint's own
-// state changes applied. Callers hold b.mu.
+// state changes applied, and a started sprint's name and dates taken from
+// the draft it was started with rather than the dataset's own, unstarted
+// ones: a demo start has nowhere else to show the reader what the dialog
+// just set. Callers hold b.mu.
 func (b *Backend) sprintsOverlay() []backend.Sprint {
 	base := demoSprints()
 	out := make([]backend.Sprint, len(base))
@@ -126,40 +129,84 @@ func (b *Backend) sprintsOverlay() []backend.Sprint {
 		if state, ok := b.sprintState[s.ID]; ok {
 			s.State = state
 		}
+		if draft, ok := b.sprintDraft[s.ID]; ok {
+			if draft.Name != "" {
+				s.Name = draft.Name
+			}
+			if draft.StartDate != "" {
+				s.StartDate = draft.StartDate
+			}
+			if draft.EndDate != "" {
+				s.EndDate = draft.EndDate
+			}
+		}
 		out[i] = s
 	}
 	return out
 }
 
-// StartSprint moves sprintID to active, using Jira's own rule that a board
-// may have only one active sprint at a time: when another sprint on the
-// same board is already active, it refuses and names it, the way Jira's own
-// 400 does. It never touches b.over, since that overlay is for issues, not
+// stateOf is a sprint's current state, overlay included, from the list
+// sprintsOverlay returns, or "" for an id not in it.
+func stateOf(sprints []backend.Sprint, sprintID int) string {
+	for _, s := range sprints {
+		if s.ID == sprintID {
+			return s.State
+		}
+	}
+	return ""
+}
+
+// StartSprint moves sprintID to active, enforcing the same rules a real
+// Jira does rather than just the one about another active sprint: it
+// refuses a sprint that is already active, and refuses reopening one that
+// is already closed, so the offline walk-through rehearses what a real
+// instance does instead of a friendlier demo-only shortcut. When another
+// sprint on the same board is active it refuses and names it, borrowing
+// Jira's own sentence for the message. The draft is held beside the state
+// in sprintDraft, which is what lets sprintsOverlay show a started
+// sprint's own name and dates rather than the dataset's unstarted ones.
+// StartSprint never touches b.over, since that overlay is for issues, not
 // sprints.
-func (b *Backend) StartSprint(_ context.Context, sprintID int, _ backend.SprintDraft) error {
+func (b *Backend) StartSprint(_ context.Context, sprintID int, draft backend.SprintDraft) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	target, ok := findDemoSprint(sprintID)
 	if !ok {
 		return fmt.Errorf("demo: no sprint %d", sprintID)
 	}
-	for _, s := range b.sprintsOverlay() {
+	overlay := b.sprintsOverlay()
+	switch stateOf(overlay, sprintID) {
+	case "active":
+		return fmt.Errorf("demo: sprint %s is already active", target.Name)
+	case "closed":
+		return fmt.Errorf("demo: sprint %s is closed and cannot be started again", target.Name)
+	}
+	for _, s := range overlay {
 		if s.BoardID == target.BoardID && s.ID != sprintID && s.State == "active" {
-			return fmt.Errorf("demo: the board already has an active sprint, %s", s.Name)
+			return fmt.Errorf("demo: another sprint is already active on this board: %s", s.Name)
 		}
 	}
 	b.sprintState[sprintID] = "active"
+	b.sprintDraft[sprintID] = draft
 	return nil
 }
 
-// CompleteSprint moves sprintID to closed. It moves nothing itself: pushing
-// the sprint's unfinished issues out, with MoveIssuesToSprint, is the
-// caller's job, exactly as it is against a real Jira.
+// CompleteSprint moves sprintID to closed, refusing one that is not
+// currently active: Jira completes only the sprint that is running, so a
+// future sprint that never started and a sprint already closed are both
+// refused here too, the same way a real instance would. It moves nothing
+// itself: pushing the sprint's unfinished issues out, with
+// MoveIssuesToSprint, is the caller's job, exactly as it is against a real
+// Jira.
 func (b *Backend) CompleteSprint(_ context.Context, sprintID int) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if _, ok := findDemoSprint(sprintID); !ok {
+	target, ok := findDemoSprint(sprintID)
+	if !ok {
 		return fmt.Errorf("demo: no sprint %d", sprintID)
+	}
+	if state := stateOf(b.sprintsOverlay(), sprintID); state != "active" {
+		return fmt.Errorf("demo: sprint %s is not active and cannot be completed", target.Name)
 	}
 	b.sprintState[sprintID] = "closed"
 	return nil

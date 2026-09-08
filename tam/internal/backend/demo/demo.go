@@ -29,6 +29,10 @@ type Backend struct {
 	conflict    map[string]bool
 	links       map[string][]backend.Link
 	sprintState map[int]string
+	// sprintDraft holds the name and dates a start was given, beside
+	// sprintState, so a demo start can show the reader what the dialog just
+	// set instead of falling back to the dataset's own, unstarted values.
+	sprintDraft map[int]backend.SprintDraft
 }
 
 // New returns a demo backend for the project key. An empty key uses the
@@ -37,7 +41,16 @@ func New(projectKey string) *Backend {
 	if projectKey == "" {
 		projectKey = demo.ProjectKey
 	}
-	b := &Backend{project: projectKey, over: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 500, conflict: map[string]bool{}, links: map[string][]backend.Link{}, sprintState: map[int]string{}}
+	b := &Backend{
+		project:     projectKey,
+		over:        map[string]backend.Issue{},
+		desc:        map[string]string{},
+		nextKey:     500,
+		conflict:    map[string]bool{},
+		links:       map[string][]backend.Link{},
+		sprintState: map[int]string{},
+		sprintDraft: map[int]backend.SprintDraft{},
+	}
 	b.conflict[b.ConflictKey()] = true
 	return b
 }

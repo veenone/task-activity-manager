@@ -468,6 +468,93 @@ func TestDemoStartSprintRefusesWhileAnotherIsActiveThenStartsTheFutureOne(t *tes
 	}
 }
 
+// TestDemoEnforcesJirasFourSprintStateRules pins down the four state rules
+// a real Jira enforces around a sprint's lifecycle, which the demo used to
+// let three of slide: starting the sprint that is already active succeeded
+// silently, starting an already-closed one reopened it, and completing a
+// future or an already-closed sprint both succeeded. A real instance
+// refuses all four, so the offline walk-through has to as well.
+func TestDemoEnforcesJirasFourSprintStateRules(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	draft := backend.SprintDraft{Name: "Sprint 12", StartDate: "2026-08-18T09:00:00.000+0000", EndDate: "2026-09-01T09:00:00.000+0000"}
+
+	// Starting the sprint that is already active must be refused, not a
+	// silent no-op.
+	if err := b.StartSprint(ctx, 12, draft); err == nil {
+		t.Error("starting the already-active sprint is refused")
+	}
+
+	// Completing a sprint that has not started yet must be refused, not
+	// treated as an early completion.
+	if err := b.CompleteSprint(ctx, 13); err == nil {
+		t.Error("completing a future sprint is refused")
+	}
+
+	// Closing the active sprint, then trying to start it again, must be
+	// refused rather than reopening it.
+	if err := b.CompleteSprint(ctx, 12); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if err := b.StartSprint(ctx, 12, draft); err == nil {
+		t.Error("restarting an already-closed sprint is refused")
+	}
+
+	// And completing that same closed sprint again must be refused too.
+	if err := b.CompleteSprint(ctx, 12); err == nil {
+		t.Error("completing an already-closed sprint is refused")
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	for _, s := range sprints {
+		if s.ID == 12 && s.State != "closed" {
+			t.Errorf("sprint 12 state = %q, want closed: none of the refused calls above may have changed it", s.State)
+		}
+		if s.ID == 13 && s.State != "future" {
+			t.Errorf("sprint 13 state = %q, want future: the refused completion may not have changed it", s.State)
+		}
+	}
+}
+
+// TestDemoStartSprintHoldsTheDraftBesideTheState is Fix 3: a demo start used
+// to discard the whole SprintDraft, so a card looking at the started sprint
+// afterward would still see the dataset's own unstarted name and dates
+// instead of what the dialog just set.
+func TestDemoStartSprintHoldsTheDraftBesideTheState(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+
+	if err := b.CompleteSprint(ctx, 12); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	draft := backend.SprintDraft{
+		Name:      "Sprint 13: the launch",
+		Goal:      "Ship the launch",
+		StartDate: "2026-09-02T09:00:00.000+0000",
+		EndDate:   "2026-09-16T09:00:00.000+0000",
+	}
+	if err := b.StartSprint(ctx, 13, draft); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	var got backend.Sprint
+	for _, s := range sprints {
+		if s.ID == 13 {
+			got = s
+		}
+	}
+	if got.Name != draft.Name || got.StartDate != draft.StartDate || got.EndDate != draft.EndDate {
+		t.Errorf("sprint 13 = %+v, want the name and dates from the start draft: %+v", got, draft)
+	}
+}
+
 // TestARefusedSprintBatchMovesNothing is Jira's own rule: a sprint move
 // takes the whole batch or none of it. The demo used to write each card as
 // it walked the list and return on the first key it did not hold, leaving

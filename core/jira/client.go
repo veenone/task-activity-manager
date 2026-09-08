@@ -336,12 +336,17 @@ func (c *Client) WriteJSONReturning(ctx context.Context, method, path string, bo
 // method, the path, the status line, and Jira's own message when the body is
 // its documented error shape ("another sprint is already active on this
 // board" is exactly this path), falling back to a short slice of the body
-// for one that is not.
+// for one that is not. Either way the chosen message is run through snippet
+// afterward: jiraErrorMessage has no length limit of its own, and this
+// string is what a failed write persists verbatim into a commit failure row
+// and what the UI renders, so a pathological errorMessages array must not
+// go into either one whole.
 func writeStatusError(method, path string, resp WriteResponse) error {
 	msg := jiraErrorMessage(resp.Body)
 	if msg == "" {
 		msg = bodyExcerpt(resp.Body)
 	}
+	msg = snippet([]byte(msg), 1024)
 	return fmt.Errorf(
 		"jira: %s %s -> %s: %s",
 		method, path, resp.Status, msg,

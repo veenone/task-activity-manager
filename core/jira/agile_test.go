@@ -422,7 +422,9 @@ func TestStartSprintSendsActiveStateAndDates(t *testing.T) {
 			t.Fatalf("decode body: %v", err)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		// Jira's partial sprint update answers with the updated sprint
+		// object, not an empty body.
+		_, _ = w.Write([]byte(`{"id":12,"name":"Sprint 12","state":"active","goal":"Ship the thing","startDate":"2026-09-09T09:00:00.000+0000","endDate":"2026-09-23T09:00:00.000+0000"}`))
 	}))
 	defer srv.Close()
 
@@ -449,6 +451,43 @@ func TestStartSprintSendsActiveStateAndDates(t *testing.T) {
 	}
 }
 
+// TestStartSprintOmitsEmptyGoalAndName pins down the fix for a partial
+// update's other trap: the goal and name keys are left out of the body when
+// empty, not sent as "". Sending "" would overwrite whatever goal or name
+// the sprint already had, which is unrecoverable here since nothing in the
+// stack round-trips a sprint's existing goal for the dialog to prefill.
+func TestStartSprintOmitsEmptyGoalAndName(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":12,"name":"Sprint 12","state":"active","startDate":"2026-09-09T09:00:00.000+0000","endDate":"2026-09-23T09:00:00.000+0000"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	err := c.StartSprint(context.Background(), 12, "", "", "2026-09-09T09:00:00.000+0000", "2026-09-23T09:00:00.000+0000")
+	if err != nil {
+		t.Fatalf("start sprint: %v", err)
+	}
+	if _, ok := gotBody["goal"]; ok {
+		t.Errorf("body = %+v, want no goal key at all for an empty goal", gotBody)
+	}
+	if _, ok := gotBody["name"]; ok {
+		t.Errorf("body = %+v, want no name key at all for an empty name", gotBody)
+	}
+	want := map[string]any{
+		"state":     "active",
+		"startDate": "2026-09-09T09:00:00.000+0000",
+		"endDate":   "2026-09-23T09:00:00.000+0000",
+	}
+	if !reflect.DeepEqual(gotBody, want) {
+		t.Errorf("body = %+v, want %+v", gotBody, want)
+	}
+}
+
 // TestCompleteSprintSendsClosedStateAndNothingElse pins down the fact the
 // spec is emphatic about: a completion that also sent the dates would
 // rewrite them, so the body must carry state and nothing else.
@@ -462,7 +501,9 @@ func TestCompleteSprintSendsClosedStateAndNothingElse(t *testing.T) {
 			t.Fatalf("decode body: %v", err)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		// Jira's partial sprint update answers with the updated sprint
+		// object, not an empty body.
+		_, _ = w.Write([]byte(`{"id":12,"name":"Sprint 12","state":"closed","startDate":"2026-09-09T09:00:00.000+0000","endDate":"2026-09-23T09:00:00.000+0000"}`))
 	}))
 	defer srv.Close()
 
@@ -482,11 +523,13 @@ func TestCompleteSprintSendsClosedStateAndNothingElse(t *testing.T) {
 	}
 }
 
-// TestStartSprintSurfacesJirasSentenceOnA400 pins down the fix in
-// writeStatusError: "another sprint is already active on this board" has to
-// reach the caller as Jira's own sentence, not a fragment of the response
-// body's JSON.
-func TestStartSprintSurfacesJirasSentenceOnA400(t *testing.T) {
+// TestStartSprintErrorHasNoLeakedJSONOnA400 pins down the fix in
+// writeStatusError. Jira's own sentence, "another sprint is already active
+// on this board", would show up in the error even from a naive formatter
+// that just quoted the raw response body, so that check alone proves
+// nothing; what actually proves jiraErrorMessage ran is that no brace from
+// the surrounding JSON survives into the message.
+func TestStartSprintErrorHasNoLeakedJSONOnA400(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"errorMessages":["another sprint is already active on this board"],"errors":{}}`))
@@ -506,10 +549,11 @@ func TestStartSprintSurfacesJirasSentenceOnA400(t *testing.T) {
 	}
 }
 
-// TestCompleteSprintSurfacesJirasSentenceOnA403 covers the other status the
-// spec names: a 403 without the Manage Sprints permission, whose message
-// must survive the same way a 400's does.
-func TestCompleteSprintSurfacesJirasSentenceOnA403(t *testing.T) {
+// TestCompleteSprintErrorHasNoLeakedJSONOnA403 covers the other status the
+// spec names, a 403 without the Manage Sprints permission, with the same
+// no-leaked-JSON check that actually exercises jiraErrorMessage rather than
+// the sentence-contains check a raw body excerpt would also pass.
+func TestCompleteSprintErrorHasNoLeakedJSONOnA403(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"errorMessages":["You do not have the Manage Sprints permission for this board."]}`))
