@@ -233,7 +233,7 @@ A sprint's start is a fact with a timestamp that a whole team reads. Journaling 
 
 And unlike a card move, there is nothing to reconcile. A transition can be rebased onto a status that moved; a sprint that someone else already started cannot be started again, and the only sensible answer is to say so and refresh.
 
-So the two lifecycle actions are online-only: the buttons say what they will do, they are disabled with a reason when the app has no connection, and they report Jira's answer directly. The card moves they sit beside stay journaled, exactly as 3b built them. This is the only place in TAM where a button talks to Jira without Commit, and the plan says so out loud rather than letting a future reader discover it.
+So the two lifecycle actions are online-only, which in practice means they are attempted rather than predicted: TAM has no connectivity signal to disable a button from, so the buttons stay enabled, the call is made, and a transport failure is reported in the dialog with a retry. Predicting offline would have meant an enabled button and a raw error for the case that actually matters, a VPN that is off at nine in the morning. The card moves they sit beside stay journaled, exactly as 3b built them. This is the only place in TAM where a button talks to Jira without Commit, and the plan says so out loud rather than letting a future reader discover it.
 
 ### 14.3 Decisions
 
@@ -247,6 +247,8 @@ So the two lifecycle actions are online-only: the buttons say what they will do,
 | What multi-select can do | Move to a sprint, and nothing else in 3c | It is what planning needs; a bulk transition would need every card's workflow checked and belongs with its own design |
 | The detail panel's sprint | A select of the board's open sprints plus the backlog, journaled exactly like the card menu's | One write path, already built and reviewed in 3b |
 | Permissions | A 403 on a lifecycle call says the account cannot manage sprints on this board, and the buttons stay | Guessing at permissions before trying is how tools hide capability from people who have it |
+| What "incomplete" means | An issue whose status id is not in the board's last column | One undefined word would otherwise decide which cards an irreversible action moves; this is the same mapping the board draws with |
+| The two selections | The detail panel's one card stays `board-card-selected`; the multi-selection is `board-card-checked`, and more than one closes the panel | Two models painting one class would make three checked cards and one open panel indistinguishable, which XTM solved with row-selected and row-checked |
 
 ### 14.4 The wire
 
@@ -268,7 +270,7 @@ The gap is real: the four writes of a board land in one transaction, but a reade
 
 ### 14.7 Errors
 
-A sprint that cannot start because another is active names the active one. A 403 says the account cannot manage sprints on this board. A completion whose issue move fails leaves the sprint open and says so, because a half-completed sprint is worse than an uncompleted one. A lifecycle call attempted with no connection is refused before it is made, with the same sentence the disabled button carries.
+A sprint that cannot start because another is active names the active one. A 403 says the account cannot manage sprints on this board. A completion whose issue move fails leaves the sprint open and says so, because a half-completed sprint is worse than an uncompleted one. A lifecycle call that cannot reach Jira reports the transport failure in the dialog, which stays open.
 
 ### 14.8 Verification
 
