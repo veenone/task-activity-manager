@@ -418,6 +418,56 @@ func TestDemoSprintMovesAndRanksApplyToTheDataset(t *testing.T) {
 	}
 }
 
+func TestDemoStartSprintRefusesWhileAnotherIsActiveThenStartsTheFutureOne(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+
+	// Sprint 12 is already active in the dataset, so starting the future
+	// sprint 13 must be refused and must name the one that is active.
+	err := b.StartSprint(ctx, 13, backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-01T09:00:00.000+0000", EndDate: "2026-09-15T09:00:00.000+0000"})
+	if err == nil || !strings.Contains(err.Error(), "Sprint 12") {
+		t.Fatalf("err = %v, want a refusal naming the active sprint", err)
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	for _, s := range sprints {
+		if s.ID == 13 && s.State != "future" {
+			t.Errorf("sprint 13 state = %q, want future: a refused start must not change it", s.State)
+		}
+	}
+
+	// Completing the active sprint frees the board, and the future one can
+	// then start.
+	if err := b.CompleteSprint(ctx, 12); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if err := b.StartSprint(ctx, 13, backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-01T09:00:00.000+0000", EndDate: "2026-09-15T09:00:00.000+0000"}); err != nil {
+		t.Fatalf("start after completing the active one: %v", err)
+	}
+
+	sprints, err = b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	states := map[int]string{}
+	for _, s := range sprints {
+		states[s.ID] = s.State
+	}
+	if states[12] != "closed" || states[13] != "active" {
+		t.Errorf("states = %v, want 12 closed and 13 active", states)
+	}
+
+	if err := b.StartSprint(ctx, 9999, backend.SprintDraft{}); err == nil {
+		t.Error("starting a sprint the demo does not have is refused")
+	}
+	if err := b.CompleteSprint(ctx, 9999); err == nil {
+		t.Error("completing a sprint the demo does not have is refused")
+	}
+}
+
 // TestARefusedSprintBatchMovesNothing is Jira's own rule: a sprint move
 // takes the whole batch or none of it. The demo used to write each card as
 // it walked the list and return on the first key it did not hold, leaving

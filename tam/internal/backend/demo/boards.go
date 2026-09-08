@@ -81,7 +81,8 @@ func (b *Backend) BoardColumns(_ context.Context, boardID int) ([]backend.BoardC
 }
 
 // BoardSprints puts the three sprints on the scrum board only, one closed,
-// one active, one future, in Jira's lowercase states.
+// one active, one future, in Jira's lowercase states, with any lifecycle
+// action this run has taken (StartSprint, CompleteSprint) overlaid on top.
 func (b *Backend) BoardSprints(_ context.Context, boardID int) ([]backend.Sprint, error) {
 	if err := knownBoard(boardID); err != nil {
 		return nil, err
@@ -89,18 +90,79 @@ func (b *Backend) BoardSprints(_ context.Context, boardID int) ([]backend.Sprint
 	if boardID != scrumBoardID {
 		return []backend.Sprint{}, nil
 	}
-	return demoSprints(), nil
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.sprintsOverlay(), nil
 }
 
-// demoSprints is the scrum board's three sprints. It is a function rather
-// than a literal inside BoardSprints because the sprint move names its
-// destination from the same list.
+// demoSprints is the scrum board's three sprints, their own dataset states,
+// with nothing overlaid. It is a function rather than a literal so the
+// sprint move and the overlay can both build on the same list.
 func demoSprints() []backend.Sprint {
 	return []backend.Sprint{
 		{ID: 11, BoardID: scrumBoardID, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z", EndDate: "2026-08-18T09:00:00Z"},
 		{ID: 12, BoardID: scrumBoardID, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z", EndDate: "2026-09-01T09:00:00Z"},
 		{ID: 13, BoardID: scrumBoardID, Name: "Sprint 13", State: "future", StartDate: "2026-09-01T09:00:00Z", EndDate: "2026-09-15T09:00:00Z"},
 	}
+}
+
+// findDemoSprint is one of the scrum board's three sprints by id, its own
+// dataset state, with nothing overlaid.
+func findDemoSprint(sprintID int) (backend.Sprint, bool) {
+	for _, s := range demoSprints() {
+		if s.ID == sprintID {
+			return s, true
+		}
+	}
+	return backend.Sprint{}, false
+}
+
+// sprintsOverlay is demoSprints with StartSprint's and CompleteSprint's own
+// state changes applied. Callers hold b.mu.
+func (b *Backend) sprintsOverlay() []backend.Sprint {
+	base := demoSprints()
+	out := make([]backend.Sprint, len(base))
+	for i, s := range base {
+		if state, ok := b.sprintState[s.ID]; ok {
+			s.State = state
+		}
+		out[i] = s
+	}
+	return out
+}
+
+// StartSprint moves sprintID to active, using Jira's own rule that a board
+// may have only one active sprint at a time: when another sprint on the
+// same board is already active, it refuses and names it, the way Jira's own
+// 400 does. It never touches b.over, since that overlay is for issues, not
+// sprints.
+func (b *Backend) StartSprint(_ context.Context, sprintID int, _ backend.SprintDraft) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	target, ok := findDemoSprint(sprintID)
+	if !ok {
+		return fmt.Errorf("demo: no sprint %d", sprintID)
+	}
+	for _, s := range b.sprintsOverlay() {
+		if s.BoardID == target.BoardID && s.ID != sprintID && s.State == "active" {
+			return fmt.Errorf("demo: the board already has an active sprint, %s", s.Name)
+		}
+	}
+	b.sprintState[sprintID] = "active"
+	return nil
+}
+
+// CompleteSprint moves sprintID to closed. It moves nothing itself: pushing
+// the sprint's unfinished issues out, with MoveIssuesToSprint, is the
+// caller's job, exactly as it is against a real Jira.
+func (b *Backend) CompleteSprint(_ context.Context, sprintID int) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := findDemoSprint(sprintID); !ok {
+		return fmt.Errorf("demo: no sprint %d", sprintID)
+	}
+	b.sprintState[sprintID] = "closed"
+	return nil
 }
 
 // BoardIssueKeys answers with the dataset's own keys: one sprint's issues

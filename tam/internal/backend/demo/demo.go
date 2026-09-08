@@ -22,12 +22,13 @@ const conflictKey = "PLAT-412"
 type Backend struct {
 	project string
 
-	mu       sync.Mutex
-	over     map[string]backend.Issue
-	desc     map[string]string
-	nextKey  int
-	conflict map[string]bool
-	links    map[string][]backend.Link
+	mu          sync.Mutex
+	over        map[string]backend.Issue
+	desc        map[string]string
+	nextKey     int
+	conflict    map[string]bool
+	links       map[string][]backend.Link
+	sprintState map[int]string
 }
 
 // New returns a demo backend for the project key. An empty key uses the
@@ -36,7 +37,7 @@ func New(projectKey string) *Backend {
 	if projectKey == "" {
 		projectKey = demo.ProjectKey
 	}
-	b := &Backend{project: projectKey, over: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 500, conflict: map[string]bool{}, links: map[string][]backend.Link{}}
+	b := &Backend{project: projectKey, over: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 500, conflict: map[string]bool{}, links: map[string][]backend.Link{}, sprintState: map[int]string{}}
 	b.conflict[b.ConflictKey()] = true
 	return b
 }

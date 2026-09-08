@@ -412,6 +412,123 @@ func TestMoveToBacklogSendsIssues(t *testing.T) {
 	}
 }
 
+func TestStartSprintSendsActiveStateAndDates(t *testing.T) {
+	var gotPath, gotMethod string
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	err := c.StartSprint(context.Background(), 12, "Sprint 12", "Ship the thing", "2026-09-09T09:00:00.000+0000", "2026-09-23T09:00:00.000+0000")
+	if err != nil {
+		t.Fatalf("start sprint: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("method = %s, want POST", gotMethod)
+	}
+	if gotPath != "/rest/agile/1.0/sprint/12" {
+		t.Errorf("path = %s", gotPath)
+	}
+	want := map[string]any{
+		"state":     "active",
+		"name":      "Sprint 12",
+		"goal":      "Ship the thing",
+		"startDate": "2026-09-09T09:00:00.000+0000",
+		"endDate":   "2026-09-23T09:00:00.000+0000",
+	}
+	if !reflect.DeepEqual(gotBody, want) {
+		t.Errorf("body = %+v, want %+v", gotBody, want)
+	}
+}
+
+// TestCompleteSprintSendsClosedStateAndNothingElse pins down the fact the
+// spec is emphatic about: a completion that also sent the dates would
+// rewrite them, so the body must carry state and nothing else.
+func TestCompleteSprintSendsClosedStateAndNothingElse(t *testing.T) {
+	var gotPath, gotMethod string
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if err := c.CompleteSprint(context.Background(), 12); err != nil {
+		t.Fatalf("complete sprint: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("method = %s, want POST", gotMethod)
+	}
+	if gotPath != "/rest/agile/1.0/sprint/12" {
+		t.Errorf("path = %s", gotPath)
+	}
+	want := map[string]any{"state": "closed"}
+	if !reflect.DeepEqual(gotBody, want) {
+		t.Errorf("body = %+v, want %+v, nothing else: dates would be rewritten", gotBody, want)
+	}
+}
+
+// TestStartSprintSurfacesJirasSentenceOnA400 pins down the fix in
+// writeStatusError: "another sprint is already active on this board" has to
+// reach the caller as Jira's own sentence, not a fragment of the response
+// body's JSON.
+func TestStartSprintSurfacesJirasSentenceOnA400(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"errorMessages":["another sprint is already active on this board"],"errors":{}}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	err := c.StartSprint(context.Background(), 12, "Sprint 12", "", "2026-09-09T09:00:00.000+0000", "2026-09-23T09:00:00.000+0000")
+	if err == nil {
+		t.Fatal("want an error for a 400")
+	}
+	if !strings.Contains(err.Error(), "another sprint is already active on this board") {
+		t.Errorf("err = %q, want Jira's own sentence, not a JSON fragment", err.Error())
+	}
+	if strings.Contains(err.Error(), "{") {
+		t.Errorf("err = %q, want no leaked JSON", err.Error())
+	}
+}
+
+// TestCompleteSprintSurfacesJirasSentenceOnA403 covers the other status the
+// spec names: a 403 without the Manage Sprints permission, whose message
+// must survive the same way a 400's does.
+func TestCompleteSprintSurfacesJirasSentenceOnA403(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"errorMessages":["You do not have the Manage Sprints permission for this board."]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	err := c.CompleteSprint(context.Background(), 12)
+	if err == nil {
+		t.Fatal("want an error for a 403")
+	}
+	if !strings.Contains(err.Error(), "You do not have the Manage Sprints permission for this board.") {
+		t.Errorf("err = %q, want Jira's own sentence", err.Error())
+	}
+	if strings.Contains(err.Error(), "{") {
+		t.Errorf("err = %q, want no leaked JSON", err.Error())
+	}
+}
+
 // A board's filter is not bounded by a project, so the read is narrowed with
 // the jql parameter the Agile endpoints AND with the board's own filter. One
 // board seen in the field answered with 8,485 cards while the project being

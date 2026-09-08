@@ -142,6 +142,12 @@ func (stubIssueBackend) RankIssue(context.Context, string, string, bool) error {
 func (stubIssueBackend) MoveIssuesToSprint(context.Context, string, []string) error {
 	return errors.New("not used")
 }
+func (stubIssueBackend) StartSprint(context.Context, int, backend.SprintDraft) error {
+	return errors.New("not used")
+}
+func (stubIssueBackend) CompleteSprint(context.Context, int) error {
+	return errors.New("not used")
+}
 func (stubIssueBackend) CanTransition(context.Context, string, []string) (backend.TransitionCheck, error) {
 	return backend.TransitionCheck{}, errors.New("not used")
 }

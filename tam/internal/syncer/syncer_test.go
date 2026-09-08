@@ -143,6 +143,14 @@ func (f *fake) MoveIssuesToSprint(context.Context, string, []string) error {
 	return errors.New("not used")
 }
 
+func (f *fake) StartSprint(context.Context, int, backend.SprintDraft) error {
+	return errors.New("not used")
+}
+
+func (f *fake) CompleteSprint(context.Context, int) error {
+	return errors.New("not used")
+}
+
 func (f *fake) Transition(context.Context, string, []string) error {
 	return errors.New("not used")
 }

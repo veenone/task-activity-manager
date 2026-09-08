@@ -333,11 +333,18 @@ func (c *Client) WriteJSONReturning(ctx context.Context, method, path string, bo
 }
 
 // writeStatusError is the error a write with a non-2xx status produces: the
-// method, the path, the status line, and a short slice of the body.
+// method, the path, the status line, and Jira's own message when the body is
+// its documented error shape ("another sprint is already active on this
+// board" is exactly this path), falling back to a short slice of the body
+// for one that is not.
 func writeStatusError(method, path string, resp WriteResponse) error {
+	msg := jiraErrorMessage(resp.Body)
+	if msg == "" {
+		msg = bodyExcerpt(resp.Body)
+	}
 	return fmt.Errorf(
 		"jira: %s %s -> %s: %s",
-		method, path, resp.Status, bodyExcerpt(resp.Body),
+		method, path, resp.Status, msg,
 	)
 }
 

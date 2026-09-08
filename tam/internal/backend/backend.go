@@ -277,6 +277,18 @@ type Sprint struct {
 	EndDate   string `json:"endDate"`
 }
 
+// SprintDraft is a sprint's fields for starting it: a name (prefilled from
+// the sprint's own), an optional goal, and start and end dates already in
+// the Agile API's own datetime format. Turning a bare date, the shape an
+// HTML date input produces, into that format is sprints.Service's job, not
+// the backend's.
+type SprintDraft struct {
+	Name      string `json:"name"`
+	Goal      string `json:"goal"`
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
+}
+
 // BoardBackend is the board capability, kept off IssueBackend so only the
 // backends that speak Jira's Agile API have to answer for it. The boards
 // sync pass and the commit pass's rank and sprint group both ask for it
@@ -309,6 +321,19 @@ type BoardBackend interface {
 	// The endpoint takes a batch, so the commit pass groups a planning
 	// session's moves by target instead of paying a round trip per card.
 	MoveIssuesToSprint(ctx context.Context, sprintID string, keys []string) error
+	// StartSprint starts sprintID with the draft's name, goal, and dates. It
+	// reaches Jira immediately: the sprint lifecycle is the one write in TAM
+	// that does not go through the journal, because a sprint's start is a
+	// timestamped fact a whole team reads and cannot be told to Jira an
+	// hour late.
+	StartSprint(ctx context.Context, sprintID int, s SprintDraft) error
+	// CompleteSprint closes sprintID, sending state closed and nothing else
+	// so it never rewrites the sprint's dates. Moving the issues that did
+	// not finish is the caller's job, through MoveIssuesToSprint (called
+	// PushIssuesToSprint when it is used this way, to keep it apart from
+	// the journal binding of the same underlying call); CompleteSprint only
+	// closes.
+	CompleteSprint(ctx context.Context, sprintID int) error
 }
 
 // ErrNoTransition is what Transition returns when no workflow transition of
