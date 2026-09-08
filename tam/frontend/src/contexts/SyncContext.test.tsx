@@ -19,6 +19,7 @@ vi.mock("../api", async () => {
     SetTheme: vi.fn(),
     SetDefaultProfile: vi.fn(),
     SyncIssues: vi.fn(),
+    SyncBoards: vi.fn(),
     GetSyncState: vi.fn(),
     EventsOn: vi.fn(() => () => {}),
   };
@@ -41,7 +42,7 @@ beforeEach(() => {
 });
 
 function Probe() {
-  const { status, progress, syncError, canSync, runSync, lastBoards } = useSync();
+  const { status, progress, syncError, canSync, runSync, runBoardsRefresh, lastBoards } = useSync();
   const state = useSyncState("p1");
   return (
     <div>
@@ -52,6 +53,7 @@ function Probe() {
       <span data-testid="boards">{lastBoards ? lastBoards.dropped.join(", ") || "none dropped" : "no pass"}</span>
       <button onClick={() => void runSync(false)} disabled={!canSync}>Sync</button>
       <button onClick={() => void runSync(true)}>Full sync</button>
+      <button onClick={() => void runBoardsRefresh().catch(() => {})}>Refresh boards</button>
     </div>
   );
 }
@@ -80,6 +82,42 @@ function renderProbe() {
 }
 
 describe("SyncProvider", () => {
+  // A boards refresh holds the same per-profile lock in Go that a sync does,
+  // so the UI has to know one is running. It used to be a plain mutation
+  // outside this reducer: the shell stayed idle, offered Sync, and Go refused
+  // it with "a sync is already running for this profile" on a profile whose
+  // status still read "not synced yet".
+  it("locks sync while a boards refresh is running", async () => {
+    let finish: (v: api.BoardSummary) => void = () => {};
+    vi.mocked(api.SyncBoards).mockImplementation(
+      () => new Promise<api.BoardSummary>((resolve) => { finish = resolve; }),
+    );
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Refresh boards" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+    expect(screen.getByRole("button", { name: "Sync" })).toBeDisabled();
+
+    await act(async () => {
+      finish({ boards: 2, columns: 6, sprints: 3, cards: 40, dropped: [], unavailable: false, elapsed: "4s" });
+    });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+    expect(screen.getByRole("button", { name: "Sync" })).toBeEnabled();
+    // The pass lands where the sync's own boards half lands, so the Boards
+    // view reports on it through one channel.
+    expect(screen.getByTestId("boards")).toHaveTextContent("none dropped");
+  });
+
+  it("releases the lock when a boards refresh fails", async () => {
+    vi.mocked(api.SyncBoards).mockRejectedValue(new Error("GET failed: 503"));
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "Refresh boards" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+    expect(screen.getByRole("button", { name: "Sync" })).toBeEnabled();
+  });
+
   it("runs a sync, shows progress frames, and refreshes the sync state", async () => {
     let finish: (v: api.SyncSummary) => void = () => {};
     vi.mocked(api.SyncIssues).mockImplementation(

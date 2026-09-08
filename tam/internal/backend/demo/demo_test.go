@@ -289,18 +289,18 @@ func TestDemoSprintsAreOnTheScrumBoardOnly(t *testing.T) {
 func TestDemoBoardIssueKeys(t *testing.T) {
 	b := demobackend.New("PLAT")
 	ctx := context.Background()
-	inSprint, err := b.BoardIssueKeys(ctx, 1, "12")
+	inSprint, err := b.BoardIssueKeys(ctx, 1, "12", "PLAT")
 	if err != nil {
 		t.Fatalf("sprint keys: %v", err)
 	}
 	if len(inSprint) == 0 {
 		t.Fatal("sprint 12 has no keys")
 	}
-	all, err := b.BoardIssueKeys(ctx, 1, "")
+	all, err := b.BoardIssueKeys(ctx, 1, "", "PLAT")
 	if err != nil {
 		t.Fatalf("board keys: %v", err)
 	}
-	kanban, err := b.BoardIssueKeys(ctx, 2, "")
+	kanban, err := b.BoardIssueKeys(ctx, 2, "", "PLAT")
 	if err != nil {
 		t.Fatalf("kanban keys: %v", err)
 	}
@@ -346,7 +346,7 @@ func TestDemoBoardIssueKeys(t *testing.T) {
 			t.Errorf("%s is in sprint 12 and the board's key list left it out", iss.Key)
 		}
 	}
-	if _, err := b.BoardIssueKeys(ctx, 9, ""); err == nil {
+	if _, err := b.BoardIssueKeys(ctx, 9, "", "PLAT"); err == nil {
 		t.Error("keys of an unknown board must fail")
 	}
 }
@@ -355,7 +355,7 @@ func TestDemoTransitionMovesTheCardAndRefusesTheCuratedStory(t *testing.T) {
 	b := demobackend.New("ACME")
 	ctx := context.Background()
 	// A card the demo lets through.
-	if err := b.Transition(ctx, "ACME-409", demobackend.StatusID("Done")); err != nil {
+	if err := b.Transition(ctx, "ACME-409", []string{demobackend.StatusID("Done")}); err != nil {
 		t.Fatalf("transition: %v", err)
 	}
 	iss, err := b.GetIssue(ctx, "ACME-409")
@@ -368,7 +368,7 @@ func TestDemoTransitionMovesTheCardAndRefusesTheCuratedStory(t *testing.T) {
 
 	// The curated story cannot reach Done, so the offline walk-through can
 	// see a failure without a real Jira.
-	err = b.Transition(ctx, b.ConflictKey(), demobackend.StatusID("Done"))
+	err = b.Transition(ctx, b.ConflictKey(), []string{demobackend.StatusID("Done")})
 	if !errors.Is(err, backend.ErrNoTransition) {
 		t.Fatalf("the curated story is refused: %v", err)
 	}
@@ -376,10 +376,10 @@ func TestDemoTransitionMovesTheCardAndRefusesTheCuratedStory(t *testing.T) {
 	if !errors.As(err, &noPath) || strings.Join(noPath.Reachable, ",") != "To Do,In Progress" {
 		t.Errorf("the refusal names what is reachable: %v", err)
 	}
-	if err := b.Transition(ctx, b.ConflictKey(), demobackend.StatusID("To Do")); err != nil {
+	if err := b.Transition(ctx, b.ConflictKey(), []string{demobackend.StatusID("To Do")}); err != nil {
 		t.Errorf("only the one target is refused: %v", err)
 	}
-	check, err := b.CanTransition(ctx, b.ConflictKey(), demobackend.StatusID("Done"))
+	check, err := b.CanTransition(ctx, b.ConflictKey(), []string{demobackend.StatusID("Done")})
 	if err != nil || check.Allowed || len(check.Reachable) != 2 {
 		t.Errorf("check = %+v, %v", check, err)
 	}

@@ -318,14 +318,14 @@ func TestBoardSprintsTakeTheBoardFromTheRequestAndKanbanHasNone(t *testing.T) {
 func TestBoardIssueKeysPassThroughForTheBoardAndForOneSprint(t *testing.T) {
 	b, _ := newBackend(t, twoFields)
 	ctx := context.Background()
-	keys, err := b.BoardIssueKeys(ctx, 1, "")
+	keys, err := b.BoardIssueKeys(ctx, 1, "", "PLAT")
 	if err != nil {
 		t.Fatalf("board keys: %v", err)
 	}
 	if len(keys) != 3 || keys[0] != "PLAT-412" || keys[2] != "OPS-7" {
 		t.Errorf("board keys = %v, want the board's own order including the key outside the project", keys)
 	}
-	keys, err = b.BoardIssueKeys(ctx, 1, "12")
+	keys, err = b.BoardIssueKeys(ctx, 1, "12", "PLAT")
 	if err != nil {
 		t.Fatalf("sprint keys: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestBoardIssueKeysPassThroughForTheBoardAndForOneSprint(t *testing.T) {
 
 func TestTransitionTakesTheLowestIdThatReachesTheTargetAndFillsTheResolution(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	if err := b.Transition(context.Background(), "PLAT-412", "5"); err != nil {
+	if err := b.Transition(context.Background(), "PLAT-412", []string{"5"}); err != nil {
 		t.Fatalf("transition: %v", err)
 	}
 	want := `POST /rest/api/2/issue/PLAT-412/transitions {"transition":{"id":"31"},"fields":{"resolution":{"id":"10000"}}}`
@@ -351,7 +351,7 @@ func TestTransitionTakesTheLowestIdThatReachesTheTargetAndFillsTheResolution(t *
 func TestTransitionTakesTheProfilesResolutionWhenTheTransitionAllowsIt(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	b.SetTransitionResolution("won't do")
-	if err := b.Transition(context.Background(), "PLAT-412", "5"); err != nil {
+	if err := b.Transition(context.Background(), "PLAT-412", []string{"5"}); err != nil {
 		t.Fatalf("transition: %v", err)
 	}
 	if len(f.writes) != 1 || !strings.Contains(f.writes[0], `"resolution":{"id":"10001"}`) {
@@ -362,7 +362,7 @@ func TestTransitionTakesTheProfilesResolutionWhenTheTransitionAllowsIt(t *testin
 	// allowed value rather than sending a value Jira will reject.
 	b2, f2 := newBackend(t, twoFields)
 	b2.SetTransitionResolution("Abandoned")
-	if err := b2.Transition(context.Background(), "PLAT-412", "5"); err != nil {
+	if err := b2.Transition(context.Background(), "PLAT-412", []string{"5"}); err != nil {
 		t.Fatalf("transition: %v", err)
 	}
 	if len(f2.writes) != 1 || !strings.Contains(f2.writes[0], `"resolution":{"id":"10000"}`) {
@@ -372,7 +372,7 @@ func TestTransitionTakesTheProfilesResolutionWhenTheTransitionAllowsIt(t *testin
 
 func TestATransitionThatNeedsNothingSendsNoFieldsAtAll(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	if err := b.Transition(context.Background(), "PLAT-412", "3"); err != nil {
+	if err := b.Transition(context.Background(), "PLAT-412", []string{"3"}); err != nil {
 		t.Fatalf("transition: %v", err)
 	}
 	want := `POST /rest/api/2/issue/PLAT-412/transitions {"transition":{"id":"21"}}`
@@ -383,7 +383,7 @@ func TestATransitionThatNeedsNothingSendsNoFieldsAtAll(t *testing.T) {
 
 func TestATransitionThatNeedsAnotherFieldIsRefusedByName(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	err := b.Transition(context.Background(), "PLAT-412", "6")
+	err := b.Transition(context.Background(), "PLAT-412", []string{"6"})
 	if err == nil {
 		t.Fatal("a transition asking for a custom field must be refused, not guessed at")
 	}
@@ -402,7 +402,7 @@ func TestATransitionThatNeedsAnotherFieldIsRefusedByName(t *testing.T) {
 
 func TestATransitionWithNoPathNamesTheIssueTheTargetAndWhatIsReachable(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	err := b.Transition(context.Background(), "PLAT-412", "9")
+	err := b.Transition(context.Background(), "PLAT-412", []string{"9"})
 	if !errors.Is(err, backend.ErrNoTransition) {
 		t.Fatalf("error kind: %v", err)
 	}
@@ -426,11 +426,11 @@ func TestATransitionWithNoPathNamesTheIssueTheTargetAndWhatIsReachable(t *testin
 func TestCanTransitionAnswersWithoutWriting(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	ctx := context.Background()
-	check, err := b.CanTransition(ctx, "PLAT-412", "5")
+	check, err := b.CanTransition(ctx, "PLAT-412", []string{"5"})
 	if err != nil || !check.Allowed {
 		t.Fatalf("check = %+v, %v", check, err)
 	}
-	check, err = b.CanTransition(ctx, "PLAT-412", "9")
+	check, err = b.CanTransition(ctx, "PLAT-412", []string{"9"})
 	if err != nil || check.Allowed {
 		t.Fatalf("check = %+v, %v", check, err)
 	}

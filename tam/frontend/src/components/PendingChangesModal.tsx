@@ -117,8 +117,7 @@ export function PendingChangesModal({ onClose }: Props) {
                     {g.createRow && <span className="chip chip-draft">Draft</span>}
                     {g.draft && <span className="pending-card-summary">{g.draft.summary}</span>}
                     {g.createRow && (
-                      <button type="button" className="btn pending-discard" disabled={busy} aria-label={`Discard ${g.key}`} onClick={() => discardOne.mutate(g.createRow!, { onError: onDiscardError })}>
-                        Discard
+                      <button type="button" className="btn btn-discard pending-discard" disabled={busy} aria-label={`Discard ${g.key}`} onClick={() => discardOne.mutate(g.createRow!, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
                       </button>
                     )}
                   </div>
@@ -135,8 +134,7 @@ export function PendingChangesModal({ onClose }: Props) {
                           <span className="b">{`${link.type} (${link.direction})`}</span>{" "}
                           <span className="accent-text">{link.toKey}</span>{" "}
                           <span>{link.toSummary}</span>{" "}
-                          <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Discard link to ${link.toKey}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}>
-                            Discard
+                          <button type="button" className="btn btn-discard btn-discard-row" disabled={busy} aria-label={`Discard link to ${link.toKey}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
                           </button>
                         </li>
                       ))}
@@ -154,8 +152,7 @@ export function PendingChangesModal({ onClose }: Props) {
                           <span>{row.beforeVal || "(none)"}</span>{" "}
                           <span className="muted">to</span>{" "}
                           <span className="b">{row.afterVal || "(none)"}</span>{" "}
-                          <button type="button" className="btn btn-ghost" disabled={busy} aria-label={`Discard ${row.field} on ${g.key}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}>
-                            Discard
+                          <button type="button" className="btn btn-discard btn-discard-row" disabled={busy} aria-label={`Discard ${row.field} on ${g.key}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
                           </button>
                         </li>
                       ))}
@@ -173,7 +170,9 @@ export function PendingChangesModal({ onClose }: Props) {
           Edits are pushed with Jira's own field update, a move with the transition, sprint, and rank endpoints. A conflict holds only that issue back.
         </span>
         <span className="pending-footer-buttons">
-          <button type="button" className="btn" disabled={busy || rows.length === 0} onClick={() => void onDiscardAll()}>Discard all</button>
+          <button type="button" className="btn btn-discard" disabled={busy || rows.length === 0} onClick={() => void onDiscardAll()}>
+            <span className="discard-mark" aria-hidden="true">✕</span>Discard all
+          </button>
           <button type="button" className="btn btn-primary" disabled={!canCommit || busy || pushable === 0} onClick={() => void runCommit()}>
             {`Commit (${pushable})`}
           </button>

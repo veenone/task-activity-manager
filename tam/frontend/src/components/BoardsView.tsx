@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FocusEvent, KeyboardEvent } from "react";
 import { errMsg, useProfile } from "@agile-suite/core";
 import type { BoardView, Issue, Profile, Settings, Swimlane } from "../api";
 import { useBoard, useBoardSprints, useBoards, useBoardsUnavailable, useSyncBoards } from "../queries/boards";
 import { useSyncState } from "../queries/issues";
+import { filterBoard } from "../lib/boardFilter";
 import { useSync } from "../contexts/SyncContext";
 import { clampFocus, findCard, moveFocus, parsePos, posId } from "../lib/boardCells";
 import type { Pos } from "../lib/boardCells";
@@ -29,7 +30,7 @@ function cardAtPos(view: BoardView, p: Pos | undefined): Issue | undefined {
 // the card's own menu moves a card, and Commit is what pushes any of it.
 export function BoardsView() {
   const { activeId } = useProfile<Profile, Settings>();
-  const { canSync, lastBoards, lastBoardsAt, lastCommit, status } = useSync();
+  const { canSync, lastBoards, lastCommit, runBoardsRefresh, status } = useSync();
   // A commit in flight is the one thing that holds a move back, and it
   // holds all three of them back: the drag, the menu, and the keys.
   const committing = status === "committing";
@@ -86,9 +87,15 @@ export function BoardsView() {
   const view = useBoard(activeId, board?.id ?? 0, effectiveSprintId, swimlane, sprintsReady);
   const unavailable = useBoardsUnavailable(activeId);
   const syncState = useSyncState(activeId);
-  const sync = useSyncBoards(activeId);
+  const sync = useSyncBoards(activeId, runBoardsRefresh);
+  // The filter is a reading aid over the drawn board, not a query: it never
+  // refetches, so clearing it costs nothing and a filtered board still holds
+  // every card the sync pulled.
+  const [filter, setFilter] = useState("");
 
-  const data = view.data;
+  // Filtered before anything reads it, so the cells, the counts, the
+  // keyboard walk, and the drop targets all agree about which cards exist.
+  const data = useMemo(() => (view.data ? filterBoard(view.data, filter) : view.data), [view.data, filter]);
   const moves = useBoardMoves({
     profileId: activeId,
     view: data,
@@ -188,7 +195,10 @@ export function BoardsView() {
   // Two passes can have written these boards: this view's own Refresh and
   // the boards half of an ordinary sync. The banner reports whichever ran
   // last, so a Refresh's stale result never hides what a later sync found.
-  const pass = sync.data && sync.submittedAt >= lastBoardsAt ? sync.data : lastBoards;
+  // Both passes now land in the same place: the Refresh writes its summary
+  // through SyncContext, exactly where the sync's own boards half writes
+  // one, so the banner reads one channel instead of racing two.
+  const pass = lastBoards;
 
   return (
     <section className="backlog" aria-label="Boards">
@@ -216,6 +226,8 @@ export function BoardsView() {
         refreshing={refreshing}
         canRefresh={canSync && !sync.isPending}
         onRefresh={() => sync.mutate()}
+        filter={filter}
+        onFilter={setFilter}
       />
 
       <BoardsBanner
@@ -241,6 +253,7 @@ export function BoardsView() {
           <BoardBody
             boards={boards}
             view={view}
+            filtered={data}
             unavailable={!!unavailable.data}
             hasBoards={boardList.length > 0}
             hasSprint={!!effectiveSprintId}

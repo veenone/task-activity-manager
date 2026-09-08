@@ -48,6 +48,10 @@ const sync = vi.hoisted(() => ({
   lastBoards: null as api.BoardSummary | null,
   lastBoardsAt: 0,
   lastCommit: null as api.CommitResult | null,
+  // The Refresh runs through SyncContext now, so that one lock covers a
+  // refresh and a sync alike. The stub does what the real one does: call the
+  // binding and record the pass where the banner reads it.
+  runBoardsRefresh: async () => ({}) as api.BoardSummary,
 }));
 vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
 
@@ -139,6 +143,12 @@ beforeEach(() => {
   sync.canSync = true;
   sync.lastBoards = null;
   sync.lastBoardsAt = 0;
+  sync.runBoardsRefresh = async () => {
+    const sum = await api.SyncBoards("p1");
+    sync.lastBoards = sum;
+    sync.lastBoardsAt = Date.now();
+    return sum;
+  };
   sync.lastCommit = null;
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Acme Platform", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
@@ -318,11 +328,21 @@ describe("BoardsView board", () => {
     renderView();
     expect(await screen.findByText("3 cards are not on the board (Approved, Blocked)")).toBeInTheDocument();
     expect(screen.getByText("2 cards on this board have not been synced")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Columns and cards follow your board's configuration. Quick filters and the board's own swimlanes are not applied.",
-      ),
-    ).toBeInTheDocument();
+  });
+
+  // The filter is what a standup asks for out loud: where's mine, where are
+  // the bugs, what is -124 doing.
+  it("filters the cards by key, assignee, or type without losing a column", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText(KEYS.key);
+    await user.type(screen.getByRole("searchbox", { name: "Filter cards" }), KEYS.key);
+    await waitFor(() => expect(screen.queryByText(PROMO.key)).not.toBeInTheDocument());
+    expect(screen.getByText(KEYS.key)).toBeInTheDocument();
+    // Every column head stays, so a filter never reads as a lost column.
+    for (const name of ["To Do", "In Progress", "Done"]) {
+      expect(screen.getByRole("columnheader", { name: new RegExp(name) })).toBeInTheDocument();
+    }
   });
 
   it("shows a capped cell's overflow while its column head still reads the true total", async () => {

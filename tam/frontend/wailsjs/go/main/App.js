@@ -170,8 +170,8 @@ export function ResolveConflictOverride(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveConflictOverride'](arg1, arg2, arg3);
 }
 
-export function SaveImportTemplate() {
-  return window['go']['main']['App']['SaveImportTemplate']();
+export function SaveImportTemplate(arg1) {
+  return window['go']['main']['App']['SaveImportTemplate'](arg1);
 }
 
 export function SearchUsers(arg1, arg2) {

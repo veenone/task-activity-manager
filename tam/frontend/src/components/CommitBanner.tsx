@@ -83,7 +83,13 @@ export function CommitBanner({ result, heldKeys, pendingRowIds, busy, onUndo }: 
   const warn = result.conflicts.length > 0 || failures.length > 0;
   return (
     <div className={`pending-banner${warn ? " pending-banner-warn" : ""}`} role="status">
-      <p className="b">{bannerLine(result)}</p>
+      {/* The sentence alone read the same whether everything landed or
+          nothing did. The mark and its colour are what say which, before
+          the sentence is read at all. */}
+      <p className={`b commit-line${warn ? " commit-line-warn" : " commit-line-ok"}`}>
+        <span className="commit-mark" aria-hidden="true">{warn ? "⚠" : "✓"}</span>
+        {bannerLine(result)}
+      </p>
       {result.conflicts.filter((c) => heldKeys.has(c.key)).map((c) => (
         <p key={c.key} className="small">{c.key} changed in Jira since you edited it. Resolve it below, then commit again.</p>
       ))}

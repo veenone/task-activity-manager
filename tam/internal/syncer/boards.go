@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	corejira "agile-suite/core/jira"
@@ -19,6 +20,10 @@ import (
 // at a Jira Software instance stops claiming there are none.
 const settingBoardsUnavailable = "boards_unavailable"
 
+// slowBoard is how long one board's read has to take before it is worth a
+// log line naming it.
+const slowBoard = 5 * time.Second
+
 // BoardSummary is what one boards pass reports.
 type BoardSummary struct {
 	Boards  int `json:"boards"`
@@ -30,7 +35,11 @@ type BoardSummary struct {
 	// is drawn on both.
 	Cards       int      `json:"cards"`
 	Dropped     []string `json:"dropped"`
-	Unavailable bool     `json:"unavailable"`
+	// Foreign is how many boards were left alone because they belong to
+	// another project. It is not a failure, so it is counted rather than
+	// listed in Dropped.
+	Foreign     int  `json:"foreign"`
+	Unavailable bool `json:"unavailable"`
 	Elapsed     string   `json:"elapsed"`
 }
 
@@ -117,6 +126,12 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 		return sum, err
 	}
 
+	boards, foreign := ownBoards(boards, projectKey, e.AllProjectBoards)
+	for _, name := range foreign {
+		log.Printf("tam: board %q belongs to another project; not syncing it for %s", name, projectKey)
+	}
+	sum.Foreign = len(foreign)
+
 	existing, err := e.Boards.ListBoards(ctx, profileID)
 	if err != nil {
 		sum.Elapsed = elapsed()
@@ -127,9 +142,17 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 		jiraIDs[b.ID] = true
 	}
 
-	for _, b := range boards {
-		emit(Progress{Phase: "boards", Stage: b.Name})
-		parts, err := e.readBoard(ctx, bb, b)
+	for i, b := range boards {
+		emit(Progress{Phase: "boards", Fetched: i, Total: len(boards), Stage: b.Name})
+		boardStart := e.Now()
+		parts, err := e.readBoard(ctx, bb, b, projectKey)
+		// Per board, so a slow pass can be attributed to a board rather than
+		// guessed at: this walk is one request per column set, per sprint
+		// page, and per page of every scope's issue keys.
+		if d := e.Now().Sub(boardStart); d > slowBoard {
+			log.Printf("tam: board %q took %s to read (%d sprints, %d cards)",
+				b.Name, d.Round(time.Millisecond), len(parts.sprints), distinctKeys(parts.keys))
+		}
 		if err != nil {
 			sum.Dropped = append(sum.Dropped, fmt.Sprintf("%s: %s", b.Name, errtext.Line(err)))
 			continue
@@ -165,12 +188,16 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 
 // readBoard gathers everything one board needs before any of it is
 // written: its columns, its sprints, its own issue list, and the issue
-// keys of its active and future sprints. Closed sprints are kept in the
+// keys of its active and future sprints, every scope narrowed to the
+// project being synced. Only that project's issues are ever in the cache,
+// so a key outside it could not be drawn anyway, and reading the board
+// entire cost a minute on a board whose filter spans far more than the
+// project (8,485 cards against the project's 38). Closed sprints are kept in the
 // sprint list but their keys are never fetched: the picker only offers
 // what a sync actually pulled membership for. Any failure here means
 // nothing is written for this board and its previous copy, if it has one,
 // stays exactly as it was.
-func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backend.Board) (boardParts, error) {
+func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backend.Board, projectKey string) (boardParts, error) {
 	cols, err := bb.BoardColumns(ctx, b.ID)
 	if err != nil {
 		return boardParts{}, err
@@ -179,7 +206,7 @@ func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backe
 	if err != nil {
 		return boardParts{}, err
 	}
-	ownKeys, err := bb.BoardIssueKeys(ctx, b.ID, "")
+	ownKeys, err := bb.BoardIssueKeys(ctx, b.ID, "", projectKey)
 	if err != nil {
 		return boardParts{}, err
 	}
@@ -189,13 +216,38 @@ func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backe
 			continue
 		}
 		sid := strconv.Itoa(s.ID)
-		sprintKeys, err := bb.BoardIssueKeys(ctx, b.ID, sid)
+		sprintKeys, err := bb.BoardIssueKeys(ctx, b.ID, sid, projectKey)
 		if err != nil {
 			return boardParts{}, err
 		}
 		keys[sid] = sprintKeys
 	}
 	return boardParts{columns: cols, sprints: sprints, keys: keys}, nil
+}
+
+// ownBoards splits the boards Jira answered with into this project's own and
+// the rest. Jira's board list answers with every board whose *filter*
+// mentions the project, so a board another team owns comes back too: one
+// seen in the field held 8,485 cards while the project being synced had 38,
+// and reading it cost a minute of every sync for cards that were not the
+// project's to draw. A board whose home the instance did not report is kept:
+// an instance that sends no location must not lose every board.
+//
+// all keeps them anyway, for the profile that genuinely works across a
+// programme board.
+func ownBoards(boards []backend.Board, projectKey string, all bool) (own []backend.Board, foreign []string) {
+	if all {
+		return boards, nil
+	}
+	own = make([]backend.Board, 0, len(boards))
+	for _, b := range boards {
+		if b.ProjectKey == "" || strings.EqualFold(b.ProjectKey, projectKey) {
+			own = append(own, b)
+			continue
+		}
+		foreign = append(foreign, b.Name)
+	}
+	return own, foreign
 }
 
 // distinctKeys counts the issue keys one board holds across all its scopes,

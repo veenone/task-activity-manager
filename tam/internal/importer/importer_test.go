@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"agile-suite/core/importfile"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/importer"
 	"agile-suite/tam/internal/issuerepo"
@@ -204,9 +205,9 @@ func TestRunRefusesAMappingWithoutSummaryOrWithAMissingColumn(t *testing.T) {
 }
 
 func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
-	data := importer.TemplateCSV()
+	data := importer.TemplateCSV("Business Requirement")
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) != 6 || !strings.HasPrefix(lines[0], "Type,Summary,Description,Priority,Labels,Assignee,Story Points,Parent") {
+	if len(lines) != 6 || !strings.HasPrefix(lines[0], "Key,Type,Summary,Description,Priority,Labels,Assignee,Story Points,Parent") {
 		t.Errorf("template: %q", string(data))
 	}
 	records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
@@ -214,12 +215,14 @@ func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 		t.Fatalf("parse template: %v", err)
 	}
 	m := importer.AutoMap(records[0])
-	if m.Type == "" || m.Summary == "" || m.StoryPoints == "" || m.ParentKey == "" {
+	if m.Key == "" || m.Type == "" || m.Summary == "" || m.StoryPoints == "" || m.ParentKey == "" {
 		t.Errorf("template headers must auto-map: %+v", m)
 	}
+	// Key and Parent are checked against the profile's cache, so a filled-in
+	// example would fail for everyone. Both stay empty in the shipped rows.
 	for i, row := range records[1:] {
-		if row[7] != "" {
-			t.Errorf("row %d parent cell must be empty: %q", i+2, row[7])
+		if row[0] != "" || row[8] != "" {
+			t.Errorf("row %d key and parent cells must be empty: %q, %q", i+2, row[0], row[8])
 		}
 	}
 	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
@@ -234,6 +237,48 @@ func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 	}
 	if res.Rows != 5 || len(res.Errors) != 0 {
 		t.Errorf("template dry run against a fresh repo: %+v", res)
+	}
+}
+
+// The workbook has to be a workbook the importer itself can read back, or
+// the round trip the template exists for does not close.
+func TestTemplateXLSXParsesBackIntoTheSameRows(t *testing.T) {
+	data, err := importer.TemplateXLSX("Business Requirement")
+	if err != nil {
+		t.Fatalf("TemplateXLSX: %v", err)
+	}
+	records, err := importfile.ParseRecords(data, true)
+	if err != nil {
+		t.Fatalf("parse workbook: %v", err)
+	}
+	if len(records) != 6 {
+		t.Fatalf("want a header and 5 examples, got %d rows", len(records))
+	}
+	for i, h := range importer.TemplateHeaders {
+		if records[0][i] != h {
+			t.Errorf("column %d: got %q, want %q", i, records[0][i], h)
+		}
+	}
+	m := importer.AutoMap(records[0])
+	if m.Key == "" || m.Summary == "" || m.Assignee == "" {
+		t.Errorf("workbook headers must auto-map: %+v", m)
+	}
+	// The requirement example uses the profile's own type name, so a project
+	// that calls it something else gets a row it can actually import.
+	if got := records[5][1]; got != "Business Requirement" {
+		t.Errorf("requirement example type: %q", got)
+	}
+	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	res, err := importer.Run(context.Background(), issuerepo.New(db.DB()), "p1", "PLAT", "Business Requirement", records, m, "template.xlsx", true)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Rows != 5 || len(res.Errors) != 0 {
+		t.Errorf("workbook dry run against a fresh repo: %+v", res)
 	}
 }
 

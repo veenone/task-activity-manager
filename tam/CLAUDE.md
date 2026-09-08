@@ -238,7 +238,24 @@ Import: the Backlog's Import button takes a CSV or XLSX (parsed by
 `core/importfile`, XTM's parser lifted out), maps columns to the eight draft
 fields (`internal/importer`), validates rows with file row numbers, and
 creates the valid rows as drafts in one transaction (`CreateDrafts`, audited
-"imported from <file>"). Links: the Links tab's Add link form journals a
+"imported from <file>").
+
+A ninth column, Key, decides what a row does. Empty, the row creates a
+draft. Filled with an issue key or a `.../browse/KEY` URL, it journals edits
+to that cached issue instead (`EditFields`, one transaction, all or
+nothing), so a sheet exported from Jira round-trips rather than duplicating
+every row. On such a row the Type cell is ignored (an issue's type is not
+editable) and an empty cell means "leave this field alone", never "clear
+it"; a value that already matches is not journaled, so re-importing an
+unchanged file leaves nothing pending. Summary is required only when no Key
+column is mapped. `SaveImportTemplate` writes a real workbook
+(`internal/importer/template.go`, excelize): an Issues sheet with the nine
+columns, a Type dropdown carrying the profile's own requirement type name,
+five examples, and a "How to use" sheet; naming the file `.csv` in the save
+dialog writes the same columns as CSV. Assignee is the Jira username, not
+the display name.
+
+Links: the Links tab's Add link form journals a
 link (entity type `link`, field `<type>|<direction>|<target>`); the
 repository merges pending links into the cached detail; the committer pushes
 link rows after edits with `POST /rest/api/2/issueLink` and drops the
@@ -347,6 +364,14 @@ Fields is the only section open on mount, so the panel still starts short.
 
 ## The create dialog
 
+A draft's parent comes from context. `parentKey` is fixed and stated (a
+sub-task's parent, from the issue it was drafted from); `initialEpic` is a
+default the picker may change, seeded from the epic on screen — the selected
+row when it is an epic, else the epic it hangs off. Starting at "(none)" made
+every draft begun with an epic open an orphan that had to be reparented
+afterwards. A fixed parent wins over a seeded epic.
+
+
 `NewIssueModal` drafts one issue and says so: it is titled after the type it
 is about to create, and its subtitle carries the offline-first sentence at
 full strength, in a slot no error message can take (it used to share the
@@ -419,6 +444,111 @@ Priority is the instance's own list through `App.ListPriorities`. Both
 pickers degrade to the text input they replaced when their lookup fails, the
 same shape the create dialog uses for a failed create-meta read: a lookup that
 cannot reach its list must not be the reason an issue cannot be assigned.
+
+## One lock, both ends
+
+Go holds a single per-profile lock (`App.acquire`) for a sync, a commit, an
+import, and a boards refresh alike, so whichever starts second is refused.
+The frontend models the same invariant in the shared sync reducer, and the two
+have to agree: the Boards view's Refresh used to be a plain mutation outside
+the reducer, so the shell stayed `idle`, kept offering Sync, and Go refused it
+with "a sync is already running for this profile" on a profile whose status
+still read "not synced yet". It runs through `SyncContext.runBoardsRefresh`
+now, which takes the same lock the sync does. **Anything new that calls a
+bound method taking `acquire` has to go through the reducer too.**
+
+`SyncBoards` acquires under its own name, so a refusal says which operation is
+actually running. The boards pass is also given the progress sink now: it
+walks every board's columns, sprints, and each sprint's issue keys, which
+takes minutes on a real project, and a standalone Refresh used to pass `nil`
+and report nothing anywhere.
+
+`SyncIssues` and `SyncBoards` log on the way in as well as out. A run that
+never returns used to leave no trace at all, so the log could not say whether
+a call had even reached Go.
+
+## The boards pass and the board's shape
+
+The pass is one request per board's column config, per page of its sprint
+list, and per page of the issue keys of every scope it holds: the board's own
+list plus each active or future sprint. Two things keep that from dominating
+the sync, and both were measured against a real instance where one board took
+66 seconds on its own:
+
+- **The Agile page size** (`pageAgileIssues`, 500). At 50 a page a board's own
+  issue list, which is every issue on the board, cost one round trip per 50
+  keys. Both paging loops advance by what actually came back, so an instance
+  that clamps `maxResults` lower is handled by the same arithmetic.
+- **The project narrowing.** A board's filter is not bounded by a project: the
+  board above held 8,485 cards while the project being synced had 38. Every
+  scope is read with `jql=project = "KEY"`, which the Agile endpoints AND with
+  the board's own filter. Only that project's issues are ever in the cache, so
+  a key outside it could not be drawn anyway.
+
+A board that still takes over five seconds names itself in the log with its
+sprint and card counts.
+
+The third saving is **whose boards get synced at all**. Jira's board list
+answers with every board whose *filter* mentions the project, which includes
+boards another team owns: the 8,485-card board above belongs to a different
+project entirely. `ownBoards` keeps only the boards whose own
+`location.projectKey` is this project, counts the rest in the summary's
+`Foreign`, and names them in the log. A board whose home the instance did not
+report is kept, so an instance that sends no location does not lose every
+board. The per-profile setting `boards_all_projects` keeps them all, for a
+profile that genuinely works across a programme board.
+
+The columns are Jira's own: `BoardColumns` reads the board's configuration and
+keeps each column's status ids, and `placeCard` puts a card in the column
+whose ids contain the card's `status_id` (schema 5 added that column; matching
+on the status *name* would break on any instance that renames one). A status
+no column collects is counted as `Unmapped` rather than drawn, which is what
+the board's unmapped line reports. Re-syncing a board therefore picks up a
+column added or renamed in Jira with no further work.
+
+## A drop asks for a column, not a status
+
+A Jira board column collects several statuses: a Done column commonly holds
+Resolved and Closed, and an instance that has migrated a workflow holds the
+old status beside the new one. Only one of them is usually reachable from
+where a card is now.
+
+So the push is given the whole column, not the one id the drop journaled.
+`BoardOrder.ColumnStatuses` returns every status sharing the dropped-on
+status's column, that one first, and `Transition` walks them in order and
+fires the first the issue's workflow offers. Keeping the journaled status
+first means a reachable target is still preferred over its siblings, and a
+refusal still names the status the user actually dropped on.
+
+The journal format is untouched: it still holds one `id|Name`, and the
+resolution happens at commit time, which is the only moment the workflow is
+knowable. `App.CanTransition` builds the same candidate set, so the drop's
+optimistic check and the push agree about what the drop meant.
+
+## The board grid
+
+The header row anchors as a **row** (`.board-columns-head`, sticky with its
+own background), not as individual sticky cells: sticking the cells alone left
+the 12px gaps between them transparent and cards scrolled through the header.
+
+The toolbar's filter is a reading aid over the drawn board, not a query
+(`lib/boardFilter.ts`): it matches a card's key, assignee, or issue type, and
+never refetches, so clearing it costs nothing. It keeps every column and lane
+so a filter never reads as a lost column, recomputes the column counts from
+what survives, and zeroes overflow rather than guessing at cards a cap left
+out. The board's own totals (unmapped, notSynced, donePoints) describe the
+board and are left alone. `BoardBody` takes the filtered view beside the query
+result: the query still says whether the board loaded, failed, or is empty.
+
+
+The column header row and each lane's row are separate elements, so they only
+line up because both are laid out on **one grid template**:
+`repeat(var(--board-cols), minmax(--board-col-w, 1fr))`, with the column count
+set on `.board-scroll` from the view. A flex row cannot do this, since each
+row sizes its own items and a lane holding a long card grew wider than the
+header above it. The cells carry `min-width: 0` so a wide card cannot push its
+track open. `minmax` is also what makes the columns share the pane's width and
+stop at a floor, past which `.board-scroll` scrolls sideways.
 
 ## Layout and scrolling
 

@@ -66,9 +66,6 @@ export function BoardNotes({ view }: { view: BoardView }) {
       {view.capped && (
         <p className="muted small">{`Showing the first ${MAX_CARDS_PER_VIEW} cards of this board`}</p>
       )}
-      <p className="muted small">
-        Columns and cards follow your board's configuration. Quick filters and the board's own swimlanes are not applied.
-      </p>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -29,6 +30,19 @@ func decodeImport(contentB64 string, isXlsx bool) ([][]string, error) {
 		return nil, errors.New("the file is larger than 20 MB")
 	}
 	return importfile.ParseRecords(data, isXlsx)
+}
+
+// requirementType is the profile's own name for its requirement level,
+// falling back to the built-in default when the profile has not set one.
+func (a *App) requirementType(profileID string) (string, error) {
+	t, err := a.repo.ProfileSetting(a.ctx, profileID, settingRequirementType)
+	if err != nil {
+		return "", err
+	}
+	if t == "" {
+		return jirabackend.DefaultRequirementType, nil
+	}
+	return t, nil
 }
 
 // PreviewImport parses an uploaded file's header row and counts its data
@@ -64,12 +78,9 @@ func (a *App) ImportIssues(profileID, contentB64 string, isXlsx bool, fileName s
 	if err != nil {
 		return importer.Result{}, err
 	}
-	reqType, err := a.repo.ProfileSetting(a.ctx, p.ID, settingRequirementType)
+	reqType, err := a.requirementType(p.ID)
 	if err != nil {
 		return importer.Result{}, err
-	}
-	if reqType == "" {
-		reqType = jirabackend.DefaultRequirementType
 	}
 	if strings.TrimSpace(fileName) == "" {
 		fileName = "an uploaded file"
@@ -79,21 +90,36 @@ func (a *App) ImportIssues(profileID, contentB64 string, isXlsx bool, fileName s
 		return res, err
 	}
 	if !dryRun {
-		log.Printf("tam: imported %d drafts from %s into %s (%d rows skipped)", len(res.Created), fileName, p.ProjectKey, len(res.Errors))
+		log.Printf("tam: imported %s into %s: %d drafts, %d issues updated, %d rows skipped", fileName, p.ProjectKey, len(res.Created), len(res.Updated), len(res.Errors))
 	}
 	return res, nil
 }
 
-// SaveImportTemplate writes the starter CSV where the user chooses and
-// returns the path, or "" when the dialog was cancelled.
-func (a *App) SaveImportTemplate() (string, error) {
+// SaveImportTemplate writes the starter workbook where the user chooses and
+// returns the path, or "" when the dialog was cancelled. The default is the
+// XLSX, which carries the notes sheet and the Type dropdown; picking a .csv
+// name in the dialog writes the plain CSV of the same columns instead, for
+// anyone whose toolchain would rather have one.
+func (a *App) SaveImportTemplate(profileID string) (string, error) {
 	if a.ctx == nil {
 		return "", errors.New("the window is not ready")
 	}
+	reqType := jirabackend.DefaultRequirementType
+	// A template is worth offering even without a usable profile, so a
+	// profile that cannot be read falls back to the default type name
+	// rather than failing the save.
+	if p, err := a.requireProfile(profileID); err == nil {
+		if t, err := a.requirementType(p.ID); err == nil {
+			reqType = t
+		}
+	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save import template",
-		DefaultFilename: "tam-import-template.csv",
-		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
+		DefaultFilename: "tam-import-template.xlsx",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Excel workbook", Pattern: "*.xlsx"},
+			{DisplayName: "CSV", Pattern: "*.csv"},
+		},
 	})
 	if err != nil {
 		return "", fmt.Errorf("save dialog: %w", err)
@@ -101,7 +127,15 @@ func (a *App) SaveImportTemplate() (string, error) {
 	if path == "" {
 		return "", nil
 	}
-	if err := os.WriteFile(path, importer.TemplateCSV(), 0o644); err != nil {
+	data := []byte(nil)
+	if strings.EqualFold(filepath.Ext(path), ".csv") {
+		data = importer.TemplateCSV(reqType)
+	} else {
+		if data, err = importer.TemplateXLSX(reqType); err != nil {
+			return "", fmt.Errorf("build template: %w", err)
+		}
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write template: %w", err)
 	}
 	return path, nil

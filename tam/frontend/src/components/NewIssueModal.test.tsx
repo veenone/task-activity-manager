@@ -380,6 +380,49 @@ describe("NewIssueModal", () => {
     expect(await screen.findByRole("dialog", { name: "New sub-task" })).toBeInTheDocument();
   });
 
+  // A draft started with an epic on screen belongs to it. Starting at
+  // "(none)" made every such draft an orphan that had to be reparented.
+  it("seeds the epic picker from the epic on screen, and still lets it change", async () => {
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <DialogProvider>
+          <ProfileProvider backend={profileBackend}>
+            <Loader />
+            <NewIssueModal onClose={vi.fn()} onCreated={vi.fn()} initialType="story" initialEpic="PLAT-360" />
+          </ProfileProvider>
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New story" });
+    await waitFor(() => expect(within(dialog).getByLabelText("Epic")).toHaveValue("PLAT-360"));
+    await user.selectOptions(within(dialog).getByLabelText("Epic"), "PLAT-350");
+    await user.type(within(dialog).getByLabelText("Summary *"), "Apply a promo code");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    expect(vi.mocked(api.CreateIssue).mock.calls[0][1].parentKey).toBe("PLAT-350");
+  });
+
+  // A sub-task's parent is fixed, so it wins over any epic in context.
+  it("keeps the fixed parent when both a parent and an epic are given", async () => {
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <DialogProvider>
+          <ProfileProvider backend={profileBackend}>
+            <Loader />
+            <NewIssueModal
+              onClose={vi.fn()} onCreated={vi.fn()}
+              initialType="subtask" lockType parentKey="PLAT-412" initialEpic="PLAT-360"
+            />
+          </ProfileProvider>
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+    const dialog = await screen.findByRole("dialog", { name: /^New / });
+    expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Epic")).not.toBeInTheDocument();
+  });
+
   it("closes without asking when nothing has been typed", async () => {
     const user = userEvent.setup();
     const { onClose } = renderModal();

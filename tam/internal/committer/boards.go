@@ -31,6 +31,11 @@ const sprintBatch = 50
 // importing issuerepo.
 type BoardOrder interface {
 	CellOrder(ctx context.Context, profileID string, boardID int) ([]string, error)
+	// ColumnStatuses is every status sharing a board column with this one,
+	// that one first. A column collects several statuses and only one is
+	// usually reachable from where a card is now, so the push is given the
+	// whole set rather than the single id the drop journaled.
+	ColumnStatuses(ctx context.Context, profileID, statusID string) ([]string, error)
 }
 
 // boardWriter is the part of backend.BoardBackend this pass needs. It asks
@@ -266,16 +271,29 @@ func (e *Engine) pushSprints(ctx context.Context, profileID string, w boardWrite
 }
 
 // pushTransitions fires one transition per issue, in key order. The
-// backend resolves the journaled status id to a transition at push time; a
-// target with no path back comes back as ErrNoTransition and is reported
-// with the statuses the card can actually reach.
+// backend resolves the journaled status to a transition at push time.
+//
+// It is given every status the dropped-on column collects, not only the one
+// the drop journaled: a Jira column holds several statuses, and only one of
+// them is usually reachable from where the card is now, so pushing the first
+// alone refused a move the board was plainly offering. The journaled status
+// stays first, so a reachable target is still preferred over its siblings.
+// A column whose statuses are all out of reach comes back as
+// ErrNoTransition and is reported with the statuses the card can reach.
 func (e *Engine) pushTransitions(ctx context.Context, profileID string, plan movePlan, res *Result) {
 	for _, key := range plan.keys {
 		p, ok := plan.transitions[key]
 		if !ok {
 			continue
 		}
-		if err := e.b.Transition(ctx, key, issuerepo.MoveID(p.AfterVal)); err != nil {
+		target := issuerepo.MoveID(p.AfterVal)
+		targets, err := e.order.ColumnStatuses(ctx, profileID, target)
+		if err != nil || len(targets) == 0 {
+			// The board's columns are a local read; failing it should not
+			// cost the move, it should only cost the siblings.
+			targets = []string{target}
+		}
+		if err := e.b.Transition(ctx, key, targets); err != nil {
 			res.Failures = append(res.Failures, boardFailure(p, namedTarget(err, issuerepo.MoveRawName(p.AfterVal)), true))
 			continue
 		}

@@ -129,7 +129,7 @@ func (stubIssueBackend) LinkTypes(context.Context) ([]backend.LinkType, error) {
 func (stubIssueBackend) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
 }
-func (stubIssueBackend) Transition(context.Context, string, string) error {
+func (stubIssueBackend) Transition(context.Context, string, []string) error {
 	return errors.New("not used")
 }
 
@@ -142,7 +142,7 @@ func (stubIssueBackend) RankIssue(context.Context, string, string, bool) error {
 func (stubIssueBackend) MoveIssuesToSprint(context.Context, string, []string) error {
 	return errors.New("not used")
 }
-func (stubIssueBackend) CanTransition(context.Context, string, string) (backend.TransitionCheck, error) {
+func (stubIssueBackend) CanTransition(context.Context, string, []string) (backend.TransitionCheck, error) {
 	return backend.TransitionCheck{}, errors.New("not used")
 }
 
@@ -176,7 +176,7 @@ func (b *simpleBoardBackend) BoardColumns(_ context.Context, boardID int) ([]bac
 func (b *simpleBoardBackend) BoardSprints(context.Context, int) ([]backend.Sprint, error) {
 	return []backend.Sprint{}, nil
 }
-func (b *simpleBoardBackend) BoardIssueKeys(context.Context, int, string) ([]string, error) {
+func (b *simpleBoardBackend) BoardIssueKeys(context.Context, int, string, string) ([]string, error) {
 	return []string{}, nil
 }
 
@@ -213,7 +213,7 @@ func (b *blockingBoardBackend) BoardColumns(_ context.Context, boardID int) ([]b
 func (b *blockingBoardBackend) BoardSprints(context.Context, int) ([]backend.Sprint, error) {
 	return []backend.Sprint{}, nil
 }
-func (b *blockingBoardBackend) BoardIssueKeys(context.Context, int, string) ([]string, error) {
+func (b *blockingBoardBackend) BoardIssueKeys(context.Context, int, string, string) ([]string, error) {
 	return []string{}, nil
 }
 
@@ -421,7 +421,7 @@ type checkingBackend struct {
 	refuse error
 }
 
-func (b *checkingBackend) CanTransition(context.Context, string, string) (backend.TransitionCheck, error) {
+func (b *checkingBackend) CanTransition(context.Context, string, []string) (backend.TransitionCheck, error) {
 	if b.refuse != nil {
 		return backend.TransitionCheck{}, b.refuse
 	}

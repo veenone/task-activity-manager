@@ -15,6 +15,12 @@ import (
 
 // acquire marks the profile as running what ("sync", "commit", or "import")
 // and refuses while any of them runs. Callers defer release.
+// boardOrder is the board-aware half of the store, the one both the commit
+// pass and the drop's own check read the columns through.
+func (a *App) boardOrder() boardrepo.Order {
+	return boardrepo.Order{Boards: a.boards, Issues: a.repo}
+}
+
 func (a *App) acquire(profileID, what string) error {
 	a.backendMu.Lock()
 	defer a.backendMu.Unlock()
@@ -132,7 +138,7 @@ func (a *App) CommitPendingChanges(profileID string) (committer.Result, error) {
 // what the rank group re-derives each neighbour from; app.go is the one
 // place holding both repositories, so it is where they are joined.
 func (a *App) commitEngine(b backend.IssueBackend) *committer.Engine {
-	return committer.New(b, a.repo, boardrepo.Order{Boards: a.boards, Issues: a.repo})
+	return committer.New(b, a.repo, a.boardOrder())
 }
 
 // ResolveConflictOverride rebases a held issue's edits so the next Commit

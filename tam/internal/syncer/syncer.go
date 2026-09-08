@@ -65,6 +65,11 @@ type Engine struct {
 	// issue-only test builds an engine without touching it, and a second
 	// constructor would only multiply with the next optional dependency.
 	Boards *boardrepo.Repository
+	// AllProjectBoards keeps the boards that belong to another project.
+	// Jira's board list answers with every board whose filter mentions the
+	// project, so the default is to sync only the project's own; a profile
+	// that genuinely works across a programme board sets this.
+	AllProjectBoards bool
 }
 
 // New builds an engine with the default page size and clock.

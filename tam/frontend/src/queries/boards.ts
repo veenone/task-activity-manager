@@ -12,6 +12,7 @@ import {
   SETTING_BOARDS_UNAVAILABLE,
   SyncBoards,
 } from "../api";
+import type { BoardSummary } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
 
@@ -67,10 +68,16 @@ export function useBoardsUnavailable(profileId: string) {
 // useSyncBoards is the Refresh button: it pulls the boards, their sprints,
 // and their cards, then refreshes everything that read them, the sync state
 // included, since the pass writes a fresh timestamp with the rest.
-export function useSyncBoards(profileId: string) {
+//
+// run is SyncContext's runBoardsRefresh, injected rather than reached for so
+// this module stays free of the context. It is what holds the sync lock for
+// the duration: Go holds one per-profile lock for a refresh and a sync alike,
+// so a refresh that did not take the frontend's lock left the shell offering
+// a Sync the backend would refuse.
+export function useSyncBoards(profileId: string, run: () => Promise<BoardSummary>) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => call(() => SyncBoards(profileId)),
+    mutationFn: run,
     onSettled: () => {
       if (!profileId) return;
       for (const queryKey of [

@@ -20,7 +20,7 @@ interface Picked {
   isXlsx: boolean;
 }
 
-const EMPTY: ImportMapping = { type: "", summary: "", description: "", priority: "", labels: "", assignee: "", storyPoints: "", parentKey: "" };
+const EMPTY: ImportMapping = { key: "", type: "", summary: "", description: "", priority: "", labels: "", assignee: "", storyPoints: "", parentKey: "" };
 const PREFLIGHT_DELAY_MS = 250;
 
 // Preflight is the automatic dry run that keeps the Import button and the
@@ -39,10 +39,15 @@ function validationLine(r: ImportResult): string {
   return `${valid} valid ${valid === 1 ? "row" : "rows"}${skipped > 0 ? `, ${skipped} skipped` : ""}.`;
 }
 
-// resultLine words a finished import that created at least one draft.
+// resultLine words a finished import. A file can create, update, or do both,
+// so the sentence names only the halves that actually happened; both land as
+// pending changes, which is the one thing the user has to act on next.
 function resultLine(r: ImportResult): string {
   const skipped = r.errors.length;
-  return `✓ Imported ${plural(r.created.length, "draft", "drafts")} as pending creates${skipped > 0 ? ` (${skipped} skipped)` : ""}. Commit them from the Pending changes dialog.`;
+  const parts: string[] = [];
+  if (r.created.length > 0) parts.push(`${plural(r.created.length, "draft", "drafts")} to create`);
+  if (r.updated.length > 0) parts.push(`${plural(r.updated.length, "issue", "issues")} to update`);
+  return `✓ Imported ${parts.join(" and ")} as pending changes${skipped > 0 ? ` (${skipped} skipped)` : ""}. Commit them from the Pending changes dialog.`;
 }
 
 // ImportIssuesModal turns a CSV or XLSX into drafts: pick, map, and import.
@@ -74,7 +79,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
       setPreflight({ kind: "none" });
       return;
     }
-    if (!debouncedMapping.summary) {
+    if (!debouncedMapping.summary && !debouncedMapping.key) {
       setPreflight({ kind: "needsSummary" });
       return;
     }
@@ -95,7 +100,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
 
   async function revalidate() {
     if (!picked) return;
-    if (!mapping.summary) {
+    if (!mapping.summary && !mapping.key) {
       setPreflight({ kind: "needsSummary" });
       return;
     }
@@ -132,7 +137,8 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
 
   const validRows = preflight.kind === "ready" ? preflight.r.rows - preflight.r.errors.length : 0;
   const importDisabled = locked || preflight.kind !== "ready" || validRows === 0;
-  const success = result !== null && result.created.length > 0;
+  const landed = (r: ImportResult) => r.created.length + r.updated.length;
+  const success = result !== null && landed(result) > 0;
 
   async function runImport() {
     if (!picked || importDisabled) return;
@@ -141,7 +147,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
     try {
       const r = await call(() => ImportIssues(activeId, picked.b64, picked.isXlsx, picked.name, mapping, false));
       setResult(r);
-      if (r.created.length > 0) {
+      if (landed(r) > 0) {
         invalidateWrites(qc, activeId);
         onImported(r.created);
         // Clear the picked file so a second click cannot re-import the same
@@ -158,7 +164,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
 
   async function template() {
     try {
-      const path = await call(() => SaveImportTemplate());
+      const path = await call(() => SaveImportTemplate(activeId));
       if (path) await notice({ title: "Template saved", message: path });
     } catch (err) {
       await notice({ title: "Template export failed", message: errMsg(err), tone: "error" });
@@ -220,7 +226,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
 
             {!result && picked && preflight.kind !== "none" && (
               <div className="import-validation">
-                {preflight.kind === "needsSummary" && <p className="muted">Map a Summary column first.</p>}
+                {preflight.kind === "needsSummary" && <p className="muted">Map a Summary column first, or an Issue key column to update issues that already exist.</p>}
                 {preflight.kind === "ready" && (
                   <>
                     <p className={preflight.r.errors.length ? "warn-text" : "ok-text"}>{validationLine(preflight.r)}</p>
@@ -236,7 +242,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
               </div>
             )}
 
-            {result && result.created.length === 0 && (
+            {result && landed(result) === 0 && (
               <div className="import-validation">
                 <p className="warn-text">Nothing was imported.</p>
                 {result.errors.length > 0 && (

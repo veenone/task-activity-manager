@@ -514,6 +514,7 @@ export interface ImportPreview {
 }
 
 export interface ImportMapping {
+  key: string;
   type: string;
   summary: string;
   description: string;
@@ -532,11 +533,15 @@ export interface ImportRowError {
 export interface ImportResult {
   rows: number;
   created: string[];
+  updated: string[];
   errors: ImportRowError[];
 }
 
-// IMPORT_FIELDS are the draft fields a column can feed, in dialog order.
+// IMPORT_FIELDS are the fields a column can feed, in dialog order. Key comes
+// first because it decides what the whole row does: mapped and filled in, the
+// row updates the issue it names instead of creating a new one.
 export const IMPORT_FIELDS: { id: keyof ImportMapping; label: string }[] = [
+  { id: "key", label: "Issue key (updates)" },
   { id: "type", label: "Type" },
   { id: "summary", label: "Summary" },
   { id: "description", label: "Description" },
@@ -703,7 +708,7 @@ export const ImportIssues = (
   dryRun: boolean,
 ): Promise<ImportResult> =>
   App.ImportIssues(profileId, contentB64, isXlsx, fileName, importer.Mapping.createFrom(mapping), dryRun) as Promise<ImportResult>;
-export const SaveImportTemplate: () => Promise<string> = App.SaveImportTemplate;
+export const SaveImportTemplate: (profileId: string) => Promise<string> = App.SaveImportTemplate;
 
 export const SearchUsers: (profileId: string, query: string) => Promise<JiraUser[]> =
   App.SearchUsers;

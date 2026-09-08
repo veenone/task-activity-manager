@@ -1,4 +1,4 @@
-import type { DragEvent, KeyboardEvent } from "react";
+import type { CSSProperties, DragEvent, KeyboardEvent } from "react";
 import type { BoardView, Issue, Sprint } from "../api";
 import { posId } from "../lib/boardCells";
 import { plural } from "../lib/format";
@@ -61,14 +61,22 @@ export function BoardGrid({
   const target = moves.target;
   return (
     <div
-      className="board-scroll"
+      // While a card is in the air the whole board marks its drop targets,
+      // so the reader can see where a card may land instead of hunting for
+      // the one cell under the cursor.
+      className={`board-scroll${moves.dragKey ? " board-scroll-dragging" : ""}`}
+      // The header row and every lane row share one grid template, so the
+      // column count has to reach the CSS: without it each row would size
+      // its own columns and a lane holding a long card would sit wider than
+      // the header above it.
+      style={{ "--board-cols": view.columns.length } as CSSProperties}
       role="grid"
       aria-label="Board"
       aria-colcount={view.columns.length}
       aria-describedby="board-move-keys"
       onDragOver={scrollNearEdge}
     >
-      <div className="board-columns" role="row">
+      <div className="board-columns board-columns-head" role="row">
         {view.columns.map((c, col) => (
           <div key={c.name} className="board-column-head" role="columnheader" aria-colindex={col + 1}>
             <span>{c.name}</span>

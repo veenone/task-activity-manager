@@ -138,7 +138,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
 .topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .topbar-btn-primary:hover { background: var(--accent-hover); }
-.chip-sync { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+/* Sync progress bar, mirrored from XTM's App.css. The track's dark fill is
+   literal there because XTM's status bar is dark; TAM's is the surface, so
+   the two tokens keep it legible in both themes. */
+.syncbar { display: flex; align-items: center; gap: 8px; }
+.syncbar-track { width: 160px; height: 8px; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.syncbar-fill { height: 100%; background: var(--accent); transition: width 0.2s ease; }
+@media (prefers-reduced-motion: reduce) { .syncbar-fill { transition: none; } }
 
 /* Backlog: filter bar, grid, pager */
 .filter-bar { flex: none; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -186,7 +192,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
    closely at it. width: max-content sizes the row to its tracks and
    min-width: 100% lets it still fill a wider pane, leaving the slack at the
    right rather than redistributing it. */
-.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) 104px 420px 132px 116px 96px 44px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
+/* SPRINT was 96px, which clipped every real sprint name ("Sprint 12 -
+   Checkout polish") to its first two words. The grid scrolls sideways now,
+   so a column wide enough to read costs nothing that matters. */
+.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) 104px 420px 132px 116px 168px 44px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
 /* Every cell clips to its track. Without this a grid item wider than its
    track paints over its neighbour (nowrap) or wraps to two lines in a row
    whose height is locked at 34px, and a clipped value reads as a complete
@@ -293,15 +302,20 @@ input, button, select { font-family: inherit; font-size: inherit; }
   white-space: nowrap;
 }
 .detail-actions { display: flex; gap: 8px; margin-top: 14px; }
-.new-issue-parent { font-weight: 600; color: var(--text); padding-top: 6px; }
+.new-issue-parent { font-weight: 600; color: var(--text); padding-top: 6px; min-width: 0; overflow-wrap: anywhere; }
 .detail-close { color: #9aa7bd; flex-shrink: 0; }
 .detail-close:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .detail-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 18px; }
 .detail-summary { font-size: 14px; margin: 0 0 12px; }
 /* The label/value grid XTM uses for the read-only facts above the editor. */
-.detail-fields { display: grid; grid-template-columns: 84px 1fr; gap: 8px 10px; align-items: center; margin-bottom: 4px; font-size: 12px; }
-.detail-fields dt { color: var(--text-muted); }
-.detail-fields dd { margin: 0; }
+/* align-items: start, not center: a value that wraps to two lines (a sprint
+   called "Sprint 12 - Checkout polish", a long path) used to sit centred
+   against its label and read as though it belonged to neither row. */
+.detail-fields { display: grid; grid-template-columns: 84px 1fr; gap: 8px 10px; align-items: start; margin-bottom: 4px; font-size: 12px; }
+.detail-fields dt { color: var(--text-muted); padding-top: 1px; }
+/* The value wraps rather than clipping: the panel is resizeable and these
+   are facts a reader needs whole, so the column gives way, not the text. */
+.detail-fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 /* Section headings double as dividers, which is what gives the dense panel
    its rhythm; the whole heading is the toggle. */
 .detail-section-title {
@@ -363,6 +377,26 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .pending-card-conflict { background: #fff7ed; border-color: #f59e0b; }
 .pending-card-head { display: flex; align-items: center; gap: 10px; }
 .pending-card-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Discard throws local work away. It is not the dangerous button on this
+   dialog (Commit is the one that reaches Jira), so it does not take the red
+   fill; it takes a quiet outline that turns red on approach, which is what
+   marks it as the destructive one of the two without shouting over Commit. */
+.btn-discard {
+  color: var(--danger-text);
+  border-color: color-mix(in srgb, var(--danger-text) 35%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-discard:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger-text) 12%, transparent);
+  border-color: var(--danger-text);
+}
+.btn-discard:focus-visible { outline: 2px solid var(--danger-text); outline-offset: 1px; }
+/* The row-level ones sit inside dense rows, so they stay ghost-quiet until
+   hovered and carry the mark rather than the word. */
+.btn-discard-row { padding: 2px 7px; font-size: 11px; border-color: transparent; }
+.discard-mark { font-size: 11px; line-height: 1; }
 .pending-discard { margin-left: auto; }
 .pending-rows { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .pending-row { display: grid; grid-template-columns: 110px 1fr auto 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
@@ -448,6 +482,14 @@ input, button, select { font-family: inherit; font-size: inherit; }
    a flex row: without it the board's own width wins and the panel is pushed
    out of the window. */
 .boards-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+/* The filter sits with the pickers and takes the same shape, so the toolbar
+   reads as one row of controls rather than a row plus a search box. */
+.board-filter input { width: 200px; border: 1px solid var(--border-strong); border-radius: 4px; padding: 4px 8px; background: var(--surface); color: var(--text); }
+/* A commit's outcome, before its sentence is read. */
+.commit-line { display: flex; align-items: baseline; gap: 7px; }
+.commit-mark { flex: none; font-size: 13px; }
+.commit-line-ok .commit-mark { color: var(--ok-text); }
+.commit-line-warn .commit-mark { color: var(--warn-text); }
 .boards-pane .board-scroll { min-width: 0; }
 
 /* Plan 1c: links */

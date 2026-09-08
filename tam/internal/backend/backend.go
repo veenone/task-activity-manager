@@ -250,6 +250,11 @@ type Board struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
+	// ProjectKey is the project the board belongs to, "" when the instance
+	// did not say. Jira's board list answers with every board whose filter
+	// mentions the project being synced, so this is what separates a
+	// project's own boards from another team's that happen to include it.
+	ProjectKey string `json:"projectKey"`
 }
 
 // BoardColumn is one column of a board's configuration. StatusIDs are the
@@ -288,9 +293,12 @@ type BoardBackend interface {
 	// for a board that has none. It never writes.
 	BoardSprints(ctx context.Context, boardID int) ([]Sprint, error)
 	// BoardIssueKeys lists the keys the board holds, for one sprint when
-	// sprintID is set and for the whole board when it is empty. It reads
-	// Jira's Agile API and never writes.
-	BoardIssueKeys(ctx context.Context, boardID int, sprintID string) ([]string, error)
+	// sprintID is set and for the whole board when it is empty, narrowed to
+	// projectKey. A board's filter is not bounded by a project, so without
+	// that narrowing a board can answer with tens of thousands of keys of
+	// which only the synced project's are usable. It reads Jira's Agile API
+	// and never writes.
+	BoardIssueKeys(ctx context.Context, boardID int, sprintID, projectKey string) ([]string, error)
 	// RankIssue ranks key immediately before or after neighbourKey. Jira's
 	// rank is one order across the whole board, so the neighbour may sit in
 	// another column; the commit pass re-derives it from the board's own
@@ -384,11 +392,11 @@ type IssueBackend interface {
 	// offers for that issue at that moment. It returns ErrNoTransition when
 	// none does and ErrTransitionFields when the transition asks for more
 	// than a resolution.
-	Transition(ctx context.Context, key, targetStatusID string) error
+	Transition(ctx context.Context, key string, targetStatusIDs []string) error
 	// CanTransition reports whether targetStatusID is reachable from where
 	// the issue sits now, and what it can reach instead. It is the check a
 	// drop makes while the app is online; it never writes.
-	CanTransition(ctx context.Context, key, targetStatusID string) (TransitionCheck, error)
+	CanTransition(ctx context.Context, key string, targetStatusIDs []string) (TransitionCheck, error)
 	// CreateIssue creates the draft and returns the key Jira assigned.
 	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, error)
 	// CreateFields lists the required create-meta fields of a logical type

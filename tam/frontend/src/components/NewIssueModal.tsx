@@ -27,6 +27,15 @@ interface Props {
   // issue it belongs to. Unlike the epic picker this is not a choice: the
   // issue the user was looking at is the parent.
   parentKey?: string;
+  // parentSummary names that issue beside its key, so the link the draft is
+  // about to make is legible without looking it up.
+  parentSummary?: string;
+  // initialEpic seeds the Epic picker for a type that has one. Unlike
+  // parentKey this is a default the user may change: a draft started while
+  // an epic is on screen almost always belongs to it, and starting at
+  // "(none)" made every such draft an orphan that had to be reparented
+  // afterwards.
+  initialEpic?: string;
 }
 
 // CREATABLE are the types this app can draft on its own. A sub-task is not
@@ -151,6 +160,8 @@ export function NewIssueModal({
   initialType = "task",
   lockType = false,
   parentKey: fixedParent = "",
+  parentSummary = "",
+  initialEpic = "",
 }: Props) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const { confirm } = useConfirm();
@@ -162,7 +173,7 @@ export function NewIssueModal({
   const [labels, setLabels] = useState("");
   const [assignee, setAssignee] = useState("");
   const [points, setPoints] = useState("");
-  const [parentKey, setParentKey] = useState(fixedParent);
+  const [parentKey, setParentKey] = useState(fixedParent || initialEpic);
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   // The control the last validation failure belongs to, so the message is
@@ -323,8 +334,13 @@ export function NewIssueModal({
         {type === "subtask" && (
           <div className="edit-row">
             <span className="muted small">Parent</span>
-            <span className="muted small new-issue-parent">
+            {/* Stated, not chosen: the issue this was opened from is the
+                parent, and it is what the draft carries to Jira's own
+                parent field. Naming it here is what makes the link the
+                user is about to create visible before they create it. */}
+            <span className="new-issue-parent">
               {fixedParent || "none"}
+              {parentSummary && <span className="muted small"> {parentSummary}</span>}
             </span>
           </div>
         )}

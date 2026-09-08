@@ -23,6 +23,11 @@ const (
 	// settingRequirementType is the per-profile key for the Jira issue type
 	// name TAM treats as a requirement.
 	settingRequirementType = "requirement_issue_type"
+	// settingAllProjectBoards keeps the boards of other projects that Jira
+	// returns for this one. Off by default: the board list answers with
+	// every board whose filter mentions the project, and reading another
+	// team's board can cost more than the whole project's sync.
+	settingAllProjectBoards = "boards_all_projects"
 	// settingTransitionResolution is the per-profile key for the resolution
 	// name a board transition sends when the workflow asks for one. Most
 	// Data Center workflows put a resolution screen on the way into Done,
@@ -34,6 +39,9 @@ const (
 	detailFreshFor = 10 * time.Minute
 	// syncProgressEvent carries syncer.Progress frames to the frontend.
 	syncProgressEvent = "tam:sync-progress"
+	// backendSlowLock is how long a backend lock wait or build has to take
+	// before it is worth a log line. Both are meant to be instant.
+	backendSlowLock = 2 * time.Second
 )
 
 // requireProfile is requireStore plus the profile row, so every issue
@@ -57,11 +65,25 @@ func (a *App) requireProfile(profileID string) (profile.Profile, error) {
 // the profile's TLS settings and the PAT from the credential store. The
 // token goes into the client and nowhere else.
 func (a *App) backendFor(p profile.Profile) (backend.IssueBackend, error) {
+	// The lock is held across a credential read and two store reads below, so
+	// every bound call that needs a backend queues behind whichever one got
+	// here first. Timing both halves is what tells a slow build apart from a
+	// call that never came back.
+	waited := time.Now()
 	a.backendMu.Lock()
 	defer a.backendMu.Unlock()
+	if held := time.Since(waited); held > backendSlowLock {
+		log.Printf("tam: waited %s for the backend lock (%s)", held.Round(time.Millisecond), p.Name)
+	}
 	if b, ok := a.backends[p.ID]; ok {
 		return b, nil
 	}
+	built := time.Now()
+	defer func() {
+		if d := time.Since(built); d > backendSlowLock {
+			log.Printf("tam: building the backend for %s took %s", p.Name, d.Round(time.Millisecond))
+		}
+	}()
 	var b backend.IssueBackend
 	if suiteprofiles.IsDemoURL(p.JiraURL) {
 		b = demobackend.New(p.ProjectKey)
@@ -99,6 +121,18 @@ func (a *App) backendForProfile(profileID string) (profile.Profile, backend.Issu
 		return profile.Profile{}, nil, err
 	}
 	return p, b, nil
+}
+
+// allProjectBoards reads the profile's board-scope setting. A read failure
+// is the default, not an error: it decides how much a sync pulls, never
+// whether it may run.
+func (a *App) allProjectBoards(profileID string) bool {
+	v, err := a.repo.ProfileSetting(a.ctx, profileID, settingAllProjectBoards)
+	if err != nil {
+		log.Printf("tam: read the board scope for %s: %v", profileID, err)
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(v), "true")
 }
 
 // forgetBackend drops a cached backend so the next call rebuilds it, which
@@ -148,17 +182,29 @@ func (a *App) SyncIssues(profileID string, full bool) (syncer.Summary, error) {
 	if err != nil {
 		return syncer.Summary{}, err
 	}
+	// Logged on the way in as well as the way out: a sync that never returns
+	// used to leave no trace at all, so the log could not say whether the call
+	// had even reached Go. The frontend stays locked until this returns, which
+	// makes a silent hang here indistinguishable from a frozen UI.
+	kind := "sync"
+	if full {
+		kind = "full sync"
+	}
+	log.Printf("tam: %s started for %s (%s)", kind, p.Name, p.ProjectKey)
 	if err := a.acquire(p.ID, "sync"); err != nil {
+		log.Printf("tam: %s refused for %s: %v", kind, p.Name, err)
 		return syncer.Summary{}, err
 	}
 	defer a.release(p.ID)
 
 	b, err := a.backendFor(p)
 	if err != nil {
+		log.Printf("tam: %s could not build the backend for %s: %v", kind, p.Name, err)
 		return syncer.Summary{}, err
 	}
 	eng := syncer.New(b, a.repo)
 	eng.Boards = a.boards
+	eng.AllProjectBoards = a.allProjectBoards(p.ID)
 	sum, err := eng.Sync(a.ctx, p.ID, p.ProjectKey, p.ScopeJQL, full, a.emitProgress)
 	if sum.Boards != nil {
 		sum.Boards.EnsureDropped()

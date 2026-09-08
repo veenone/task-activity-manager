@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Menu, LiveRegion, useProfile, errMsg } from "@agile-suite/core";
 import { Health, EventsOn, SetNavRailVisible, isDemoUrl } from "./api";
-import type { HealthInfo, Profile, Settings } from "./api";
+import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
 import type { View } from "./nav";
 import { useModal } from "./modals";
@@ -21,6 +21,37 @@ import { formatWhen } from "./lib/format";
 // The topbar, profile controls, and status bar mirror XTM's App.tsx/App.css
 // so the two windows read as one product; the nav rail is TAM's own element
 // (XTM switches views with topbar tabs instead of a rail).
+// SyncBar is XTM's status-bar progress bar, class for class: a fixed track
+// with a filled proportion, and the stage beside it. A count only exists for
+// a phase that knows its total (the issue pull, and now the boards pass,
+// which counts boards), so the track is only drawn when there is a
+// proportion to draw; everything else says what it is doing and trails off.
+function SyncBar({ progress }: { progress: SyncProgress }) {
+  const hasCount = progress.total > 0;
+  const pct = hasCount ? Math.round((progress.fetched / progress.total) * 100) : 0;
+  const stage = progress.stage || (progress.phase === "boards" ? "Boards" : "Syncing");
+  return (
+    <div className="syncbar" role="status">
+      {hasCount && (
+        <div
+          className="syncbar-track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={progress.total}
+          aria-valuenow={progress.fetched}
+          aria-label={stage}
+        >
+          <div className="syncbar-fill" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      <span className="muted">
+        {stage}
+        {hasCount ? `: ${progress.fetched.toLocaleString()} / ${progress.total.toLocaleString()}` : "…"}
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const {
     profiles,
@@ -245,13 +276,7 @@ export default function App() {
         ) : (
           <span className="muted">Profiles shared with XTM · agile-suite/profiles.db</span>
         )}
-        {progress && (
-          <span className="chip chip-sync" role="status">
-            {progress.total > 0
-              ? `Syncing: ${progress.fetched} of ${progress.total}`
-              : progress.stage || "Syncing"}
-          </span>
-        )}
+        {progress && <SyncBar progress={progress} />}
         {(syncError || syncState.data?.lastError) && !progress && (
           <span className="error-text" data-testid="sync-error">
             Last sync failed: {syncError || syncState.data?.lastError}
