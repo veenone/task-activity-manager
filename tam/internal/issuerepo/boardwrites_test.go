@@ -37,17 +37,6 @@ func seedBoardCards(t *testing.T, repo *issuerepo.Repository) {
 	}
 }
 
-// seedSprintRow writes one row of the boards sync's sprint table, which is
-// where the name of a sprint no issue is in yet has to come from.
-func seedSprintRow(t *testing.T, db *sql.DB, id int, name string) {
-	t.Helper()
-	if _, err := db.Exec(
-		`INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date) VALUES (?, ?, 1, ?, 'future', '', '')`,
-		"p1", id, name); err != nil {
-		t.Fatalf("seed sprint %d: %v", id, err)
-	}
-}
-
 // oneRow is the profile's single pending change, or a failure naming what
 // was there instead.
 func oneRow(t *testing.T, repo *issuerepo.Repository, key string) journal.PendingChange {
@@ -103,20 +92,31 @@ func TestMoveToColumnNamesAStatusTheCacheHasNeverSeenByItsID(t *testing.T) {
 		t.Errorf("after = %q, want the id whatever the name is", p.AfterVal)
 	}
 	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
-	if iss.StatusID != "10099" || iss.Status != "10099" {
-		t.Errorf("row = %+v, want the id shown in place of a name nobody knows", iss)
+	if iss.StatusID != "10099" {
+		t.Errorf("row = %+v, want the target status id", iss)
+	}
+	// The name column stays empty rather than taking the id: a fabricated
+	// name is what the next drop on this column would read back as the real
+	// one, and IsDone reads that column too.
+	if iss.Status != "" {
+		t.Errorf("status name = %q, want no name invented for an id the cache has never seen", iss.Status)
+	}
+	if err := repo.MoveToColumn(ctx, "p1", "PLAT-2", "10099"); err != nil {
+		t.Fatalf("second move: %v", err)
+	}
+	if p := oneRow(t, repo, "PLAT-2"); p.AfterVal != "10099|" {
+		t.Errorf("after = %q, want the second drop to find no name either", p.AfterVal)
 	}
 }
 
 func TestMoveToSprintJournalsTheSprintAndTheBacklog(t *testing.T) {
-	repo, db := newRepoDB(t)
+	repo := newRepo(t)
 	ctx := context.Background()
 	seedBoardCards(t, repo)
-	// Sprint 13 is a future sprint no issue is in yet, so its name can only
-	// come from the boards sync's own table.
-	seedSprintRow(t, db, 13, "Sprint 13")
 
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "13"); err != nil {
+	// Sprint 13 is a future sprint no issue is in yet, so no cached row can
+	// name it: the caller, which holds the sprint list, hands the name in.
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "13", "Sprint 13"); err != nil {
 		t.Fatalf("move: %v", err)
 	}
 	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
@@ -133,7 +133,7 @@ func TestMoveToSprintJournalsTheSprintAndTheBacklog(t *testing.T) {
 
 	// The backlog is a destination, not an absence: the row stays, with an
 	// empty value, and the columns are cleared.
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", ""); err != nil {
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "", ""); err != nil {
 		t.Fatalf("backlog: %v", err)
 	}
 	p = oneRow(t, repo, "PLAT-1")
@@ -144,6 +144,15 @@ func TestMoveToSprintJournalsTheSprintAndTheBacklog(t *testing.T) {
 	if iss.SprintID != "" || iss.SprintName != "" {
 		t.Errorf("row = %+v, want the sprint cleared", iss)
 	}
+
+	// A caller with no name to give falls back to the name a cached issue
+	// in that sprint already carries.
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-3", "12", ""); err != nil {
+		t.Fatalf("fallback: %v", err)
+	}
+	if p := oneRow(t, repo, "PLAT-3"); p.AfterVal != "12|Sprint 12" {
+		t.Errorf("after = %q, want the name the cache knows for sprint 12", p.AfterVal)
+	}
 }
 
 func TestRankIssueJournalsItsNeighbourAndWritesNoColumn(t *testing.T) {
@@ -151,15 +160,25 @@ func TestRankIssueJournalsItsNeighbourAndWritesNoColumn(t *testing.T) {
 	ctx := context.Background()
 	seedBoardCards(t, repo)
 
-	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-2", true); err != nil {
+	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-2", true, 7); err != nil {
 		t.Fatalf("rank: %v", err)
 	}
 	p := oneRow(t, repo, "PLAT-1")
 	if p.EntityType != issuerepo.EntityRank || p.Field != issuerepo.FieldRank {
 		t.Errorf("journal row = %+v, want a rank", p)
 	}
-	if p.BeforeVal != "" || p.AfterVal != "before|PLAT-2" || p.BaseVersion != v1 {
-		t.Errorf("journal row = %+v, want the neighbour and its side and no before value", p)
+	// The board is the third segment: one key can sit on two boards whose
+	// orders disagree, and the commit pass re-derives the neighbour from
+	// the order of the board the drop was made on.
+	if p.BeforeVal != "" || p.AfterVal != "before|PLAT-2|7" || p.BaseVersion != v1 {
+		t.Errorf("journal row = %+v, want the neighbour, its side, and its board, and no before value", p)
+	}
+	if key, before, boardID := issuerepo.ParseRank(p.AfterVal); key != "PLAT-2" || !before || boardID != 7 {
+		t.Errorf("parsed = %q, %v, %d", key, before, boardID)
+	}
+	// A row journaled before the board joined the value still parses.
+	if key, before, boardID := issuerepo.ParseRank("after|PLAT-9"); key != "PLAT-9" || before || boardID != 0 {
+		t.Errorf("two-segment value parsed as %q, %v, %d, want board 0", key, before, boardID)
 	}
 	// Decision 4: a made-up LexoRank in the cache would be a second source
 	// of truth the next sync overwrites.
@@ -172,12 +191,20 @@ func TestRankIssueJournalsItsNeighbourAndWritesNoColumn(t *testing.T) {
 	}
 
 	// The other side, and a second rank replacing the first.
-	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-3", false); err != nil {
+	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-3", false, 7); err != nil {
 		t.Fatalf("re-rank: %v", err)
 	}
 	p = oneRow(t, repo, "PLAT-1")
-	if p.AfterVal != "after|PLAT-3" {
+	if p.AfterVal != "after|PLAT-3|7" {
 		t.Errorf("after = %q, want the newest drop", p.AfterVal)
+	}
+	// The same neighbour and side on another board is another drop, not the
+	// one already journaled.
+	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-3", false, 8); err != nil {
+		t.Fatalf("other board: %v", err)
+	}
+	if p = oneRow(t, repo, "PLAT-1"); p.AfterVal != "after|PLAT-3|8" {
+		t.Errorf("after = %q, want the board the newest drop was made on", p.AfterVal)
 	}
 }
 
@@ -205,10 +232,9 @@ func TestASecondMoveReplacesTheFirstAndKeepsItsBeforeValue(t *testing.T) {
 }
 
 func TestAMoveBackToWhereItStartedDeletesTheRowAndAuditsTheUndo(t *testing.T) {
-	repo, db := newRepoDB(t)
+	repo := newRepo(t)
 	ctx := context.Background()
 	seedBoardCards(t, repo)
-	seedSprintRow(t, db, 13, "Sprint 13")
 
 	// PLAT-1 is the only cached issue in status 1, so once it has moved, no
 	// row names that status any more and the target is journaled as a bare
@@ -233,11 +259,12 @@ func TestAMoveBackToWhereItStartedDeletesTheRowAndAuditsTheUndo(t *testing.T) {
 		t.Errorf("audit = %+v, want the undo recorded", act)
 	}
 
-	// The same rule on a sprint move.
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "13"); err != nil {
+	// The same rule on a sprint move, and on ids alone: the sprint was
+	// renamed in Jira between the two drops, and a rename is not a move.
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "13", "Sprint 13"); err != nil {
 		t.Fatalf("sprint out: %v", err)
 	}
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "12"); err != nil {
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "12", "Sprint 12 (renamed)"); err != nil {
 		t.Fatalf("sprint home: %v", err)
 	}
 	rows, _ = repo.PendingForKey(ctx, "p1", "PLAT-1")
@@ -273,16 +300,16 @@ func TestABoardMoveRefusesAKeyTheCacheDoesNotHold(t *testing.T) {
 	if err := repo.MoveToColumn(ctx, "p1", "PLAT-404", "3"); !errors.Is(err, issuerepo.ErrNotFound) {
 		t.Errorf("move of an unknown key = %v, want ErrNotFound", err)
 	}
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-404", "13"); !errors.Is(err, issuerepo.ErrNotFound) {
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-404", "13", "Sprint 13"); !errors.Is(err, issuerepo.ErrNotFound) {
 		t.Errorf("sprint move of an unknown key = %v, want ErrNotFound", err)
 	}
 	// A rank against a card nobody has seen would be pushed to Jira as a key
 	// that does not resolve.
-	err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-404", true)
+	err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-404", true, 1)
 	if err == nil || !strings.Contains(err.Error(), "PLAT-404") {
 		t.Errorf("rank against an unknown neighbour = %v, want it refused by name", err)
 	}
-	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-1", true); err == nil {
+	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-1", true, 1); err == nil {
 		t.Error("an issue ranked against itself must be refused")
 	}
 	if err := repo.MoveToColumn(ctx, "p1", "PLAT-1", "  "); err == nil {
@@ -302,12 +329,12 @@ func TestADraftIsMovedInPlaceAndJournalsNothingNew(t *testing.T) {
 	if err := repo.MoveToColumn(ctx, "p1", key, "3"); err != nil {
 		t.Fatalf("move: %v", err)
 	}
-	if err := repo.MoveToSprint(ctx, "p1", key, "12"); err != nil {
+	if err := repo.MoveToSprint(ctx, "p1", key, "12", "Sprint 12"); err != nil {
 		t.Fatalf("sprint: %v", err)
 	}
 	// A rank has neither a column nor a draft field, so it is where a
 	// draft's drag stops, and it must not fail the caller.
-	if err := repo.RankIssue(ctx, "p1", key, "PLAT-1", true); err != nil {
+	if err := repo.RankIssue(ctx, "p1", key, "PLAT-1", true, 1); err != nil {
 		t.Fatalf("rank: %v", err)
 	}
 
@@ -356,7 +383,7 @@ func TestDiscardingAMoveRestoresTheColumnsItChanged(t *testing.T) {
 	}
 
 	// A sprint move reverts both of its columns.
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", ""); err != nil {
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "", ""); err != nil {
 		t.Fatalf("sprint: %v", err)
 	}
 	p = oneRow(t, repo, "PLAT-1")
@@ -374,7 +401,7 @@ func TestDiscardingARankOnlyDropsTheRow(t *testing.T) {
 	ctx := context.Background()
 	seedBoardCards(t, repo)
 
-	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-2", false); err != nil {
+	if err := repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-2", false, 1); err != nil {
 		t.Fatalf("rank: %v", err)
 	}
 	n, err := repo.DiscardKey(ctx, "p1", "PLAT-1")
@@ -391,21 +418,29 @@ func TestDiscardingARankOnlyDropsTheRow(t *testing.T) {
 	}
 }
 
-func TestDiscardingAMoveLeavesTheColumnAloneWhenJiraHasMovedOn(t *testing.T) {
-	repo := newRepo(t)
+// diverge writes a column straight onto the row, behind the journal's back,
+// which is the one way a cached column stops holding what a pending move
+// wrote there: a sync cannot do it, because the replay puts the pending
+// target back over every row it refreshes.
+func diverge(t *testing.T, db *sql.DB, key, status, statusID string) {
+	t.Helper()
+	if _, err := db.Exec(
+		`UPDATE issue SET status = ?, status_id = ?, updated = ? WHERE profile_id = 'p1' AND key = ?`,
+		status, statusID, v2, key); err != nil {
+		t.Fatalf("diverge %s: %v", key, err)
+	}
+}
+
+func TestDiscardingAMoveLeavesAColumnThatHasMovedOnAlone(t *testing.T) {
+	repo, db := newRepoDB(t)
 	ctx := context.Background()
 	seedBoardCards(t, repo)
 
 	if err := repo.MoveToColumn(ctx, "p1", "PLAT-1", "3"); err != nil {
 		t.Fatalf("move: %v", err)
 	}
-	// A sync brings the row back with a newer version: whatever the card's
-	// column is now, it is not the one the move was made against.
-	fresh := []backend.Issue{{Key: "PLAT-1", ID: "101", Project: "PLAT", Type: backend.TypeStory, Summary: "one",
-		Status: "Blocked", StatusID: "10098", SprintID: "12", SprintName: "Sprint 12", Rank: "0|a", Updated: v2}}
-	if err := repo.UpsertPage(ctx, "p1", fresh, time.Now(), false); err != nil {
-		t.Fatalf("sync: %v", err)
-	}
+	diverge(t, db, "PLAT-1", "Blocked", "10098")
+
 	p := oneRow(t, repo, "PLAT-1")
 	if err := repo.DiscardPendingChange(ctx, "p1", p.ID); err != nil {
 		t.Fatalf("discard: %v", err)
@@ -413,12 +448,97 @@ func TestDiscardingAMoveLeavesTheColumnAloneWhenJiraHasMovedOn(t *testing.T) {
 	rows, _ := repo.PendingForKey(ctx, "p1", "PLAT-1")
 	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
 	if len(rows) != 0 {
-		t.Errorf("pending = %+v, want the row gone whatever the base version says", rows)
+		t.Errorf("pending = %+v, want the row gone whatever the column says", rows)
 	}
-	// Writing a stale before_val over a fresher remote is worse than leaving
-	// the value in place; the next sync is what settles it.
-	if iss.StatusID == "1" {
-		t.Errorf("row = %+v, want the stale before value not written back", iss)
+	// The card is no longer where this app put it, so the before value is
+	// not this app's to write back; the next sync settles the column.
+	if iss.StatusID != "10098" {
+		t.Errorf("row = %+v, want the value that is there now kept", iss)
+	}
+}
+
+func TestADragHomeLeavesAColumnThatHasMovedOnAlone(t *testing.T) {
+	repo, db := newRepoDB(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.MoveToColumn(ctx, "p1", "PLAT-1", "3"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	diverge(t, db, "PLAT-1", "Blocked", "10098")
+
+	// An undo puts a column back exactly as a discard does, so it asks the
+	// same question first. One drag home means one thing whichever of the
+	// two handles it.
+	if err := repo.MoveToColumn(ctx, "p1", "PLAT-1", "1"); err != nil {
+		t.Fatalf("home: %v", err)
+	}
+	rows, _ := repo.PendingForKey(ctx, "p1", "PLAT-1")
+	if len(rows) != 0 {
+		t.Errorf("pending = %+v, want the journal row gone", rows)
+	}
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
+	if iss.StatusID != "10098" {
+		t.Errorf("row = %+v, want the column that has moved on kept", iss)
+	}
+	act, _ := repo.ListActivity(ctx, "p1", "PLAT-1", 0)
+	if len(act) != 2 || act[0].Action != "undo" {
+		t.Errorf("audit = %+v, want the undo recorded", act)
+	}
+}
+
+func TestDiscardingAMoveAfterASyncThatOnlyFreshenedTheStampPutsTheCardBack(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.MoveToColumn(ctx, "p1", "PLAT-1", "3"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	// Someone commented on the issue in Jira. The sync brings the row back
+	// with a newer stamp and the status it always had, and the replay puts
+	// the pending target over it again: the column the row holds now is
+	// this app's own write, not a value Jira moved the card to.
+	fresh := []backend.Issue{{Key: "PLAT-1", ID: "101", Project: "PLAT", Type: backend.TypeStory, Summary: "one",
+		Status: "To Do", StatusID: "1", SprintID: "12", SprintName: "Sprint 12", Rank: "0|a", Updated: v2}}
+	if err := repo.UpsertPage(ctx, "p1", fresh, time.Now(), false); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1"); iss.StatusID != "3" {
+		t.Fatalf("row after the sync = %+v, want the pending move still drawn", iss)
+	}
+	p := oneRow(t, repo, "PLAT-1")
+	if err := repo.DiscardPendingChange(ctx, "p1", p.ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+	// Discard means the same thing on a board row as on a field edit. A
+	// card left at its pending target with no journal row behind it is in a
+	// state that exists in neither Jira nor the journal.
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
+	if iss.StatusID != "1" || iss.Status != "To Do" || iss.Pending {
+		t.Errorf("row = %+v, want the column the card started in", iss)
+	}
+}
+
+func TestASecondDropOnARenamedSprintIsNotAMove(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "13", "Sprint 13"); err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	// The sprint was renamed in Jira between two identical drops. The card
+	// has not moved, and every comparison here is on ids.
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "13", "Sprint 13 renamed"); err != nil {
+		t.Fatalf("second: %v", err)
+	}
+	if p := oneRow(t, repo, "PLAT-1"); p.AfterVal != "13|Sprint 13" {
+		t.Errorf("after = %q, want the journal row left as it was", p.AfterVal)
+	}
+	act, _ := repo.ListActivity(ctx, "p1", "PLAT-1", 0)
+	if len(act) != 1 {
+		t.Errorf("audit = %+v, want one move rather than a second that did not happen", act)
 	}
 }
 
@@ -430,7 +550,7 @@ func TestAFullSyncKeepsAPendingMoveOnScreen(t *testing.T) {
 	if err := repo.MoveToColumn(ctx, "p1", "PLAT-1", "3"); err != nil {
 		t.Fatalf("move: %v", err)
 	}
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-2", ""); err != nil {
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-2", "", ""); err != nil {
 		t.Fatalf("sprint: %v", err)
 	}
 	// A full sync deletes and reinserts every row. Without the board types
@@ -459,7 +579,7 @@ func TestAFullSyncKeepsAPendingMoveOnScreen(t *testing.T) {
 	}
 }
 
-func TestRekeyRepointsARankJournaledAgainstADraft(t *testing.T) {
+func TestRekeyRepointsARankJournaledAgainstADraftAndKeepsItsBoard(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()
 	seedBoardCards(t, repo)
@@ -467,7 +587,7 @@ func TestRekeyRepointsARankJournaledAgainstADraft(t *testing.T) {
 	if err != nil {
 		t.Fatalf("draft: %v", err)
 	}
-	if err := repo.RankIssue(ctx, "p1", "PLAT-1", draft, true); err != nil {
+	if err := repo.RankIssue(ctx, "p1", "PLAT-1", draft, true, 7); err != nil {
 		t.Fatalf("rank: %v", err)
 	}
 	// The draft gets the key Jira assigned. A rank still naming TAM-NEW-n
@@ -476,8 +596,12 @@ func TestRekeyRepointsARankJournaledAgainstADraft(t *testing.T) {
 		t.Fatalf("rekey: %v", err)
 	}
 	p := oneRow(t, repo, "PLAT-1")
-	if p.AfterVal != "before|PLAT-99" {
-		t.Errorf("rank after the rekey = %q, want the real key", p.AfterVal)
+	// The board the drop was made on has to survive the repoint: the draft
+	// neighbour is exactly the case the commit pass needs it for, and a
+	// value rebuilt without it would leave the rank naming a board 0 that
+	// does not exist.
+	if p.AfterVal != "before|PLAT-99|7" {
+		t.Errorf("rank after the rekey = %q, want the real key and the board it was dropped on", p.AfterVal)
 	}
 }
 
@@ -489,10 +613,10 @@ func TestPendingMovesFoldsTheThreeTypesPerIssue(t *testing.T) {
 	if err := repo.MoveToColumn(ctx, "p1", "PLAT-1", "3"); err != nil {
 		t.Fatalf("column: %v", err)
 	}
-	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", ""); err != nil {
+	if err := repo.MoveToSprint(ctx, "p1", "PLAT-1", "", ""); err != nil {
 		t.Fatalf("sprint: %v", err)
 	}
-	if err := repo.RankIssue(ctx, "p1", "PLAT-2", "PLAT-3", true); err != nil {
+	if err := repo.RankIssue(ctx, "p1", "PLAT-2", "PLAT-3", true, 1); err != nil {
 		t.Fatalf("rank: %v", err)
 	}
 	// An ordinary field edit is not a board intent and must not appear here.

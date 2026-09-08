@@ -15,7 +15,9 @@ import (
 // the issue's current value and its updated stamp, refuses a key the cache
 // does not hold, journals the intent against that stamp, audits it, and
 // writes the local column so the view repaints where the card was dropped.
-// Nothing here talks to Jira: the journal is what Commit pushes.
+// Nothing here talks to Jira: the journal is what Commit pushes. What a
+// journaled value means in columns, and what putting one back may
+// overwrite, is movecolumns.go.
 
 // boardRow is what a board write reads before it decides anything: the two
 // columns a move can change and the version the intent is journaled
@@ -52,7 +54,7 @@ func (r *Repository) MoveToColumn(ctx context.Context, profileID, key, statusID 
 	if statusID == "" {
 		return errors.New("a column move needs the status the column collects")
 	}
-	return r.inMoveTx(ctx, func(tx *sql.Tx) error {
+	return r.inTx(ctx, func(tx *sql.Tx) error {
 		row, err := readBoardRow(ctx, tx, profileID, key)
 		if err != nil {
 			return err
@@ -69,16 +71,25 @@ func (r *Repository) MoveToColumn(ctx context.Context, profileID, key, statusID 
 // MoveToSprint journals a card moved to another sprint and moves it
 // locally. An empty sprintID is the backlog, which is a destination and not
 // an absence.
-func (r *Repository) MoveToSprint(ctx context.Context, profileID, key, sprintID string) error {
+//
+// sprintName is the destination's name as the caller knows it. The sprint
+// list is boardrepo's table, and this package does not read it to name its
+// own destination: app.go holds both repositories and asks the one that
+// owns the sprints. A caller with no name to give falls back to the name a
+// cached issue in that sprint carries.
+func (r *Repository) MoveToSprint(ctx context.Context, profileID, key, sprintID, sprintName string) error {
 	sprintID = strings.TrimSpace(sprintID)
-	return r.inMoveTx(ctx, func(tx *sql.Tx) error {
+	sprintName = strings.TrimSpace(sprintName)
+	return r.inTx(ctx, func(tx *sql.Tx) error {
 		row, err := readBoardRow(ctx, tx, profileID, key)
 		if err != nil {
 			return err
 		}
-		name, err := sprintNameFor(ctx, tx, profileID, sprintID)
-		if err != nil {
-			return err
+		name := sprintName
+		if name == "" {
+			if name, err = sprintNameFor(ctx, tx, profileID, sprintID); err != nil {
+				return err
+			}
 		}
 		return recordMove(ctx, tx, profileID, key, EntitySprintMove, FieldSprintID,
 			MoveValue(row.sprintID, row.sprintName), MoveValue(sprintID, name), row.updated)
@@ -86,10 +97,11 @@ func (r *Repository) MoveToSprint(ctx context.Context, profileID, key, sprintID 
 }
 
 // RankIssue journals a card dropped before or after neighbourKey inside its
-// cell. It writes no column, by Decision 4: a made-up LexoRank in the cache
-// would be a second source of truth the next sync silently overwrites, so
-// the board read is what orders a pending rank, by its neighbour.
-func (r *Repository) RankIssue(ctx context.Context, profileID, key, neighbourKey string, before bool) error {
+// cell, on the board the drop was made on. It writes no column, by
+// Decision 4: a made-up LexoRank in the cache would be a second source of
+// truth the next sync silently overwrites, so the board read is what orders
+// a pending rank, by its neighbour.
+func (r *Repository) RankIssue(ctx context.Context, profileID, key, neighbourKey string, before bool, boardID int) error {
 	neighbourKey = strings.TrimSpace(neighbourKey)
 	if neighbourKey == "" {
 		return errors.New("a rank needs the card it was dropped against")
@@ -97,7 +109,7 @@ func (r *Repository) RankIssue(ctx context.Context, profileID, key, neighbourKey
 	if neighbourKey == key {
 		return errors.New("an issue cannot be ranked against itself")
 	}
-	return r.inMoveTx(ctx, func(tx *sql.Tx) error {
+	return r.inTx(ctx, func(tx *sql.Tx) error {
 		row, err := readBoardRow(ctx, tx, profileID, key)
 		if err != nil {
 			return err
@@ -111,21 +123,8 @@ func (r *Repository) RankIssue(ctx context.Context, profileID, key, neighbourKey
 		// A rank has no cached value, so there is no before to journal and
 		// nothing for its revert to put back.
 		return recordMove(ctx, tx, profileID, key, EntityRank, FieldRank,
-			"", RankValue(neighbourKey, before), row.updated)
+			"", RankValue(neighbourKey, before, boardID), row.updated)
 	})
-}
-
-// inMoveTx runs one board write in its own transaction.
-func (r *Repository) inMoveTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
 }
 
 // recordMove is the body every board write shares. current is the value the
@@ -140,10 +139,16 @@ func (r *Repository) inMoveTx(ctx context.Context, fn func(tx *sql.Tx) error) er
 // replaces the first while the first row's before_val survives, or a later
 // discard would put the card somewhere it never was.
 //
+// The undo puts a column back, so it asks first what the Discard path asks:
+// the column goes back only while the row still holds the value this app
+// wrote there. Both go through holdsMove, so one drag home means one thing
+// whichever of them handles it.
+//
 // Every one of those comparisons is on ids, never on the "id|Name" text: a
 // status name that differs between the board configuration and the cached
 // issue row would otherwise make a card dragged home look like a move to
-// somewhere new.
+// somewhere new, and a sprint renamed between two identical drops would
+// rewrite a row that never changed.
 func recordMove(ctx context.Context, tx *sql.Tx, profileID, key, entityType, field, current, after, baseVersion string) error {
 	if strings.HasPrefix(key, DraftPrefix) {
 		return moveDraft(ctx, tx, profileID, key, entityType, field, current, after)
@@ -153,19 +158,21 @@ func recordMove(ctx context.Context, tx *sql.Tx, profileID, key, entityType, fie
 		return err
 	}
 	switch {
-	case held && existingAfter == after:
+	case held && sameMove(entityType, existingAfter, after):
 		return nil
-	case held && MoveID(after) == MoveID(existingBefore):
+	case held && sameMove(entityType, after, existingBefore):
 		if _, err := tx.ExecContext(ctx,
 			`DELETE FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = ?`,
 			profileID, entityType, key, field); err != nil {
 			return fmt.Errorf("undo %s on %s: %w", field, key, err)
 		}
-		if err := applyMoveColumns(ctx, tx, profileID, key, entityType, existingBefore); err != nil {
-			return err
+		if holdsMove(entityType, current, existingAfter) {
+			if err := applyMoveColumns(ctx, tx, profileID, key, entityType, existingBefore); err != nil {
+				return err
+			}
 		}
 		return journal.Audit(tx, profileID, entityType, key, "undo", field, existingAfter, existingBefore, "")
-	case !held && MoveID(after) == MoveID(current):
+	case !held && sameMove(entityType, after, current):
 		return nil
 	}
 	if err := journal.Put(tx, profileID, entityType, key, field, current, after, baseVersion); err != nil {
@@ -175,6 +182,17 @@ func recordMove(ctx context.Context, tx *sql.Tx, profileID, key, entityType, fie
 		return err
 	}
 	return journal.Audit(tx, profileID, entityType, key, "move", field, current, after, "")
+}
+
+// sameMove compares two board values the way every decision here does: on
+// ids for a transition and a sprint move, and on the whole text for a rank,
+// whose value is a side, a neighbour, and a board with no id half to
+// compare.
+func sameMove(entityType, a, b string) bool {
+	if entityType == EntityRank {
+		return a == b
+	}
+	return MoveID(a) == MoveID(b)
 }
 
 // readJournaledMove returns the board row the journal already holds for one
@@ -193,70 +211,13 @@ func readJournaledMove(ctx context.Context, q execer, profileID, entityType, key
 	return before, after, true, nil
 }
 
-// applyMoveColumns writes what a board value means on the issue row, so the
-// board and the Backlog repaint together. It is the one place that turns a
-// journaled value into columns, which is why the write path, the revert,
-// and the post-sync replay all go through it.
-func applyMoveColumns(ctx context.Context, q execer, profileID, key, entityType, value string) error {
-	switch entityType {
-	case EntityTransition:
-		if _, err := q.ExecContext(ctx,
-			`UPDATE issue SET status = ?, status_id = ? WHERE profile_id = ? AND key = ?`,
-			MoveName(value), MoveID(value), profileID, key); err != nil {
-			return fmt.Errorf("move %s to status %s: %w", key, MoveID(value), err)
-		}
-		return nil
-	case EntitySprintMove:
-		id, name := MoveID(value), ""
-		if id != "" {
-			name = MoveName(value)
-		}
-		if _, err := q.ExecContext(ctx,
-			`UPDATE issue SET sprint_id = ?, sprint_name = ? WHERE profile_id = ? AND key = ?`,
-			id, name, profileID, key); err != nil {
-			return fmt.Errorf("move %s to sprint %s: %w", key, id, err)
-		}
-		return nil
-	case EntityRank:
-		// Decision 4: a rank stays out of the cache.
-		return nil
-	}
-	return fmt.Errorf("%q is not a board move", entityType)
-}
-
-// revertMove puts back the columns one board row changed. A rank has none.
-// A row whose base version no longer matches the issue's updated stamp
-// leaves the columns alone: Jira has moved on since the move was made, and
-// writing a stale before_val over a fresher remote is worse than leaving
-// the value the sync brought in.
-func revertMove(ctx context.Context, tx *sql.Tx, profileID string, p journal.PendingChange) error {
-	if p.EntityType == EntityRank {
-		return nil
-	}
-	var updated string
-	err := tx.QueryRowContext(ctx, `SELECT updated FROM issue WHERE profile_id = ? AND key = ?`,
-		profileID, p.EntityKey).Scan(&updated)
-	if errors.Is(err, sql.ErrNoRows) {
-		// A full sync no longer returns this issue; there is no row left to
-		// revert, and the journal row still goes.
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("check %s exists: %w", p.EntityKey, err)
-	}
-	if updated != p.BaseVersion {
-		return nil
-	}
-	return applyMoveColumns(ctx, tx, profileID, p.EntityKey, p.EntityType, p.BeforeVal)
-}
-
 // moveDraft moves a draft in place. A TAM-NEW-n card has no Jira state, so
 // a drag rewrites the draft's own JSON and the row's columns and journals
 // nothing new: the create row is the only journal row a draft has, and
 // Commit sends the draft, not the move. A rank has neither a column nor a
 // draft field, so it is where a draft's drag stops.
 func moveDraft(ctx context.Context, tx *sql.Tx, profileID, key, entityType, field, current, after string) error {
-	if entityType == EntityRank || MoveID(after) == MoveID(current) {
+	if entityType == EntityRank || sameMove(entityType, after, current) {
 		return nil
 	}
 	if entityType == EntityTransition {
@@ -280,7 +241,7 @@ func moveDraft(ctx context.Context, tx *sql.Tx, profileID, key, entityType, fiel
 		d.SprintID = MoveID(after)
 		d.SprintName = ""
 		if d.SprintID != "" {
-			d.SprintName = MoveName(after)
+			d.SprintName = MoveRawName(after)
 		}
 	}); err != nil {
 		return err
@@ -307,20 +268,18 @@ func statusNameFor(ctx context.Context, q execer, profileID, statusID string) (s
 	return name, nil
 }
 
-// sprintNameFor is the name of a sprint id: the boards sync's own row when
-// there is one, since a future sprint holds no issues to borrow a name
-// from, and otherwise the name any issue in that sprint carries.
+// sprintNameFor is the fallback name of a sprint id: whatever a cached
+// issue already in that sprint carries. The sprint list is boardrepo's, and
+// a caller that holds it hands the name in rather than having this package
+// read another package's table for it.
 func sprintNameFor(ctx context.Context, q execer, profileID, sprintID string) (string, error) {
 	if sprintID == "" {
 		return "", nil
 	}
 	var name string
 	err := q.QueryRowContext(ctx,
-		`SELECT name FROM sprint WHERE profile_id = ? AND id = ? AND name <> ''
-		 UNION ALL
-		 SELECT sprint_name FROM issue WHERE profile_id = ? AND sprint_id = ? AND sprint_name <> ''
-		 LIMIT 1`,
-		profileID, sprintID, profileID, sprintID).Scan(&name)
+		`SELECT sprint_name FROM issue WHERE profile_id = ? AND sprint_id = ? AND sprint_name <> '' LIMIT 1`,
+		profileID, sprintID).Scan(&name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -331,7 +290,8 @@ func sprintNameFor(ctx context.Context, q execer, profileID, sprintID string) (s
 }
 
 // rekeyRankNeighbours repoints the rank rows that were journaled against a
-// draft once that draft has its real key. Without it a rank would push
+// draft once that draft has its real key, keeping the side it was dropped
+// on and the board it was dropped on. Without it a rank would push
 // "TAM-NEW-3" to Jira, which is the bug Phase 2 already fixed once for
 // parents.
 func rekeyRankNeighbours(ctx context.Context, tx *sql.Tx, profileID, tempKey, realKey string) error {
@@ -355,9 +315,9 @@ func rekeyRankNeighbours(ctx context.Context, tx *sql.Tx, profileID, tempKey, re
 			rows.Close()
 			return err
 		}
-		neighbour, before := ParseRank(value)
+		neighbour, before, boardID := ParseRank(value)
 		if neighbour == tempKey {
-			todo = append(todo, repoint{id: id, value: RankValue(realKey, before)})
+			todo = append(todo, repoint{id: id, value: RankValue(realKey, before, boardID)})
 		}
 	}
 	rows.Close()

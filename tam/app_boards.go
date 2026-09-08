@@ -49,6 +49,23 @@ func (a *App) GetBoard(profileID string, boardID int, sprintID, swimlane string)
 	return a.boards.Board(a.ctx, a.repo, profileID, boardID, sprintID, swimlane)
 }
 
+// MoveIssueToSprint journals a card dropped on another sprint, or on the
+// backlog, and moves it in the local cache. The destination's name comes
+// from boardrepo, which owns the sprint list; the issue repository writes
+// it into the row and the journal but does not read another package's
+// tables to learn it. This is the one method that holds both repositories,
+// which is why the lookup is here.
+func (a *App) MoveIssueToSprint(profileID, key, sprintID string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	name, err := a.boards.SprintName(a.ctx, profileID, sprintID)
+	if err != nil {
+		return err
+	}
+	return a.repo.MoveToSprint(a.ctx, profileID, key, sprintID, name)
+}
+
 // SyncBoards pulls the profile's boards, sprints, and issue keys. It runs
 // under the same busy guard as SyncIssues, so a sync, a commit, and a
 // boards sync never overlap for one profile.

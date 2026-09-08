@@ -328,11 +328,14 @@ func (r *Repository) PendingMoves(ctx context.Context, profileID string) ([]back
 		}
 		switch entityType {
 		case EntityTransition:
-			out[i].StatusID, out[i].HasTransition = MoveID(value), true
+			out[i].StatusID, out[i].StatusName, out[i].HasTransition = MoveID(value), MoveRawName(value), true
 		case EntitySprintMove:
-			out[i].SprintID, out[i].HasSprint = MoveID(value), true
+			out[i].SprintID, out[i].SprintName, out[i].HasSprint = MoveID(value), MoveRawName(value), true
 		case EntityRank:
-			out[i].RankNeighbour, out[i].RankBefore = ParseRank(value)
+			// The board a rank was dropped on is the commit pass's, which
+			// reads the journal row itself; the view orders a cell by the
+			// neighbour and the side alone.
+			out[i].RankNeighbour, out[i].RankBefore, _ = ParseRank(value)
 			out[i].HasRank = true
 		}
 	}

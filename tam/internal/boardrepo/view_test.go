@@ -810,3 +810,60 @@ func TestAPendingMoveDoesNotDisturbACardWithoutOne(t *testing.T) {
 		t.Errorf("Done = %v", got)
 	}
 }
+
+func TestADraggedDraftIsDrawnInTheColumnItsStatusIDNames(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	// A draft has no Jira status to journal a transition against, so a drag
+	// writes the dropped column's status id onto the draft's own row.
+	// Honouring it here is the only thing that makes the drag visible.
+	dragged := draftCard("TAM-NEW-1")
+	dragged.StatusID = "3"
+	// A status id no column collects degrades to where an undragged draft
+	// goes, rather than taking the card off the board.
+	unknown := draftCard("TAM-NEW-2")
+	unknown.StatusID = "99999"
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
+		withDrafts(dragged, unknown)
+
+	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	lane := view.Lanes[0]
+	if got := cellKeys(lane.Cells[2]); len(got) != 1 || got[0] != "TAM-NEW-1" {
+		t.Errorf("In Progress = %v, want the dragged draft where it was dropped", got)
+	}
+	if got := cellKeys(lane.Cells[1]); len(got) != 2 || got[1] != "TAM-NEW-2" {
+		t.Errorf("To Do = %v, want the card and the draft whose status id no column collects", got)
+	}
+	if view.Unmapped != 0 {
+		t.Errorf("unmapped = %d, want both drafts drawn", view.Unmapped)
+	}
+	if view.Columns[1].Total != 2 || view.Columns[2].Total != 1 {
+		t.Errorf("column totals = %d and %d, want the dragged draft counted in its target",
+			view.Columns[1].Total, view.Columns[2].Total)
+	}
+}
+
+func TestAPendingTransitionOverridesTheStatusNameWithTheID(t *testing.T) {
+	r, _ := newRepo(t)
+	moved := card("PLAT-412", "To Do", "1")
+	moved.StoryPoints = pts(5)
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{moved}).
+		withMoves(backend.PendingMove{Key: "PLAT-412", StatusID: "5", StatusName: "Done", HasTransition: true})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	cell := view.Lanes[0].Cells[4]
+	if len(cell) != 1 || cell[0].Status != "Done" {
+		t.Fatalf("Done = %+v, want the card carrying the name journaled beside the id", cell)
+	}
+	// DonePoints counts by the status name, so a card drawn in the Done
+	// column while its name still read To Do would leave the view's own
+	// total disagreeing with the column it drew.
+	if view.DonePoints != 5 {
+		t.Errorf("done points = %v, want the moved card counted where it is drawn", view.DonePoints)
+	}
+}

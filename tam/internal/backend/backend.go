@@ -100,6 +100,14 @@ type PendingMove struct {
 	Key      string `json:"key"`
 	StatusID string `json:"statusId"`
 	SprintID string `json:"sprintId"`
+	// StatusName and SprintName are the names journaled beside the two ids,
+	// empty when the cache never held one. The board read overrides them on
+	// the card together with the ids: IsDone reads the status name, so a
+	// card drawn in a Done column while its name still said In Progress
+	// would leave the view's own points total disagreeing with the column
+	// it drew.
+	StatusName string `json:"statusName"`
+	SprintName string `json:"sprintName"`
 	// RankNeighbour is the key the card was dropped against and RankBefore
 	// which side of it. The rank itself is never cached: a made-up LexoRank
 	// would be a second source of truth the next sync overwrites.

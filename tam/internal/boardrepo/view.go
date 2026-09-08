@@ -312,6 +312,12 @@ func countNotSynced(boardKeys []string, cards []backend.Issue) int {
 // and drops the cards a pending sprint move has taken out of the sprint
 // being viewed. A whole-board view has no sprint to leave, so it drops
 // nothing.
+//
+// Each id is overridden with the name journaled beside it. DonePoints
+// counts by backend.IsDone over the status name, so a card whose id said
+// Done while its name still said In Progress would be drawn in one column
+// and counted as if it were in another, on any path that repaints a row
+// without replaying the journal onto it.
 func applyMoves(cards []backend.Issue, moves []backend.PendingMove, sprintID string) []backend.Issue {
 	if len(moves) == 0 {
 		return cards
@@ -324,13 +330,13 @@ func applyMoves(cards []backend.Issue, moves []backend.PendingMove, sprintID str
 	for _, c := range cards {
 		if m, ok := byKey[c.Key]; ok {
 			if m.HasTransition {
-				c.StatusID = m.StatusID
+				c.StatusID, c.Status = m.StatusID, m.StatusName
 			}
 			if m.HasSprint {
 				if sprintID != "" && m.SprintID != sprintID {
 					continue
 				}
-				c.SprintID = m.SprintID
+				c.SprintID, c.SprintName = m.SprintID, m.SprintName
 			}
 		}
 		out = append(out, c)

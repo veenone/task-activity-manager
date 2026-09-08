@@ -34,7 +34,9 @@ const (
 	// Pending changes dialog and the Activity tab read the name.
 	EntityTransition = "issue_transition"
 	// EntityRank is a card reordered inside its cell. Its after_val is
-	// RankValue's "side|neighbour"; its before_val is empty, because a rank
+	// RankValue's "side|neighbour|board", where the board is the one the
+	// drop was made on, since one key can sit on two boards whose orders
+	// disagree; its before_val is empty, because a rank
 	// has no cached value to go back to (a made-up LexoRank would be a
 	// second source of truth the next sync overwrites).
 	EntityRank = "issue_rank"

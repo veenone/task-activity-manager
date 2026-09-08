@@ -13,65 +13,59 @@ import (
 // its before value, a board move puts the card back where it was, and a
 // create row takes its draft row with it.
 func (r *Repository) DiscardPendingChange(ctx context.Context, profileID string, id int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	p, err := journal.Get(tx, profileID, id)
-	if err != nil {
-		return err
-	}
-	if err := discardOne(ctx, tx, profileID, p); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		p, err := journal.Get(tx, profileID, id)
+		if err != nil {
+			return err
+		}
+		return discardOne(ctx, tx, profileID, p)
+	})
 }
 
 // DiscardAllPendingChanges reverts every journal row of the profile and
 // returns how many it reverted.
 func (r *Repository) DiscardAllPendingChanges(ctx context.Context, profileID string) (int, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-	all, err := journal.List(tx, profileID)
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range all {
-		if err := discardOne(ctx, tx, profileID, p); err != nil {
-			return 0, err
+	n := 0
+	err := r.inTx(ctx, func(tx *sql.Tx) error {
+		all, err := journal.List(tx, profileID)
+		if err != nil {
+			return err
 		}
-	}
-	if err := tx.Commit(); err != nil {
+		for _, p := range all {
+			if err := discardOne(ctx, tx, profileID, p); err != nil {
+				return err
+			}
+		}
+		n = len(all)
+		return nil
+	})
+	if err != nil {
 		return 0, err
 	}
-	return len(all), nil
+	return n, nil
 }
 
 // DiscardKey reverts every pending change of one issue, which is what a
 // keep-remote resolution does before it replaces the row.
 func (r *Repository) DiscardKey(ctx context.Context, profileID, key string) (int, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-	rows, err := journal.ListForKey(tx, profileID, key)
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range rows {
-		if err := discardOne(ctx, tx, profileID, p); err != nil {
-			return 0, err
+	n := 0
+	err := r.inTx(ctx, func(tx *sql.Tx) error {
+		rows, err := journal.ListForKey(tx, profileID, key)
+		if err != nil {
+			return err
 		}
-	}
-	if err := tx.Commit(); err != nil {
+		for _, p := range rows {
+			if err := discardOne(ctx, tx, profileID, p); err != nil {
+				return err
+			}
+		}
+		n = len(rows)
+		return nil
+	})
+	if err != nil {
 		return 0, err
 	}
-	return len(rows), nil
+	return n, nil
 }
 
 func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.PendingChange) error {
@@ -115,20 +109,14 @@ func (r *Repository) MarkCommitted(ctx context.Context, profileID string, change
 	if len(changes) == 0 {
 		return nil
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	ids := make([]int64, 0, len(changes))
-	for _, p := range changes {
-		ids = append(ids, p.ID)
-		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, ""); err != nil {
-			return err
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		ids := make([]int64, 0, len(changes))
+		for _, p := range changes {
+			ids = append(ids, p.ID)
+			if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, p.AfterVal, ""); err != nil {
+				return err
+			}
 		}
-	}
-	if err := journal.Delete(tx, profileID, ids); err != nil {
-		return err
-	}
-	return tx.Commit()
+		return journal.Delete(tx, profileID, ids)
+	})
 }
