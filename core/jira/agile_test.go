@@ -247,7 +247,7 @@ func TestBoardIssueKeysPageTheSearchEnvelope(t *testing.T) {
 
 	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
 
-	keys, err := c.BoardIssueKeys(context.Background(), 1, "")
+	keys, err := c.BoardIssueKeys(context.Background(), 1, "", "")
 	if err != nil {
 		t.Fatalf("board issue keys: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestBoardIssueKeysPageTheSearchEnvelope(t *testing.T) {
 		t.Fatalf("keys = %v, want %v", keys, want)
 	}
 
-	keys, err = c.BoardIssueKeys(context.Background(), 1, "12")
+	keys, err = c.BoardIssueKeys(context.Background(), 1, "12", "")
 	if err != nil {
 		t.Fatalf("sprint issue keys: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestBoardIssueKeysEscapesSprintID(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
-	keys, err := c.BoardIssueKeys(context.Background(), 1, "12 a/b")
+	keys, err := c.BoardIssueKeys(context.Background(), 1, "12 a/b", "")
 	if err != nil {
 		t.Fatalf("sprint issue keys: %v", err)
 	}
@@ -409,5 +409,42 @@ func TestMoveToBacklogSendsIssues(t *testing.T) {
 	}
 	if want := (map[string]any{"issues": []any{"PLAT-412"}}); !reflect.DeepEqual(gotBody, want) {
 		t.Errorf("body = %+v, want %+v", gotBody, want)
+	}
+}
+
+// A board's filter is not bounded by a project, so the read is narrowed with
+// the jql parameter the Agile endpoints AND with the board's own filter. One
+// board seen in the field answered with 8,485 cards while the project being
+// synced had 38.
+func TestBoardIssueKeysNarrowsToTheProject(t *testing.T) {
+	var gotJQL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotJQL = r.URL.Query().Get("jql")
+		_, _ = w.Write([]byte(`{"startAt":0,"maxResults":500,"total":1,"issues":[{"key":"PLAT-1"}]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if _, err := c.BoardIssueKeys(context.Background(), 1, "", "PLAT"); err != nil {
+		t.Fatalf("board issue keys: %v", err)
+	}
+	if want := `project = "PLAT"`; gotJQL != want {
+		t.Errorf("jql = %q, want %q", gotJQL, want)
+	}
+
+	// A key with a quote in it cannot break out of the clause.
+	if _, err := c.BoardIssueKeys(context.Background(), 1, "", `A" OR project = "B`); err != nil {
+		t.Fatalf("board issue keys: %v", err)
+	}
+	if want := `project = "A\" OR project = \"B"`; gotJQL != want {
+		t.Errorf("quoted jql = %q, want %q", gotJQL, want)
+	}
+
+	// No project means the board entire, with no jql sent at all.
+	if _, err := c.BoardIssueKeys(context.Background(), 1, "", ""); err != nil {
+		t.Fatalf("board issue keys: %v", err)
+	}
+	if gotJQL != "" {
+		t.Errorf("jql = %q, want none", gotJQL)
 	}
 }

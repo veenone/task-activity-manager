@@ -80,6 +80,9 @@ export function EpicsView() {
   }, [movedKey]);
 
   const selected = tree.data ? findIssue(tree.data, selectedKey) : undefined;
+  // The epic a new draft belongs to: the selected row when it is one, else
+  // the epic the selected row hangs off.
+  const epicInContext = selected ? (selected.type === "epic" ? selected.key : selected.parentKey) : "";
   const epicCount = tree.data?.epics.length ?? 0;
   const orphanCount = tree.data?.orphans.length ?? 0;
   const issueCount = (tree.data?.epics.reduce((sum, e) => sum + e.children.length, 0) ?? 0) + orphanCount;
@@ -173,6 +176,9 @@ export function EpicsView() {
           // The button says "+ New epic", so the dialog creates an epic and
           // does not re-ask. Anything else is drafted from the Backlog.
           lockType
+          // Unused while the type is locked to epic, and correct the moment
+          // it is not: the epic on screen is the one a draft belongs to.
+          initialEpic={epicInContext}
           onCreated={(key) => {
             setSelectedKey(key);
             setExpanded((prev) => new Set(prev).add(key));

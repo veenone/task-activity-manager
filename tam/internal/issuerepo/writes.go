@@ -324,6 +324,74 @@ func (r *Repository) EditField(ctx context.Context, profileID, key, field, value
 	return tx.Commit()
 }
 
+// Edit is one field change of one issue, for a batch that has to land or
+// fail as a whole.
+type Edit struct {
+	Key   string
+	Field string
+	Value string
+}
+
+// EditFields journals many field changes in one transaction, the write half
+// of an import that updates issues rather than creating them. A field whose
+// value already matches is skipped rather than journaled, so re-importing an
+// unchanged file leaves nothing pending. note is what the audit records, the
+// same way CreateDrafts records the file an import came from.
+//
+// It returns the keys it actually changed, in the order they were given and
+// each once, so the caller can report what an import touched.
+func (r *Repository) EditFields(ctx context.Context, profileID string, edits []Edit, note string) ([]string, error) {
+	if len(edits) == 0 {
+		return []string{}, nil
+	}
+	for _, e := range edits {
+		if err := validateField(e.Field, e.Value); err != nil {
+			return nil, fmt.Errorf("%s %s: %w", e.Key, e.Field, err)
+		}
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	touched := []string{}
+	seen := map[string]bool{}
+	for _, e := range edits {
+		current, updated, ownType, err := readField(ctx, tx, profileID, e.Key, e.Field)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", e.Key, err)
+		}
+		value := e.Value
+		if e.Field == "parentKey" {
+			value = strings.TrimSpace(value)
+			if err := validateParent(ctx, tx, profileID, e.Key, ownType, value); err != nil {
+				return nil, fmt.Errorf("%s: %w", e.Key, err)
+			}
+		}
+		if current == value {
+			continue
+		}
+		if err := writeField(ctx, tx, profileID, e.Key, e.Field, value); err != nil {
+			return nil, err
+		}
+		if err := journal.Upsert(tx, profileID, EntityIssue, e.Key, e.Field, current, value, updated); err != nil {
+			return nil, err
+		}
+		if err := journal.Audit(tx, profileID, EntityIssue, e.Key, "edit", e.Field, current, value, note); err != nil {
+			return nil, err
+		}
+		if !seen[e.Key] {
+			seen[e.Key] = true
+			touched = append(touched, e.Key)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return touched, nil
+}
+
 func updateDraftJSON(ctx context.Context, tx *sql.Tx, profileID, key, field, value string) error {
 	return editDraft(ctx, tx, profileID, key, func(d *backend.IssueDraft) {
 		switch field {

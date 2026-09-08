@@ -36,14 +36,16 @@ export function AboutModal({ onClose }: { onClose: () => void }) {
       .catch(() => {});
   }, []);
 
-  const rows: Array<[string, string]> = [
+  // The third element marks a filesystem path, which the readout truncates
+  // from the left so the filename stays visible.
+  const rows: Array<[string, string, boolean?]> = [
     ["Version", diag?.version ? `v${diag.version}` : "…"],
     ["Schema", diag ? `v${diag.schemaVersion}` : "…"],
     ["Runtime", diag ? `${diag.goVersion} · ${diag.os}/${diag.arch}` : "…"],
     ["Targets", "Jira DC 8.14+"],
-    ["Database", diag?.dbPath || "—"],
-    ["Profiles", diag?.sharedPath || "—"],
-    ["Log", diag?.logPath || "—"],
+    ["Database", diag?.dbPath || "—", true],
+    ["Profiles", diag?.sharedPath || "—", true],
+    ["Log", diag?.logPath || "—", true],
   ];
 
   return (
@@ -63,17 +65,17 @@ export function AboutModal({ onClose }: { onClose: () => void }) {
 
       <div className="about-body">
         <p className="about-tagline">
-          A fast, local-first desktop tool for planning and tracking Jira Data
-          Center work at scale. Part of the agile suite with Xray Test Manager.
+          Planning and tracking Jira Data Center work, offline. Part of the agile
+          suite with Xray Test Manager.
         </p>
 
         <div className="about-plate">
           <span className="about-plate-label">Build &amp; environment</span>
           <dl className="about-info">
-            {rows.map(([k, v]) => (
+            {rows.map(([k, v, isPath]) => (
               <div className="about-row" key={k}>
                 <dt>{k}</dt>
-                <dd className="mono">{v}</dd>
+                <dd className={`mono${isPath ? " about-path" : ""}`} title={v}>{v}</dd>
               </div>
             ))}
           </dl>

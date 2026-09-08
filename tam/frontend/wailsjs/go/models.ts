@@ -592,6 +592,7 @@ export namespace committer {
 export namespace importer {
 	
 	export class Mapping {
+	    key: string;
 	    type: string;
 	    summary: string;
 	    description: string;
@@ -607,6 +608,7 @@ export namespace importer {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
 	        this.type = source["type"];
 	        this.summary = source["summary"];
 	        this.description = source["description"];
@@ -634,6 +636,7 @@ export namespace importer {
 	export class Result {
 	    rows: number;
 	    created: string[];
+	    updated: string[];
 	    errors: RowError[];
 	
 	    static createFrom(source: any = {}) {
@@ -644,6 +647,7 @@ export namespace importer {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rows = source["rows"];
 	        this.created = source["created"];
+	        this.updated = source["updated"];
 	        this.errors = this.convertValues(source["errors"], RowError);
 	    }
 	
@@ -1099,6 +1103,7 @@ export namespace syncer {
 	    sprints: number;
 	    cards: number;
 	    dropped: string[];
+	    foreign: number;
 	    unavailable: boolean;
 	    elapsed: string;
 	
@@ -1113,6 +1118,7 @@ export namespace syncer {
 	        this.sprints = source["sprints"];
 	        this.cards = source["cards"];
 	        this.dropped = source["dropped"];
+	        this.foreign = source["foreign"];
 	        this.unavailable = source["unavailable"];
 	        this.elapsed = source["elapsed"];
 	    }

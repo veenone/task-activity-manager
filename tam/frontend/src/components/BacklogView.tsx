@@ -230,6 +230,9 @@ export function BacklogView() {
       {isOpen("newIssue") && (
         <NewIssueModal
           onClose={closeModal}
+          // A draft started with an issue open almost always belongs where
+          // that issue does.
+          initialEpic={selected ? (selected.type === "epic" ? selected.key : selected.parentKey) : ""}
           onCreated={(key) => {
             setPage(0);
             setSelectedKey(key);

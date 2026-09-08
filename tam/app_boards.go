@@ -146,7 +146,14 @@ func (a *App) CanTransition(profileID, key, statusID string) (backend.Transition
 	if err != nil {
 		return backend.TransitionCheck{}, err
 	}
-	check, err := b.CanTransition(a.ctx, key, statusID)
+	// The same set the commit will try: the whole column, the dropped-on
+	// status first, so the optimistic check and the push agree about what
+	// the drop means. A local read, so a failure only costs the siblings.
+	targets, terr := a.boardOrder().ColumnStatuses(a.ctx, profileID, statusID)
+	if terr != nil || len(targets) == 0 {
+		targets = []string{statusID}
+	}
+	check, err := b.CanTransition(a.ctx, key, targets)
 	if err != nil {
 		return backend.TransitionCheck{}, err
 	}
@@ -168,18 +175,27 @@ func (a *App) SyncBoards(profileID string) (syncer.BoardSummary, error) {
 	if err != nil {
 		return syncer.BoardSummary{}, err
 	}
-	if err := a.acquire(p.ID, "sync"); err != nil {
+	// Acquired under its own name, not "sync": this holds the same per-profile
+	// lock a sync does, so whichever runs second is refused, and the refusal
+	// has to say which one is actually running.
+	if err := a.acquire(p.ID, "boards refresh"); err != nil {
 		return syncer.BoardSummary{}, err
 	}
 	defer a.release(p.ID)
 
+	log.Printf("tam: boards refresh started for %s (%s)", p.Name, p.ProjectKey)
 	b, err := a.backendFor(p)
 	if err != nil {
 		return syncer.BoardSummary{}, err
 	}
 	eng := syncer.New(b, a.repo)
 	eng.Boards = a.boards
-	sum, err := eng.SyncBoards(a.ctx, p.ID, p.ProjectKey, nil)
+	eng.AllProjectBoards = a.allProjectBoards(p.ID)
+	// The pass reports per board. It used to be given no progress sink at
+	// all, so a refresh that walks every board's sprints, which takes
+	// minutes on a real project, showed nothing anywhere and read as a
+	// frozen app.
+	sum, err := eng.SyncBoards(a.ctx, p.ID, p.ProjectKey, a.emitProgress)
 	sum.EnsureDropped()
 	if err != nil {
 		log.Printf("tam: sync boards %s (%s) failed: %v", p.Name, p.ProjectKey, err)

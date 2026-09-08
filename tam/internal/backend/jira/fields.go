@@ -222,9 +222,15 @@ func displayName(u userRef) string {
 }
 
 // Legacy Sprint values are toString dumps of the GreenHopper sprint object.
+//
+// The name runs to the next ",key=" pair or to the dump's closing bracket,
+// not to the first "," or "]": a sprint is routinely named for its team in
+// brackets ("[SGRS] Sprint 12"), and stopping at the first "]" cut that to
+// "[SGRS". Lazy up to the delimiter is what keeps a bracket, and a comma
+// that is not followed by a key, inside the name.
 var (
 	legacySprintID   = regexp.MustCompile(`\bid=(\d+)`)
-	legacySprintName = regexp.MustCompile(`\bname=([^,\]]*)`)
+	legacySprintName = regexp.MustCompile(`\bname=(.*?)(?:,[A-Za-z][A-Za-z0-9]*=|\]\s*$)`)
 )
 
 // parseSprint reads the Sprint custom field in either shape Jira DC uses

@@ -26,6 +26,10 @@ vi.mock("../api", async () => {
     ListActivity: vi.fn(),
     EditIssue: vi.fn(),
     GetLinkTypes: vi.fn(),
+    GetSubtaskTypeName: vi.fn(),
+    SearchUsers: vi.fn(),
+    ListPriorities: vi.fn(),
+    CreateIssue: vi.fn(),
   };
 });
 
@@ -82,6 +86,9 @@ beforeEach(() => {
   vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
   vi.mocked(api.EditIssue).mockResolvedValue(undefined);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
+  vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
+  vi.mocked(api.SearchUsers).mockResolvedValue([]);
+  vi.mocked(api.ListPriorities).mockResolvedValue(["High"]);
 });
 
 describe("EpicsView", () => {
@@ -105,6 +112,31 @@ describe("EpicsView", () => {
     expect(screen.getByText("1 of 2 done, 10 pts")).toBeInTheDocument();
     expect(screen.getByText("Apply promo code")).toBeInTheDocument();
     expect(screen.getByText("Add coupon banner")).toBeInTheDocument();
+  });
+
+  // The reported path: open an epic, select a story under it, draft a
+  // technical task from the panel. The parent is the story, not the epic and
+  // not nothing.
+  it("drafts a technical task under the story the panel is showing", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [
+        epicNode({
+          issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }),
+          children: [issue({ key: "PLAT-101", type: "story", summary: "Apply promo code" })],
+          total: 1, done: 0, points: 5, donePoints: 0,
+        }),
+      ],
+      orphans: [],
+      truncated: false,
+    });
+    renderView();
+    await user.click(await screen.findByRole("treeitem", { name: "PLAT-100 Checkout revamp" }));
+    await user.click(await screen.findByText("Apply promo code"));
+    await user.click(await screen.findByRole("button", { name: "+ Technical task" }));
+    const dialog = await screen.findByRole("dialog", { name: /^New / });
+    expect(within(dialog).getByText("PLAT-101")).toBeInTheDocument();
+    expect(within(dialog).queryByText("none")).not.toBeInTheDocument();
   });
 
   it("shows the No epic node with its count and a line past 200 orphans", async () => {

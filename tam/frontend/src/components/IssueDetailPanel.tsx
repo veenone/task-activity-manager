@@ -294,6 +294,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, onClose }: Props) 
           initialType="subtask"
           lockType
           parentKey={issue.key}
+          parentSummary={issue.summary}
           onCreated={() => setDrafting(false)}
         />
       )}
@@ -324,7 +325,9 @@ function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard
                   <>
                     <span className="pending-dot" role="img" aria-label="Pending changes" />
                     <span className="muted small">pending</span>
-                    <button type="button" className="btn btn-ghost" aria-label={`Discard link to ${l.key}`} disabled={discarding} onClick={() => onDiscard(l.pendingId ?? 0)}>Discard</button>
+                    <button type="button" className="btn btn-discard btn-discard-row" aria-label={`Discard link to ${l.key}`} disabled={discarding} onClick={() => onDiscard(l.pendingId ?? 0)}>
+                      <span className="discard-mark" aria-hidden="true">✕</span>Discard
+                    </button>
                   </>
                 )}
               </li>

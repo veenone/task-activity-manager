@@ -835,6 +835,13 @@
   position: relative;
   width: 430px;
   max-width: calc(100vw - 32px);
+  /* The card had no height bound at all, so it grew to whatever the readout
+     needed and, with overflow hidden, could run past a short window with its
+     footer unreachable. It is a column now: the banner and the footer hold
+     their place and the body between them takes the slack and scrolls. */
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
   margin: auto;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -884,10 +891,11 @@
 /* Header "scan panel": dark instrument band with a faint grid and accent glow. */
 .about-banner {
   position: relative;
+  flex: none;
   display: flex;
   align-items: center;
   gap: 15px;
-  padding: 26px 24px;
+  padding: 22px 24px;
   background:
     radial-gradient(
       130% 120% at 88% -20%,
@@ -937,12 +945,15 @@
 }
 
 .about-body {
-  padding: 20px 24px 22px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 24px 20px;
 }
 .about-tagline {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--text-muted);
 }
 
@@ -982,10 +993,28 @@
 }
 .about-row dd {
   margin: 0;
+  min-width: 0;
   font-size: 11.5px;
   color: var(--text-strong);
-  word-break: break-all;
-  text-align: right;
+  /* One line each, with the full value on hover and in a copy. CSS
+     truncation does not truncate the text itself, so selecting the readout
+     for a bug report still yields the whole path.
+
+     Values are left aligned so they form a column against the labels. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+/* A path's tail is what identifies it (tam.db against tam.log) while the
+   leading C:\Users\...\Roaming repeats on every row, so a path truncates from
+   the left. direction: rtl moves the overflow to the start of the line.
+
+   It is scoped to paths on purpose: rtl reorders a neutral character sitting
+   at the end of a string, which turned the Targets row's "Jira DC 8.14+" into
+   "+Jira DC 8.14". Paths end in a letter, so they are safe. */
+.about-row dd.about-path {
+  direction: rtl;
 }
 
 .about-actions {
@@ -1005,6 +1034,7 @@
 }
 
 .about-foot {
+  flex: none;
   padding: 11px 24px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-2);
@@ -1159,8 +1189,12 @@
 /* Only the board itself scrolls, in both directions: its column strip is
    wider than the pane and its cells are taller. The toolbar above it and
    the summary and notes below it stay where they are. */
+/* Both axes: the columns scroll sideways once they hit their floor, and the
+   lanes scroll down. The pane bounds it, so the board never grows the window
+   and its own scrollbars are the ones that move. */
 .board-scroll {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
 }
@@ -1194,9 +1228,33 @@
 /* ===== The board itself ===== */
 /* Column heads and the cells under them take their width from one custom
    property, so the two rows cannot drift apart. */
-.board-columns { --board-col-w: 320px; display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
-.board-cell, .board-column-head { width: var(--board-col-w); }
-.board-column-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
+/* The header row and every lane row are separate elements, so the only way
+   their columns line up is to lay both out on the same track list. A flex row
+   cannot do that: each row sizes its own items, so a lane holding a long card
+   grew wider than the header above it. One grid template, driven by the
+   column count the board carries, is what keeps them in step.
+
+   minmax(floor, 1fr) is what makes the columns share the pane's width and
+   stop shrinking at the floor; past that the row overflows and .board-scroll
+   scrolls it sideways. */
+.board-columns {
+  --board-col-w: 264px;
+  display: grid;
+  grid-template-columns: repeat(var(--board-cols, 1), minmax(var(--board-col-w), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+/* min-width: 0 lets a track hold a card wider than itself without pushing the
+   track open, which is the other half of keeping the rows aligned. */
+.board-cell, .board-column-head { min-width: 0; }
+.board-card { min-width: 0; }
+/* A long summary or key wraps inside the card rather than widening it. */
+.board-card-summary, .board-card-head { min-width: 0; overflow-wrap: anywhere; }
+/* The whole header row anchors, not each cell: sticking the cells alone
+   left the 12px gaps between them transparent, so cards scrolled through the
+   header. The row carries the ground and the cells sit on it. */
+.board-columns-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-bottom: 8px; }
+.board-column-head { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
 .board-column-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .board-lane { display: flex; flex-direction: column; gap: 6px; }
 .board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
@@ -1218,7 +1276,26 @@
 .board-card-menu-wrap { margin-left: auto; position: relative; }
 .board-card-menu { padding: 0 6px; font-size: 11px; color: var(--text-muted); }
 .board-card-menu:hover:not(:disabled) { color: var(--text); }
-.board-card-dragging { opacity: 0.5; border-style: dashed; }
+/* A card being dragged reads as lifted rather than merely faded: it keeps
+   its substance, tilts, and casts a shadow, so the thing under the cursor is
+   obviously the card and not a hole where it used to be. */
+.board-card { cursor: grab; }
+.board-card:active { cursor: grabbing; }
+.board-card-dragging {
+  opacity: 0.85;
+  cursor: grabbing;
+  border-style: dashed;
+  border-color: var(--accent);
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.35);
+  transform: rotate(1.5deg);
+}
+/* While a drag is in flight every drop target says it is one, so the reader
+   is not hunting for the single cell that happens to be under the cursor. */
+.board-scroll-dragging .board-cell { outline: 1px dashed var(--border-strong); outline-offset: -3px; border-radius: 4px; }
+.board-scroll-dragging .board-cell-over { outline: 2px solid var(--accent); outline-offset: -3px; }
+@media (prefers-reduced-motion: reduce) {
+  .board-card-dragging { transform: none; }
+}
 /* The card the board has just moved, for the two seconds after it lands,
    the way a reparented row flashes in the Epics tree. */
 .board-card-moved { animation: board-card-moved 2s ease-out; }
@@ -1249,4 +1326,4 @@
 .board-card-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
 .board-unmapped { margin-top: 12px; }
 .board-overflow { font-size: 11px; color: var(--text-muted); padding: 2px 4px; }
-.boards-body { display: flex; gap: 12px; align-items: flex-start; min-height: 0; flex: 1; }
+.boards-body { display: flex; gap: 0; align-items: stretch; min-height: 0; flex: 1; }

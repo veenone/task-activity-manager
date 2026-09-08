@@ -31,9 +31,9 @@ func (b *Backend) Boards(ctx context.Context, projectKey string) ([]backend.Boar
 	for _, rb := range raw {
 		switch strings.ToLower(rb.Type) {
 		case backend.BoardTypeScrum:
-			out = append(out, backend.Board{ID: rb.ID, Name: rb.Name, Type: backend.BoardTypeScrum})
+			out = append(out, backend.Board{ID: rb.ID, Name: rb.Name, Type: backend.BoardTypeScrum, ProjectKey: rb.Location.ProjectKey})
 		case backend.BoardTypeKanban:
-			out = append(out, backend.Board{ID: rb.ID, Name: rb.Name, Type: backend.BoardTypeKanban})
+			out = append(out, backend.Board{ID: rb.ID, Name: rb.Name, Type: backend.BoardTypeKanban, ProjectKey: rb.Location.ProjectKey})
 		default:
 			log.Printf("tam: board %d %q is a %q board, which TAM does not draw; skipping it", rb.ID, rb.Name, rb.Type)
 		}
@@ -89,10 +89,10 @@ func (b *Backend) BoardSprints(ctx context.Context, boardID int) ([]backend.Spri
 }
 
 // BoardIssueKeys lists the keys the board holds, for one sprint when
-// sprintID is set and for the whole board when it is empty. It never
-// writes.
-func (b *Backend) BoardIssueKeys(ctx context.Context, boardID int, sprintID string) ([]string, error) {
-	keys, err := b.c.BoardIssueKeys(ctx, boardID, sprintID)
+// sprintID is set and for the whole board when it is empty, narrowed to
+// projectKey. It never writes.
+func (b *Backend) BoardIssueKeys(ctx context.Context, boardID int, sprintID, projectKey string) ([]string, error) {
+	keys, err := b.c.BoardIssueKeys(ctx, boardID, sprintID, projectKey)
 	if err != nil {
 		return nil, fmt.Errorf("board %d issues: %w", boardID, err)
 	}

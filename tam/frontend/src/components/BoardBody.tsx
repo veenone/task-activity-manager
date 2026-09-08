@@ -8,6 +8,10 @@ import type { BoardMoves } from "./useBoardMoves";
 interface Props {
   boards: UseQueryResult<Board[], Error>;
   view: UseQueryResult<BoardView, Error>;
+  // filtered is the view the grid draws: the query's own board with the
+  // toolbar's filter applied. The query result is still what says whether
+  // the board loaded, failed, or is empty, so the two travel together.
+  filtered: BoardView | undefined;
   // unavailable is the profile setting the boards sync writes when this Jira
   // answered with no Agile API at all, which is a different empty than one a
   // sync would fill.
@@ -39,7 +43,7 @@ interface Props {
 // board. Each state says what is missing and, where a sync would fix it,
 // offers one.
 export function BoardBody({
-  boards, view, unavailable, hasBoards, hasSprint, swimlane, selectedKey, focusId, moves, flashKey,
+  boards, view, filtered, unavailable, hasBoards, hasSprint, swimlane, selectedKey, focusId, moves, flashKey,
   sprints, sprintId, committing, canSync, onSync, onSelect, onFocusCard, onKeyDown,
 }: Props) {
   if (boards.isError) {
@@ -68,7 +72,7 @@ export function BoardBody({
       </p>
     );
   }
-  const data = view.data;
+  const data = filtered ?? view.data;
   if (!data) return <p className="muted">Loading the board</p>;
 
   // Right after the version 4 upgrade no cached issue carries a status id

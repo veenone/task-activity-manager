@@ -96,7 +96,7 @@ export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>
 
 export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function SaveImportTemplate():Promise<string>;
+export function SaveImportTemplate(arg1:string):Promise<string>;
 
 export function SearchUsers(arg1:string,arg2:string):Promise<Array<backend.User>>;
 

@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	agile-suite/core v0.0.0
 	github.com/wailsapp/wails/v2 v2.15.0
+	github.com/xuri/excelize/v2 v2.10.1
 )
 
 require (
@@ -40,7 +41,6 @@ require (
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
-	github.com/xuri/excelize/v2 v2.10.1 // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	github.com/zalando/go-keyring v0.2.8 // indirect
 	golang.org/x/crypto v0.53.0 // indirect

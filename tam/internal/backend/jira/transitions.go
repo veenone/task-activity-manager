@@ -49,14 +49,14 @@ func (b *Backend) resolution() string {
 // backend.ErrNoTransition through, when nothing reaches the target, and an
 // error wrapping backend.ErrTransitionFields when the transition asks for a
 // field beyond a resolution. Both name the issue and the target.
-func (b *Backend) Transition(ctx context.Context, key, targetStatusID string) error {
+func (b *Backend) Transition(ctx context.Context, key string, targetStatusIDs []string) error {
 	list, err := b.c.Transitions(ctx, key)
 	if err != nil {
 		return fmt.Errorf("transitions of %s: %w", key, err)
 	}
-	tr, ok := pickTransition(list, targetStatusID)
+	tr, targetStatusID, ok := pickTransition(list, targetStatusIDs)
 	if !ok {
-		return &backend.NoTransition{Key: key, TargetStatusID: targetStatusID, Reachable: reachableNames(list)}
+		return &backend.NoTransition{Key: key, TargetStatusID: firstID(targetStatusIDs), Reachable: reachableNames(list)}
 	}
 	fields, err := transitionFields(key, targetStatusID, tr, b.resolution())
 	if err != nil {
@@ -70,31 +70,50 @@ func (b *Backend) Transition(ctx context.Context, key, targetStatusID string) er
 // no judgement about the fields a transition would demand: a card whose way
 // into Done is guarded by a required custom field can still be dropped
 // there, and Commit is where that answer belongs.
-func (b *Backend) CanTransition(ctx context.Context, key, targetStatusID string) (backend.TransitionCheck, error) {
+func (b *Backend) CanTransition(ctx context.Context, key string, targetStatusIDs []string) (backend.TransitionCheck, error) {
 	list, err := b.c.Transitions(ctx, key)
 	if err != nil {
 		return backend.TransitionCheck{}, fmt.Errorf("transitions of %s: %w", key, err)
 	}
-	_, ok := pickTransition(list, targetStatusID)
+	_, _, ok := pickTransition(list, targetStatusIDs)
 	return backend.TransitionCheck{Reachable: reachableNames(list), Allowed: ok}, nil
 }
 
-// pickTransition is the transition that reaches targetStatusID, the lowest
-// id when several do.
-func pickTransition(list []corejira.RawTransition, targetStatusID string) (corejira.RawTransition, bool) {
-	var (
-		best  corejira.RawTransition
-		found bool
-	)
-	for _, tr := range list {
-		if tr.To.ID != targetStatusID {
-			continue
+// pickTransition is the transition that reaches the first of targets the
+// issue's workflow offers, and the status it reaches. The targets are the
+// statuses one board column collects, the dropped-on status first: a column
+// holds several, and only one of them is usually reachable from where the
+// card is now, so trying the first alone refused a move the board was
+// plainly offering. Within one status, the lowest transition id wins, so the
+// same drop resolves the same way on every run.
+func pickTransition(list []corejira.RawTransition, targets []string) (corejira.RawTransition, string, bool) {
+	for _, target := range targets {
+		var (
+			best  corejira.RawTransition
+			found bool
+		)
+		for _, tr := range list {
+			if tr.To.ID != target {
+				continue
+			}
+			if !found || lowerID(tr.ID, best.ID) {
+				best, found = tr, true
+			}
 		}
-		if !found || lowerID(tr.ID, best.ID) {
-			best, found = tr, true
+		if found {
+			return best, target, true
 		}
 	}
-	return best, found
+	return corejira.RawTransition{}, "", false
+}
+
+// firstID names the target a refusal is about: the status actually dropped
+// on, not whichever sibling was tried last.
+func firstID(targets []string) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	return targets[0]
 }
 
 // lowerID compares two transition ids as numbers, falling back to text for

@@ -17,6 +17,9 @@ interface Props {
   refreshing: boolean;
   canRefresh: boolean;
   onRefresh: () => void;
+  // filter narrows the cards drawn, by key, assignee, or issue type.
+  filter: string;
+  onFilter: (v: string) => void;
 }
 
 // sprintOption labels a sprint "Name (State)". Jira sends the state
@@ -31,7 +34,7 @@ function sprintOption(s: Sprint): string {
 // for a board name and absurd for three swimlane options.
 export function BoardsToolbar({
   boards, board, onBoard, sprints, sprint, onSprint, swimlane, onSwimlane,
-  refreshing, canRefresh, onRefresh,
+  refreshing, canRefresh, onRefresh, filter, onFilter,
 }: Props) {
   return (
     <div className="board-head">
@@ -46,6 +49,17 @@ export function BoardsToolbar({
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
         </select>
+      </label>
+
+      <label className="board-picker board-filter">
+        <span>Filter</span>
+        <input
+          type="search"
+          aria-label="Filter cards"
+          placeholder="key, assignee, or type"
+          value={filter}
+          onChange={(e) => onFilter(e.target.value)}
+        />
       </label>
 
       {board?.type === "scrum" && (

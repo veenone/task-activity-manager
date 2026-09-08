@@ -32,6 +32,12 @@ interface SyncApi {
   canCommit: boolean;
   canSwitchProfile: boolean;
   runSync: (full: boolean) => Promise<void>;
+  // runBoardsRefresh is the Boards view's own Refresh. It holds the same
+  // lock a sync does, because Go holds the same per-profile lock for both:
+  // a refresh outside this reducer left the shell offering Sync while the
+  // backend was bound to refuse it. It rejects on failure so the caller's
+  // mutation still sees the error.
+  runBoardsRefresh: () => Promise<BoardSummary>;
   // runCommit resolves to the result, or null when nothing ran or the call
   // failed (the failure is shown as a notice).
   runCommit: () => Promise<CommitResult | null>;
@@ -108,6 +114,27 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     [activeId, qc, notice],
   );
 
+  const runBoardsRefresh = useCallback(async (): Promise<BoardSummary> => {
+    if (!activeId) throw new Error("no profile selected");
+    if (statusRef.current !== "idle") {
+      throw new Error("a sync is already running for this profile");
+    }
+    statusRef.current = "syncing";
+    dispatch({
+      type: "SYNC_START",
+      clearError: true,
+      initialProgress: { phase: "boards", fetched: 0, total: 0, done: false, stage: "Refreshing boards" },
+    });
+    try {
+      const sum = await call(() => SyncBoards(activeId));
+      setBoards({ summary: sum, at: Date.now() });
+      return sum;
+    } finally {
+      statusRef.current = "idle";
+      dispatch({ type: "SYNC_END" });
+    }
+  }, [activeId]);
+
   const runCommit = useCallback(async (): Promise<CommitResult | null> => {
     if (!activeId || statusRef.current !== "idle") return null;
     statusRef.current = "committing";
@@ -154,13 +181,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       canCommit: canCommitSel(state) && !!activeId,
       canSwitchProfile: canSwitchProfileSel(state),
       runSync,
+      runBoardsRefresh,
       runCommit,
       lastCommit,
       dismissConflict,
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, activeId, runSync, runCommit, lastCommit, dismissConflict, boards],
+    [state, activeId, runSync, runBoardsRefresh, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

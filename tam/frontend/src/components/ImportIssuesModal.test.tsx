@@ -46,7 +46,13 @@ function renderModal(onImported = vi.fn(), onClose = vi.fn()) {
 }
 
 const csv = "Issue Type,Summary,Points\nStory,Apply promo,5\nTask,,\n";
-const mapping: api.ImportMapping = { type: "Issue Type", summary: "Summary", description: "", priority: "", labels: "", assignee: "", storyPoints: "Points", parentKey: "" };
+const mapping: api.ImportMapping = { key: "", type: "Issue Type", summary: "Summary", description: "", priority: "", labels: "", assignee: "", storyPoints: "Points", parentKey: "" };
+
+// result fills in the halves a case does not care about, so a test names only
+// what it is actually asserting on.
+function result(r: Partial<api.ImportResult>): api.ImportResult {
+  return { rows: 0, created: [], updated: [], errors: [], ...r };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,7 +62,7 @@ beforeEach(() => {
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
   vi.mocked(api.PreviewImport).mockResolvedValue({ headers: ["Issue Type", "Summary", "Points"], rowCount: 2, sample: ["Story", "Apply promo", "5"] });
   vi.mocked(api.AutoMapImport).mockResolvedValue(mapping);
-  vi.mocked(api.SaveImportTemplate).mockResolvedValue("C:/tam-import-template.csv");
+  vi.mocked(api.SaveImportTemplate).mockResolvedValue("C:/tam-import-template.xlsx");
 });
 
 async function pickFile(user: ReturnType<typeof userEvent.setup>) {
@@ -68,7 +74,7 @@ async function pickFile(user: ReturnType<typeof userEvent.setup>) {
 describe("ImportIssuesModal", () => {
   it("previews the file, pre-fills the mapping, and runs the automatic preflight", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.ImportIssues).mockResolvedValue({ rows: 2, created: [], errors: [{ row: 3, message: "Summary is empty." }] });
+    vi.mocked(api.ImportIssues).mockResolvedValue(result({ rows: 2, errors: [{ row: 3, message: "Summary is empty." }] }));
     renderModal();
     await screen.findByText("Import issues (CSV or XLSX)");
     await pickFile(user);
@@ -88,14 +94,14 @@ describe("ImportIssuesModal", () => {
 
   it("imports with the edited mapping and reports the drafts", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.ImportIssues).mockResolvedValue({ rows: 2, created: ["TAM-NEW-1"], errors: [{ row: 3, message: "Summary is empty." }] });
+    vi.mocked(api.ImportIssues).mockResolvedValue(result({ rows: 2, created: ["TAM-NEW-1"], errors: [{ row: 3, message: "Summary is empty." }] }));
     const { onImported } = renderModal();
     await pickFile(user);
     await waitFor(() => expect(screen.getByRole("button", { name: "Import" })).toBeEnabled());
     await user.selectOptions(screen.getByLabelText("Priority"), "Points");
     await user.click(screen.getByRole("button", { name: "Import" }));
     await waitFor(() => expect(api.ImportIssues).toHaveBeenCalledWith("p1", expect.any(String), false, "backlog.csv", { ...mapping, priority: "Points" }, false));
-    expect(await screen.findByText("✓ Imported 1 draft as pending creates (1 skipped). Commit them from the Pending changes dialog.")).toBeInTheDocument();
+    expect(await screen.findByText("✓ Imported 1 draft to create as pending changes (1 skipped). Commit them from the Pending changes dialog.")).toBeInTheDocument();
     expect(onImported).toHaveBeenCalledWith(["TAM-NEW-1"]);
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
@@ -109,8 +115,8 @@ describe("ImportIssuesModal", () => {
     expect(await screen.findByText(/not a valid zip file/)).toBeInTheDocument();
     expect(vi.mocked(api.PreviewImport).mock.calls[0][1]).toBe(true);
     await user.click(screen.getByRole("button", { name: "Download template" }));
-    await waitFor(() => expect(api.SaveImportTemplate).toHaveBeenCalled());
-    expect(await screen.findByText("C:/tam-import-template.csv")).toBeInTheDocument();
+    await waitFor(() => expect(api.SaveImportTemplate).toHaveBeenCalledWith("p1"));
+    expect(await screen.findByText("C:/tam-import-template.xlsx")).toBeInTheDocument();
   });
 
   it("shows the preflight message and disables Import when no Summary column is mapped", async () => {
@@ -118,16 +124,32 @@ describe("ImportIssuesModal", () => {
     vi.mocked(api.AutoMapImport).mockResolvedValue({ ...mapping, summary: "" });
     renderModal();
     await pickFile(user);
-    expect(await screen.findByText("Map a Summary column first.")).toBeInTheDocument();
+    expect(await screen.findByText("Map a Summary column first, or an Issue key column to update issues that already exist.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
     expect(api.ImportIssues).not.toHaveBeenCalled();
+  });
+
+  it("imports a key column as updates, with no Summary column mapped", async () => {
+    const user = userEvent.setup();
+    const keyed: api.ImportMapping = { ...mapping, summary: "", key: "Issue Type" };
+    vi.mocked(api.AutoMapImport).mockResolvedValue(keyed);
+    vi.mocked(api.ImportIssues).mockResolvedValue(result({ rows: 1, updated: ["PLAT-412"] }));
+    const { onImported } = renderModal();
+    await pickFile(user);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("✓ Imported 1 issue to update as pending changes. Commit them from the Pending changes dialog.")).toBeInTheDocument();
+    // Nothing was created, so there are no new keys to hand back, but the
+    // dialog still finishes rather than offering Import again.
+    expect(onImported).toHaveBeenCalledWith([]);
+    expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
   });
 
   it("shows the zero-drafts outcome when every row is skipped on import", async () => {
     const user = userEvent.setup();
     vi.mocked(api.ImportIssues)
-      .mockResolvedValueOnce({ rows: 1, created: [], errors: [] })
-      .mockResolvedValueOnce({ rows: 1, created: [], errors: [{ row: 2, message: "Already a draft (TAM-NEW-1); commit or discard it first." }] });
+      .mockResolvedValueOnce(result({ rows: 1 }))
+      .mockResolvedValueOnce(result({ rows: 1, errors: [{ row: 2, message: "Already a draft (TAM-NEW-1); commit or discard it first." }] }));
     renderModal();
     await pickFile(user);
     await waitFor(() => expect(screen.getByRole("button", { name: "Import" })).toBeEnabled());

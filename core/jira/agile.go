@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // ErrNoAgile is what Boards returns when the instance answers 404 on
@@ -27,6 +28,13 @@ type RawBoard struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
+	// Location is the board's own home. /board?projectKeyOrId= answers with
+	// every board whose filter *mentions* the project, which includes boards
+	// another team owns, so this is the only thing that says whose board it
+	// is. An instance that does not send it leaves ProjectKey empty.
+	Location struct {
+		ProjectKey string `json:"projectKey"`
+	} `json:"location"`
 }
 
 // RawSprint is one entry of /rest/agile/1.0/board/{id}/sprint, transport
@@ -108,7 +116,10 @@ type agileIssuePage struct {
 // collection is known to exist, and a failure there is a real one, not the
 // instance saying the collection is absent.
 func pageAgile[T any](ctx context.Context, c *Client, path string, query url.Values, onFirstPageErr func(error) error) ([]T, error) {
-	const size = 50
+	// Board and sprint lists are short, but the loop ends on isLast or an
+	// empty page and advances by what came back, so a larger ask costs
+	// nothing and saves a round trip on a project with many boards.
+	const size = 200
 	out := []T{}
 	for start := 0; ; {
 		q := url.Values{}
@@ -145,12 +156,21 @@ func pageAgile[T any](ctx context.Context, c *Client, path string, query url.Val
 // pages until startAt plus the issues just read reaches total, or until a
 // page comes back empty, which guards against an instance that reports a
 // total it will not serve.
-func pageAgileIssues(ctx context.Context, c *Client, path string) ([]string, error) {
-	const size = 50
+func pageAgileIssues(ctx context.Context, c *Client, path, jql string) ([]string, error) {
+	// A board's own issue list is every issue on the board, so this is the
+	// one Agile collection that is routinely thousands long: at 50 a page a
+	// 5,000-issue board cost 100 serial round trips, and a sync walks this
+	// once per board plus once per open sprint. Asking for more is free
+	// because the loop advances by what actually came back, so an instance
+	// that clamps maxResults lower is handled by the same arithmetic.
+	const size = 500
 	out := []string{}
 	for start := 0; ; {
 		q := url.Values{}
 		q.Set("fields", "key")
+		if jql != "" {
+			q.Set("jql", jql)
+		}
 		q.Set("startAt", strconv.Itoa(start))
 		q.Set("maxResults", strconv.Itoa(size))
 		var page agileIssuePage
@@ -218,12 +238,22 @@ func (c *Client) Sprints(ctx context.Context, boardID int) ([]RawSprint, error) 
 // answer with the search envelope, not the values/isLast one the board and
 // sprint lists use, and both are asked for fields=key since a key is all
 // this call returns.
-func (c *Client) BoardIssueKeys(ctx context.Context, boardID int, sprintID string) ([]string, error) {
+//
+// projectKey narrows the read to one project through the jql parameter, which
+// both endpoints AND with the board's own filter. A board's filter is not
+// bounded by a project: one seen in the field holds 8,485 cards while the
+// project being synced has 38, and reading the whole board to keep those 38
+// took a minute of the sync on its own. Passing "" reads the board entire.
+func (c *Client) BoardIssueKeys(ctx context.Context, boardID int, sprintID, projectKey string) ([]string, error) {
 	path := fmt.Sprintf("/rest/agile/1.0/board/%d/issue", boardID)
 	if sprintID != "" {
 		path = fmt.Sprintf("/rest/agile/1.0/board/%d/sprint/%s/issue", boardID, url.PathEscape(sprintID))
 	}
-	return pageAgileIssues(ctx, c, path)
+	jql := ""
+	if p := strings.TrimSpace(projectKey); p != "" {
+		jql = "project = " + strconv.Quote(p)
+	}
+	return pageAgileIssues(ctx, c, path, jql)
 }
 
 // RankIssue ranks key immediately before or after neighbourKey via PUT

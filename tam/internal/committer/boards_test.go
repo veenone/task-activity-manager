@@ -30,10 +30,12 @@ var statusNames = map[string]string{"1": "To Do", "3": "In Progress", "5": "Done
 type boardOrder struct {
 	order map[int][]string
 	err   map[int]error
+	// siblings is the statuses a column collects, keyed by any one of them.
+	siblings map[string][]string
 }
 
 func newBoardOrder() *boardOrder {
-	return &boardOrder{order: map[int][]string{}, err: map[int]error{}}
+	return &boardOrder{order: map[int][]string{}, err: map[int]error{}, siblings: map[string][]string{}}
 }
 
 func (b *boardOrder) CellOrder(_ context.Context, _ string, boardID int) ([]string, error) {
@@ -89,7 +91,7 @@ func newHarness(t *testing.T) harness {
 // The board writes the fake records. Transition and MoveIssuesToSprint
 // rewrite the rows they touch, so a later remote read sees what landed.
 
-func (f *fake) Transition(_ context.Context, key, targetStatusID string) error {
+func (f *fake) Transition(_ context.Context, key string, targetStatusIDs []string) error {
 	if f.onTransition != nil {
 		f.onTransition()
 	}
@@ -100,6 +102,19 @@ func (f *fake) Transition(_ context.Context, key, targetStatusID string) error {
 	if !ok {
 		return fmt.Errorf("no issue %s", key)
 	}
+	// The live backend takes the first of the column's statuses its
+	// workflow reaches; the fake reaches whatever it is given, so the first
+	// it knows a name for stands in for that.
+	targetStatusID := ""
+	for _, id := range targetStatusIDs {
+		if statusNames[id] != "" {
+			targetStatusID = id
+			break
+		}
+	}
+	if targetStatusID == "" {
+		return fmt.Errorf("no status among %v", targetStatusIDs)
+	}
 	iss.StatusID, iss.Status = targetStatusID, statusNames[targetStatusID]
 	iss.Updated = "2026-09-07T00:00:00Z"
 	f.rows[key] = iss
@@ -107,8 +122,14 @@ func (f *fake) Transition(_ context.Context, key, targetStatusID string) error {
 	return nil
 }
 
-func (f *fake) CanTransition(_ context.Context, key, targetStatusID string) (backend.TransitionCheck, error) {
-	return backend.TransitionCheck{Reachable: []string{statusNames[targetStatusID]}, Allowed: f.transitionErr[key] == nil}, nil
+func (f *fake) CanTransition(_ context.Context, key string, targetStatusIDs []string) (backend.TransitionCheck, error) {
+	names := []string{}
+	for _, id := range targetStatusIDs {
+		if n := statusNames[id]; n != "" {
+			names = append(names, n)
+		}
+	}
+	return backend.TransitionCheck{Reachable: names, Allowed: f.transitionErr[key] == nil}, nil
 }
 
 func (f *fake) RankIssue(_ context.Context, key, neighbourKey string, before bool) error {
@@ -494,4 +515,18 @@ func TestRemainingCountsTheBoardRowsThatStayed(t *testing.T) {
 	if res.Remaining != 1 {
 		t.Errorf("one row stayed: %d", res.Remaining)
 	}
+}
+
+// ColumnStatuses: the fake board holds one status per column, so a status is
+// its own only sibling unless a test says otherwise.
+func (o *boardOrder) ColumnStatuses(_ context.Context, _, statusID string) ([]string, error) {
+	if o.siblings != nil {
+		if ids, ok := o.siblings[statusID]; ok {
+			return ids, nil
+		}
+	}
+	if statusID == "" {
+		return nil, nil
+	}
+	return []string{statusID}, nil
 }

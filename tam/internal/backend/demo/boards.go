@@ -108,7 +108,7 @@ func demoSprints() []backend.Sprint {
 // Requirements are left out because neither demo board collects them: a
 // board holds the work items, and the demo's requirements have no sprint
 // and no status either column maps.
-func (b *Backend) BoardIssueKeys(_ context.Context, boardID int, sprintID string) ([]string, error) {
+func (b *Backend) BoardIssueKeys(_ context.Context, boardID int, sprintID, _ string) ([]string, error) {
 	if err := knownBoard(boardID); err != nil {
 		return nil, err
 	}
@@ -132,15 +132,18 @@ func (b *Backend) BoardIssueKeys(_ context.Context, boardID int, sprintID string
 // a Data Center workflow routinely has no path from where a card sits to
 // where it was dropped, and the offline walk-through has to be able to show
 // that failure without a real Jira behind it.
-func (b *Backend) Transition(_ context.Context, key, targetStatusID string) error {
+func (b *Backend) Transition(_ context.Context, key string, targetStatusIDs []string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	iss, ok := b.find(key)
 	if !ok {
 		return fmt.Errorf("demo: no issue %s", key)
 	}
-	if err := b.refuseTransition(key, targetStatusID); err != nil {
-		return err
+	// The same rule the live backend follows: the first of the column's
+	// statuses this issue may actually reach.
+	targetStatusID, ok := b.firstAllowed(key, targetStatusIDs)
+	if !ok {
+		return b.refuseTransition(key, firstOf(targetStatusIDs))
 	}
 	name := StatusName(targetStatusID)
 	if name == "" {
@@ -154,14 +157,38 @@ func (b *Backend) Transition(_ context.Context, key, targetStatusID string) erro
 
 // CanTransition answers what the demo's own workflow allows: every status
 // the columns collect, minus the one the curated story is refused.
-func (b *Backend) CanTransition(_ context.Context, key, targetStatusID string) (backend.TransitionCheck, error) {
+func (b *Backend) CanTransition(_ context.Context, key string, targetStatusIDs []string) (backend.TransitionCheck, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if _, ok := b.find(key); !ok {
 		return backend.TransitionCheck{}, fmt.Errorf("demo: no issue %s", key)
 	}
-	check := backend.TransitionCheck{Reachable: reachableFrom(key, b.ConflictKey()), Allowed: b.refuseTransition(key, targetStatusID) == nil}
+	_, allowed := b.firstAllowed(key, targetStatusIDs)
+	check := backend.TransitionCheck{Reachable: reachableFrom(key, b.ConflictKey()), Allowed: allowed}
 	return check, nil
+}
+
+// firstAllowed is the first of the column's statuses this issue may reach,
+// mirroring the live backend, which walks the column's statuses in order and
+// takes the first its workflow offers a transition to.
+func (b *Backend) firstAllowed(key string, targets []string) (string, bool) {
+	for _, id := range targets {
+		if id == "" || StatusName(id) == "" {
+			continue
+		}
+		if b.refuseTransition(key, id) == nil {
+			return id, true
+		}
+	}
+	return "", false
+}
+
+// firstOf names the status a refusal is about: the one dropped on.
+func firstOf(targets []string) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	return targets[0]
 }
 
 // refuseTransition is the one staged workflow refusal: the curated story
