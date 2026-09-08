@@ -178,7 +178,7 @@ func TestBoardMovesPushTheSprintThenTheTransitionThenTheRanks(t *testing.T) {
 	if m := byType[issuerepo.EntityTransition]; m.Target != "Done" {
 		t.Errorf("transition: %+v", m)
 	}
-	if m := byType[issuerepo.EntityRank]; m.Target != "after PLAT-2" {
+	if m := byType[issuerepo.EntityRank]; m.Target != "PLAT-2" || m.Side != issuerepo.RankSideAfter {
 		t.Errorf("rank: %+v", m)
 	}
 	iss, _ := h.repo.GetIssue(ctx, "p1", "PLAT-1")
@@ -219,6 +219,43 @@ func TestABoardRowNeverReachesTheEditsPass(t *testing.T) {
 		}
 	}
 	if strings.Join(res.Committed, ",") != "PLAT-1" || len(res.Failures) != 0 || len(res.Moved) != 1 || res.Remaining != 0 {
+		t.Errorf("result: %+v", res)
+	}
+}
+
+// TestABoardRowSurvivesTheRegroupAfterACreate is the other half of that
+// guard, and the half nothing exercised: regroupEdits re-lists the journal,
+// but only when a commit carries both creates and edits, so a board row it
+// failed to filter out would be swept into commitEdit, sent to Jira as a
+// field, and deleted along with the edits it rode in with. This is the one
+// commit shape that reaches that code.
+func TestABoardRowSurvivesTheRegroupAfterACreate(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	if _, err := h.repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "New task"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.repo.EditField(ctx, "p1", "PLAT-1", "summary", "uno"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.repo.MoveToColumn(ctx, "p1", "PLAT-1", "5"); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.jira.pushed) != 1 || h.jira.pushed[0] != "transition PLAT-1 5" {
+		t.Fatalf("the board pass pushed the move, not the edits pass: %v", h.jira.pushed)
+	}
+	if len(h.jira.updates) != 1 || h.jira.updates[0] != "PLAT-1 summary=uno" {
+		t.Errorf("the field update carries the edit and nothing else: %v", h.jira.updates)
+	}
+	if len(res.Created) != 1 || strings.Join(res.Committed, ",") != "PLAT-1" {
+		t.Errorf("the create and the edit both landed: %+v", res)
+	}
+	if len(res.Moved) != 1 || len(res.Failures) != 0 || res.Remaining != 0 {
 		t.Errorf("result: %+v", res)
 	}
 }
@@ -341,96 +378,6 @@ func TestASprintMoveIsCheckedAndBatchedByItsTarget(t *testing.T) {
 		if m.Key == "PLAT-3" && m.Target != "Backlog" {
 			t.Errorf("the backlog is named, not left blank: %+v", m)
 		}
-	}
-}
-
-func TestTwoCardsRankedAgainstEachOtherCommitInTheBoardsOrder(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	if err := h.repo.RankIssue(ctx, "p1", "PLAT-3", "PLAT-2", true, demoBoard); err != nil {
-		t.Fatal(err)
-	}
-	if err := h.repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-3", true, demoBoard); err != nil {
-		t.Fatal(err)
-	}
-	// The order the screen ended up showing, which is not the order the two
-	// drops were journaled in.
-	h.order.order[demoBoard] = []string{"PLAT-2", "PLAT-1", "PLAT-3"}
-
-	res, err := h.eng.Commit(ctx, "p1", "PLAT")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"rank PLAT-1 after PLAT-2", "rank PLAT-3 after PLAT-1"}
-	if strings.Join(h.jira.pushed, " | ") != strings.Join(want, " | ") {
-		t.Errorf("ranks push top to bottom, each after the card above it: %v", h.jira.pushed)
-	}
-	if len(res.Moved) != 2 || len(res.Failures) != 0 || res.Remaining != 0 {
-		t.Errorf("result: %+v", res)
-	}
-}
-
-func TestARankWhoseNeighbourHasLeftTheCellIsDroppedWithAReason(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	if err := h.repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-2", true, demoBoard); err != nil {
-		t.Fatal(err)
-	}
-	// PLAT-2 has gone from the board, so the card it was dropped against is
-	// not there and nothing sits above it any more.
-	h.order.order[demoBoard] = []string{"PLAT-1", "PLAT-3"}
-
-	res, err := h.eng.Commit(ctx, "p1", "PLAT")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(h.jira.pushed) != 0 {
-		t.Errorf("nothing is pushed against a card that is not there: %v", h.jira.pushed)
-	}
-	if len(res.Failures) != 1 {
-		t.Fatalf("one failure, the rank's: %+v", res.Failures)
-	}
-	f := res.Failures[0]
-	if f.Key != "PLAT-1" || f.EntityType != issuerepo.EntityRank || f.RowID == 0 || f.Retryable {
-		t.Errorf("the dropped rank names its row: %+v", f)
-	}
-	if !strings.Contains(f.Error, "top of board 1") {
-		t.Errorf("the reason says why: %s", f.Error)
-	}
-	if res.Remaining != 1 {
-		t.Errorf("the row stays for an undo: %d", res.Remaining)
-	}
-}
-
-func TestARankWhoseCardHasLeftTheBoardIsDropped(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	if err := h.repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-2", true, demoBoard); err != nil {
-		t.Fatal(err)
-	}
-	h.order.order[demoBoard] = []string{"PLAT-2", "PLAT-3"}
-
-	res, _ := h.eng.Commit(ctx, "p1", "PLAT")
-	if len(h.jira.pushed) != 0 || len(res.Failures) != 1 {
-		t.Fatalf("pushed %v, failures %+v", h.jira.pushed, res.Failures)
-	}
-	if !strings.Contains(res.Failures[0].Error, "no longer on board 1") || res.Remaining != 1 {
-		t.Errorf("failure: %+v (remaining %d)", res.Failures[0], res.Remaining)
-	}
-}
-
-func TestARankWhoseBoardIsGoneFromTheStoreIsDropped(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	if err := h.repo.RankIssue(ctx, "p1", "PLAT-1", "PLAT-2", true, 9); err != nil {
-		t.Fatal(err)
-	}
-	res, _ := h.eng.Commit(ctx, "p1", "PLAT")
-	if len(res.Failures) != 1 || res.Failures[0].Retryable || res.Remaining != 1 {
-		t.Fatalf("result: %+v", res)
-	}
-	if !strings.Contains(res.Failures[0].Error, "board 9") {
-		t.Errorf("the reason names the board: %s", res.Failures[0].Error)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	corejira "agile-suite/core/jira"
 	"agile-suite/core/journal"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
@@ -22,11 +23,6 @@ import (
 // takes fifty, and a standup's worth of planning would otherwise be fifty
 // round trips.
 const sprintBatch = 50
-
-// backlogLabel is what an empty sprint value reads as. Leaving every sprint
-// is a destination, not an absence, and a conflict card that showed an
-// empty cell for it would be unreadable.
-const backlogLabel = "Backlog"
 
 // BoardOrder is the board's final local order, top to bottom, which the
 // rank group re-derives every neighbour from. boardrepo.Order satisfies it
@@ -45,29 +41,42 @@ type boardWriter interface {
 	MoveIssuesToSprint(ctx context.Context, sprintID string, keys []string) error
 }
 
-// errNoAgile is what a rank or a sprint move reports on an instance whose
-// Jira has no Agile API. It is a fact about the instance, not a failure of
-// this commit, so retrying will not change it.
-var errNoAgile = errors.New("this connection cannot move cards between sprints or reorder them: its Jira has no agile api")
+// errNoBoardWrites is what a rank or a sprint move reports when the backend
+// behind this commit cannot write to boards at all. It says nothing about
+// the instance: an instance whose Jira has no Agile API answers the two
+// endpoints with a 404, which core/jira turns into jira.ErrNoAgile and
+// which arrives here inside the push error. Both are settled facts rather
+// than failures of this commit, so neither is worth a retry.
+var errNoBoardWrites = errors.New("this connection cannot move cards between sprints or reorder them")
 
-// noAgileWrites stands in for a backend that cannot answer
+// noBoardWrites stands in for a backend that cannot answer
 // backend.BoardBackend, so the rows that need it fail with a reason where
-// they are pushed instead of taking every board row down at the door.
-type noAgileWrites struct{}
+// they are pushed instead of taking every board row down at the door. Both
+// shipped backends do answer it; this is the door a future read-only one
+// comes through, and a transition still pushes past it.
+type noBoardWrites struct{}
 
-func (noAgileWrites) RankIssue(context.Context, string, string, bool) error { return errNoAgile }
+func (noBoardWrites) RankIssue(context.Context, string, string, bool) error {
+	return errNoBoardWrites
+}
 
-func (noAgileWrites) MoveIssuesToSprint(context.Context, string, []string) error { return errNoAgile }
+func (noBoardWrites) MoveIssuesToSprint(context.Context, string, []string) error {
+	return errNoBoardWrites
+}
 
 // Moved is one board write this Commit settled: a card transitioned,
 // moved to a sprint, or ranked. Target is what was pushed, named rather
-// than numbered. Satisfied marks a row Jira already agreed with, where the
-// move had happened on the web or by someone else and the row was dropped
-// rather than pushed again.
+// than numbered: a status or a sprint by name, and for a rank the key of
+// the card it was placed against, with Side saying which side of that card
+// it went. Side is empty for everything but a rank, so a reader that wants
+// a sentence joins the two rather than parsing one apart. Satisfied marks
+// a row Jira already agreed with, where the move had happened on the web or
+// by someone else and the row was dropped rather than pushed again.
 type Moved struct {
 	Key        string `json:"key"`
 	EntityType string `json:"entityType"`
 	Target     string `json:"target"`
+	Side       string `json:"side"`
 	Satisfied  bool   `json:"satisfied"`
 }
 
@@ -84,13 +93,13 @@ type movePlan struct {
 // commitBoardMoves pushes the journal's board rows: per issue the sprint
 // move and then the transition, since a sprint move changes which columns
 // apply and a transition changes the status a rank is measured against, and
-// then every rank as one group. A failure is per row and does not stop the
+// then every rank as one group, in ranks.go. A failure is per row and does not stop the
 // pass; a row whose key is still a draft waits for the next Commit, the
 // rule the link pass already uses.
 func (e *Engine) commitBoardMoves(ctx context.Context, profileID string, res *Result) {
 	rows, err := e.boardRows(ctx, profileID)
 	if err != nil {
-		res.Failures = append(res.Failures, Failure{Key: "board moves", Error: "the journal could not be read for board moves: " + err.Error(), Retryable: true, Reachable: []string{}})
+		res.Failures = append(res.Failures, failure("board moves", "", "the journal could not be read for board moves: "+err.Error(), true))
 		return
 	}
 	if len(rows) == 0 {
@@ -100,7 +109,7 @@ func (e *Engine) commitBoardMoves(ctx context.Context, profileID string, res *Re
 	// whether or not the instance has the Agile one; only the rank and the
 	// sprint move need that, and they say so per row rather than failing
 	// every board row at the door.
-	var w boardWriter = noAgileWrites{}
+	var w boardWriter = noBoardWrites{}
 	if bw, ok := e.b.(boardWriter); ok {
 		w = bw
 	}
@@ -243,7 +252,7 @@ func (e *Engine) pushSprints(ctx context.Context, profileID string, w boardWrite
 			}
 			if err := w.MoveIssuesToSprint(ctx, target, keys); err != nil {
 				for _, p := range batch {
-					res.Failures = append(res.Failures, boardFailure(p, err, !errors.Is(err, errNoAgile)))
+					res.Failures = append(res.Failures, boardFailure(p, err, true))
 				}
 				continue
 			}
@@ -276,96 +285,19 @@ func (e *Engine) pushTransitions(ctx context.Context, profileID string, plan mov
 	}
 }
 
-// pushRanks is the last group, after every transition and sprint move has
-// landed, because both change where a card sits. Each board's ranks push in
-// that board's final local order, top to bottom, every card anchored with
-// rankAfterIssue against the card already anchored above it: mixing before
-// and after between two cards that were ranked against each other is how an
-// order becomes a cycle.
-//
-// A rank needs no issue refresh afterwards, which halves the calls in the
-// group that has the most rows. A rank whose board is gone from the store,
-// whose card has left that board, or that has nothing above it to anchor
-// against is dropped with its reason rather than pushed against a card that
-// is not there; its journal row stays, so the user can undo the move or
-// sync the boards and commit again.
-func (e *Engine) pushRanks(ctx context.Context, profileID string, w boardWriter, ranks []journal.PendingChange, res *Result) {
-	if len(ranks) == 0 {
-		return
-	}
-	byBoard := map[int][]journal.PendingChange{}
-	var boards []int
-	for _, p := range ranks {
-		_, _, boardID := issuerepo.ParseRank(p.AfterVal)
-		if _, seen := byBoard[boardID]; !seen {
-			boards = append(boards, boardID)
-		}
-		byBoard[boardID] = append(byBoard[boardID], p)
-	}
-	sort.Ints(boards)
-	for _, boardID := range boards {
-		rows := byBoard[boardID]
-		if e.order == nil {
-			e.dropRanks(rows, res, errors.New("this commit was built with no board order to rank against"))
-			continue
-		}
-		order, err := e.order.CellOrder(ctx, profileID, boardID)
-		if err != nil {
-			e.dropRanks(rows, res, fmt.Errorf("board %d's order could not be read: %w", boardID, err))
-			continue
-		}
-		want := make(map[string]journal.PendingChange, len(rows))
-		for _, p := range rows {
-			want[p.EntityKey] = p
-		}
-		prev := ""
-		for _, key := range order {
-			p, ok := want[key]
-			if !ok {
-				prev = key
-				continue
-			}
-			delete(want, key)
-			if prev == "" {
-				res.Failures = append(res.Failures, boardFailure(p, fmt.Errorf("%s is at the top of board %d, so there is no card above it to rank it against", key, boardID), false))
-			} else if err := w.RankIssue(ctx, key, prev, false); err != nil {
-				res.Failures = append(res.Failures, boardFailure(p, err, !errors.Is(err, errNoAgile)))
-			} else {
-				e.clearMove(ctx, profileID, p, res)
-				res.Moved = append(res.Moved, Moved{Key: key, EntityType: p.EntityType, Target: "after " + prev})
-			}
-			prev = key
-		}
-		// Whatever is left never appeared in the order: the card has gone
-		// from the board, so the cell the rank was measured in no longer
-		// holds it.
-		leftover := make([]journal.PendingChange, 0, len(want))
-		for _, p := range rows {
-			if _, still := want[p.EntityKey]; still {
-				leftover = append(leftover, p)
-			}
-		}
-		for _, p := range leftover {
-			res.Failures = append(res.Failures, boardFailure(p, fmt.Errorf("%s is no longer on board %d, so there is nothing to rank it against", p.EntityKey, boardID), false))
-		}
-	}
-}
-
-// dropRanks reports every rank of one board with the same reason.
-func (e *Engine) dropRanks(rows []journal.PendingChange, res *Result, err error) {
-	for _, p := range rows {
-		res.Failures = append(res.Failures, boardFailure(p, err, false))
-	}
-}
-
 // clearMove drops the journal row of a board write that landed, but only
 // while its after_val is still the value that was pushed: the move bindings
 // take no busy guard, so a card dragged again mid-push updates that row in
 // place, and a delete by id would throw away an intent Jira was never told
 // about. The commit is audited either way, because the push did happen.
+//
+// A failure here is a local SQLite write, the most transient thing in the
+// pass, and retrying is the fix rather than a false hope: the next Commit
+// reads a remote that is already at the target, classifies the row as
+// satisfied, and deletes it. So it is retryable.
 func (e *Engine) clearMove(ctx context.Context, profileID string, p journal.PendingChange, res *Result) {
-	if _, err := e.repo.MarkMoveCommitted(ctx, profileID, p, p.AfterVal); err != nil {
-		res.Failures = append(res.Failures, boardFailure(p, fmt.Errorf("pushed to Jira but the journal could not be cleared: %w", err), false))
+	if err := e.repo.MarkMoveCommitted(ctx, profileID, p); err != nil {
+		res.Failures = append(res.Failures, boardFailure(p, fmt.Errorf("pushed to Jira but the journal could not be cleared: %w", err), true))
 	}
 }
 
@@ -384,69 +316,17 @@ func (e *Engine) holdBoard(res *Result, key string, remote backend.Issue, fields
 	})
 }
 
-// The three answers a fresh remote read gives one journaled board move.
-const (
-	moveSatisfied = iota
-	movePush
-	moveConflict
-)
-
-// classifyMove compares the journal's ids with the remote's, never the
-// "id|Name" text: a status name that differs between the board
-// configuration and the cached row would make a card that never moved look
-// like a conflict.
-func classifyMove(p journal.PendingChange, remoteID string) int {
-	switch {
-	case issuerepo.MoveID(p.AfterVal) == remoteID:
-		return moveSatisfied
-	case issuerepo.MoveID(p.BeforeVal) == remoteID:
-		return movePush
-	default:
-		return moveConflict
-	}
-}
-
-// remoteValue is the id a board row is checked against.
-func remoteValue(entityType string, remote backend.Issue) string {
-	if entityType == issuerepo.EntitySprintMove {
-		return remote.SprintID
-	}
-	return remote.StatusID
-}
-
-// moveLabel is what a journaled board value reads as. issuerepo.FieldValue
-// is not used anywhere in this file: it knows the six editable fields and
-// would render an empty string for a status or a sprint.
-func moveLabel(entityType, value string) string {
-	if entityType == issuerepo.EntitySprintMove && issuerepo.MoveID(value) == "" {
-		return backlogLabel
-	}
-	return issuerepo.MoveName(value)
-}
-
-// remoteLabel is what Jira holds now, for the conflict card.
-func remoteLabel(entityType string, remote backend.Issue) string {
-	if entityType == issuerepo.EntitySprintMove {
-		switch {
-		case remote.SprintID == "":
-			return backlogLabel
-		case remote.SprintName != "":
-			return remote.SprintName
-		}
-		return remote.SprintID
-	}
-	if remote.Status != "" {
-		return remote.Status
-	}
-	return remote.StatusID
-}
-
 // boardFailure is one board row that did not land. It carries the row so a
 // per-row Undo knows exactly what to discard: one card can fail a
-// transition and drop a rank in the same Commit. A transition with no path
-// and one asking for a field TAM cannot fill will fail identically forever,
-// so neither is retryable however the caller asked for it, and the first
-// hands over the statuses the card can actually reach.
+// transition and drop a rank in the same Commit.
+//
+// Four errors fail identically for as long as they are sent, so none of
+// them is retryable however the caller asked for it: a transition with no
+// path, one asking for a field TAM cannot fill, a backend that cannot write
+// to boards, and an instance whose Jira has no Agile API to write to. The
+// first also hands over the statuses the card can actually reach.
+var settledFacts = []error{backend.ErrNoTransition, backend.ErrTransitionFields, errNoBoardWrites, corejira.ErrNoAgile}
+
 func boardFailure(p journal.PendingChange, err error, retryable bool) Failure {
 	f := Failure{
 		Key: p.EntityKey, EntityType: p.EntityType, RowID: p.ID,
@@ -456,8 +336,10 @@ func boardFailure(p journal.PendingChange, err error, retryable bool) Failure {
 	if errors.As(err, &noPath) {
 		f.Reachable = backend.NonNil(noPath.Reachable)
 	}
-	if errors.Is(err, backend.ErrNoTransition) || errors.Is(err, backend.ErrTransitionFields) {
-		f.Retryable = false
+	for _, settled := range settledFacts {
+		if errors.Is(err, settled) {
+			f.Retryable = false
+		}
 	}
 	return f
 }

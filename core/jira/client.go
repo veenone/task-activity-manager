@@ -335,12 +335,18 @@ func (c *Client) WriteJSONReturning(ctx context.Context, method, path string, bo
 // writeStatusError is the error a write with a non-2xx status produces: the
 // method, the path, the status line, and a short slice of the body.
 func writeStatusError(method, path string, resp WriteResponse) error {
-	body := resp.Body
+	return fmt.Errorf(
+		"jira: %s %s -> %s: %s",
+		method, path, resp.Status, bodyExcerpt(resp.Body),
+	)
+}
+
+// bodyExcerpt is as much of a failed write's body as belongs in an error
+// message: a kilobyte at most, trimmed. Both the ordinary status error and
+// the Agile bulk writes quote a body, so the limit is defined once.
+func bodyExcerpt(body []byte) string {
 	if len(body) > 1024 {
 		body = body[:1024]
 	}
-	return fmt.Errorf(
-		"jira: %s %s -> %s: %s",
-		method, path, resp.Status, strings.TrimSpace(string(body)),
-	)
+	return strings.TrimSpace(string(body))
 }

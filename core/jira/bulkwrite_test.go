@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -181,6 +182,35 @@ func TestBulkWriteSurfacesA4xx(t *testing.T) {
 	for _, want := range []string{"move to sprint", "400", "Sprint does not exist", "/rest/agile/1.0/sprint/12/issue"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v, want it to mention %q", err, want)
+		}
+	}
+}
+
+// TestAnAgileWriteAnswered404IsErrNoAgile is the whole reason the commit
+// pass can call a rank or a sprint move unretryable: a Data Center without
+// Jira Software serves none of the Agile paths, so it answers the writes
+// the same 404 it answers /board with, and the caller has to be able to
+// tell that from a transport hiccup. The body stays in the message, since
+// the same status also covers a target that is gone.
+func TestAnAgileWriteAnswered404IsErrNoAgile(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errorMessages":["null for uri: /rest/agile/1.0/issue/rank"]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	cases := map[string]error{
+		"rank":       c.RankIssue(context.Background(), "PLAT-412", "PLAT-409", false),
+		"to sprint":  c.MoveToSprint(context.Background(), "12", []string{"PLAT-412"}),
+		"to backlog": c.MoveToBacklog(context.Background(), []string{"PLAT-412"}),
+	}
+	for name, err := range cases {
+		if !errors.Is(err, ErrNoAgile) {
+			t.Errorf("%s: err = %v, want it to wrap ErrNoAgile", name, err)
+		}
+		if !strings.Contains(err.Error(), "/rest/agile/1.0/issue/rank") {
+			t.Errorf("%s: err = %v, want Jira's own body kept", name, err)
 		}
 	}
 }

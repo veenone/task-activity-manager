@@ -35,20 +35,19 @@ func TestCellOrderIsTheBoardColumnByColumnWithThePendingMovesApplied(t *testing.
 	}
 }
 
-func TestCellOrderLeavesOutDraftsAndCardsNoColumnCollects(t *testing.T) {
+func TestCellOrderLeavesOutCardsNoColumnCollects(t *testing.T) {
 	r, _ := newRepo(t)
 	cards := []backend.Issue{
 		card("PLAT-409", "To Do", "1"),
 		card("PLAT-777", "Blocked", "99"), // a status no column collects
 	}
-	src := seedBoard(t, r, sampleColumns(), cards).withDrafts(draftCard("TAM-NEW-1"))
+	src := seedBoard(t, r, sampleColumns(), cards)
 
 	order, err := boardrepo.Order{Boards: r, Issues: src}.CellOrder(context.Background(), "p1", 1)
 	if err != nil {
 		t.Fatalf("cell order: %v", err)
 	}
-	// Jira has never seen TAM-NEW-1, so it can neither be ranked nor anchor
-	// another card's rank, and a card the board does not draw cannot either.
+	// A card the board does not draw cannot anchor another card's rank.
 	if strings.Join(order, ",") != "PLAT-409" {
 		t.Errorf("order = %v", order)
 	}

@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"agile-suite/tam/internal/backend"
-	"agile-suite/tam/internal/demo"
 )
 
 // The only consumer is a type assertion, so drift would skip the sync silently; this fails the build.
@@ -162,7 +160,7 @@ func (b *Backend) CanTransition(_ context.Context, key, targetStatusID string) (
 	if _, ok := b.find(key); !ok {
 		return backend.TransitionCheck{}, fmt.Errorf("demo: no issue %s", key)
 	}
-	check := backend.TransitionCheck{Reachable: reachableFrom(key), Allowed: b.refuseTransition(key, targetStatusID) == nil}
+	check := backend.TransitionCheck{Reachable: reachableFrom(key, b.ConflictKey()), Allowed: b.refuseTransition(key, targetStatusID) == nil}
 	return check, nil
 }
 
@@ -172,14 +170,17 @@ func (b *Backend) refuseTransition(key, targetStatusID string) error {
 	if key != b.ConflictKey() || targetStatusID != StatusID("Done") {
 		return nil
 	}
-	return &backend.NoTransition{Key: key, TargetStatusID: targetStatusID, Reachable: reachableFrom(key)}
+	return &backend.NoTransition{Key: key, TargetStatusID: targetStatusID, Reachable: reachableFrom(key, b.ConflictKey())}
 }
 
 // reachableFrom is the demo's list of statuses a card can move to: the
-// three the columns collect, less Done for the curated story.
-func reachableFrom(key string) []string {
+// three the columns collect, less Done for the curated story. The curated
+// story is passed in rather than recognised by the tail of its key, which
+// matched any key ending the same way and would have gone quietly wrong the
+// moment either constant moved.
+func reachableFrom(key, conflictKey string) []string {
 	names := []string{"To Do", "In Progress", "Done"}
-	if !strings.HasSuffix(key, conflictKey[len(demo.ProjectKey):]) {
+	if key != conflictKey {
 		return names
 	}
 	return names[:2]
@@ -202,6 +203,11 @@ func (b *Backend) RankIssue(_ context.Context, key, neighbourKey string, _ bool)
 // MoveIssuesToSprint moves the batch onto the sprint, or onto the backlog
 // when the id is empty. The name comes from the scrum board's sprints, so a
 // moved card reads the same as one the dataset put there.
+//
+// Every key is looked up before any of them is written. Jira applies a
+// sprint move to the whole batch or to none of it, and a demo that wrote
+// the first half of a batch and then refused the rest would leave the
+// overlay in a state no Commit could have produced.
 func (b *Backend) MoveIssuesToSprint(_ context.Context, sprintID string, keys []string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -211,14 +217,18 @@ func (b *Backend) MoveIssuesToSprint(_ context.Context, sprintID string, keys []
 			return fmt.Errorf("demo: no sprint %s", sprintID)
 		}
 	}
-	now := time.Now().UTC().Format(time.RFC3339)
+	moving := make([]backend.Issue, 0, len(keys))
 	for _, key := range keys {
 		iss, ok := b.find(key)
 		if !ok {
 			return fmt.Errorf("demo: no issue %s", key)
 		}
+		moving = append(moving, iss)
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, iss := range moving {
 		iss.SprintID, iss.SprintName, iss.Updated = sprintID, name, now
-		b.over[key] = iss
+		b.over[iss.Key] = iss
 	}
 	return nil
 }

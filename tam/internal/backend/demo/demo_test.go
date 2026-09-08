@@ -417,3 +417,22 @@ func TestDemoSprintMovesAndRanksApplyToTheDataset(t *testing.T) {
 		t.Error("a rank against a card the demo does not hold is refused")
 	}
 }
+
+// TestARefusedSprintBatchMovesNothing is Jira's own rule: a sprint move
+// takes the whole batch or none of it. The demo used to write each card as
+// it walked the list and return on the first key it did not hold, leaving
+// the earlier ones moved.
+func TestARefusedSprintBatchMovesNothing(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+	if err := b.MoveIssuesToSprint(ctx, "13", []string{"ACME-412", "ACME-9999"}); err == nil {
+		t.Fatal("a batch naming a card the demo does not hold is refused")
+	}
+	iss, err := b.GetIssue(ctx, "ACME-412")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iss.SprintID == "13" {
+		t.Errorf("the first half of a refused batch was applied: %+v", iss)
+	}
+}

@@ -29,11 +29,11 @@ type Order struct {
 // Jira's rank is one order across the board and a card ranked in a sprint
 // view still moves in that one order.
 //
-// Two deliberate differences from what the view draws. Nothing is capped:
+// One deliberate difference from what the view draws: nothing is capped.
 // MaxCardsPerCell decides what a person can read, not where a card belongs.
-// And drafts are left out: Jira has never seen a TAM-NEW key, so a draft
-// can neither be ranked nor anchor another card's rank, and including one
-// would have the pass push a temporary key as a neighbour.
+// Drafts never arrive here at all, since the order is built from the key
+// list Jira answered the board endpoint with, which is the reason a draft
+// can neither be ranked nor anchor another card's rank.
 //
 // A board the store does not hold answers with an error, which is what the
 // commit pass reports when it drops that board's ranks.

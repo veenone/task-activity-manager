@@ -19,6 +19,10 @@ import (
 // keys are the issues the call was made with. They are named in the message
 // because the rank endpoint reports its rejections by numeric issue id,
 // which a caller holding issue keys cannot match on its own.
+//
+// A 404 is wrapped in ErrNoAgile, the same answer Boards gives the read
+// path: an instance with no Agile API answers every one of these paths that
+// way, and nothing about resending the call changes it.
 func (c *Client) bulkWrite(ctx context.Context, op, method, path string, body any, keys []string) error {
 	resp, err := c.WriteJSONRaw(ctx, method, path, body)
 	if err != nil {
@@ -30,6 +34,15 @@ func (c *Client) bulkWrite(ctx context.Context, op, method, path string, body an
 			"jira: %s refused: %s %s -> %s for %s: %s",
 			op, method, path, resp.Status, strings.Join(keys, ", "), multiStatusReason(resp.Body),
 		)
+	case resp.Code == http.StatusNotFound:
+		// Every path this helper writes to is an Agile 1.0 one, and a Data
+		// Center without Jira Software serves none of them. A 404 can also
+		// be a target that is gone, a sprint someone closed and deleted, so
+		// Jira's own body stays in the message; either way the same request
+		// will fail the same way for as long as it is sent, which is what
+		// ErrNoAgile tells a caller that branches on it.
+		return fmt.Errorf("jira: %s: %w: %s %s -> %s: %s",
+			op, ErrNoAgile, method, path, resp.Status, bodyExcerpt(resp.Body))
 	case resp.Code >= 300:
 		return fmt.Errorf("jira: %s: %w", op, writeStatusError(method, path, resp))
 	}
