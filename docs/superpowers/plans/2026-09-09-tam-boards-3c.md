@@ -75,7 +75,7 @@ This is the inherited bug, not a feature. `TestReplaceBoardLandsColumnsAndMember
 
 - [ ] **Step 2: Prove it, and fix the test that could never have passed.** `TestReplaceBoardLandsColumnsAndMembershipTogether` reads with `r.Columns` and a raw `countKeys` helper: two separate statements, which is two separate snapshots no matter what the read path does internally. The test asks for atomicity across two calls, which no API can promise, so wrapping `Board` and `CellOrder` would not have quieted it and Task 5's `-count=20` gate would still have failed. That is the actual reason two sessions chased this.
 
-Drive the reader through one snapshot read instead: `Repository.Board`, which is what the view uses and what Task 1 has just made atomic. Then run it with `-count=20` and it must pass every time. Add one more that fails without the fix, driving a reader in a loop while a writer replaces a board twice, asserting the reader only ever sees one whole board or the other.
+Drive the reader through one snapshot read instead: `Repository.Board`, which is what the view uses and what Step 1 has just made atomic. Then run it with `-count=20` and it must pass every time. Add one more that fails without the fix, driving a reader in a loop while a writer replaces a board twice, asserting the reader only ever sees one whole board or the other.
 
 - [ ] **Step 3: Commit** as `fix(tam): a board read sees one board, not the moment between two`.
 
@@ -160,3 +160,22 @@ Record each result, fix what fails, rerun only what failed. Do not lower an asse
 ## Deferred
 
 Creating a board, editing a sprint's dates once it has started, and a bulk transition, a bulk rank, a bulk assignee and bulk points. That last group is a cut rather than a completion: selecting several cards and being offered one action reads as unfinished, so the toolbar action is worded as exactly what it does, "Move N cards to sprint", and promises nothing else. A bulk transition needs every selected card's workflow checked, which is its own design, sprint reports and burndown (Phase 4, which is what these completed sprints feed), and the board's own quick filters and swimlane rules.
+
+---
+
+## Review report
+
+Run 2026-09-09, three phases, each an independent voice that had not seen the others, every claim checked against the code before it was adopted.
+
+**Nine findings changed the plan, four of them fatal to an implementer's day.**
+
+- **The bulk move could not be written as specified.** `issuerepo.MoveToSprint` already opens its own transaction, so looping it inside an outer one takes a second pooled connection, hits `SQLITE_BUSY` once the outer transaction has written, and burns the five second timeout per key: twenty keys would have frozen the UI for a hundred seconds and then failed.
+- **The completion could not decide what it was deciding.** It was given no board id while requiring a read that needs one, and the call it was told to use returns keys without statuses, while "incomplete" is defined by status.
+- **The atomicity task would not have fixed its own flake.** The test reads through two separate calls, which is two snapshots no matter what the read path does internally, so wrapping the reads would have left it failing and the gate with it.
+- **One name meant two opposite things**, so a completion would have journaled rows and then closed the sprint, moving nothing and leaving a journal full of rows that fail on every future Commit.
+
+And five more: the plan claimed a disabled-when-offline state TAM has no signal to compute; ending a lifecycle action with a boards sync would have blocked the UI for minutes or been refused by the lock the action itself holds; the sprint-only refresh it called for has no writer, and the nearest one would have wiped the board's membership on its way past; "incomplete" was never defined, though it decides which cards an irreversible action moves; and the multi-selection would have painted the same class as the single selection the detail panel uses, making three checked cards and one open panel indistinguishable.
+
+**Rejected.** Journaling the sprint start, so the app keeps one rule. Two adjacent buttons in one toolbar behaving differently is harder to explain than one sentence about ceremonies happening online, and a locally started sprint that Jira has not seen yet is a state with no good answer for the cards moved into it.
+
+**Cut rather than completed.** A bulk transition, rank, assignee and points. Selecting several cards and being offered one action reads as unfinished, so the action is worded as exactly what it does and promises nothing more.
