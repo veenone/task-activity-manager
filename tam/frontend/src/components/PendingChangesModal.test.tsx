@@ -303,7 +303,7 @@ describe("PendingChangesModal board moves", () => {
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
-    expect(await within(dialog).findByText("Last commit: 2 cards moved.")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Last commit: 2 cards moved (PLAT-412 to In Progress, PLAT-412 before PLAT-409).")).toBeInTheDocument();
   });
 
   it("does not count a move Jira had already made as a card this Commit moved", async () => {
@@ -320,7 +320,7 @@ describe("PendingChangesModal board moves", () => {
     const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
     expect(
-      await within(dialog).findByText("Last commit: 1 card moved, 1 already in place."),
+      await within(dialog).findByText("Last commit: 1 card moved (PLAT-412 to In Progress), 1 already in place."),
     ).toBeInTheDocument();
   });
 

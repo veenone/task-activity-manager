@@ -286,6 +286,11 @@ func TestATransitionWithNoPathFailsNamesTheReachableStatusesAndLeavesTheRankAlon
 	if strings.Join(f.Reachable, ",") != "In Progress" || !strings.Contains(f.Error, "In Progress") {
 		t.Errorf("failure carries where the card can go: %+v", f)
 	}
+	// The banner shows this sentence word for word, so the target reads as
+	// the status it is and not as the id the backend was handed.
+	if !strings.Contains(f.Error, "cannot move to Done") || strings.Contains(f.Error, "status 5") {
+		t.Errorf("failure names the target status: %q", f.Error)
+	}
 	if len(h.jira.pushed) != 1 || h.jira.pushed[0] != "rank PLAT-1 after PLAT-2" {
 		t.Errorf("the rank still pushed: %v", h.jira.pushed)
 	}

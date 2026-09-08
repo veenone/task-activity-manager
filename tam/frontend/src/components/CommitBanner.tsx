@@ -1,6 +1,14 @@
 import { isMoveEntity } from "../api";
-import type { CommitFailure, CommitResult } from "../api";
+import type { CommitFailure, CommitMove, CommitResult } from "../api";
 import { plural } from "../lib/format";
+
+// movedPhrase names one board write the way a created issue names its new
+// key: a transition and a sprint move by where the card went, a rank by the
+// card it was placed against and which side of it. Side is empty for
+// everything but a rank, which is what tells the two apart.
+export function movedPhrase(m: CommitMove): string {
+  return m.side ? `${m.key} ${m.side} ${m.target}` : `${m.key} to ${m.target}`;
+}
 
 // bannerLine renders a commit result as one sentence.
 export function bannerLine(r: CommitResult): string {
@@ -16,7 +24,9 @@ export function bannerLine(r: CommitResult): string {
   // counting it as one credits the push with work it did not do.
   const pushed = moved.filter((m) => !m.satisfied);
   const already = moved.length - pushed.length;
-  if (pushed.length) parts.push(plural(pushed.length, "card moved", "cards moved"));
+  if (pushed.length) {
+    parts.push(`${plural(pushed.length, "card moved", "cards moved")} (${pushed.map(movedPhrase).join(", ")})`);
+  }
   if (already) parts.push(`${already} already in place`);
   if (r.conflicts.length) parts.push(`${r.conflicts.length} held back`);
   if (r.failures.length) parts.push(`${r.failures.length} failed`);

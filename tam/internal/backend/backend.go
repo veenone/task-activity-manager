@@ -313,17 +313,29 @@ var ErrNoTransition = errors.New("no workflow transition reaches that status")
 // and the target and carries the names of the statuses that are reachable,
 // so a failure can say where the card can go instead of only where it
 // cannot. errors.Is finds ErrNoTransition through it.
+//
+// TargetStatus is the target's display name, empty where nothing knew it.
+// The backend is handed a status id and has no name for a status its
+// workflow cannot reach, so the journal row, which carries "id|Name", is
+// what fills this in. Without it the sentence named the target by number
+// while naming the reachable ones by name, and it is shown verbatim in the
+// commit banner.
 type NoTransition struct {
 	Key            string
 	TargetStatusID string
+	TargetStatus   string
 	Reachable      []string
 }
 
 func (e *NoTransition) Error() string {
-	if len(e.Reachable) == 0 {
-		return fmt.Sprintf("%s cannot move to status %s: its workflow offers no transition at all from where it is now", e.Key, e.TargetStatusID)
+	target := e.TargetStatus
+	if target == "" {
+		target = "status " + e.TargetStatusID
 	}
-	return fmt.Sprintf("%s cannot move to status %s: no transition reaches it. From here it can move to %s", e.Key, e.TargetStatusID, strings.Join(e.Reachable, ", "))
+	if len(e.Reachable) == 0 {
+		return fmt.Sprintf("%s cannot move to %s: its workflow offers no transition at all from where it is now", e.Key, target)
+	}
+	return fmt.Sprintf("%s cannot move to %s: no transition reaches it. From here it can move to %s", e.Key, target, strings.Join(e.Reachable, ", "))
 }
 
 // Unwrap is what makes errors.Is(err, ErrNoTransition) true.

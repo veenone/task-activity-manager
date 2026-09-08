@@ -74,6 +74,10 @@ export function BoardCard({
       aria-selected={selected}
       aria-colindex={colIndex}
       aria-label={label}
+      // A failed move's reason otherwise lived only in the label above, so
+      // a sighted user had to open the Pending changes dialog to read why
+      // the card is marked. The hover costs nothing and says it in place.
+      title={move.reason || undefined}
       tabIndex={focused ? 0 : -1}
       data-board-pos={posId}
       className={className}

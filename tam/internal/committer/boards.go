@@ -276,7 +276,7 @@ func (e *Engine) pushTransitions(ctx context.Context, profileID string, plan mov
 			continue
 		}
 		if err := e.b.Transition(ctx, key, issuerepo.MoveID(p.AfterVal)); err != nil {
-			res.Failures = append(res.Failures, boardFailure(p, err, true))
+			res.Failures = append(res.Failures, boardFailure(p, namedTarget(err, issuerepo.MoveRawName(p.AfterVal)), true))
 			continue
 		}
 		e.clearMove(ctx, profileID, p, res)
@@ -326,6 +326,22 @@ func (e *Engine) holdBoard(res *Result, key string, remote backend.Issue, fields
 // to boards, and an instance whose Jira has no Agile API to write to. The
 // first also hands over the statuses the card can actually reach.
 var settledFacts = []error{backend.ErrNoTransition, backend.ErrTransitionFields, errNoBoardWrites, corejira.ErrNoAgile}
+
+// namedTarget puts the journaled status name into a refused transition's
+// sentence. The backend is given a status id and can only name a status it
+// cannot reach by number; the journal row carries "id|Name", and this
+// sentence is what the commit banner shows the user word for word. A row
+// whose name half is empty, which is a status the cache has never seen,
+// leaves the error exactly as it was.
+func namedTarget(err error, name string) error {
+	var noPath *backend.NoTransition
+	if name == "" || !errors.As(err, &noPath) || noPath.TargetStatus != "" {
+		return err
+	}
+	named := *noPath
+	named.TargetStatus = name
+	return &named
+}
 
 func boardFailure(p journal.PendingChange, err error, retryable bool) Failure {
 	f := Failure{
