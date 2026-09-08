@@ -1,8 +1,9 @@
 // Package committer pushes TAM's journal to Jira: drafts are created and
 // rekeyed first, then each edited issue is version-checked, pushed, and
-// refreshed. An issue whose remote version moved is held back as a conflict
-// carrying base, mine, and remote for every pending field; the two
-// resolutions rebase the edits or drop them.
+// refreshed, then the board moves in boards.go, then the links. An issue
+// whose remote version moved is held back as a conflict carrying base,
+// mine, and remote for every pending field; the two resolutions rebase the
+// edits or drop them.
 package committer
 
 import (
@@ -42,10 +43,26 @@ type Conflict struct {
 	Fields        []FieldConflict `json:"fields"`
 }
 
-// Failure is an issue whose push or create failed; its rows stay.
+// Failure is a push that did not land; its journal rows stay. EntityType
+// and RowID name the row it was, because one card can fail a transition and
+// drop a rank in the same Commit and a per-failure Undo has to know which
+// row to discard; RowID is 0 for a failure that covers every pending row of
+// an issue, which is what an edits push is. Retryable is false for the
+// failures that will fail identically forever, so "Commit again to retry"
+// is only offered where it can help, and Reachable carries the statuses a
+// refused transition could have reached instead.
 type Failure struct {
-	Key   string `json:"key"`
-	Error string `json:"error"`
+	Key        string   `json:"key"`
+	EntityType string   `json:"entityType"`
+	RowID      int64    `json:"rowId"`
+	Error      string   `json:"error"`
+	Retryable  bool     `json:"retryable"`
+	Reachable  []string `json:"reachable"`
+}
+
+// failure is the ordinary push failure: retryable, and on no single row.
+func failure(key, entityType, message string) Failure {
+	return Failure{Key: key, EntityType: entityType, Error: message, Retryable: true, Reachable: []string{}}
 }
 
 // Linked is a link Commit created.
@@ -60,26 +77,31 @@ type Result struct {
 	Committed []string   `json:"committed"`
 	Created   []Created  `json:"created"`
 	Linked    []Linked   `json:"linked"`
+	Moved     []Moved    `json:"moved"`
 	Conflicts []Conflict `json:"conflicts"`
 	Failures  []Failure  `json:"failures"`
 	Remaining int        `json:"remaining"`
 }
 
-// Engine runs commits for one backend and repository pair.
+// Engine runs commits for one backend and repository pair. order is the
+// board order the rank group re-derives its neighbours from; a nil one
+// drops the ranks with that reason rather than pushing them against a
+// neighbour nobody checked.
 type Engine struct {
-	b    backend.IssueBackend
-	repo *issuerepo.Repository
+	b     backend.IssueBackend
+	repo  *issuerepo.Repository
+	order BoardOrder
 }
 
-// New returns an engine over the backend and the store.
-func New(b backend.IssueBackend, repo *issuerepo.Repository) *Engine {
-	return &Engine{b: b, repo: repo}
+// New returns an engine over the backend, the store, and the board order.
+func New(b backend.IssueBackend, repo *issuerepo.Repository, order BoardOrder) *Engine {
+	return &Engine{b: b, repo: repo, order: order}
 }
 
 // Commit pushes every pending change of the profile. Only a store failure
 // returns an error; per-issue outcomes land in the Result.
 func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Result, error) {
-	res := Result{Committed: []string{}, Created: []Created{}, Linked: []Linked{}, Conflicts: []Conflict{}, Failures: []Failure{}}
+	res := Result{Committed: []string{}, Created: []Created{}, Linked: []Linked{}, Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}}
 	all, err := e.repo.ListPendingChanges(ctx, profileID)
 	if err != nil {
 		return res, err
@@ -87,7 +109,7 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 	byKey := map[string][]journal.PendingChange{}
 	var creates, edits []string
 	for _, p := range all {
-		if p.EntityType == issuerepo.EntityLink {
+		if p.EntityType == issuerepo.EntityLink || boardRow(p.EntityType) {
 			continue
 		}
 		if _, seen := byKey[p.EntityKey]; !seen {
@@ -119,6 +141,7 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 	for _, key := range edits {
 		e.commitEdit(ctx, profileID, key, byKey[key], &res)
 	}
+	e.commitBoardMoves(ctx, profileID, &res)
 	e.commitLinks(ctx, profileID, &res)
 
 	left, err := e.repo.ListPendingChanges(ctx, profileID)
@@ -129,6 +152,23 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 	return res, nil
 }
 
+// boardRow is true for the three board move entity types, which the board
+// pass owns. Naming them here and in regroupEdits is what keeps them out of
+// the edits pass: sorting one into it would have commitEdit send "statusId"
+// to Jira as a field, fail on it, and take the issue's genuine edits down
+// with it.
+func boardRow(entityType string) bool {
+	switch entityType {
+	case issuerepo.EntityTransition, issuerepo.EntityRank, issuerepo.EntitySprintMove:
+		return true
+	}
+	return false
+}
+
+// isDraftKey says the key is a local placeholder Commit has not created
+// yet, so its rows wait for the next one.
+func isDraftKey(key string) bool { return strings.HasPrefix(key, issuerepo.DraftPrefix) }
+
 func (e *Engine) commitCreate(ctx context.Context, profileID, projectKey, tempKey string, rows []journal.PendingChange, res *Result) {
 	var createRow journal.PendingChange
 	for _, p := range rows {
@@ -138,12 +178,12 @@ func (e *Engine) commitCreate(ctx context.Context, profileID, projectKey, tempKe
 	}
 	var d backend.IssueDraft
 	if err := json.Unmarshal([]byte(createRow.AfterVal), &d); err != nil {
-		res.Failures = append(res.Failures, Failure{Key: tempKey, Error: "the draft could not be decoded: " + err.Error()})
+		res.Failures = append(res.Failures, failure(tempKey, issuerepo.EntityIssueCreate, "the draft could not be decoded: "+err.Error()))
 		return
 	}
 	realKey, err := e.b.CreateIssue(ctx, projectKey, d)
 	if err != nil {
-		res.Failures = append(res.Failures, Failure{Key: tempKey, Error: err.Error()})
+		res.Failures = append(res.Failures, failure(tempKey, issuerepo.EntityIssueCreate, err.Error()))
 		return
 	}
 	if err := e.repo.Rekey(ctx, profileID, tempKey, realKey); err != nil {
@@ -152,10 +192,10 @@ func (e *Engine) commitCreate(ctx context.Context, profileID, projectKey, tempKe
 		// reconciles instead of posting a duplicate; report the real key so
 		// the user can find it. The next full sync brings its row in.
 		if merr := e.repo.MarkCreatedWithoutRekey(ctx, profileID, tempKey, realKey, rows); merr != nil {
-			res.Failures = append(res.Failures, Failure{Key: realKey, Error: fmt.Sprintf("created in Jira as %s but the local row could not be renamed, and the journal could not be cleared: %v", realKey, merr)})
+			res.Failures = append(res.Failures, failure(realKey, issuerepo.EntityIssueCreate, fmt.Sprintf("created in Jira as %s but the local row could not be renamed, and the journal could not be cleared: %v", realKey, merr)))
 			return
 		}
-		res.Failures = append(res.Failures, Failure{Key: realKey, Error: fmt.Sprintf("created in Jira as %s but the local row could not be renamed: %v", realKey, err)})
+		res.Failures = append(res.Failures, failure(realKey, issuerepo.EntityIssueCreate, fmt.Sprintf("created in Jira as %s but the local row could not be renamed: %v", realKey, err)))
 		return
 	}
 	// Rekey already moved these rows' audit trail to realKey; follow suit so
@@ -164,7 +204,7 @@ func (e *Engine) commitCreate(ctx context.Context, profileID, projectKey, tempKe
 		rows[i].EntityKey = realKey
 	}
 	if err := e.repo.MarkCommitted(ctx, profileID, rows); err != nil {
-		res.Failures = append(res.Failures, Failure{Key: realKey, Error: "created in Jira but the journal could not be cleared: " + err.Error()})
+		res.Failures = append(res.Failures, failure(realKey, issuerepo.EntityIssueCreate, "created in Jira but the journal could not be cleared: "+err.Error()))
 		return
 	}
 	e.refresh(ctx, profileID, realKey)
@@ -174,7 +214,7 @@ func (e *Engine) commitCreate(ctx context.Context, profileID, projectKey, tempKe
 func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []journal.PendingChange, res *Result) {
 	remote, err := e.b.GetIssue(ctx, key)
 	if err != nil {
-		res.Failures = append(res.Failures, Failure{Key: key, Error: err.Error()})
+		res.Failures = append(res.Failures, failure(key, issuerepo.EntityIssue, err.Error()))
 		return
 	}
 	// rows is sorted oldest first; comparing against the oldest edit's base is
@@ -188,7 +228,7 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 	}
 	for _, p := range rows {
 		if strings.HasPrefix(p.AfterVal, issuerepo.DraftPrefix) {
-			res.Failures = append(res.Failures, Failure{Key: key, Error: fmt.Sprintf("the epic %s has not been created in Jira yet, so this change waits for the next commit", p.AfterVal)})
+			res.Failures = append(res.Failures, failure(key, issuerepo.EntityIssue, fmt.Sprintf("the epic %s has not been created in Jira yet, so this change waits for the next commit", p.AfterVal)))
 			return
 		}
 	}
@@ -197,11 +237,11 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 		fields[p.Field] = p.AfterVal
 	}
 	if err := e.b.UpdateIssue(ctx, key, fields); err != nil {
-		res.Failures = append(res.Failures, Failure{Key: key, Error: err.Error()})
+		res.Failures = append(res.Failures, failure(key, issuerepo.EntityIssue, err.Error()))
 		return
 	}
 	if err := e.repo.MarkCommitted(ctx, profileID, rows); err != nil {
-		res.Failures = append(res.Failures, Failure{Key: key, Error: "pushed to Jira but the journal could not be cleared: " + err.Error()})
+		res.Failures = append(res.Failures, failure(key, issuerepo.EntityIssue, "pushed to Jira but the journal could not be cleared: "+err.Error()))
 		return
 	}
 	e.refresh(ctx, profileID, key)
@@ -217,7 +257,7 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result) {
 	all, err := e.repo.ListPendingChanges(ctx, profileID)
 	if err != nil {
-		res.Failures = append(res.Failures, Failure{Key: "links", Error: "the journal could not be read for links: " + err.Error()})
+		res.Failures = append(res.Failures, failure("links", issuerepo.EntityLink, "the journal could not be read for links: "+err.Error()))
 		return
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
@@ -230,15 +270,15 @@ func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result)
 		}
 		var d backend.LinkDraft
 		if err := json.Unmarshal([]byte(p.AfterVal), &d); err != nil {
-			res.Failures = append(res.Failures, Failure{Key: p.EntityKey, Error: "the link could not be decoded: " + err.Error()})
+			res.Failures = append(res.Failures, linkFailure(p, "the link could not be decoded: "+err.Error()))
 			continue
 		}
 		if err := e.b.CreateLink(ctx, p.EntityKey, d); err != nil {
-			res.Failures = append(res.Failures, Failure{Key: p.EntityKey, Error: err.Error()})
+			res.Failures = append(res.Failures, linkFailure(p, err.Error()))
 			continue
 		}
 		if err := e.repo.MarkCommitted(ctx, profileID, []journal.PendingChange{p}); err != nil {
-			res.Failures = append(res.Failures, Failure{Key: p.EntityKey, Error: "linked in Jira but the journal could not be cleared: " + err.Error()})
+			res.Failures = append(res.Failures, linkFailure(p, "linked in Jira but the journal could not be cleared: "+err.Error()))
 			continue
 		}
 		if err := e.repo.ClearDetail(ctx, profileID, p.EntityKey); err != nil {
@@ -246,6 +286,12 @@ func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result)
 		}
 		res.Linked = append(res.Linked, Linked{Key: p.EntityKey, ToKey: d.ToKey, Type: d.Type})
 	}
+}
+
+// linkFailure is one link row that did not land, carrying its row id so the
+// dialog can offer to discard exactly that link.
+func linkFailure(p journal.PendingChange, message string) Failure {
+	return Failure{Key: p.EntityKey, EntityType: issuerepo.EntityLink, RowID: p.ID, Error: message, Retryable: true, Reachable: []string{}}
 }
 
 // regroupEdits re-lists the pending changes after the creates pass, in
@@ -257,13 +303,13 @@ func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result)
 func (e *Engine) regroupEdits(ctx context.Context, profileID string, orig map[string][]journal.PendingChange, edits []string, res *Result) (map[string][]journal.PendingChange, []string) {
 	all, err := e.repo.ListPendingChanges(ctx, profileID)
 	if err != nil {
-		res.Failures = append(res.Failures, Failure{Key: "edits", Error: "the journal could not be reread after the creates pass: " + err.Error()})
+		res.Failures = append(res.Failures, failure("edits", issuerepo.EntityIssue, "the journal could not be reread after the creates pass: "+err.Error()))
 		return orig, edits
 	}
 	byKey := map[string][]journal.PendingChange{}
 	var keys []string
 	for _, p := range all {
-		if p.EntityType == issuerepo.EntityLink || p.EntityType == issuerepo.EntityIssueCreate {
+		if p.EntityType == issuerepo.EntityLink || p.EntityType == issuerepo.EntityIssueCreate || boardRow(p.EntityType) {
 			continue
 		}
 		if _, seen := byKey[p.EntityKey]; !seen {

@@ -104,6 +104,35 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 	return journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "discard", p.Field, p.AfterVal, p.BeforeVal, "")
 }
 
+// MarkMoveCommitted clears one board row after its write landed in Jira,
+// and says whether the row went. The delete is conditional on after_val
+// still being the value that was pushed: the board's move bindings take no
+// busy guard, so a card dragged again while the commit pass is mid-push
+// updates that row in place, and a delete by id would throw away an intent
+// Jira has never been told about. The commit is audited either way, because
+// the push did happen.
+func (r *Repository) MarkMoveCommitted(ctx context.Context, profileID string, p journal.PendingChange, pushed string) (bool, error) {
+	gone := false
+	err := r.inTx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx,
+			`DELETE FROM pending_change WHERE profile_id = ? AND id = ? AND after_val = ?`,
+			profileID, p.ID, pushed)
+		if err != nil {
+			return fmt.Errorf("clear move %d of %s: %w", p.ID, p.EntityKey, err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		gone = n > 0
+		return journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "commit", p.Field, p.BeforeVal, pushed, "")
+	})
+	if err != nil {
+		return false, err
+	}
+	return gone, nil
+}
+
 // MarkCommitted deletes the journal rows a commit pushed and audits each.
 func (r *Repository) MarkCommitted(ctx context.Context, profileID string, changes []journal.PendingChange) error {
 	if len(changes) == 0 {

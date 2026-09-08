@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,10 +11,10 @@ import (
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/committer"
 	"agile-suite/tam/internal/issuerepo"
-	"agile-suite/tam/internal/tamstore"
 )
 
-// fake is a Jira that remembers its rows and every write.
+// fake is a Jira that remembers its rows and every write. The board writes
+// it answers are in boards_test.go.
 type fake struct {
 	rows      map[string]backend.Issue
 	desc      map[string]string
@@ -27,10 +26,24 @@ type fake struct {
 	getErr    map[string]error
 	links     []string
 	linkErr   error
+
+	// The board writes: pushed records them in the order they were made,
+	// which is half of what the board pass promises.
+	pushed        []string
+	transitionErr map[string]error
+	rankErr       map[string]error
+	sprintErr     error
+	// onTransition runs inside a transition push, which is where a test
+	// drags the same card again while the pass is mid-push.
+	onTransition func()
 }
 
 func newFake() *fake {
-	return &fake{rows: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 501, updateErr: map[string]error{}, getErr: map[string]error{}}
+	return &fake{
+		rows: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 501,
+		updateErr: map[string]error{}, getErr: map[string]error{},
+		transitionErr: map[string]error{}, rankErr: map[string]error{},
+	}
 }
 
 func (f *fake) TestConnection(context.Context) (backend.User, error) {
@@ -112,27 +125,11 @@ func (f *fake) CreateLink(_ context.Context, fromKey string, d backend.LinkDraft
 	return nil
 }
 
+// setup is the harness without the two things only the board tests need.
 func setup(t *testing.T) (*committer.Engine, *issuerepo.Repository, *fake) {
 	t.Helper()
-	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	repo := issuerepo.New(db.DB())
-	f := newFake()
-	rows := []backend.Issue{
-		{Key: "PLAT-1", ID: "1", Project: "PLAT", Type: backend.TypeTask, Summary: "one", Status: "To Do", Priority: "Medium", Labels: []string{"a"}, StoryPoints: pts(3), Updated: "2026-09-01T00:00:00Z"},
-		{Key: "PLAT-2", ID: "2", Project: "PLAT", Type: backend.TypeStory, Summary: "two", Status: "To Do", Labels: []string{}, Updated: "2026-09-01T00:00:00Z"},
-	}
-	for _, r := range rows {
-		f.rows[r.Key] = r
-	}
-	f.desc["PLAT-1"] = "remote text"
-	if err := repo.UpsertPage(context.Background(), "p1", rows, time.Now(), false); err != nil {
-		t.Fatal(err)
-	}
-	return committer.New(f, repo), repo, f
+	h := newHarness(t)
+	return h.eng, h.repo, h.jira
 }
 
 func pts(v float64) *float64 { return &v }

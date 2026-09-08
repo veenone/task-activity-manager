@@ -128,6 +128,22 @@ func (stubIssueBackend) LinkTypes(context.Context) ([]backend.LinkType, error) {
 func (stubIssueBackend) CreateLink(context.Context, string, backend.LinkDraft) error {
 	return errors.New("not used")
 }
+func (stubIssueBackend) Transition(context.Context, string, string) error {
+	return errors.New("not used")
+}
+
+// The two board writes live on the issue stub rather than on each board
+// fake, so all three of them inherit a refusal: a boards sync never writes,
+// and a test that made one would rather see this than a silent success.
+func (stubIssueBackend) RankIssue(context.Context, string, string, bool) error {
+	return errors.New("not used")
+}
+func (stubIssueBackend) MoveIssuesToSprint(context.Context, string, []string) error {
+	return errors.New("not used")
+}
+func (stubIssueBackend) CanTransition(context.Context, string, string) (backend.TransitionCheck, error) {
+	return backend.TransitionCheck{}, errors.New("not used")
+}
 
 // The three lookups the forms use. A board test never reaches them, but
 // IssueBackend carries them, so the stub has to answer.
