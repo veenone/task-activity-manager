@@ -79,9 +79,15 @@ type BoardView struct {
 // ColumnView is one column heading with the totals of everything that
 // landed in it, capped cards included.
 type ColumnView struct {
-	Name   string  `json:"name"`
-	Total  int     `json:"total"`
-	Points float64 `json:"points"`
+	Name string `json:"name"`
+	// StatusIDs are the statuses this column collects, in the board's own
+	// order. The view needs them to move a card: a drop journals the status
+	// the target column collects, and the first of these is the one a card
+	// dropped there takes, the way placeCard reads them coming the other
+	// way. A column with none collects nothing and is not a drop target.
+	StatusIDs []string `json:"statusIds"`
+	Total     int      `json:"total"`
+	Points    float64  `json:"points"`
 }
 
 // LaneView is one swimlane: a cell per column, in the same order as
@@ -128,7 +134,7 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 		return view, nil
 	}
 	for _, c := range cols {
-		view.Columns = append(view.Columns, ColumnView{Name: c.Name})
+		view.Columns = append(view.Columns, ColumnView{Name: c.Name, StatusIDs: backend.NonNil(c.StatusIDs)})
 	}
 
 	boardKeys, err := r.issueKeys(ctx, profileID, boardID, sprintID)

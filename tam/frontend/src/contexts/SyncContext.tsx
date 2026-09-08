@@ -13,7 +13,7 @@ import {
   errMsg,
 } from "@agile-suite/core";
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
-import { CommitPendingChanges, EventsOn, SyncIssues } from "../api";
+import { CommitPendingChanges, EventsOn, SyncBoards, SyncIssues } from "../api";
 import type { BoardSummary, CommitResult, Profile, Settings } from "../api";
 import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
@@ -115,6 +115,20 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     try {
       const res = await call(() => CommitPendingChanges(activeId));
       setLastCommit(res);
+      // A Commit that moved cards ends with a boards sync, because a
+      // board's membership is whatever Jira's board endpoint last
+      // answered with: without it a card that was just pushed jumps back
+      // to where the previous sync saw it. It is best effort, and its
+      // summary goes where every other boards pass's does, so a board it
+      // had to skip is still reported.
+      if ((res.moved ?? []).length > 0) {
+        try {
+          setBoards({ summary: await call(() => SyncBoards(activeId)), at: Date.now() });
+        } catch {
+          // The commit itself landed. A failed refresh leaves the board
+          // showing the local move, which is what it showed a moment ago.
+        }
+      }
       return res;
     } catch (e) {
       void notice({ title: "Commit failed", message: errMsg(e), tone: "error" });

@@ -273,6 +273,23 @@ describe("IssueDetailPanel write path", () => {
     expect(api.ListActivity).toHaveBeenCalledWith("p1", "PLAT-412", 200);
   });
 
+  it("reads a board move as a place rather than as a field and an id", async () => {
+    vi.mocked(api.ListActivity).mockResolvedValue([
+      { id: 4, occurredAt: "2026-09-06T10:20:00Z", actor: "araha", entityType: "issue_rank", entityKey: "PLAT-412", action: "move", field: "rank", beforeVal: "", afterVal: "before|PLAT-409|1", note: "" },
+      { id: 3, occurredAt: "2026-09-06T10:15:00Z", actor: "araha", entityType: "issue_sprint", entityKey: "PLAT-412", action: "commit", field: "sprintId", beforeVal: "12|Sprint 12", afterVal: "13|Sprint 13", note: "" },
+      { id: 2, occurredAt: "2026-09-06T10:10:00Z", actor: "araha", entityType: "issue_transition", entityKey: "PLAT-412", action: "discard", field: "statusId", beforeVal: "3|In Progress", afterVal: "1|To Do", note: "" },
+      { id: 1, occurredAt: "2026-09-06T10:05:00Z", actor: "araha", entityType: "issue_transition", entityKey: "PLAT-412", action: "move", field: "statusId", beforeVal: "1|To Do", afterVal: "3|In Progress", note: "" },
+    ]);
+    renderPanel();
+    await openSection("Activity");
+    const items = await screen.findAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("araha moved this card before PLAT-409");
+    expect(items[1]).toHaveTextContent("araha pushed the move to Sprint 13");
+    expect(items[2]).toHaveTextContent("araha put this card back in To Do");
+    expect(items[3]).toHaveTextContent("araha moved this card to In Progress");
+    expect(screen.queryByText(/statusId/)).not.toBeInTheDocument();
+  });
+
   it("marks a draft in the panel head", async () => {
     render(
       <QueryClientProvider client={createQueryClient()}>

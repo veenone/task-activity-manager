@@ -455,6 +455,14 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .add-link-key .detail-input { flex: 1; }
 .linked-row .pending-dot { margin-left: 4px; }
 .pending-row-link { grid-template-columns: 110px auto auto 1fr auto; }
+/* Phase 3b: a journaled board move reads as a place, so its row is label,
+   where it was, and where it is going, with the middle two collapsing for
+   a rank, which has no value it came from. */
+.pending-row-move { grid-template-columns: 110px auto auto 1fr auto; }
+/* A moved card's dot is not the plain pending dot: its position is what is
+   provisional, and a card carrying a pending edit is not making that
+   claim. */
+.pending-dot-move { background: var(--accent); }
 
 /* Assignee combobox: an input with a clear button and a floating result
    list, so a person is picked rather than a username remembered. */

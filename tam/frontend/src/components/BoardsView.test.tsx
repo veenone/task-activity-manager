@@ -1,11 +1,11 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import * as api from "../api";
-import type { BoardView, Issue } from "../api";
+import type { BoardView, Issue, PendingChange } from "../api";
 import { profileBackend } from "../profileBackend";
 import { ModalProvider } from "../modals";
 import { BoardsView } from "./BoardsView";
@@ -30,6 +30,12 @@ vi.mock("../api", async () => {
     ListEpics: vi.fn(),
     GetLinkTypes: vi.fn(),
     EditIssue: vi.fn(),
+    ListPendingChanges: vi.fn(),
+    DiscardPendingChange: vi.fn(),
+    MoveIssueToColumn: vi.fn(),
+    MoveIssueToSprint: vi.fn(),
+    RankIssue: vi.fn(),
+    CanTransition: vi.fn(),
   };
 });
 
@@ -41,6 +47,7 @@ const sync = vi.hoisted(() => ({
   canSync: true,
   lastBoards: null as api.BoardSummary | null,
   lastBoardsAt: 0,
+  lastCommit: null as api.CommitResult | null,
 }));
 vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
 
@@ -71,9 +78,9 @@ function board(over: Partial<BoardView>): BoardView {
 }
 
 const COLUMNS = [
-  { name: "To Do", total: 4, points: 20 },
-  { name: "In Progress", total: 2, points: 0 },
-  { name: "Done", total: 3, points: 27 },
+  { name: "To Do", statusIds: ["1"], total: 4, points: 20 },
+  { name: "In Progress", statusIds: ["3"], total: 2, points: 0 },
+  { name: "Done", statusIds: ["5"], total: 3, points: 27 },
 ];
 
 const PROMO = issue({ key: "PLAT-412", type: "story", summary: "Checkout: apply promo code", status: "In Progress", assignee: "R. Anand", storyPoints: 8 });
@@ -88,6 +95,13 @@ function oneLane(cells: Issue[][], overflow = [0, 0, 0]) {
     lanes: [{ id: "", label: "All issues", count: cells.flat().length, cells, overflow }],
   });
 }
+
+// TRANSITION_ROW is one journaled column move, the row the board reads to
+// know a card's position is provisional.
+const TRANSITION_ROW: PendingChange = {
+  id: 7, entityType: "issue_transition", entityKey: "PLAT-412", field: "statusId",
+  beforeVal: "1|To Do", afterVal: "3|In Progress", baseVersion: "v1", createdAt: "",
+};
 
 const SPRINTS: api.Sprint[] = [
   { id: 12, boardId: 1, name: "Sprint 12", state: "active", startDate: "2026-08-29T09:00:00Z", endDate: "2026-09-12T09:00:00Z" },
@@ -121,6 +135,7 @@ beforeEach(() => {
   sync.canSync = true;
   sync.lastBoards = null;
   sync.lastBoardsAt = 0;
+  sync.lastCommit = null;
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Acme Platform", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
   ]);
@@ -143,6 +158,12 @@ beforeEach(() => {
   vi.mocked(api.ListActivity).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
+  vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
+  vi.mocked(api.DiscardPendingChange).mockResolvedValue();
+  vi.mocked(api.MoveIssueToColumn).mockResolvedValue();
+  vi.mocked(api.MoveIssueToSprint).mockResolvedValue();
+  vi.mocked(api.RankIssue).mockResolvedValue();
+  vi.mocked(api.CanTransition).mockResolvedValue({ reachable: [], allowed: true });
 });
 
 describe("BoardsView toolbar", () => {
@@ -178,9 +199,9 @@ describe("BoardsView toolbar", () => {
     vi.mocked(api.GetBoard).mockResolvedValue(
       board({
         columns: [
-          { name: "To Do", total: 1, points: 3 },
-          { name: "In Progress", total: 1, points: 5 },
-          { name: "Blocked", total: 1, points: 3 },
+          { name: "To Do", statusIds: ["1"], total: 1, points: 3 },
+          { name: "In Progress", statusIds: ["3"], total: 1, points: 5 },
+          { name: "Blocked", statusIds: ["9"], total: 1, points: 3 },
         ],
         donePoints: 5,
         lanes: [{ id: "", label: "All issues", count: 2, cells: [[], [done], [blocked]], overflow: [0, 0, 0] }],
@@ -199,7 +220,7 @@ describe("BoardsView toolbar", () => {
     const drawn = issue({ key: "PLAT-601", summary: "Ship the changelog", status: "Done", storyPoints: 2 });
     vi.mocked(api.GetBoard).mockResolvedValue(
       board({
-        columns: [{ name: "To Do", total: 0, points: 0 }, { name: "Done", total: 450, points: 900 }],
+        columns: [{ name: "To Do", statusIds: ["1"], total: 0, points: 0 }, { name: "Done", statusIds: ["5"], total: 450, points: 900 }],
         donePoints: 900,
         capped: true,
         lanes: [{ id: "", label: "All issues", count: 450, cells: [[], [drawn]], overflow: [0, 449] }],
@@ -239,7 +260,15 @@ describe("BoardsView board", () => {
     expect(within(retro).getByText("Unassigned")).toBeInTheDocument();
   });
 
-  it("refuses a drag where the drag happens", async () => {
+  it("lets a card be dragged, and says so nowhere else", async () => {
+    renderView();
+    const promo = await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    expect(promo).toHaveAttribute("draggable", "true");
+    expect(screen.queryByText("Read only")).not.toBeInTheDocument();
+  });
+
+  it("stops a card being dragged while a commit is pushing", async () => {
+    sync.status = "committing";
     renderView();
     const promo = await screen.findByRole("gridcell", { name: /PLAT-412/ });
     expect(promo).toHaveAttribute("draggable", "false");
@@ -537,5 +566,172 @@ describe("BoardsView keyboard", () => {
     await waitFor(() => expect(screen.queryByRole("gridcell", { name: /PLAT-390/ })).not.toBeInTheDocument());
     const grid = screen.getByRole("grid", { name: "Board" });
     expect(grid.querySelectorAll('[tabindex="0"]')).toHaveLength(1);
+  });
+});
+
+describe("BoardsView moves", () => {
+  // jsdom lays nothing out, so a cell's cards are given forty-pixel boxes
+  // stacked from the top of it. The drop arithmetic reads those and a
+  // clientY, and nothing else.
+  function layOut(cell: HTMLElement) {
+    cell.querySelectorAll<HTMLElement>("[data-board-pos]").forEach((card, i) => {
+      card.getBoundingClientRect = () => ({
+        top: i * 40, bottom: i * 40 + 40, height: 40, width: 300, left: 0, right: 300, x: 0, y: i * 40,
+        toJSON: () => "",
+      });
+    });
+  }
+
+  // A DataTransfer that records what the handlers put in it, since jsdom
+  // has none of its own.
+  function transfer() {
+    const held: Record<string, string> = {};
+    return {
+      dropEffect: "",
+      effectAllowed: "",
+      setData: (k: string, v: string) => { held[k] = v; },
+      getData: (k: string) => held[k] ?? "",
+    };
+  }
+
+  function cells(): HTMLElement[] {
+    return [...document.querySelectorAll<HTMLElement>(".board-cell")];
+  }
+
+  async function dragTo(cardName: RegExp, col: number, clientY: number) {
+    const card = await screen.findByRole("gridcell", { name: cardName });
+    const dataTransfer = transfer();
+    fireEvent.dragStart(card, { dataTransfer });
+    const cell = cells()[col];
+    layOut(cell);
+    fireEvent.dragOver(cell, { dataTransfer, clientY });
+    fireEvent.drop(cell, { dataTransfer, clientY });
+    return dataTransfer;
+  }
+
+  it("journals a transition when a card is dropped on another column, and repaints it there", async () => {
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    const moved = issue({ ...KEYS, status: "In Progress" });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[], [PROMO, moved], [RETRO]]));
+
+    await dragTo(/PLAT-409/, 1, 100);
+    await waitFor(() => expect(api.MoveIssueToColumn).toHaveBeenCalledWith("p1", "PLAT-409", "3"));
+    expect(api.RankIssue).not.toHaveBeenCalled();
+    expect(
+      await screen.findByRole("gridcell", { name: "PLAT-409 Rotate payment gateway API keys In Progress" }),
+    ).toBeInTheDocument();
+  });
+
+  it("journals a rank when a card is dropped inside its own cell, with the neighbour and the side", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, RETRO], [PROMO], []]));
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-347/ });
+
+    await dragTo(/PLAT-347/, 0, 5);
+    await waitFor(() => expect(api.RankIssue).toHaveBeenCalledWith("p1", "PLAT-347", "PLAT-409", true, 1));
+    expect(api.MoveIssueToColumn).not.toHaveBeenCalled();
+  });
+
+  it("refuses a drop that would change nothing, and journals nothing", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, RETRO], [PROMO], []]));
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-409/ });
+
+    // The top of the first card is the first card's own place.
+    const dataTransfer = await dragTo(/PLAT-409/, 0, 5);
+    expect(dataTransfer.dropEffect).toBe("none");
+    expect(document.querySelector(".board-drop-line")).toBeNull();
+    expect(document.querySelector(".board-cell-over")).toBeNull();
+    expect(api.RankIssue).not.toHaveBeenCalled();
+    expect(api.MoveIssueToColumn).not.toHaveBeenCalled();
+  });
+
+  it("draws the drop line where the card would land", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, RETRO], [PROMO], []]));
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    const dataTransfer = transfer();
+    fireEvent.dragStart(card, { dataTransfer });
+    expect(card).toHaveClass("board-card-dragging");
+    const cell = cells()[0];
+    layOut(cell);
+    fireEvent.dragOver(cell, { dataTransfer, clientY: 100 });
+    expect(cell).toHaveClass("board-cell-over");
+    expect(cell.querySelectorAll(".board-drop-line")).toHaveLength(1);
+  });
+
+  it("moves a card a column with Ctrl and an arrow", async () => {
+    const user = userEvent.setup();
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    await user.click(card);
+    await user.keyboard("{Control>}{ArrowRight}{/Control}");
+    await waitFor(() => expect(api.MoveIssueToColumn).toHaveBeenCalledWith("p1", "PLAT-409", "3"));
+  });
+
+  it("ranks a card inside its cell with Ctrl and an arrow", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, RETRO], [PROMO], []]));
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    await user.click(card);
+    await user.keyboard("{Control>}{ArrowDown}{/Control}");
+    await waitFor(() => expect(api.RankIssue).toHaveBeenCalledWith("p1", "PLAT-409", "PLAT-347", false, 1));
+  });
+
+  it("moves a card to another sprint from its own menu", async () => {
+    const user = userEvent.setup();
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(within(card).getByRole("button", { name: "Move PLAT-412" }));
+    await user.click(await within(card).findByRole("menuitem", { name: "Move to Sprint 13" }));
+    await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-412", "13"));
+    // The menu is not the card: opening it must not open the detail panel.
+    expect(screen.queryByRole("heading", { name: "PLAT-412" })).not.toBeInTheDocument();
+  });
+
+  it("marks a card carrying a pending move rather than giving it the plain pending dot", async () => {
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([TRANSITION_ROW]);
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    expect(await within(card).findByRole("img", { name: "Pending move" })).toBeInTheDocument();
+    expect(within(card).queryByRole("img", { name: "Pending changes" })).not.toBeInTheDocument();
+  });
+
+  it("warns when the drop target cannot be reached, and offers to put the card back", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([{ ...TRANSITION_ROW, entityKey: "PLAT-409" }]);
+    vi.mocked(api.CanTransition).mockResolvedValue({ reachable: ["Review", "Done"], allowed: false });
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-409/ });
+
+    await dragTo(/PLAT-409/, 1, 100);
+    const banner = await screen.findByText(
+      "PLAT-409 cannot reach In Progress from where it is now. Jira offers Review, Done.",
+    );
+    expect(banner.closest(".pending-banner-warn")).toBeInTheDocument();
+    expect(screen.getByRole("gridcell", { name: /PLAT-409/ })).toHaveClass("board-card-warn");
+
+    await user.click(screen.getByRole("button", { name: "Put it back" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 7));
+    await waitFor(() => expect(screen.queryByText(/cannot reach In Progress/)).not.toBeInTheDocument());
+  });
+
+  it("marks a card whose move failed at the last Commit, with the reason in its label", async () => {
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([TRANSITION_ROW]);
+    sync.lastCommit = {
+      committed: [], created: [], linked: [], moved: [], conflicts: [], remaining: 1,
+      failures: [{
+        key: "PLAT-412", entityType: "issue_transition", rowId: 7, retryable: false,
+        reachable: ["Done"], error: "PLAT-412 cannot reach In Progress; it can reach Done",
+      }],
+    };
+    renderView();
+    const card = await screen.findByRole(
+      "gridcell",
+      { name: "PLAT-412 Checkout: apply promo code In Progress. PLAT-412 cannot reach In Progress; it can reach Done" },
+    );
+    expect(card).toHaveClass("board-card-failed");
   });
 });

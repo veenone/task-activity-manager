@@ -1,8 +1,13 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
+	"strconv"
+	"strings"
 
+	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/syncer"
 )
@@ -49,21 +54,104 @@ func (a *App) GetBoard(profileID string, boardID int, sprintID, swimlane string)
 	return a.boards.Board(a.ctx, a.repo, profileID, boardID, sprintID, swimlane)
 }
 
+// The three board writes are shaped like EditIssue in app_writes.go: check
+// the store, check what the caller sent, call the repository, return. None
+// of them takes the busy guard. acquire covers the five long operations
+// that talk to Jira, and a local journal write is not one of them: giving
+// these one would refuse a drag while a commit runs, which no other write
+// does. The race that leaves is the commit pass's to settle, in its
+// conditional delete, rather than the board's to prevent by locking the
+// user out of it.
+
+// requireMove is the check every board write starts with: a profile to
+// write against and an issue to write about.
+func requireMove(profileID, key string) error {
+	if strings.TrimSpace(profileID) == "" {
+		return errors.New("no profile selected")
+	}
+	if strings.TrimSpace(key) == "" {
+		return errors.New("issue key is empty")
+	}
+	return nil
+}
+
+// MoveIssueToColumn journals a card dragged into another column. statusID
+// is the status that column collects; which transition reaches it is the
+// backend's to resolve at Commit, from what Jira offers for that issue at
+// that moment.
+func (a *App) MoveIssueToColumn(profileID, key, statusID string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if err := requireMove(profileID, key); err != nil {
+		return err
+	}
+	return a.repo.MoveToColumn(a.ctx, profileID, key, statusID)
+}
+
+// RankIssue journals a card dropped before or after neighbourKey on the
+// board the drop was made on. The repository refuses a neighbour the cache
+// does not hold, so a rank can never be pushed against an issue nobody has
+// seen.
+func (a *App) RankIssue(profileID, key, neighbourKey string, before bool, boardID int) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if err := requireMove(profileID, key); err != nil {
+		return err
+	}
+	return a.repo.RankIssue(a.ctx, profileID, key, strings.TrimSpace(neighbourKey), before, boardID)
+}
+
 // MoveIssueToSprint journals a card dropped on another sprint, or on the
 // backlog, and moves it in the local cache. The destination's name comes
 // from boardrepo, which owns the sprint list; the issue repository writes
 // it into the row and the journal but does not read another package's
 // tables to learn it. This is the one method that holds both repositories,
 // which is why the lookup is here.
+//
+// A sprint id that is not a number is refused here rather than at Commit:
+// it ends up in a URL path, and the only honest answer to "sprint fourteen"
+// is that it is not a sprint id at all.
 func (a *App) MoveIssueToSprint(profileID, key, sprintID string) error {
 	if err := a.requireStore(); err != nil {
 		return err
+	}
+	if err := requireMove(profileID, key); err != nil {
+		return err
+	}
+	sprintID = strings.TrimSpace(sprintID)
+	if sprintID != "" {
+		if _, err := strconv.Atoi(sprintID); err != nil {
+			return fmt.Errorf("sprint id %q is not a number", sprintID)
+		}
 	}
 	name, err := a.boards.SprintName(a.ctx, profileID, sprintID)
 	if err != nil {
 		return err
 	}
 	return a.repo.MoveToSprint(a.ctx, profileID, key, sprintID, name)
+}
+
+// CanTransition asks Jira whether the card can reach statusID from where it
+// sits right now, and what it can reach instead. It is the one board
+// binding that touches the network, and it is best effort: an error means
+// the check could not be made, never that the move is illegal, so the
+// caller shows nothing rather than a warning it cannot stand behind.
+func (a *App) CanTransition(profileID, key, statusID string) (backend.TransitionCheck, error) {
+	if err := requireMove(profileID, key); err != nil {
+		return backend.TransitionCheck{}, err
+	}
+	_, b, err := a.backendForProfile(profileID)
+	if err != nil {
+		return backend.TransitionCheck{}, err
+	}
+	check, err := b.CanTransition(a.ctx, key, statusID)
+	if err != nil {
+		return backend.TransitionCheck{}, err
+	}
+	check.Reachable = backend.NonNil(check.Reachable)
+	return check, nil
 }
 
 // SyncBoards pulls the profile's boards, sprints, and issue keys. It runs

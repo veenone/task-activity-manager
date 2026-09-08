@@ -1,14 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
 import {
+  CanTransition,
   GetBoard,
   GetProfileSetting,
   ListBoardSprints,
   ListBoards,
+  MoveIssueToColumn,
+  MoveIssueToSprint,
+  RankIssue,
   SETTING_BOARDS_UNAVAILABLE,
   SyncBoards,
 } from "../api";
 import { keys } from "./keys";
+import { invalidateWrites } from "./invalidate";
 
 // useBoards lists the profile's cached boards for the board picker.
 export function useBoards(profileId: string) {
@@ -78,5 +83,50 @@ export function useSyncBoards(profileId: string) {
         qc.invalidateQueries({ queryKey });
       }
     },
+  });
+}
+
+// The three board writes. Each one journals the move and moves the card in
+// the local cache, so the board repaints where it was dropped; nothing here
+// reaches Jira, which Commit does. All three refresh what a local write can
+// change, the board included, through the one invalidation every write
+// uses.
+export function useMoveToColumn(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, statusId }: { key: string; statusId: string }) =>
+      call(() => MoveIssueToColumn(profileId, key, statusId)),
+    onSuccess: (_, v) => invalidateWrites(qc, profileId, v.key),
+  });
+}
+
+export function useRankIssue(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, neighbourKey, before, boardId }: { key: string; neighbourKey: string; before: boolean; boardId: number }) =>
+      call(() => RankIssue(profileId, key, neighbourKey, before, boardId)),
+    onSuccess: (_, v) => invalidateWrites(qc, profileId, v.key),
+  });
+}
+
+export function useMoveToSprint(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, sprintId }: { key: string; sprintId: string; sprintName: string }) =>
+      call(() => MoveIssueToSprint(profileId, key, sprintId)),
+    onSuccess: (_, v) => invalidateWrites(qc, profileId, v.key),
+  });
+}
+
+// useCanTransition is the one board call that reads Jira: it asks whether
+// a card can reach the column it was just dropped in. It is a mutation
+// rather than a query because it is asked once per drop, about a card and
+// a target that will not be asked about again, and because it must not be
+// retried or cached: an answer is only true of the moment it was given.
+export function useCanTransition(profileId: string) {
+  return useMutation({
+    mutationFn: ({ key, statusId }: { key: string; statusId: string; target: string }) =>
+      call(() => CanTransition(profileId, key, statusId)),
+    retry: false,
   });
 }

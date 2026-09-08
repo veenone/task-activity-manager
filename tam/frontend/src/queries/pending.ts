@@ -10,6 +10,7 @@ import {
   ListActivity,
   ListPendingChanges,
 } from "../api";
+import { isMoveEntity } from "../api";
 import type { IssueDraft, LinkDraft, PendingChange } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
@@ -104,13 +105,16 @@ export function useDiscardById(profileId: string) {
 
 // A PendingGroup is one issue's rows. A draft group carries its decoded
 // draft; an edit group carries one row per field; a link group carries one
-// row per journaled link.
+// row per journaled link; a move group carries the board rows, which are
+// their own kind because they are pushed their own way and read as places
+// rather than as field values.
 export interface PendingGroup {
   key: string;
   draft: IssueDraft | null;
   createRow: PendingChange | null;
   edits: PendingChange[];
   links: { row: PendingChange; link: LinkDraft }[];
+  moves: PendingChange[];
 }
 
 // groupPending folds the journal (newest first) into one group per key,
@@ -120,7 +124,7 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
   for (const row of rows) {
     let g = byKey.get(row.entityKey);
     if (!g) {
-      g = { key: row.entityKey, draft: null, createRow: null, edits: [], links: [] };
+      g = { key: row.entityKey, draft: null, createRow: null, edits: [], links: [], moves: [] };
       byKey.set(row.entityKey, g);
     }
     if (row.entityType === "issue_create") {
@@ -130,6 +134,8 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
       } catch {
         g.draft = null;
       }
+    } else if (isMoveEntity(row.entityType)) {
+      g.moves.push(row);
     } else if (row.entityType === "link") {
       try {
         g.links.push({ row, link: JSON.parse(row.afterVal) as LinkDraft });

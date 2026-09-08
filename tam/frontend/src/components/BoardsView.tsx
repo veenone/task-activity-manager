@@ -8,10 +8,14 @@ import { useSync } from "../contexts/SyncContext";
 import { clampFocus, findCard, moveFocus, parsePos, posId } from "../lib/boardCells";
 import type { Pos } from "../lib/boardCells";
 import { BoardBody } from "./BoardBody";
+import { BoardMoveBanner } from "./BoardMoveBanner";
 import { BoardsBanner } from "./BoardsBanner";
 import { BoardSummaryLine } from "./BoardNotes";
 import { BoardsToolbar } from "./BoardsToolbar";
+import { CARD_MENU_CLASS } from "./CardMoveMenu";
 import { IssueDetailPanel } from "./IssueDetailPanel";
+import { useBoardMoves } from "./useBoardMoves";
+import { useMovedCard } from "./useMovedCard";
 
 // cardAtPos reads one card out of the view by its position.
 function cardAtPos(view: BoardView, p: Pos | undefined): Issue | undefined {
@@ -19,12 +23,13 @@ function cardAtPos(view: BoardView, p: Pos | undefined): Issue | undefined {
   return view.lanes[p.lane]?.cells[p.col]?.[p.index];
 }
 
-// BoardsView is the read-only board: XTM's board head over the board's own
-// columns, the cards in them, and the lines that say what the board is not
-// showing. Phase 3a draws; nothing here writes.
+// BoardsView is the board: XTM's board head over the board's own columns,
+// the cards in them, and the lines that say what the board is not showing.
+// Phase 3b makes it writable, through the journal: a drag, a key press, or
+// the card's own menu moves a card, and Commit is what pushes any of it.
 export function BoardsView() {
   const { activeId } = useProfile<Profile, Settings>();
-  const { canSync, lastBoards, lastBoardsAt } = useSync();
+  const { canSync, lastBoards, lastBoardsAt, lastCommit, status } = useSync();
   const [boardId, setBoardId] = useState(0);
   const [sprintId, setSprintId] = useState("");
   const [swimlane, setSwimlane] = useState<Swimlane>("none");
@@ -70,6 +75,24 @@ export function BoardsView() {
   const sync = useSyncBoards(activeId);
 
   const data = view.data;
+  const moves = useBoardMoves({
+    profileId: activeId,
+    view: data,
+    boardId: board?.id ?? 0,
+    commit: lastCommit,
+  });
+  // A move is announced and focused only once the board has redrawn, so
+  // the card is reported where it actually landed rather than where it was
+  // sent.
+  const flashKey = useMovedCard(data, !view.isFetching, moves.intent, (id) => {
+    setFocusId(id);
+    const card = bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${id}"]`);
+    // Focus follows the card only when the board already had it: a drag
+    // made with the mouse must not pull focus out of wherever the user
+    // put it.
+    if (card && bodyRef.current?.contains(document.activeElement)) card.focus();
+  });
+
   // Exactly one card is focusable, in every state: the one focus is on when
   // it survived the last change, else the selected card, else the first card
   // on the board.
@@ -83,14 +106,33 @@ export function BoardsView() {
     setFocusId(id);
   }
 
+  // openMenu is the keyboard's way into the card's move menu. Enter and
+  // Space are taken by the selection that opens the detail panel, so the
+  // menu key and Shift with F10 press the trigger the mouse presses, then
+  // take focus into the panel it opened.
+  function openMenu(id: string) {
+    const card = bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${id}"]`);
+    card?.querySelector<HTMLElement>(`.${CARD_MENU_CLASS}`)?.click();
+    card?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }
+
   function onKeyDown(e: KeyboardEvent, id: string) {
     if (!data) return;
     const p = parsePos(id);
     if (!p) return;
+    const issue = cardAtPos(data, p);
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      const issue = cardAtPos(data, p);
       if (issue) select(issue, id);
+      return;
+    }
+    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+      e.preventDefault();
+      openMenu(id);
+      return;
+    }
+    if (e.ctrlKey && issue && moves.moveByKeyboard(p, issue, e.key)) {
+      e.preventDefault();
       return;
     }
     const next = moveFocus(data, p, e.key);
@@ -144,6 +186,13 @@ export function BoardsView() {
         onRetry={() => sync.mutate()}
       />
 
+      <BoardMoveBanner
+        line={moves.warning?.line ?? ""}
+        canPutBack={!!moves.warning?.row}
+        busy={moves.busy}
+        onPutBack={moves.putBack}
+      />
+
       {data && <BoardSummaryLine view={data} sprint={sprint} lastSynced={syncState.data?.lastSynced ?? ""} />}
 
       <div className="boards-body" ref={bodyRef}>
@@ -157,6 +206,11 @@ export function BoardsView() {
             swimlane={swimlane}
             selectedKey={selectedKey}
             focusId={focus}
+            moves={moves}
+            flashKey={flashKey}
+            sprints={openSprints}
+            sprintId={effectiveSprintId}
+            committing={status === "committing"}
             canSync={canSync && !sync.isPending}
             onSync={() => sync.mutate()}
             onSelect={(issue) => {

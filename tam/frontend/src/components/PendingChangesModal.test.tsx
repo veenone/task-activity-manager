@@ -261,3 +261,63 @@ describe("PendingChangesModal", () => {
     expect(await within(dialog).findByText("Last commit: 1 link pushed.")).toBeInTheDocument();
   });
 });
+
+describe("PendingChangesModal board moves", () => {
+  const moveRows: PendingChange[] = [
+    { id: 12, entityType: "issue_transition", entityKey: "PLAT-412", field: "statusId", beforeVal: "1|To Do", afterVal: "3|In Progress", baseVersion: "v1", createdAt: "" },
+    { id: 11, entityType: "issue_sprint", entityKey: "PLAT-412", field: "sprintId", beforeVal: "12|Sprint 12", afterVal: "13|Sprint 13", baseVersion: "v1", createdAt: "" },
+    { id: 10, entityType: "issue_rank", entityKey: "PLAT-412", field: "rank", beforeVal: "", afterVal: "before|PLAT-409|1", baseVersion: "v1", createdAt: "" },
+  ];
+
+  it("reads each move in words rather than in ids, and discards one of them", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
+    const rows = within(card).getAllByRole("listitem");
+    expect(rows[0]).toHaveTextContent("Status To Do to In Progress");
+    expect(rows[1]).toHaveTextContent("Sprint Sprint 12 to Sprint 13");
+    expect(rows[2]).toHaveTextContent("Rank before PLAT-409");
+    expect(within(card).queryByText("statusId")).not.toBeInTheDocument();
+
+    await user.click(within(card).getByRole("button", { name: "Discard the status move on PLAT-412" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 12));
+  });
+
+  it("counts the cards a Commit moved, rather than reporting nothing pushed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], linked: [], conflicts: [], failures: [], remaining: 0,
+      moved: [
+        { key: "PLAT-412", entityType: "issue_transition", target: "In Progress", side: "", satisfied: false },
+        { key: "PLAT-412", entityType: "issue_rank", target: "PLAT-409", side: "before", satisfied: false },
+      ],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    expect(await within(dialog).findByText("Last commit: 2 cards moved.")).toBeInTheDocument();
+  });
+
+  it("offers an Undo on a board failure, and no retry where a retry cannot help", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], linked: [], moved: [], conflicts: [], remaining: 3,
+      failures: [{
+        key: "PLAT-412", entityType: "issue_transition", rowId: 12, retryable: false,
+        reachable: ["Done"], error: "PLAT-412 cannot reach In Progress; it can reach Done",
+      }],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    expect(await within(dialog).findByText(/cannot reach In Progress/)).toBeInTheDocument();
+    expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Undo this move" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 12));
+  });
+});

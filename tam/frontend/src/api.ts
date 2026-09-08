@@ -235,6 +235,10 @@ export interface Sprint {
 
 export interface ColumnView {
   name: string;
+  // statusIds are the statuses the column collects, in the board's own
+  // order. A drop journals the first of them, and a column with none
+  // collects nothing and cannot be a drop target.
+  statusIds: string[];
   total: number;
   points: number;
 }
@@ -315,6 +319,21 @@ export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "assignee", label: "Assignee" },
   { id: "parentKey", label: "Epic" },
 ];
+
+// The three journal entity types a board move writes, mirroring
+// issuerepo.EntityTransition, EntitySprintMove, and EntityRank. Both
+// dialogs that show pending work branch on them, and the board reads them
+// to know which of its cards carry a pending move.
+export const ENTITY_TRANSITION = "issue_transition";
+export const ENTITY_SPRINT_MOVE = "issue_sprint";
+export const ENTITY_RANK = "issue_rank";
+export const MOVE_ENTITIES: string[] = [ENTITY_TRANSITION, ENTITY_SPRINT_MOVE, ENTITY_RANK];
+
+// isMoveEntity says whether a journal row or an audit entry is a board
+// move rather than an edit, a link, or a create.
+export function isMoveEntity(entityType: string): boolean {
+  return MOVE_ENTITIES.includes(entityType);
+}
 
 export function fieldLabel(field: string): string {
   return EDITABLE_FIELDS.find((f) => f.id === field)?.label ?? field;
@@ -408,13 +427,50 @@ export interface LinkDraft {
   toType: string;
 }
 
+// CommitFailure is one push that did not land. entityType and rowId name
+// the journal row it was, which is what an Undo on a board failure
+// discards; retryable is false for the ones that will fail identically
+// forever, and reachable carries the statuses a refused transition could
+// have reached instead. The four are optional for the reason Issue.pending
+// is: the backend always sends them, but fixtures written before the board
+// pass existed do not spell them out.
+export interface CommitFailure {
+  key: string;
+  error: string;
+  entityType?: string;
+  rowId?: number;
+  retryable?: boolean;
+  reachable?: string[];
+}
+
+// CommitMove is one board write a Commit settled: a card transitioned,
+// moved to a sprint, or ranked. target is named rather than numbered, and
+// side says which side of the neighbour a rank went; satisfied marks a row
+// Jira already agreed with.
+export interface CommitMove {
+  key: string;
+  entityType: string;
+  target: string;
+  side: string;
+  satisfied: boolean;
+}
+
 export interface CommitResult {
   committed: string[];
   created: { tempKey: string; key: string }[];
   linked: { key: string; toKey: string; type: string }[];
+  // moved is optional for the same reason CommitFailure's fields are.
+  moved?: CommitMove[];
   conflicts: Conflict[];
-  failures: { key: string; error: string }[];
+  failures: CommitFailure[];
   remaining: number;
+}
+
+// TransitionCheck is what CanTransition answers with. It is best effort: an
+// error means the check could not be made, never that the move is illegal.
+export interface TransitionCheck {
+  reachable: string[];
+  allowed: boolean;
 }
 
 export interface ImportPreview {
@@ -559,6 +615,23 @@ export const GetBoard = (
 ): Promise<BoardView> =>
   App.GetBoard(profileId, boardId, sprintId, swimlane) as Promise<BoardView>;
 export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.SyncBoards;
+
+// The three board writes. Each one journals and moves the card locally;
+// none of them touches Jira, which Commit does. CanTransition is the one
+// board binding that reads Jira, and only to check a drop.
+export const MoveIssueToColumn: (profileId: string, key: string, statusId: string) => Promise<void> =
+  App.MoveIssueToColumn;
+export const MoveIssueToSprint: (profileId: string, key: string, sprintId: string) => Promise<void> =
+  App.MoveIssueToSprint;
+export const RankIssue: (
+  profileId: string,
+  key: string,
+  neighbourKey: string,
+  before: boolean,
+  boardId: number,
+) => Promise<void> = App.RankIssue;
+export const CanTransition: (profileId: string, key: string, statusId: string) => Promise<TransitionCheck> =
+  App.CanTransition;
 export const SetProfileSetting: (
   profileId: string,
   key: string,

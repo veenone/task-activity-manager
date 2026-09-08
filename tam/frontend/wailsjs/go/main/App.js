@@ -10,6 +10,10 @@ export function AutoMapImport(arg1) {
   return window['go']['main']['App']['AutoMapImport'](arg1);
 }
 
+export function CanTransition(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CanTransition'](arg1, arg2, arg3);
+}
+
 export function CommitPendingChanges(arg1) {
   return window['go']['main']['App']['CommitPendingChanges'](arg1);
 }
@@ -142,8 +146,20 @@ export function LookupIssue(arg1, arg2) {
   return window['go']['main']['App']['LookupIssue'](arg1, arg2);
 }
 
+export function MoveIssueToColumn(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MoveIssueToColumn'](arg1, arg2, arg3);
+}
+
+export function MoveIssueToSprint(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MoveIssueToSprint'](arg1, arg2, arg3);
+}
+
 export function PreviewImport(arg1, arg2) {
   return window['go']['main']['App']['PreviewImport'](arg1, arg2);
+}
+
+export function RankIssue(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['RankIssue'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function ResolveConflictKeepRemote(arg1, arg2) {

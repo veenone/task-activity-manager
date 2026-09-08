@@ -1,13 +1,15 @@
 import { useMemo } from "react";
 import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
 import { fieldLabel } from "../api";
-import type { CommitResult, IssueDraft, Profile, Settings } from "../api";
+import type { IssueDraft, Profile, Settings } from "../api";
 import { ISSUE_TYPES } from "../api";
-import { groupPending, useDiscardAll, useDiscardChange, usePendingChanges } from "../queries/pending";
+import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
 import { useSync } from "../contexts/SyncContext";
 import { plural } from "../lib/format";
+import { CommitBanner } from "./CommitBanner";
 import { ConflictCard } from "./ConflictCard";
+import { PendingMoveRow } from "./PendingMoveRow";
 
 interface Props {
   onClose: () => void;
@@ -18,22 +20,6 @@ export function summaryLine(groups: PendingGroup[], rowCount: number): string {
   const drafts = groups.filter((g) => g.createRow).length;
   const base = `${plural(rowCount, "change", "changes")} on ${plural(groups.length, "issue", "issues")}`;
   return drafts > 0 ? `${base}, ${drafts} of them new` : base;
-}
-
-// bannerLine renders a commit result as one sentence.
-export function bannerLine(r: CommitResult): string {
-  const parts: string[] = [];
-  if (r.committed.length) parts.push(plural(r.committed.length, "issue pushed", "issues pushed"));
-  if (r.created.length) {
-    const mapping = r.created.map((c) => `${c.tempKey} is now ${c.key}`).join(", ");
-    parts.push(`${r.created.length} created (${mapping})`);
-  }
-  if (r.linked.length) parts.push(plural(r.linked.length, "link pushed", "links pushed"));
-  if (r.conflicts.length) parts.push(`${r.conflicts.length} held back`);
-  if (r.failures.length) parts.push(`${r.failures.length} failed`);
-  if (parts.length === 0) return "Last commit: nothing to push.";
-  if (!r.committed.length && !r.created.length && !r.linked.length) return `Last commit: nothing pushed, ${parts.join(", ")}.`;
-  return `Last commit: ${parts.join(", ")}.`;
 }
 
 function draftLine(d: IssueDraft, project: string): string {
@@ -49,6 +35,7 @@ export function PendingChangesModal({ onClose }: Props) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const pending = usePendingChanges(activeId);
   const discardOne = useDiscardChange(activeId);
+  const discardRow = useDiscardById(activeId);
   const discardAll = useDiscardAll(activeId);
   const { confirm } = useConfirm();
   const { notice } = useNotice();
@@ -69,7 +56,7 @@ export function PendingChangesModal({ onClose }: Props) {
     ],
     [groups, conflictKeys],
   );
-  const busy = status !== "idle" || discardOne.isPending || discardAll.isPending;
+  const busy = status !== "idle" || discardOne.isPending || discardAll.isPending || discardRow.isPending;
 
   function onDiscardError(e: unknown) {
     void notice({ title: "Discard failed", message: errMsg(e), tone: "error" });
@@ -95,18 +82,12 @@ export function PendingChangesModal({ onClose }: Props) {
 
       <div className="bulk-body">
         {lastCommit && (
-          <div className={`pending-banner${lastCommit.conflicts.length || lastCommit.failures.length ? " pending-banner-warn" : ""}`} role="status">
-            <p className="b">{bannerLine(lastCommit)}</p>
-            {lastCommit.conflicts.filter((c) => conflictKeys.has(c.key)).map((c) => (
-              <p key={c.key} className="small">{c.key} changed in Jira since you edited it. Resolve it below, then commit again.</p>
-            ))}
-            {lastCommit.failures.map((f) => (
-              <p key={f.key} className="small error-text">{f.key}: {f.error}</p>
-            ))}
-            {lastCommit.failures.length > 0 && (
-              <p className="muted small">Commit again to retry the failures.</p>
-            )}
-          </div>
+          <CommitBanner
+            result={lastCommit}
+            heldKeys={conflictKeys}
+            busy={busy}
+            onUndo={(id, key) => discardRow.mutate({ id, key }, { onError: onDiscardError })}
+          />
         )}
 
         {pending.isError ? (
@@ -152,6 +133,14 @@ export function PendingChangesModal({ onClose }: Props) {
                           </button>
                         </li>
                       ))}
+                      {g.moves.map((row) => (
+                        <PendingMoveRow
+                          key={row.id}
+                          row={row}
+                          disabled={busy}
+                          onDiscard={() => discardOne.mutate(row, { onError: onDiscardError })}
+                        />
+                      ))}
                       {g.edits.map((row) => (
                         <li key={row.id} className="pending-row">
                           <span className="muted">{fieldLabel(row.field)}</span>{" "}
@@ -173,7 +162,9 @@ export function PendingChangesModal({ onClose }: Props) {
       </div>
 
       <div className="pending-actions">
-        <span className="muted small">Edits are pushed with Jira's own field update; a conflict holds only that issue back.</span>
+        <span className="muted small">
+          Edits are pushed with Jira's own field update, a move with the transition, sprint, and rank endpoints. A conflict holds only that issue back.
+        </span>
         <span className="pending-footer-buttons">
           <button type="button" className="btn" disabled={busy || rows.length === 0} onClick={() => void onDiscardAll()}>Discard all</button>
           <button type="button" className="btn btn-primary" disabled={!canCommit || busy || pushable === 0} onClick={() => void runCommit()}>
