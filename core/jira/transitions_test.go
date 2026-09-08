@@ -65,41 +65,57 @@ func TestTransitionsDecodesFieldsWithNamesAndAllowedValues(t *testing.T) {
 	}
 }
 
+// TestDoTransitionSendsOnlyTheTransitionIDWhenFieldsIsEmpty covers both
+// ways a caller can say "no fields": a nil map and an empty one. Both have
+// to produce {"transition":{"id":"31"}} with no fields key, since a Data
+// Center workflow with a resolution screen can refuse a request that always
+// sends "fields" as an empty object.
 func TestDoTransitionSendsOnlyTheTransitionIDWhenFieldsIsEmpty(t *testing.T) {
-	var gotBody map[string]json.RawMessage
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/rest/api/2/issue/PLAT-412/transitions" {
-			t.Errorf("path = %s", r.URL.Path)
-		}
-		if r.Method != http.MethodPost {
-			t.Errorf("method = %s", r.Method)
-		}
-		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-			t.Fatalf("decode body: %v", err)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
+	cases := []struct {
+		name   string
+		fields map[string]any
+	}{
+		{name: "nil map", fields: nil},
+		{name: "empty map", fields: map[string]any{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotBody map[string]json.RawMessage
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/rest/api/2/issue/PLAT-412/transitions" {
+					t.Errorf("path = %s", r.URL.Path)
+				}
+				if r.Method != http.MethodPost {
+					t.Errorf("method = %s", r.Method)
+				}
+				if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+					t.Fatalf("decode body: %v", err)
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer srv.Close()
 
-	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
-	if err := c.DoTransition(context.Background(), "PLAT-412", "31", nil); err != nil {
-		t.Fatalf("do transition: %v", err)
-	}
+			c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+			if err := c.DoTransition(context.Background(), "PLAT-412", "31", tc.fields); err != nil {
+				t.Fatalf("do transition: %v", err)
+			}
 
-	if len(gotBody) != 1 {
-		t.Fatalf("body = %+v, want only a transition key", gotBody)
-	}
-	if _, ok := gotBody["fields"]; ok {
-		t.Errorf("body = %+v, want no fields key at all", gotBody)
-	}
-	var transition struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(gotBody["transition"], &transition); err != nil {
-		t.Fatalf("unmarshal transition: %v", err)
-	}
-	if transition.ID != "31" {
-		t.Errorf("transition id = %q, want 31", transition.ID)
+			if len(gotBody) != 1 {
+				t.Fatalf("body = %+v, want only a transition key", gotBody)
+			}
+			if _, ok := gotBody["fields"]; ok {
+				t.Errorf("body = %+v, want no fields key at all", gotBody)
+			}
+			var transition struct {
+				ID string `json:"id"`
+			}
+			if err := json.Unmarshal(gotBody["transition"], &transition); err != nil {
+				t.Fatalf("unmarshal transition: %v", err)
+			}
+			if transition.ID != "31" {
+				t.Errorf("transition id = %q, want 31", transition.ID)
+			}
+		})
 	}
 }
 

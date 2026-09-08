@@ -66,14 +66,14 @@ func (c *Client) Transitions(ctx context.Context, key string) ([]RawTransition, 
 }
 
 // DoTransition fires transitionID on key via POST
-// /rest/api/2/issue/{key}/transitions, one of the four calls in this
-// package that change anything on the instance. fields fills the
-// transition's resolution screen and any other fields Transitions reported
-// as required, keyed by field id; when empty it is left out of the request
-// body entirely. Most Data Center workflows put a resolution screen on the
-// transition into Done, and some of them reject a request that always sends
-// "fields" as an empty object, so a caller with nothing to fill has to be
-// able to send no fields key at all. The key is path-escaped.
+// /rest/api/2/issue/{key}/transitions, one of the endpoint-specific write
+// calls in this package. fields fills the transition's resolution screen
+// and any other fields Transitions reported as required, keyed by field id;
+// a nil or empty map is left out of the request body entirely. Most Data
+// Center workflows put a resolution screen on the transition into Done, and
+// some of them reject a request that always sends "fields" as an empty
+// object, so a caller with nothing to fill has to be able to send no fields
+// key at all. The key is path-escaped.
 func (c *Client) DoTransition(ctx context.Context, key, transitionID string, fields map[string]any) error {
 	path := fmt.Sprintf("/rest/api/2/issue/%s/transitions", url.PathEscape(key))
 	body := transitionRequest{Transition: transitionRef{ID: transitionID}, Fields: fields}

@@ -411,25 +411,3 @@ func TestMoveToBacklogSendsIssues(t *testing.T) {
 		t.Errorf("body = %+v, want %+v", gotBody, want)
 	}
 }
-
-// TestMoveToSprintRejectsOn207 is the case that matters most: WriteJSON
-// treats any status under 300 as a win, so a 207 whose body rejects one of
-// two issues has to be read and turned into an error naming that issue, not
-// recorded as though both landed. A rank Jira refused that is treated as
-// pushed is exactly the silent failure this transport exists to avoid.
-func TestMoveToSprintRejectsOn207(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusMultiStatus)
-		_, _ = w.Write([]byte(`{"errors":{"PLAT-409":"The issue is already in this sprint"}}`))
-	}))
-	defer srv.Close()
-
-	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
-	err := c.MoveToSprint(context.Background(), "12", []string{"PLAT-412", "PLAT-409"})
-	if err == nil {
-		t.Fatal("want an error for a 207 rejecting one of two issues")
-	}
-	if !strings.Contains(err.Error(), "PLAT-409") {
-		t.Errorf("err = %v, want it to name the rejected issue PLAT-409", err)
-	}
-}

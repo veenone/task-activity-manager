@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
-	"strings"
 )
 
 // ErrNoAgile is what Boards returns when the instance answers 404 on
@@ -228,39 +226,11 @@ func (c *Client) BoardIssueKeys(ctx context.Context, boardID int, sprintID strin
 	return pageAgileIssues(ctx, c, path)
 }
 
-// bulkMoveResult is the body the Agile bulk rank and move endpoints answer
-// with, present whether the status is a plain 2xx or a 207 Multi-Status:
-// Errors holds the issues Jira rejected, keyed by issue key, with its
-// reason. WriteJSON alone treats anything under 300 as a win, so RankIssue,
-// MoveToSprint, and MoveToBacklog decode this themselves and fail on any
-// entry it holds, naming the rejected issue.
-type bulkMoveResult struct {
-	Errors map[string]string `json:"errors"`
-}
-
-// err turns a non-empty Errors map into one error naming every rejected
-// issue, sorted for a stable message. A nil or empty map is not a failure.
-func (r bulkMoveResult) err() error {
-	if len(r.Errors) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(r.Errors))
-	for k := range r.Errors {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	parts := make([]string, len(keys))
-	for i, k := range keys {
-		parts[i] = fmt.Sprintf("%s: %s", k, r.Errors[k])
-	}
-	return fmt.Errorf("jira: rejected %s", strings.Join(parts, "; "))
-}
-
 // RankIssue ranks key immediately before or after neighbourKey via PUT
-// /rest/agile/1.0/issue/rank, one of the four calls in this package that
-// change anything on the instance. The endpoint answers 207 Multi-Status
-// when the rank is refused, so the response body is decoded and checked
-// rather than trusted on status alone.
+// /rest/agile/1.0/issue/rank, one of the endpoint-specific write calls in
+// this package. The endpoint answers 204 when the rank landed and 207
+// Multi-Status when it did not, so bulkWrite fails on a 207 whatever body
+// came with it.
 func (c *Client) RankIssue(ctx context.Context, key, neighbourKey string, before bool) error {
 	body := map[string]any{"issues": []string{key}}
 	if before {
@@ -268,34 +238,21 @@ func (c *Client) RankIssue(ctx context.Context, key, neighbourKey string, before
 	} else {
 		body["rankAfterIssue"] = neighbourKey
 	}
-	var result bulkMoveResult
-	if err := c.WriteJSONReturning(ctx, http.MethodPut, "/rest/agile/1.0/issue/rank", body, &result); err != nil {
-		return err
-	}
-	return result.err()
+	return c.bulkWrite(ctx, "rank issue", http.MethodPut, "/rest/agile/1.0/issue/rank", body, []string{key})
 }
 
 // MoveToSprint moves keys onto sprintID via POST
-// /rest/agile/1.0/sprint/{sprintId}/issue, one of the four calls in this
-// package that change anything on the instance. The sprint id is
-// path-escaped. Same 207 handling as RankIssue: a rejected issue is a
-// failure even when the status itself is under 300.
+// /rest/agile/1.0/sprint/{sprintId}/issue, one of the endpoint-specific
+// write calls in this package. The sprint id is path-escaped. Same 207
+// handling as RankIssue.
 func (c *Client) MoveToSprint(ctx context.Context, sprintID string, keys []string) error {
 	path := fmt.Sprintf("/rest/agile/1.0/sprint/%s/issue", url.PathEscape(sprintID))
-	var result bulkMoveResult
-	if err := c.WriteJSONReturning(ctx, http.MethodPost, path, map[string]any{"issues": keys}, &result); err != nil {
-		return err
-	}
-	return result.err()
+	return c.bulkWrite(ctx, "move to sprint", http.MethodPost, path, map[string]any{"issues": keys}, keys)
 }
 
 // MoveToBacklog moves keys off any sprint and onto the backlog via POST
-// /rest/agile/1.0/backlog/issue, one of the four calls in this package that
-// change anything on the instance. Same 207 handling as RankIssue.
+// /rest/agile/1.0/backlog/issue, one of the endpoint-specific write calls in
+// this package. Same 207 handling as RankIssue.
 func (c *Client) MoveToBacklog(ctx context.Context, keys []string) error {
-	var result bulkMoveResult
-	if err := c.WriteJSONReturning(ctx, http.MethodPost, "/rest/agile/1.0/backlog/issue", map[string]any{"issues": keys}, &result); err != nil {
-		return err
-	}
-	return result.err()
+	return c.bulkWrite(ctx, "move to backlog", http.MethodPost, "/rest/agile/1.0/backlog/issue", map[string]any{"issues": keys}, keys)
 }
