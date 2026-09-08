@@ -27,7 +27,8 @@
 - A held-back write reuses 1b's conflict card and its two resolutions. A rank is never held back: it has nothing to compare and nothing to rebase.
 - Native HTML5 drag and drop. No new frontend dependency.
 - Every move has a keyboard path on the focused card. The board shipped a keyboard model in 3a and must not lose it.
-- Bound method signatures are exactly: `MoveIssueToColumn(profileID, key, statusID string) error`, `RankIssue(profileID, key, neighbourKey string, before bool) error`, `MoveIssueToSprint(profileID, key, sprintID string) error`.
+- Bound method signatures are exactly: `MoveIssueToColumn(profileID, key, statusID string) error`, `RankIssue(profileID, key, neighbourKey string, before bool, boardID int) error`, `MoveIssueToSprint(profileID, key, sprintID string) error`.
+- The board id on the rank is not decoration. The commit pass re-derives each neighbour from that board's final order (Task 3 Step 2b), and it has no other way to know which board a rank was made on: a key can sit on two boards whose orders disagree. It travels as the third segment of the rank row's `after_val` (`before|PLAT-409|1`), the way a link row already packs its parts into one column. An earlier draft of this plan pinned the signature without it and then required the committer to use it, which was an inconsistency in this document rather than in anyone's implementation.
 - The PAT stays in the Jira client's Authorization header only.
 - Files stay small and single purpose; a helper used from two places lives in its own module. TAM mirrors XTM's design language where XTM has a counterpart.
 - UI text uses no em dashes. No AI attribution or mentions anywhere. Conventional commit prefixes, no trailers. Never add, commit, or delete untracked local tooling files; revert Wails churn under `tam/frontend/wailsjs/runtime`, `tam/frontend/package.json.md5`, and `tam/go.mod` with `git checkout --`.
