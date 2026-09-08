@@ -248,7 +248,7 @@ Not deferred any more: warning about an impossible drop before Commit. It was de
 
 ## Review report
 
-Run 2026-09-08 on branch `feat/phase-3b-board-writes`, three phases, each an independent voice that had not seen the others, with every claim checked against the code before it was adopted. Codex is not installed, so every voice ran as a Claude subagent and each phase is single-voice.
+Run 2026-09-08 on branch `feat/phase-3b-board-writes`, three phases, each an independent voice that had not seen the others, with every claim checked against the code before it was adopted. Each phase is single-voice.
 
 ### What the review changed, worst first
 
