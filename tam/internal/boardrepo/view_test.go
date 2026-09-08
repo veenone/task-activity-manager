@@ -8,6 +8,7 @@ import (
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/dbtx"
 )
 
 // staticIssues is the issue cache the view reads through: a fixed set of
@@ -37,7 +38,7 @@ func (s staticIssues) withDrafts(drafts ...backend.Issue) staticIssues {
 	return s
 }
 
-func (s staticIssues) IssuesByKeys(_ context.Context, _ string, keys []string) ([]backend.Issue, error) {
+func (s staticIssues) IssuesByKeys(_ context.Context, _ dbtx.Querier, _ string, keys []string) ([]backend.Issue, error) {
 	*s.asked = append(*s.asked, keys...)
 	out := []backend.Issue{}
 	for _, k := range keys {
@@ -48,7 +49,7 @@ func (s staticIssues) IssuesByKeys(_ context.Context, _ string, keys []string) (
 	return out, nil
 }
 
-func (s staticIssues) DraftIssues(_ context.Context, _ string) ([]backend.Issue, error) {
+func (s staticIssues) DraftIssues(_ context.Context, _ dbtx.Querier, _ string) ([]backend.Issue, error) {
 	return s.drafts, nil
 }
 
@@ -58,7 +59,7 @@ func (s staticIssues) withMoves(moves ...backend.PendingMove) staticIssues {
 	return s
 }
 
-func (s staticIssues) PendingMoves(_ context.Context, _ string) ([]backend.PendingMove, error) {
+func (s staticIssues) PendingMoves(_ context.Context, _ dbtx.Querier, _ string) ([]backend.PendingMove, error) {
 	return s.moves, nil
 }
 

@@ -2,6 +2,7 @@ package issuerepo_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -15,12 +16,22 @@ import (
 
 func newRepo(t *testing.T) *issuerepo.Repository {
 	t.Helper()
+	r, _ := newRepoWithDB(t)
+	return r
+}
+
+// newRepoWithDB is newRepo with the handle beside it, for the reads that
+// take the querier they run on: the board composes itself inside one read
+// transaction and hands that in, and a test reading on its own hands in
+// the handle.
+func newRepoWithDB(t *testing.T) (*issuerepo.Repository, *sql.DB) {
+	t.Helper()
 	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return issuerepo.New(db.DB())
+	return issuerepo.New(db.DB()), db.DB()
 }
 
 func pts(v float64) *float64 { return &v }
@@ -196,7 +207,7 @@ func TestUpsertKeepsTheStatusID(t *testing.T) {
 }
 
 func TestIssuesByKeysReturnsTheCallersOrderAndSkipsWhatIsNotCached(t *testing.T) {
-	r := newRepo(t)
+	r, db := newRepoWithDB(t)
 	ctx := context.Background()
 	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
 	if err := r.UpsertPage(ctx, "p1", sample(), now, false); err != nil {
@@ -205,7 +216,7 @@ func TestIssuesByKeysReturnsTheCallersOrderAndSkipsWhatIsNotCached(t *testing.T)
 	// A board's order is neither the key order nor the rank order, and the
 	// missing key is one a board filter reached outside the project.
 	keys := []string{"PLAT-347", "OPS-9", "PLAT-412", "PLAT-350"}
-	got, err := r.IssuesByKeys(ctx, "p1", keys)
+	got, err := r.IssuesByKeys(ctx, db, "p1", keys)
 	if err != nil {
 		t.Fatalf("by keys: %v", err)
 	}
@@ -222,28 +233,28 @@ func TestIssuesByKeysReturnsTheCallersOrderAndSkipsWhatIsNotCached(t *testing.T)
 		t.Errorf("rows come back whole: %+v", got[0])
 	}
 	// Another profile's cache is not readable through the same keys.
-	other, err := r.IssuesByKeys(ctx, "p2", keys)
+	other, err := r.IssuesByKeys(ctx, db, "p2", keys)
 	if err != nil || len(other) != 0 {
 		t.Errorf("other profile = %+v, %v; want empty", other, err)
 	}
 }
 
 func TestIssuesByKeysWithNoKeys(t *testing.T) {
-	r := newRepo(t)
-	got, err := r.IssuesByKeys(context.Background(), "p1", nil)
+	r, db := newRepoWithDB(t)
+	got, err := r.IssuesByKeys(context.Background(), db, "p1", nil)
 	if err != nil {
 		t.Fatalf("nil keys: %v", err)
 	}
 	if got == nil || len(got) != 0 {
 		t.Errorf("nil keys = %+v, want an empty slice", got)
 	}
-	if got, err = r.IssuesByKeys(context.Background(), "p1", []string{}); err != nil || len(got) != 0 {
+	if got, err = r.IssuesByKeys(context.Background(), db, "p1", []string{}); err != nil || len(got) != 0 {
 		t.Errorf("empty keys = %+v, %v", got, err)
 	}
 }
 
 func TestDraftIssuesReadsTheProfilesDraftsInKeyOrder(t *testing.T) {
-	r := newRepo(t)
+	r, db := newRepoWithDB(t)
 	ctx := context.Background()
 	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
 	if err := r.UpsertPage(ctx, "p1", sample(), now, false); err != nil {
@@ -261,7 +272,7 @@ func TestDraftIssuesReadsTheProfilesDraftsInKeyOrder(t *testing.T) {
 		t.Fatalf("other profile draft: %v", err)
 	}
 
-	got, err := r.DraftIssues(ctx, "p1")
+	got, err := r.DraftIssues(ctx, db, "p1")
 	if err != nil {
 		t.Fatalf("drafts: %v", err)
 	}
@@ -288,8 +299,8 @@ func TestDraftIssuesReadsTheProfilesDraftsInKeyOrder(t *testing.T) {
 }
 
 func TestDraftIssuesWithNoDrafts(t *testing.T) {
-	r := newRepo(t)
-	got, err := r.DraftIssues(context.Background(), "p1")
+	r, db := newRepoWithDB(t)
+	got, err := r.DraftIssues(context.Background(), db, "p1")
 	if err != nil {
 		t.Fatalf("drafts: %v", err)
 	}
@@ -299,7 +310,7 @@ func TestDraftIssuesWithNoDrafts(t *testing.T) {
 }
 
 func TestIssuesByKeysReadsPastTheChunkBoundary(t *testing.T) {
-	r := newRepo(t)
+	r, db := newRepoWithDB(t)
 	ctx := context.Background()
 	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
 	// One more than a chunk, so the read spans two statements.
@@ -318,7 +329,7 @@ func TestIssuesByKeysReadsPastTheChunkBoundary(t *testing.T) {
 	for i, j := 0, len(keys)-1; i < j; i, j = i+1, j-1 {
 		keys[i], keys[j] = keys[j], keys[i]
 	}
-	got, err := r.IssuesByKeys(ctx, "p1", keys)
+	got, err := r.IssuesByKeys(ctx, db, "p1", keys)
 	if err != nil {
 		t.Fatalf("by keys: %v", err)
 	}

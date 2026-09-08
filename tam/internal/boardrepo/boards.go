@@ -87,9 +87,18 @@ func (r *Repository) ListBoards(ctx context.Context, profileID string) ([]Board,
 	return out, rows.Err()
 }
 
-// Columns returns one board's columns in board order.
+// Columns returns one board's columns in board order, on the handle. A
+// caller composing a whole board reads them inside its own snapshot
+// instead, through columnsOf.
 func (r *Repository) Columns(ctx context.Context, profileID string, boardID int) ([]backend.BoardColumn, error) {
-	rows, err := r.db.QueryContext(ctx, columnsSQL, profileID, boardID)
+	return columnsOf(ctx, r.db, profileID, boardID)
+}
+
+// columnsOf is the columns read itself, on whichever querier the caller
+// hands it: the handle for a lone read, a read transaction for a board
+// composed of several.
+func columnsOf(ctx context.Context, q dbtx.Querier, profileID string, boardID int) ([]backend.BoardColumn, error) {
+	rows, err := q.QueryContext(ctx, columnsSQL, profileID, boardID)
 	if err != nil {
 		return nil, fmt.Errorf("board %d columns: %w", boardID, err)
 	}
@@ -155,8 +164,10 @@ func (r *Repository) SprintName(ctx context.Context, profileID, sprintID string)
 
 // issueKeys returns the keys one board holds for a sprint, in board order.
 // An empty sprintID reads the board's own list, the way the sync stored it.
-func (r *Repository) issueKeys(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, boardKeysSQL, profileID, boardID, sprintID)
+// It reads on whichever querier the caller hands it, so the board and its
+// membership can be read on one snapshot.
+func issueKeys(ctx context.Context, q dbtx.Querier, profileID string, boardID int, sprintID string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, boardKeysSQL, profileID, boardID, sprintID)
 	if err != nil {
 		return nil, fmt.Errorf("board %d issue keys: %w", boardID, err)
 	}
@@ -170,10 +181,4 @@ func (r *Repository) issueKeys(ctx context.Context, profileID string, boardID in
 		out = append(out, key)
 	}
 	return out, rows.Err()
-}
-
-// inTx runs fn inside one transaction, through the helper issuerepo shares,
-// so a replace never leaves the table holding a delete without its inserts.
-func (r *Repository) inTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	return dbtx.In(ctx, r.db, fn)
 }

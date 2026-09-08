@@ -636,7 +636,7 @@ func TestRekeyRepointsARankJournaledAgainstADraftAndKeepsItsBoard(t *testing.T) 
 }
 
 func TestPendingMovesFoldsTheThreeTypesPerIssue(t *testing.T) {
-	repo := newRepo(t)
+	repo, db := newRepoWithDB(t)
 	ctx := context.Background()
 	seedBoardCards(t, repo)
 
@@ -654,7 +654,7 @@ func TestPendingMovesFoldsTheThreeTypesPerIssue(t *testing.T) {
 		t.Fatalf("edit: %v", err)
 	}
 
-	moves, err := repo.PendingMoves(ctx, "p1")
+	moves, err := repo.PendingMoves(ctx, db, "p1")
 	if err != nil {
 		t.Fatalf("pending moves: %v", err)
 	}

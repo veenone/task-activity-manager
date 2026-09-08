@@ -13,6 +13,7 @@ import (
 	"fmt"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/dbtx"
 )
 
 // Repository runs the queries. It holds no state beyond the handle.
@@ -43,20 +44,26 @@ type Sprint struct {
 
 // IssueSource is what the view needs from the issue cache. Keeping it an
 // interface is what lets boardrepo compose a board without importing
-// issuerepo; app.go passes the issue repository, which already has both
-// methods.
+// issuerepo; app.go passes the issue repository, which already has all
+// three methods.
+//
+// Every method takes the querier its statement runs on, because a board
+// read is one snapshot: the board tables and the issue cache are read
+// inside the same transaction, and a source that opened its own handle
+// would read the cache as of a later moment than the columns it is being
+// placed into.
 type IssueSource interface {
 	// IssuesByKeys returns the cached rows for the board's own keys, in the
 	// order they were asked for.
-	IssuesByKeys(ctx context.Context, profileID string, keys []string) ([]backend.Issue, error)
+	IssuesByKeys(ctx context.Context, q dbtx.Querier, profileID string, keys []string) ([]backend.Issue, error)
 	// DraftIssues returns the profile's local drafts. Jira's board issue
 	// list can never name a draft key, so the board reads them separately
 	// or they never reach a board at all.
-	DraftIssues(ctx context.Context, profileID string) ([]backend.Issue, error)
+	DraftIssues(ctx context.Context, q dbtx.Querier, profileID string) ([]backend.Issue, error)
 	// PendingMoves returns the board intents the journal holds, one per
 	// issue. The view applies them as it places the cards, so a card is
 	// drawn where it was dropped and not where the last sync left it.
-	PendingMoves(ctx context.Context, profileID string) ([]backend.PendingMove, error)
+	PendingMoves(ctx context.Context, q dbtx.Querier, profileID string) ([]backend.PendingMove, error)
 }
 
 // PurgeProfile drops everything the board tables hold for a profile. The

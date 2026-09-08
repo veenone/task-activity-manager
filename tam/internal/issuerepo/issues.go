@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/dbtx"
 )
 
 const (
@@ -236,7 +237,12 @@ const keyChunk = 500
 // the board's, not the database's, and no ORDER BY can ask SQL to return an
 // IN list in the order it was given, so the rows are scanned into a map and
 // the caller's slice is walked to build the result.
-func (r *Repository) IssuesByKeys(ctx context.Context, profileID string, keys []string) ([]backend.Issue, error) {
+//
+// q is what the statements run on. A board read hands in its own read
+// transaction, so the cards it draws come from the same moment as the
+// columns and the membership it draws them into; a caller with one read to
+// make hands in the handle.
+func (r *Repository) IssuesByKeys(ctx context.Context, q dbtx.Querier, profileID string, keys []string) ([]backend.Issue, error) {
 	if len(keys) == 0 {
 		return []backend.Issue{}, nil
 	}
@@ -253,7 +259,7 @@ func (r *Repository) IssuesByKeys(ctx context.Context, profileID string, keys []
 		for _, k := range chunk {
 			args = append(args, k)
 		}
-		if err := r.scanIssuesInto(ctx, found,
+		if err := scanIssuesInto(ctx, q, found,
 			`SELECT `+issueColumns+` FROM issue WHERE profile_id = ? AND key IN (`+marks+`)`, args); err != nil {
 			return nil, err
 		}
@@ -277,9 +283,10 @@ const draftsSQL = `SELECT ` + issueColumns + ` FROM issue WHERE profile_id = ? A
 // list is where those come from and it can never name a draft key, so
 // without this a draft would never reach a board at all. Drafts are
 // project-level, which is why every board and every sprint of the profile
-// gets the same ones.
-func (r *Repository) DraftIssues(ctx context.Context, profileID string) ([]backend.Issue, error) {
-	rows, err := r.db.QueryContext(ctx, draftsSQL, profileID, DraftPrefix+"%")
+// gets the same ones. q is the querier the read runs on, as IssuesByKeys
+// takes one.
+func (r *Repository) DraftIssues(ctx context.Context, q dbtx.Querier, profileID string) ([]backend.Issue, error) {
+	rows, err := q.QueryContext(ctx, draftsSQL, profileID, DraftPrefix+"%")
 	if err != nil {
 		return nil, fmt.Errorf("draft issues: %w", err)
 	}
@@ -298,15 +305,16 @@ func (r *Repository) DraftIssues(ctx context.Context, profileID string) ([]backe
 // PendingMoves returns every pending board intent of the profile, one value
 // per issue, in key order. The three entity types come back in one
 // statement and are folded together here, so the board read applies them in
-// memory rather than asking the journal once per card.
-func (r *Repository) PendingMoves(ctx context.Context, profileID string) ([]backend.PendingMove, error) {
+// memory rather than asking the journal once per card. q is the querier the
+// read runs on, as IssuesByKeys takes one.
+func (r *Repository) PendingMoves(ctx context.Context, q dbtx.Querier, profileID string) ([]backend.PendingMove, error) {
 	args := make([]any, 0, len(BoardEntities)+1)
 	args = append(args, profileID)
 	for _, t := range BoardEntities {
 		args = append(args, t)
 	}
 	marks := strings.TrimSuffix(strings.Repeat("?, ", len(BoardEntities)), ", ")
-	rows, err := r.db.QueryContext(ctx,
+	rows, err := q.QueryContext(ctx,
 		`SELECT entity_type, entity_key, after_val FROM pending_change
 		 WHERE profile_id = ? AND entity_type IN (`+marks+`) ORDER BY entity_key, id`, args...)
 	if err != nil {
@@ -342,9 +350,10 @@ func (r *Repository) PendingMoves(ctx context.Context, profileID string) ([]back
 	return out, rows.Err()
 }
 
-// scanIssuesInto runs one row read and files every row under its key.
-func (r *Repository) scanIssuesInto(ctx context.Context, into map[string]backend.Issue, query string, args []any) error {
-	rows, err := r.db.QueryContext(ctx, query, args...)
+// scanIssuesInto runs one row read and files every row under its key, on
+// the querier the caller is reading through.
+func scanIssuesInto(ctx context.Context, q dbtx.Querier, into map[string]backend.Issue, query string, args []any) error {
+	rows, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("issues by keys: %w", err)
 	}

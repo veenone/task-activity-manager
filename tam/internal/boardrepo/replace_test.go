@@ -2,10 +2,10 @@ package boardrepo_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 )
 
 func oneColumn() []backend.BoardColumn {
@@ -19,25 +19,35 @@ func twoColumns() []backend.BoardColumn {
 	}
 }
 
-// countKeys reads how many keys one board holds for a sprint scope. It
-// takes no *testing.T, so the reader goroutine below can call it.
-func countKeys(db *sql.DB, profileID string, boardID int, sprintID string) (int, error) {
-	var n int
-	err := db.QueryRow(
-		`SELECT count(*) FROM board_issue WHERE profile_id = ? AND board_id = ? AND sprint_id = ?`,
-		profileID, boardID, sprintID).Scan(&n)
-	return n, err
+// cardsIn is how many cards the view drew, over every column. The reader
+// below compares it against the number of columns, which is the invariant
+// the two board shapes hold.
+func cardsIn(view boardrepo.BoardView) int {
+	n := 0
+	for _, c := range view.Columns {
+		n += c.Total
+	}
+	return n
 }
 
 // TestReplaceBoardLandsColumnsAndMembershipTogether writes two boards while
-// a reader shaped like the Boards view runs beside it: columns, then
-// membership, over and over. One column per card is the invariant the seed
-// and the replacement both hold, so a reader that ever sees a different
-// count has caught a board with its columns replaced and its membership
-// still old, which is what the four separate transactions allowed.
+// a reader shaped like the Boards view runs beside it: one Board read, over
+// and over. One column per card is the invariant the seed and the
+// replacement both hold, so a reader that ever sees a different count has
+// caught a board with its columns replaced and its membership still old,
+// which is what the four separate transactions allowed.
+//
+// The reader makes one call and not two, which is the point rather than a
+// convenience. Two calls are two snapshots however carefully each of them
+// reads, so nothing a store can do would make a pair of them atomic; what
+// can be promised is that one read is one board, and Repository.Board is
+// the read the view actually makes.
 func TestReplaceBoardLandsColumnsAndMembershipTogether(t *testing.T) {
 	r, db := newRepo(t)
 	ctx := context.Background()
+	// Both cards sit in the column that exists in either shape, so the
+	// number of cards drawn is the size of the membership and nothing else.
+	issues := newIssues(card("PLAT-1", "To Do", "1"), card("PLAT-2", "To Do", "1"))
 
 	before := map[string][]string{"": {"PLAT-1"}}
 	for _, b := range sampleBoards() {
@@ -57,17 +67,13 @@ func TestReplaceBoardLandsColumnsAndMembershipTogether(t *testing.T) {
 				return
 			default:
 			}
-			cols, err := r.Columns(ctx, "p1", 1)
+			view, err := r.Board(ctx, issues, "p1", 1, "", boardrepo.SwimlaneNone)
 			if err != nil {
 				continue
 			}
-			keys, err := countKeys(db, "p1", 1, "")
-			if err != nil {
-				continue
-			}
-			if len(cols) != keys {
+			if cards := cardsIn(view); len(view.Columns) != cards {
 				select {
-				case torn <- [2]int{len(cols), keys}:
+				case torn <- [2]int{len(view.Columns), cards}:
 				default:
 				}
 				return
