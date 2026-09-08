@@ -89,9 +89,14 @@ export function BoardGrid({
             {view.columns.map((column, col) => {
               const over = target?.lane === laneIndex && target.col === col;
               const line = over ? target.index : null;
+              // A cross-column drop lands the card at the rank it already
+              // has, so the whole cell is outlined rather than given a gap
+              // line: the outline says "it lands here" without claiming a
+              // place in the order this move never chooses.
+              const outlined = over && line === null;
               return (
                 <div
-                  className={`board-cell${over ? " board-cell-over" : ""}`}
+                  className={`board-cell${over ? " board-cell-over" : ""}${outlined ? " board-cell-target" : ""}`}
                   key={column.name}
                   role="presentation"
                   onDragOver={(e) => moves.onCellDragOver(e, laneIndex, col)}
@@ -134,7 +139,13 @@ export function BoardGrid({
                       </div>
                     );
                   })}
-                  {line !== null && line >= (lane.cells[col] ?? []).length && <div className="board-drop-line" />}
+                  {/* The line below the last card has no slot to be
+                      positioned against, so it takes its own place in the
+                      cell's flex column instead of escaping to whatever
+                      ancestor happens to be positioned. */}
+                  {line !== null && line >= (lane.cells[col] ?? []).length && (
+                    <div className="board-drop-line board-drop-line-end" />
+                  )}
                   {(lane.overflow[col] ?? 0) > 0 && (
                     <p className="board-overflow">{`+${lane.overflow[col]} more`}</p>
                   )}

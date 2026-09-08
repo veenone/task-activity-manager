@@ -55,7 +55,10 @@ export function BoardCard({
 }: Props) {
   const points = issue.storyPoints ?? null;
   const assignee = issue.assignee || "Unassigned";
-  const pendingMove = move.state !== "";
+  // A failed move is not pending in the sense the dot means: it was pushed
+  // and refused, so a dot promising it will land is the one thing this card
+  // must not say. Its border and the reason in its label carry it instead.
+  const pendingMove = move.state !== "" && move.state !== "failed";
   const label = [`${issue.key} ${issue.summary} ${columnName}`, move.reason].filter(Boolean).join(". ");
   const className = [
     "board-card",
@@ -85,10 +88,9 @@ export function BoardCard({
         <TypeChip type={issue.type} />
         <span className="accent-text">{issue.key}</span>
         {issue.draft && <span className="chip chip-draft">Draft</span>}
-        {pendingMove ? (
-          <span className="pending-dot pending-dot-move" role="img" aria-label="Pending move" />
-        ) : (
-          issue.pending && <span className="pending-dot" role="img" aria-label="Pending changes" />
+        {pendingMove && <span className="pending-dot pending-dot-move" role="img" aria-label="Pending move" />}
+        {move.state === "" && issue.pending && (
+          <span className="pending-dot" role="img" aria-label="Pending changes" />
         )}
         {menu}
       </div>

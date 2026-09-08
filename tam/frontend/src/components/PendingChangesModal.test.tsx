@@ -301,6 +301,24 @@ describe("PendingChangesModal board moves", () => {
     expect(await within(dialog).findByText("Last commit: 2 cards moved.")).toBeInTheDocument();
   });
 
+  it("does not count a move Jira had already made as a card this Commit moved", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], linked: [], conflicts: [], failures: [], remaining: 0,
+      moved: [
+        { key: "PLAT-412", entityType: "issue_transition", target: "In Progress", side: "", satisfied: false },
+        { key: "PLAT-412", entityType: "issue_rank", target: "PLAT-409", side: "before", satisfied: true },
+      ],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
+    expect(
+      await within(dialog).findByText("Last commit: 1 card moved, 1 already in place."),
+    ).toBeInTheDocument();
+  });
+
   it("offers an Undo on a board failure, and no retry where a retry cannot help", async () => {
     const user = userEvent.setup();
     vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows);
@@ -308,7 +326,7 @@ describe("PendingChangesModal board moves", () => {
       committed: [], created: [], linked: [], moved: [], conflicts: [], remaining: 3,
       failures: [{
         key: "PLAT-412", entityType: "issue_transition", rowId: 12, retryable: false,
-        reachable: ["Done"], error: "PLAT-412 cannot reach In Progress; it can reach Done",
+        error: "PLAT-412 cannot reach In Progress; it can reach Done",
       }],
     });
     renderModal();

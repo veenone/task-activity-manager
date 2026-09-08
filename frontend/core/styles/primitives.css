@@ -1227,8 +1227,10 @@
   to { background: var(--surface); }
 }
 /* The four states a move can be in on the card itself. A card that will
-   never land must not look like one that is about to. */
-.board-card-checking { border-style: dashed; }
+   never land must not look like one that is about to. The check in flight
+   is dotted and accented rather than dashed: a dashed border is already
+   the card being carried, and two states wearing one mark is no mark. */
+.board-card-checking { border-style: dotted; border-color: var(--accent); }
 .board-card-warn, .board-card-conflict { background: var(--warn-soft); border-color: var(--warn-border); }
 .board-card-failed { border-color: var(--danger-text); }
 /* The slot is what the drop line is measured against, so a line appearing
@@ -1236,8 +1238,13 @@
    column would reflow the whole column on every dragover. */
 .board-card-slot { position: relative; }
 .board-drop-line { position: absolute; top: -5px; left: 0; right: 0; height: 2px; background: var(--accent); border-radius: 1px; }
+/* The line below the last card of a cell: no slot to be measured against,
+   so it sits in the cell's own flex column and keeps only its colour. */
 .board-drop-line-end { position: static; height: 2px; }
 .board-cell-over { background: var(--row-hover); border-radius: 4px; }
+/* A cross-column drop takes the rank the card already has, so the target
+   is the cell and not a gap in it. */
+.board-cell-target { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
 .board-move-keys { margin: 0 0 8px; }
 .board-card-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
 .board-unmapped { margin-top: 12px; }

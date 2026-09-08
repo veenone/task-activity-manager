@@ -429,18 +429,18 @@ export interface LinkDraft {
 
 // CommitFailure is one push that did not land. entityType and rowId name
 // the journal row it was, which is what an Undo on a board failure
-// discards; retryable is false for the ones that will fail identically
-// forever, and reachable carries the statuses a refused transition could
-// have reached instead. The four are optional for the reason Issue.pending
-// is: the backend always sends them, but fixtures written before the board
-// pass existed do not spell them out.
+// discards, and retryable is false for the ones that will fail identically
+// forever. The three are optional for the reason Issue.pending is: the
+// backend always sends them, but fixtures written before the board pass
+// existed do not spell them out. The statuses a refused transition could
+// have reached instead are in the error sentence itself, so nothing here
+// reads them a second time.
 export interface CommitFailure {
   key: string;
   error: string;
   entityType?: string;
   rowId?: number;
   retryable?: boolean;
-  reachable?: string[];
 }
 
 // CommitMove is one board write a Commit settled: a card transitioned,

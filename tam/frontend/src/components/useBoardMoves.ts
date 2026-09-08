@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { announce, errMsg, useNotice } from "@agile-suite/core";
 import { ENTITY_TRANSITION } from "../api";
@@ -33,9 +33,13 @@ interface Args {
   view: BoardView | undefined;
   boardId: number;
   commit: CommitResult | null;
+  // committing is a Commit in flight. The drag is stopped by the card's
+  // own draggable and the menu by its disabled items, so this is the
+  // keyboard's half of the same answer.
+  committing: boolean;
 }
 
-export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
+export function useBoardMoves({ profileId, view, boardId, commit, committing }: Args) {
   const { notice } = useNotice();
   const pending = usePendingChanges(profileId);
   const toColumn = useMoveToColumn(profileId);
@@ -54,11 +58,28 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
   // never overwrite a newer one.
   const asked = useRef(new Map<string, number>());
 
-  const rows = pending.data ?? [];
+  const rows = useMemo(() => pending.data ?? [], [pending.data]);
   const moves = useMemo(
     () => cardMoves({ pending: rows, commit, warnings, checking }),
     [rows, commit, warnings, checking],
   );
+
+  // A warning belongs to a journaled transition, and that row can be
+  // discarded anywhere: this banner's own Put it back, the Pending changes
+  // dialog, Discard all, or a Commit that pushed it. The card's marker
+  // clears with the row, so the sentence above the board has to go with it
+  // rather than stand there contradicting the card it names.
+  useEffect(() => {
+    if (!pending.data) return;
+    setWarnings((prev) => {
+      if (prev.size === 0) return prev;
+      const journaled = new Set(
+        pending.data.filter((r) => r.entityType === ENTITY_TRANSITION).map((r) => r.entityKey),
+      );
+      const next = new Map([...prev].filter(([key]) => journaled.has(key)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [pending.data]);
 
   function forget(key: string) {
     setWarnings((prev) => {
@@ -82,7 +103,7 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
     asked.current.set(key, n);
     setChecking((prev) => new Set(prev).add(key));
     check.mutate(
-      { key, statusId, target: columnName },
+      { key, statusId },
       {
         onSuccess: (answer) => {
           if (asked.current.get(key) !== n || answer.allowed) return;
@@ -103,8 +124,15 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
   function moveToColumn(key: string, col: number) {
     if (!view) return;
     const column = view.columns[col];
-    const statusId = (column?.statusIds ?? [])[0];
-    if (!statusId) return;
+    if (!column) return;
+    const statusId = (column.statusIds ?? [])[0];
+    // The keyboard refuses this column with a sentence, and a menu never
+    // offers it, but a drag can still be dropped on one. Saying nothing
+    // would make the card look as though it moved and came back.
+    if (!statusId) {
+      announce(`${column.name} collects no status, so a card cannot be moved into it`);
+      return;
+    }
     forget(key);
     toColumn.mutate(
       { key, statusId },
@@ -133,7 +161,7 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
     const name = sprint ? sprint.name : "";
     forget(key);
     toSprint.mutate(
-      { key, sprintId, sprintName: name },
+      { key, sprintId },
       {
         onSuccess: () => setIntent({ key, kind: "sprint", target: name, at: Date.now() }),
         onError: failed,
@@ -149,6 +177,10 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
     if (!view) return false;
     const move = keyboardMove(view, p, issue.key, key);
     if (!move) return false;
+    if (committing) {
+      announce(`${issue.key} cannot be moved while a commit is running`);
+      return true;
+    }
     if (move.kind === "refused") {
       announce(move.message);
       return true;
@@ -189,6 +221,14 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
     return view && dragKey ? findCard(view, dragKey) : undefined;
   }
 
+  // belowHidden is a drop under the last card of a capped cell: the rank
+  // would be against a card the column is not showing. The drop refuses it
+  // and says so, and the dragover must not draw a line promising it first.
+  function belowHidden(lane: number, col: number, index: number): boolean {
+    const cards = view?.lanes[lane]?.cells[col] ?? [];
+    return index >= cards.length && (view?.lanes[lane]?.overflow[col] ?? 0) > 0;
+  }
+
   function onCellDragOver(e: DragEvent<HTMLElement>, lane: number, col: number) {
     const start = from();
     if (!view || !start) return;
@@ -196,6 +236,7 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
     const same = isSameCell(start, lane, col);
     if (!same && (start.lane !== lane || (view.columns[col]?.statusIds ?? []).length === 0)) return refuse(e);
     if (same && isNoMove(start, lane, col, drop.index)) return refuse(e);
+    if (same && belowHidden(lane, col, drop.index)) return refuse(e);
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setTarget({ lane, col, index: same ? drop.index : null });
@@ -214,8 +255,7 @@ export function useBoardMoves({ profileId, view, boardId, commit }: Args) {
       return;
     }
     if (isNoMove(start, lane, col, drop.index)) return;
-    const cards = view.lanes[lane]?.cells[col] ?? [];
-    if (drop.index >= cards.length && (view.lanes[lane]?.overflow[col] ?? 0) > 0) {
+    if (belowHidden(lane, col, drop.index)) {
       announce(`${key} cannot be placed below the cards this column is not showing`);
       return;
     }

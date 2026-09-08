@@ -468,6 +468,41 @@ func TestABoardWriteJournalsWhileACommitRuns(t *testing.T) {
 	}
 }
 
+// TestMoveIssueToColumnJournalsTheStatusAsIDAndName pins the value the
+// binding writes through. Commit pushes the id half and the Pending
+// changes dialog and the Activity tab read the name half, so a row
+// carrying one without the other is either a push with nothing to push or
+// a dialog printing "3".
+func TestMoveIssueToColumnJournalsTheStatusAsIDAndName(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	// Two cards, so the target column's status is named in the cache the
+	// way it is in the app: by an issue already sitting in it.
+	rows := []backend.Issue{
+		{Key: "PLAT-1", ID: "PLAT-1", Project: "PLAT", Type: backend.TypeStory, Summary: "one",
+			Status: "To Do", StatusID: "1", Rank: "0|a", Updated: "2026-09-01T00:00:00Z"},
+		{Key: "PLAT-2", ID: "PLAT-2", Project: "PLAT", Type: backend.TypeStory, Summary: "two",
+			Status: "In Progress", StatusID: "3", Rank: "0|b", Updated: "2026-09-01T00:00:00Z"},
+	}
+	if err := a.repo.UpsertPage(context.Background(), p.ID, rows, time.Now(), false); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := a.MoveIssueToColumn(p.ID, "PLAT-1", "3"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	pending, err := a.repo.PendingForKey(a.ctx, p.ID, "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("pending rows = %+v, want exactly one", pending)
+	}
+	if row := pending[0]; row.BeforeVal != "1|To Do" || row.AfterVal != "3|In Progress" {
+		t.Errorf("journal row = %+v, want id|Name on both sides of the move", row)
+	}
+}
+
 // TestMoveIssueToSprintRefusesASprintIdThatIsNotANumber keeps a value that
 // would end up in a URL path from reaching one. The backlog, which is the
 // empty id, is a destination and stays allowed.

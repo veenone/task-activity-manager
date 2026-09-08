@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
+import { DialogProvider, LiveRegion, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import * as api from "../api";
 import type { BoardView, Issue, PendingChange } from "../api";
 import { profileBackend } from "../profileBackend";
@@ -121,6 +121,10 @@ function renderView() {
         <ProfileProvider backend={profileBackend}>
           <ModalProvider>
             <Loader />
+            {/* The board announces every move it makes, so the region
+                those announcements land in is part of what these tests
+                render. */}
+            <LiveRegion />
             <BoardsView />
           </ModalProvider>
         </ProfileProvider>
@@ -594,18 +598,38 @@ describe("BoardsView moves", () => {
     };
   }
 
+  // jsdom has no DragEvent, so testing-library builds a drag out of
+  // window.Event, which drops every init member it does not know and then
+  // re-attaches dataTransfer alone. clientY is one of the members it
+  // drops, and a drop with no coordinate resolves to the bottom of the
+  // cell whatever the test aimed at. A MouseEvent carries the coordinate;
+  // the transfer is attached by hand, by reference, so the handlers'
+  // writes to it are visible here.
+  function fireDrag(el: Element, type: string, dataTransfer: ReturnType<typeof transfer>, clientY = 0) {
+    const e = new MouseEvent(type, { bubbles: true, cancelable: true, clientY });
+    Object.defineProperty(e, "dataTransfer", { value: dataTransfer });
+    fireEvent(el, e);
+  }
+
   function cells(): HTMLElement[] {
     return [...document.querySelectorAll<HTMLElement>(".board-cell")];
   }
 
-  async function dragTo(cardName: RegExp, col: number, clientY: number) {
+  // startDrag picks a card up and lays out the cell it is aimed at, which
+  // is everything the drop arithmetic reads.
+  async function startDrag(cardName: RegExp, col: number) {
     const card = await screen.findByRole("gridcell", { name: cardName });
     const dataTransfer = transfer();
-    fireEvent.dragStart(card, { dataTransfer });
+    fireDrag(card, "dragstart", dataTransfer);
     const cell = cells()[col];
     layOut(cell);
-    fireEvent.dragOver(cell, { dataTransfer, clientY });
-    fireEvent.drop(cell, { dataTransfer, clientY });
+    return { card, cell, dataTransfer };
+  }
+
+  async function dragTo(cardName: RegExp, col: number, clientY: number) {
+    const { cell, dataTransfer } = await startDrag(cardName, col);
+    fireDrag(cell, "dragover", dataTransfer, clientY);
+    fireDrag(cell, "drop", dataTransfer, clientY);
     return dataTransfer;
   }
 
@@ -648,17 +672,71 @@ describe("BoardsView moves", () => {
   });
 
   it("draws the drop line where the card would land", async () => {
+    // Three forty-pixel cards, so their midpoints are 20, 60 and 100 and a
+    // clientY picks a gap rather than always falling past the last card.
+    const WEBHOOK = issue({ key: "PLAT-333", summary: "Retire the legacy webhook" });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, RETRO, WEBHOOK], [PROMO], []]));
+    renderView();
+    const { card, cell, dataTransfer } = await startDrag(/PLAT-409/, 0);
+    expect(card).toHaveClass("board-card-dragging");
+
+    // Above the third card's midpoint: the line is drawn in that card's
+    // own slot, which is the box it is positioned against.
+    fireDrag(cell, "dragover", dataTransfer, 70);
+    expect(cell).toHaveClass("board-cell-over");
+    const slots = [...cell.querySelectorAll(".board-card-slot")];
+    expect(cell.querySelectorAll(".board-drop-line")).toHaveLength(1);
+    expect(slots[2].firstElementChild).toHaveClass("board-drop-line");
+
+    // Below the last card there is no slot to measure against, so the line
+    // takes its own place in the cell rather than being positioned against
+    // whatever ancestor happens to be positioned.
+    fireDrag(cell, "dragover", dataTransfer, 200);
+    const end = cell.querySelector(".board-drop-line");
+    expect(end?.parentElement).toBe(cell);
+    expect(end).toHaveClass("board-drop-line-end");
+  });
+
+  it("outlines the whole cell for a cross-column drop, and draws no line in it", async () => {
     vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, RETRO], [PROMO], []]));
     renderView();
-    const card = await screen.findByRole("gridcell", { name: /PLAT-409/ });
-    const dataTransfer = transfer();
-    fireEvent.dragStart(card, { dataTransfer });
-    expect(card).toHaveClass("board-card-dragging");
-    const cell = cells()[0];
-    layOut(cell);
-    fireEvent.dragOver(cell, { dataTransfer, clientY: 100 });
-    expect(cell).toHaveClass("board-cell-over");
-    expect(cell.querySelectorAll(".board-drop-line")).toHaveLength(1);
+    const { cell, dataTransfer } = await startDrag(/PLAT-409/, 1);
+    fireDrag(cell, "dragover", dataTransfer, 5);
+    // A column move lands the card at the rank it already has, so a gap
+    // line would promise a place this move never takes.
+    expect(cell).toHaveClass("board-cell-target");
+    expect(cell.querySelector(".board-drop-line")).toBeNull();
+  });
+
+  it("refuses a drop below the cards a capped column is not showing, on the dragover", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue({
+      ...oneLane([[KEYS, RETRO], [PROMO], []], [41, 0, 0]),
+      capped: true,
+    });
+    renderView();
+    const { cell, dataTransfer } = await startDrag(/PLAT-409/, 0);
+    fireDrag(cell, "dragover", dataTransfer, 200);
+    expect(dataTransfer.dropEffect).toBe("none");
+    expect(cell.querySelector(".board-drop-line")).toBeNull();
+    expect(cell).not.toHaveClass("board-cell-over");
+  });
+
+  it("says so when a column collects no status a card could be moved into", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue(
+      board({
+        columns: [COLUMNS[0], { name: "Waiting", statusIds: [], total: 0, points: 0 }],
+        lanes: [{ id: "", label: "All issues", count: 1, cells: [[KEYS], []], overflow: [0, 0] }],
+      }),
+    );
+    renderView();
+    const { cell, dataTransfer } = await startDrag(/PLAT-409/, 1);
+    fireDrag(cell, "dragover", dataTransfer, 5);
+    expect(dataTransfer.dropEffect).toBe("none");
+    fireDrag(cell, "drop", dataTransfer, 5);
+    expect(
+      await screen.findByText("Waiting collects no status, so a card cannot be moved into it"),
+    ).toBeInTheDocument();
+    expect(api.MoveIssueToColumn).not.toHaveBeenCalled();
   });
 
   it("moves a card a column with Ctrl and an arrow", async () => {
@@ -724,7 +802,7 @@ describe("BoardsView moves", () => {
       committed: [], created: [], linked: [], moved: [], conflicts: [], remaining: 1,
       failures: [{
         key: "PLAT-412", entityType: "issue_transition", rowId: 7, retryable: false,
-        reachable: ["Done"], error: "PLAT-412 cannot reach In Progress; it can reach Done",
+        error: "PLAT-412 cannot reach In Progress; it can reach Done",
       }],
     };
     renderView();
@@ -733,5 +811,87 @@ describe("BoardsView moves", () => {
       { name: "PLAT-412 Checkout: apply promo code In Progress. PLAT-412 cannot reach In Progress; it can reach Done" },
     );
     expect(card).toHaveClass("board-card-failed");
+    // The move was pushed and refused, so the dot that promises it is
+    // about to land would be the one thing this card must not wear.
+    expect(within(card).queryByRole("img", { name: "Pending move" })).not.toBeInTheDocument();
+  });
+
+  it("keeps focus on the card it moved to another column", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("gridcell", { name: /PLAT-409/ }));
+    vi.mocked(api.GetBoard).mockResolvedValue(
+      oneLane([[], [PROMO, issue({ ...KEYS, status: "In Progress" })], [RETRO]]),
+    );
+    await user.keyboard("{Control>}{ArrowRight}{/Control}");
+    // The move unmounts the card and mounts a new one in the other cell,
+    // so this is only true when the board remembered that it held focus
+    // before the move rather than asking afterwards.
+    await waitFor(() => expect(screen.getByRole("gridcell", { name: /PLAT-409/ })).toHaveFocus());
+
+    vi.mocked(api.GetBoard).mockResolvedValue(
+      oneLane([[], [PROMO], [RETRO, issue({ ...KEYS, status: "Done" })]]),
+    );
+    await user.keyboard("{Control>}{ArrowRight}{/Control}");
+    await waitFor(() => expect(api.MoveIssueToColumn).toHaveBeenCalledWith("p1", "PLAT-409", "5"));
+  });
+
+  it("announces where a moved card landed", async () => {
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    vi.mocked(api.GetBoard).mockResolvedValue(
+      oneLane([[], [PROMO, issue({ ...KEYS, status: "In Progress" })], [RETRO]]),
+    );
+    await dragTo(/PLAT-409/, 1, 100);
+    expect(await screen.findByText("PLAT-409 moved to In Progress, 2 of 2")).toBeInTheDocument();
+  });
+
+  it("refuses a keyboard move while a commit is pushing, the way the drag and the menu do", async () => {
+    sync.status = "committing";
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("gridcell", { name: /PLAT-409/ }));
+    await user.keyboard("{Control>}{ArrowRight}{/Control}");
+    expect(
+      await screen.findByText("PLAT-409 cannot be moved while a commit is running"),
+    ).toBeInTheDocument();
+    expect(api.MoveIssueToColumn).not.toHaveBeenCalled();
+  });
+
+  it("opens a card's move menu from the keyboard and puts focus in it", async () => {
+    const user = userEvent.setup();
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(card);
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    // The panel is a state change React flushes when the key handler
+    // returns, so the focus has to wait for the render rather than run in
+    // the press that asked for it.
+    await waitFor(() =>
+      expect(within(card).getByRole("menuitem", { name: "Move to To Do" })).toHaveFocus(),
+    );
+  });
+
+  it("drops the warning when the move it warned about is discarded elsewhere", async () => {
+    const user = userEvent.setup();
+    let rows: PendingChange[] = [{ ...TRANSITION_ROW, entityKey: "PLAT-409" }];
+    vi.mocked(api.ListPendingChanges).mockImplementation(async () => rows);
+    vi.mocked(api.CanTransition).mockResolvedValue({ reachable: ["Done"], allowed: false });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[KEYS, RETRO], [PROMO], []]));
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-409/ });
+
+    await dragTo(/PLAT-409/, 1, 100);
+    await screen.findByText(/PLAT-409 cannot reach In Progress/);
+
+    // The Pending changes dialog, Discard all, and a Commit that pushed
+    // the row all end the same way: the row is gone on the next read.
+    rows = [];
+    await user.click(screen.getByRole("gridcell", { name: /PLAT-347/ }));
+    await user.keyboard("{Control>}{ArrowUp}{/Control}");
+    await waitFor(() => expect(api.RankIssue).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.queryByText(/PLAT-409 cannot reach In Progress/)).not.toBeInTheDocument(),
+    );
   });
 });

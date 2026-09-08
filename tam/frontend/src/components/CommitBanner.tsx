@@ -12,11 +12,16 @@ export function bannerLine(r: CommitResult): string {
   }
   if (r.linked.length) parts.push(plural(r.linked.length, "link pushed", "links pushed"));
   const moved = r.moved ?? [];
-  if (moved.length) parts.push(plural(moved.length, "card moved", "cards moved"));
+  // A move Jira had already made is not a card this Commit moved, and
+  // counting it as one credits the push with work it did not do.
+  const pushed = moved.filter((m) => !m.satisfied);
+  const already = moved.length - pushed.length;
+  if (pushed.length) parts.push(plural(pushed.length, "card moved", "cards moved"));
+  if (already) parts.push(`${already} already in place`);
   if (r.conflicts.length) parts.push(`${r.conflicts.length} held back`);
   if (r.failures.length) parts.push(`${r.failures.length} failed`);
   if (parts.length === 0) return "Last commit: nothing to push.";
-  if (!r.committed.length && !r.created.length && !r.linked.length && !moved.length) {
+  if (!r.committed.length && !r.created.length && !r.linked.length && !pushed.length) {
     return `Last commit: nothing pushed, ${parts.join(", ")}.`;
   }
   return `Last commit: ${parts.join(", ")}.`;

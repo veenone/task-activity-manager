@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FocusEvent, KeyboardEvent } from "react";
 import { errMsg, useProfile } from "@agile-suite/core";
 import type { BoardView, Issue, Profile, Settings, Swimlane } from "../api";
 import { useBoard, useBoardSprints, useBoards, useBoardsUnavailable, useSyncBoards } from "../queries/boards";
@@ -30,12 +30,26 @@ function cardAtPos(view: BoardView, p: Pos | undefined): Issue | undefined {
 export function BoardsView() {
   const { activeId } = useProfile<Profile, Settings>();
   const { canSync, lastBoards, lastBoardsAt, lastCommit, status } = useSync();
+  // A commit in flight is the one thing that holds a move back, and it
+  // holds all three of them back: the drag, the menu, and the keys.
+  const committing = status === "committing";
   const [boardId, setBoardId] = useState(0);
   const [sprintId, setSprintId] = useState("");
   const [swimlane, setSwimlane] = useState<Swimlane>("none");
   const [selectedKey, setSelectedKey] = useState("");
   const [focusId, setFocusId] = useState("");
+  // menuOpenedOn is the card whose move menu the keyboard has just opened.
+  // The panel does not exist until React has flushed the trigger's own
+  // click, so the focus that follows has to wait for the render rather
+  // than run in the key press that asked for it.
+  const [menuOpenedOn, setMenuOpenedOn] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
+  // Whether focus was inside the board when the last move was made. A move
+  // across columns unmounts the focused card and mounts a new one in the
+  // other cell, so by the time the board has redrawn document.activeElement
+  // is already the page body: asking then would answer no every time, and
+  // focus would be left behind on the first Ctrl and an arrow.
+  const hadFocus = useRef(false);
 
   // The board, sprint, and swimlane choices belong to the profile they were
   // made for, so a switch clears them in the render that first sees the new
@@ -80,6 +94,7 @@ export function BoardsView() {
     view: data,
     boardId: board?.id ?? 0,
     commit: lastCommit,
+    committing,
   });
   // A move is announced and focused only once the board has redrawn, so
   // the card is reported where it actually landed rather than where it was
@@ -90,8 +105,18 @@ export function BoardsView() {
     // Focus follows the card only when the board already had it: a drag
     // made with the mouse must not pull focus out of wherever the user
     // put it.
-    if (card && bodyRef.current?.contains(document.activeElement)) card.focus();
+    if (card && hadFocus.current) card.focus();
   });
+
+  // The card's menu is opened by pressing the trigger the mouse presses,
+  // and focus goes into the panel that press produced, once React has
+  // drawn it.
+  useEffect(() => {
+    if (!menuOpenedOn) return;
+    const card = bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${menuOpenedOn}"]`);
+    card?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    setMenuOpenedOn("");
+  }, [menuOpenedOn]);
 
   // Exactly one card is focusable, in every state: the one focus is on when
   // it survived the last change, else the selected card, else the first card
@@ -108,12 +133,28 @@ export function BoardsView() {
 
   // openMenu is the keyboard's way into the card's move menu. Enter and
   // Space are taken by the selection that opens the detail panel, so the
-  // menu key and Shift with F10 press the trigger the mouse presses, then
-  // take focus into the panel it opened.
+  // menu key and Shift with F10 press the trigger the mouse presses. The
+  // focus that follows is left to the effect above: the panel is a state
+  // change React flushes when this handler returns, so querying for a menu
+  // item here would search a board that still has no panel in it.
   function openMenu(id: string) {
     const card = bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${id}"]`);
-    card?.querySelector<HTMLElement>(`.${CARD_MENU_CLASS}`)?.click();
-    card?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const trigger = card?.querySelector<HTMLElement>(`.${CARD_MENU_CLASS}`);
+    if (!trigger) return;
+    trigger.click();
+    setMenuOpenedOn(id);
+  }
+
+  // rememberFocus keeps hadFocus true across the unmount a move makes: a
+  // card leaving the DOM takes focus to the body with no related target,
+  // and that is the case the flag exists for. Focus genuinely leaving the
+  // board, which names where it went, is what clears it.
+  function rememberFocus(e: FocusEvent<HTMLDivElement>) {
+    if (e.type === "focus") {
+      hadFocus.current = true;
+      return;
+    }
+    if (e.relatedTarget && !bodyRef.current?.contains(e.relatedTarget)) hadFocus.current = false;
   }
 
   function onKeyDown(e: KeyboardEvent, id: string) {
@@ -195,7 +236,7 @@ export function BoardsView() {
 
       {data && <BoardSummaryLine view={data} sprint={sprint} lastSynced={syncState.data?.lastSynced ?? ""} />}
 
-      <div className="boards-body" ref={bodyRef}>
+      <div className="boards-body" ref={bodyRef} onFocusCapture={rememberFocus} onBlurCapture={rememberFocus}>
         <div className="boards-pane">
           <BoardBody
             boards={boards}
@@ -210,7 +251,7 @@ export function BoardsView() {
             flashKey={flashKey}
             sprints={openSprints}
             sprintId={effectiveSprintId}
-            committing={status === "committing"}
+            committing={committing}
             canSync={canSync && !sync.isPending}
             onSync={() => sync.mutate()}
             onSelect={(issue) => {

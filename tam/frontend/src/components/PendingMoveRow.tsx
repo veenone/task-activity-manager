@@ -12,14 +12,18 @@ interface Props {
 // "statusId: 3 to 5", because the dialog knows fields and this row is a
 // place. A rank has no value it came from, so its row is its label and
 // where it went.
+//
+// The spans are separated the way the link and edit rows are: without the
+// spaces a screen reader runs them together as one word, and the row reads
+// "StatusTo DotoIn Progress".
 export function PendingMoveRow({ row, disabled, onDiscard }: Props) {
   const { label, from, to } = moveWords(row.entityType, row.beforeVal, row.afterVal);
   return (
     <li className="pending-row pending-row-move">
-      <span className="muted">{label}</span>
-      <span>{from}</span>
-      <span className="muted">{from ? "to" : ""}</span>
-      <span className="b">{to}</span>
+      <span className="muted">{label}</span>{" "}
+      <span>{from}</span>{" "}
+      <span className="muted">{from ? "to" : ""}</span>{" "}
+      <span className="b">{to}</span>{" "}
       <button
         type="button"
         className="btn btn-ghost"

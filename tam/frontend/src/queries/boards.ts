@@ -112,7 +112,7 @@ export function useRankIssue(profileId: string) {
 export function useMoveToSprint(profileId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ key, sprintId }: { key: string; sprintId: string; sprintName: string }) =>
+    mutationFn: ({ key, sprintId }: { key: string; sprintId: string }) =>
       call(() => MoveIssueToSprint(profileId, key, sprintId)),
     onSuccess: (_, v) => invalidateWrites(qc, profileId, v.key),
   });
@@ -125,7 +125,7 @@ export function useMoveToSprint(profileId: string) {
 // retried or cached: an answer is only true of the moment it was given.
 export function useCanTransition(profileId: string) {
   return useMutation({
-    mutationFn: ({ key, statusId }: { key: string; statusId: string; target: string }) =>
+    mutationFn: ({ key, statusId }: { key: string; statusId: string }) =>
       call(() => CanTransition(profileId, key, statusId)),
     retry: false,
   });
