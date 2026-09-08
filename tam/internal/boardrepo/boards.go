@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/dbtx"
 )
 
 const upsertBoardSQL = `
@@ -171,16 +172,8 @@ func (r *Repository) issueKeys(ctx context.Context, profileID string, boardID in
 	return out, rows.Err()
 }
 
-// inTx runs fn inside one transaction, so a replace never leaves the table
-// holding a delete without its inserts.
+// inTx runs fn inside one transaction, through the helper issuerepo shares,
+// so a replace never leaves the table holding a delete without its inserts.
 func (r *Repository) inTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return dbtx.In(ctx, r.db, fn)
 }

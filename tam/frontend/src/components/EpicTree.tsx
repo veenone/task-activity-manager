@@ -5,8 +5,7 @@ import { MAX_ORPHAN_ROWS, NO_EPIC_KEY, ownerOf, visibleRows } from "../lib/epicT
 import type { Row } from "../lib/epicTreeItems";
 import { EpicChildRow, EpicRow } from "./EpicRow";
 import { keyColumnWidth } from "../lib/keyColumn";
-
-export const MOVED_FLASH_MS = 2000;
+import { MOVED_FLASH_MS } from "../lib/flash";
 
 interface Props {
   tree: EpicTreeData;

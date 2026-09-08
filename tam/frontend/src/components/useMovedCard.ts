@@ -4,7 +4,7 @@ import type { BoardView } from "../api";
 import { findCard, posId } from "../lib/boardCells";
 import { landedMessage } from "../lib/cardMove";
 import type { MoveIntent } from "../lib/cardMove";
-import { MOVED_FLASH_MS } from "./EpicTree";
+import { MOVED_FLASH_MS } from "../lib/flash";
 
 // useMovedCard follows a moved card rather than the slot it left. posId is
 // lane-col-index, so the focused id names a place on the board and not a
