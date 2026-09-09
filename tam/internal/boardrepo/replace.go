@@ -49,6 +49,42 @@ func (r *Repository) ReplaceBoard(ctx context.Context, profileID string, b backe
 	})
 }
 
+// ReplaceSprints rewrites one board's sprint list and nothing else. It is
+// what a sprint that has just been started or completed is recorded with:
+// one Sprints call and this write, instead of a boards sync, which walks
+// every board's columns, sprints and membership and takes minutes on a real
+// project.
+//
+// It exists because writeSprints is private and its only other caller is
+// ReplaceBoard, which deletes and rewrites the board's columns and every one
+// of its membership rows on the way past. Reaching for that to refresh a
+// sprint list would wipe the board the user is looking at.
+func (r *Repository) ReplaceSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error {
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		return writeSprints(ctx, tx, profileID, boardID, sprints)
+	})
+}
+
+// ReplaceSprintIssues rewrites the membership of one scope of one board: a
+// sprint's keys when sprintID is set, the board's own list when it is empty.
+//
+// A completion that pushed some of a sprint's cards out and then failed is
+// what needs it. Those cards have left the sprint in Jira while the cache
+// still lists them in it, and the user is about to be shown a sprint that is
+// still open. Rewriting the one scope is the smallest true statement TAM can
+// make about where they went; the alternative, ReplaceBoard, would demand
+// the columns and every other scope be re-read first.
+func (r *Repository) ReplaceSprintIssues(ctx context.Context, profileID string, boardID int, sprintID string, keys []string) error {
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM board_issue WHERE profile_id = ? AND board_id = ? AND sprint_id = ?`,
+			profileID, boardID, sprintID); err != nil {
+			return fmt.Errorf("clear issue keys of board %d sprint %q: %w", boardID, sprintID, err)
+		}
+		return writeIssueKeys(ctx, tx, profileID, boardID, sprintID, keys)
+	})
+}
+
 // writeBoardRow inserts or updates one board's row.
 func writeBoardRow(ctx context.Context, tx *sql.Tx, profileID string, b backend.Board, stamp string) error {
 	if _, err := tx.ExecContext(ctx, upsertBoardSQL, profileID, b.ID, b.Name, b.Type, stamp); err != nil {

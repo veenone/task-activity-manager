@@ -1095,6 +1095,47 @@ export namespace settings {
 
 }
 
+export namespace sprints {
+	
+	export class Completion {
+	    moved: number;
+	    movedTo: string;
+	    failed: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Completion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.moved = source["moved"];
+	        this.movedTo = source["movedTo"];
+	        this.failed = source["failed"];
+	    }
+	}
+	export class Suggestion {
+	    name: string;
+	    start: string;
+	    end: string;
+	    length: number;
+	    fromHistory: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Suggestion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.start = source["start"];
+	        this.end = source["end"];
+	        this.length = source["length"];
+	        this.fromHistory = source["fromHistory"];
+	    }
+	}
+
+}
+
 export namespace syncer {
 	
 	export class BoardSummary {

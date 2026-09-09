@@ -11,6 +11,7 @@ import {settings} from '../models';
 import {journal} from '../models';
 import {importfile} from '../models';
 import {syncer} from '../models';
+import {sprints} from '../models';
 
 export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<void>;
 
@@ -19,6 +20,8 @@ export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
 export function CanTransition(arg1:string,arg2:string,arg3:string):Promise<backend.TransitionCheck>;
 
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
+
+export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<sprints.Completion>;
 
 export function CreateIssue(arg1:string,arg2:backend.IssueDraft):Promise<string>;
 
@@ -62,6 +65,8 @@ export function ImportIssues(arg1:string,arg2:string,arg3:boolean,arg4:string,ar
 
 export function ImportProfile():Promise<profile.Profile>;
 
+export function JournalSprintMoves(arg1:string,arg2:Array<string>,arg3:string):Promise<void>;
+
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
 
 export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrepo.Sprint>>;
@@ -88,6 +93,8 @@ export function MoveIssueToColumn(arg1:string,arg2:string,arg3:string):Promise<v
 
 export function MoveIssueToSprint(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function PendingInSprint(arg1:string,arg2:number):Promise<number>;
+
 export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Preview>;
 
 export function RankIssue(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:number):Promise<void>;
@@ -107,6 +114,10 @@ export function SetNavRailVisible(arg1:boolean):Promise<void>;
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
+
+export function StartSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string):Promise<void>;
+
+export function SuggestSprintDates(arg1:string,arg2:number):Promise<sprints.Suggestion>;
 
 export function SyncBoards(arg1:string):Promise<syncer.BoardSummary>;
 

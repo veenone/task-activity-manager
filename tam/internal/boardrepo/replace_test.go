@@ -201,3 +201,68 @@ func TestReplaceBoardWritesADuplicatedKeyOnce(t *testing.T) {
 		}
 	}
 }
+
+// TestReplaceSprintsLeavesTheRestOfTheBoardAlone is why the sprint list has
+// a writer of its own. writeSprints is private and its other caller,
+// ReplaceBoard, deletes and rewrites the board's columns and every one of
+// its membership rows on the way past: reaching for that to record a sprint
+// that has just started would wipe the board the user is looking at.
+func TestReplaceSprintsLeavesTheRestOfTheBoardAlone(t *testing.T) {
+	r, db := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	keys := map[string][]string{"": {"PLAT-1", "PLAT-2"}, "13": {"PLAT-2"}}
+	sprints := []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "future"}}
+	if err := r.ReplaceBoard(ctx, "p1", board, twoColumns(), sprints, keys); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	started := []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active", StartDate: "2026-09-09T09:00:00.000+0000"}}
+	if err := r.ReplaceSprints(ctx, "p1", 1, started); err != nil {
+		t.Fatalf("replace sprints: %v", err)
+	}
+
+	got, err := r.ListSprints(ctx, "p1", 1)
+	if err != nil || len(got) != 1 || got[0].State != "active" {
+		t.Fatalf("sprints = %+v, %v, want the started copy", got, err)
+	}
+	cols, err := r.Columns(ctx, "p1", 1)
+	if err != nil || len(cols) != 2 {
+		t.Errorf("columns = %+v, %v, want both still there", cols, err)
+	}
+	if own := boardKeys(t, db, "p1", 1, ""); len(own) != 2 {
+		t.Errorf("board membership = %v, want it untouched", own)
+	}
+	if inSprint := boardKeys(t, db, "p1", 1, "13"); len(inSprint) != 1 || inSprint[0] != "PLAT-2" {
+		t.Errorf("sprint membership = %v, want it untouched", inSprint)
+	}
+}
+
+// TestReplaceSprintIssuesRewritesOneScope is the write a half-finished
+// completion corrects itself with: the cards it pushed out have left the
+// sprint in Jira, and the sprint's own scope is the only thing that may
+// change to say so.
+func TestReplaceSprintIssuesRewritesOneScope(t *testing.T) {
+	r, db := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	keys := map[string][]string{"": {"PLAT-1", "PLAT-2", "PLAT-3"}, "12": {"PLAT-1", "PLAT-2", "PLAT-3"}}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), sampleSprints(), keys); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if err := r.ReplaceSprintIssues(ctx, "p1", 1, "12", []string{"PLAT-3"}); err != nil {
+		t.Fatalf("replace sprint issues: %v", err)
+	}
+
+	if got := boardKeys(t, db, "p1", 1, "12"); len(got) != 1 || got[0] != "PLAT-3" {
+		t.Errorf("sprint membership = %v, want only the card that stayed", got)
+	}
+	if got := boardKeys(t, db, "p1", 1, ""); len(got) != 3 {
+		t.Errorf("board membership = %v, want the board's own list untouched", got)
+	}
+	sp, err := r.ListSprints(ctx, "p1", 1)
+	if err != nil || len(sp) != len(sampleSprints()) {
+		t.Errorf("sprints = %+v, %v, want them untouched", sp, err)
+	}
+}
