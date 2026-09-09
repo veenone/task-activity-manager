@@ -57,17 +57,18 @@ describe("SprintField", () => {
     expect(screen.queryByText(/No sprints yet/)).not.toBeInTheDocument();
   });
 
-  it("names the board beside a sprint only when two sprints share a name", async () => {
+  it("names the board beside a sprint only when two sprints share a name, case-insensitively", async () => {
     const user = userEvent.setup();
     renderField([
       { id: 12, name: "Sprint 1", boardName: "Platform board" },
-      { id: 13, name: "Sprint 1", boardName: "Ops board" },
+      { id: 13, name: "sprint 1", boardName: "Ops board" },
       { id: 14, name: "Sprint 2", boardName: "Ops board" },
     ]);
     const select = screen.getByRole("combobox", { name: "Sprint" });
-    // Both same-named sprints get their board name, not only the second.
+    // Both same-named sprints get their board name, not only the second, and
+    // the fold does not care that the two spell the name with different case.
     expect(within(select).getByRole("option", { name: "Sprint 1 (Platform board)" })).toBeInTheDocument();
-    expect(within(select).getByRole("option", { name: "Sprint 1 (Ops board)" })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: "sprint 1 (Ops board)" })).toBeInTheDocument();
     // A unique name is shown plain.
     expect(within(select).getByRole("option", { name: "Sprint 2" })).toBeInTheDocument();
     await user.selectOptions(select, "13");

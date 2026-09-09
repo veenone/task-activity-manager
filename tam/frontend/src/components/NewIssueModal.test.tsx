@@ -161,6 +161,9 @@ describe("NewIssueModal", () => {
     renderModal(vi.fn(), vi.fn(), "story");
     const dialog = await screen.findByRole("dialog", { name: "New story" });
     const sprint = await within(dialog).findByLabelText("Sprint");
+    // The label is on screen before useOpenSprints settles, so the select's
+    // own loading state, not a bare timeout, is the real thing to wait for.
+    await waitFor(() => expect(sprint).not.toBeDisabled());
     expect(within(sprint).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
     expect(within(sprint).getByRole("option", { name: "Sprint 12" })).toBeInTheDocument();
     expect(within(sprint).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
@@ -173,16 +176,42 @@ describe("NewIssueModal", () => {
     expect(draft.sprintName).toBe("Sprint 13");
   });
 
-  it("has no sprint select for an epic, and drops a chosen sprint when the type becomes one", async () => {
+  it("has no sprint select for an epic", async () => {
     const user = userEvent.setup();
     vi.mocked(api.ListOpenSprints).mockResolvedValue([
       { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
     ]);
     renderModal(vi.fn(), vi.fn(), "story");
     const dialog = await screen.findByRole("dialog", { name: "New story" });
-    await user.selectOptions(await within(dialog).findByLabelText("Sprint"), "12");
+    const sprint = await within(dialog).findByLabelText("Sprint");
+    await waitFor(() => expect(sprint).not.toBeDisabled());
+    await user.selectOptions(sprint, "12");
     await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
     expect(within(dialog).queryByLabelText("Sprint")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Summary *"), "Checkout revamp");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.sprintId).toBe("");
+    expect(draft.sprintName).toBe("");
+  });
+
+  // This is what changeType's own setSprintId("") owns: the draft's
+  // type === "epic" ternary already empties the sprint on an epic draft, so
+  // only a round trip through epic and back proves this line does anything.
+  it("drops a chosen sprint when the type becomes one, even after switching back", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "story");
+    const dialog = await screen.findByRole("dialog", { name: "New story" });
+    const sprint = await within(dialog).findByLabelText("Sprint");
+    await waitFor(() => expect(sprint).not.toBeDisabled());
+    await user.selectOptions(sprint, "12");
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "story");
+    expect(within(dialog).getByLabelText("Sprint")).toHaveValue("");
     await user.type(within(dialog).getByLabelText("Summary *"), "Checkout revamp");
     await user.click(await submitButton(dialog));
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());

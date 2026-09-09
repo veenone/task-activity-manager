@@ -1,6 +1,7 @@
 import { errMsg, useNotice } from "@agile-suite/core";
 import type { Issue, SprintOption } from "../api";
 import { useMoveToSprint } from "../queries/boards";
+import { duplicateNameIds, sprintOptionLabel } from "../lib/sprintOptions";
 
 interface Props {
   profileId: string;
@@ -14,27 +15,6 @@ interface Props {
   // busy is a sync or a commit in flight, the same guard the edit form takes:
   // the row refresh that follows either one would land on top of the move.
   busy: boolean;
-}
-
-// duplicateNameIds is which sprint ids share a name with another sprint in
-// the same list, compared case-insensitively. Only those get their board
-// name beside them, both of them and not just the second; a sprint whose
-// name is unique is shown plain.
-function duplicateNameIds(sprints: SprintOption[]): Set<number> {
-  const byName = new Map<string, number[]>();
-  for (const s of sprints) {
-    const key = s.name.toLowerCase();
-    byName.set(key, [...(byName.get(key) ?? []), s.id]);
-  }
-  const dups = new Set<number>();
-  for (const ids of byName.values()) {
-    if (ids.length > 1) ids.forEach((id) => dups.add(id));
-  }
-  return dups;
-}
-
-function optionLabel(s: SprintOption, dupIds: Set<number>): string {
-  return dupIds.has(s.id) && s.boardName ? `${s.name} (${s.boardName})` : s.name;
 }
 
 // SprintField is the detail panel's sprint, as a choice rather than a fact.
@@ -73,7 +53,7 @@ export function SprintField({ profileId, issue, sprints, busy }: Props) {
           <option value={issue.sprintId}>{issue.sprintName || `Sprint ${issue.sprintId}`}</option>
         )}
         {sprints.map((s) => (
-          <option key={s.id} value={String(s.id)}>{optionLabel(s, dupIds)}</option>
+          <option key={s.id} value={String(s.id)}>{sprintOptionLabel(s, dupIds)}</option>
         ))}
       </select>
       {/* Guidance beside the select, not a replacement for it: the backlog

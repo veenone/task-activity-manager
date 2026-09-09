@@ -11,6 +11,7 @@ import { useSubtaskType } from "../queries/people";
 import { AssigneePicker } from "./AssigneePicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { invalidateWrites } from "../queries/invalidate";
+import { duplicateNameIds, sprintOptionLabel } from "../lib/sprintOptions";
 
 interface Props {
   onClose: () => void;
@@ -317,6 +318,12 @@ export function NewIssueModal({
 
   const checking = meta.isPending;
   const parentEpics = epics.data ?? [];
+  const sprintChoices = openSprints.data ?? [];
+  // The board suffix disambiguates two sprints named alike the same way the
+  // detail panel's own Sprint field does; a repeated name here is two
+  // genuinely different sprints now that OpenSprints folds one sprint id to
+  // one row.
+  const sprintDupIds = duplicateNameIds(sprintChoices);
 
   return (
     <Modal
@@ -403,15 +410,19 @@ export function NewIssueModal({
         {hasSprintPicker(type) && (
           <label className="edit-row" htmlFor="new-sprint">
             <span className="muted small">Sprint</span>
+            {/* Gated on isLoading, not isFetching, the same way the Epic
+                picker above is: a background refetch should not blank the
+                control mid-edit. */}
             <select
               id="new-sprint"
               className="detail-input"
+              disabled={openSprints.isLoading}
               value={sprintId}
               onChange={(e) => setSprintId(e.target.value)}
             >
-              <option value="">The backlog</option>
-              {(openSprints.data ?? []).map((s) => (
-                <option key={s.id} value={String(s.id)}>{s.name}</option>
+              <option value="">{openSprints.isLoading ? "(loading)" : "The backlog"}</option>
+              {sprintChoices.map((s) => (
+                <option key={s.id} value={String(s.id)}>{sprintOptionLabel(s, sprintDupIds)}</option>
               ))}
             </select>
           </label>

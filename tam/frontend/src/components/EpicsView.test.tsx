@@ -247,7 +247,10 @@ describe("EpicsView", () => {
     ]);
     renderView();
     await user.click(await screen.findByText("Apply promo code"));
-    const picker = await screen.findByRole("combobox", { name: "Sprint" });
+    // The filter bar has its own select with the same "Sprint" label, so the
+    // query is scoped to the detail panel, the element the test is about.
+    const panel = await screen.findByRole("complementary");
+    const picker = await within(panel).findByRole("combobox", { name: "Sprint" });
     expect(within(picker).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
     await user.selectOptions(picker, "13");
     await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-101", "13"));

@@ -232,6 +232,10 @@ export function BacklogView() {
             profileId={activeId}
             issue={selected}
             jiraUrl={activeProfile?.jiraUrl}
+            // undefined here covers a read still in flight and one that
+            // failed alike (retry is off, so a failure is permanent for the
+            // session): both fall back to the panel's read-only branch with
+            // nothing said, a known limit rather than a bug.
             sprints={openSprints.data}
             onClose={() => setSelectedKey("")}
           />

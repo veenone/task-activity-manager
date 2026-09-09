@@ -319,7 +319,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The Sprint field's select and its "no sprints yet" sentence stack rather
    than crowd the same line, on a profile whose boards have not been synced. */
 .sprint-field { display: flex; flex-direction: column; gap: 4px; }
-.sprint-field-empty { display: block; }
 /* Section headings double as dividers, which is what gives the dense panel
    its rhythm; the whole heading is the toggle. */
 .detail-section-title {
