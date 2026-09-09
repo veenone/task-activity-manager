@@ -261,16 +261,57 @@ issues by numeric id, which cannot be mapped back to a key, so the whole
 batch fails together and a smaller batch limits how much of a completion
 one refusal can take down.
 
-A push that fails partway is reported inside `sprints.Completion` (`Moved`,
-`MovedTo`, `Failed`, `Message`) rather than as a Go error, because Wails
-discards a bound method's return value whenever the method also returns a
-non-nil error: the dispatcher fills in either the result or the error and
-never both. An error would therefore deliver the sentence and drop the
-keys it is about, which is the one thing the dialog needs at that moment.
-`CompleteSprint` still returns a real error for a refusal that has moved
-nothing, and for a close that fails after every card has already left the
-sprint, since a sentence about zero progress or about every card gone
-stands on its own.
+A completion that reached Jira and then failed is reported inside
+`sprints.Completion` (`Moved`, `MovedTo`, `Failed`, `Note`, `Message`)
+rather than as a Go error, because Wails discards a bound method's return
+value whenever the method also returns a non-nil error: the dispatcher
+fills in either the result or the error and never both. An error would
+therefore deliver the sentence and drop the counts and keys it is about,
+which is what the dialog needs at that moment. Both failures travel that
+way, a push that stopped partway and a close Jira refused once every card
+had already moved, and for a second reason as well: the dialog renders a
+`Message` as an outcome and a Go error as a refusal, so the refused close
+used to print its accurate sentence directly above a list still headed "47
+cards are not finished and will move out of the sprint" and a footer still
+promising the move. `CompleteSprint` returns a real error only for the
+refusals that happen before anything moves, and those go through
+`internal/errtext` first, as does the `Message` a failed push or a refused
+close carries: Jira's words come straight off the wire, and a Data Center
+answering 403 with an HTML login page would otherwise put a kilobyte of
+markup inline beside the start dialog's buttons.
+
+`Note` is the opposite case: the ceremony worked and the bookkeeping after
+it did not. `refreshSprints` answers with its own failure now rather than
+only logging it, because the cached row still says `future` for the sprint
+that is now running, so the toolbar offers Start for it and Jira answers
+that second start with a 400. Both ceremonies carry it back as one line
+telling the user to press Refresh, beside their own success; `StartSprint`
+returns it as a string, and the board's ceremony banner is where both are
+read.
+
+A completion refuses a sprint the cache calls `future`, and only `future`.
+It moves the cards out before it asks Jira to close the sprint, so aimed at
+a sprint that never started it empties that sprint and then fails the
+close, and TAM can undo neither half. A sprint started on the web an hour
+ago still reads as future in a cache nobody has refreshed since, and
+refusing that costs a Refresh where emptying it costs the sprint, so no
+other state is refused here.
+
+The cards that move are written back into both scopes of the board cache,
+the sprint they left and the destination they were sent to, the second of
+which used to be missed: the banner said twelve cards moved to Sprint 15
+and the picker switched to Sprint 15, which drew exactly what it drew
+before, and nothing else would have corrected it, since a ceremony writes
+no journal row for the view to fold in. An empty destination is the board's
+own list, which is a scope like any other.
+
+The demo backend narrows its search to `sprint = N`. That is the one scope
+it honours, and it is not decoration: the completion's own read is that
+query, and the service keeps an issue the backend reports no sprint for on
+the grounds that the query already narrowed it. Against a backend that
+ignored the scope, every card in the project walked past that guard, so
+completing a sprint on the demo profile moved the whole backlog and
+reported success.
 
 A board read now runs inside one deferred read transaction
 (`boardrepo.Board`, `Order.CellOrder`, both through `Repository.inReadTx`),
@@ -739,9 +780,11 @@ until one is entered. A Kiwi profile file is refused.
     app_issues.go        the issue methods: sync, list, detail, per-profile settings
     app_writes.go        the write methods: edit, create, commit, and conflict resolution
     app_imports.go       the import methods: preview, mapping, and creating drafts from a file
-    app_boards.go        the board methods: list boards, list sprints, get a board's view, sync boards
-    app_sprints.go        the two sprint ceremonies, SuggestSprintDates, PendingInSprint, and
-                          JournalSprintMoves's guarded lookup of the destination's name
+    app_boards.go        the board methods: list boards, list sprints, get a board's view, sync
+                          boards, the three journaled board moves, CanTransition, and
+                          JournalSprintMoves, the selection's bulk move, with its guarded lookup
+                          of the destination's name
+    app_sprints.go       the two sprint ceremonies, SuggestSprintDates, and PendingInSprint
     internal/tamstore/   TAM's own SQLite file (schema version 6: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
                           sprint, plus the shared journal tables pending_change and audit_log)
@@ -760,7 +803,12 @@ until one is entered. A Kiwi profile file is refused.
                           transaction; sprintlength.go is the median-of-three-closed-sprints read
                           the start dialog's date suggestion is built from
     internal/sprints/    the sprint lifecycle service: Start and Complete, the two writes that
-                          reach Jira outside a Commit, and the only package that touches them
+                          reach Jira outside a Commit, and the only package that touches them;
+                          guards.go is what a ceremony refuses before it reaches Jira, cache.go
+                          the board cache's bookkeeping after it has, and suggest.go the start
+                          dialog's suggested name and dates
+    internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
+                          datetime format, shared by the ceremonies and the suggestion
     internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
                           InRead for a deferred read-only transaction, and the Querier interface a
                           read helper takes so it can run on the handle or inside either kind
