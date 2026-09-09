@@ -13,10 +13,13 @@ func TestListOpenSprintsAnswersAcrossTheProfilesBoards(t *testing.T) {
 	p := newTestProfile(t, a)
 	ctx := context.Background()
 	scrum := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	// The future sprint carries the lower id on purpose, so plain id order and
+	// the order this asks for disagree: without that, the assertion below
+	// would pass on a read that had never heard of a sprint's state.
 	sprints := []backend.Sprint{
 		{ID: 11, BoardID: 1, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z"},
 		{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z"},
-		{ID: 13, BoardID: 1, Name: "Sprint 13", State: "future", StartDate: "2026-09-01T09:00:00Z"},
+		{ID: 9, BoardID: 1, Name: "Sprint 9", State: "future", StartDate: "2026-09-01T09:00:00Z"},
 	}
 	if err := a.boards.ReplaceBoard(ctx, p.ID, scrum, nil, sprints, nil); err != nil {
 		t.Fatalf("seed board: %v", err)
@@ -26,7 +29,7 @@ func TestListOpenSprintsAnswersAcrossTheProfilesBoards(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListOpenSprints: %v", err)
 	}
-	if len(open) != 2 || open[0].Name != "Sprint 12" || open[1].Name != "Sprint 13" {
+	if len(open) != 2 || open[0].Name != "Sprint 12" || open[1].Name != "Sprint 9" {
 		t.Fatalf("the two open sprints, active first: %+v", open)
 	}
 	if open[0].BoardName != "PLAT Scrum" {

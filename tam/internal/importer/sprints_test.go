@@ -22,7 +22,10 @@ func openSprints() []boardrepo.SprintChoice {
 func sprintRecords() [][]string {
 	return [][]string{
 		{"Type", "Summary", "Sprint"},
-		{"Task", "Into the active sprint", "sprint 12"},
+		// Neither the cell's case nor the sprint's own survives the match, so
+		// this cell disagrees with "Sprint 12" in both directions at once:
+		// folding either side alone would still fail it.
+		{"Task", "Into the active sprint", "SPRINT 12"},
 		{"Task", "Into a sprint that closed", "Sprint 11"},
 		{"Task", "Into the backlog", ""},
 		{"Task", "Into a sprint nobody has", "Sprint 99"},
@@ -45,8 +48,9 @@ func TestTheSprintColumnMatchesAnOpenSprintByNameAndTurnsAwayTheRest(t *testing.
 		t.Fatalf("two rows landed and two were turned away: %+v", res)
 	}
 
-	// The cell is matched without regard for case, and the draft carries the
-	// id the move will be pushed with beside the name a reader sees.
+	// The cell matched despite disagreeing with the sprint's name in case,
+	// and the draft carries the id the move will be pushed with beside the
+	// name a reader sees, which is the sprint's own and not the cell's.
 	first, err := repo.GetIssue(ctx, "p1", "TAM-NEW-1")
 	if err != nil || first.SprintID != "12" || first.SprintName != "Sprint 12" {
 		t.Errorf("the first draft is in the active sprint: %+v %v", first, err)

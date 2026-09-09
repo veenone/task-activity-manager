@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/importer"
 	"agile-suite/tam/internal/issuerepo"
 )
@@ -174,6 +175,35 @@ func TestRunReportsBadKeyedRows(t *testing.T) {
 	}
 	if detail(t, repo, "PLAT-412").Summary != "Apply promo code" {
 		t.Error("a rejected row edited the issue anyway")
+	}
+}
+
+// A keyed row's Sprint cell is read by nothing on purpose: a sprint is a
+// board write EditFields cannot carry, so the row edits its other fields
+// and leaves the issue's sprint alone even when the cell names a real open
+// sprint, rather than failing the row or moving it.
+func TestRunIgnoresTheSprintCellOnAKeyedRowOnPurpose(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Key", "Summary", "Priority", "Sprint"},
+		{"PLAT-412", "Apply promo code, revised", "Low", "Sprint 12"},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || len(res.Updated) != 1 || res.Updated[0] != "PLAT-412" {
+		t.Fatalf("a real open sprint in the Sprint cell must not fail the row: %+v", res)
+	}
+	story := detail(t, repo, "PLAT-412")
+	if story.Summary != "Apply promo code, revised" || story.Priority != "Low" {
+		t.Errorf("the row's other fields still land: %+v", story)
+	}
+	if story.SprintID != "" || story.SprintName != "" {
+		t.Errorf("the Sprint cell must not move the issue: %+v", story)
 	}
 }
 

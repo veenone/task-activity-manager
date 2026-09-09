@@ -86,13 +86,13 @@ func (a *App) ImportIssues(profileID, contentB64 string, isXlsx bool, fileName s
 	if strings.TrimSpace(fileName) == "" {
 		fileName = "an uploaded file"
 	}
-	// The Sprint column is matched against these by name. A read failure is
-	// not worth failing the whole import for: it costs the Sprint column its
-	// list, and every row naming a sprint then says so with the rest.
+	// The Sprint column is matched against these by name. This is a local
+	// SQLite read against the same handle the rest of the import writes
+	// through, so a failure here means the import cannot see straight and
+	// has to stop rather than guess at what a Sprint cell meant.
 	open, err := a.boards.OpenSprints(a.ctx, p.ID)
 	if err != nil {
-		log.Printf("tam: open sprints for the import of %s: %v", fileName, err)
-		open = nil
+		return importer.Result{}, fmt.Errorf("open sprints could not be read: %w", err)
 	}
 	res, err := importer.Run(a.ctx, a.repo, p.ID, p.ProjectKey, reqType, open, records, mapping, fileName, dryRun)
 	if err != nil {

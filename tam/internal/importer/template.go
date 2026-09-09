@@ -153,8 +153,19 @@ const sprintListLimit = 255
 // generous range the Type list uses so pasted rows are validated too. A
 // profile with no synced sprints gets no list at all: an empty dropdown
 // would refuse every value including the ones the import accepts.
+//
+// A name carrying a comma is left out. Excel stores an inline list as one
+// comma-joined string, so "Sprint 12, phase two" would arrive in the picker
+// as two entries, neither of which names a sprint.
 func addSprintList(f *excelize.File, names []string) error {
-	if len(names) == 0 || len(strings.Join(names, ","))+len(names) > sprintListLimit {
+	usable := make([]string, 0, len(names))
+	for _, n := range names {
+		if !strings.Contains(n, ",") {
+			usable = append(usable, n)
+		}
+	}
+	names = usable
+	if len(names) == 0 || len(strings.Join(names, ",")) > sprintListLimit {
 		return nil
 	}
 	col, err := excelize.ColumnNumberToName(len(TemplateHeaders))

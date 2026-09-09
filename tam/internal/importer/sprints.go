@@ -73,22 +73,44 @@ func (idx sprintIndex) lookup(raw string) (boardrepo.SprintChoice, string) {
 	}
 	return boardrepo.SprintChoice{}, fmt.Sprintf(
 		"Sprint %q is not an open sprint; use %s, or clear the cell for the backlog",
-		cell, strings.Join(idx.offered, ", "))
+		cell, idx.offerList())
 }
 
-// sprintNames are the open sprints' names, deduplicated and in offer order.
-// The template's dropdown lists these and nothing else: the cell is matched
-// by name, so an entry carrying a board name beside it would be a value the
-// import then turns away.
+// offerListLimit is how many sprints the unknown-sprint message names before
+// it starts counting instead. The message is repeated once per bad row, and a
+// profile with thirty open sprints would turn a row error into a paragraph.
+const offerListLimit = 10
+
+func (idx sprintIndex) offerList() string {
+	if len(idx.offered) <= offerListLimit {
+		return strings.Join(idx.offered, ", ")
+	}
+	return fmt.Sprintf("%s, and %d more",
+		strings.Join(idx.offered[:offerListLimit], ", "), len(idx.offered)-offerListLimit)
+}
+
+// sprintNames are the names the import will actually accept, in offer order.
+// The template's dropdown lists these and nothing else, and two kinds of
+// entry are left out on purpose. A name carrying its board beside it is one
+// the cell match would turn away, since the cell is matched by name alone.
+// And a name two different sprints share is one lookup refuses as ambiguous,
+// so offering it would put a value in the picker that fails every row it is
+// used on. The same sprint reaching two boards is still one sprint and stays,
+// which is why this reads the index rather than counting names itself.
 func sprintNames(open []boardrepo.SprintChoice) []string {
+	idx := newSprintIndex(open)
 	names := []string{}
 	seen := map[string]bool{}
 	for _, s := range open {
 		name := strings.TrimSpace(s.Name)
-		if name == "" || seen[strings.ToLower(name)] {
+		folded := strings.ToLower(name)
+		if name == "" || seen[folded] {
 			continue
 		}
-		seen[strings.ToLower(name)] = true
+		seen[folded] = true
+		if len(idx.byName[folded]) != 1 {
+			continue
+		}
 		names = append(names, name)
 	}
 	return names

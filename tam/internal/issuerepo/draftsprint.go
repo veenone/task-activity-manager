@@ -32,6 +32,13 @@ import (
 // the remote sprint, not against an updated stamp.
 //
 // A draft with no sprint journals nothing at all.
+//
+// The applyMoveColumns call below writes the two columns CreateDrafts has
+// already written from the same draft. Neither write is dead: the create
+// writes what the Backlog and the panel read before Commit, and this one is
+// what every other sprint move does to the cached row, so the path stays the
+// same shape as the one a drag takes. They agree because they read the one
+// draft.
 func journalDraftSprint(ctx context.Context, tx *sql.Tx, profileID, key string) error {
 	var encoded string
 	err := tx.QueryRowContext(ctx,
