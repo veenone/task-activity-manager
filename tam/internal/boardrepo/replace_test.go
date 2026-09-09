@@ -37,6 +37,13 @@ func cardsIn(view boardrepo.BoardView) int {
 // caught a board with its columns replaced and its membership still old,
 // which is what the four separate transactions allowed.
 //
+// The writer swaps the two shapes back and forth rather than writing each
+// of them once, for the same reason the snapshot test does: a reader gets
+// one chance to land mid-write per replacement, and a test that offers it
+// two chances catches a broken read on a lucky run rather than on every
+// run. Measured against a copy with the read transaction taken out, one
+// pass of each shape passed sixty runs out of sixty.
+//
 // The reader makes one call and not two, which is the point rather than a
 // convenience. Two calls are two snapshots however carefully each of them
 // reads, so nothing a store can do would make a pair of them atomic; what
@@ -50,11 +57,16 @@ func TestReplaceBoardLandsColumnsAndMembershipTogether(t *testing.T) {
 	issues := newIssues(card("PLAT-1", "To Do", "1"), card("PLAT-2", "To Do", "1"))
 
 	before := map[string][]string{"": {"PLAT-1"}}
-	for _, b := range sampleBoards() {
-		if err := r.ReplaceBoard(ctx, "p1", b, oneColumn(), nil, before); err != nil {
-			t.Fatalf("seed board %d: %v", b.ID, err)
+	after := map[string][]string{"": {"PLAT-1", "PLAT-2"}}
+	replace := func(cols []backend.BoardColumn, keys map[string][]string) {
+		for _, b := range sampleBoards() {
+			if err := r.ReplaceBoard(ctx, "p1", b, cols, nil, keys); err != nil {
+				t.Errorf("replace board %d: %v", b.ID, err)
+				return
+			}
 		}
 	}
+	replace(oneColumn(), before)
 
 	stop := make(chan struct{})
 	done := make(chan struct{})
@@ -81,12 +93,14 @@ func TestReplaceBoardLandsColumnsAndMembershipTogether(t *testing.T) {
 		}
 	}()
 
-	after := map[string][]string{"": {"PLAT-1", "PLAT-2"}}
-	for _, b := range sampleBoards() {
-		if err := r.ReplaceBoard(ctx, "p1", b, twoColumns(), nil, after); err != nil {
-			t.Fatalf("replace board %d: %v", b.ID, err)
+	for i := 0; i < replacements; i++ {
+		if i%2 == 0 {
+			replace(twoColumns(), after)
+			continue
 		}
+		replace(oneColumn(), before)
 	}
+	replace(twoColumns(), after)
 	close(stop)
 	<-done
 	select {
