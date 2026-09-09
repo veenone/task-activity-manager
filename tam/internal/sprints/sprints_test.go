@@ -157,7 +157,14 @@ func newStore() *fakeStore {
 // cards it moved from, and it is deliberately not the order the search
 // answers in.
 func (s *fakeStore) inSprint(keys ...string) {
-	s.cached["12"] = keys
+	s.holds("12", keys...)
+}
+
+// holds seeds one scope of the board's cached membership: a sprint by id, or
+// the board's own list under the empty id, which is the scope a completion
+// into the backlog writes back to.
+func (s *fakeStore) holds(scopeID string, keys ...string) {
+	s.cached[scopeID] = keys
 }
 
 func (s *fakeStore) Columns(context.Context, string, int) ([]backend.BoardColumn, error) {
@@ -825,5 +832,58 @@ func TestCompleteOnTheDemoBackendMovesOnlyThatSprintsCards(t *testing.T) {
 		if finished := before[key].status == "Done"; finished == moved {
 			t.Errorf("%s is %q and moved = %v, want only the unfinished cards of the sprint moved", key, before[key].status, moved)
 		}
+	}
+}
+
+// TestTheDestinationLearnsWhatWasMovedIntoIt is the other half of the
+// membership rewrite, and the half nothing used to write. The banner says
+// twelve cards moved to Sprint 13 and the board switches its picker to
+// Sprint 13, so a destination that still draws what it drew before makes the
+// one report this ceremony gives look like a lie. Nothing else corrects it:
+// the ceremony bypasses the journal, so there is no pending move for the
+// view to fold in either.
+func TestTheDestinationLearnsWhatWasMovedIntoIt(t *testing.T) {
+	b := &fakeBackend{issues: sprintOf("1", "5", "1")}
+	store := newStore()
+	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3")
+	store.holds("13", "PLAT-40")
+
+	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "13")
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if done.Moved != 2 || done.MovedTo != "Sprint 13" {
+		t.Fatalf("completion = %+v, want the two unfinished cards moved to Sprint 13", done)
+	}
+	if got := strings.Join(store.membership["12"], ","); got != "PLAT-2" {
+		t.Errorf("sprint 12 = %q, want only the card that finished", got)
+	}
+	// The cards it already held first, in the order it held them, and the
+	// arrivals after: the destination's own rank is Jira's to hand back at
+	// the next boards sync.
+	if got := strings.Join(store.membership["13"], ","); got != "PLAT-40,PLAT-1,PLAT-3" {
+		t.Errorf("sprint 13 = %q, want the cards it held plus the ones it was sent", got)
+	}
+}
+
+// TestACompletionIntoTheBacklogWritesTheBoardsOwnList is the backlog as a
+// destination rather than as an absence. The scope it writes back to is the
+// board's own list, whose keys are already on the board, so the write is
+// there to keep the pair symmetric and must not duplicate a card the list
+// already holds.
+func TestACompletionIntoTheBacklogWritesTheBoardsOwnList(t *testing.T) {
+	b := &fakeBackend{issues: sprintOf("1", "1")}
+	store := newStore()
+	store.inSprint("PLAT-1", "PLAT-2")
+	store.holds("", "PLAT-1", "PLAT-2", "PLAT-7")
+
+	if _, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if got := strings.Join(store.membership["12"], ","); got != "" {
+		t.Errorf("sprint 12 = %q, want it empty now every card has left it", got)
+	}
+	if got := strings.Join(store.membership[""], ","); got != "PLAT-1,PLAT-2,PLAT-7" {
+		t.Errorf("the board's own list = %q, want it unchanged, since the cards never left the board", got)
 	}
 }
