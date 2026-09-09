@@ -57,9 +57,12 @@ its rows.
 
 `internal/boardrepo` is the store layer over the four tables, beside
 `issuerepo` since boards are their own concern. It never imports
-`issuerepo`: what it needs from the issue cache is the two-method
-`IssueSource` interface (`IssuesByKeys`, `DraftIssues`), which `app.go`
-satisfies with the issue repository it already holds. `boardrepo.Board`
+`issuerepo`: what it needs from the issue cache is the three-method
+`IssueSource` interface (`IssuesByKeys`, `DraftIssues`, `PendingMoves`),
+which `app.go` satisfies with the issue repository it already holds. Every
+method takes the `dbtx.Querier` the board read is running on, so the cards
+and moves come from the same transaction as the board's own columns and
+membership rather than from a later moment on the handle. `boardrepo.Board`
 composes the view a board draws: columns in board order, cards bucketed
 into them by status id (a draft goes to the first column that collects
 any status, since Jira has never assigned it one), and the lanes the
