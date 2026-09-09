@@ -198,8 +198,8 @@ beforeEach(() => {
   vi.mocked(api.RankIssue).mockResolvedValue();
   vi.mocked(api.CanTransition).mockResolvedValue({ reachable: [], allowed: true });
   vi.mocked(api.JournalSprintMoves).mockResolvedValue(3);
-  vi.mocked(api.StartSprint).mockResolvedValue();
-  vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [], message: "" });
+  vi.mocked(api.StartSprint).mockResolvedValue("");
+  vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [], note: "", message: "" });
   vi.mocked(api.SuggestSprintDates).mockResolvedValue({
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
@@ -1192,6 +1192,27 @@ describe("BoardsView sprint ceremonies", () => {
     expect(within(banner).getByText("Sprint 13 is running, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
   });
 
+  // The sprint started and its board's sprint list did not come back, so the
+  // cached row still calls it future: the picker offers it as a future
+  // sprint and the toolbar offers to start it a second time, which Jira
+  // answers with a 400. The ceremony succeeded, so the note rides with the
+  // sentence rather than replacing it.
+  it("reports a sprint list it could not re-read beside the start it did make", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.StartSprint).mockResolvedValue(
+      "the board's sprint list could not be re-read: 503 Service Unavailable, so the sprint list on screen may be out of date; press Refresh.",
+    );
+    renderView();
+    const dialog = await openStart(user);
+    await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
+    await user.click(within(dialog).getByRole("button", { name: "Start sprint" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Start Sprint 13" })).not.toBeInTheDocument());
+    const banner = await screen.findByRole("status", { name: "Sprint ceremony" });
+    expect(within(banner).getByText(/Sprint 13 is running, 2026-09-14 to 2026-09-28\./)).toBeInTheDocument();
+    expect(within(banner).getByText(/press Refresh\./)).toBeInTheDocument();
+  });
+
   it("refuses an end date before the start without asking Jira", async () => {
     const user = userEvent.setup();
     renderView();
@@ -1241,7 +1262,7 @@ describe("BoardsView sprint ceremonies", () => {
 
   it("completes into the chosen sprint and says what moved where", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "Sprint 13", failed: [], message: "" });
+    vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "Sprint 13", failed: [], note: "", message: "" });
     renderView();
     await screen.findByRole("gridcell", { name: /PLAT-412/ });
     await user.click(screen.getByRole("button", { name: "Complete sprint" }));
@@ -1259,6 +1280,28 @@ describe("BoardsView sprint ceremonies", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("13"));
   });
 
+  // The same postscript on the other ceremony: the sprint is closed and the
+  // cards have moved, and only the list the picker reads is stale.
+  it("reports a sprint list it could not re-read beside the completion it did make", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CompleteSprint).mockResolvedValue({
+      moved: 2,
+      movedTo: "the backlog",
+      failed: [],
+      note: "the board's sprint list could not be cached: disk full, so the sprint list on screen may be out of date; press Refresh.",
+      message: "",
+    });
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(screen.getByRole("button", { name: "Complete sprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
+    await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
+
+    const banner = await screen.findByRole("status", { name: "Sprint ceremony" });
+    expect(within(banner).getByText(/Sprint 12 is closed\. 2 unfinished cards moved to the backlog\./)).toBeInTheDocument();
+    expect(within(banner).getByText(/press Refresh\./)).toBeInTheDocument();
+  });
+
   // A push that fell over partway comes back as a completion carrying its
   // own message, never as a rejection: Wails hands the frontend the value or
   // the error and never both, and the keys are the half that matters. The
@@ -1271,6 +1314,7 @@ describe("BoardsView sprint ceremonies", () => {
       moved: 1,
       movedTo: "the backlog",
       failed: ["PLAT-412"],
+      note: "",
       message: "1 of 2 unfinished issues moved to the backlog, so the sprint was left open: 403 Forbidden",
     });
     renderView();
@@ -1305,6 +1349,7 @@ describe("BoardsView sprint ceremonies", () => {
       moved: 2,
       movedTo: "the backlog",
       failed: [],
+      note: "",
       message: "2 of 2 unfinished issues moved to the backlog, but the sprint could not be closed and is open with none of them in it: 403 Forbidden",
     });
     renderView();

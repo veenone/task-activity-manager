@@ -48,6 +48,7 @@ type fakeBackend struct {
 	completeErr error
 
 	sprints     []backend.Sprint
+	sprintErr   error
 	sprintReads int
 
 	// order is what happened, in the order it happened, so "moved first and
@@ -123,6 +124,9 @@ func (f *fakeBackend) CompleteSprint(_ context.Context, sprintID int) error {
 
 func (f *fakeBackend) BoardSprints(context.Context, int) ([]backend.Sprint, error) {
 	f.sprintReads++
+	if f.sprintErr != nil {
+		return nil, f.sprintErr
+	}
 	return f.sprints, nil
 }
 
@@ -227,8 +231,12 @@ func TestStartPassesTheDraftThroughWithJiraSDates(t *testing.T) {
 	store := newStore()
 	draft := backend.SprintDraft{Name: "Sprint 13", Goal: "Ship the board", StartDate: "2026-09-09", EndDate: "2026-09-23"}
 
-	if err := newService(b, store).Start(context.Background(), "p1", 1, 13, draft); err != nil {
+	note, err := newService(b, store).Start(context.Background(), "p1", 1, 13, draft)
+	if err != nil {
 		t.Fatalf("start: %v", err)
+	}
+	if note != "" {
+		t.Errorf("note = %q, want none when the sprint list was re-read", note)
 	}
 	if len(b.starts) != 1 {
 		t.Fatalf("starts = %+v, want the one call", b.starts)
@@ -254,7 +262,7 @@ func TestStartReturnsJiraSRefusalWordForWord(t *testing.T) {
 	b := &fakeBackend{startErr: errors.New(refusal)}
 	store := newStore()
 
-	err := newService(b, store).Start(context.Background(), "p1", 1, 13,
+	_, err := newService(b, store).Start(context.Background(), "p1", 1, 13,
 		backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-09", EndDate: "2026-09-23"})
 	if err == nil {
 		t.Fatal("start = nil error, want Jira's refusal")
@@ -283,7 +291,7 @@ func TestStartRefusesDatesItCannotUse(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			b := &fakeBackend{}
-			err := newService(b, newStore()).Start(context.Background(), "p1", 1, 13,
+			_, err := newService(b, newStore()).Start(context.Background(), "p1", 1, 13,
 				backend.SprintDraft{Name: "Sprint 13", StartDate: tc.start, EndDate: tc.end})
 			if err == nil {
 				t.Fatal("start = nil error, want a refusal")
@@ -595,7 +603,7 @@ func TestCompleteLeavesACardThatIsNoLongerInTheSprintAlone(t *testing.T) {
 // does not guess at those before trying.
 func TestABackendWithNoAgileApiRefusesBothCeremonies(t *testing.T) {
 	s := sprints.New(searchOnly{}, newStore(), "PLAT")
-	if err := s.Start(context.Background(), "p1", 1, 13, backend.SprintDraft{StartDate: "2026-09-09", EndDate: "2026-09-23"}); err == nil {
+	if _, err := s.Start(context.Background(), "p1", 1, 13, backend.SprintDraft{StartDate: "2026-09-09", EndDate: "2026-09-23"}); err == nil {
 		t.Error("start = nil error, want a backend with no Agile API refused")
 	}
 	if _, err := s.Complete(context.Background(), "p1", 1, 12, ""); err == nil {
@@ -650,13 +658,13 @@ func TestARefreshThatComesBackEmptyLeavesTheBoardsSprintsAlone(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name string
-		run  func(s *sprints.Service) error
+		run  func(s *sprints.Service) (string, error)
 	}{
-		{"after a completion", func(s *sprints.Service) error {
-			_, err := s.Complete(context.Background(), "p1", 1, 12, "")
-			return err
+		{"after a completion", func(s *sprints.Service) (string, error) {
+			done, err := s.Complete(context.Background(), "p1", 1, 12, "")
+			return done.Note, err
 		}},
-		{"after a start", func(s *sprints.Service) error {
+		{"after a start", func(s *sprints.Service) (string, error) {
 			return s.Start(context.Background(), "p1", 1, 13,
 				backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-09", EndDate: "2026-09-23"})
 		}},
@@ -666,8 +674,14 @@ func TestARefreshThatComesBackEmptyLeavesTheBoardsSprintsAlone(t *testing.T) {
 			store := newStore()
 			store.sprints = append([]backend.Sprint{}, history...)
 
-			if err := tc.run(newService(b, store)); err != nil {
+			note, err := tc.run(newService(b, store))
+			if err != nil {
 				t.Fatalf("ceremony: %v", err)
+			}
+			// The list was not written, so the picker is stale and the user
+			// is the only one who can do anything about it.
+			if !strings.Contains(note, "Refresh") {
+				t.Errorf("note = %q, want it to say the list on screen may be stale", note)
 			}
 			if b.sprintReads != 1 {
 				t.Errorf("sprint reads = %d, want the one re-read", b.sprintReads)
@@ -971,4 +985,44 @@ func TestCompleteAllowsAStateItCannotVouchFor(t *testing.T) {
 			t.Errorf("complete with the cached state %q = %v, want it attempted", state, err)
 		}
 	}
+}
+
+// TestASprintListThatCannotBeReReadIsANoteAndNotAFailure is the state the
+// ceremony leaves behind when only its bookkeeping fails. The sprint has
+// started, or closed, on Jira; the cached row still calls it future, so the
+// toolbar offers Start for a sprint that is already running and Jira answers
+// that with a 400. The ceremony still succeeds, and the note is how the user
+// finds out to press Refresh.
+func TestASprintListThatCannotBeReReadIsANoteAndNotAFailure(t *testing.T) {
+	t.Run("after a start", func(t *testing.T) {
+		b := &fakeBackend{sprintErr: errors.New("<html><body>You must log in</body></html>")}
+		note, err := newService(b, newStore()).Start(context.Background(), "p1", 1, 13,
+			backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-09", EndDate: "2026-09-23"})
+		if err != nil {
+			t.Fatalf("start = %v, want the sprint started and the refresh reported beside it", err)
+		}
+		if len(b.starts) != 1 {
+			t.Fatalf("starts = %+v, want the sprint started all the same", b.starts)
+		}
+		if !strings.Contains(note, "You must log in") || !strings.Contains(note, "Refresh") {
+			t.Errorf("note = %q, want Jira's own reason and what to do about it", note)
+		}
+		if strings.Contains(note, "<") {
+			t.Errorf("note = %q, want the markup stripped the way every other reason is", note)
+		}
+	})
+
+	t.Run("after a completion", func(t *testing.T) {
+		b := &fakeBackend{issues: sprintOf("5"), sprintErr: errors.New("503 Service Unavailable")}
+		done, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, "")
+		if err != nil {
+			t.Fatalf("complete = %v, want the sprint closed and the refresh reported beside it", err)
+		}
+		if len(b.completed) != 1 || done.Message != "" {
+			t.Fatalf("completion = %+v after closing %v, want it finished", done, b.completed)
+		}
+		if !strings.Contains(done.Note, "503") || !strings.Contains(done.Note, "Refresh") {
+			t.Errorf("note = %q, want Jira's own reason and what to do about it", done.Note)
+		}
+	})
 }

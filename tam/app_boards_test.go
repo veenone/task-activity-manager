@@ -641,7 +641,7 @@ func TestALifecycleCallIsRefusedWhileABoardsRefreshHoldsTheLock(t *testing.T) {
 	}
 	defer a.release(p.ID)
 
-	err := a.StartSprint(p.ID, 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23")
+	_, err := a.StartSprint(p.ID, 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23")
 	if err == nil {
 		t.Fatal("StartSprint during a boards refresh = nil error, want a refusal")
 	}
@@ -668,7 +668,10 @@ func TestASecondCeremonyIsRefusedWhileTheFirstRuns(t *testing.T) {
 	a.backends[p.ID] = blocking
 
 	done := make(chan error, 1)
-	go func() { done <- a.StartSprint(p.ID, 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23") }()
+	go func() {
+		_, err := a.StartSprint(p.ID, 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23")
+		done <- err
+	}()
 	<-blocking.started
 
 	_, err := a.CompleteSprint(p.ID, 1, 12, "")

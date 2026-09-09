@@ -297,10 +297,17 @@ export interface SprintSuggestion {
 // never both, so a partial completion reported as an error would deliver the
 // sentence and drop failed, which is the list the user needs. A non-empty
 // message means the completion did not finish.
+//
+// note is the other way round: the sprint closed and the cards moved, and
+// something after that did not land. Today that is the board's sprint list,
+// which the ceremony re-reads so the picker stops calling a closed sprint
+// active, and which leaves the toolbar offering the wrong button when it
+// cannot be read. It is reported beside the success, never instead of it.
 export interface SprintCompletion {
   moved: number;
   movedTo: string;
   failed: string[];
+  note: string;
   message: string;
 }
 
@@ -690,6 +697,9 @@ export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.Sync
 // every other write on this surface, the ceremonies push to Jira the moment
 // they are called and take the app's per-profile lock while they do, so both
 // go through SyncContext rather than being called from a component directly.
+// StartSprint answers with the note the ceremony left, empty when there is
+// none: the sprint started and the board's sprint list could not be re-read
+// afterwards, so the picker on screen is stale.
 export const StartSprint: (
   profileId: string,
   boardId: number,
@@ -698,7 +708,7 @@ export const StartSprint: (
   goal: string,
   start: string,
   end: string,
-) => Promise<void> = App.StartSprint;
+) => Promise<string> = App.StartSprint;
 export const CompleteSprint = (
   profileId: string,
   boardId: number,

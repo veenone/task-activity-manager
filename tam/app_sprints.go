@@ -10,6 +10,7 @@ import (
 	"agile-suite/core/profile"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/errtext"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/sprints"
 )
@@ -38,23 +39,46 @@ func (a *App) sprintService(p profile.Profile, b backend.IssueBackend) *sprints.
 // dialog collected, and refreshes that board's sprint list afterwards. The
 // dates arrive as a date input wrote them and are parsed by the service; a
 // value that is not a date, or an end before a start, never reaches Jira.
-func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, start, end string) error {
+//
+// It answers with the note the ceremony left, empty when there is none: the
+// sprint started, and the board's own sprint list could not be re-read
+// afterwards, so the picker on screen is stale and the toolbar will offer to
+// start the sprint a second time. The dialog reports it beside the success.
+func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, start, end string) (string, error) {
 	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := a.acquire(p.ID, "sprint"); err != nil {
-		return err
+		return "", err
 	}
 	defer a.release(p.ID)
 
 	log.Printf("tam: starting sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
 	draft := backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end}
-	if err := a.sprintService(p, b).Start(a.ctx, p.ID, boardID, sprintID, draft); err != nil {
+	note, err := a.sprintService(p, b).Start(a.ctx, p.ID, boardID, sprintID, draft)
+	if err != nil {
 		log.Printf("tam: start sprint %d for %s failed: %v", sprintID, p.Name, err)
-		return err
+		return "", ceremonyError(err)
 	}
-	return nil
+	if note != "" {
+		log.Printf("tam: sprint %d for %s started, with a note: %s", sprintID, p.Name, note)
+	}
+	return note, nil
+}
+
+// ceremonyError is what a ceremony's refusal reads as on screen. These two
+// are the bindings whose errors come straight off the wire, Jira's own
+// sentence about a second active sprint or a missing permission, and a Data
+// Center answering 403 with an HTML login page hands the transport a
+// kilobyte of markup that the start dialog renders inline beside its
+// buttons. internal/errtext is the same reduction the sync summaries and the
+// dropped-board reasons take.
+func ceremonyError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return errors.New(errtext.Line(err))
 }
 
 // CompleteSprint moves the sprint's unfinished issues to moveTo, the
@@ -87,11 +111,14 @@ func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo str
 	done.Failed = backend.NonNil(done.Failed)
 	if err != nil {
 		log.Printf("tam: complete sprint %d for %s failed after moving %d: %v", sprintID, p.Name, done.Moved, err)
-		return done, err
+		return done, ceremonyError(err)
 	}
 	if done.Message != "" {
 		log.Printf("tam: complete sprint %d for %s did not finish: %s", sprintID, p.Name, done.Message)
 		return done, nil
+	}
+	if done.Note != "" {
+		log.Printf("tam: complete sprint %d for %s left a note: %s", sprintID, p.Name, done.Note)
 	}
 	log.Printf("tam: completed sprint %d for %s: %d issues moved to %s", sprintID, p.Name, done.Moved, done.MovedTo)
 	return done, nil

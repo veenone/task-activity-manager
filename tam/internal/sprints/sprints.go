@@ -102,6 +102,12 @@ type Completion struct {
 	// Failed are the incomplete issues that did not move, empty when they
 	// all did.
 	Failed []string `json:"failed"`
+	// Note is what did not land after the sprint was closed, empty when
+	// everything did. It is never a failure of the completion: the sprint is
+	// closed and the cards have moved, and this is the cache bookkeeping
+	// after them, whose one visible consequence is a picker still offering
+	// Start for a sprint that is already running.
+	Note string `json:"note"`
 	// Message is why the completion did not finish, empty when it did. A
 	// completion carrying one has left the sprint open: either the push
 	// stopped partway, and Failed names the cards still in the sprint, or
@@ -152,19 +158,24 @@ func New(b Backend, store Store, projectKey string) *Service {
 // Jira's own error is returned unchanged. A sprint that cannot be started,
 // because another is already active or because the account cannot manage
 // sprints, is answered in a sentence the user needs to read word for word.
-func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft) error {
+//
+// The sprint has started once Jira says so, whatever happens to the cache
+// afterwards, so a sprint list that could not be re-read comes back as the
+// note beside a success rather than as a failure. Without it the picker
+// still calls the running sprint future, the toolbar still offers Start for
+// it, and Jira answers that second start with a 400 nobody can explain.
+func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft) (string, error) {
 	b, err := s.board()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if d.StartDate, d.EndDate, err = dates(d.StartDate, d.EndDate); err != nil {
-		return err
+		return "", err
 	}
 	if err := b.StartSprint(ctx, sprintID, d); err != nil {
-		return err
+		return "", err
 	}
-	s.refreshSprints(ctx, b, profileID, boardID)
-	return nil
+	return note(s.refreshSprints(ctx, b, profileID, boardID)), nil
 }
 
 // Complete moves the sprint's unfinished cards and then closes it, in that
@@ -256,7 +267,7 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 		return done, nil
 	}
 	s.refreshMembership(ctx, profileID, boardID, sid, moveTo, moved)
-	s.refreshSprints(ctx, b, profileID, boardID)
+	done.Note = note(s.refreshSprints(ctx, b, profileID, boardID))
 	return done, nil
 }
 

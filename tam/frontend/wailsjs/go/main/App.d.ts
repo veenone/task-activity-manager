@@ -115,7 +115,7 @@ export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<v
 
 export function SetTheme(arg1:string):Promise<void>;
 
-export function StartSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string):Promise<void>;
+export function StartSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string):Promise<string>;
 
 export function SuggestSprintDates(arg1:string,arg2:number):Promise<sprints.Suggestion>;
 

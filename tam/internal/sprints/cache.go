@@ -2,7 +2,10 @@ package sprints
 
 import (
 	"context"
+	"fmt"
 	"log"
+
+	"agile-suite/tam/internal/errtext"
 )
 
 // The board cache's bookkeeping after a ceremony: which cards each scope
@@ -106,11 +109,18 @@ func appended(cached, arrived []string) []string {
 // sync: that walks every board's columns, sprints and membership, takes
 // minutes on a real project, and would be refused outright by the lock the
 // ceremony itself is holding.
-func (s *Service) refreshSprints(ctx context.Context, b lifecycle, profileID string, boardID int) {
+//
+// It answers with what went wrong rather than only logging it. The ceremony
+// has happened and cannot be failed over a cache read, but a sprint list
+// that was not re-read still says "future" for the sprint now running, so
+// the toolbar offers Start for it and Jira answers the second start with a
+// 400. The caller carries this back as a note beside its own success, which
+// is how the user finds out to press Refresh.
+func (s *Service) refreshSprints(ctx context.Context, b lifecycle, profileID string, boardID int) error {
 	list, err := b.BoardSprints(ctx, boardID)
 	if err != nil {
 		log.Printf("tam: board %d sprints could not be re-read after the ceremony: %v", boardID, err)
-		return
+		return fmt.Errorf("the board's sprint list could not be re-read: %w", err)
 	}
 	if len(list) == 0 {
 		// A ceremony has just started or completed a sprint on this board, so
@@ -123,9 +133,22 @@ func (s *Service) refreshSprints(ctx context.Context, b lifecycle, profileID str
 		// drop the sprint length the date suggestion is built from, with
 		// nothing reported anywhere because the call did not fail.
 		log.Printf("tam: board %d answered the ceremony with no sprints at all, which cannot be true of a board a ceremony has just run on; the cached list is left as it was", boardID)
-		return
+		return fmt.Errorf("the board answered with no sprints at all, so its cached list was left as it was")
 	}
 	if err := s.store.ReplaceSprints(ctx, profileID, boardID, list); err != nil {
 		log.Printf("tam: board %d sprints could not be cached after the ceremony: %v", boardID, err)
+		return fmt.Errorf("the board's sprint list could not be cached: %w", err)
 	}
+	return nil
+}
+
+// note is what a ceremony reports beside its own success when the cache
+// bookkeeping after it did not land: one line, and the one thing the user
+// can do about it. Jira's own words reach here off the wire, so they go
+// through the same reduction a sync summary's do.
+func note(err error) string {
+	if err == nil {
+		return ""
+	}
+	return errtext.Line(err) + ", so the sprint list on screen may be out of date; press Refresh."
 }

@@ -94,8 +94,14 @@ export function StartSprintModal({ profileId, boardId, sprint, active, onClose, 
     start.mutate(
       { boardId, sprintId: sprint.id, name: name.trim(), goal: goal.trim(), start: from, end: to },
       {
-        onSuccess: () => {
-          const line = `${name.trim()} is running, ${from} to ${to}.`;
+        // The note is the ceremony's own postscript, empty almost always:
+        // Jira started the sprint and the board's sprint list could not be
+        // re-read afterwards, so the picker still calls it future and the
+        // toolbar still offers Start. It rides with the sentence into the
+        // board's banner, since this dialog closes on success.
+        onSuccess: (note) => {
+          const started = `${name.trim()} is running, ${from} to ${to}.`;
+          const line = note ? `${started} ${note}` : started;
           announce(line);
           onStarted(String(sprint.id), line);
           onClose();

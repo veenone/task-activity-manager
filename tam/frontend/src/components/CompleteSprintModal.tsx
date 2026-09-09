@@ -105,9 +105,14 @@ export function CompleteSprintModal({
             setStopped(done);
             return;
           }
-          const line = done.moved > 0
+          const closed = done.moved > 0
             ? `${sprint.name} is closed. ${plural(done.moved, "unfinished card", "unfinished cards")} moved to ${done.movedTo}.`
             : `${sprint.name} is closed, with nothing left unfinished.`;
+          // The note is not a failure of the completion: the sprint closed
+          // and the cards moved, and the cache bookkeeping after them did
+          // not land. It travels with the sentence rather than instead of
+          // it, and this dialog closes, so the banner is where it is read.
+          const line = done.note ? `${closed} ${done.note}` : closed;
           announce(line);
           onCompleted(moveTo, line);
           onClose();
