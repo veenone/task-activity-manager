@@ -5,8 +5,14 @@ Jira DC tasks, epics, stories, bugs, and requirements for scrum masters,
 product owners, and team members. It shares connection profiles and the
 Windows Credential Manager entries with Xray Test Manager through
 `core/profile` and the shared `profiles.db`. The design lives in
-`docs/superpowers/specs/2026-09-04-tam-foundation-design.md`; the Outline
-collection "Task Activity Manager" mirrors it.
+`docs/superpowers/specs/2026-09-04-tam-foundation-design.md`.
+
+Outline mirrors this file for readers who are not in the repository, under
+**Tools → Task Activity Manager (TAM)**: a User Guide (end users), Feature
+List, Supported Views, Architecture, Code Structure, Developer User Guide,
+and Change Log, alongside XTM's own pages in the same collection. Keep the
+Outline pages in step when a change here alters what the app does; the User
+Guide is the one written for people who will never read this file.
 
 ## Status
 
