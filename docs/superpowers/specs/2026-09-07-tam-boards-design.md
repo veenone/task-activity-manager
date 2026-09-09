@@ -241,7 +241,7 @@ So the two lifecycle actions are online-only, which in practice means they are a
 |---|---|---|
 | Where a sprint's lifecycle lives | The Boards toolbar, beside the sprint picker | It acts on the sprint that is already selected, and nowhere else in the app knows about sprints |
 | Starting a sprint | A dialog: name (prefilled), goal, start and end dates, defaulting to today and today plus the board's usual sprint length | Jira requires the dates; a length guessed from the board's last three sprints is right far more often than a blank field |
-| Completing a sprint | A dialog naming how many issues are incomplete and where they go: the backlog, or a named future sprint | This is Jira's own question, and answering it in TAM rather than sending the user to the web is the point |
+| Completing a sprint | A dialog listing the issues that are incomplete, by key and summary, and where they go: the backlog, or a named future sprint | This is Jira's own question, and answering it in TAM rather than sending the user to the web is the point; this is the one action TAM cannot undo, and a count is not something the user can check against a board of forty |
 | What happens to the incomplete issues | TAM moves them first, with the sprint move it already has, then closes the sprint | The move is a normal Agile call TAM already makes, and doing it first means a failure leaves the sprint open rather than half closed |
 | Multi-select | Click, then shift-click for a range and control-click to add, on the board only, cleared by any board or sprint change | The board is the only place with more than one card on screen at once |
 | What multi-select can do | Move to a sprint, and nothing else in 3c | It is what planning needs; a bulk transition would need every card's workflow checked and belongs with its own design |
@@ -252,17 +252,18 @@ So the two lifecycle actions are online-only, which in practice means they are a
 
 ### 14.4 The wire
 
-Three calls in `core/jira/agile.go`, beside the four 3b added:
+Two calls in `core/jira/agile.go`, beside the four 3b added:
 
-- `CreateSprint(ctx, boardID int, name, goal, start, end string) (RawSprint, error)` over `POST /rest/agile/1.0/sprint`.
 - `StartSprint(ctx, sprintID int, name, goal, start, end string) error` over `POST /rest/agile/1.0/sprint/{id}` with `state: "active"`.
 - `CompleteSprint(ctx, sprintID int) error` over the same endpoint with `state: "closed"`.
+
+A sprint always already exists in Jira by the time either is reached, so there is no `CreateSprint`: 3c starts and completes a sprint the board's own sync already fetched, it does not create one. Both endpoint-specific writes a completion's push uses, `MoveToSprint` and `MoveToBacklog`, already exist from 3b.
 
 Jira answers 400 when a sprint cannot start (another is already active on that board, the dates are wrong) and 403 without the Manage Sprints permission; both come back as the message Jira gave, not as a TAM guess.
 
 ### 14.5 The store
 
-No new tables. `sprint` already holds what the pickers need, and a lifecycle action ends with a boards sync so the row matches Jira. `boardrepo` gains one read: `SprintLength(profileID, boardID)` returning the median length of that board's last three closed sprints, for the dialog's default end date, and nothing when there are none.
+No new tables. `sprint` already holds what the pickers need, and a lifecycle action ends by re-reading and caching that one board's sprint list (`BoardSprints` plus `boardrepo.ReplaceSprints`), not a full boards sync: that walks every board's columns, sprints, and membership, takes minutes on a real project, and is refused outright by the very lock the ceremony itself holds. `boardrepo` gains one read: `SprintLength(profileID, boardID)` returning the median length of that board's last three closed sprints, for the dialog's default end date, and nothing when there are none.
 
 ### 14.6 `ReplaceBoard`
 
@@ -274,8 +275,8 @@ A sprint that cannot start because another is active names the active one. A 403
 
 ### 14.8 Verification
 
-Go: the three client calls against the httptest server, including the 400 and the 403; `SprintLength` over three closed sprints and over none; the lifecycle methods on both backends, with the demo refusing a second active sprint; the read-transaction fix proving a concurrent reader never sees a half-applied board. Vitest: the start dialog's defaults, the complete dialog's count and destination, multi-select by click, shift-click and control-click, a bulk move journaling one row per card, the detail panel's sprint select, and the disabled buttons offline. Offline: on the demo profile, select the future sprint, start it, move three cards into it, complete it, and read where the incomplete ones went.
+Go: the two client calls against the httptest server, including the 400 and the 403; `SprintLength` over three closed sprints and over none; the lifecycle methods on both backends, with the demo refusing a second active sprint; the read-transaction fix proving a concurrent reader never sees a half-applied board. Vitest: the start dialog's defaults, the complete dialog's list and destination, multi-select by click, shift-click and control-click, a bulk move journaling one row per card, the detail panel's sprint select. There is no disabled-offline state to test: TAM has no connectivity signal, so both buttons stay enabled and a transport failure is reported in the dialog instead. Offline: on the demo profile, select the future sprint, start it, move three cards into it, complete it, and read where the incomplete ones went.
 
 ### 14.9 Out of scope
 
-Creating a board, editing a sprint's dates after it starts, a bulk transition, a bulk rank, sprint reports and burndown (Phase 4, which is what the completed sprints feed), and the board's own quick filters.
+Creating a board, creating a sprint (3c starts and completes a sprint the board's own sync already fetched), editing a sprint's dates after it starts, a bulk transition, a bulk rank, sprint reports and burndown (Phase 4, which is what the completed sprints feed), and the board's own quick filters.

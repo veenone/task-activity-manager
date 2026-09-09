@@ -16,7 +16,9 @@ Desktop tools for Jira Data Center that share one code spine:
   read-only Boards view: a project's boards, their columns, and their
   sprints, synced from Jira's Agile API. Phase 3b makes the board
   writable, journaling a dragged or keyboard-moved card offline and
-  pushing it on Commit like every other TAM write.
+  pushing it on Commit like every other TAM write. Phase 3c adds the
+  sprint ceremonies: starting and completing a sprint, moving several
+  selected cards into one at once, and the detail panel's sprint field.
 
 Both are Go + Wails + React apps that sync Jira into a local SQLite cache and
 push edits back on commit.
