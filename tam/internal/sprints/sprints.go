@@ -377,10 +377,17 @@ func (s *Service) completeStatuses(ctx context.Context, profileID string, boardI
 //
 // The query is narrowed to the sprint on the wire, and the answer is
 // narrowed again here. That is not belt and braces: it is what keeps an
-// irreversible move honest against a backend whose search does not honour
-// the scope, and it can only ever move fewer cards, never more. An issue the
-// backend reports no sprint for is kept, since the query is what put it in
-// this list.
+// irreversible move honest against a backend that answers with a card the
+// sprint no longer holds, and it can only ever move fewer cards, never
+// more.
+//
+// An issue the backend reports no sprint for is kept, since the query is
+// what put it in this list. That leniency is the one part of this read that
+// leans on the backend: a backend whose search ignores the scope hands the
+// whole project to this loop, every card of it reports no sprint, and every
+// card of it walks past the guard and out of the backlog. Both the demo
+// backend and this package's fake narrow "sprint = N" for exactly that
+// reason.
 func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete map[string]bool) ([]string, error) {
 	incomplete := []string{}
 	startAt, total := 0, -1

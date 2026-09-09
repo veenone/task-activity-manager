@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
 	"agile-suite/tam/internal/backend"
+	demobackend "agile-suite/tam/internal/backend/demo"
 	"agile-suite/tam/internal/sprints"
 )
 
@@ -28,6 +30,13 @@ type fakeBackend struct {
 	scopes    []string
 	projects  []string
 	searchErr error
+
+	// ignoreScope answers every search with every issue, whatever the query
+	// asked for, which is what a backend that does not honour the scope
+	// looks like from here. The default narrows, the way Jira and the demo
+	// backend both do, so a test meaning to exercise the service's own
+	// second narrowing has to ask for a backend that does not.
+	ignoreScope bool
 
 	moves   []moveCall
 	moveErr map[int]error
@@ -52,7 +61,11 @@ func (f *fakeBackend) SearchIssuesPage(_ context.Context, projectKey, scopeJQL, 
 	}
 	f.scopes = append(f.scopes, scopeJQL)
 	f.projects = append(f.projects, projectKey)
-	total := len(f.issues)
+	all := f.issues
+	if !f.ignoreScope {
+		all = inScope(f.issues, scopeJQL)
+	}
+	total := len(all)
 	if startAt >= total {
 		return []backend.Issue{}, total, nil
 	}
@@ -60,7 +73,23 @@ func (f *fakeBackend) SearchIssuesPage(_ context.Context, projectKey, scopeJQL, 
 	if end > total {
 		end = total
 	}
-	return f.issues[startAt:end], total, nil
+	return all[startAt:end], total, nil
+}
+
+// inScope is the narrowing the query itself does on a backend that honours
+// it: "sprint = N" comes back with that sprint's cards and no others. The
+// service leans on exactly this when it keeps an issue the backend reports
+// no sprint for, so a fake that answered with the whole project would let a
+// completion that moves the backlog pass every test here.
+func inScope(issues []backend.Issue, scopeJQL string) []backend.Issue {
+	id := strings.TrimPrefix(scopeJQL, "sprint = ")
+	out := make([]backend.Issue, 0, len(issues))
+	for _, iss := range issues {
+		if iss.SprintID == id {
+			out = append(out, iss)
+		}
+	}
+	return out
 }
 
 func (f *fakeBackend) MoveIssuesToSprint(_ context.Context, sprintID string, keys []string) error {
@@ -531,13 +560,14 @@ func TestCompleteRefusesABoardItCannotJudge(t *testing.T) {
 }
 
 // TestCompleteLeavesACardThatIsNoLongerInTheSprintAlone is the narrowing the
-// service does on top of the query. It can only ever move fewer cards than
+// service does on top of the query, against a backend that answers the
+// query with more than it asked for. It can only ever move fewer cards than
 // the search returned, never more, which is the right direction for a move
 // nobody can undo from TAM.
 func TestCompleteLeavesACardThatIsNoLongerInTheSprintAlone(t *testing.T) {
 	elsewhere := issue("PLAT-9", "1")
 	elsewhere.SprintID = "13"
-	b := &fakeBackend{issues: append(sprintOf("1"), elsewhere)}
+	b := &fakeBackend{issues: append(sprintOf("1"), elsewhere), ignoreScope: true}
 
 	done, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
@@ -711,5 +741,89 @@ func TestACloseThatFailsSaysWhereTheCardsWent(t *testing.T) {
 	}
 	if got := strings.Join(store.membership["12"], ","); got != "PLAT-3" {
 		t.Errorf("cached membership = %q, want the cards that are still in the sprint", got)
+	}
+}
+
+// demoCard is one card of the demo dataset as the backend reports it now.
+type demoCard struct {
+	sprintID string
+	status   string
+}
+
+// demoCards is the whole dataset by key, which is what a completion against
+// the demo backend is measured against: which sprint every card was in
+// before, and which it is in after.
+func demoCards(t *testing.T, b *demobackend.Backend) map[string]demoCard {
+	t.Helper()
+	page, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 500)
+	if err != nil {
+		t.Fatalf("read the demo dataset: %v", err)
+	}
+	out := map[string]demoCard{}
+	for _, iss := range page {
+		out[iss.Key] = demoCard{sprintID: iss.SprintID, status: iss.Status}
+	}
+	return out
+}
+
+// TestCompleteOnTheDemoBackendMovesOnlyThatSprintsCards runs the ceremony
+// against the backend the plan's own walk-through uses, rather than against
+// a fake written beside the service.
+//
+// It is the test that would have caught the demo answering "sprint = N"
+// with the whole project: every card in the dataset then walked through the
+// service's second narrowing, since an issue the search returns is kept
+// unless it names a different sprint, and a completion moved the whole
+// backlog into the destination and reported success. Nothing outside sprint
+// 12 may move, and what does move is exactly the sprint's own unfinished
+// cards.
+func TestCompleteOnTheDemoBackendMovesOnlyThatSprintsCards(t *testing.T) {
+	b := demobackend.New("PLAT")
+	before := demoCards(t, b)
+	store := newStore()
+	store.columns = []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{demobackend.StatusID("To Do")}},
+		{Name: "In Progress", StatusIDs: []string{demobackend.StatusID("In Progress")}},
+		{Name: "Done", StatusIDs: []string{demobackend.StatusID("Done")}},
+	}
+	inTwelve := []string{}
+	for key, card := range before {
+		if card.sprintID == "12" {
+			inTwelve = append(inTwelve, key)
+		}
+	}
+	sort.Strings(inTwelve)
+	store.cached["12"] = inTwelve
+
+	done, err := sprints.New(b, store, "PLAT").Complete(context.Background(), "p1", 1, 12, "13")
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+
+	after := demoCards(t, b)
+	left := 0
+	for key, was := range before {
+		if after[key].sprintID == was.sprintID {
+			continue
+		}
+		left++
+		if was.sprintID != "12" {
+			t.Errorf("%s was in sprint %q and is now in %q; completing sprint 12 moved a card that was never in it",
+				key, was.sprintID, after[key].sprintID)
+		}
+	}
+	if done.Moved != left {
+		t.Errorf("the completion reported %d cards moved and %d actually moved", done.Moved, left)
+	}
+	if done.Moved == 0 || done.Moved >= len(before) {
+		t.Fatalf("completion = %+v over a dataset of %d cards, want sprint 12's unfinished ones", done, len(before))
+	}
+	// The definition, read off the dataset rather than assumed: a card of
+	// the sprint moved if and only if it was outside the last column.
+	for _, key := range inTwelve {
+		moved := after[key].sprintID != before[key].sprintID
+		if finished := before[key].status == "Done"; finished == moved {
+			t.Errorf("%s is %q and moved = %v, want only the unfinished cards of the sprint moved", key, before[key].status, moved)
+		}
 	}
 }

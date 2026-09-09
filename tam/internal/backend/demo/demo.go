@@ -6,6 +6,8 @@ package demo
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -90,15 +92,31 @@ func (b *Backend) issues() []backend.Issue {
 	return all
 }
 
-func (b *Backend) SearchIssuesPage(_ context.Context, _, _, _ string, types []string, startAt, maxResults int) ([]backend.Issue, int, error) {
+// SearchIssuesPage answers a page of the dataset, narrowed by issue type
+// and by the one scope this backend understands: "sprint = N".
+//
+// That scope is not decoration. A sprint completion reads the sprint it is
+// about with exactly that query and moves everything it comes back with, so
+// a demo that answered the whole project would move the whole backlog out
+// of a sprint and report it as a success. The service narrows the answer
+// again by the sprint each issue reports, but it keeps an issue that
+// reports none, on the grounds that the query already narrowed it, which is
+// only true of a backend that honours the query. Any other scope is still
+// ignored: the demo has no JQL engine, and the profile's own scope JQL is a
+// filter this dataset was never built to answer.
+func (b *Backend) SearchIssuesPage(_ context.Context, _, scopeJQL, _ string, types []string, startAt, maxResults int) ([]backend.Issue, int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	want := map[string]bool{}
 	for _, t := range types {
 		want[t] = true
 	}
+	sprintID, bySprint := sprintScope(scopeJQL)
 	var all []backend.Issue
 	for _, iss := range b.issues() {
+		if bySprint && iss.SprintID != sprintID {
+			continue
+		}
 		if len(want) == 0 || want[iss.Type] {
 			all = append(all, iss)
 		}
@@ -112,6 +130,27 @@ func (b *Backend) SearchIssuesPage(_ context.Context, _, _, _ string, types []st
 		end = total
 	}
 	return all[startAt:end], total, nil
+}
+
+// sprintScope reads a "sprint = N" query, the one narrowing the demo
+// honours, and answers with the sprint id it names. Anything else, an empty
+// scope included, is not one.
+func sprintScope(jql string) (string, bool) {
+	rest, ok := strings.CutPrefix(strings.TrimSpace(jql), "sprint")
+	if !ok {
+		return "", false
+	}
+	if rest, ok = strings.CutPrefix(strings.TrimSpace(rest), "="); !ok {
+		return "", false
+	}
+	id := strings.TrimSpace(rest)
+	if id == "" {
+		return "", false
+	}
+	if _, err := strconv.Atoi(id); err != nil {
+		return "", false
+	}
+	return id, true
 }
 
 func (b *Backend) GetIssueDetail(_ context.Context, key string) (backend.IssueDetail, error) {

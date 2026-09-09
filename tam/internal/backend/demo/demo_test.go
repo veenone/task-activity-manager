@@ -39,7 +39,11 @@ func TestDemoBackendPagesTheWholeDataset(t *testing.T) {
 	}
 }
 
-func TestDemoBackendFiltersByTypeAndIgnoresScopeAndSince(t *testing.T) {
+// TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer is the demo's
+// half of the sync's query: the issue types are honoured, and a scope JQL
+// this dataset has no engine for is ignored rather than guessed at. The one
+// scope it does honour is the sprint query below.
+func TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer(t *testing.T) {
 	b := demobackend.New("PLAT")
 	ctx := context.Background()
 	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "labels = nothing", "2030-01-01T00:00:00Z", []string{backend.TypeEpic}, 0, 100)
@@ -47,12 +51,53 @@ func TestDemoBackendFiltersByTypeAndIgnoresScopeAndSince(t *testing.T) {
 		t.Fatalf("search: %v", err)
 	}
 	if total != 4 || len(page) != 4 {
-		t.Errorf("epics: total %d, rows %d, want 4 (scope and since are ignored)", total, len(page))
+		t.Errorf("epics: total %d, rows %d, want 4 (a scope it cannot answer, and since, are ignored)", total, len(page))
 	}
 	for _, iss := range page {
 		if iss.Type != backend.TypeEpic {
 			t.Errorf("non-epic in result: %+v", iss)
 		}
+	}
+}
+
+// TestDemoBackendNarrowsToTheSprintTheQueryNames is the read a sprint
+// completion makes, against the backend the plan's own walk-through uses.
+// The completion asks for "sprint = N" and moves everything that comes
+// back, so a demo that answered with the whole project would empty the
+// backlog into the destination and report it as a success.
+func TestDemoBackendNarrowsToTheSprintTheQueryNames(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	whole, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 500)
+	if err != nil {
+		t.Fatalf("whole project: %v", err)
+	}
+
+	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "sprint = 12", "", backend.AllTypes, 0, 500)
+	if err != nil {
+		t.Fatalf("sprint 12: %v", err)
+	}
+	if total != len(page) {
+		t.Errorf("total = %d over %d rows, want the narrowed count", total, len(page))
+	}
+	if len(page) == 0 || len(page) >= len(whole) {
+		t.Fatalf("sprint 12 answered %d of the project's %d issues, want its own cards and no more", len(page), len(whole))
+	}
+	for _, iss := range page {
+		if iss.SprintID != "12" {
+			t.Errorf("%s reports sprint %q, want only sprint 12's cards", iss.Key, iss.SprintID)
+		}
+	}
+	// Every one of them, not just some: a completion that reads half a
+	// sprint leaves the other half behind in a closed one.
+	want := 0
+	for _, iss := range whole {
+		if iss.SprintID == "12" {
+			want++
+		}
+	}
+	if len(page) != want {
+		t.Errorf("sprint 12 answered %d cards, want the %d the dataset puts in it", len(page), want)
 	}
 }
 
