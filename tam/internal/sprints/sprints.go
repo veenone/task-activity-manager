@@ -77,12 +77,18 @@ type Store interface {
 	ReplaceSprintIssues(ctx context.Context, profileID string, boardID int, sprintID string, keys []string) error
 }
 
-// Completion is what a completion did, and it is returned together with the
-// error rather than instead of it. A push that fails partway has already
-// taken some cards out of the sprint, so "twelve of forty moved and the
-// sprint is still open" is the only honest report, and a count alone cannot
-// say it: Failed names the cards still in the sprint, which is the list the
-// user needs to decide what to do next.
+// Completion is what a completion did, and a push that failed partway is one
+// of the things it can have done. A failed push has already taken some cards
+// out of the sprint, so "twelve of forty moved and the sprint is still open"
+// is the only honest report, and a count alone cannot say it: Failed names
+// the cards still in the sprint, which is the list the user needs to decide
+// what to do next.
+//
+// That report travels in Message rather than in a Go error, because Wails
+// discards a bound method's return value whenever the method also returns a
+// non-nil error: the dispatcher fills in either the result or the error and
+// never both. An error would therefore deliver the sentence and drop the
+// keys it is about, which is the one thing the user needs at that moment.
 //
 // Every count here is over the issue types TAM syncs (backend.AllTypes) and
 // nothing else. A sprint holding a card of a type this project defines for
@@ -98,6 +104,10 @@ type Completion struct {
 	// Failed are the incomplete issues that did not move, empty when they
 	// all did.
 	Failed []string `json:"failed"`
+	// Message is why the completion did not finish, empty when it did. A
+	// completion carrying one has left the sprint open, and Failed names the
+	// cards still in it.
+	Message string `json:"message"`
 }
 
 // Service runs the ceremonies against one profile's backend and the board
@@ -168,6 +178,12 @@ func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID
 // because a key alone cannot say whether the card finished: an issue is
 // complete when its status id is in the last board column's status ids, the
 // same mapping the board itself draws with.
+//
+// A push that failed partway is reported in the Completion and not as an
+// error, so the keys travel with the sentence about them. Everything else is
+// an error: a refusal before anything moved has nothing to report, and a
+// close that failed after every card moved names its own counts in a
+// sentence that stands on its own.
 func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (Completion, error) {
 	sid := strconv.Itoa(sprintID)
 	done := Completion{Failed: []string{}}
@@ -210,9 +226,12 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 			// open sprint with nothing recording where they went.
 			done.Failed = append(done.Failed, incomplete[start:]...)
 			done.Moved = len(moved)
-			s.refreshMembership(ctx, profileID, boardID, sid, moved)
-			return done, fmt.Errorf("%d of %d unfinished issues moved to %s, so the sprint was left open: %w",
+			done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s, so the sprint was left open: %s",
 				done.Moved, len(incomplete), done.MovedTo, err)
+			s.refreshMembership(ctx, profileID, boardID, sid, moved)
+			// No Go error: the keys in Failed are what the dialog has to
+			// name, and Wails drops the value when an error goes with it.
+			return done, nil
 		}
 		moved = append(moved, incomplete[start:end]...)
 	}

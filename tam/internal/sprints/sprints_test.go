@@ -339,9 +339,10 @@ func TestCompleteWithNothingUnfinishedClosesWithoutAMove(t *testing.T) {
 }
 
 // TestCompleteWhoseMoveFailsLeavesTheSprintOpen is the destructive case. The
-// push fails, so the sprint is never closed, the completion says so, and the
-// error carries the count with it: the dialog has to be able to tell the
-// user what did happen before it tells them what did not.
+// push fails, so the sprint is never closed, and the completion says so in
+// its own Message rather than in a Go error: Wails would drop the value the
+// keys travel in. The dialog has to be able to tell the user what did happen
+// before it tells them what did not.
 func TestCompleteWhoseMoveFailsLeavesTheSprintOpen(t *testing.T) {
 	b := &fakeBackend{
 		issues:  sprintOf("1", "3", "1"),
@@ -350,11 +351,11 @@ func TestCompleteWhoseMoveFailsLeavesTheSprintOpen(t *testing.T) {
 	store := newStore()
 
 	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
-	if err == nil {
-		t.Fatal("complete = nil error, want the failed push reported")
+	if err != nil {
+		t.Fatalf("complete = %v, want the failed push carried in the completion instead", err)
 	}
-	if !strings.Contains(err.Error(), "403 Forbidden") || !strings.Contains(err.Error(), "left open") {
-		t.Errorf("err = %v, want Jira's reason and the fact the sprint is still open", err)
+	if !strings.Contains(done.Message, "403 Forbidden") || !strings.Contains(done.Message, "left open") {
+		t.Errorf("message = %q, want Jira's reason and the fact the sprint is still open", done.Message)
 	}
 	if done.Moved != 0 || len(done.Failed) != 3 {
 		t.Errorf("completion = %+v, want nothing moved and all three named", done)
@@ -393,11 +394,11 @@ func TestAMiddleChunkThatFailsReportsWhatMovedAndCorrectsTheCache(t *testing.T) 
 	s.PushBatch = 3
 
 	done, err := s.Complete(context.Background(), "p1", 1, 12, "")
-	if err == nil {
-		t.Fatal("complete = nil error, want the failed chunk reported")
+	if err != nil {
+		t.Fatalf("complete = %v, want the failed chunk carried in the completion instead", err)
 	}
-	if !strings.Contains(err.Error(), "3 of 9") {
-		t.Errorf("err = %v, want it to say how many of the unfinished cards moved", err)
+	if !strings.Contains(done.Message, "3 of 9") {
+		t.Errorf("message = %q, want it to say how many of the unfinished cards moved", done.Message)
 	}
 	if done.Moved != 3 || len(done.Failed) != 6 {
 		t.Errorf("completion = %+v, want three moved and the other six named", done)

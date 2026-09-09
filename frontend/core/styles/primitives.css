@@ -1358,7 +1358,8 @@
   border-radius: 6px;
   background: var(--surface-2);
 }
-.bulk-count { font-weight: 600; color: var(--accent); }
+.bulk-count { font-weight: 600; }
+.board-selection-bar .bulk-count { color: var(--accent); }
 .board-selection-bar .board-picker { margin: 0; }
 .board-selection-clear { margin-left: auto; }
 .board-card-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }

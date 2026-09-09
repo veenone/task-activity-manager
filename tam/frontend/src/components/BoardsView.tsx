@@ -47,7 +47,9 @@ export function BoardsView() {
   // The board, sprint, and swimlane choices belong to the profile they were
   // made for, so a switch clears them in the render that first sees the new
   // id. An effect would be one render too late: a board query would go out
-  // pairing the new profile with the old board id.
+  // pairing the new profile with the old board id. The checked cards are
+  // cleared the same way, inside useBoardSelection, which does not exist yet
+  // at this point in the render.
   const [filtersFor, setFiltersFor] = useState(activeId);
   if (filtersFor !== activeId) {
     setFiltersFor(activeId);
@@ -95,7 +97,10 @@ export function BoardsView() {
   // board, filter and all, so the selection can only ever hold cards the
   // reader can see.
   const order = useMemo(() => (data ? cardKeys(data) : []), [data]);
-  const selection = useBoardSelection(order);
+  // The selection resets itself on a profile switch, from the id handed in
+  // here: the block above runs before this hook exists, so it cannot clear
+  // something it has not built yet.
+  const selection = useBoardSelection(order, activeId);
   const askBeforeCompleting = useCompleteGuard(activeId);
   const moves = useBoardMoves({
     profileId: activeId,
@@ -229,8 +234,11 @@ export function BoardsView() {
         onPutBack={moves.putBack}
       />
 
+      {/* Named, because the sentence is also announced through the shared
+          live region and the two status regions are otherwise the same
+          thing to anything reading the page. */}
       {ceremonyLine && (
-        <div className="pending-banner" role="status">
+        <div className="pending-banner" role="status" aria-label="Sprint ceremony">
           <p>{ceremonyLine}</p>
         </div>
       )}

@@ -11,8 +11,20 @@ import type { Selection } from "../lib/boardSelection";
 // card the board is no longer drawing can never be counted, painted, or
 // moved: a refetch narrows the selection instead of silently widening what
 // the next action touches.
-export function useBoardSelection(order: string[]) {
+//
+// madeFor is who the selection belongs to, the active profile. It is reset
+// here rather than by the caller because the caller's own render-time reset
+// runs before this hook exists, and an effect would be one render too late:
+// a bulk move fired in between would carry the last profile's keys. Two
+// profiles over the same project key draw the same issue keys, so a
+// selection carried across a switch would look entirely plausible.
+export function useBoardSelection(order: string[], madeFor: string) {
   const [selection, setSelection] = useState<Selection>(NONE);
+  const [belongsTo, setBelongsTo] = useState(madeFor);
+  if (belongsTo !== madeFor) {
+    setBelongsTo(madeFor);
+    setSelection(NONE);
+  }
   const keys = useMemo(() => checkedIn(selection, order), [selection, order]);
   const checked = useMemo(() => new Set(keys), [keys]);
 
@@ -22,9 +34,10 @@ export function useBoardSelection(order: string[]) {
     keys,
     checked,
     count: keys.length,
-    // reset empties it and forgets the anchor: a change of board, sprint,
-    // swimlane or profile is a different board, and a selection made on the
-    // last one means nothing on this one.
+    // reset empties it and forgets the anchor: a change of board, sprint or
+    // swimlane is a different board, and a selection made on the last one
+    // means nothing on this one. A change of profile does the same, from the
+    // check above rather than from a caller.
     reset: () => setSelection(NONE),
     // clearTo is the plain gesture: nothing checked, and the card just
     // touched left as the anchor a shift gesture will measure from.

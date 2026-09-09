@@ -127,6 +127,13 @@ function Loader() {
   return null;
 }
 
+// Switcher stands in for the topbar's profile picker, which lives above
+// BoardsView in the shell.
+function Switcher() {
+  const { setActiveId } = useProfile<api.Profile, api.Settings>();
+  return <button type="button" onClick={() => setActiveId("p2")}>Switch profile</button>;
+}
+
 function renderView() {
   return render(
     <QueryClientProvider client={createQueryClient()}>
@@ -134,9 +141,12 @@ function renderView() {
         <ProfileProvider backend={profileBackend}>
           <ModalProvider>
             <Loader />
+            <Switcher />
             {/* The board announces every move it makes, so the region
                 those announcements land in is part of what these tests
-                render. */}
+                render. A ceremony's sentence lands in both this region and
+                the board's own banner, so anything asserting on one of them
+                says which. */}
             <LiveRegion />
             <BoardsView />
           </ModalProvider>
@@ -189,7 +199,7 @@ beforeEach(() => {
   vi.mocked(api.CanTransition).mockResolvedValue({ reachable: [], allowed: true });
   vi.mocked(api.JournalSprintMoves).mockResolvedValue(3);
   vi.mocked(api.StartSprint).mockResolvedValue();
-  vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [] });
+  vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [], message: "" });
   vi.mocked(api.SuggestSprintDates).mockResolvedValue({
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
@@ -1003,7 +1013,7 @@ describe("BoardsView selection", () => {
     await screen.findByText("3 cards selected");
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Move the selected cards to" }), "13");
-    await user.click(screen.getByRole("button", { name: "Move 3 cards to sprint" }));
+    await user.click(screen.getByRole("button", { name: "Move 3 cards" }));
 
     await waitFor(() =>
       expect(api.JournalSprintMoves).toHaveBeenCalledWith("p1", ["PLAT-409", "PLAT-412", "PLAT-347"], "13"),
@@ -1047,6 +1057,77 @@ describe("BoardsView selection", () => {
     await screen.findByText("1 card selected");
     await user.click(screen.getByRole("button", { name: "Clear" }));
     await waitFor(() => expect(screen.queryByText(/card selected/)).not.toBeInTheDocument());
+  });
+
+  // Enter opens the panel for one card, which is the same thing a plain
+  // click is, so it empties the selection the same way a plain click does.
+  it("clears the selection on Enter, which is the panel's own gesture", async () => {
+    const user = userEvent.setup();
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    check(card);
+    check(screen.getByRole("gridcell", { name: /PLAT-412/ }));
+    await screen.findByText("2 cards selected");
+
+    card.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByText(/cards selected/)).not.toBeInTheDocument());
+    expect(await screen.findByRole("heading", { name: "PLAT-409" })).toBeInTheDocument();
+  });
+
+  // The board is the scroller, so a Space the board does not swallow scrolls
+  // the cards out from under the focused one. Every Space is suppressed;
+  // only the unmodified one checks.
+  it("swallows a modified Space rather than letting it scroll the board", async () => {
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    card.focus();
+    expect(fireEvent.keyDown(card, { key: " ", shiftKey: true })).toBe(false);
+    expect(fireEvent.keyDown(card, { key: " ", ctrlKey: true })).toBe(false);
+    expect(screen.queryByText(/card selected/)).not.toBeInTheDocument();
+  });
+
+  // Two profiles over the same project key draw the same issue keys, so a
+  // selection carried across a switch would look entirely plausible and act
+  // on the wrong profile's cards.
+  it("clears the selection when the profile changes under it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListProfiles).mockResolvedValue([
+      { id: "p1", name: "Acme Platform", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
+      { id: "p2", name: "Acme Platform (staging)", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
+    ]);
+    renderView();
+    check(await screen.findByRole("gridcell", { name: /PLAT-409/ }));
+    check(screen.getByRole("gridcell", { name: /PLAT-412/ }));
+    await screen.findByText("2 cards selected");
+
+    await user.click(screen.getByRole("button", { name: "Switch profile" }));
+    // Waiting for the board the new profile drew, so this is the selection
+    // after the redraw rather than the gap while one is in flight.
+    await waitFor(() => expect(api.GetBoard).toHaveBeenCalledWith("p2", 1, "12", "none"));
+    await screen.findByRole("gridcell", { name: /PLAT-409/ });
+    expect(screen.queryByText(/cards selected/)).not.toBeInTheDocument();
+  });
+
+  // The backlog is always somewhere to put a card, and both the card's own
+  // menu and the panel's sprint field offer it, so the bar cannot be the one
+  // surface saying there is nowhere to move them.
+  it("moves the checked cards to the backlog when that is the destination", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListBoardSprints).mockResolvedValue([SPRINTS[0]]);
+    renderView();
+    check(await screen.findByRole("gridcell", { name: /PLAT-409/ }));
+    check(screen.getByRole("gridcell", { name: /PLAT-412/ }));
+    await screen.findByText("2 cards selected");
+
+    const picker = screen.getByRole("combobox", { name: "Move the selected cards to" });
+    expect(within(picker).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
+    await user.selectOptions(picker, "backlog");
+    await user.click(screen.getByRole("button", { name: "Move 2 cards" }));
+
+    await waitFor(() =>
+      expect(api.JournalSprintMoves).toHaveBeenCalledWith("p1", ["PLAT-409", "PLAT-412"], ""),
+    );
   });
 });
 
@@ -1104,7 +1185,11 @@ describe("BoardsView sprint ceremonies", () => {
       expect(api.StartSprint).toHaveBeenCalledWith("p1", 1, 13, "Sprint 13", "", "2026-09-14", "2026-09-28"),
     );
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Start Sprint 13" })).not.toBeInTheDocument());
-    expect(await screen.findByText("Sprint 13 is running, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
+    // Scoped to the banner: the same sentence also goes to the shared live
+    // region, so an unscoped query matches twice as soon as the region's
+    // own timer fires.
+    const banner = await screen.findByRole("status", { name: "Sprint ceremony" });
+    expect(within(banner).getByText("Sprint 13 is running, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
   });
 
   it("refuses an end date before the start without asking Jira", async () => {
@@ -1156,7 +1241,7 @@ describe("BoardsView sprint ceremonies", () => {
 
   it("completes into the chosen sprint and says what moved where", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "Sprint 13", failed: [] });
+    vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "Sprint 13", failed: [], message: "" });
     renderView();
     await screen.findByRole("gridcell", { name: /PLAT-412/ });
     await user.click(screen.getByRole("button", { name: "Complete sprint" }));
@@ -1165,19 +1250,29 @@ describe("BoardsView sprint ceremonies", () => {
     await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
 
     await waitFor(() => expect(api.CompleteSprint).toHaveBeenCalledWith("p1", 1, 12, "13"));
+    const banner = await screen.findByRole("status", { name: "Sprint ceremony" });
     expect(
-      await screen.findByText("Sprint 12 is closed. 2 unfinished cards moved to Sprint 13."),
+      within(banner).getByText("Sprint 12 is closed. 2 unfinished cards moved to Sprint 13."),
     ).toBeInTheDocument();
     // The picker moved to where the cards went, rather than to whatever is
     // first in the list.
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("13"));
   });
 
-  it("keeps the completion dialog open and says the sprint is still open when it fails", async () => {
+  // A push that fell over partway comes back as a completion carrying its
+  // own message, never as a rejection: Wails hands the frontend the value or
+  // the error and never both, and the keys are the half that matters. The
+  // dialog then stops promising a move and names the cards that did not make
+  // it, which is the one thing the user needs when every unfinished card has
+  // already left an open sprint.
+  it("names the cards a half finished completion did not move", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockRejectedValue(
-      new Error("1 of 2 unfinished issues moved to the backlog, so the sprint was left open: 403"),
-    );
+    vi.mocked(api.CompleteSprint).mockResolvedValue({
+      moved: 1,
+      movedTo: "the backlog",
+      failed: ["PLAT-412"],
+      message: "1 of 2 unfinished issues moved to the backlog, so the sprint was left open: 403 Forbidden",
+    });
     renderView();
     await screen.findByRole("gridcell", { name: /PLAT-412/ });
     await user.click(screen.getByRole("button", { name: "Complete sprint" }));
@@ -1186,8 +1281,59 @@ describe("BoardsView sprint ceremonies", () => {
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("the sprint was left open");
     expect(screen.getByRole("dialog", { name: "Complete Sprint 12" })).toBeInTheDocument();
+    // The list is about the cards that did not move now, and says so rather
+    // than promising a move over a list that has changed meaning underneath.
+    expect(
+      within(dialog).getByText("1 card did not move and is still in Sprint 12:"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
+    expect(within(dialog).queryByText("PLAT-409")).not.toBeInTheDocument();
+    // The foot reports what happened instead of promising what will.
+    expect(within(dialog).getByText("1 card moved to the backlog.")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/cards move to/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the completion dialog open with Jira's own sentence when a close fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CompleteSprint).mockRejectedValue(
+      new Error("2 of 2 unfinished issues moved to the backlog, but the sprint could not be closed and is open with none of them in it: 403"),
+    );
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(screen.getByRole("button", { name: "Complete sprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
+    await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("could not be closed");
+    expect(screen.getByRole("dialog", { name: "Complete Sprint 12" })).toBeInTheDocument();
     // The cards it was moving are still named above the message.
     expect(within(dialog).getByText("PLAT-409")).toBeInTheDocument();
+  });
+
+  // The list is the drawn board, and a drawn board is not the whole sprint.
+  // Cards past a cell's cap, cards the sync has not fetched, and cards whose
+  // status no column collects are in no cell to be read out of, so the
+  // dialog says how many it cannot show rather than presenting the list as
+  // the sprint.
+  it("says the list is the last sync and how many cards it cannot show", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetBoard).mockResolvedValue({
+      ...oneLane([[KEYS], [PROMO], [RETRO]], [2, 0, 4]),
+      unmapped: 3,
+      unmappedStatuses: ["Blocked"],
+      notSynced: 1,
+      capped: true,
+    });
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(screen.getByRole("button", { name: "Complete sprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
+
+    expect(within(dialog).getByText(/This is the board as TAM last synced it/)).toBeInTheDocument();
+    // Two in the first column's overflow, three unmapped and one unsynced.
+    // The four in the last column's overflow have finished, so they are not
+    // cards this list is meant to be naming.
+    expect(within(dialog).getByText(/^6 cards on this board are not drawn/)).toBeInTheDocument();
   });
 
   it("stops the completion before the dialog opens when the sprint has pending work", async () => {

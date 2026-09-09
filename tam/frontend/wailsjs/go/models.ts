@@ -1101,6 +1101,7 @@ export namespace sprints {
 	    moved: number;
 	    movedTo: string;
 	    failed: string[];
+	    message: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Completion(source);
@@ -1111,6 +1112,7 @@ export namespace sprints {
 	        this.moved = source["moved"];
 	        this.movedTo = source["movedTo"];
 	        this.failed = source["failed"];
+	        this.message = source["message"];
 	    }
 	}
 	export class Suggestion {

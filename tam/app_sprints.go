@@ -60,10 +60,11 @@ func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, s
 // CompleteSprint moves the sprint's unfinished issues to moveTo, the
 // backlog when it is empty, and then closes the sprint.
 //
-// The completion comes back with the error rather than instead of it: a
-// push that failed partway has already taken cards out of the sprint, and
-// the dialog has to be able to say how many went where before it says the
-// sprint is still open.
+// A push that failed partway comes back as a Completion carrying its own
+// Message, with no Go error: Wails hands the frontend either the value or
+// the error and never both, so an error there would deliver the sentence and
+// drop the keys it is about. Every other failure is an error, and says
+// everything it has to say in its own words.
 //
 // boardID is not in the plan's one-line signature and is needed all the
 // same: "unfinished" is defined by the board's last column, which cannot be
@@ -84,6 +85,10 @@ func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo str
 	if err != nil {
 		log.Printf("tam: complete sprint %d for %s failed after moving %d: %v", sprintID, p.Name, done.Moved, err)
 		return done, err
+	}
+	if done.Message != "" {
+		log.Printf("tam: complete sprint %d for %s stopped partway: %s", sprintID, p.Name, done.Message)
+		return done, nil
 	}
 	log.Printf("tam: completed sprint %d for %s: %d issues moved to %s", sprintID, p.Name, done.Moved, done.MovedTo)
 	return done, nil

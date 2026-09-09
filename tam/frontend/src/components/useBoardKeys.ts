@@ -109,9 +109,13 @@ export function useBoardKeys({
       if (issue) onOpen(issue, id);
       return;
     }
-    if (e.key === " " && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+    // Space belongs to the board in every combination, not only on its own:
+    // the board is the scroller, so a Space that falls through scrolls the
+    // cards out from under the card focus is on. It is suppressed either
+    // way, as 3b's branch suppressed it, and only the unmodified one checks.
+    if (e.key === " ") {
       e.preventDefault();
-      if (issue) selection.check(issue.key);
+      if (issue && !e.ctrlKey && !e.shiftKey && !e.altKey) selection.check(issue.key);
       return;
     }
     if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {

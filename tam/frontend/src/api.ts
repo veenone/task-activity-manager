@@ -291,10 +291,17 @@ export interface SprintSuggestion {
 // It comes back with a failure as well as with a success: a push that fell
 // over partway has already taken cards out of the sprint, and the dialog has
 // to say how many went where before it says the sprint is still open.
+//
+// message is how that failure arrives, rather than as a rejected promise.
+// Wails hands the frontend either a bound method's value or its error and
+// never both, so a partial completion reported as an error would deliver the
+// sentence and drop failed, which is the list the user needs. A non-empty
+// message means the completion did not finish.
 export interface SprintCompletion {
   moved: number;
   movedTo: string;
   failed: string[];
+  message: string;
 }
 
 export interface BoardSummary {

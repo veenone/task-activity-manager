@@ -45,6 +45,27 @@ function incompleteCards(view: BoardView): Issue[] {
   return out;
 }
 
+// hiddenCards is how many of this board's cards incompleteCards can never
+// reach, because they are in no drawn cell to be read out of.
+//
+// Three kinds, and Jira's re-read at completion time moves all of them: the
+// cards past MaxCardsPerCell or MaxCardsPerView, which the lane counts in
+// its overflow rather than rendering; the ones counted in notSynced, in the
+// sprint as far as the board's own key list goes but absent from the issue
+// cache; and the ones counted in unmapped, whose status no column collects,
+// so they land in no cell at all. The last column's overflow is left out,
+// since a card in it has finished.
+function hiddenCards(view: BoardView): number {
+  const last = view.columns.length - 1;
+  let n = view.unmapped + view.notSynced;
+  for (const lane of view.lanes) {
+    (lane.overflow ?? []).forEach((over, col) => {
+      if (col !== last) n += over;
+    });
+  }
+  return n;
+}
+
 // useCompleteGuard is what the Complete button asks before the dialog opens.
 //
 // A card dragged to Done an hour ago is Done on this board and not in Jira,
@@ -109,6 +130,7 @@ export function BoardCeremonies({
         sprint={sprint}
         futures={sprints.filter((s) => s.state === "future")}
         incomplete={view ? incompleteCards(view) : []}
+        hidden={view ? hiddenCards(view) : 0}
         lastColumn={view?.columns[view.columns.length - 1]?.name ?? "the last column"}
         onClose={onClose}
         onCompleted={onCompleted}
