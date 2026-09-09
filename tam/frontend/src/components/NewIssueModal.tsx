@@ -6,6 +6,7 @@ import { CreateIssue, ISSUE_TYPES } from "../api";
 import type { FieldSpec, IssueDraft, IssueType, Profile, Settings } from "../api";
 import { useCreateFields } from "../queries/pending";
 import { useEpics } from "../queries/tree";
+import { useOpenSprints } from "../queries/boards";
 import { useSubtaskType } from "../queries/people";
 import { AssigneePicker } from "./AssigneePicker";
 import { PriorityPicker } from "./PriorityPicker";
@@ -61,6 +62,13 @@ function typeLabel(type: IssueType): string {
 // epic has no parent at all.
 function hasParentPicker(type: IssueType): boolean {
   return type !== "epic" && type !== "subtask";
+}
+
+// hasSprintPicker says whether the type can belong to a sprint at all. An
+// epic cannot: it is not a card a board carries, and Jira has no sprint
+// field on it.
+function hasSprintPicker(type: IssueType): boolean {
+  return type !== "epic";
 }
 
 // hasPoints says whether a type carries story points. An epic is measured by
@@ -174,6 +182,9 @@ export function NewIssueModal({
   const [assignee, setAssignee] = useState("");
   const [points, setPoints] = useState("");
   const [parentKey, setParentKey] = useState(fixedParent || initialEpic);
+  // "" is the backlog, a destination and not an absence, the same default
+  // MoveIssueToSprint's own picker opens on.
+  const [sprintId, setSprintId] = useState("");
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   // The control the last validation failure belongs to, so the message is
@@ -182,6 +193,7 @@ export function NewIssueModal({
   const [saving, setSaving] = useState(false);
   const meta = useCreateFields(activeId, type);
   const epics = useEpics(activeId);
+  const openSprints = useOpenSprints(activeId);
   const subtaskType = useSubtaskType(activeId);
   const specs = meta.data ?? [];
   const summaryRef = useRef<HTMLInputElement>(null);
@@ -228,7 +240,10 @@ export function NewIssueModal({
     setError("");
     setInvalidField("");
     if (!hasPoints(next)) setPoints("");
-    if (next === "epic") setParentKey("");
+    if (next === "epic") {
+      setParentKey("");
+      setSprintId("");
+    }
   }
 
   function fail(message: string, field: string) {
@@ -263,6 +278,10 @@ export function NewIssueModal({
         return;
       }
     }
+    // The name travels with the id: Task 1's create path reads the draft's
+    // JSON, and the sprint's name is what the Backlog and the detail panel
+    // show before Commit, before there is anything cached to look it up in.
+    const chosenSprintName = openSprints.data?.find((s) => String(s.id) === sprintId)?.name ?? "";
     const draft: IssueDraft = {
       type,
       summary: summary.trim(),
@@ -272,6 +291,8 @@ export function NewIssueModal({
       assignee,
       storyPoints: !hasPoints(type) || points.trim() === "" ? null : Number(points.trim()),
       parentKey: type === "epic" ? "" : parentKey,
+      sprintId: type === "epic" ? "" : sprintId,
+      sprintName: type === "epic" ? "" : chosenSprintName,
       extra: Object.fromEntries(Object.entries(extra).filter(([, v]) => v.trim() !== "")),
     };
     setError("");
@@ -375,6 +396,22 @@ export function NewIssueModal({
               <option value="">{epics.isLoading ? "(loading)" : "(none)"}</option>
               {parentEpics.map((epic) => (
                 <option key={epic.key} value={epic.key}>{epicOptionLabel(epic.key, epic.summary)}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {hasSprintPicker(type) && (
+          <label className="edit-row" htmlFor="new-sprint">
+            <span className="muted small">Sprint</span>
+            <select
+              id="new-sprint"
+              className="detail-input"
+              value={sprintId}
+              onChange={(e) => setSprintId(e.target.value)}
+            >
+              <option value="">The backlog</option>
+              {(openSprints.data ?? []).map((s) => (
+                <option key={s.id} value={String(s.id)}>{s.name}</option>
               ))}
             </select>
           </label>

@@ -21,6 +21,8 @@ vi.mock("../api", async () => {
     GetEpicTree: vi.fn(),
     ListEpics: vi.fn(),
     ListSprints: vi.fn(),
+    ListOpenSprints: vi.fn(),
+    MoveIssueToSprint: vi.fn(),
     GetIssueDetail: vi.fn(),
     ListLinkedTests: vi.fn(),
     ListActivity: vi.fn(),
@@ -86,6 +88,8 @@ beforeEach(() => {
   vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
   vi.mocked(api.EditIssue).mockResolvedValue(undefined);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
+  vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
+  vi.mocked(api.MoveIssueToSprint).mockResolvedValue();
   vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
   vi.mocked(api.SearchUsers).mockResolvedValue([]);
   vi.mocked(api.ListPriorities).mockResolvedValue(["High"]);
@@ -222,6 +226,31 @@ describe("EpicsView", () => {
     renderView();
     await user.click(await screen.findByText("Apply promo code"));
     expect(await screen.findByRole("heading", { name: "PLAT-101" })).toBeInTheDocument();
+  });
+
+  it("offers the profile's open sprints on a child issue and journals a move", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [
+        epicNode({
+          issue: issue({ key: "PLAT-100", type: "epic", summary: "Checkout revamp" }),
+          children: [issue({ key: "PLAT-101", summary: "Apply promo code", sprintId: "12", sprintName: "Sprint 12" })],
+          total: 1, done: 0, points: 0, donePoints: 0,
+        }),
+      ],
+      orphans: [],
+      truncated: false,
+    });
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+      { id: 13, name: "Sprint 13", boardName: "Platform board", state: "future" },
+    ]);
+    renderView();
+    await user.click(await screen.findByText("Apply promo code"));
+    const picker = await screen.findByRole("combobox", { name: "Sprint" });
+    expect(within(picker).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
+    await user.selectOptions(picker, "13");
+    await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-101", "13"));
   });
 
   it("highlights the moved row for two seconds after a parentKey edit", async () => {

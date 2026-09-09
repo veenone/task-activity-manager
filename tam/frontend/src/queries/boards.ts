@@ -8,6 +8,7 @@ import {
   JournalSprintMoves,
   ListBoardSprints,
   ListBoards,
+  ListOpenSprints,
   MoveIssueToColumn,
   MoveIssueToSprint,
   RankIssue,
@@ -36,6 +37,18 @@ export function useBoardSprints(profileId: string, boardId: number) {
     queryKey: keys.boardSprints(profileId, boardId),
     queryFn: () => call(() => ListBoardSprints(profileId, boardId)),
     enabled: !!profileId && boardId > 0,
+  });
+}
+
+// useOpenSprints lists every open sprint across every board the profile has
+// synced, active ones first then by start date. It is what a caller with no
+// board of its own (the Backlog, the Epics tree) hands the detail panel's
+// Sprint field so it can offer a choice instead of only printing a fact.
+export function useOpenSprints(profileId: string) {
+  return useQuery({
+    queryKey: keys.openSprints(profileId),
+    queryFn: () => call(() => ListOpenSprints(profileId)),
+    enabled: !!profileId,
   });
 }
 
@@ -78,6 +91,10 @@ export function useBoardsUnavailable(profileId: string) {
 // the duration: Go holds one per-profile lock for a refresh and a sync alike,
 // so a refresh that did not take the frontend's lock left the shell offering
 // a Sync the backend would refuse.
+//
+// openSprints is invalidated here too: a board's sprints can change on this
+// pass alone, without a full issue sync, and the profile-wide list is drawn
+// from the same per-board sprint rows.
 export function useSyncBoards(profileId: string, run: () => Promise<BoardSummary>) {
   const qc = useQueryClient();
   return useMutation({
@@ -90,6 +107,7 @@ export function useSyncBoards(profileId: string, run: () => Promise<BoardSummary
         [profileId, "board"] as const,
         keys.boardsUnavailable(profileId),
         keys.syncState(profileId),
+        keys.openSprints(profileId),
       ]) {
         qc.invalidateQueries({ queryKey });
       }

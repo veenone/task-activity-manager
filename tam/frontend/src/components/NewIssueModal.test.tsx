@@ -18,6 +18,7 @@ vi.mock("../api", async () => {
     SetDefaultProfile: vi.fn(),
     GetCreateFields: vi.fn(),
     ListEpics: vi.fn(),
+    ListOpenSprints: vi.fn(),
     SearchUsers: vi.fn(),
     ListPriorities: vi.fn(),
     GetSubtaskTypeName: vi.fn(),
@@ -77,7 +78,7 @@ const epic = (key: string, summary: string): api.Issue => ({
 // The draft every test expects, minus whatever that test changes.
 const baseDraft = {
   type: "task", summary: "", description: "", priority: "", labels: [] as string[],
-  assignee: "", storyPoints: null as number | null, parentKey: "", extra: {},
+  assignee: "", storyPoints: null as number | null, parentKey: "", sprintId: "", sprintName: "", extra: {},
 };
 
 beforeEach(() => {
@@ -95,6 +96,7 @@ beforeEach(() => {
     epic("PLAT-350", "Promotions and discounts"),
     epic("PLAT-360", "Checkout revamp"),
   ]);
+  vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
   vi.mocked(api.SearchUsers).mockResolvedValue([
     { name: "mortiz", displayName: "M. Ortiz" },
     { name: "ranand", displayName: "R. Anand" },
@@ -148,6 +150,45 @@ describe("NewIssueModal", () => {
     await user.click(await submitButton(dialog));
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
     expect(vi.mocked(api.CreateIssue).mock.calls[0][1].parentKey).toBe("PLAT-350");
+  });
+
+  it("lists the open sprints and sends the chosen one on the draft", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+      { id: 13, name: "Sprint 13", boardName: "Platform board", state: "future" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "story");
+    const dialog = await screen.findByRole("dialog", { name: "New story" });
+    const sprint = await within(dialog).findByLabelText("Sprint");
+    expect(within(sprint).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
+    expect(within(sprint).getByRole("option", { name: "Sprint 12" })).toBeInTheDocument();
+    expect(within(sprint).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
+    await user.selectOptions(sprint, "13");
+    await user.type(within(dialog).getByLabelText("Summary *"), "Apply a promo code");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.sprintId).toBe("13");
+    expect(draft.sprintName).toBe("Sprint 13");
+  });
+
+  it("has no sprint select for an epic, and drops a chosen sprint when the type becomes one", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "story");
+    const dialog = await screen.findByRole("dialog", { name: "New story" });
+    await user.selectOptions(await within(dialog).findByLabelText("Sprint"), "12");
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
+    expect(within(dialog).queryByLabelText("Sprint")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Summary *"), "Checkout revamp");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.sprintId).toBe("");
+    expect(draft.sprintName).toBe("");
   });
 
   it("has no epic picker for an epic, and drops a parent when the type becomes one", async () => {

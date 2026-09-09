@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { errMsg, useNotice } from "@agile-suite/core";
-import type { Issue, Link, Sprint } from "../api";
+import type { Issue, Link, SprintOption } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { useDiscardById } from "../queries/pending";
 import { formatWhen } from "../lib/format";
@@ -88,11 +88,12 @@ interface Props {
   profileId: string;
   issue: Issue;
   jiraUrl?: string;
-  // sprints are the board's open sprints, given only by a caller that has a
-  // board: with them, Sprint is a choice that journals a move; without them
-  // it stays the fact it has always been. The Backlog and the Epics tree
-  // belong to a project, not to a board, and have no such list to offer.
-  sprints?: Sprint[];
+  // sprints are every open sprint the panel can offer: the board's own list
+  // from BoardsView, or the profile-wide list from BacklogView and
+  // EpicsView. With a list, however empty, Sprint is a choice that journals
+  // a move; undefined keeps the panel's read-only fact, which is what a
+  // caller passes while its own sprint query is still in flight.
+  sprints?: SprintOption[];
   onClose: () => void;
 }
 

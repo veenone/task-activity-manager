@@ -316,6 +316,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The value wraps rather than clipping: the panel is resizeable and these
    are facts a reader needs whole, so the column gives way, not the text. */
 .detail-fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+/* The Sprint field's select and its "no sprints yet" sentence stack rather
+   than crowd the same line, on a profile whose boards have not been synced. */
+.sprint-field { display: flex; flex-direction: column; gap: 4px; }
+.sprint-field-empty { display: block; }
 /* Section headings double as dividers, which is what gives the dense panel
    its rhythm; the whole heading is the toggle. */
 .detail-section-title {

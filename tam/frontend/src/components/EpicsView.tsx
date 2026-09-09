@@ -3,6 +3,7 @@ import { useProfile } from "@agile-suite/core";
 import type { EpicTreeData, Issue, Profile, Settings, TreeQuery } from "../api";
 import { useEpicTree } from "../queries/tree";
 import { useSprints } from "../queries/issues";
+import { useOpenSprints } from "../queries/boards";
 import { EpicTree } from "./EpicTree";
 import { MOVED_FLASH_MS } from "../lib/flash";
 import { IssueDetailPanel } from "./IssueDetailPanel";
@@ -61,6 +62,9 @@ export function EpicsView() {
   const query = useMemo<TreeQuery>(() => ({ text: search, sprintId, showDone }), [search, sprintId, showDone]);
   const tree = useEpicTree(activeId, query);
   const sprints = useSprints(activeId);
+  // The detail panel's own Sprint field, not the filter bar above: away from
+  // a board this is the only sprint list an issue here can be moved through.
+  const openSprints = useOpenSprints(activeId);
   const subtaskType = useSubtaskType(activeId);
   const { isOpen, openModal, closeModal } = useModal();
 
@@ -165,7 +169,14 @@ export function EpicsView() {
           )}
         </div>
         {selected && (
-          <IssueDetailPanel key={selected.key} profileId={activeId} issue={selected} jiraUrl={activeProfile?.jiraUrl} onClose={() => setSelectedKey("")} />
+          <IssueDetailPanel
+            key={selected.key}
+            profileId={activeId}
+            issue={selected}
+            jiraUrl={activeProfile?.jiraUrl}
+            sprints={openSprints.data}
+            onClose={() => setSelectedKey("")}
+          />
         )}
       </div>
 
