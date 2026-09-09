@@ -13,6 +13,7 @@ import (
 
 	"agile-suite/core/importfile"
 	jirabackend "agile-suite/tam/internal/backend/jira"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/importer"
 )
 
@@ -85,7 +86,15 @@ func (a *App) ImportIssues(profileID, contentB64 string, isXlsx bool, fileName s
 	if strings.TrimSpace(fileName) == "" {
 		fileName = "an uploaded file"
 	}
-	res, err := importer.Run(a.ctx, a.repo, p.ID, p.ProjectKey, reqType, records, mapping, fileName, dryRun)
+	// The Sprint column is matched against these by name. A read failure is
+	// not worth failing the whole import for: it costs the Sprint column its
+	// list, and every row naming a sprint then says so with the rest.
+	open, err := a.boards.OpenSprints(a.ctx, p.ID)
+	if err != nil {
+		log.Printf("tam: open sprints for the import of %s: %v", fileName, err)
+		open = nil
+	}
+	res, err := importer.Run(a.ctx, a.repo, p.ID, p.ProjectKey, reqType, open, records, mapping, fileName, dryRun)
 	if err != nil {
 		return res, err
 	}
@@ -105,12 +114,16 @@ func (a *App) SaveImportTemplate(profileID string) (string, error) {
 		return "", errors.New("the window is not ready")
 	}
 	reqType := jirabackend.DefaultRequirementType
+	var open []boardrepo.SprintChoice
 	// A template is worth offering even without a usable profile, so a
-	// profile that cannot be read falls back to the default type name
-	// rather than failing the save.
+	// profile that cannot be read falls back to the default type name and
+	// an unlisted Sprint column rather than failing the save.
 	if p, err := a.requireProfile(profileID); err == nil {
 		if t, err := a.requirementType(p.ID); err == nil {
 			reqType = t
+		}
+		if s, err := a.boards.OpenSprints(a.ctx, p.ID); err == nil {
+			open = s
 		}
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
@@ -131,7 +144,7 @@ func (a *App) SaveImportTemplate(profileID string) (string, error) {
 	if strings.EqualFold(filepath.Ext(path), ".csv") {
 		data = importer.TemplateCSV(reqType)
 	} else {
-		if data, err = importer.TemplateXLSX(reqType); err != nil {
+		if data, err = importer.TemplateXLSX(reqType, open); err != nil {
 			return "", fmt.Errorf("build template: %w", err)
 		}
 	}

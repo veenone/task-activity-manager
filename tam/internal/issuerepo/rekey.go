@@ -12,7 +12,8 @@ import (
 // Rekey moves a draft to the key Jira assigned, across the row, its links,
 // its journal rows, and its audit trail, and repoints any issue or pending
 // edit that named the temporary key, the parent of an edit and the
-// neighbour of a rank alike, and audits the creation.
+// neighbour of a rank alike, journals the sprint the draft was created with
+// as a move under the real key, and audits the creation.
 func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -34,6 +35,12 @@ func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey stri
 	// A rank's neighbour is packed into after_val beside the side it was
 	// dropped on, so no UPDATE over the whole column can repoint it.
 	if err := rekeyRankNeighbours(ctx, tx, profileID, tempKey, realKey); err != nil {
+		return err
+	}
+	// The sprint is the one piece of a draft the create cannot carry, so it
+	// becomes a move under the real key here, beside the repointing, and the
+	// board pass of the same Commit pushes it. draftsprint.go says why.
+	if err := journalDraftSprint(ctx, tx, profileID, realKey); err != nil {
 		return err
 	}
 	if err := journal.Audit(tx, profileID, EntityIssue, realKey, "created", "", tempKey, realKey, "created in Jira"); err != nil {

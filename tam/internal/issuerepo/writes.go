@@ -512,12 +512,18 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 		// status_id is left at its default: a draft has no Jira status, and
 		// an empty status id is what puts it in the board's first real
 		// column instead of nowhere.
+		//
+		// The sprint is written, because unlike a status it is a choice the
+		// person made rather than a place the workflow put the card: the
+		// Backlog's sprint field and the Boards view both read these two
+		// columns, so leaving them empty would show a draft in the backlog
+		// until the Commit that already knows better.
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
 				sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
-			VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, '', '', ?, ?, '', ?, '', '', ?, ?)`,
+			VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, '', '', ?, ?)`,
 			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Priority, string(labels),
-			d.ParentKey, points, now, string(detail), now); err != nil {
+			d.SprintID, d.SprintName, d.ParentKey, points, now, string(detail), now); err != nil {
 			return nil, fmt.Errorf("insert draft: %w", err)
 		}
 		if err := journal.Put(tx, profileID, EntityIssueCreate, key, FieldCreate, "", string(encoded), ""); err != nil {

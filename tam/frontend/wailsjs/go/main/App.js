@@ -134,6 +134,10 @@ export function ListLinkedTests(arg1, arg2) {
   return window['go']['main']['App']['ListLinkedTests'](arg1, arg2);
 }
 
+export function ListOpenSprints(arg1) {
+  return window['go']['main']['App']['ListOpenSprints'](arg1);
+}
+
 export function ListPendingChanges(arg1) {
   return window['go']['main']['App']['ListPendingChanges'](arg1);
 }

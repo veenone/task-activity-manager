@@ -3,6 +3,7 @@
 import {backend} from '../models';
 import {importer} from '../models';
 import {committer} from '../models';
+import {sprints} from '../models';
 import {profile} from '../models';
 import {boardrepo} from '../models';
 import {main} from '../models';
@@ -11,7 +12,6 @@ import {settings} from '../models';
 import {journal} from '../models';
 import {importfile} from '../models';
 import {syncer} from '../models';
-import {sprints} from '../models';
 
 export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<void>;
 
@@ -78,6 +78,8 @@ export function ListEpics(arg1:string):Promise<Array<backend.Issue>>;
 export function ListIssues(arg1:string,arg2:issuerepo.IssueQuery):Promise<issuerepo.IssuePage>;
 
 export function ListLinkedTests(arg1:string,arg2:string):Promise<Array<issuerepo.LinkedTest>>;
+
+export function ListOpenSprints(arg1:string):Promise<Array<boardrepo.SprintChoice>>;
 
 export function ListPendingChanges(arg1:string):Promise<Array<journal.PendingChange>>;
 

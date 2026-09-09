@@ -81,10 +81,16 @@ type IssueDraft struct {
 	ParentKey string `json:"parentKey"`
 
 	// StatusID, SprintID, and SprintName are where a draft was last dropped
-	// on a board. A draft has no Jira state, so a drag moves it in place
-	// rather than journalling a transition against an issue Jira has never
-	// seen; the create sends none of the three, since a new issue lands in
-	// its workflow's first status whatever the board showed.
+	// on a board, or where the form that made it said it belongs. A draft
+	// has no Jira state, so a drag moves it in place rather than journalling
+	// a transition against an issue Jira has never seen.
+	//
+	// The create sends none of the three. A new issue lands in its
+	// workflow's first status whatever the board showed, and the Sprint
+	// field is missing from most Data Center create screens, so a create
+	// carrying it is refused. The sprint is not dropped, though: Rekey
+	// journals it as a sprint move under the key Jira hands back, and the
+	// board pass of the same Commit pushes it through the Agile endpoint.
 	StatusID   string `json:"statusId"`
 	SprintID   string `json:"sprintId"`
 	SprintName string `json:"sprintName"`

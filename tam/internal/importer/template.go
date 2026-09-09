@@ -6,18 +6,20 @@ import (
 	"strings"
 
 	"github.com/xuri/excelize/v2"
+
+	"agile-suite/tam/internal/boardrepo"
 )
 
 // TemplateHeaders are the columns of the generated workbook, in the order it
 // writes them and the order the dialog maps them. They are spelled the way
 // AutoMap's synonyms expect, so a file saved from this template maps itself
 // with no clicking.
-var TemplateHeaders = []string{"Key", "Type", "Summary", "Description", "Priority", "Labels", "Assignee", "Story Points", "Parent"}
+var TemplateHeaders = []string{"Key", "Type", "Summary", "Description", "Priority", "Labels", "Assignee", "Story Points", "Parent", "Sprint"}
 
 // templateWidths are the column widths in characters. Summary, Description,
 // and Acceptance-criteria-sized prose get the room they need, so the file
 // opens readable rather than as a wall of ##### and clipped text.
-var templateWidths = []float64{26, 14, 46, 60, 12, 22, 16, 12, 22}
+var templateWidths = []float64{26, 14, 46, 60, 12, 22, 16, 12, 22, 20}
 
 const (
 	templateSheet = "Issues"
@@ -32,11 +34,16 @@ const (
 // the dropdown offers the word that project actually uses rather than a
 // generic "Requirement" the import would then reject.
 //
-// The example rows leave Key and Parent empty on purpose. Both are checked
-// against the issues already cached for the profile, so any key written in
-// here would be wrong for everyone but the machine it was written on, and
-// would greet a first-time user with two validation errors.
-func TemplateXLSX(requirementType string) ([]byte, error) {
+// open is the profile's open sprints, which become the Sprint column's
+// dropdown, so the one column whose valid values are per profile can be
+// picked instead of remembered. A profile with no synced boards gets the
+// column without a list rather than an empty one nobody can satisfy.
+//
+// The example rows leave Key, Parent, and Sprint empty on purpose. All
+// three are checked against what is already cached for the profile, so any
+// value written in here would be wrong for everyone but the machine it was
+// written on, and would greet a first-time user with validation errors.
+func TemplateXLSX(requirementType string, open []boardrepo.SprintChoice) ([]byte, error) {
 	f := excelize.NewFile()
 	defer f.Close()
 
@@ -121,6 +128,10 @@ func TemplateXLSX(requirementType string) ([]byte, error) {
 		return nil, err
 	}
 
+	if err := addSprintList(f, sprintNames(open)); err != nil {
+		return nil, err
+	}
+
 	if err := writeNotes(f, requirementType); err != nil {
 		return nil, err
 	}
@@ -130,6 +141,34 @@ func TemplateXLSX(requirementType string) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// sprintListLimit is how long an inline dropdown may be. Excel stores an
+// inline list as one formula string and refuses it past 255 characters,
+// which a project with a dozen open sprints reaches; past that the column
+// keeps its notes-sheet explanation and loses only the picker.
+const sprintListLimit = 255
+
+// addSprintList puts the open sprints on the Sprint column, over the same
+// generous range the Type list uses so pasted rows are validated too. A
+// profile with no synced sprints gets no list at all: an empty dropdown
+// would refuse every value including the ones the import accepts.
+func addSprintList(f *excelize.File, names []string) error {
+	if len(names) == 0 || len(strings.Join(names, ","))+len(names) > sprintListLimit {
+		return nil
+	}
+	col, err := excelize.ColumnNumberToName(len(TemplateHeaders))
+	if err != nil {
+		return err
+	}
+	dv := excelize.NewDataValidation(true)
+	dv.Sqref = fmt.Sprintf("%s2:%s1000", col, col)
+	if err := dv.SetDropList(names); err != nil {
+		return err
+	}
+	dv.SetError(excelize.DataValidationErrorStyleStop, "Sprint",
+		"Pick one of this profile's open sprints, or clear the cell for the backlog.")
+	return f.AddDataValidation(templateSheet, dv)
 }
 
 func templateTypes(requirementType string) []string {
@@ -143,11 +182,11 @@ func templateTypes(requirementType string) []string {
 func templateRows(requirementType string) [][]string {
 	req := requirementLabel(requirementType)
 	return [][]string{
-		{"", "Epic", "Promotions and discounts", "Everything about promo codes", "High", "promo", "", "", ""},
-		{"", "Story", "Apply promo code at payment step", "As a shopper I can enter a promo code and see the discount before paying.", "High", "checkout, promo", "jdoe", "5", ""},
-		{"", "Task", "Rotate the payment gateway keys", "Rotate before the audit window closes.", "Medium", "security", "jdoe", "2", ""},
-		{"", "Bug", "Promo code field accepts whitespace", "Trim the input before validating.", "Low", "promo", "", "1", ""},
-		{"", req, "Promo codes are single-use per customer", "Enforced at redemption.", "High", "promo", "", "", ""},
+		{"", "Epic", "Promotions and discounts", "Everything about promo codes", "High", "promo", "", "", "", ""},
+		{"", "Story", "Apply promo code at payment step", "As a shopper I can enter a promo code and see the discount before paying.", "High", "checkout, promo", "jdoe", "5", "", ""},
+		{"", "Task", "Rotate the payment gateway keys", "Rotate before the audit window closes.", "Medium", "security", "jdoe", "2", "", ""},
+		{"", "Bug", "Promo code field accepts whitespace", "Trim the input before validating.", "Low", "promo", "", "1", "", ""},
+		{"", req, "Promo codes are single-use per customer", "Enforced at redemption.", "High", "promo", "", "", "", ""},
 	}
 }
 
@@ -165,6 +204,7 @@ var notes = [][]string{
 	{"Assignee", "The Jira username, not the display name. It is what appears in the user's profile URL, for example jdoe, not John Doe."},
 	{"Story Points", "A number. Leave empty for no estimate."},
 	{"Parent", "The epic this issue belongs to, by key. An epic row must leave it empty. An epic named here has to exist in the project already, or be created by an earlier row of this same file."},
+	{"Sprint", "The sprint name, exactly as your Jira spells it, from any board this profile has synced. Empty means the backlog. Ignored on a row that has a Key: move an existing issue between sprints on the Boards view."},
 	{"", ""},
 	{"Rules", ""},
 	{"Empty cells", "On a row with a Key, an empty cell means leave that field alone. It never clears a value; clear a field in the app instead."},
@@ -172,6 +212,17 @@ var notes = [][]string{
 	{"Re-importing", "Safe. A create that already exists as a draft is skipped, and an update whose values already match records nothing."},
 	{"Bad rows", "A row that fails validation is listed with its spreadsheet row number and skipped. The rest of the file still imports."},
 	{"Extra columns", "Ignored. Keep whatever else your spreadsheet carries; map only the columns above."},
+}
+
+// rulesRow is the 1-based sheet row the "Rules" heading landed on, or 0
+// when the notes no longer carry one.
+func rulesRow() int {
+	for i, row := range notes {
+		if len(row) > 0 && row[0] == "Rules" {
+			return i + 1
+		}
+	}
+	return 0
 }
 
 func writeNotes(f *excelize.File, requirementType string) error {
@@ -207,8 +258,13 @@ func writeNotes(f *excelize.File, requirementType string) error {
 	if err := f.SetCellStyle(notesSheet, "A1", "B1", head); err != nil {
 		return err
 	}
-	if err := f.SetCellStyle(notesSheet, "A12", "B12", head); err != nil {
-		return err
+	// The Rules heading is found rather than numbered: the column rows above
+	// it grow whenever the importer learns a new column, and a hard-coded
+	// row would quietly bold a rule instead.
+	if rules := rulesRow(); rules > 0 {
+		if err := f.SetCellStyle(notesSheet, fmt.Sprintf("A%d", rules), fmt.Sprintf("B%d", rules), head); err != nil {
+			return err
+		}
 	}
 	return f.SetCellStyle(notesSheet, "B2", fmt.Sprintf("B%d", len(notes)), wrap)
 }

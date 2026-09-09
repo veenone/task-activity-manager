@@ -24,7 +24,7 @@ func updateRecords() [][]string {
 func run(t *testing.T, repo *issuerepo.Repository, recs [][]string, dryRun bool) importer.Result {
 	t.Helper()
 	m := importer.AutoMap(recs[0])
-	res, err := importer.Run(context.Background(), repo, "p1", "PLAT", "Business Requirement", recs, m, "kanban.xlsx", dryRun)
+	res, err := importer.Run(context.Background(), repo, "p1", "PLAT", "Business Requirement", nil, recs, m, "kanban.xlsx", dryRun)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

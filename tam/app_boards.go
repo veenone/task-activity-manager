@@ -43,6 +43,30 @@ func (a *App) ListBoardSprints(profileID string, boardID int) ([]boardrepo.Sprin
 	return sprints, nil
 }
 
+// ListOpenSprints returns the profile's open sprints across every board it
+// has synced, each carrying the board it came from. It is the sprint list
+// for the surfaces that have no board on screen to scope one: the New issue
+// dialog, the detail panel, and the importer.
+//
+// It takes no busy guard, like the other board reads: nothing here talks to
+// Jira, and refusing a dropdown while a commit runs is not a thing any
+// other local read does. A profile that has never refreshed its boards gets
+// an empty list and no error, and the view says so.
+func (a *App) ListOpenSprints(profileID string) ([]boardrepo.SprintChoice, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return nil, err
+	}
+	open, err := a.boards.OpenSprints(a.ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	if open == nil {
+		open = []boardrepo.SprintChoice{}
+	}
+	return open, nil
+}
+
 // GetBoard composes the Boards view's data from the cache: the board's
 // columns in order, the cached cards bucketed into them, and the lanes the
 // chosen swimlane asks for. a.repo is the IssueSource: the cards themselves
