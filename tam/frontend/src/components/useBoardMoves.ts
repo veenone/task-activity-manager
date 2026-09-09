@@ -3,7 +3,7 @@ import type { DragEvent } from "react";
 import { announce, errMsg, useNotice } from "@agile-suite/core";
 import { DRAFT_PREFIX, ENTITY_TRANSITION } from "../api";
 import type { BoardView, CommitResult, Issue, Sprint } from "../api";
-import { findCard } from "../lib/boardCells";
+import { cardAtPos, findCard } from "../lib/boardCells";
 import type { Pos } from "../lib/boardCells";
 import { columnDrop, isNoMove, isSameCell, keyboardMove } from "../lib/cardMove";
 import type { Drop, MoveIntent } from "../lib/cardMove";
@@ -192,6 +192,21 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
     );
   }
 
+  // alreadyThere is how many of the selected cards the destination already
+  // holds. A move to where a card already is journals nothing, which is
+  // recordMove's own rule, and the binding counts it as moved all the same,
+  // since it is where it was asked to be. The two counts differ exactly when
+  // the sentence about Commit would be false.
+  function alreadyThere(keys: string[], sprintId: string): number {
+    if (!view) return 0;
+    let n = 0;
+    for (const key of keys) {
+      const card = cardAtPos(view, findCard(view, key));
+      if (card && card.sprintId === sprintId) n += 1;
+    }
+    return n;
+  }
+
   // moveManyToSprint is the selection bar's move: the same journal write the
   // card menu makes, for every checked card at once. It goes through this
   // hook rather than straight to the binding so the cards mark themselves
@@ -199,7 +214,11 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
   // leaves behind, rather than staying unmarked until the next refetch.
   //
   // It announces rather than flashing a card: fifty cards have no one place
-  // for focus to land, and the count is the thing the user needs told.
+  // for focus to land, and the count is the thing the user needs told. A
+  // selection that did not move whole takes the notice as well, because the
+  // announcement is the only report otherwise: the selection clears itself
+  // either way, so a sighted user is left with a board that looks as though
+  // everything landed.
   function moveManyToSprint(keys: string[], sprint: Sprint | null, onDone?: () => void) {
     if (keys.length === 0) return;
     const sprintId = sprint ? String(sprint.id) : "";
@@ -209,8 +228,22 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
       { keys, sprintId },
       {
         onSuccess: (moved) => {
-          const done = `${plural(moved, "card", "cards")} moved to ${where}. Commit pushes the move to Jira.`;
-          announce(moved < keys.length ? `${done} ${keys.length - moved} are not in the cache and were left where they are.` : done);
+          // Nothing was journaled when every card the cache holds was
+          // already on the destination, and Commit has nothing of theirs to
+          // push, so it is not offered as the next step.
+          const journaled = moved - alreadyThere(keys, sprintId);
+          const done = journaled > 0
+            ? `${plural(moved, "card", "cards")} moved to ${where}. Commit pushes the move to Jira.`
+            : `${plural(moved, "card is", "cards are")} already in ${where}, so nothing was journaled.`;
+          const left = keys.length - moved;
+          if (left === 0) {
+            announce(done);
+            onDone?.();
+            return;
+          }
+          const behind = `${plural(left, "card", "cards")} ${left === 1 ? "is" : "are"} not in the cache and stayed where ${left === 1 ? "it is" : "they are"}. Sync, then move ${left === 1 ? "it" : "them"} again.`;
+          announce(`${done} ${behind}`);
+          void notice({ title: "Not every card moved", message: `${done} ${behind}` });
           onDone?.();
         },
         onError: (e) => void notice({ title: "The cards could not be moved", message: errMsg(e), tone: "error" }),

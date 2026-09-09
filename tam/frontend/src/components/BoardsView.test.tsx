@@ -1109,6 +1109,77 @@ describe("BoardsView selection", () => {
     expect(screen.queryByText(/cards selected/)).not.toBeInTheDocument();
   });
 
+  // The count the binding answers with is every selected card the cache
+  // holds, and a card already sitting on the destination is one of them: it
+  // is where it was asked to be, and it journals nothing. A card drawn in
+  // sprint 12's view while its own row already says 13 is what a pending
+  // move looks like, so this is the second time the same cards are sent to
+  // the same place.
+  it("does not offer Commit when every card was already on the destination", async () => {
+    const user = userEvent.setup();
+    const moved = (over: Partial<api.Issue>) => issue({ ...over, sprintId: "13", sprintName: "Sprint 13" });
+    vi.mocked(api.GetBoard).mockResolvedValue(
+      oneLane([[moved({ key: "PLAT-409", summary: "Rotate payment gateway API keys" })],
+        [moved({ key: "PLAT-412", summary: "Checkout: apply promo code" })], []]),
+    );
+    vi.mocked(api.JournalSprintMoves).mockResolvedValue(2);
+    renderView();
+    check(await screen.findByRole("gridcell", { name: /PLAT-409/ }));
+    check(screen.getByRole("gridcell", { name: /PLAT-412/ }));
+    await screen.findByText("2 cards selected");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Move the selected cards to" }), "13");
+    await user.click(screen.getByRole("button", { name: "Move 2 cards" }));
+
+    expect(
+      await screen.findByText("2 cards are already in Sprint 13, so nothing was journaled."),
+    ).toBeInTheDocument();
+  });
+
+  // The selection clears itself whatever happened, so an announcement is the
+  // only thing a sighted user could have missed the warning in. Two of the
+  // three did not move; the notice is the same one the error path opens.
+  it("shows the cards a bulk move left behind rather than only announcing them", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.JournalSprintMoves).mockResolvedValue(1);
+    renderView();
+    check(await screen.findByRole("gridcell", { name: /PLAT-409/ }));
+    check(screen.getByRole("gridcell", { name: /PLAT-412/ }));
+    check(screen.getByRole("gridcell", { name: /PLAT-347/ }));
+    await screen.findByText("3 cards selected");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Move the selected cards to" }), "13");
+    await user.click(screen.getByRole("button", { name: "Move 3 cards" }));
+
+    expect(await screen.findByText("Not every card moved")).toBeInTheDocument();
+    // Scoped to the dialog: the same sentence is announced through the
+    // shared live region, which is the report that was not enough on its
+    // own.
+    const notice = screen.getByRole("alertdialog");
+    expect(
+      within(notice).getByText(/2 cards are not in the cache and stayed where they are\./),
+    ).toBeInTheDocument();
+  });
+
+  // The clause the count alone used to get wrong: one card left behind is
+  // "1 card", never "1 are".
+  it("counts one card left behind in the singular", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.JournalSprintMoves).mockResolvedValue(1);
+    renderView();
+    check(await screen.findByRole("gridcell", { name: /PLAT-409/ }));
+    check(screen.getByRole("gridcell", { name: /PLAT-412/ }));
+    await screen.findByText("2 cards selected");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Move the selected cards to" }), "13");
+    await user.click(screen.getByRole("button", { name: "Move 2 cards" }));
+
+    await screen.findByText("Not every card moved");
+    expect(
+      within(screen.getByRole("alertdialog")).getByText(/1 card is not in the cache and stayed where it is\./),
+    ).toBeInTheDocument();
+  });
+
   // The backlog is always somewhere to put a card, and both the card's own
   // menu and the panel's sprint field offer it, so the bar cannot be the one
   // surface saying there is nowhere to move them.
