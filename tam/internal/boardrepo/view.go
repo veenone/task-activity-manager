@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/dbtx"
 )
 
 // The swimlanes the Boards view offers.
@@ -109,11 +110,32 @@ type LaneView struct {
 // come from the issue cache, the board's own keys plus the profile's
 // drafts; a status no column covers is counted in Unmapped so nothing
 // disappears silently.
+//
+// The half dozen statements it takes all run on one snapshot, so the
+// columns, the membership, and the cards are the same board. A boards sync
+// replaces all of those together, and a read spread across the handle would
+// otherwise land in the middle of one and draw cards into columns that no
+// longer exist.
 func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID string, boardID int, sprintID, swimlane string) (BoardView, error) {
 	lane, err := normalizeSwimlane(swimlane)
 	if err != nil {
 		return BoardView{}, err
 	}
+	var view BoardView
+	if err := r.inReadTx(ctx, func(q dbtx.Querier) error {
+		v, err := composeBoard(ctx, q, issues, profileID, boardID, sprintID, lane)
+		view = v
+		return err
+	}); err != nil {
+		return BoardView{}, err
+	}
+	return view, nil
+}
+
+// composeBoard is the read itself, every statement on the querier it was
+// given. lane is already normalized: the one check that needs no database
+// is made before a transaction is opened for it.
+func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profileID string, boardID int, sprintID, lane string) (BoardView, error) {
 	view := BoardView{
 		BoardID:          boardID,
 		SprintID:         sprintID,
@@ -122,7 +144,7 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 		Lanes:            []LaneView{},
 		UnmappedStatuses: []string{},
 	}
-	cols, err := r.Columns(ctx, profileID, boardID)
+	cols, err := columnsOf(ctx, q, profileID, boardID)
 	if err != nil {
 		return BoardView{}, err
 	}
@@ -136,15 +158,15 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 		view.Columns = append(view.Columns, ColumnView{Name: c.Name, StatusIDs: backend.NonNil(c.StatusIDs)})
 	}
 
-	boardKeys, err := r.issueKeys(ctx, profileID, boardID, sprintID)
+	boardKeys, err := issueKeys(ctx, q, profileID, boardID, sprintID)
 	if err != nil {
 		return BoardView{}, err
 	}
-	moves, err := issues.PendingMoves(ctx, profileID)
+	moves, err := issues.PendingMoves(ctx, q, profileID)
 	if err != nil {
 		return BoardView{}, err
 	}
-	cards, err := issues.IssuesByKeys(ctx, profileID, withMovedIn(boardKeys, moves, sprintID))
+	cards, err := issues.IssuesByKeys(ctx, q, profileID, withMovedIn(boardKeys, moves, sprintID))
 	if err != nil {
 		return BoardView{}, err
 	}
@@ -155,7 +177,7 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 	// which is Jira's and can never name one. They are project-level, so
 	// every board and every sprint of the profile draws the same ones and
 	// the Draft chip on the card is what says so.
-	drafts, err := issues.DraftIssues(ctx, profileID)
+	drafts, err := issues.DraftIssues(ctx, q, profileID)
 	if err != nil {
 		return BoardView{}, err
 	}

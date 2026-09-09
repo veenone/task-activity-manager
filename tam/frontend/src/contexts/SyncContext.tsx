@@ -38,6 +38,12 @@ interface SyncApi {
   // backend was bound to refuse it. It rejects on failure so the caller's
   // mutation still sees the error.
   runBoardsRefresh: () => Promise<BoardSummary>;
+  // runSprintCeremony runs a start or a completion under the same lock. Both
+  // bound methods take Go's per-profile lock the moment they are called, so
+  // a ceremony started while a sync runs would be refused by the backend on a
+  // shell that still offered Sync. It rejects rather than swallowing: the
+  // dialog is what reports a ceremony's failure, word for word.
+  runSprintCeremony: <T>(action: () => Promise<T>) => Promise<T>;
   // runCommit resolves to the result, or null when nothing ran or the call
   // failed (the failure is shown as a notice).
   runCommit: () => Promise<CommitResult | null>;
@@ -135,6 +141,29 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [activeId]);
 
+  // A ceremony is short, one Jira call or a handful, so it reports a stage
+  // rather than a count: there is nothing to page through and no total to
+  // fill in. It emits no progress frames of its own, exactly as the boards
+  // refresh does not.
+  const runSprintCeremony = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
+    if (!activeId) throw new Error("no profile selected");
+    if (statusRef.current !== "idle") {
+      throw new Error("a sync is already running for this profile");
+    }
+    statusRef.current = "syncing";
+    dispatch({
+      type: "SYNC_START",
+      clearError: true,
+      initialProgress: { phase: "sprint", fetched: 0, total: 0, done: false, stage: "Talking to Jira" },
+    });
+    try {
+      return await action();
+    } finally {
+      statusRef.current = "idle";
+      dispatch({ type: "SYNC_END" });
+    }
+  }, [activeId]);
+
   const runCommit = useCallback(async (): Promise<CommitResult | null> => {
     if (!activeId || statusRef.current !== "idle") return null;
     statusRef.current = "committing";
@@ -182,13 +211,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       canSwitchProfile: canSwitchProfileSel(state),
       runSync,
       runBoardsRefresh,
+      runSprintCeremony,
       runCommit,
       lastCommit,
       dismissConflict,
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, activeId, runSync, runBoardsRefresh, runCommit, lastCommit, dismissConflict, boards],
+    [state, activeId, runSync, runBoardsRefresh, runSprintCeremony, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

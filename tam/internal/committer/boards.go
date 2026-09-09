@@ -22,7 +22,14 @@ import (
 // sprintBatch is how many issues one sprint move carries. Jira's endpoint
 // takes fifty, and a standup's worth of planning would otherwise be fifty
 // round trips.
-const sprintBatch = 50
+//
+// Twenty rather than fifty, because the board's bulk move now makes batches
+// this large routinely: the endpoint answers a partial refusal with a 207
+// that names issues by numeric id, which cannot be mapped back to keys, so
+// every card in a batch fails together. Twenty is how much of a planning
+// session one refusal can take down, and it is the same width the sprint
+// completion pushes at.
+const sprintBatch = 20
 
 // BoardOrder is the board's final local order, top to bottom, which the
 // rank group re-derives every neighbour from. boardrepo.Order satisfies it

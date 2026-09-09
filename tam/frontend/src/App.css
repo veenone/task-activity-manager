@@ -508,6 +508,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
    claim. */
 .pending-dot-move { background: var(--accent); }
 
+/* Phase 3c: the completion dialog names every unfinished card rather than
+   counting them, so the list is rows of key and summary in the same card
+   shape the Pending changes dialog uses, capped so a sprint of forty does
+   not push the destination picker and the buttons off the dialog. */
+.sprint-incomplete { max-height: 260px; overflow-y: auto; gap: 6px; }
+.sprint-incomplete-card { display: flex; align-items: baseline; gap: 10px; padding: 6px 10px; }
+
 /* Assignee combobox: an input with a clear button and a floating result
    list, so a person is picked rather than a username remembered. */
 .assignee-picker { position: relative; min-width: 0; }

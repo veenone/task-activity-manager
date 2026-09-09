@@ -17,9 +17,14 @@ import, cross-project links, and requirement creation. Phase 2 adds the
 epic and story hierarchy: the Epics view, `parentKey` as the seventh
 editable field, and epic creation. Phase 3a adds the Boards view: boards,
 columns, and sprints synced from Jira's Agile API, read only. Phase 3b
-(this branch) makes the board writable: a card dragged or keyboard-moved
-across columns, within a column, or into another sprint journals the same
-way every other TAM write does, and Commit pushes it.
+makes the board writable: a card dragged or keyboard-moved across
+columns, within a column, or into another sprint journals the same way
+every other TAM write does, and Commit pushes it. Phase 3c (this branch)
+closes Phase 3 with the sprint ceremonies: starting and completing a
+sprint from the Boards toolbar, moving several selected cards into a
+sprint at once, and the sprint field in the detail panel, plus the board
+read now taking one transaction so a reader can never observe a board
+mid-write.
 
 ## Phase 3a: boards
 
@@ -57,9 +62,12 @@ its rows.
 
 `internal/boardrepo` is the store layer over the four tables, beside
 `issuerepo` since boards are their own concern. It never imports
-`issuerepo`: what it needs from the issue cache is the two-method
-`IssueSource` interface (`IssuesByKeys`, `DraftIssues`), which `app.go`
-satisfies with the issue repository it already holds. `boardrepo.Board`
+`issuerepo`: what it needs from the issue cache is the three-method
+`IssueSource` interface (`IssuesByKeys`, `DraftIssues`, `PendingMoves`),
+which `app.go` satisfies with the issue repository it already holds. Every
+method takes the `dbtx.Querier` the board read is running on, so the cards
+and moves come from the same transaction as the board's own columns and
+membership rather than from a later moment on the handle. `boardrepo.Board`
 composes the view a board draws: columns in board order, cards bucketed
 into them by status id (a draft goes to the first column that collects
 any status, since Jira has never assigned it one), and the lanes the
@@ -211,6 +219,148 @@ different writes: a drop line at the cursor inside the card's own cell,
 exactly where a rank will land, and a full-cell outline for a drop on
 another column, never a line there, since a transition lands the card by
 its own rank rather than at the cursor.
+
+## Phase 3c: the sprint lifecycle
+
+Starting a sprint and completing one are the only writes in TAM that reach
+Jira outside a Commit. Everything else in this app is journaled and waits
+for the user to push it; these two do not, for reasons that do not apply
+to a card move. A sprint's start is a timestamped fact a whole team reads
+the moment it happens, and Phase 4's burndown will be computed from it, so
+journaling it would mean TAM decides when the sprint started and tells
+Jira an hour later. A completion is the harder case: what happens to the
+issues that did not finish depends on the sprint's contents at the exact
+moment it closes, not at whatever moment a Commit next happens to run, and
+there is nothing to reconcile the way a held transition or rank can be, a
+sprint someone else already started cannot be started again. `internal/sprints`
+owns both ceremonies (`Service.Start`, `Service.Complete`) so the exception
+has one home and one place to test; nothing in that package touches the
+journal. The bound methods, `StartSprint` and `CompleteSprint` in
+`app_sprints.go`, take the same per-profile lock (`a.acquire(p.ID, "sprint")`)
+a sync, a commit, and a boards refresh take, and the frontend reaches them
+through `SyncContext.runSprintCeremony`, which is the same reducer path
+`runBoardsRefresh` uses. Neither button has an offline state: TAM has no
+connectivity signal to disable one from, so both stay enabled, the call is
+attempted, and a transport failure or a Jira refusal (a second active
+sprint, a missing Manage Sprints permission) is reported in the dialog,
+which stays open with what the user typed still in it.
+
+A completion moves the sprint's unfinished issues before it closes the
+sprint, never after: the reverse would leave a closed sprint whose cards
+went nowhere, which nobody can undo from TAM. "Unfinished" is one
+definition used everywhere it matters: an issue whose status id is not in
+the board's last `board_column`'s `status_ids`, the same mapping the board
+itself draws with and the same one `DonePoints` counts by. The sprint's
+own membership is re-read from Jira through the issue search rather than
+from the cache or from `BoardIssueKeys`, because the cache can be minutes
+stale and a key list carries no status; the search comes back with both in
+one paged call. The push itself moves in chunks of twenty
+(`sprints.pushBatch`, matching the committer's own `sprintBatch`), because
+Jira's bulk endpoints answer a partial refusal with a 207 that names
+issues by numeric id, which cannot be mapped back to a key, so the whole
+batch fails together and a smaller batch limits how much of a completion
+one refusal can take down.
+
+A completion that reached Jira and then failed is reported inside
+`sprints.Completion` (`Moved`, `MovedTo`, `Failed`, `Note`, `Message`)
+rather than as a Go error, because Wails discards a bound method's return
+value whenever the method also returns a non-nil error: the dispatcher
+fills in either the result or the error and never both. An error would
+therefore deliver the sentence and drop the counts and keys it is about,
+which is what the dialog needs at that moment. Both failures travel that
+way, a push that stopped partway and a close Jira refused once every card
+had already moved, and for a second reason as well: the dialog renders a
+`Message` as an outcome and a Go error as a refusal, so the refused close
+used to print its accurate sentence directly above a list still headed "47
+cards are not finished and will move out of the sprint" and a footer still
+promising the move. `CompleteSprint` returns a real error only for the
+refusals that happen before anything moves, and those go through
+`internal/errtext` first, as does the `Message` a failed push or a refused
+close carries: Jira's words come straight off the wire, and a Data Center
+answering 403 with an HTML login page would otherwise put a kilobyte of
+markup inline beside the start dialog's buttons.
+
+`Note` is the opposite case: the ceremony worked and the bookkeeping after
+it did not. `refreshSprints` answers with its own failure now rather than
+only logging it, because the cached row still says `future` for the sprint
+that is now running, so the toolbar offers Start for it and Jira answers
+that second start with a 400. Both ceremonies carry it back as one line
+telling the user to press Refresh, beside their own success; `StartSprint`
+returns it as a string, and the board's ceremony banner is where both are
+read.
+
+A completion refuses a sprint the cache calls `future`, and only `future`.
+It moves the cards out before it asks Jira to close the sprint, so aimed at
+a sprint that never started it empties that sprint and then fails the
+close, and TAM can undo neither half. A sprint started on the web an hour
+ago still reads as future in a cache nobody has refreshed since, and
+refusing that costs a Refresh where emptying it costs the sprint, so no
+other state is refused here.
+
+The cards that move are written back into both scopes of the board cache,
+the sprint they left and the destination they were sent to, the second of
+which used to be missed: the banner said twelve cards moved to Sprint 15
+and the picker switched to Sprint 15, which drew exactly what it drew
+before, and nothing else would have corrected it, since a ceremony writes
+no journal row for the view to fold in. An empty destination is the board's
+own list, which is a scope like any other.
+
+The demo backend narrows its search to `sprint = N`. That is the one scope
+it honours, and it is not decoration: the completion's own read is that
+query, and the service keeps an issue the backend reports no sprint for on
+the grounds that the query already narrowed it. Against a backend that
+ignored the scope, every card in the project walked past that guard, so
+completing a sprint on the demo profile moved the whole backlog and
+reported success.
+
+A board read now runs inside one deferred read transaction
+(`boardrepo.Board`, `Order.CellOrder`, both through `Repository.inReadTx`),
+and every read the issue cache does on the way, `IssuesByKeys`,
+`DraftIssues`, `PendingMoves`, takes the `dbtx.Querier` that transaction
+opened rather than the bare handle. `ReplaceBoard` writes a board's row,
+columns, sprints, and membership together in one transaction and was
+already correct; the gap was on the read side, where `Board` used to issue
+four separate statements on the handle and could land between two of
+`ReplaceBoard`'s writes, drawing cards into columns that had already been
+replaced or a membership list that had not been written yet. That is the
+flake two sessions chased before this plan named it: a reader on another
+connection sees a consistent snapshot only inside a transaction, and a
+read spread across the handle never had one. The sprint lifecycle itself
+does not write an empty sprint list back over a board it has just acted
+on: `sprints.Service.refreshSprints` refuses to persist what
+`BoardSprints` answers with when the answer is empty, because a single 400
+on the sprint endpoint is indistinguishable from "no sprints" the way
+`core/jira` maps it, and a ceremony has just proven the board has at least
+one sprint. Overwriting the cache with that empty answer would delete
+every sprint row of the board and drop the sprint length the start dialog
+suggests from, with nothing reported anywhere since the call itself did
+not fail; `boardrepo.ReplaceSprints` does the write once the caller has
+decided the list is real.
+
+The board's multi-selection (`lib/boardSelection.ts`, `useBoardSelection`)
+is a set of issue keys, never a set of positions, because the board
+redraws on every refetch and a position-based selection would silently
+select whatever cards happen to land in those slots afterwards, the same
+class of bug 3b hit with keyboard focus. It is also a different thing from
+the detail panel's one selected card: the panel's selection stays
+`.board-card-selected` and opens on a plain click or Enter; the
+multi-selection paints `.board-card-checked`, grows with a control-click
+or a shift-click range, and more than one checked card closes the detail
+panel and replaces it with `BoardSelectionBar`, because a panel describing
+one card while three are checked would be lying about what the next
+action touches. Its one action, "Move N cards", journals through the same
+`issuerepo.MoveManyToSprint` (`moveToSprintTx` shared with the single-card
+move) that every other board write uses, so it takes no guard, has a
+conflict story already reviewed in 3b, and needs no new case in Discard,
+the pending dialog, or the commit pass.
+
+The detail panel's Sprint field, and the start dialog's suggested end
+date, both read the cache rather than Jira: `SuggestSprintDates` combines
+`boardrepo.SprintLength` (the median whole-day length of the board's last
+three closed sprints, zero when none exist) with the board's cached
+sprint list, so the dialog can open with a plausible date before any
+network call and say plainly whether the date came from history or from a
+two-week default.
 
 ## The write path (plan 1b)
 
@@ -630,7 +780,11 @@ until one is entered. A Kiwi profile file is refused.
     app_issues.go        the issue methods: sync, list, detail, per-profile settings
     app_writes.go        the write methods: edit, create, commit, and conflict resolution
     app_imports.go       the import methods: preview, mapping, and creating drafts from a file
-    app_boards.go        the board methods: list boards, list sprints, get a board's view, sync boards
+    app_boards.go        the board methods: list boards, list sprints, get a board's view, sync
+                          boards, the three journaled board moves, CanTransition, and
+                          JournalSprintMoves, the selection's bulk move, with its guarded lookup
+                          of the destination's name
+    app_sprints.go       the two sprint ceremonies, SuggestSprintDates, and PendingInSprint
     internal/tamstore/   TAM's own SQLite file (schema version 6: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
                           sprint, plus the shared journal tables pending_change and audit_log)
@@ -643,8 +797,21 @@ until one is entered. A Kiwi profile file is refused.
                           movecolumns.go, and rebasemoves.go are the three board moves, their
                           before_val/after_val packing, and what Override does to a held one
     internal/boardrepo/  the store layer over board, board_column, board_issue, and sprint; view.go
-                          composes the Boards view's data over the issue cache through IssueSource;
-                          cellorder.go is the board's final local order the commit pass ranks against
+                          composes the Boards view's data over the issue cache through IssueSource,
+                          both in one deferred read transaction (tx.go); cellorder.go is the board's
+                          final local order the commit pass ranks against, on the same kind of
+                          transaction; sprintlength.go is the median-of-three-closed-sprints read
+                          the start dialog's date suggestion is built from
+    internal/sprints/    the sprint lifecycle service: Start and Complete, the two writes that
+                          reach Jira outside a Commit, and the only package that touches them;
+                          guards.go is what a ceremony refuses before it reaches Jira, cache.go
+                          the board cache's bookkeeping after it has, and suggest.go the start
+                          dialog's suggested name and dates
+    internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
+                          datetime format, shared by the ceremonies and the suggestion
+    internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
+                          InRead for a deferred read-only transaction, and the Querier interface a
+                          read helper takes so it can run on the handle or inside either kind
     internal/committer/  pushes the journal to Jira and resolves conflicts; boards.go, ranks.go,
                           and boardvalues.go are the board pass, after the edits and before the links
     internal/importer/   maps import columns to draft fields and validates rows
@@ -656,8 +823,11 @@ until one is entered. A Kiwi profile file is refused.
     frontend/            React app on @agile-suite/core (see ../frontend/core)
       src/api.ts         typed access to the bindings; plain shapes for fixtures
       src/lib/keyColumn.ts  the issue-key column width both tables share
+      src/lib/boardSelection.ts  the board's multi-selection: a set of keys and the three
+                          gestures over an ordered key list, no React and no DOM
       src/queries/       TanStack Query keys, hooks, and the post-sync invalidation
-      src/contexts/      SyncContext on the shared sync reducer
+      src/contexts/      SyncContext on the shared sync reducer; runSprintCeremony is the reducer
+                          path StartSprint and CompleteSprint run through, beside runBoardsRefresh
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands
@@ -672,7 +842,10 @@ until one is entered. A Kiwi profile file is refused.
                           EpicTree, EpicRow, BoardsView, BoardsToolbar, BoardBody, BoardGrid,
                           BoardCard, BoardNotes, useBoardMoves (the three writes, the drag state,
                           the keyboard moves), useMovedCard, CardMoveMenu, BoardMoveBanner,
-                          PendingMoveRow, CommitBanner
+                          PendingMoveRow, CommitBanner, BoardCeremonies (the two sprint dialogs'
+                          shared context), StartSprintModal, CompleteSprintModal,
+                          BoardSelectionBar (the multi-selection's count, destination, and Move
+                          action), useBoardSelection (the selection as React state)
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands

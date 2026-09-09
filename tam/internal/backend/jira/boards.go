@@ -132,3 +132,23 @@ func (b *Backend) MoveIssuesToSprint(ctx context.Context, sprintID string, keys 
 	}
 	return nil
 }
+
+// StartSprint starts sprintID on Jira with the draft's name, goal, and
+// dates. It is one of the calls in TAM that reach Jira outside a Commit;
+// see core/jira/agile.go's StartSprint doc comment for why.
+func (b *Backend) StartSprint(ctx context.Context, sprintID int, s backend.SprintDraft) error {
+	if err := b.c.StartSprint(ctx, sprintID, s.Name, s.Goal, s.StartDate, s.EndDate); err != nil {
+		return fmt.Errorf("start sprint %d: %w", sprintID, err)
+	}
+	return nil
+}
+
+// CompleteSprint closes sprintID on Jira, sending state closed and nothing
+// else. Moving the sprint's unfinished issues out first is the caller's
+// job.
+func (b *Backend) CompleteSprint(ctx context.Context, sprintID int) error {
+	if err := b.c.CompleteSprint(ctx, sprintID); err != nil {
+		return fmt.Errorf("complete sprint %d: %w", sprintID, err)
+	}
+	return nil
+}

@@ -2,17 +2,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
 import {
   CanTransition,
+  CompleteSprint,
   GetBoard,
   GetProfileSetting,
+  JournalSprintMoves,
   ListBoardSprints,
   ListBoards,
   MoveIssueToColumn,
   MoveIssueToSprint,
   RankIssue,
   SETTING_BOARDS_UNAVAILABLE,
+  StartSprint,
+  SuggestSprintDates,
   SyncBoards,
 } from "../api";
-import type { BoardSummary } from "../api";
+import type { BoardSummary, SprintCompletion } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
 
@@ -122,6 +126,96 @@ export function useMoveToSprint(profileId: string) {
     mutationFn: ({ key, sprintId }: { key: string; sprintId: string }) =>
       call(() => MoveIssueToSprint(profileId, key, sprintId)),
     onSuccess: (_, v) => invalidateWrites(qc, profileId, v.key),
+  });
+}
+
+// useJournalSprintMoves is the bulk move behind the selection bar: one
+// journal row per card, written in one transaction, with nothing reaching
+// Jira until Commit. It refreshes exactly what the single move refreshes,
+// so the cards it touched wear the same pending marks a dragged one does.
+export function useJournalSprintMoves(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ keys, sprintId }: { keys: string[]; sprintId: string }) =>
+      call(() => JournalSprintMoves(profileId, keys, sprintId)),
+    onSuccess: () => invalidateWrites(qc, profileId),
+  });
+}
+
+// useSprintSuggestion is what the start dialog opens with: the name the
+// board's numbering implies and the dates its own history suggests. It reads
+// the cache only, so it answers whether or not Jira can be reached, and it
+// is not retried: a suggestion is a convenience, and the dialog is usable
+// without one.
+export function useSprintSuggestion(profileId: string, boardId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: keys.sprintSuggestion(profileId, boardId),
+    queryFn: () => call(() => SuggestSprintDates(profileId, boardId)),
+    enabled: enabled && !!profileId && boardId > 0,
+    retry: false,
+    // A suggestion built from today's date must not be served from an hour
+    // ago on a machine left open overnight.
+    gcTime: 0,
+    staleTime: 0,
+  });
+}
+
+// The two ceremonies. Both push to Jira the moment they are called, so both
+// go through run, which is SyncContext's runSprintCeremony: it holds the
+// same per-profile lock a sync and a commit hold, injected rather than
+// reached for so this module stays free of the context.
+//
+// Both refresh the board's sprint list, which the service itself re-read
+// into the cache, and the board under it, whose cards have moved.
+function invalidateSprints(qc: ReturnType<typeof useQueryClient>, profileId: string) {
+  if (!profileId) return;
+  for (const queryKey of [
+    keys.boards(profileId),
+    [profileId, "boardSprints"] as const,
+    [profileId, "board"] as const,
+    [profileId, "sprintSuggestion"] as const,
+  ]) {
+    qc.invalidateQueries({ queryKey });
+  }
+}
+
+export interface StartSprintArgs {
+  boardId: number;
+  sprintId: number;
+  name: string;
+  goal: string;
+  start: string;
+  end: string;
+}
+
+export function useStartSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: StartSprintArgs) =>
+      run(() => call(() => StartSprint(profileId, v.boardId, v.sprintId, v.name, v.goal, v.start, v.end))),
+    onSettled: () => invalidateSprints(qc, profileId),
+  });
+}
+
+export interface CompleteSprintArgs {
+  boardId: number;
+  sprintId: number;
+  // moveTo is the destination sprint's id, empty for the backlog, which is a
+  // destination and not an absence.
+  moveTo: string;
+}
+
+// A completion refreshes on settle rather than on success, because a
+// completion that failed partway has still moved cards: the board it leaves
+// behind is not the board it started from.
+export function useCompleteSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
+  const qc = useQueryClient();
+  return useMutation<SprintCompletion, Error, CompleteSprintArgs>({
+    mutationFn: (v) => run(() => call(() => CompleteSprint(profileId, v.boardId, v.sprintId, v.moveTo))),
+    onSettled: () => {
+      invalidateSprints(qc, profileId);
+      invalidateWrites(qc, profileId);
+    },
   });
 }
 

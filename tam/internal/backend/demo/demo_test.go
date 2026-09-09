@@ -39,7 +39,11 @@ func TestDemoBackendPagesTheWholeDataset(t *testing.T) {
 	}
 }
 
-func TestDemoBackendFiltersByTypeAndIgnoresScopeAndSince(t *testing.T) {
+// TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer is the demo's
+// half of the sync's query: the issue types are honoured, and a scope JQL
+// this dataset has no engine for is ignored rather than guessed at. The one
+// scope it does honour is the sprint query below.
+func TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer(t *testing.T) {
 	b := demobackend.New("PLAT")
 	ctx := context.Background()
 	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "labels = nothing", "2030-01-01T00:00:00Z", []string{backend.TypeEpic}, 0, 100)
@@ -47,12 +51,53 @@ func TestDemoBackendFiltersByTypeAndIgnoresScopeAndSince(t *testing.T) {
 		t.Fatalf("search: %v", err)
 	}
 	if total != 4 || len(page) != 4 {
-		t.Errorf("epics: total %d, rows %d, want 4 (scope and since are ignored)", total, len(page))
+		t.Errorf("epics: total %d, rows %d, want 4 (a scope it cannot answer, and since, are ignored)", total, len(page))
 	}
 	for _, iss := range page {
 		if iss.Type != backend.TypeEpic {
 			t.Errorf("non-epic in result: %+v", iss)
 		}
+	}
+}
+
+// TestDemoBackendNarrowsToTheSprintTheQueryNames is the read a sprint
+// completion makes, against the backend the plan's own walk-through uses.
+// The completion asks for "sprint = N" and moves everything that comes
+// back, so a demo that answered with the whole project would empty the
+// backlog into the destination and report it as a success.
+func TestDemoBackendNarrowsToTheSprintTheQueryNames(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	whole, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 500)
+	if err != nil {
+		t.Fatalf("whole project: %v", err)
+	}
+
+	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "sprint = 12", "", backend.AllTypes, 0, 500)
+	if err != nil {
+		t.Fatalf("sprint 12: %v", err)
+	}
+	if total != len(page) {
+		t.Errorf("total = %d over %d rows, want the narrowed count", total, len(page))
+	}
+	if len(page) == 0 || len(page) >= len(whole) {
+		t.Fatalf("sprint 12 answered %d of the project's %d issues, want its own cards and no more", len(page), len(whole))
+	}
+	for _, iss := range page {
+		if iss.SprintID != "12" {
+			t.Errorf("%s reports sprint %q, want only sprint 12's cards", iss.Key, iss.SprintID)
+		}
+	}
+	// Every one of them, not just some: a completion that reads half a
+	// sprint leaves the other half behind in a closed one.
+	want := 0
+	for _, iss := range whole {
+		if iss.SprintID == "12" {
+			want++
+		}
+	}
+	if len(page) != want {
+		t.Errorf("sprint 12 answered %d cards, want the %d the dataset puts in it", len(page), want)
 	}
 }
 
@@ -415,6 +460,143 @@ func TestDemoSprintMovesAndRanksApplyToTheDataset(t *testing.T) {
 	}
 	if err := b.RankIssue(ctx, "ACME-412", "ACME-9999", true); err == nil {
 		t.Error("a rank against a card the demo does not hold is refused")
+	}
+}
+
+func TestDemoStartSprintRefusesWhileAnotherIsActiveThenStartsTheFutureOne(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+
+	// Sprint 12 is already active in the dataset, so starting the future
+	// sprint 13 must be refused and must name the one that is active.
+	err := b.StartSprint(ctx, 13, backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-01T09:00:00.000+0000", EndDate: "2026-09-15T09:00:00.000+0000"})
+	if err == nil || !strings.Contains(err.Error(), "Sprint 12") {
+		t.Fatalf("err = %v, want a refusal naming the active sprint", err)
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	for _, s := range sprints {
+		if s.ID == 13 && s.State != "future" {
+			t.Errorf("sprint 13 state = %q, want future: a refused start must not change it", s.State)
+		}
+	}
+
+	// Completing the active sprint frees the board, and the future one can
+	// then start.
+	if err := b.CompleteSprint(ctx, 12); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if err := b.StartSprint(ctx, 13, backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-01T09:00:00.000+0000", EndDate: "2026-09-15T09:00:00.000+0000"}); err != nil {
+		t.Fatalf("start after completing the active one: %v", err)
+	}
+
+	sprints, err = b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	states := map[int]string{}
+	for _, s := range sprints {
+		states[s.ID] = s.State
+	}
+	if states[12] != "closed" || states[13] != "active" {
+		t.Errorf("states = %v, want 12 closed and 13 active", states)
+	}
+
+	if err := b.StartSprint(ctx, 9999, backend.SprintDraft{}); err == nil {
+		t.Error("starting a sprint the demo does not have is refused")
+	}
+	if err := b.CompleteSprint(ctx, 9999); err == nil {
+		t.Error("completing a sprint the demo does not have is refused")
+	}
+}
+
+// TestDemoEnforcesJirasFourSprintStateRules pins down the four state rules
+// a real Jira enforces around a sprint's lifecycle, which the demo used to
+// let three of slide: starting the sprint that is already active succeeded
+// silently, starting an already-closed one reopened it, and completing a
+// future or an already-closed sprint both succeeded. A real instance
+// refuses all four, so the offline walk-through has to as well.
+func TestDemoEnforcesJirasFourSprintStateRules(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	draft := backend.SprintDraft{Name: "Sprint 12", StartDate: "2026-08-18T09:00:00.000+0000", EndDate: "2026-09-01T09:00:00.000+0000"}
+
+	// Starting the sprint that is already active must be refused, not a
+	// silent no-op.
+	if err := b.StartSprint(ctx, 12, draft); err == nil {
+		t.Error("starting the already-active sprint is refused")
+	}
+
+	// Completing a sprint that has not started yet must be refused, not
+	// treated as an early completion.
+	if err := b.CompleteSprint(ctx, 13); err == nil {
+		t.Error("completing a future sprint is refused")
+	}
+
+	// Closing the active sprint, then trying to start it again, must be
+	// refused rather than reopening it.
+	if err := b.CompleteSprint(ctx, 12); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if err := b.StartSprint(ctx, 12, draft); err == nil {
+		t.Error("restarting an already-closed sprint is refused")
+	}
+
+	// And completing that same closed sprint again must be refused too.
+	if err := b.CompleteSprint(ctx, 12); err == nil {
+		t.Error("completing an already-closed sprint is refused")
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	for _, s := range sprints {
+		if s.ID == 12 && s.State != "closed" {
+			t.Errorf("sprint 12 state = %q, want closed: none of the refused calls above may have changed it", s.State)
+		}
+		if s.ID == 13 && s.State != "future" {
+			t.Errorf("sprint 13 state = %q, want future: the refused completion may not have changed it", s.State)
+		}
+	}
+}
+
+// TestDemoStartSprintHoldsTheDraftBesideTheState is Fix 3: a demo start used
+// to discard the whole SprintDraft, so a card looking at the started sprint
+// afterward would still see the dataset's own unstarted name and dates
+// instead of what the dialog just set.
+func TestDemoStartSprintHoldsTheDraftBesideTheState(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+
+	if err := b.CompleteSprint(ctx, 12); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	draft := backend.SprintDraft{
+		Name:      "Sprint 13: the launch",
+		Goal:      "Ship the launch",
+		StartDate: "2026-09-02T09:00:00.000+0000",
+		EndDate:   "2026-09-16T09:00:00.000+0000",
+	}
+	if err := b.StartSprint(ctx, 13, draft); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	var got backend.Sprint
+	for _, s := range sprints {
+		if s.ID == 13 {
+			got = s
+		}
+	}
+	if got.Name != draft.Name || got.StartDate != draft.StartDate || got.EndDate != draft.EndDate {
+		t.Errorf("sprint 13 = %+v, want the name and dates from the start draft: %+v", got, draft)
 	}
 }
 

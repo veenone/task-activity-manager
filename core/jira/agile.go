@@ -286,3 +286,50 @@ func (c *Client) MoveToSprint(ctx context.Context, sprintID string, keys []strin
 func (c *Client) MoveToBacklog(ctx context.Context, keys []string) error {
 	return c.bulkWrite(ctx, "move to backlog", http.MethodPost, "/rest/agile/1.0/backlog/issue", map[string]any{"issues": keys}, keys)
 }
+
+// StartSprint starts sprintID via POST /rest/agile/1.0/sprint/{sprintId},
+// sending state: "active" with the start and end dates, and name and goal
+// when either is given. start and end must already be in the Agile API's
+// own datetime format, 2026-09-09T09:00:00.000+0000; a bare date is
+// rejected, and turning one into the other is sprints.Service's job, not
+// this transport's.
+//
+// name and goal are left out of the body when empty rather than sent as
+// "": this endpoint is a partial update, so a key that is present
+// overwrites and one that is absent is left alone, and sending "" would
+// clear whatever name or goal the sprint already had. This is the same
+// rule CompleteSprint's own comment states for the dates: a start with an
+// empty goal box must not silently wipe out a goal typed in on an earlier
+// start.
+//
+// Starting a sprint, moving its unfinished issues at completion (through
+// MoveToSprint or MoveToBacklog above), and completing it below are the
+// only calls in TAM that reach Jira outside a Commit: a sprint's start is
+// a timestamped fact a whole team reads, and what a completion does with
+// the issues that did not finish depends on the sprint's contents at the
+// moment it closes, not at whatever moment a Commit next runs.
+func (c *Client) StartSprint(ctx context.Context, sprintID int, name, goal, start, end string) error {
+	path := fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID)
+	body := map[string]any{
+		"state":     "active",
+		"startDate": start,
+		"endDate":   end,
+	}
+	if name != "" {
+		body["name"] = name
+	}
+	if goal != "" {
+		body["goal"] = goal
+	}
+	return c.WriteJSON(ctx, http.MethodPost, path, body)
+}
+
+// CompleteSprint completes sprintID via POST /rest/agile/1.0/sprint/{sprintId},
+// sending state: "closed" and nothing else: a completion that also sent the
+// dates would rewrite them, and Jira needs nothing more to close a sprint.
+// See StartSprint's doc comment for why this is one of the calls that reach
+// Jira outside a Commit.
+func (c *Client) CompleteSprint(ctx context.Context, sprintID int) error {
+	path := fmt.Sprintf("/rest/agile/1.0/sprint/%d", sprintID)
+	return c.WriteJSON(ctx, http.MethodPost, path, map[string]any{"state": "closed"})
+}

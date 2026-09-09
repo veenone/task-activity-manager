@@ -133,6 +133,59 @@ func (a *App) MoveIssueToSprint(profileID, key, sprintID string) error {
 	return a.repo.MoveToSprint(a.ctx, profileID, key, sprintID, name)
 }
 
+// JournalSprintMoves journals a whole selection of cards onto one sprint,
+// or onto the backlog. It is the board's bulk move, and it only ever writes
+// journal rows: what reaches Jira is the Commit that follows, which is why
+// it takes no busy guard, exactly like the single move above.
+//
+// It keeps the single move's two guards, the numeric sprint id and the
+// destination's name read from the sprint list, and the repository writes
+// every card in one transaction. A key the cache does not hold is logged
+// and skipped rather than allowed to take the rest of the selection down
+// with it; a card already sitting on the destination journals nothing at
+// all, so a selection of twenty rarely produces twenty rows.
+//
+// It answers with how many of the selected cards were moved, which is every
+// one the cache holds: a card already on the destination is where it was
+// asked to go and counts, whether or not it needed a journal row. A partly
+// uncached selection used to return a nil error, so the only place the fact
+// was recorded was the Go log and the UI could not say "18 of 20 moved".
+func (a *App) JournalSprintMoves(profileID string, keys []string, sprintID string) (int, error) {
+	if err := a.requireStore(); err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(profileID) == "" {
+		return 0, errors.New("no profile selected")
+	}
+	if len(keys) == 0 {
+		return 0, errors.New("no cards are selected")
+	}
+	sprintID = strings.TrimSpace(sprintID)
+	if sprintID != "" {
+		if _, err := strconv.Atoi(sprintID); err != nil {
+			return 0, fmt.Errorf("sprint id %q is not a number", sprintID)
+		}
+	}
+	name, err := a.boards.SprintName(a.ctx, profileID, sprintID)
+	if err != nil {
+		return 0, err
+	}
+	missing, err := a.repo.MoveManyToSprint(a.ctx, profileID, keys, sprintID, name)
+	if err != nil {
+		return 0, err
+	}
+	moved := len(keys) - len(missing)
+	if len(missing) == 0 {
+		return moved, nil
+	}
+	log.Printf("tam: %d of %d selected cards are not in the cache and were not moved: %s",
+		len(missing), len(keys), strings.Join(missing, ", "))
+	if moved == 0 {
+		return 0, fmt.Errorf("none of the %d selected cards is in the cache; sync first", len(keys))
+	}
+	return moved, nil
+}
+
 // CanTransition asks Jira whether the card can reach statusID from where it
 // sits right now, and what it can reach instead. It is the one board
 // binding that touches the network, and it is best effort: an error means

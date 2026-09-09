@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { Board, BoardView, Issue, Sprint, Swimlane } from "../api";
 import { BoardGrid } from "./BoardGrid";
@@ -23,6 +23,9 @@ interface Props {
   hasSprint: boolean;
   swimlane: Swimlane;
   selectedKey: string;
+  // checked is the multi-selection, by key, which the grid paints and the
+  // selection bar acts on.
+  checked: ReadonlySet<string>;
   focusId: string;
   // The move half of the board: the writes, the drag state, and what each
   // card's move is doing, plus the key of the card that has just landed.
@@ -33,7 +36,7 @@ interface Props {
   committing: boolean;
   canSync: boolean;
   onSync: () => void;
-  onSelect: (issue: Issue) => void;
+  onSelect: (issue: Issue, e: MouseEvent<HTMLDivElement>) => void;
   onFocusCard: (id: string) => void;
   onKeyDown: (e: KeyboardEvent, id: string) => void;
 }
@@ -43,7 +46,7 @@ interface Props {
 // board. Each state says what is missing and, where a sync would fix it,
 // offers one.
 export function BoardBody({
-  boards, view, filtered, unavailable, hasBoards, hasSprint, swimlane, selectedKey, focusId, moves, flashKey,
+  boards, view, filtered, unavailable, hasBoards, hasSprint, swimlane, selectedKey, checked, focusId, moves, flashKey,
   sprints, sprintId, committing, canSync, onSync, onSelect, onFocusCard, onKeyDown,
 }: Props) {
   if (boards.isError) {
@@ -118,12 +121,14 @@ export function BoardBody({
           {/* Nothing else on screen says the moves exist, and the grid
               names this line in its aria-describedby. */}
           <p className="muted small board-move-keys" id="board-move-keys">
-            Drag a card to move it, or focus one and hold Ctrl with an arrow key. Shift and F10 open its move menu.
+            Drag a card to move it, or focus one and hold Ctrl with an arrow key. Space checks a card and Shift with an
+            arrow checks a run of them. Shift and F10 open a card's move menu.
           </p>
           <BoardGrid
             view={data}
             swimlane={swimlane}
             selectedKey={selectedKey}
+            checked={checked}
             focusId={focusId}
             moves={moves}
             flashKey={flashKey}

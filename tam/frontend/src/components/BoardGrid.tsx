@@ -1,4 +1,4 @@
-import type { CSSProperties, DragEvent, KeyboardEvent } from "react";
+import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent } from "react";
 import type { BoardView, Issue, Sprint } from "../api";
 import { posId } from "../lib/boardCells";
 import { plural } from "../lib/format";
@@ -17,6 +17,10 @@ interface Props {
   view: BoardView;
   swimlane: string;
   selectedKey: string;
+  // checked is the multi-selection: the keys a bulk action would touch. It
+  // is a set of keys and never of positions, because the board redraws on
+  // every refetch.
+  checked: ReadonlySet<string>;
   focusId: string;
   moves: BoardMoves;
   flashKey: string;
@@ -25,7 +29,7 @@ interface Props {
   // committing is a Commit in flight: the cards stop being draggable while
   // one is pushing.
   committing: boolean;
-  onSelect: (issue: Issue) => void;
+  onSelect: (issue: Issue, e: MouseEvent<HTMLDivElement>) => void;
   onFocusCard: (id: string) => void;
   onKeyDown: (e: KeyboardEvent, id: string) => void;
 }
@@ -55,7 +59,7 @@ function scrollNearEdge(e: DragEvent<HTMLElement>) {
 // is the card. A screen reader reading a lane therefore hears every card
 // with the column it sits in, which the card's own label repeats.
 export function BoardGrid({
-  view, swimlane, selectedKey, focusId, moves, flashKey, sprints, sprintId, committing,
+  view, swimlane, selectedKey, checked, focusId, moves, flashKey, sprints, sprintId, committing,
   onSelect, onFocusCard, onKeyDown,
 }: Props) {
   const target = moves.target;
@@ -72,6 +76,9 @@ export function BoardGrid({
       style={{ "--board-cols": view.columns.length } as CSSProperties}
       role="grid"
       aria-label="Board"
+      // Two selections live on this grid: the one card the detail panel is
+      // about, and the run a bulk action would touch.
+      aria-multiselectable
       aria-colcount={view.columns.length}
       aria-describedby="board-move-keys"
       onDragOver={scrollNearEdge}
@@ -118,6 +125,7 @@ export function BoardGrid({
                         <BoardCard
                           issue={issue}
                           selected={issue.key === selectedKey}
+                          checked={checked.has(issue.key)}
                           focused={id === focusId}
                           columnName={column.name}
                           colIndex={col + 1}
@@ -138,7 +146,7 @@ export function BoardGrid({
                               onSprint={(sprint) => moves.moveToSprint(issue.key, sprint)}
                             />
                           )}
-                          onSelect={() => onSelect(issue)}
+                          onSelect={(e) => onSelect(issue, e)}
                           onFocus={() => onFocusCard(id)}
                           onKeyDown={(e) => onKeyDown(e, id)}
                           onDragStart={(e) => moves.onDragStart(e, issue.key)}

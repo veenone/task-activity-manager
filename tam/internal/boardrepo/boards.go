@@ -47,6 +47,9 @@ const boardKeysSQL = `
 const sprintNameSQL = `
 	SELECT name FROM sprint WHERE profile_id = ? AND id = ? AND name <> '' LIMIT 1`
 
+const boardSprintSQL = `
+	SELECT state FROM sprint WHERE profile_id = ? AND board_id = ? AND id = ? LIMIT 1`
+
 // RemoveBoards drops the boards and everything hanging off them: their
 // columns, their issue keys, and their sprints, in one transaction.
 func (r *Repository) RemoveBoards(ctx context.Context, profileID string, boardIDs []int) error {
@@ -87,9 +90,18 @@ func (r *Repository) ListBoards(ctx context.Context, profileID string) ([]Board,
 	return out, rows.Err()
 }
 
-// Columns returns one board's columns in board order.
+// Columns returns one board's columns in board order, on the handle. A
+// caller composing a whole board reads them inside its own snapshot
+// instead, through columnsOf.
 func (r *Repository) Columns(ctx context.Context, profileID string, boardID int) ([]backend.BoardColumn, error) {
-	rows, err := r.db.QueryContext(ctx, columnsSQL, profileID, boardID)
+	return columnsOf(ctx, r.db, profileID, boardID)
+}
+
+// columnsOf is the columns read itself, on whichever querier the caller
+// hands it: the handle for a lone read, a read transaction for a board
+// composed of several.
+func columnsOf(ctx context.Context, q dbtx.Querier, profileID string, boardID int) ([]backend.BoardColumn, error) {
+	rows, err := q.QueryContext(ctx, columnsSQL, profileID, boardID)
 	if err != nil {
 		return nil, fmt.Errorf("board %d columns: %w", boardID, err)
 	}
@@ -153,10 +165,51 @@ func (r *Repository) SprintName(ctx context.Context, profileID, sprintID string)
 	return name, nil
 }
 
+// BoardSprintState is what this board's cached sprint list says about that
+// sprint: its state, and whether the board holds it at all. A ceremony asks
+// both before it acts.
+//
+// Whether the board holds it, because a completion judges "finished" against
+// one board's last column while the cards come from the sprint, so a board
+// and a sprint that have nothing to do with each other would decide where
+// somebody's work goes and then close the sprint anyway. The board's own key
+// is (profile_id, board_id, id), which is that whole question.
+//
+// The state, because a completion aimed at a sprint that never started
+// empties it in Jira and only then finds out Jira will not close it. The
+// state is Jira's own lowercase word, active, future or closed, kept as it
+// arrived.
+func (r *Repository) BoardSprintState(ctx context.Context, profileID string, boardID int, sprintID string) (string, bool, error) {
+	if strings.TrimSpace(sprintID) == "" {
+		return "", false, nil
+	}
+	var state string
+	err := r.db.QueryRowContext(ctx, boardSprintSQL, profileID, boardID, sprintID).Scan(&state)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("sprint %s of board %d: %w", sprintID, boardID, err)
+	}
+	return state, true, nil
+}
+
+// SprintIssues returns the keys one board holds for one sprint, in the board
+// order the view reads them back in. A completion subtracts the cards that
+// left the sprint from this rather than replacing it with what a search
+// answered: the search orders by key and is scoped by project and issue
+// type, so writing its result back would alphabetize the board and could
+// insert keys the board's own filter never drew.
+func (r *Repository) SprintIssues(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error) {
+	return issueKeys(ctx, r.db, profileID, boardID, sprintID)
+}
+
 // issueKeys returns the keys one board holds for a sprint, in board order.
 // An empty sprintID reads the board's own list, the way the sync stored it.
-func (r *Repository) issueKeys(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, boardKeysSQL, profileID, boardID, sprintID)
+// It reads on whichever querier the caller hands it, so the board and its
+// membership can be read on one snapshot.
+func issueKeys(ctx context.Context, q dbtx.Querier, profileID string, boardID int, sprintID string) ([]string, error) {
+	rows, err := q.QueryContext(ctx, boardKeysSQL, profileID, boardID, sprintID)
 	if err != nil {
 		return nil, fmt.Errorf("board %d issue keys: %w", boardID, err)
 	}
@@ -170,10 +223,4 @@ func (r *Repository) issueKeys(ctx context.Context, profileID string, boardID in
 		out = append(out, key)
 	}
 	return out, rows.Err()
-}
-
-// inTx runs fn inside one transaction, through the helper issuerepo shares,
-// so a replace never leaves the table holding a delete without its inserts.
-func (r *Repository) inTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	return dbtx.In(ctx, r.db, fn)
 }

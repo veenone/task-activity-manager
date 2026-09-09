@@ -81,19 +81,66 @@ func (r *Repository) MoveToSprint(ctx context.Context, profileID, key, sprintID,
 	sprintID = strings.TrimSpace(sprintID)
 	sprintName = strings.TrimSpace(sprintName)
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		row, err := readBoardRow(ctx, tx, profileID, key)
-		if err != nil {
-			return err
-		}
-		name := sprintName
-		if name == "" {
-			if name, err = sprintNameFor(ctx, tx, profileID, sprintID); err != nil {
+		return moveToSprintTx(ctx, tx, profileID, key, sprintID, sprintName)
+	})
+}
+
+// MoveManyToSprint journals a whole selection onto one destination inside a
+// single transaction, so a planning session that moves twenty cards writes
+// them all or none.
+//
+// It shares moveToSprintTx with the single move rather than looping over
+// MoveToSprint, and that is the whole reason it exists. MoveToSprint opens
+// its own transaction: calling it inside another one takes a second pooled
+// connection, which blocks the moment the outer transaction has written,
+// burns the driver's five second busy timeout, and then fails. Twenty cards
+// would have frozen the app for a hundred seconds to journal nothing.
+//
+// A key the cache does not hold comes back in missing instead of ending the
+// batch: one stale card in a selection of twenty must not cost the other
+// nineteen their move. A card already sitting on the destination journals
+// nothing, which is recordMove's own rule and not a special case here.
+func (r *Repository) MoveManyToSprint(ctx context.Context, profileID string, keys []string, sprintID, sprintName string) (missing []string, err error) {
+	sprintID = strings.TrimSpace(sprintID)
+	sprintName = strings.TrimSpace(sprintName)
+	err = r.inTx(ctx, func(tx *sql.Tx) error {
+		missing = nil
+		for _, key := range keys {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			switch err := moveToSprintTx(ctx, tx, profileID, key, sprintID, sprintName); {
+			case errors.Is(err, ErrNotFound):
+				missing = append(missing, key)
+			case err != nil:
 				return err
 			}
 		}
-		return recordMove(ctx, tx, profileID, key, EntitySprintMove, FieldSprintID,
-			MoveValue(row.sprintID, row.sprintName), MoveValue(sprintID, name), row.updated)
+		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return missing, nil
+}
+
+// moveToSprintTx is the body both sprint moves share, on the transaction the
+// caller opened. A caller with no name for the destination gets the fallback
+// a cached issue already in that sprint carries.
+func moveToSprintTx(ctx context.Context, tx *sql.Tx, profileID, key, sprintID, sprintName string) error {
+	row, err := readBoardRow(ctx, tx, profileID, key)
+	if err != nil {
+		return err
+	}
+	name := sprintName
+	if name == "" {
+		if name, err = sprintNameFor(ctx, tx, profileID, sprintID); err != nil {
+			return err
+		}
+	}
+	return recordMove(ctx, tx, profileID, key, EntitySprintMove, FieldSprintID,
+		MoveValue(row.sprintID, row.sprintName), MoveValue(sprintID, name), row.updated)
 }
 
 // RankIssue journals a card dropped before or after neighbourKey inside its

@@ -1,33 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { FocusEvent, KeyboardEvent } from "react";
+import { useMemo, useState } from "react";
+import type { MouseEvent } from "react";
 import { errMsg, useProfile } from "@agile-suite/core";
-import type { BoardView, Issue, Profile, Settings, Swimlane } from "../api";
+import type { Issue, Profile, Settings, Swimlane } from "../api";
 import { useBoard, useBoardSprints, useBoards, useBoardsUnavailable, useSyncBoards } from "../queries/boards";
 import { useSyncState } from "../queries/issues";
 import { filterBoard } from "../lib/boardFilter";
 import { useSync } from "../contexts/SyncContext";
-import { clampFocus, findCard, moveFocus, parsePos, posId } from "../lib/boardCells";
-import type { Pos } from "../lib/boardCells";
+import { cardAtPos, cardKeys, findCard, posId } from "../lib/boardCells";
 import { BoardBody } from "./BoardBody";
+import { BoardCeremonies, useCompleteGuard } from "./BoardCeremonies";
+import type { Ceremony } from "./BoardCeremonies";
+import { BoardSelectionBar } from "./BoardSelectionBar";
+import { useBoardSelection } from "./useBoardSelection";
+import { useBoardKeys } from "./useBoardKeys";
 import { BoardMoveBanner } from "./BoardMoveBanner";
 import { BoardsBanner } from "./BoardsBanner";
 import { BoardSummaryLine } from "./BoardNotes";
 import { BoardsToolbar } from "./BoardsToolbar";
-import { CARD_MENU_CLASS } from "./CardMoveMenu";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useBoardMoves } from "./useBoardMoves";
-import { useMovedCard } from "./useMovedCard";
-
-// cardAtPos reads one card out of the view by its position.
-function cardAtPos(view: BoardView, p: Pos | undefined): Issue | undefined {
-  if (!p) return undefined;
-  return view.lanes[p.lane]?.cells[p.col]?.[p.index];
-}
 
 // BoardsView is the board: XTM's board head over the board's own columns,
 // the cards in them, and the lines that say what the board is not showing.
 // Phase 3b makes it writable, through the journal: a drag, a key press, or
 // the card's own menu moves a card, and Commit is what pushes any of it.
+// Phase 3c adds the ceremonies beside it: a selection of cards moved into a
+// sprint in one gesture, and the two dialogs that start and complete one,
+// which are the only writes here that do not wait for Commit.
 export function BoardsView() {
   const { activeId } = useProfile<Profile, Settings>();
   const { canSync, lastBoards, lastCommit, runBoardsRefresh, status } = useSync();
@@ -39,23 +38,18 @@ export function BoardsView() {
   const [swimlane, setSwimlane] = useState<Swimlane>("none");
   const [selectedKey, setSelectedKey] = useState("");
   const [focusId, setFocusId] = useState("");
-  // menuOpenedOn is the card whose move menu the keyboard has just opened.
-  // The panel does not exist until React has flushed the trigger's own
-  // click, so the focus that follows has to wait for the render rather
-  // than run in the key press that asked for it.
-  const [menuOpenedOn, setMenuOpenedOn] = useState("");
-  const bodyRef = useRef<HTMLDivElement>(null);
-  // Whether focus was inside the board when the last move was made. A move
-  // across columns unmounts the focused card and mounts a new one in the
-  // other cell, so by the time the board has redrawn document.activeElement
-  // is already the page body: asking then would answer no every time, and
-  // focus would be left behind on the first Ctrl and an arrow.
-  const hadFocus = useRef(false);
+  // Which ceremony dialog is open, and the sentence the last one to finish
+  // left behind. A completion is irreversible and its result is the one
+  // thing on this screen worth keeping until the user moves on.
+  const [ceremony, setCeremony] = useState<Ceremony>("");
+  const [ceremonyLine, setCeremonyLine] = useState("");
 
   // The board, sprint, and swimlane choices belong to the profile they were
   // made for, so a switch clears them in the render that first sees the new
   // id. An effect would be one render too late: a board query would go out
-  // pairing the new profile with the old board id.
+  // pairing the new profile with the old board id. The checked cards are
+  // cleared the same way, inside useBoardSelection, which does not exist yet
+  // at this point in the render.
   const [filtersFor, setFiltersFor] = useState(activeId);
   if (filtersFor !== activeId) {
     setFiltersFor(activeId);
@@ -64,6 +58,8 @@ export function BoardsView() {
     setSwimlane("none");
     setSelectedKey("");
     setFocusId("");
+    setCeremony("");
+    setCeremonyLine("");
   }
 
   const boards = useBoards(activeId);
@@ -96,6 +92,16 @@ export function BoardsView() {
   // Filtered before anything reads it, so the cells, the counts, the
   // keyboard walk, and the drop targets all agree about which cards exist.
   const data = useMemo(() => (view.data ? filterBoard(view.data, filter) : view.data), [view.data, filter]);
+  // The board in reading order, which is what a shift gesture measures a run
+  // against and the order a bulk move sends its keys in. It is the drawn
+  // board, filter and all, so the selection can only ever hold cards the
+  // reader can see.
+  const order = useMemo(() => (data ? cardKeys(data) : []), [data]);
+  // The selection resets itself on a profile switch, from the id handed in
+  // here: the block above runs before this hook exists, so it cannot clear
+  // something it has not built yet.
+  const selection = useBoardSelection(order, activeId);
+  const askBeforeCompleting = useCompleteGuard(activeId);
   const moves = useBoardMoves({
     profileId: activeId,
     view: data,
@@ -103,32 +109,21 @@ export function BoardsView() {
     commit: lastCommit,
     committing,
   });
-  // A move is announced and focused only once the board has redrawn, so
-  // the card is reported where it actually landed rather than where it was
-  // sent.
-  const flashKey = useMovedCard(data, !view.isFetching, moves.intent, (id) => {
-    setFocusId(id);
-    const card = bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${id}"]`);
-    // Focus follows the card only when the board already had it: a drag
-    // made with the mouse must not pull focus out of wherever the user
-    // put it.
-    if (card && hadFocus.current) card.focus();
+  // The focus model and the key map, which are their own concern: the board
+  // is a grid with one tab stop, and a move unmounts the card focus was on.
+  const { bodyRef, focus, flashKey, onKeyDown, rememberFocus } = useBoardKeys({
+    data,
+    fetching: view.isFetching,
+    moves,
+    selection,
+    selectedKey,
+    focusId,
+    setFocusId,
+    onOpen: (issue, id) => {
+      selection.clearTo(issue.key);
+      select(issue, id);
+    },
   });
-
-  // The card's menu is opened by pressing the trigger the mouse presses,
-  // and focus goes into the panel that press produced, once React has
-  // drawn it.
-  useEffect(() => {
-    if (!menuOpenedOn) return;
-    const card = bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${menuOpenedOn}"]`);
-    card?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-    setMenuOpenedOn("");
-  }, [menuOpenedOn]);
-
-  // Exactly one card is focusable, in every state: the one focus is on when
-  // it survived the last change, else the selected card, else the first card
-  // on the board.
-  const focus = data ? clampFocus(data, focusId, findCard(data, selectedKey)) : "";
 
   const selectedPos = data ? findCard(data, selectedKey) : undefined;
   const selected = data ? cardAtPos(data, selectedPos) : undefined;
@@ -138,57 +133,38 @@ export function BoardsView() {
     setFocusId(id);
   }
 
-  // openMenu is the keyboard's way into the card's move menu. Enter and
-  // Space are taken by the selection that opens the detail panel, so the
-  // menu key and Shift with F10 press the trigger the mouse presses. The
-  // focus that follows is left to the effect above: the panel is a state
-  // change React flushes when this handler returns, so querying for a menu
-  // item here would search a board that still has no panel in it.
-  function openMenu(id: string) {
-    const card = bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${id}"]`);
-    const trigger = card?.querySelector<HTMLElement>(`.${CARD_MENU_CLASS}`);
-    if (!trigger) return;
-    trigger.click();
-    setMenuOpenedOn(id);
+  // A click on a card is one of three gestures. Control toggles the card's
+  // check and shift extends the run from the anchor; neither opens the
+  // panel, since neither is about one card. A plain click is the one that
+  // is, so it clears the multi-selection and leaves the clicked card as the
+  // anchor the next shift gesture measures from.
+  function clickCard(issue: Issue, e: MouseEvent<HTMLDivElement>) {
+    const p = data ? findCard(data, issue.key) : undefined;
+    const id = p ? posId(p) : "";
+    if (e.shiftKey) {
+      selection.extendTo(issue.key);
+      setFocusId(id);
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) {
+      selection.check(issue.key);
+      setFocusId(id);
+      return;
+    }
+    selection.clearTo(issue.key);
+    select(issue, id);
   }
 
-  // rememberFocus keeps hadFocus true across the unmount a move makes: a
-  // card leaving the DOM takes focus to the body with no related target,
-  // and that is the case the flag exists for. Focus genuinely leaving the
-  // board, which names where it went, is what clears it.
-  function rememberFocus(e: FocusEvent<HTMLDivElement>) {
-    if (e.type === "focus") {
-      hadFocus.current = true;
-      return;
-    }
-    if (e.relatedTarget && !bodyRef.current?.contains(e.relatedTarget)) hadFocus.current = false;
-  }
-
-  function onKeyDown(e: KeyboardEvent, id: string) {
-    if (!data) return;
-    const p = parsePos(id);
-    if (!p) return;
-    const issue = cardAtPos(data, p);
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      if (issue) select(issue, id);
-      return;
-    }
-    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
-      e.preventDefault();
-      openMenu(id);
-      return;
-    }
-    if (e.ctrlKey && issue && moves.moveByKeyboard(p, issue, e.key)) {
-      e.preventDefault();
-      return;
-    }
-    const next = moveFocus(data, p, e.key);
-    if (!next) return;
-    e.preventDefault();
-    const nextId = posId(next);
-    setFocusId(nextId);
-    bodyRef.current?.querySelector<HTMLElement>(`[data-board-pos="${nextId}"]`)?.focus();
+  // afterCeremony is what both ceremonies leave behind: the picker on
+  // the sprint the action was about, nothing checked, and one sentence
+  // saying what happened.
+  function afterCeremony(nextSprintId: string, line: string) {
+    setCeremony("");
+    setCeremonyLine(line);
+    selection.reset();
+    setSelectedKey("");
+    setFocusId("");
+    if (nextSprintId) setSprintId(nextSprintId);
   }
 
   const refreshing = sync.isPending || (view.isFetching && !view.isLoading);
@@ -210,6 +186,8 @@ export function BoardsView() {
           setSprintId("");
           setSelectedKey("");
           setFocusId("");
+          selection.reset();
+          setCeremonyLine("");
         }}
         sprints={openSprints}
         sprint={sprint}
@@ -217,17 +195,27 @@ export function BoardsView() {
           setSprintId(id);
           setSelectedKey("");
           setFocusId("");
+          selection.reset();
+          setCeremonyLine("");
         }}
         swimlane={swimlane}
         onSwimlane={(s) => {
           setSwimlane(s);
           setFocusId("");
+          selection.reset();
         }}
         refreshing={refreshing}
         canRefresh={canSync && !sync.isPending}
         onRefresh={() => sync.mutate()}
         filter={filter}
         onFilter={setFilter}
+        onStart={() => setCeremony("start")}
+        onComplete={() => {
+          if (!sprint) return;
+          void askBeforeCompleting(sprint.id).then((ok) => {
+            if (ok) setCeremony("complete");
+          });
+        }}
       />
 
       <BoardsBanner
@@ -246,7 +234,27 @@ export function BoardsView() {
         onPutBack={moves.putBack}
       />
 
+      {/* Named, because the sentence is also announced through the shared
+          live region and the two status regions are otherwise the same
+          thing to anything reading the page. */}
+      {ceremonyLine && (
+        <div className="pending-banner" role="status" aria-label="Sprint ceremony">
+          <p>{ceremonyLine}</p>
+        </div>
+      )}
+
       {data && <BoardSummaryLine view={data} sprint={sprint} lastSynced={syncState.data?.lastSynced ?? ""} />}
+
+      {selection.count > 0 && (
+        <BoardSelectionBar
+          count={selection.count}
+          sprints={openSprints}
+          sprintId={effectiveSprintId}
+          busy={moves.movingMany || committing}
+          onMove={(target) => moves.moveManyToSprint(selection.keys, target, selection.reset)}
+          onClear={selection.reset}
+        />
+      )}
 
       <div className="boards-body" ref={bodyRef} onFocusCapture={rememberFocus} onBlurCapture={rememberFocus}>
         <div className="boards-pane">
@@ -259,6 +267,7 @@ export function BoardsView() {
             hasSprint={!!effectiveSprintId}
             swimlane={swimlane}
             selectedKey={selectedKey}
+            checked={selection.checked}
             focusId={focus}
             moves={moves}
             flashKey={flashKey}
@@ -267,18 +276,36 @@ export function BoardsView() {
             committing={committing}
             canSync={canSync && !sync.isPending}
             onSync={() => sync.mutate()}
-            onSelect={(issue) => {
-              const p = data ? findCard(data, issue.key) : undefined;
-              select(issue, p ? posId(p) : "");
-            }}
+            onSelect={clickCard}
             onFocusCard={setFocusId}
             onKeyDown={onKeyDown}
           />
         </div>
-        {selected && (
-          <IssueDetailPanel key={selected.key} profileId={activeId} issue={selected} onClose={() => setSelectedKey("")} />
+        {/* A panel describing one card while three are checked would be
+            lying about what the next action touches, so the multi-selection
+            takes the pane; dropping back to one card gives it back. */}
+        {selected && selection.count <= 1 && (
+          <IssueDetailPanel
+            key={selected.key}
+            profileId={activeId}
+            issue={selected}
+            sprints={openSprints}
+            onClose={() => setSelectedKey("")}
+          />
         )}
       </div>
+
+      <BoardCeremonies
+        profileId={activeId}
+        boardId={board?.id ?? 0}
+        open={ceremony}
+        sprint={sprint}
+        sprints={openSprints}
+        view={view.data}
+        onClose={() => setCeremony("")}
+        onStarted={afterCeremony}
+        onCompleted={afterCeremony}
+      />
     </section>
   );
 }

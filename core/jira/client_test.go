@@ -2,9 +2,11 @@ package jira
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -129,6 +131,33 @@ func TestGetBytesStatusReturnsBodyAndStatus(t *testing.T) {
 	_, code, err = c.GetBytesStatus(context.Background(), "/bad")
 	if code != 400 || err == nil || err.Error() != "jira: GET /bad -> 400 Bad Request: not a test" {
 		t.Errorf("bad: %d %v", code, err)
+	}
+}
+
+// TestWriteStatusErrorCapsAnOversizedMessage pins down the bound
+// writeStatusError lost when it moved onto jiraErrorMessage: that helper has
+// no length limit of its own, and WriteJSONRaw reads up to 64 KiB, so an
+// oversized errorMessages entry used to go into the error, and from there
+// into a commit failure row and the UI, whole.
+func TestWriteStatusErrorCapsAnOversizedMessage(t *testing.T) {
+	long := strings.Repeat("x", 4096)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		body, _ := json.Marshal(map[string]any{"errorMessages": []string{long}})
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	err := c.Post(context.Background(), "/bad", map[string]string{})
+	if err == nil {
+		t.Fatal("want an error for a 400")
+	}
+	if strings.Contains(err.Error(), long) {
+		t.Errorf("err length = %d, want the oversized message capped rather than persisted whole", len(err.Error()))
+	}
+	if len(err.Error()) > 1200 {
+		t.Errorf("err length = %d, want it bounded near the 1024-byte snippet cap plus the surrounding prefix", len(err.Error()))
 	}
 }
 

@@ -3,6 +3,8 @@ package boardrepo
 import (
 	"context"
 	"fmt"
+
+	"agile-suite/tam/internal/dbtx"
 )
 
 // The commit pass pushes a rank against the card above it in the board's
@@ -38,22 +40,39 @@ type Order struct {
 // A board the store does not hold answers with an error, which is what the
 // commit pass reports when it drops that board's ranks.
 func (o Order) CellOrder(ctx context.Context, profileID string, boardID int) ([]string, error) {
-	cols, err := o.Boards.Columns(ctx, profileID, boardID)
+	var out []string
+	err := o.Boards.inReadTx(ctx, func(q dbtx.Querier) error {
+		keys, err := cellOrder(ctx, q, o.Issues, profileID, boardID)
+		out = keys
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// cellOrder is the order itself, every statement on one snapshot, so the
+// columns a card is placed into and the membership it is placed from are
+// the same board. A rank pushed from an order half of one sync and half of
+// the next would anchor against a card that board never drew.
+func cellOrder(ctx context.Context, q dbtx.Querier, issues IssueSource, profileID string, boardID int) ([]string, error) {
+	cols, err := columnsOf(ctx, q, profileID, boardID)
 	if err != nil {
 		return nil, err
 	}
 	if len(cols) == 0 {
 		return nil, fmt.Errorf("board %d is not in the store; sync the boards first", boardID)
 	}
-	boardKeys, err := o.Boards.issueKeys(ctx, profileID, boardID, "")
+	boardKeys, err := issueKeys(ctx, q, profileID, boardID, "")
 	if err != nil {
 		return nil, err
 	}
-	moves, err := o.Issues.PendingMoves(ctx, profileID)
+	moves, err := issues.PendingMoves(ctx, q, profileID)
 	if err != nil {
 		return nil, err
 	}
-	cards, err := o.Issues.IssuesByKeys(ctx, profileID, boardKeys)
+	cards, err := issues.IssuesByKeys(ctx, q, profileID, boardKeys)
 	if err != nil {
 		return nil, err
 	}

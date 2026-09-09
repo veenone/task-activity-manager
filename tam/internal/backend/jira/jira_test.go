@@ -466,3 +466,22 @@ func TestTheBoardWritesPassThroughToTheAgileEndpoints(t *testing.T) {
 		t.Errorf("wrote %v", f.writes)
 	}
 }
+
+func TestStartAndCompleteSprintPassThroughToTheAgileEndpoint(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	ctx := context.Background()
+	draft := backend.SprintDraft{Name: "Sprint 12", Goal: "Ship the thing", StartDate: "2026-09-09T09:00:00.000+0000", EndDate: "2026-09-23T09:00:00.000+0000"}
+	if err := b.StartSprint(ctx, 12, draft); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := b.CompleteSprint(ctx, 12); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	want := []string{
+		`POST /rest/agile/1.0/sprint/12 {"endDate":"2026-09-23T09:00:00.000+0000","goal":"Ship the thing","name":"Sprint 12","startDate":"2026-09-09T09:00:00.000+0000","state":"active"}`,
+		`POST /rest/agile/1.0/sprint/12 {"state":"closed"}`,
+	}
+	if strings.Join(f.writes, " | ") != strings.Join(want, " | ") {
+		t.Errorf("wrote %v", f.writes)
+	}
+}

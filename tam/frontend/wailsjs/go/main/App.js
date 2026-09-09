@@ -18,6 +18,10 @@ export function CommitPendingChanges(arg1) {
   return window['go']['main']['App']['CommitPendingChanges'](arg1);
 }
 
+export function CompleteSprint(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CompleteSprint'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateIssue(arg1, arg2) {
   return window['go']['main']['App']['CreateIssue'](arg1, arg2);
 }
@@ -102,6 +106,10 @@ export function ImportProfile() {
   return window['go']['main']['App']['ImportProfile']();
 }
 
+export function JournalSprintMoves(arg1, arg2, arg3) {
+  return window['go']['main']['App']['JournalSprintMoves'](arg1, arg2, arg3);
+}
+
 export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
 }
@@ -154,6 +162,10 @@ export function MoveIssueToSprint(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveIssueToSprint'](arg1, arg2, arg3);
 }
 
+export function PendingInSprint(arg1, arg2) {
+  return window['go']['main']['App']['PendingInSprint'](arg1, arg2);
+}
+
 export function PreviewImport(arg1, arg2) {
   return window['go']['main']['App']['PreviewImport'](arg1, arg2);
 }
@@ -192,6 +204,14 @@ export function SetProfileSetting(arg1, arg2, arg3) {
 
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
+}
+
+export function StartSprint(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['StartSprint'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function SuggestSprintDates(arg1, arg2) {
+  return window['go']['main']['App']['SuggestSprintDates'](arg1, arg2);
 }
 
 export function SyncBoards(arg1) {
