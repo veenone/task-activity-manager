@@ -68,7 +68,7 @@ type lifecycle interface {
 // two writes that keep the cache honest once Jira has moved.
 type Store interface {
 	Columns(ctx context.Context, profileID string, boardID int) ([]backend.BoardColumn, error)
-	BoardHasSprint(ctx context.Context, profileID string, boardID int, sprintID string) (bool, error)
+	BoardSprintState(ctx context.Context, profileID string, boardID int, sprintID string) (string, bool, error)
 	SprintName(ctx context.Context, profileID, sprintID string) (string, error)
 	SprintIssues(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error)
 	ReplaceSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error
@@ -205,7 +205,7 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 	if err != nil {
 		return done, err
 	}
-	if err := s.requireOwnSprint(ctx, profileID, boardID, sid); err != nil {
+	if err := s.requireCompletable(ctx, profileID, boardID, sid); err != nil {
 		return done, err
 	}
 	incomplete, err := s.sprintIssues(ctx, sid, complete)

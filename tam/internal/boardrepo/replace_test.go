@@ -325,11 +325,12 @@ func TestSprintIssuesReadsTheBoardsOwnOrder(t *testing.T) {
 	}
 }
 
-// TestBoardHasSprintAnswersForOneBoard is what a ceremony asks before it
+// TestBoardSprintStateAnswersForOneBoard is what a ceremony asks before it
 // acts. Jira hands the same sprint to every board whose filter reaches it,
 // so the question is never "does this sprint exist" but "is it this board's",
-// and the sprint table's key is what answers it.
-func TestBoardHasSprintAnswersForOneBoard(t *testing.T) {
+// and the sprint table's key is what answers it. The state comes back with
+// the answer, because a completion also refuses a sprint that never started.
+func TestBoardSprintStateAnswersForOneBoard(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
 	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
@@ -338,23 +339,26 @@ func TestBoardHasSprintAnswersForOneBoard(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name     string
-		boardID  int
-		sprintID string
-		want     bool
+		name      string
+		boardID   int
+		sprintID  string
+		wantHeld  bool
+		wantState string
 	}{
-		{"a sprint of this board", 1, "12", true},
-		{"a sprint of another board", 2, "12", false},
-		{"a sprint nobody holds", 1, "99", false},
-		{"no sprint at all", 1, "", false},
+		{"a sprint of this board", 1, "12", true, "active"},
+		{"a future sprint of this board", 1, "13", true, "future"},
+		{"a sprint of another board", 2, "12", false, ""},
+		{"a sprint nobody holds", 1, "99", false, ""},
+		{"no sprint at all", 1, "", false, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := r.BoardHasSprint(ctx, "p1", tc.boardID, tc.sprintID)
+			state, held, err := r.BoardSprintState(ctx, "p1", tc.boardID, tc.sprintID)
 			if err != nil {
-				t.Fatalf("board has sprint: %v", err)
+				t.Fatalf("board sprint state: %v", err)
 			}
-			if got != tc.want {
-				t.Errorf("board %d holds sprint %q = %v, want %v", tc.boardID, tc.sprintID, got, tc.want)
+			if held != tc.wantHeld || state != tc.wantState {
+				t.Errorf("board %d sprint %q = %q, %v, want %q, %v",
+					tc.boardID, tc.sprintID, state, held, tc.wantState, tc.wantHeld)
 			}
 		})
 	}

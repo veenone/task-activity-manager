@@ -129,9 +129,13 @@ func (f *fakeBackend) BoardSprints(context.Context, int) ([]backend.Sprint, erro
 // fakeStore is the board cache: the columns "complete" is defined against,
 // the destination's name, and the two writes the ceremonies make.
 type fakeStore struct {
-	columns    []backend.BoardColumn
-	names      map[string]string
-	onBoard    map[string]bool
+	columns []backend.BoardColumn
+	names   map[string]string
+	// onBoard is the state of each sprint the board holds, by board id and
+	// sprint id. A pair that is not in it is a sprint the board does not
+	// hold at all, which is a different refusal from a sprint it holds and
+	// that has never been started.
+	onBoard    map[string]string
 	cached     map[string][]string
 	sprints    []backend.Sprint
 	written    int
@@ -146,7 +150,7 @@ func newStore() *fakeStore {
 			{Name: "Done", StatusIDs: []string{"5", "6"}},
 		},
 		names:      map[string]string{"13": "Sprint 13"},
-		onBoard:    map[string]bool{"1/12": true, "1/13": true},
+		onBoard:    map[string]string{"1/12": "active", "1/13": "future"},
 		cached:     map[string][]string{},
 		membership: map[string][]string{},
 	}
@@ -175,8 +179,9 @@ func (s *fakeStore) SprintName(_ context.Context, _, sprintID string) (string, e
 	return s.names[sprintID], nil
 }
 
-func (s *fakeStore) BoardHasSprint(_ context.Context, _ string, boardID int, sprintID string) (bool, error) {
-	return s.onBoard[fmt.Sprintf("%d/%s", boardID, sprintID)], nil
+func (s *fakeStore) BoardSprintState(_ context.Context, _ string, boardID int, sprintID string) (string, bool, error) {
+	state, ok := s.onBoard[fmt.Sprintf("%d/%s", boardID, sprintID)]
+	return state, ok, nil
 }
 
 func (s *fakeStore) SprintIssues(_ context.Context, _ string, _ int, sprintID string) ([]string, error) {
@@ -925,5 +930,45 @@ func TestACompletionIntoTheBacklogWritesTheBoardsOwnList(t *testing.T) {
 	}
 	if got := strings.Join(store.membership[""], ","); got != "PLAT-1,PLAT-2,PLAT-7" {
 		t.Errorf("the board's own list = %q, want it unchanged, since the cards never left the board", got)
+	}
+}
+
+// TestCompleteRefusesASprintThatWasNeverStarted is the order the ceremony
+// runs in, enforced against the cache. A completion moves the cards out
+// first and only then asks Jira to close the sprint, so aimed at a future
+// sprint it empties that sprint and then fails on the close, and TAM can
+// undo neither half. The toolbar offers Complete on the active sprint only;
+// the bound method is reachable without the toolbar.
+func TestCompleteRefusesASprintThatWasNeverStarted(t *testing.T) {
+	b := &fakeBackend{issues: sprintOf("1")}
+	store := newStore()
+	store.onBoard["1/12"] = "future"
+
+	_, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
+	if err == nil {
+		t.Fatal("complete = nil error, want a sprint that has not started refused")
+	}
+	if !strings.Contains(err.Error(), "not been started") || !strings.Contains(err.Error(), "Refresh") {
+		t.Errorf("err = %v, want it to say the sprint never started and what to do about it", err)
+	}
+	if len(b.order) != 0 {
+		t.Errorf("Jira was called (%v) for a sprint that was never started", b.order)
+	}
+}
+
+// TestCompleteAllowsAStateItCannotVouchFor is why the guard names "future"
+// and not "everything that is not active". A sprint started on the web an
+// hour ago still reads as future in a cache nobody has refreshed since, and
+// a cache that has never heard of the state at all is not evidence either.
+// Refusing those costs a Refresh; refusing to move on them costs nothing,
+// so Jira is left to answer for them.
+func TestCompleteAllowsAStateItCannotVouchFor(t *testing.T) {
+	for _, state := range []string{"active", "", "ACTIVE", "started"} {
+		b := &fakeBackend{issues: sprintOf("1")}
+		store := newStore()
+		store.onBoard["1/12"] = state
+		if _, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
+			t.Errorf("complete with the cached state %q = %v, want it attempted", state, err)
+		}
 	}
 }

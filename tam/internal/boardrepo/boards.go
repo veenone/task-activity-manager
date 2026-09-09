@@ -48,7 +48,7 @@ const sprintNameSQL = `
 	SELECT name FROM sprint WHERE profile_id = ? AND id = ? AND name <> '' LIMIT 1`
 
 const boardSprintSQL = `
-	SELECT 1 FROM sprint WHERE profile_id = ? AND board_id = ? AND id = ? LIMIT 1`
+	SELECT state FROM sprint WHERE profile_id = ? AND board_id = ? AND id = ? LIMIT 1`
 
 // RemoveBoards drops the boards and everything hanging off them: their
 // columns, their issue keys, and their sprints, in one transaction.
@@ -165,25 +165,33 @@ func (r *Repository) SprintName(ctx context.Context, profileID, sprintID string)
 	return name, nil
 }
 
-// BoardHasSprint says whether this board's cached sprint list holds that
-// sprint. A ceremony asks before it acts: a completion judges "finished"
-// against one board's last column while the cards come from the sprint, so a
-// board and a sprint that have nothing to do with each other would decide
-// where somebody's work goes and then close the sprint anyway. The board's
-// own key is (profile_id, board_id, id), which is the whole question.
-func (r *Repository) BoardHasSprint(ctx context.Context, profileID string, boardID int, sprintID string) (bool, error) {
+// BoardSprintState is what this board's cached sprint list says about that
+// sprint: its state, and whether the board holds it at all. A ceremony asks
+// both before it acts.
+//
+// Whether the board holds it, because a completion judges "finished" against
+// one board's last column while the cards come from the sprint, so a board
+// and a sprint that have nothing to do with each other would decide where
+// somebody's work goes and then close the sprint anyway. The board's own key
+// is (profile_id, board_id, id), which is that whole question.
+//
+// The state, because a completion aimed at a sprint that never started
+// empties it in Jira and only then finds out Jira will not close it. The
+// state is Jira's own lowercase word, active, future or closed, kept as it
+// arrived.
+func (r *Repository) BoardSprintState(ctx context.Context, profileID string, boardID int, sprintID string) (string, bool, error) {
 	if strings.TrimSpace(sprintID) == "" {
-		return false, nil
+		return "", false, nil
 	}
-	var one int
-	err := r.db.QueryRowContext(ctx, boardSprintSQL, profileID, boardID, sprintID).Scan(&one)
+	var state string
+	err := r.db.QueryRowContext(ctx, boardSprintSQL, profileID, boardID, sprintID).Scan(&state)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
+		return "", false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("sprint %s of board %d: %w", sprintID, boardID, err)
+		return "", false, fmt.Errorf("sprint %s of board %d: %w", sprintID, boardID, err)
 	}
-	return true, nil
+	return state, true, nil
 }
 
 // SprintIssues returns the keys one board holds for one sprint, in the board
