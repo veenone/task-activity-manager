@@ -17,6 +17,12 @@ interface Props {
   refreshing: boolean;
   canRefresh: boolean;
   onRefresh: () => void;
+  // The two ceremonies, offered by the state of the sprint on screen: a
+  // future sprint can be started and the active one completed. Neither
+  // button is ever disabled for a connection TAM cannot see: the call is
+  // attempted and its dialog reports what Jira said.
+  onStart: () => void;
+  onComplete: () => void;
   // filter narrows the cards drawn, by key, assignee, or issue type.
   filter: string;
   onFilter: (v: string) => void;
@@ -34,8 +40,13 @@ function sprintOption(s: Sprint): string {
 // for a board name and absurd for three swimlane options.
 export function BoardsToolbar({
   boards, board, onBoard, sprints, sprint, onSprint, swimlane, onSwimlane,
-  refreshing, canRefresh, onRefresh, filter, onFilter,
+  refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete,
 }: Props) {
+  // A ceremony belongs to the sprint on screen: the one that has not begun
+  // can be started, the one that is running can be completed, and a closed
+  // sprint or a kanban board offers neither.
+  const canStart = sprint?.state === "future";
+  const canComplete = sprint?.state === "active";
   return (
     <div className="board-head">
       <label className="board-picker">
@@ -95,6 +106,12 @@ export function BoardsToolbar({
 
       <div className="board-head-actions">
         {refreshing && <span className="muted small">Refreshing</span>}
+        {canStart && (
+          <button type="button" className="btn" onClick={onStart}>Start sprint</button>
+        )}
+        {canComplete && (
+          <button type="button" className="btn" onClick={onComplete}>Complete sprint</button>
+        )}
         <button type="button" className="btn" disabled={!canRefresh} onClick={onRefresh}>
           Refresh
         </button>

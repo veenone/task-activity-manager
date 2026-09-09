@@ -20,6 +20,10 @@ export const keys = {
     [profileId, "boardSprints", boardId] as const,
   board: (profileId: string, boardId: number, sprintId: string, swimlane: string) =>
     [profileId, "board", boardId, sprintId, swimlane] as const,
+  // What the start dialog opens with: the next sprint's name and the dates
+  // the board's own history suggests.
+  sprintSuggestion: (profileId: string, boardId: number) =>
+    [profileId, "sprintSuggestion", boardId] as const,
   // The one profile setting the Boards view reads: whether this Jira
   // answered the boards call with no Agile API at all.
   boardsUnavailable: (profileId: string) => [profileId, "boardsUnavailable"] as const,

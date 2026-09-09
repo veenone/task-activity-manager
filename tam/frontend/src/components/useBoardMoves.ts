@@ -9,7 +9,14 @@ import { columnDrop, isNoMove, isSameCell, keyboardMove } from "../lib/cardMove"
 import type { Drop, MoveIntent } from "../lib/cardMove";
 import { cardMoves, warningLine } from "../lib/cardMoveState";
 import type { Warning } from "../lib/cardMoveState";
-import { useCanTransition, useMoveToColumn, useMoveToSprint, useRankIssue } from "../queries/boards";
+import { plural } from "../lib/format";
+import {
+  useCanTransition,
+  useJournalSprintMoves,
+  useMoveToColumn,
+  useMoveToSprint,
+  useRankIssue,
+} from "../queries/boards";
 import { useDiscardChange, usePendingChanges } from "../queries/pending";
 
 // useBoardMoves is everything a board move is, in one place: the three
@@ -52,6 +59,7 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
   const toColumn = useMoveToColumn(profileId);
   const rank = useRankIssue(profileId);
   const toSprint = useMoveToSprint(profileId);
+  const manyToSprint = useJournalSprintMoves(profileId);
   const check = useCanTransition(profileId);
   const discard = useDiscardChange(profileId);
 
@@ -184,6 +192,32 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
     );
   }
 
+  // moveManyToSprint is the selection bar's move: the same journal write the
+  // card menu makes, for every checked card at once. It goes through this
+  // hook rather than straight to the binding so the cards mark themselves
+  // the way a single move's card does, from the pending rows the write
+  // leaves behind, rather than staying unmarked until the next refetch.
+  //
+  // It announces rather than flashing a card: fifty cards have no one place
+  // for focus to land, and the count is the thing the user needs told.
+  function moveManyToSprint(keys: string[], sprint: Sprint | null, onDone?: () => void) {
+    if (keys.length === 0) return;
+    const sprintId = sprint ? String(sprint.id) : "";
+    const where = sprint ? sprint.name : "the backlog";
+    for (const key of keys) forget(key);
+    manyToSprint.mutate(
+      { keys, sprintId },
+      {
+        onSuccess: (moved) => {
+          const done = `${plural(moved, "card", "cards")} moved to ${where}. Commit pushes the move to Jira.`;
+          announce(moved < keys.length ? `${done} ${keys.length - moved} are not in the cache and were left where they are.` : done);
+          onDone?.();
+        },
+        onError: (e) => void notice({ title: "The cards could not be moved", message: errMsg(e), tone: "error" }),
+      },
+    );
+  }
+
   // moveByKeyboard answers Ctrl and an arrow on the focused card, and says
   // so when the move it asks for cannot be made. It returns whether the
   // key press was a move at all, so the caller can leave every other key
@@ -309,9 +343,11 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
     dragKey,
     target,
     busy: discard.isPending,
+    movingMany: manyToSprint.isPending,
     moveByKeyboard,
     moveToColumn,
     moveToSprint,
+    moveManyToSprint,
     onDragStart,
     onDragEnd,
     onCellDragOver,

@@ -273,6 +273,30 @@ export interface BoardView {
   needsStatusSync: boolean;
 }
 
+// SprintSuggestion is what the start dialog opens with, mirroring
+// sprints.Suggestion. fromHistory is the field that keeps the dates honest:
+// a plausible wrong end date nobody checks is this feature's failure mode,
+// so the dialog says whether the length came from the board's own closed
+// sprints or from the fortnight default.
+export interface SprintSuggestion {
+  name: string;
+  // start and end are bare days, the shape a date input takes and writes.
+  start: string;
+  end: string;
+  length: number;
+  fromHistory: boolean;
+}
+
+// SprintCompletion is what a completion did, mirroring sprints.Completion.
+// It comes back with a failure as well as with a success: a push that fell
+// over partway has already taken cards out of the sprint, and the dialog has
+// to say how many went where before it says the sprint is still open.
+export interface SprintCompletion {
+  moved: number;
+  movedTo: string;
+  failed: string[];
+}
+
 export interface BoardSummary {
   boards: number;
   columns: number;
@@ -654,6 +678,40 @@ export const GetBoard = (
 ): Promise<BoardView> =>
   App.GetBoard(profileId, boardId, sprintId, swimlane) as Promise<BoardView>;
 export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.SyncBoards;
+
+// The two sprint ceremonies and the two reads the dialogs open with. Unlike
+// every other write on this surface, the ceremonies push to Jira the moment
+// they are called and take the app's per-profile lock while they do, so both
+// go through SyncContext rather than being called from a component directly.
+export const StartSprint: (
+  profileId: string,
+  boardId: number,
+  sprintId: number,
+  name: string,
+  goal: string,
+  start: string,
+  end: string,
+) => Promise<void> = App.StartSprint;
+export const CompleteSprint = (
+  profileId: string,
+  boardId: number,
+  sprintId: number,
+  moveTo: string,
+): Promise<SprintCompletion> =>
+  App.CompleteSprint(profileId, boardId, sprintId, moveTo) as Promise<SprintCompletion>;
+export const SuggestSprintDates = (profileId: string, boardId: number): Promise<SprintSuggestion> =>
+  App.SuggestSprintDates(profileId, boardId) as Promise<SprintSuggestion>;
+// How many journal rows belong to cards staying in this sprint. The Complete
+// button asks before it opens its dialog: a card dragged to Done an hour ago
+// is Done on the board and not in Jira, and completing the sprint would move
+// it to the backlog as unfinished.
+export const PendingInSprint: (profileId: string, sprintId: number) => Promise<number> =
+  App.PendingInSprint;
+// The board's bulk move: one journal row per card, in one transaction, and
+// nothing reaches Jira until Commit. It answers with how many of the given
+// cards were moved, which is every one the cache holds.
+export const JournalSprintMoves: (profileId: string, keys: string[], sprintId: string) => Promise<number> =
+  App.JournalSprintMoves;
 
 // The three board writes. Each one journals and moves the card locally;
 // none of them touches Jira, which Commit does. CanTransition is the one

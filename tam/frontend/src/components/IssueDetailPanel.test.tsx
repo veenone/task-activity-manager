@@ -12,7 +12,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), CreateIssue: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -36,18 +36,25 @@ const epics: Issue[] = [
 
 // The panel opens the create dialog for a sub-task, and that dialog reads the
 // active profile, so the harness carries a provider the way the app does.
-function renderPanel(onClose = vi.fn()) {
+function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[]) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <IssueDetailPanel profileId="p1" issue={story} onClose={onClose} />
+          <IssueDetailPanel profileId="p1" issue={story} sprints={sprints} onClose={onClose} />
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
   );
   return onClose;
 }
+
+// BOARD_SPRINTS are what a caller with a board hands down. Away from one
+// there is no such list, and the panel prints the sprint's name instead.
+const BOARD_SPRINTS: api.Sprint[] = [
+  { id: 12, boardId: 1, name: "Sprint 12", state: "active", startDate: "", endDate: "" },
+  { id: 13, boardId: 1, name: "Sprint 13", state: "future", startDate: "", endDate: "" },
+];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -67,6 +74,7 @@ beforeEach(() => {
     { key: "XT-1019", summary: "Expired promo code rejected", linkType: "Tested By" },
   ]);
   vi.mocked(api.EditIssue).mockResolvedValue();
+  vi.mocked(api.MoveIssueToSprint).mockResolvedValue();
   vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.SearchUsers).mockResolvedValue([{ name: "ranand", displayName: "R. Anand" }]);
@@ -379,5 +387,41 @@ describe("IssueDetailPanel Epic field", () => {
     expect(screen.queryByLabelText("Epic")).not.toBeInTheDocument();
     expect(within(details).queryByText("Epic")).not.toBeInTheDocument();
     expect(within(details).queryByText("Parent")).not.toBeInTheDocument();
+  });
+});
+
+describe("IssueDetailPanel sprint field", () => {
+  it("prints the sprint as a fact away from a board", async () => {
+    renderPanel();
+    expect(await screen.findByText("Sprint 12 - Checkout polish")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Sprint" })).not.toBeInTheDocument();
+  });
+
+  it("journals a sprint move through the binding the card menu uses", async () => {
+    renderPanel(vi.fn(), BOARD_SPRINTS);
+    const picker = await screen.findByRole("combobox", { name: "Sprint" });
+    expect(picker).toHaveValue("12");
+    await userEvent.selectOptions(picker, "13");
+    await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-412", "13"));
+    // Nothing else is touched: a sprint move is its own journal row, not an
+    // edit riding on the field form.
+    expect(api.EditIssue).not.toHaveBeenCalled();
+  });
+
+  it("offers the backlog as a destination, which is a place and not an absence", async () => {
+    renderPanel(vi.fn(), BOARD_SPRINTS);
+    const picker = await screen.findByRole("combobox", { name: "Sprint" });
+    expect(within(picker).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
+    await userEvent.selectOptions(picker, "");
+    await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-412", ""));
+  });
+
+  it("keeps a closed sprint the picker never offers as its own option", async () => {
+    // The issue sits in sprint 12; a board whose picker has moved on to 13
+    // and 14 would otherwise show this card as being in the backlog.
+    renderPanel(vi.fn(), [BOARD_SPRINTS[1]]);
+    const picker = await screen.findByRole("combobox", { name: "Sprint" });
+    expect(picker).toHaveValue("12");
+    expect(within(picker).getByRole("option", { name: "Sprint 12 - Checkout polish" })).toBeInTheDocument();
   });
 });

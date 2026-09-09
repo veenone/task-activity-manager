@@ -1,4 +1,4 @@
-import type { BoardView } from "../api";
+import type { BoardView, Issue } from "../api";
 
 // A card's place on the board: which lane band, which column, and where in
 // that cell's list. The board addresses cards by position rather than by
@@ -22,6 +22,13 @@ export function parsePos(id: string): Pos | null {
   const [lane, col, index] = parts.map(Number);
   if ([lane, col, index].some((n) => !Number.isInteger(n) || n < 0)) return null;
   return { lane, col, index };
+}
+
+// cardAtPos reads one card out of the view by its position, which the view
+// and its keyboard both need and neither owns.
+export function cardAtPos(view: BoardView, p: Pos | undefined): Issue | undefined {
+  if (!p) return undefined;
+  return view.lanes[p.lane]?.cells[p.col]?.[p.index];
 }
 
 function cardCount(view: BoardView, lane: number, col: number): number {
@@ -54,6 +61,20 @@ export function clampFocus(view: BoardView, id: string, selected?: Pos): string 
   if (selected && hasCard(view, selected)) return posId(selected);
   const first = firstCard(view);
   return first ? posId(first) : "";
+}
+
+// cardKeys is the board in reading order: lane by lane, column by column,
+// card by card. It is the order a shift gesture measures a run against and
+// the order a bulk action sends its keys in, so both agree with what the
+// reader sees.
+export function cardKeys(view: BoardView): string[] {
+  const out: string[] = [];
+  for (const lane of view.lanes) {
+    for (const cell of lane.cells ?? []) {
+      for (const card of cell) out.push(card.key);
+    }
+  }
+  return out;
 }
 
 // findCard locates one issue key on the board, so a click or a selection

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { errMsg, useNotice } from "@agile-suite/core";
-import type { Issue, Link } from "../api";
+import type { Issue, Link, Sprint } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { useDiscardById } from "../queries/pending";
 import { formatWhen } from "../lib/format";
@@ -11,6 +11,7 @@ import { IssueKeyLink } from "./IssueKeyLink";
 import { NewIssueModal } from "./NewIssueModal";
 import { useSubtaskType } from "../queries/people";
 import { EditableFields } from "./EditableFields";
+import { SprintField } from "./SprintField";
 import { ActivityTab } from "./ActivityTab";
 import { AddLinkForm } from "./AddLinkForm";
 
@@ -87,13 +88,18 @@ interface Props {
   profileId: string;
   issue: Issue;
   jiraUrl?: string;
+  // sprints are the board's open sprints, given only by a caller that has a
+  // board: with them, Sprint is a choice that journals a move; without them
+  // it stays the fact it has always been. The Backlog and the Epics tree
+  // belong to a project, not to a board, and have no such list to offer.
+  sprints?: Sprint[];
   onClose: () => void;
 }
 
 // IssueDetailPanel shows one issue beside the grid. The grid row's fields
 // render at once; the description, links, and linked tests load through the
 // backend's detail cache. Nothing here writes; the actions arrive in plan 1b.
-export function IssueDetailPanel({ profileId, issue, jiraUrl, onClose }: Props) {
+export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, onClose }: Props) {
   // Fields open, everything else closed: the panel starts on what a reader
   // came for and lets them reach the rest without leaving the column.
   const [open, setOpen] = useState<Record<string, boolean>>({ fields: true });
@@ -175,7 +181,12 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, onClose }: Props) 
       )}
       <p className="detail-summary">{issue.summary}</p>
       <dl className="detail-fields">
-        <dt>Sprint</dt><dd>{issue.sprintName || "-"}</dd>
+        <dt>Sprint</dt>
+        <dd>
+          {sprints
+            ? <SprintField profileId={profileId} issue={issue} sprints={sprints} busy={busy} />
+            : issue.sprintName || "-"}
+        </dd>
         <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>
         <dt>Reporter</dt><dd>{issue.reporter || "-"}</dd>
       </dl>

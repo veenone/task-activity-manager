@@ -1,11 +1,16 @@
-import type { DragEvent, KeyboardEvent, ReactNode } from "react";
+import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import type { Issue } from "../api";
 import type { CardMove } from "../lib/cardMoveState";
 import { TypeChip } from "./TypeChip";
 
 interface Props {
   issue: Issue;
+  // selected is the one card the detail panel is about; checked is one card
+  // of the multi-selection a bulk action will touch. They are two models on
+  // one surface, so they paint differently, the way XTM's row-selected and
+  // row-checked do.
   selected: boolean;
+  checked: boolean;
   focused: boolean;
   // columnName is on the card, not only on the column head: the card carries
   // no status chip, so the column is the only thing holding the status, and
@@ -28,7 +33,10 @@ interface Props {
   draggable: boolean;
   // menu is the card's own move menu, rendered in the head beside the key.
   menu: ReactNode;
-  onSelect: () => void;
+  // onSelect is given the click itself, because which gesture it was is the
+  // whole question: plain selects, control toggles the check, shift extends
+  // the run.
+  onSelect: (e: MouseEvent<HTMLDivElement>) => void;
   onFocus: () => void;
   onKeyDown: (e: KeyboardEvent) => void;
   onDragStart: (e: DragEvent) => void;
@@ -50,7 +58,7 @@ const MOVE_CLASS: Record<string, string> = {
 // grid's own semantics rather than a button's. It is the surface the user
 // made a move on, so it is the surface that reports what became of it.
 export function BoardCard({
-  issue, selected, focused, columnName, colIndex, posId, move, flashed, dragging, draggable, menu,
+  issue, selected, checked, focused, columnName, colIndex, posId, move, flashed, dragging, draggable, menu,
   onSelect, onFocus, onKeyDown, onDragStart, onDragEnd,
 }: Props) {
   const points = issue.storyPoints ?? null;
@@ -63,6 +71,7 @@ export function BoardCard({
   const className = [
     "board-card",
     selected ? "board-card-selected" : "",
+    checked ? "board-card-checked" : "",
     MOVE_CLASS[move.state] ?? "",
     dragging ? "board-card-dragging" : "",
     flashed ? "board-card-moved" : "",
@@ -71,7 +80,9 @@ export function BoardCard({
   return (
     <div
       role="gridcell"
-      aria-selected={selected}
+      // The grid is multi-selectable now, so a checked card is a selected
+      // one to a screen reader whether or not the panel is about it.
+      aria-selected={selected || checked}
       aria-colindex={colIndex}
       aria-label={label}
       // A failed move's reason otherwise lived only in the label above, so
