@@ -266,3 +266,96 @@ func TestReplaceSprintIssuesRewritesOneScope(t *testing.T) {
 		t.Errorf("sprints = %+v, %v, want them untouched", sp, err)
 	}
 }
+
+// TestReplaceSprintsForgetsTheMembershipOfASprintThatIsGone is the other
+// half of rewriting the sprint list. A sprint that has dropped out of it
+// cannot be read again, since every membership read reaches its scope
+// through a sprint the list still holds, so its rows would sit in
+// board_issue for good and the table would grow by a whole sprint every
+// time one was deleted in Jira.
+func TestReplaceSprintsForgetsTheMembershipOfASprintThatIsGone(t *testing.T) {
+	r, db := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	keys := map[string][]string{
+		"":   {"PLAT-1", "PLAT-2", "PLAT-3"},
+		"12": {"PLAT-1", "PLAT-2"},
+		"13": {"PLAT-3"},
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), sampleSprints(), keys); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	// Sprint 13 has been deleted in Jira; the list comes back without it.
+	kept := []backend.Sprint{{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active"}}
+	if err := r.ReplaceSprints(ctx, "p1", 1, kept); err != nil {
+		t.Fatalf("replace sprints: %v", err)
+	}
+
+	if got := boardKeys(t, db, "p1", 1, "13"); len(got) != 0 {
+		t.Errorf("membership of the sprint that is gone = %v, want it dropped with the sprint", got)
+	}
+	if got := boardKeys(t, db, "p1", 1, "12"); len(got) != 2 {
+		t.Errorf("membership of the sprint that stayed = %v, want it untouched", got)
+	}
+	if got := boardKeys(t, db, "p1", 1, ""); len(got) != 3 {
+		t.Errorf("board membership = %v, want the board's own list untouched", got)
+	}
+}
+
+// TestSprintIssuesReadsTheBoardsOwnOrder is the read a completion subtracts
+// the cards it moved from. The order is the board's rank order, which is
+// what the view draws, and not the key order the completion's own search
+// answers in.
+func TestSprintIssuesReadsTheBoardsOwnOrder(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	keys := map[string][]string{"": {"PLAT-3", "PLAT-1"}, "12": {"PLAT-3", "PLAT-1"}}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), sampleSprints(), keys); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got, err := r.SprintIssues(ctx, "p1", 1, "12")
+	if err != nil {
+		t.Fatalf("sprint issues: %v", err)
+	}
+	if len(got) != 2 || got[0] != "PLAT-3" || got[1] != "PLAT-1" {
+		t.Errorf("sprint issues = %v, want the board's own order", got)
+	}
+}
+
+// TestBoardHasSprintAnswersForOneBoard is what a ceremony asks before it
+// acts. Jira hands the same sprint to every board whose filter reaches it,
+// so the question is never "does this sprint exist" but "is it this board's",
+// and the sprint table's key is what answers it.
+func TestBoardHasSprintAnswersForOneBoard(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), sampleSprints(), nil); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name     string
+		boardID  int
+		sprintID string
+		want     bool
+	}{
+		{"a sprint of this board", 1, "12", true},
+		{"a sprint of another board", 2, "12", false},
+		{"a sprint nobody holds", 1, "99", false},
+		{"no sprint at all", 1, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := r.BoardHasSprint(ctx, "p1", tc.boardID, tc.sprintID)
+			if err != nil {
+				t.Fatalf("board has sprint: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("board %d holds sprint %q = %v, want %v", tc.boardID, tc.sprintID, got, tc.want)
+			}
+		})
+	}
+}

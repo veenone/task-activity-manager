@@ -704,8 +704,12 @@ func TestJournalSprintMovesWritesOneRowPerMovedCard(t *testing.T) {
 		seedSprintCard(t, a, p.ID, key, "12", "Sprint 12")
 	}
 
-	if err := a.JournalSprintMoves(p.ID, keys, "13"); err != nil {
+	moved, err := a.JournalSprintMoves(p.ID, keys, "13")
+	if err != nil {
 		t.Fatalf("bulk move: %v", err)
+	}
+	if moved != len(keys) {
+		t.Errorf("moved = %d, want all %d selected cards", moved, len(keys))
 	}
 	for _, key := range keys {
 		rows, err := a.repo.PendingForKey(a.ctx, p.ID, key)
@@ -735,8 +739,15 @@ func TestABulkMoveSkipsAnUncachedKeyAndACardAlreadyThere(t *testing.T) {
 	seedSprintCard(t, a, p.ID, "PLAT-3", "13", "Sprint 13")
 
 	keys := []string{"PLAT-1", "PLAT-404", "PLAT-2", "PLAT-3"}
-	if err := a.JournalSprintMoves(p.ID, keys, "13"); err != nil {
+	moved, err := a.JournalSprintMoves(p.ID, keys, "13")
+	if err != nil {
 		t.Fatalf("bulk move: %v, want the uncached key to cost only itself", err)
+	}
+	// Three of the four, so the dialog can say so. PLAT-3 is already in the
+	// target sprint and journals nothing, and it is still one of the three:
+	// it is where it was asked to go.
+	if moved != 3 {
+		t.Errorf("moved = %d, want the three cards the cache holds", moved)
 	}
 	for _, want := range []struct {
 		key  string
@@ -766,13 +777,13 @@ func TestABulkMoveRefusesASprintIdThatIsNotANumber(t *testing.T) {
 	p := newTestProfile(t, a)
 	seedSprintCard(t, a, p.ID, "PLAT-1", "12", "Sprint 12")
 
-	if err := a.JournalSprintMoves(p.ID, []string{"PLAT-1"}, "fourteen"); err == nil {
+	if _, err := a.JournalSprintMoves(p.ID, []string{"PLAT-1"}, "fourteen"); err == nil {
 		t.Fatal("a sprint id that is not a number was accepted, want a refusal")
 	}
-	if err := a.JournalSprintMoves(p.ID, nil, "13"); err == nil {
+	if _, err := a.JournalSprintMoves(p.ID, nil, "13"); err == nil {
 		t.Error("an empty selection was accepted, want a refusal")
 	}
-	if err := a.JournalSprintMoves(p.ID, []string{"PLAT-404"}, "13"); err == nil {
+	if _, err := a.JournalSprintMoves(p.ID, []string{"PLAT-404"}, "13"); err == nil {
 		t.Error("a selection of nothing but uncached keys was accepted, want it to say so")
 	}
 }

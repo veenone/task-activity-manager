@@ -144,39 +144,46 @@ func (a *App) MoveIssueToSprint(profileID, key, sprintID string) error {
 // and skipped rather than allowed to take the rest of the selection down
 // with it; a card already sitting on the destination journals nothing at
 // all, so a selection of twenty rarely produces twenty rows.
-func (a *App) JournalSprintMoves(profileID string, keys []string, sprintID string) error {
+//
+// It answers with how many of the selected cards were moved, which is every
+// one the cache holds: a card already on the destination is where it was
+// asked to go and counts, whether or not it needed a journal row. A partly
+// uncached selection used to return a nil error, so the only place the fact
+// was recorded was the Go log and the UI could not say "18 of 20 moved".
+func (a *App) JournalSprintMoves(profileID string, keys []string, sprintID string) (int, error) {
 	if err := a.requireStore(); err != nil {
-		return err
+		return 0, err
 	}
 	if strings.TrimSpace(profileID) == "" {
-		return errors.New("no profile selected")
+		return 0, errors.New("no profile selected")
 	}
 	if len(keys) == 0 {
-		return errors.New("no cards are selected")
+		return 0, errors.New("no cards are selected")
 	}
 	sprintID = strings.TrimSpace(sprintID)
 	if sprintID != "" {
 		if _, err := strconv.Atoi(sprintID); err != nil {
-			return fmt.Errorf("sprint id %q is not a number", sprintID)
+			return 0, fmt.Errorf("sprint id %q is not a number", sprintID)
 		}
 	}
 	name, err := a.boards.SprintName(a.ctx, profileID, sprintID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	missing, err := a.repo.MoveManyToSprint(a.ctx, profileID, keys, sprintID, name)
 	if err != nil {
-		return err
+		return 0, err
 	}
+	moved := len(keys) - len(missing)
 	if len(missing) == 0 {
-		return nil
+		return moved, nil
 	}
 	log.Printf("tam: %d of %d selected cards are not in the cache and were not moved: %s",
 		len(missing), len(keys), strings.Join(missing, ", "))
-	if len(missing) == len(keys) {
-		return fmt.Errorf("none of the %d selected cards is in the cache; sync first", len(keys))
+	if moved == 0 {
+		return 0, fmt.Errorf("none of the %d selected cards is in the cache; sync first", len(keys))
 	}
-	return nil
+	return moved, nil
 }
 
 // CanTransition asks Jira whether the card can reach statusID from where it

@@ -26,6 +26,7 @@ type moveCall struct {
 type fakeBackend struct {
 	issues    []backend.Issue
 	scopes    []string
+	projects  []string
 	searchErr error
 
 	moves   []moveCall
@@ -45,11 +46,12 @@ type fakeBackend struct {
 	order []string
 }
 
-func (f *fakeBackend) SearchIssuesPage(_ context.Context, _, scopeJQL, _ string, _ []string, startAt, maxResults int) ([]backend.Issue, int, error) {
+func (f *fakeBackend) SearchIssuesPage(_ context.Context, projectKey, scopeJQL, _ string, _ []string, startAt, maxResults int) ([]backend.Issue, int, error) {
 	if f.searchErr != nil {
 		return nil, 0, f.searchErr
 	}
 	f.scopes = append(f.scopes, scopeJQL)
+	f.projects = append(f.projects, projectKey)
 	total := len(f.issues)
 	if startAt >= total {
 		return []backend.Issue{}, total, nil
@@ -100,6 +102,8 @@ func (f *fakeBackend) BoardSprints(context.Context, int) ([]backend.Sprint, erro
 type fakeStore struct {
 	columns    []backend.BoardColumn
 	names      map[string]string
+	onBoard    map[string]bool
+	cached     map[string][]string
 	sprints    []backend.Sprint
 	written    int
 	membership map[string][]string
@@ -113,8 +117,18 @@ func newStore() *fakeStore {
 			{Name: "Done", StatusIDs: []string{"5", "6"}},
 		},
 		names:      map[string]string{"13": "Sprint 13"},
+		onBoard:    map[string]bool{"1/12": true, "1/13": true},
+		cached:     map[string][]string{},
 		membership: map[string][]string{},
 	}
+}
+
+// inSprint seeds the board's own cached membership of sprint 12, in the rank
+// order the view reads it back in. That is what a completion subtracts the
+// cards it moved from, and it is deliberately not the order the search
+// answers in.
+func (s *fakeStore) inSprint(keys ...string) {
+	s.cached["12"] = keys
 }
 
 func (s *fakeStore) Columns(context.Context, string, int) ([]backend.BoardColumn, error) {
@@ -123,6 +137,14 @@ func (s *fakeStore) Columns(context.Context, string, int) ([]backend.BoardColumn
 
 func (s *fakeStore) SprintName(_ context.Context, _, sprintID string) (string, error) {
 	return s.names[sprintID], nil
+}
+
+func (s *fakeStore) BoardHasSprint(_ context.Context, _ string, boardID int, sprintID string) (bool, error) {
+	return s.onBoard[fmt.Sprintf("%d/%s", boardID, sprintID)], nil
+}
+
+func (s *fakeStore) SprintIssues(_ context.Context, _ string, _ int, sprintID string) ([]string, error) {
+	return append([]string{}, s.cached[sprintID]...), nil
 }
 
 func (s *fakeStore) ReplaceSprints(_ context.Context, _ string, _ int, list []backend.Sprint) error {
@@ -243,6 +265,7 @@ func TestStartRefusesDatesItCannotUse(t *testing.T) {
 func TestCompleteMovesTheUnfinishedCardsThenCloses(t *testing.T) {
 	b := &fakeBackend{issues: sprintOf("1", "5", "3", "6", "1")}
 	store := newStore()
+	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3", "PLAT-4", "PLAT-5")
 
 	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
@@ -344,18 +367,28 @@ func TestCompleteWhoseMoveFailsLeavesTheSprintOpen(t *testing.T) {
 	}
 }
 
-// TestASecondChunkThatFailsReportsWhatMovedAndCorrectsTheCache is the
+// TestAMiddleChunkThatFailsReportsWhatMovedAndCorrectsTheCache is the
 // half-finished completion, at chunks of three. The first chunk lands, the
 // second is refused, and everything from it on is still in the sprint: the
-// count says three of seven, the sprint stays open, and the cache is
+// count says three of nine, the sprint stays open, and the cache is
 // corrected before the user is told, or they are left with cards that
 // vanished from an open sprint with nothing recording where they went.
-func TestASecondChunkThatFailsReportsWhatMovedAndCorrectsTheCache(t *testing.T) {
+//
+// Nine unfinished cards at a width of three, so the refusal lands in the
+// middle chunk and every assertion here carries its own weight. At seven
+// cards, six of them unfinished, the failure was in the last chunk of two:
+// "everything from the failure on" and "the failing chunk" were the same
+// three keys, so a slice bound that stopped at the chunk read exactly like
+// one that ran to the end, and "two pushes" could not tell a pass that
+// stopped from a pass that ran out of chunks.
+func TestAMiddleChunkThatFailsReportsWhatMovedAndCorrectsTheCache(t *testing.T) {
 	b := &fakeBackend{
-		issues:  sprintOf("1", "1", "1", "1", "1", "1", "5"),
+		issues:  sprintOf("1", "1", "1", "1", "1", "1", "1", "1", "1", "5"),
 		moveErr: map[int]error{1: errors.New("500 Internal Server Error")},
 	}
 	store := newStore()
+	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3", "PLAT-4", "PLAT-5",
+		"PLAT-6", "PLAT-7", "PLAT-8", "PLAT-9", "PLAT-10")
 	s := newService(b, store)
 	s.PushBatch = 3
 
@@ -363,24 +396,29 @@ func TestASecondChunkThatFailsReportsWhatMovedAndCorrectsTheCache(t *testing.T) 
 	if err == nil {
 		t.Fatal("complete = nil error, want the failed chunk reported")
 	}
-	if !strings.Contains(err.Error(), "3 of 6") {
+	if !strings.Contains(err.Error(), "3 of 9") {
 		t.Errorf("err = %v, want it to say how many of the unfinished cards moved", err)
 	}
-	if done.Moved != 3 || len(done.Failed) != 3 {
-		t.Errorf("completion = %+v, want three moved and the other three named", done)
+	if done.Moved != 3 || len(done.Failed) != 6 {
+		t.Errorf("completion = %+v, want three moved and the other six named", done)
 	}
-	if strings.Join(done.Failed, ",") != "PLAT-4,PLAT-5,PLAT-6" {
+	// The chunk that failed and the chunk after it, which was never
+	// attempted: both are still in the sprint, and the failing chunk alone
+	// would be a report that loses three cards.
+	if strings.Join(done.Failed, ",") != "PLAT-4,PLAT-5,PLAT-6,PLAT-7,PLAT-8,PLAT-9" {
 		t.Errorf("failed = %v, want the failing chunk and everything after it", done.Failed)
 	}
 	if len(b.completed) != 0 {
 		t.Errorf("sprint %v was closed after a chunk that failed", b.completed)
 	}
+	// Two of the three chunks, so this says the pass stopped rather than that
+	// it ran to the end.
 	if len(b.moves) != 2 {
 		t.Errorf("moves = %+v, want the pass to stop at the chunk that failed", b.moves)
 	}
-	// The three that landed have gone; the three that did not, and the card
+	// The three that landed have gone; the six that did not, and the card
 	// that had finished, are what the sprint still holds.
-	if got := strings.Join(store.membership["12"], ","); got != "PLAT-4,PLAT-5,PLAT-6,PLAT-7" {
+	if got := strings.Join(store.membership["12"], ","); got != "PLAT-4,PLAT-5,PLAT-6,PLAT-7,PLAT-8,PLAT-9,PLAT-10" {
 		t.Errorf("cached membership = %q, want the cards that are still in the sprint", got)
 	}
 }
@@ -460,7 +498,7 @@ func TestCompleteRefusesWhileTheJournalHoldsCardsStayingInTheSprint(t *testing.T
 // would be wrong before anything moved: an id that is not a number, which
 // ends up in a URL path, and the sprint completing into itself.
 func TestCompleteRefusesADestinationItCannotUse(t *testing.T) {
-	for _, moveTo := range []string{"fourteen", "12"} {
+	for _, moveTo := range []string{"fourteen", "12", "012", "+13", "-1", "0", "13.0"} {
 		b := &fakeBackend{issues: sprintOf("1")}
 		if _, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, moveTo); err == nil {
 			t.Errorf("complete into %q = nil error, want a refusal", moveTo)
@@ -538,9 +576,139 @@ func TestTheSearchIsScopedToTheSprintAndTheProject(t *testing.T) {
 	if _, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
+	if len(b.scopes) == 0 {
+		t.Fatal("the sprint was never read")
+	}
 	for _, scope := range b.scopes {
 		if scope != "sprint = "+strconv.Itoa(12) {
 			t.Errorf("scope = %q, want the sprint's own query", scope)
 		}
+	}
+	for _, project := range b.projects {
+		if project != "PLAT" {
+			t.Errorf("project = %q, want the profile's own project", project)
+		}
+	}
+}
+
+// TestARefreshThatComesBackEmptyLeavesTheBoardsSprintsAlone is the silent
+// corruption a single 400 used to cause. core/jira turns any 400 on the
+// sprint endpoint's first page into ErrNoSprints, for the kanban board that
+// genuinely has none, and the Jira backend turns that into an empty slice
+// and no error. Handing that to ReplaceSprints, which deletes the board's
+// sprint rows before it inserts, emptied the picker and dropped the sprint
+// length the date suggestion is built from, with nothing reported anywhere
+// because the call did not fail. A board a ceremony has just run on
+// demonstrably has a sprint, so an empty answer is not written.
+func TestARefreshThatComesBackEmptyLeavesTheBoardsSprintsAlone(t *testing.T) {
+	history := []backend.Sprint{
+		{ID: 11, BoardID: 1, Name: "Sprint 11", State: "closed"},
+		{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active"},
+	}
+	for _, tc := range []struct {
+		name string
+		run  func(s *sprints.Service) error
+	}{
+		{"after a completion", func(s *sprints.Service) error {
+			_, err := s.Complete(context.Background(), "p1", 1, 12, "")
+			return err
+		}},
+		{"after a start", func(s *sprints.Service) error {
+			return s.Start(context.Background(), "p1", 1, 13,
+				backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-09", EndDate: "2026-09-23"})
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &fakeBackend{issues: sprintOf("5"), sprints: []backend.Sprint{}}
+			store := newStore()
+			store.sprints = append([]backend.Sprint{}, history...)
+
+			if err := tc.run(newService(b, store)); err != nil {
+				t.Fatalf("ceremony: %v", err)
+			}
+			if b.sprintReads != 1 {
+				t.Errorf("sprint reads = %d, want the one re-read", b.sprintReads)
+			}
+			if store.written != 0 {
+				t.Error("the board's sprint list was rewritten from an empty answer, which empties the picker and the sprint length with it")
+			}
+			if len(store.sprints) != len(history) {
+				t.Errorf("cached sprints = %+v, want the board's history left as it was", store.sprints)
+			}
+		})
+	}
+}
+
+// TestTheMembershipRewriteKeepsTheBoardsOrderAndItsScope is the other silent
+// corruption. The completion's search ends ORDER BY key ASC and is scoped by
+// project and issue type, while the cached membership is the board's rank
+// order drawn from the board's own filter. Writing the search's answer back
+// alphabetized the sprint until the next boards sync and could insert a key
+// the board never drew, so what stays is the cached scope minus the cards
+// that moved.
+func TestTheMembershipRewriteKeepsTheBoardsOrderAndItsScope(t *testing.T) {
+	// PLAT-2 is the one unfinished card. PLAT-9 is in the sprint and in the
+	// search's answer, but the board's filter does not draw it.
+	b := &fakeBackend{issues: append(sprintOf("5", "1", "5"), issue("PLAT-9", "5"))}
+	store := newStore()
+	store.inSprint("PLAT-3", "PLAT-2", "PLAT-1")
+
+	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
+	if err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if done.Moved != 1 {
+		t.Fatalf("completion = %+v, want the one unfinished card moved", done)
+	}
+	// Rank order, not key order, and without the card the board never drew.
+	if got := strings.Join(store.membership["12"], ","); got != "PLAT-3,PLAT-1" {
+		t.Errorf("cached membership = %q, want the board's own scope in the board's own order", got)
+	}
+}
+
+// TestCompleteRefusesASprintThatIsNotOnTheBoard is the pair nothing used to
+// check. "Finished" is judged against the board's last column while the
+// cards come from the sprint, so a board and a sprint with nothing to do
+// with each other silently decided where somebody's work went, and the close
+// landed anyway.
+func TestCompleteRefusesASprintThatIsNotOnTheBoard(t *testing.T) {
+	b := &fakeBackend{issues: sprintOf("1")}
+	store := newStore()
+
+	_, err := newService(b, store).Complete(context.Background(), "p1", 7, 12, "")
+	if err == nil {
+		t.Fatal("complete = nil error, want a sprint that is not on the board refused")
+	}
+	if !strings.Contains(err.Error(), "12") || !strings.Contains(err.Error(), "7") {
+		t.Errorf("err = %v, want it to name both the sprint and the board", err)
+	}
+	if len(b.order) != 0 {
+		t.Errorf("Jira was called (%v) for a board the sprint is not on", b.order)
+	}
+}
+
+// TestACloseThatFailsSaysWhereTheCardsWent is the worst state this feature
+// reaches: every unfinished card has left a sprint that is still open. The
+// move path already wraps its own failure that way, and Jira's bare refusal
+// on its own says nothing about the cards.
+func TestACloseThatFailsSaysWhereTheCardsWent(t *testing.T) {
+	b := &fakeBackend{issues: sprintOf("1", "1", "5"), completeErr: errors.New("403 Forbidden")}
+	store := newStore()
+	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3")
+
+	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "13")
+	if err == nil {
+		t.Fatal("complete = nil error, want the refused close reported")
+	}
+	for _, want := range []string{"403 Forbidden", "2 of 2", "Sprint 13", "could not be closed"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %v, want it to say %q", err, want)
+		}
+	}
+	if done.Moved != 2 {
+		t.Errorf("completion = %+v, want the two cards it did move", done)
+	}
+	if got := strings.Join(store.membership["12"], ","); got != "PLAT-3" {
+		t.Errorf("cached membership = %q, want the cards that are still in the sprint", got)
 	}
 }

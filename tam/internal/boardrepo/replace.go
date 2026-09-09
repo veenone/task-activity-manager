@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"agile-suite/tam/internal/backend"
@@ -59,10 +61,39 @@ func (r *Repository) ReplaceBoard(ctx context.Context, profileID string, b backe
 // ReplaceBoard, which deletes and rewrites the board's columns and every one
 // of its membership rows on the way past. Reaching for that to refresh a
 // sprint list would wipe the board the user is looking at.
+// The membership of a sprint that has dropped out of the list goes with it,
+// in the same transaction. Those rows can never be read again, since every
+// read reaches them through a sprint the list still holds, and leaving them
+// behind means board_issue grows by a whole sprint every time one is deleted
+// in Jira.
 func (r *Repository) ReplaceSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		return writeSprints(ctx, tx, profileID, boardID, sprints)
+		if err := writeSprints(ctx, tx, profileID, boardID, sprints); err != nil {
+			return err
+		}
+		return deleteOrphanSprintIssues(ctx, tx, profileID, boardID, sprints)
 	})
+}
+
+// deleteOrphanSprintIssues drops the membership rows of every sprint scope of
+// this board the new list does not name. The board's own list, whose sprint
+// id is empty, is never one of them: it belongs to the board and not to any
+// sprint.
+func deleteOrphanSprintIssues(ctx context.Context, tx *sql.Tx, profileID string, boardID int, sprints []backend.Sprint) error {
+	args := []any{profileID, boardID}
+	keep := make([]string, 0, len(sprints))
+	for _, s := range sprints {
+		keep = append(keep, "?")
+		args = append(args, strconv.Itoa(s.ID))
+	}
+	q := `DELETE FROM board_issue WHERE profile_id = ? AND board_id = ? AND sprint_id <> ''`
+	if len(keep) > 0 {
+		q += ` AND sprint_id NOT IN (` + strings.Join(keep, ", ") + `)`
+	}
+	if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+		return fmt.Errorf("clear membership of sprints board %d no longer holds: %w", boardID, err)
+	}
+	return nil
 }
 
 // ReplaceSprintIssues rewrites the membership of one scope of one board: a

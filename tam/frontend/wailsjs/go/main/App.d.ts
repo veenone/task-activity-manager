@@ -65,7 +65,7 @@ export function ImportIssues(arg1:string,arg2:string,arg3:boolean,arg4:string,ar
 
 export function ImportProfile():Promise<profile.Profile>;
 
-export function JournalSprintMoves(arg1:string,arg2:Array<string>,arg3:string):Promise<void>;
+export function JournalSprintMoves(arg1:string,arg2:Array<string>,arg3:string):Promise<number>;
 
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
 

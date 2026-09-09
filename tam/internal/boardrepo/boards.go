@@ -47,6 +47,9 @@ const boardKeysSQL = `
 const sprintNameSQL = `
 	SELECT name FROM sprint WHERE profile_id = ? AND id = ? AND name <> '' LIMIT 1`
 
+const boardSprintSQL = `
+	SELECT 1 FROM sprint WHERE profile_id = ? AND board_id = ? AND id = ? LIMIT 1`
+
 // RemoveBoards drops the boards and everything hanging off them: their
 // columns, their issue keys, and their sprints, in one transaction.
 func (r *Repository) RemoveBoards(ctx context.Context, profileID string, boardIDs []int) error {
@@ -160,6 +163,37 @@ func (r *Repository) SprintName(ctx context.Context, profileID, sprintID string)
 		return "", fmt.Errorf("name of sprint %s: %w", sprintID, err)
 	}
 	return name, nil
+}
+
+// BoardHasSprint says whether this board's cached sprint list holds that
+// sprint. A ceremony asks before it acts: a completion judges "finished"
+// against one board's last column while the cards come from the sprint, so a
+// board and a sprint that have nothing to do with each other would decide
+// where somebody's work goes and then close the sprint anyway. The board's
+// own key is (profile_id, board_id, id), which is the whole question.
+func (r *Repository) BoardHasSprint(ctx context.Context, profileID string, boardID int, sprintID string) (bool, error) {
+	if strings.TrimSpace(sprintID) == "" {
+		return false, nil
+	}
+	var one int
+	err := r.db.QueryRowContext(ctx, boardSprintSQL, profileID, boardID, sprintID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("sprint %s of board %d: %w", sprintID, boardID, err)
+	}
+	return true, nil
+}
+
+// SprintIssues returns the keys one board holds for one sprint, in the board
+// order the view reads them back in. A completion subtracts the cards that
+// left the sprint from this rather than replacing it with what a search
+// answered: the search orders by key and is scoped by project and issue
+// type, so writing its result back would alphabetize the board and could
+// insert keys the board's own filter never drew.
+func (r *Repository) SprintIssues(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error) {
+	return issueKeys(ctx, r.db, profileID, boardID, sprintID)
 }
 
 // issueKeys returns the keys one board holds for a sprint, in board order.

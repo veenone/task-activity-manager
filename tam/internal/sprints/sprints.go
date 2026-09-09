@@ -70,7 +70,9 @@ type lifecycle interface {
 // two writes that keep the cache honest once Jira has moved.
 type Store interface {
 	Columns(ctx context.Context, profileID string, boardID int) ([]backend.BoardColumn, error)
+	BoardHasSprint(ctx context.Context, profileID string, boardID int, sprintID string) (bool, error)
 	SprintName(ctx context.Context, profileID, sprintID string) (string, error)
+	SprintIssues(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error)
 	ReplaceSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error
 	ReplaceSprintIssues(ctx context.Context, profileID string, boardID int, sprintID string, keys []string) error
 }
@@ -81,8 +83,15 @@ type Store interface {
 // sprint is still open" is the only honest report, and a count alone cannot
 // say it: Failed names the cards still in the sprint, which is the list the
 // user needs to decide what to do next.
+//
+// Every count here is over the issue types TAM syncs (backend.AllTypes) and
+// nothing else. A sprint holding a card of a type this project defines for
+// itself is a sprint the completion never sees that card in: it is not
+// counted, not moved to the chosen destination, and lands in the backlog by
+// Jira's own close behaviour. So Moved and Failed describe what the
+// completion considered, and neither is offered as the size of the sprint.
 type Completion struct {
-	// Moved is how many issues left the sprint.
+	// Moved is how many of the issues it considered left the sprint.
 	Moved int `json:"moved"`
 	// MovedTo names where they went, the backlog or a sprint by name.
 	MovedTo string `json:"movedTo"`
@@ -161,21 +170,14 @@ func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID
 // same mapping the board itself draws with.
 func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (Completion, error) {
 	sid := strconv.Itoa(sprintID)
-	moveTo = strings.TrimSpace(moveTo)
 	done := Completion{Failed: []string{}}
 	b, err := s.board()
 	if err != nil {
 		return done, err
 	}
-	if moveTo != "" {
-		// The id ends up in a URL path, so the only honest answer to
-		// "sprint fourteen" is that it is not a sprint id at all.
-		if _, err := strconv.Atoi(moveTo); err != nil {
-			return done, fmt.Errorf("sprint id %q is not a number", moveTo)
-		}
-	}
-	if moveTo == sid {
-		return done, errors.New("a sprint cannot be completed into itself")
+	moveTo, err = destinationID(moveTo, sprintID)
+	if err != nil {
+		return done, err
 	}
 	if done.MovedTo, err = s.destination(ctx, profileID, moveTo); err != nil {
 		return done, err
@@ -187,7 +189,10 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 	if err != nil {
 		return done, err
 	}
-	all, incomplete, err := s.sprintIssues(ctx, sid, complete)
+	if err := s.requireOwnSprint(ctx, profileID, boardID, sid); err != nil {
+		return done, err
+	}
+	incomplete, err := s.sprintIssues(ctx, sid, complete)
 	if err != nil {
 		return done, err
 	}
@@ -205,7 +210,7 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 			// open sprint with nothing recording where they went.
 			done.Failed = append(done.Failed, incomplete[start:]...)
 			done.Moved = len(moved)
-			s.refreshMembership(ctx, profileID, boardID, sid, all, moved)
+			s.refreshMembership(ctx, profileID, boardID, sid, moved)
 			return done, fmt.Errorf("%d of %d unfinished issues moved to %s, so the sprint was left open: %w",
 				done.Moved, len(incomplete), done.MovedTo, err)
 		}
@@ -214,10 +219,15 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 	done.Moved = len(moved)
 
 	if err := b.CompleteSprint(ctx, sprintID); err != nil {
-		s.refreshMembership(ctx, profileID, boardID, sid, all, moved)
-		return done, err
+		// The worst state this feature reaches: every unfinished card has
+		// left a sprint that is still open. The move path says so and this
+		// one has to say it too, or the sentence the user reads is Jira's
+		// bare refusal with no word about where their cards went.
+		s.refreshMembership(ctx, profileID, boardID, sid, moved)
+		return done, fmt.Errorf("%d of %d unfinished issues moved to %s, but the sprint could not be closed and is open with none of them in it: %w",
+			done.Moved, len(incomplete), done.MovedTo, err)
 	}
-	s.refreshMembership(ctx, profileID, boardID, sid, all, moved)
+	s.refreshMembership(ctx, profileID, boardID, sid, moved)
 	s.refreshSprints(ctx, b, profileID, boardID)
 	return done, nil
 }
@@ -243,6 +253,48 @@ func (s *Service) pageWidth() int {
 		return s.PageSize
 	}
 	return searchPage
+}
+
+// destinationID reads the destination the dialog sent: a sprint id, or the
+// empty string for the backlog, which is a destination and not an absence.
+//
+// The id ends up in a URL path, so only a plain positive number is a sprint
+// id here. strconv.Atoi on its own takes "+13", "-1", "0" and "012", and
+// "012" then walked past a string comparison with the sprint being completed
+// and went to Jira as it was typed. Comparing the numbers is what catches
+// that, and refusing everything but the canonical form is what keeps the
+// value that reaches Jira the one that was checked.
+func destinationID(moveTo string, sprintID int) (string, error) {
+	moveTo = strings.TrimSpace(moveTo)
+	if moveTo == "" {
+		return "", nil
+	}
+	n, err := strconv.Atoi(moveTo)
+	if err != nil || n <= 0 || strconv.Itoa(n) != moveTo {
+		return "", fmt.Errorf("sprint id %q is not a sprint id", moveTo)
+	}
+	if n == sprintID {
+		return "", errors.New("a sprint cannot be completed into itself")
+	}
+	return moveTo, nil
+}
+
+// requireOwnSprint refuses a sprint and a board that have nothing to do with
+// each other. The completion judges "finished" against the board's last
+// column while the cards come from the sprint, so a mismatched pair would
+// decide where somebody's work goes on a definition borrowed from a board the
+// sprint was never on, and close the sprint anyway. It is the same argument
+// the end-before-start check already accepts, that the bound method is
+// reachable without the dialog, applied to a more consequential input.
+func (s *Service) requireOwnSprint(ctx context.Context, profileID string, boardID int, sprintID string) error {
+	ok, err := s.store.BoardHasSprint(ctx, profileID, boardID, sprintID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("sprint %s is not on board %d, so that board's last column cannot say which of the sprint's cards finished; complete the sprint from the board it belongs to", sprintID, boardID)
+	}
+	return nil
 }
 
 // destination is what the completion reports as the place the cards went.
@@ -301,8 +353,8 @@ func (s *Service) completeStatuses(ctx context.Context, profileID string, boardI
 	return set, nil
 }
 
-// sprintIssues reads the sprint from Jira in one paged query and splits it:
-// every key it holds, and the keys of the ones that did not finish.
+// sprintIssues reads the sprint from Jira in one paged query and keeps the
+// keys of the cards that did not finish.
 //
 // The query is narrowed to the sprint on the wire, and the answer is
 // narrowed again here. That is not belt and braces: it is what keeps an
@@ -310,20 +362,19 @@ func (s *Service) completeStatuses(ctx context.Context, profileID string, boardI
 // the scope, and it can only ever move fewer cards, never more. An issue the
 // backend reports no sprint for is kept, since the query is what put it in
 // this list.
-func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete map[string]bool) (all, incomplete []string, err error) {
-	all, incomplete = []string{}, []string{}
+func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete map[string]bool) ([]string, error) {
+	incomplete := []string{}
 	startAt, total := 0, -1
 	for total < 0 || startAt < total {
 		page, n, err := s.b.SearchIssuesPage(ctx, s.project, "sprint = "+sprintID, "", backend.AllTypes, startAt, s.pageWidth())
 		if err != nil {
-			return nil, nil, fmt.Errorf("read sprint %s: %w", sprintID, err)
+			return nil, fmt.Errorf("read sprint %s: %w", sprintID, err)
 		}
 		total = n
 		for _, iss := range page {
 			if iss.SprintID != "" && iss.SprintID != sprintID {
 				continue
 			}
-			all = append(all, iss.Key)
 			if !complete[iss.StatusID] {
 				incomplete = append(incomplete, iss.Key)
 			}
@@ -333,23 +384,39 @@ func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete ma
 			break
 		}
 	}
-	return all, incomplete, nil
+	return incomplete, nil
 }
 
 // refreshMembership writes back what the sprint still holds once some of its
-// cards have left it. It is best effort and logged: the cards have moved in
-// Jira whatever the cache says, and failing the ceremony over a local write
-// would report a move that happened as one that did not.
-func (s *Service) refreshMembership(ctx context.Context, profileID string, boardID int, sprintID string, all, moved []string) {
+// cards have left it: the board's own cached scope minus the cards that
+// moved.
+//
+// It subtracts rather than replacing, because the two lists are not the same
+// list. The cached scope is the board's rank order, which is the order the
+// view reads back, and it came from the board's own filter. The completion's
+// search orders by key and is scoped by project and issue type, so writing
+// its answer back would leave the sprint alphabetical until the next boards
+// sync and could insert keys the board never drew.
+//
+// It is best effort and logged: the cards have moved in Jira whatever the
+// cache says, and failing the ceremony over a local write would report a move
+// that happened as one that did not. A read that fails writes nothing, since
+// a guessed membership is worse than a stale one.
+func (s *Service) refreshMembership(ctx context.Context, profileID string, boardID int, sprintID string, moved []string) {
 	if len(moved) == 0 {
+		return
+	}
+	cached, err := s.store.SprintIssues(ctx, profileID, boardID, sprintID)
+	if err != nil {
+		log.Printf("tam: sprint %s membership could not be read after %d cards left it: %v", sprintID, len(moved), err)
 		return
 	}
 	gone := make(map[string]bool, len(moved))
 	for _, key := range moved {
 		gone[key] = true
 	}
-	remaining := make([]string, 0, len(all))
-	for _, key := range all {
+	remaining := make([]string, 0, len(cached))
+	for _, key := range cached {
 		if !gone[key] {
 			remaining = append(remaining, key)
 		}
@@ -368,6 +435,19 @@ func (s *Service) refreshSprints(ctx context.Context, b lifecycle, profileID str
 	list, err := b.BoardSprints(ctx, boardID)
 	if err != nil {
 		log.Printf("tam: board %d sprints could not be re-read after the ceremony: %v", boardID, err)
+		return
+	}
+	if len(list) == 0 {
+		// A ceremony has just started or completed a sprint on this board, so
+		// the board demonstrably has one and an empty list is not the truth
+		// about it. It is what a single 400 on the sprint endpoint looks like
+		// from here: core/jira turns any 400 on the first page into
+		// ErrNoSprints, for the kanban board that genuinely has none, and the
+		// backend turns that into an empty slice and no error. Writing it
+		// would delete every sprint row of the board, empty the picker, and
+		// drop the sprint length the date suggestion is built from, with
+		// nothing reported anywhere because the call did not fail.
+		log.Printf("tam: board %d answered the ceremony with no sprints at all, which cannot be true of a board a ceremony has just run on; the cached list is left as it was", boardID)
 		return
 	}
 	if err := s.store.ReplaceSprints(ctx, profileID, boardID, list); err != nil {
