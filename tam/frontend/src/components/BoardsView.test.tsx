@@ -1293,11 +1293,20 @@ describe("BoardsView sprint ceremonies", () => {
     expect(within(dialog).queryByText(/cards move to/)).not.toBeInTheDocument();
   });
 
-  it("keeps the completion dialog open with Jira's own sentence when a close fails", async () => {
+  // Every card moved and then Jira refused the close, which is the worst
+  // state this feature reaches. It comes back as a completion carrying a
+  // message and naming no failed card, so the dialog reports what happened
+  // and drops everything that was about what would: the list, the
+  // destination, and the footer's promise were all future tense over a move
+  // that had already been made.
+  it("stops promising a move when the close failed after every card moved", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockRejectedValue(
-      new Error("2 of 2 unfinished issues moved to the backlog, but the sprint could not be closed and is open with none of them in it: 403"),
-    );
+    vi.mocked(api.CompleteSprint).mockResolvedValue({
+      moved: 2,
+      movedTo: "the backlog",
+      failed: [],
+      message: "2 of 2 unfinished issues moved to the backlog, but the sprint could not be closed and is open with none of them in it: 403 Forbidden",
+    });
     renderView();
     await screen.findByRole("gridcell", { name: /PLAT-412/ });
     await user.click(screen.getByRole("button", { name: "Complete sprint" }));
@@ -1306,8 +1315,14 @@ describe("BoardsView sprint ceremonies", () => {
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("could not be closed");
     expect(screen.getByRole("dialog", { name: "Complete Sprint 12" })).toBeInTheDocument();
-    // The cards it was moving are still named above the message.
-    expect(within(dialog).getByText("PLAT-409")).toBeInTheDocument();
+    // No list, because no card is still in the sprint to be listed.
+    expect(within(dialog).queryByText(/will move out of the sprint/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("PLAT-409")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox", { name: "Move them to" })).not.toBeInTheDocument();
+    // The foot reports the move rather than promising it.
+    expect(within(dialog).getByText("2 cards moved to the backlog.")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/cards move to/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Jira is re-read when the sprint is completed/)).not.toBeInTheDocument();
   });
 
   // The list is the drawn board, and a drawn board is not the whole sprint.

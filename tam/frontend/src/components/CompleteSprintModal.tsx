@@ -67,8 +67,12 @@ export function CompleteSprintModal({
   const [moveTo, setMoveTo] = useState("");
   const [error, setError] = useState("");
   // stopped is a completion that came back saying it did not finish. It is
-  // not an error: it carries the cards that are still in the sprint, and
-  // from here on the dialog is about them rather than about the board.
+  // not an error: it reached Jira and moved cards, and from here on the
+  // dialog is about what it did rather than about what it was going to do.
+  // Two failures arrive this way, and the second has an empty failed list:
+  // a push that stopped partway, which names the cards still in the sprint,
+  // and a close Jira refused after every card had already left it, which
+  // has none to name.
   const [stopped, setStopped] = useState<SprintCompletion | null>(null);
   const dates = sprintDates(sprint);
   const destination = futures.find((s) => String(s.id) === moveTo);
@@ -90,11 +94,13 @@ export function CompleteSprintModal({
       { boardId, sprintId: sprint.id, moveTo },
       {
         onSuccess: (done) => {
-          // A completion that fell over partway comes back rather than
-          // throwing, because the keys it did not move are what the user
-          // needs and Wails drops a value that travels with an error. Every
-          // unfinished card has left an open sprint by now, so the dialog
-          // stays open and re-titles its list around the ones that did not.
+          // A completion that reached Jira and then failed comes back
+          // rather than throwing, because what it did is what the user
+          // needs and Wails drops a value that travels with an error. The
+          // sprint is open either way, so the dialog stays open and stops
+          // describing a move it has already made: a push that stopped
+          // names the cards still in the sprint, and a refused close has
+          // none to name and says so with its message alone.
           if (done.message) {
             setStopped(done);
             return;
@@ -106,8 +112,9 @@ export function CompleteSprintModal({
           onCompleted(moveTo, line);
           onClose();
         },
-        // Everything else Go refuses is a sentence that stands on its own,
-        // a close that failed after every card moved included.
+        // What is left as an error is the refusals that happen before
+        // anything moves, and each of those is a sentence that stands on
+        // its own with no cards to report beside it.
         onError: (e) => setError(errMsg(e)),
       },
     );
@@ -136,18 +143,29 @@ export function CompleteSprintModal({
         {/* What this list is, and what it cannot be. Jira decides the
             completion from its own read, so the board can only ever be the
             last thing TAM saw, and the cards it is not drawing are not in
-            the list however carefully the rest of it is built. */}
-        <p className="muted small">
-          This is the board as TAM last synced it. Jira is re-read when the sprint is completed, and that read is what decides which cards move.
-        </p>
-        {hidden > 0 && (
+            the list however carefully the rest of it is built. Both
+            sentences are about a move that has not happened yet, so both go
+            once one has. */}
+        {!stopped && (
+          <p className="muted small">
+            This is the board as TAM last synced it. Jira is re-read when the sprint is completed, and that read is what decides which cards move.
+          </p>
+        )}
+        {!stopped && hidden > 0 && (
           <p className="muted small">
             {`${plural(hidden, "card", "cards")} on this board ${hidden === 1 ? "is" : "are"} not drawn (a status no column collects, a card the sync has not fetched, or a cell past what it renders), so the list cannot name ${hidden === 1 ? "it" : "them"} and more than these can move.`}
           </p>
         )}
 
-        {!stopped && rows.length === 0 ? (
-          <p className="muted">Every card on this board's sprint is finished, so nothing moves.</p>
+        {/* Nothing to list, and nothing to promise. A completion that
+            stopped with no card left behind is the close that was refused
+            after every card had already moved: the message above is the
+            whole story, and a list headed "will move out of the sprint"
+            under it would be describing a move that has happened. */}
+        {rows.length === 0 ? (
+          stopped ? null : (
+            <p className="muted">Every card on this board's sprint is finished, so nothing moves.</p>
+          )
         ) : (
           <>
             <p>

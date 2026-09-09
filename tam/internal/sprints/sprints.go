@@ -17,6 +17,7 @@ import (
 	"strconv"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/errtext"
 )
 
 // pushBatch is how many cards one push of a completion carries. Twenty
@@ -102,8 +103,10 @@ type Completion struct {
 	// all did.
 	Failed []string `json:"failed"`
 	// Message is why the completion did not finish, empty when it did. A
-	// completion carrying one has left the sprint open, and Failed names the
-	// cards still in it.
+	// completion carrying one has left the sprint open: either the push
+	// stopped partway, and Failed names the cards still in the sprint, or
+	// every card left and the close itself was refused, and Failed is empty
+	// because the open sprint holds none of them.
 	Message string `json:"message"`
 }
 
@@ -176,11 +179,11 @@ func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID
 // complete when its status id is in the last board column's status ids, the
 // same mapping the board itself draws with.
 //
-// A push that failed partway is reported in the Completion and not as an
-// error, so the keys travel with the sentence about them. Everything else is
-// an error: a refusal before anything moved has nothing to report, and a
-// close that failed after every card moved names its own counts in a
-// sentence that stands on its own.
+// A ceremony that reached Jira and then failed is reported in the Completion
+// and not as an error, so what did happen travels with the sentence about
+// it: the keys a half-finished push left behind, and the counts a refused
+// close has to be read against. An error is kept for the refusals that
+// happen before anything moves, which have nothing to report but themselves.
 func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (Completion, error) {
 	sid := strconv.Itoa(sprintID)
 	done := Completion{Failed: []string{}}
@@ -224,7 +227,7 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 			done.Failed = append(done.Failed, incomplete[start:]...)
 			done.Moved = len(moved)
 			done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s, so the sprint was left open: %s",
-				done.Moved, len(incomplete), done.MovedTo, err)
+				done.Moved, len(incomplete), done.MovedTo, errtext.Line(err))
 			s.refreshMembership(ctx, profileID, boardID, sid, moveTo, moved)
 			// No Go error: the keys in Failed are what the dialog has to
 			// name, and Wails drops the value when an error goes with it.
@@ -239,9 +242,18 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 		// left a sprint that is still open. The move path says so and this
 		// one has to say it too, or the sentence the user reads is Jira's
 		// bare refusal with no word about where their cards went.
+		//
+		// It travels in Message rather than as a Go error for the same
+		// reason the failed push does, and for one more. The dialog renders
+		// a Completion carrying a Message as an outcome and a Go error as a
+		// refusal, so an error printed this accurate sentence directly above
+		// a list still headed "47 cards are not finished and will move out
+		// of the sprint" and a footer still promising the move: both future
+		// tense, both already false, on the one state nobody can undo.
+		done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s, but the sprint could not be closed and is open with none of them in it: %s",
+			done.Moved, len(incomplete), done.MovedTo, errtext.Line(err))
 		s.refreshMembership(ctx, profileID, boardID, sid, moveTo, moved)
-		return done, fmt.Errorf("%d of %d unfinished issues moved to %s, but the sprint could not be closed and is open with none of them in it: %w",
-			done.Moved, len(incomplete), done.MovedTo, err)
+		return done, nil
 	}
 	s.refreshMembership(ctx, profileID, boardID, sid, moveTo, moved)
 	s.refreshSprints(ctx, b, profileID, boardID)

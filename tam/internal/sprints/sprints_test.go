@@ -727,27 +727,67 @@ func TestCompleteRefusesASprintThatIsNotOnTheBoard(t *testing.T) {
 
 // TestACloseThatFailsSaysWhereTheCardsWent is the worst state this feature
 // reaches: every unfinished card has left a sprint that is still open. The
-// move path already wraps its own failure that way, and Jira's bare refusal
-// on its own says nothing about the cards.
+// move path already reports its own failure this way, and Jira's bare
+// refusal on its own says nothing about the cards.
+//
+// It comes back as a Completion carrying a Message and no Go error, which is
+// what puts the sentence into the dialog's outcome rendering. As an error it
+// printed above a list still headed "2 cards are not finished and will move
+// out of the sprint" and a footer still promising the move, both of them
+// about a move that had already happened.
 func TestACloseThatFailsSaysWhereTheCardsWent(t *testing.T) {
 	b := &fakeBackend{issues: sprintOf("1", "1", "5"), completeErr: errors.New("403 Forbidden")}
 	store := newStore()
 	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3")
 
 	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "13")
-	if err == nil {
-		t.Fatal("complete = nil error, want the refused close reported")
+	if err != nil {
+		t.Fatalf("complete = %v, want the refused close carried in the completion instead", err)
 	}
 	for _, want := range []string{"403 Forbidden", "2 of 2", "Sprint 13", "could not be closed"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("err = %v, want it to say %q", err, want)
+		if !strings.Contains(done.Message, want) {
+			t.Errorf("message = %q, want it to say %q", done.Message, want)
 		}
 	}
 	if done.Moved != 2 {
 		t.Errorf("completion = %+v, want the two cards it did move", done)
 	}
+	// Nothing failed to move, so nothing is named: the sprint is open and
+	// holds none of them, which is what the message says.
+	if len(done.Failed) != 0 {
+		t.Errorf("failed = %v, want it empty when every card moved", done.Failed)
+	}
 	if got := strings.Join(store.membership["12"], ","); got != "PLAT-3" {
 		t.Errorf("cached membership = %q, want the cards that are still in the sprint", got)
+	}
+}
+
+// TestAJiraRefusalReachesTheCompletionAsOneLine keeps a Data Center's HTML
+// login page out of the sentence the dialog prints. A 403 answered with a
+// page rather than a message is the case internal/errtext exists for, and
+// both ways a completion can fail carry Jira's own words into their
+// Message.
+func TestAJiraRefusalReachesTheCompletionAsOneLine(t *testing.T) {
+	const page = "<html>\n<head><title>Log in</title></head>\n<body><h1>You must log in</h1></body>\n</html>"
+	for _, tc := range []struct {
+		name string
+		b    *fakeBackend
+	}{
+		{"a push that failed", &fakeBackend{issues: sprintOf("1"), moveErr: map[int]error{0: errors.New(page)}}},
+		{"a close that failed", &fakeBackend{issues: sprintOf("1"), completeErr: errors.New(page)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			done, err := newService(tc.b, newStore()).Complete(context.Background(), "p1", 1, 12, "")
+			if err != nil {
+				t.Fatalf("complete = %v, want the failure carried in the completion", err)
+			}
+			if strings.Contains(done.Message, "<") || strings.Contains(done.Message, "\n") {
+				t.Errorf("message = %q, want one line with the markup stripped", done.Message)
+			}
+			if !strings.Contains(done.Message, "You must log in") {
+				t.Errorf("message = %q, want Jira's own sentence kept", done.Message)
+			}
+		})
 	}
 }
 
