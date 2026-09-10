@@ -1,13 +1,21 @@
 <#
-Keeps main and tags in step across the three remotes that hold this repository.
+Keeps main and tags in step across the two remotes that hold this repository.
 
   .\scripts\sync-remotes.ps1 -Setup   write the push fan-out on origin and create the named remotes
   .\scripts\sync-remotes.ps1          fast-forward main and tags across the remotes
 
-The named remotes are origin (task-activity-manager), xtm-origin
-(xray-testcase-manager) and gitea. After -Setup, a plain git push of a branch
-or a tag reaches all three. Run the script without arguments after merging a
-pull request on GitHub, which lands on one remote only.
+The named remotes are origin (task-activity-manager) and gitea, its mirror.
+After -Setup, a plain git push of a branch or a tag reaches both. Run the
+script without arguments after merging a pull request on GitHub, which lands
+on one remote only.
+
+xray-testcase-manager is deliberately not in that list. The two repositories
+share a history up to Phase 3a and have been separate projects since: this one
+is the Task Activity Manager monorepo, and that one carries its own Xray work,
+its own releases and its own main. Pushing this main there would mean deciding
+what happens to nine commits of somebody else's feature work. If you want to
+look at it, the xtm-origin remote is still configured for fetching; it is not
+in the fan-out and it is not synchronised here.
 
 Nothing here forces a push or overwrites a tag. When two remotes disagree in a
 way that is not a fast-forward, the script prints both commits and exits 1.
@@ -16,12 +24,11 @@ Exit code 2 means a git command failed.
 param(
     [switch]$Setup,
     [string]$OriginUrl = "git@github.com:veenone/task-activity-manager.git",
-    [string]$XtmUrl = "git@github.com:veenone/xray-testcase-manager.git",
     [string]$GiteaUrl = "git@gitea2.myhome.lan:achmarah/xray-test-manager.git",
     [string]$Branch = "main"
 )
 
-$remoteUrls = [ordered]@{ "origin" = $OriginUrl; "xtm-origin" = $XtmUrl; "gitea" = $GiteaUrl }
+$remoteUrls = [ordered]@{ "origin" = $OriginUrl; "gitea" = $GiteaUrl }
 $names = @($remoteUrls.Keys)
 $syncNs = "refs/synctags"
 
@@ -59,7 +66,7 @@ if ($Setup) {
             Invoke-Git @("remote", "add", $n, $remoteUrls[$n]) | Out-Null
         }
     }
-    # Rewrite the push list from scratch so a second run leaves exactly three.
+    # Rewrite the push list from scratch so a second run leaves exactly two.
     # --unset-all exits 5 when the key does not exist yet, which is the normal
     # first run, so this call is the one git call whose exit code is ignored.
     & git config --unset-all remote.origin.pushurl | Out-Null
@@ -79,7 +86,7 @@ $urls = @{}
 foreach ($n in $names) {
     if ($existing -notcontains $n) { Fail "Remote '$n' is missing. Run .\scripts\sync-remotes.ps1 -Setup first." }
     # Pushes below go to the remote's URL, not its name: after -Setup a push
-    # to "origin" would fan out to all three remotes at once.
+    # to "origin" would fan out to both remotes at once.
     $urls[$n] = (Invoke-Git @("remote", "get-url", $n))
 }
 

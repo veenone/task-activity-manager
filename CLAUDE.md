@@ -20,22 +20,35 @@ that share a Go core.
 
 ## Remotes
 
-Three remotes hold this repository and all three are equal:
-`origin` (github.com/veenone/task-activity-manager), `xtm-origin`
-(github.com/veenone/xray-testcase-manager, XTM's original home) and `gitea`
-(the home Gitea, `achmarah/xray-test-manager`). `origin` pushes to all three,
-so a plain `git push` lands everywhere; `.\scripts\sync-remotes.ps1 -Setup`
-writes that configuration on a fresh clone (it also points `origin`'s fetch
-URL at task-activity-manager, whichever repository the clone came from).
+Two remotes hold this repository: `origin`
+(github.com/veenone/task-activity-manager) and `gitea` (the home Gitea,
+`achmarah/xray-test-manager`), which mirrors it. `origin` pushes to both, so a
+plain `git push` lands on each; `.\scripts\sync-remotes.ps1 -Setup` writes that
+configuration on a fresh clone.
 
 A pull request merged on GitHub lands on that one remote only. Run
 `.\scripts\sync-remotes.ps1` afterwards: it fast-forwards `main` and tags on
-whichever remotes are behind. It stops before pushing anything if the `main`
-branches have diverged, and stops before touching tags if two remotes disagree
-on one. Feature branches are not synchronised; they are pushed through the
-fan-out and deleted where they were merged. Dependabot opens the same bump on
-both GitHub repositories: merge it on task-activity-manager only and close the
-copy on xray-testcase-manager, so the two `main` branches never diverge.
+whichever remote is behind. It stops before pushing anything if the two `main`
+branches have diverged, and stops before touching tags if they disagree on one.
+Feature branches are not synchronised; they are pushed through the fan-out and
+deleted where they were merged.
+
+**xray-testcase-manager is a separate project now, and this repository does not
+push to it.** The two shared a history up to Phase 3a and diverged after it:
+this one became the Task Activity Manager monorepo, and that one carried on
+with its own Xray work, its own releases and its own `main`. Trying to keep the
+two `main` branches in step stopped being bookkeeping and started being a
+question about whose feature work wins, which is not a thing a sync script
+should answer. The `xtm-origin` remote is still configured, for fetching and
+for reading history; it is not in the push fan-out and the sync script ignores
+it. If a change genuinely belongs to both, carry it across deliberately.
+
+**Stacked pull requests need care on this repository.** A PR whose base is
+another feature branch merges into that branch, not into `main`, so a stack
+merged in order leaves every commit but the first sitting somewhere `main`
+cannot see. Either merge the base down to `main` first and retarget each PR as
+it comes up, or open the last one against `main` once the stack is complete.
+This has already caught us once.
 
 Release tags carry the app name: `xtm/v1.10.0` for XTM, `tam/v0.1.0` for TAM
 once it ships. The release workflow filters on `xtm/v*`.
