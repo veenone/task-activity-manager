@@ -91,8 +91,7 @@ var Schema = store.Schema{
 		// backfill the column: a sprint is not read by an issue sync, and
 		// its only refresh is a board's own Refresh button. Every sprint
 		// cached before this version keeps an empty goal until the next
-		// Boards Refresh rewrites it, and that gap is deliberate, not an
-		// oversight left for later.
+		// Boards Refresh rewrites it.
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "sprint", "goal TEXT NOT NULL DEFAULT ''")
 		},

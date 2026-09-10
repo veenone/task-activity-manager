@@ -32,10 +32,10 @@ type Board struct {
 }
 
 // Sprint is one cached sprint. State is Jira's own lowercase value: active,
-// future, or closed. Goal is empty both for a sprint Jira has none set on
-// and for one cached before schema version 7 added the column and never
-// refreshed since; the two are indistinguishable here; a caller that needs
-// to tell them apart wants a raw Jira read, not this cache.
+// future, or closed. Goal reads empty in two cases this cache cannot tell
+// apart: a sprint with no goal set in Jira, and one cached before schema
+// version 7 added the column and not refreshed since. A caller that needs
+// to distinguish them wants a raw Jira read, not this cache.
 type Sprint struct {
 	ID        int    `json:"id"`
 	BoardID   int    `json:"boardId"`

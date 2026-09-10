@@ -306,15 +306,34 @@ func TestBoardSprintsTakeTheBoardFromTheRequestAndKanbanHasNone(t *testing.T) {
 	if sprints[1].StartDate == "" || sprints[1].EndDate == "" {
 		t.Errorf("sprint dates dropped: %+v", sprints[1])
 	}
-	if sprints[0].Goal != "Ship the promo code flow" {
-		t.Errorf("sprint goal dropped: %+v", sprints[0])
-	}
 	none, err := b.BoardSprints(ctx, 2)
 	if err != nil {
 		t.Fatalf("a kanban board with no sprints must not fail: %v", err)
 	}
 	if len(none) != 0 {
 		t.Errorf("kanban sprints = %+v, want none", none)
+	}
+}
+
+// TestBoardSprintsCarryTheGoalJiraSent used to be a couple of assertions
+// bolted onto TestBoardSprintsTakeTheBoardFromTheRequestAndKanbanHasNone,
+// describing a second behaviour under a name that only promised the first.
+// It also covers the fixture's empty goal on sprint 12, which nothing used
+// to check.
+func TestBoardSprintsCarryTheGoalJiraSent(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	sprints, err := b.BoardSprints(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	if len(sprints) != 2 {
+		t.Fatalf("sprints = %+v, want 2", sprints)
+	}
+	if sprints[0].Goal != "Ship the promo code flow" {
+		t.Errorf("sprint goal dropped: %+v", sprints[0])
+	}
+	if sprints[1].Goal != "" {
+		t.Errorf("sprint goal = %q, want empty for Jira's own empty goal", sprints[1].Goal)
 	}
 }
 

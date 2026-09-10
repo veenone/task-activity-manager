@@ -118,10 +118,10 @@ func findDemoSprint(sprintID int) (backend.Sprint, bool) {
 }
 
 // sprintsOverlay is demoSprints with StartSprint's and CompleteSprint's own
-// state changes applied, and a started sprint's name and dates taken from
-// the draft it was started with rather than the dataset's own, unstarted
-// ones: a demo start has nowhere else to show the reader what the dialog
-// just set. Callers hold b.mu.
+// state changes applied, and a started sprint's name, dates, and goal taken
+// from the draft it was started with rather than the dataset's own,
+// unstarted ones: a demo start has nowhere else to show the reader what the
+// dialog just set. Callers hold b.mu.
 func (b *Backend) sprintsOverlay() []backend.Sprint {
 	base := demoSprints()
 	out := make([]backend.Sprint, len(base))
@@ -138,6 +138,9 @@ func (b *Backend) sprintsOverlay() []backend.Sprint {
 			}
 			if draft.EndDate != "" {
 				s.EndDate = draft.EndDate
+			}
+			if draft.Goal != "" {
+				s.Goal = draft.Goal
 			}
 		}
 		out[i] = s

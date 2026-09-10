@@ -397,6 +397,7 @@ export namespace boardrepo {
 	    state: string;
 	    startDate: string;
 	    endDate: string;
+	    goal: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Sprint(source);
@@ -410,6 +411,7 @@ export namespace boardrepo {
 	        this.state = source["state"];
 	        this.startDate = source["startDate"];
 	        this.endDate = source["endDate"];
+	        this.goal = source["goal"];
 	    }
 	}
 	export class SprintChoice {
