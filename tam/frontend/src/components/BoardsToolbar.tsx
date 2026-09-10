@@ -23,6 +23,10 @@ interface Props {
   // attempted and its dialog reports what Jira said.
   onStart: () => void;
   onComplete: () => void;
+  // onCreate opens the New sprint dialog, offered whenever a scrum board is
+  // on screen: unlike Start and Complete it needs no sprint already picked,
+  // so it is not gated on one.
+  onCreate: () => void;
   // filter narrows the cards drawn, by key, assignee, or issue type.
   filter: string;
   onFilter: (v: string) => void;
@@ -40,7 +44,7 @@ function sprintOption(s: Sprint): string {
 // for a board name and absurd for three swimlane options.
 export function BoardsToolbar({
   boards, board, onBoard, sprints, sprint, onSprint, swimlane, onSwimlane,
-  refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete,
+  refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete, onCreate,
 }: Props) {
   // A ceremony belongs to the sprint on screen: the one that has not begun
   // can be started, the one that is running can be completed, and a closed
@@ -106,6 +110,9 @@ export function BoardsToolbar({
 
       <div className="board-head-actions">
         {refreshing && <span className="muted small">Refreshing</span>}
+        {board?.type === "scrum" && (
+          <button type="button" className="btn" onClick={onCreate}>New sprint</button>
+        )}
         {canStart && (
           <button type="button" className="btn" onClick={onStart}>Start sprint</button>
         )}

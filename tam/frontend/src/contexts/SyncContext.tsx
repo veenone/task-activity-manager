@@ -44,6 +44,17 @@ interface SyncApi {
   // shell that still offered Sync. It rejects rather than swallowing: the
   // dialog is what reports a ceremony's failure, word for word.
   runSprintCeremony: <T>(action: () => Promise<T>) => Promise<T>;
+  // runQuietLock is what a fast management write (creating, renaming, or
+  // destroying a sprint) takes Go's per-profile lock through without reading
+  // as a ceremony. It guards against overlapping a sync, a commit, a boards
+  // refresh, or a ceremony the same synchronous way runSprintCeremony does,
+  // so two locked calls from this client can never race each other, but it
+  // dispatches neither SYNC_START nor SYNC_END: status, canSync, and the
+  // progress banner never move for it, because a create is not something
+  // every other view needs to announce. Go's own lock still refuses the call
+  // outright when another operation already holds it there, and that
+  // refusal reaches the caller as an ordinary rejected promise.
+  runQuietLock: <T>(action: () => Promise<T>) => Promise<T>;
   // runCommit resolves to the result, or null when nothing ran or the call
   // failed (the failure is shown as a notice).
   runCommit: () => Promise<CommitResult | null>;
@@ -164,6 +175,25 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [activeId]);
 
+  // A quiet lock is the same statusRef guard every other run function
+  // checks, so it still refuses while any of them is in flight, but it never
+  // touches the reducer: no SYNC_START, no SYNC_END, no progress frame. The
+  // global banner and canSync are what they would be if the call were not
+  // running at all, which is the point, since a create is fast and local to
+  // its own dialog.
+  const runQuietLock = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
+    if (!activeId) throw new Error("no profile selected");
+    if (statusRef.current !== "idle") {
+      throw new Error("a sync is already running for this profile");
+    }
+    statusRef.current = "syncing";
+    try {
+      return await action();
+    } finally {
+      statusRef.current = "idle";
+    }
+  }, [activeId]);
+
   const runCommit = useCallback(async (): Promise<CommitResult | null> => {
     if (!activeId || statusRef.current !== "idle") return null;
     statusRef.current = "committing";
@@ -212,13 +242,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       runSync,
       runBoardsRefresh,
       runSprintCeremony,
+      runQuietLock,
       runCommit,
       lastCommit,
       dismissConflict,
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, activeId, runSync, runBoardsRefresh, runSprintCeremony, runCommit, lastCommit, dismissConflict, boards],
+    [state, activeId, runSync, runBoardsRefresh, runSprintCeremony, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

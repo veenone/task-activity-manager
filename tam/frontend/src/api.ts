@@ -333,6 +333,15 @@ export interface SprintCompletion {
   message: string;
 }
 
+// SprintCreated is what CreateSprint answers with, mirroring the App-level
+// SprintCreated struct: the sprint Jira made, whose id is what the dialog
+// switches the board's picker to, and the note beside it when the board's
+// own re-read did not land.
+export interface SprintCreated {
+  sprint: Sprint;
+  note: string;
+}
+
 export interface BoardSummary {
   boards: number;
   columns: number;
@@ -756,6 +765,35 @@ export const CompleteSprint = (
   App.CompleteSprint(profileId, boardId, sprintId, moveTo) as Promise<SprintCompletion>;
 export const SuggestSprintDates = (profileId: string, boardId: number): Promise<SprintSuggestion> =>
   App.SuggestSprintDates(profileId, boardId) as Promise<SprintSuggestion>;
+// CreateSprint, EditSprint and DeleteSprint make, change and destroy a
+// sprint, the same immediate writes the two ceremonies are: none of the
+// three is journaled, and all three take the same per-profile lock, so a
+// caller reaches them through the lock SyncContext holds rather than calling
+// them directly. CreateSprint's four fields are the dialog's whole draft;
+// EditSprint's clearGoal is the one argument the draft alone cannot carry,
+// since an empty goal box left alone and one asking to clear a goal that was
+// there are different requests.
+export const CreateSprint = (
+  profileId: string,
+  boardId: number,
+  name: string,
+  goal: string,
+  start: string,
+  end: string,
+): Promise<SprintCreated> =>
+  App.CreateSprint(profileId, boardId, name, goal, start, end) as Promise<SprintCreated>;
+export const EditSprint = (
+  profileId: string,
+  boardId: number,
+  sprintId: number,
+  name: string,
+  goal: string,
+  start: string,
+  end: string,
+  clearGoal: boolean,
+): Promise<string> => App.EditSprint(profileId, boardId, sprintId, name, goal, start, end, clearGoal);
+export const DeleteSprint: (profileId: string, boardId: number, sprintId: number) => Promise<string> =
+  App.DeleteSprint;
 // How many journal rows belong to cards staying in this sprint. The Complete
 // button asks before it opens its dialog: a card dragged to Done an hour ago
 // is Done on the board and not in Jira, and completing the sprint would move

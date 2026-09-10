@@ -233,6 +233,30 @@ export namespace backend {
 	        this.outward = source["outward"];
 	    }
 	}
+	export class Sprint {
+	    id: number;
+	    boardId: number;
+	    name: string;
+	    state: string;
+	    startDate: string;
+	    endDate: string;
+	    goal: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Sprint(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.boardId = source["boardId"];
+	        this.name = source["name"];
+	        this.state = source["state"];
+	        this.startDate = source["startDate"];
+	        this.endDate = source["endDate"];
+	        this.goal = source["goal"];
+	    }
+	}
 	export class TransitionCheck {
 	    reachable: string[];
 	    allowed: boolean;
@@ -1028,6 +1052,38 @@ export namespace main {
 	        this.sharedPath = source["sharedPath"];
 	        this.logPath = source["logPath"];
 	    }
+	}
+	export class SprintCreated {
+	    sprint: backend.Sprint;
+	    note: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprintCreated(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sprint = this.convertValues(source["sprint"], backend.Sprint);
+	        this.note = source["note"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

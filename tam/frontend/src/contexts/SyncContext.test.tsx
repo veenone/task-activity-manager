@@ -26,10 +26,16 @@ vi.mock("../api", async () => {
 });
 
 let progressListener: ((p: SyncProgress) => void) | null = null;
+// finishQuiet resolves the Probe's own quiet-write promise, the way finish
+// resolves a mocked api call in the other tests below; runQuietLock wraps
+// an arbitrary action rather than one particular bound method, so there is
+// no api mock to hang a controllable promise off here.
+let finishQuiet: () => void = () => {};
 
 beforeEach(() => {
   vi.clearAllMocks();
   progressListener = null;
+  finishQuiet = () => {};
   vi.mocked(api.EventsOn).mockImplementation((name: string, cb: (p: SyncProgress) => void) => {
     if (name === "tam:sync-progress") progressListener = cb;
     return () => {};
@@ -42,8 +48,9 @@ beforeEach(() => {
 });
 
 function Probe() {
-  const { status, progress, syncError, canSync, runSync, runBoardsRefresh, lastBoards } = useSync();
+  const { status, progress, syncError, canSync, runSync, runBoardsRefresh, runQuietLock, lastBoards } = useSync();
   const state = useSyncState("p1");
+  const [quiet, setQuiet] = React.useState("idle");
   return (
     <div>
       <span data-testid="status">{status}</span>
@@ -51,9 +58,20 @@ function Probe() {
       <span data-testid="error">{syncError}</span>
       <span data-testid="count">{state.data?.issueCount ?? "?"}</span>
       <span data-testid="boards">{lastBoards ? lastBoards.dropped.join(", ") || "none dropped" : "no pass"}</span>
+      <span data-testid="quiet">{quiet}</span>
       <button onClick={() => void runSync(false)} disabled={!canSync}>Sync</button>
       <button onClick={() => void runSync(true)}>Full sync</button>
       <button onClick={() => void runBoardsRefresh().catch(() => {})}>Refresh boards</button>
+      <button
+        onClick={() => {
+          setQuiet("running");
+          void runQuietLock(() => new Promise<void>((resolve) => { finishQuiet = resolve; }))
+            .then(() => setQuiet("done"))
+            .catch((e) => setQuiet(String(e)));
+        }}
+      >
+        Quiet write
+      </button>
     </div>
   );
 }
@@ -184,5 +202,44 @@ describe("SyncProvider", () => {
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", true);
     // The shared notice dialog is an alertdialog, whatever the tone.
     expect(screen.getByRole("alertdialog")).toHaveTextContent("Sync failed");
+  });
+
+  // runQuietLock is what a sprint create, rename, or delete takes Go's lock
+  // through: it must guard against a sync exactly as runBoardsRefresh does,
+  // but without reading as one, since none of those three writes is a
+  // ceremony every other view needs to announce.
+  it("guards a quiet write against a sync in both directions, without ever driving the sync banner", async () => {
+    let finishSync: (v: api.SyncSummary) => void = () => {};
+    vi.mocked(api.SyncIssues).mockImplementation(
+      () => new Promise<api.SyncSummary>((resolve) => { finishSync = resolve; }),
+    );
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+
+    // A quiet write in flight takes the guard, but the reducer never moves:
+    // no "syncing" status, and Sync still reads enabled, exactly as it would
+    // if nothing were running at all.
+    await userEvent.click(screen.getByRole("button", { name: "Quiet write" }));
+    expect(screen.getByTestId("status")).toHaveTextContent("idle");
+    expect(screen.getByRole("button", { name: "Sync" })).toBeEnabled();
+
+    // The guard is real even though the banner never moved: a sync attempted
+    // while the quiet write is in flight is silently refused, the same
+    // no-op every other overlapping SYNC_START already is.
+    await userEvent.click(screen.getByRole("button", { name: "Sync" }));
+    expect(api.SyncIssues).not.toHaveBeenCalled();
+
+    await act(async () => { finishQuiet(); });
+    await waitFor(() => expect(screen.getByTestId("quiet")).toHaveTextContent("done"));
+
+    // The other direction: a quiet write attempted while a real sync is
+    // running is refused in words the caller can show, not swallowed.
+    await userEvent.click(screen.getByRole("button", { name: "Sync" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+    await userEvent.click(screen.getByRole("button", { name: "Quiet write" }));
+    await waitFor(() => expect(screen.getByTestId("quiet")).toHaveTextContent(/already running/));
+
+    await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" }); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
   });
 });

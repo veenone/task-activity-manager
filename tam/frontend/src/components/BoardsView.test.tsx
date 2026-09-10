@@ -39,6 +39,7 @@ vi.mock("../api", async () => {
     JournalSprintMoves: vi.fn(),
     StartSprint: vi.fn(),
     CompleteSprint: vi.fn(),
+    CreateSprint: vi.fn(),
     SuggestSprintDates: vi.fn(),
     PendingInSprint: vi.fn(),
   };
@@ -61,6 +62,10 @@ const sync = vi.hoisted(() => ({
   // reducer as well. The stub is what the real one is once the lock is
   // free: it runs the action and hands the answer back.
   runSprintCeremony: async <T,>(action: () => Promise<T>) => action(),
+  // A create takes the same lock through runQuietLock instead, since it is
+  // not a ceremony; the stub is the same shape once the lock is free, and
+  // SyncContext.test.tsx is what tests the lock itself.
+  runQuietLock: async <T,>(action: () => Promise<T>) => action(),
 }));
 vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
 
@@ -200,6 +205,10 @@ beforeEach(() => {
   vi.mocked(api.JournalSprintMoves).mockResolvedValue(3);
   vi.mocked(api.StartSprint).mockResolvedValue("");
   vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [], note: "", message: "" });
+  vi.mocked(api.CreateSprint).mockResolvedValue({
+    sprint: { id: 14, boardId: 1, name: "Sprint 14", state: "future", startDate: "2026-09-14T09:00:00Z", endDate: "2026-09-28T09:00:00Z" },
+    note: "",
+  });
   vi.mocked(api.SuggestSprintDates).mockResolvedValue({
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
@@ -1477,6 +1486,87 @@ describe("BoardsView sprint ceremonies", () => {
     expect(screen.getByText(/3 pending changes belong to cards staying in this sprint/)).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Complete Sprint 12" })).not.toBeInTheDocument();
     expect(api.CompleteSprint).not.toHaveBeenCalled();
+  });
+});
+
+describe("BoardsView sprint create", () => {
+  it("offers New sprint on a scrum board and hides it on a kanban one", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    expect(screen.getByRole("button", { name: "New sprint" })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Board" }), "2");
+    await waitFor(() => expect(screen.queryByRole("combobox", { name: "Sprint" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "New sprint" })).not.toBeInTheDocument();
+  });
+
+  it("creates a sprint with the dialog's four fields and moves the picker to it", async () => {
+    const user = userEvent.setup();
+    // The board's sprint list is invalidated on create, the same way a
+    // ceremony invalidates it; the second answer is what a real re-read
+    // would come back with once Jira's new sprint is in it.
+    const created: api.Sprint = { id: 14, boardId: 1, name: "Sprint 14", state: "future", startDate: "2026-09-14T09:00:00Z", endDate: "2026-09-28T09:00:00Z" };
+    vi.mocked(api.ListBoardSprints).mockResolvedValueOnce(SPRINTS).mockResolvedValue([...SPRINTS, created]);
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(screen.getByRole("button", { name: "New sprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+
+    // The suggestion seeds all three fields the start dialog seeds, since a
+    // create is asking the same question: the next sprint's likely name and
+    // dates, read from the board's own history.
+    await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("Sprint 14");
+    expect(within(dialog).getByLabelText("End")).toHaveValue("2026-09-28");
+    await user.type(within(dialog).getByLabelText("Goal"), "Ship the grid");
+    await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
+
+    await waitFor(() =>
+      expect(api.CreateSprint).toHaveBeenCalledWith("p1", 1, "Sprint 14", "Ship the grid", "2026-09-14", "2026-09-28"),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "New sprint" })).not.toBeInTheDocument());
+    // Scoped to the banner: the same sentence also goes to the shared live
+    // region, so an unscoped query matches twice as soon as the region's own
+    // timer fires.
+    const banner = await screen.findByRole("status", { name: "Sprint ceremony" });
+    expect(within(banner).getByText("Sprint 14 was created, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("14"));
+  });
+
+  // A sprint with a name and no dates cannot be created, because the
+  // service converts both through sprintdate.Parse, which errors on an
+  // empty value; the dialog says so itself rather than letting the user
+  // discover it from a round trip to Jira.
+  it("refuses a create with an empty date before asking Jira", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(screen.getByRole("button", { name: "New sprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
+
+    fireEvent.change(within(dialog).getByLabelText("Start"), { target: { value: "" } });
+    await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
+    expect(await within(dialog).findByText("The start date cannot be empty.")).toBeInTheDocument();
+    expect(api.CreateSprint).not.toHaveBeenCalled();
+  });
+
+  // The lock is Go's, not the dialog's own: a create attempted while another
+  // operation holds it is refused in the same words a start would be, and
+  // the dialog is what has to show that sentence rather than let it vanish.
+  it("keeps the create dialog open with the refusal when Go's lock is already held", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CreateSprint).mockRejectedValue(new Error("a boards refresh is already running for this profile"));
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await user.click(screen.getByRole("button", { name: "New sprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
+
+    await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("a boards refresh is already running for this profile");
+    expect(screen.getByRole("dialog", { name: "New sprint" })).toBeInTheDocument();
   });
 });
 

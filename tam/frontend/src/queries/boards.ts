@@ -3,6 +3,7 @@ import { call } from "@agile-suite/core";
 import {
   CanTransition,
   CompleteSprint,
+  CreateSprint,
   GetBoard,
   GetProfileSetting,
   JournalSprintMoves,
@@ -17,7 +18,7 @@ import {
   SuggestSprintDates,
   SyncBoards,
 } from "../api";
-import type { BoardSummary, SprintCompletion } from "../api";
+import type { BoardSummary, SprintCompletion, SprintCreated } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
 
@@ -233,6 +234,37 @@ export function useCompleteSprint(profileId: string, run: <T>(action: () => Prom
     onSettled: () => {
       invalidateSprints(qc, profileId);
       invalidateWrites(qc, profileId);
+    },
+  });
+}
+
+export interface CreateSprintArgs {
+  boardId: number;
+  name: string;
+  goal: string;
+  start: string;
+  end: string;
+}
+
+// useCreateSprint is the toolbar's New sprint button. It is a management
+// write, not a ceremony: unlike Start and Complete it does not go through
+// runSprintCeremony, since making a sprint is not something every other view
+// needs to announce with the sync banner. run is SyncContext's
+// runQuietLock, injected the same way the ceremonies' run is, and it still
+// takes Go's per-profile lock for the call's duration, so a create during a
+// boards refresh is refused exactly as a start would be.
+//
+// openSprints is invalidated beside the board's own lists, on top of what
+// invalidateSprints already covers, because a create is the one write on
+// this surface that adds a sprint the Backlog and the Epics tree's
+// profile-wide picker can now offer.
+export function useCreateSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
+  const qc = useQueryClient();
+  return useMutation<SprintCreated, Error, CreateSprintArgs>({
+    mutationFn: (v) => run(() => call(() => CreateSprint(profileId, v.boardId, v.name, v.goal, v.start, v.end))),
+    onSettled: () => {
+      invalidateSprints(qc, profileId);
+      if (profileId) qc.invalidateQueries({ queryKey: keys.openSprints(profileId) });
     },
   });
 }
