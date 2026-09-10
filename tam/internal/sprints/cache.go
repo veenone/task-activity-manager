@@ -142,6 +142,29 @@ func (s *Service) refreshSprints(ctx context.Context, b lifecycle, profileID str
 	return nil
 }
 
+// refreshSprintsAllowEmpty is refreshSprints without its refusal of an
+// empty answer, for the one caller that can make an empty answer true: a
+// delete that has just removed a board's only sprint leaves BoardSprints
+// with nothing left to report, and that emptiness is the sprint's real
+// absence rather than the ambiguous 400 refreshSprints exists to distrust.
+// Everything else about the read and the write is unchanged, on purpose:
+// the same call, the same log line and wrapped error on a transport
+// failure, and the same write through ReplaceSprints. refreshSprints keeps
+// its comment and its own two callers exactly as they are; this is a
+// second path, not a loosened version of the first.
+func (s *Service) refreshSprintsAllowEmpty(ctx context.Context, b lifecycle, profileID string, boardID int) error {
+	list, err := b.BoardSprints(ctx, boardID)
+	if err != nil {
+		log.Printf("tam: board %d sprints could not be re-read after a sprint was deleted: %v", boardID, err)
+		return fmt.Errorf("the board's sprint list could not be re-read: %w", err)
+	}
+	if err := s.store.ReplaceSprints(ctx, profileID, boardID, list); err != nil {
+		log.Printf("tam: board %d sprints could not be cached after a sprint was deleted: %v", boardID, err)
+		return fmt.Errorf("the board's sprint list could not be cached: %w", err)
+	}
+	return nil
+}
+
 // note is what a ceremony reports beside its own success when the cache
 // bookkeeping after it did not land: one line, and the one thing the user
 // can do about it. Jira's own words reach here off the wire, so they go
