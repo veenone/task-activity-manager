@@ -114,9 +114,15 @@ Sprint 12, day 6 of 14, 8 of 14 done, 21 of 34 pts
 |     [ ] PLAT-455  Audit the tax table To Do        |  |                                      |
 | > Sprint 13  Future  1 Sep to 15 Sep     6   [...] |  |                                      |
 | > Sprint 11  Closed  4 Aug to 18 Aug         [...] |  |                                      |
-| > Unassigned on this board              31         |  |                                      |
+| > Board backlog                         31         |  |                                      |
 +---------------------------------------------------+  +--------------------------------------+
 ```
+
+**Amendment, 2026-09-10.** The unassigned node's row above used to read "Unassigned on this
+board." It is built as `UnassignedSprintName`, "Board backlog", and the mockup is corrected to
+match: "Unassigned" already names an assignee group two rows above it in this same tree, and a
+node meaning "the board's own list" needs a different word, not the same one pointed at a
+different question.
 
 The tree is `folder-tree` and its rows share `folder-item`, `folder-selected` and `folder-caret`
 with the Epics tree, so the two views read as one app. The sprint row's own cells are
@@ -194,10 +200,20 @@ refuses while journal rows point at the sprint.
 
 Create and edit re read the board's sprints into the cache afterwards through the existing
 `refreshSprints`, which refuses to persist an empty answer because a single 400 on that endpoint
-is indistinguishable from "no sprints" and would otherwise delete the board's history. **Delete
-uses a variant that permits an empty answer**, because deleting a board's only sprint makes the
-empty answer true; everything else about the path is shared, including the orphan membership
-cleanup `ReplaceSprints` already does.
+is indistinguishable from "no sprints" and would otherwise delete the board's history. That
+re-read is their only cache work: Jira already holds the true list, so asking it again and
+replacing what TAM cached is enough.
+
+**Amendment, 2026-09-10.** The paragraph above used to say delete follows the same path as create
+and edit, through a variant of `refreshSprints` that permits an empty answer. It does not, and
+Decision 4's row on the sprint cache had it right: delete removes the sprint's own rows itself,
+through `boardrepo.DeleteSprintEverywhere`, in its own transaction, before Jira is asked again for
+anything. A re-read afterwards would not do that job: the deleted sprint is simply absent from
+Jira's answer, which is a difference `ReplaceBoard` has no way to tell from "this board never had
+it," so nothing would prompt the orphan cleanup a departed sprint's cached rows need. Delete does
+still re-read the board's sprint list once its own removal has landed, through the same
+empty-permitting variant this paragraph named, but that call is bookkeeping for whatever else
+about the board moved, not the mechanism that removes the deleted sprint.
 
 The bound methods go in a new file rather than growing `app_sprints.go`, and they take the same
 per profile lock under the same `"sprint"` label, which means the frontend reaches them through

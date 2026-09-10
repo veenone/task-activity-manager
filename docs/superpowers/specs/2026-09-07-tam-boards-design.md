@@ -233,7 +233,9 @@ A sprint's start is a fact with a timestamp that a whole team reads. Journaling 
 
 And unlike a card move, there is nothing to reconcile. A transition can be rebased onto a status that moved; a sprint that someone else already started cannot be started again, and the only sensible answer is to say so and refresh.
 
-So the two lifecycle actions are online-only, which in practice means they are attempted rather than predicted: TAM has no connectivity signal to disable a button from, so the buttons stay enabled, the call is made, and a transport failure is reported in the dialog with a retry. Predicting offline would have meant an enabled button and a raw error for the case that actually matters, a VPN that is off at nine in the morning. The card moves they sit beside stay journaled, exactly as 3b built them. This is the only place in TAM where a button talks to Jira without Commit, and the plan says so out loud rather than letting a future reader discover it.
+So the two lifecycle actions are online-only, which in practice means they are attempted rather than predicted: TAM has no connectivity signal to disable a button from, so the buttons stay enabled, the call is made, and a transport failure is reported in the dialog with a retry. Predicting offline would have meant an enabled button and a raw error for the case that actually matters, a VPN that is off at nine in the morning. The card moves they sit beside stay journaled, exactly as 3b built them.
+
+**Amendment, 2026-09-10.** The sentence above used to end here, calling this the only place in TAM where a button talks to Jira without Commit. It no longer is: the Sprints view design (`docs/superpowers/specs/2026-09-10-tam-sprints-view-design.md`, section 3) extends the same exception to creating, editing and deleting a sprint, for the same reasons argued here, and fences the whole set of five as the exported methods of `internal/sprints.Service`. Read that section for the argument; this one still holds for why starting and completing were the first two.
 
 ### 14.3 Decisions
 
