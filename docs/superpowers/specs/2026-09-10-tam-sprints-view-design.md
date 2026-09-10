@@ -142,7 +142,7 @@ the first member in the tree that neither opens nor toggles. The issues stay the
 under a sprint, which is what keeps this a two level tree.
 
 Order is active first, then future by start date, then closed by start date with the most recent
-first, then the board's backlog last. Closed sprints are behind a "Show closed" toggle that starts
+first, then the board's unassigned work last. Closed sprints are behind a "Show closed" toggle that starts
 off, because a board two years old has fifty of them and none of them are what the view is for.
 Only the active sprint starts expanded, because a board with twelve future sprints would otherwise
 paint twelve open branches.
@@ -222,8 +222,8 @@ Everything else the view needs is already stored. One new read, in its own file 
 `internal/boardrepo`: one board's sprints with their dates, their goal, and **their issues**,
 which is what the tree draws. Keys alone would not do: a row shows a summary and a status, the
 grouping needs an assignee, and the detail panel needs a whole issue, so returning keys would
-force a second query and lose the single snapshot the read exists for. The board's backlog comes
-back as one more scope, which the cache already stores with an empty sprint id. `OpenSprints` is
+force a second query and lose the single snapshot the read exists for. The board's unassigned work
+is computed rather than read, for the reason given in section 5. `OpenSprints` is
 not this read: it exists for a picker, drops the dates and the board id on purpose, and is folded
 to one row per sprint.
 
