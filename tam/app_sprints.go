@@ -71,8 +71,9 @@ func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, s
 	return note, nil
 }
 
-// ceremonyError is what a ceremony's refusal reads as on screen. These two
-// are the bindings whose errors come straight off the wire, Jira's own
+// ceremonyError is what a sprint write's refusal reads as on screen. The two
+// ceremonies here and the three management bindings in app_sprintmanage.go
+// are the calls whose errors come straight off the wire, Jira's own
 // sentence about a second active sprint or a missing permission, and a Data
 // Center answering 403 with an HTML login page hands the transport a
 // kilobyte of markup that the start dialog renders inline beside its

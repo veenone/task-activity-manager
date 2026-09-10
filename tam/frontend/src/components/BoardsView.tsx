@@ -248,7 +248,7 @@ export function BoardsView() {
           live region and the two status regions are otherwise the same
           thing to anything reading the page. */}
       {ceremonyLine && (
-        <div className="pending-banner" role="status" aria-label="Sprint ceremony">
+        <div className="pending-banner" role="status" aria-label="Sprint outcome">
           <p>{ceremonyLine}</p>
         </div>
       )}

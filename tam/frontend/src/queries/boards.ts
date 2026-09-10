@@ -179,13 +179,15 @@ export function useSprintSuggestion(profileId: string, boardId: number, enabled:
   });
 }
 
-// The two ceremonies. Both push to Jira the moment they are called, so both
-// go through run, which is SyncContext's runSprintCeremony: it holds the
-// same per-profile lock a sync and a commit hold, injected rather than
-// reached for so this module stays free of the context.
+// The sprint writes that reach Jira the moment they are called. The two
+// ceremonies below go through run, which is SyncContext's runSprintCeremony:
+// it holds the same per-profile lock a sync and a commit hold, injected
+// rather than reached for so this module stays free of the context. Creating
+// a sprint takes that same lock through a quieter path, for the reason
+// useCreateSprint's own comment gives.
 //
-// Both refresh the board's sprint list, which the service itself re-read
-// into the cache, and the board under it, whose cards have moved.
+// The ceremonies refresh the board's sprint list, which the service itself
+// re-read into the cache, and the board under it, whose cards have moved.
 function invalidateSprints(qc: ReturnType<typeof useQueryClient>, profileId: string) {
   if (!profileId) return;
   for (const queryKey of [

@@ -89,6 +89,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const { activeId } = useProfile<Profile, Settings>();
   const qc = useQueryClient();
   const { notice } = useNotice();
+  // statusRef is the lock, and since runQuietLock it no longer always agrees
+  // with state.status. A quiet write sets this to "syncing" and leaves the
+  // reducer idle on purpose, so every run* still refuses against it while the
+  // shell shows no progress banner. Nothing outside this file reads the ref,
+  // and the cost of the divergence is written down beside the rule it bends
+  // in tam/CLAUDE.md.
   const statusRef = useRef<SyncStatus>("idle");
   const [lastCommit, setLastCommit] = useState<CommitResult | null>(null);
   const [boards, setBoards] = useState<{ summary: BoardSummary | null; at: number }>({ summary: null, at: 0 });

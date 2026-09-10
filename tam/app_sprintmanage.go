@@ -11,9 +11,14 @@ import (
 // surface over internal/sprints' Create, Edit, and Delete, laid out the same
 // way app_sprints.go lays out the two ceremonies: requireProfile by way of
 // backendForProfile, a.acquire(p.ID, "sprint") under the same name a start
-// and a completion take so a refusal says which sprint action is actually
-// running, the service call, and ceremonyError to reduce whatever Jira said
-// to one readable line. Nothing here is journaled, for the reasons
+// and a completion take, the service call, and ceremonyError to reduce
+// whatever Jira said to one readable line.
+//
+// All five sprint bindings share the one lock name on purpose. acquire
+// reports the name that is HELD, so sharing it means a refusal says a sprint
+// operation is running rather than which one, and that is the trade: what a
+// user needs to know is that this profile is busy with a sprint and not with
+// a sync, a commit or a boards refresh, which are the other names in play. Nothing here is journaled, for the reasons
 // internal/sprints' package doc gives: a sprint id has to be real before
 // anything can point at it, and there is nothing to defer.
 //

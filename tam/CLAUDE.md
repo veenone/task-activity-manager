@@ -243,7 +243,9 @@ journal. The bound methods, `StartSprint` and `CompleteSprint` in
 `app_sprints.go`, take the same per-profile lock (`a.acquire(p.ID, "sprint")`)
 a sync, a commit, and a boards refresh take, and the frontend reaches them
 through `SyncContext.runSprintCeremony`, which is the same reducer path
-`runBoardsRefresh` uses. Neither button has an offline state: TAM has no
+`runBoardsRefresh` uses. The three sprint management writes in
+`app_sprintmanage.go` take that same Go lock but reach it through
+`runQuietLock` instead, for the reason the sync section below gives. Neither button has an offline state: TAM has no
 connectivity signal to disable one from, so both stay enabled, the call is
 attempted, and a transport failure or a Jira refusal (a second active
 sprint, a missing Manage Sprints permission) is reported in the dialog,
@@ -563,7 +565,7 @@ Fields is the only section open on mount, so the panel still starts short.
 
 A draft's parent comes from context. `parentKey` is fixed and stated (a
 sub-task's parent, from the issue it was drafted from); `initialEpic` is a
-default the picker may change, seeded from the epic on screen — the selected
+default the picker may change, seeded from the epic on screen: the selected
 row when it is an epic, else the epic it hangs off. Starting at "(none)" made
 every draft begun with an epic open an orphan that had to be reparented
 afterwards. A fixed parent wins over a seeded epic.
@@ -652,7 +654,24 @@ the reducer, so the shell stayed `idle`, kept offering Sync, and Go refused it
 with "a sync is already running for this profile" on a profile whose status
 still read "not synced yet". It runs through `SyncContext.runBoardsRefresh`
 now, which takes the same lock the sync does. **Anything new that calls a
-bound method taking `acquire` has to go through the reducer too.**
+bound method taking `acquire` has to take the frontend's lock too.**
+
+There is one deliberate exception, and it is narrower than it looks.
+`SyncContext.runQuietLock` takes the same `statusRef` guard every other `run*`
+takes, so a sync, a commit, a boards refresh and a ceremony all still refuse
+against it, but it dispatches no progress actions, so the reducer stays
+`idle`. Creating, editing and deleting a sprint go through it: those are one
+short call each, and flashing the whole app's sync banner for a rename would
+say something untrue about what is happening.
+
+What that costs is worth knowing, because it is the same shape as the bug the
+rule above was written about. For the length of the call the shell's Sync and
+Commit buttons stay enabled and do nothing when pressed, and the profile
+picker stays enabled, because all three read `state.status` rather than the
+ref. What keeps a user away from them is the dialog holding focus, which is
+why those dialogs refuse Escape while their write is in flight rather than
+merely disabling their own buttons. A fourth quiet write would have to earn
+the same treatment.
 
 `SyncBoards` acquires under its own name, so a refusal says which operation is
 actually running. The boards pass is also given the progress sink now: it
@@ -874,7 +893,9 @@ until one is entered. A Kiwi profile file is refused.
                           gestures over an ordered key list, no React and no DOM
       src/queries/       TanStack Query keys, hooks, and the post-sync invalidation
       src/contexts/      SyncContext on the shared sync reducer; runSprintCeremony is the reducer
-                          path StartSprint and CompleteSprint run through, beside runBoardsRefresh
+                          path StartSprint and CompleteSprint run through, beside runBoardsRefresh;
+                          runQuietLock takes the same lock without the banner, for the three
+                          sprint management writes
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands

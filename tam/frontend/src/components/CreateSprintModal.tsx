@@ -98,7 +98,12 @@ export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Pr
           const made = `${created.sprint.name || name.trim()} was created, ${from} to ${to}.`;
           const line = created.note ? `${made} ${created.note}` : made;
           announce(line);
-          onCreated(String(created.sprint.id), line);
+          // A zero id is a documented answer rather than a failure: core/jira
+          // treats an empty create response, or one with no id, as "made, go
+          // and refresh", because the sprint exists in Jira either way. So
+          // there is no id to select and the board keeps the sprint it had,
+          // rather than switching the picker to a sprint numbered zero.
+          onCreated(created.sprint.id ? String(created.sprint.id) : "", line);
           onClose();
         },
         // The dialog stays open with what the user typed still in it: the
@@ -116,7 +121,20 @@ export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Pr
   const days = suggested ? plural(suggested.length, "day", "days") : "";
 
   return (
-    <Modal onClose={onClose} className="modal pending-modal" labelledBy="create-sprint-title" closeOnOverlayClick={false}>
+    // Escape is closed off while the create is in flight, and this is not
+    // politeness. runQuietLock holds the per-profile lock without moving the
+    // reducer, so the shell's Sync and Commit buttons stay enabled and inert
+    // for the length of the call; the dialog holding focus is what keeps a
+    // user away from them. Unmounting mid-call would also lose the outcome,
+    // since a mutate-scoped onSuccess never runs once its observer is gone,
+    // and the sprint would appear in the picker unannounced and unexplained.
+    <Modal
+      onClose={onClose}
+      className="modal pending-modal"
+      labelledBy="create-sprint-title"
+      closeOnOverlayClick={false}
+      closeOnEsc={!create.isPending}
+    >
       <div className="pending-head">
         <h2 id="create-sprint-title">New sprint</h2>
         <span className="muted">Jira makes it now. This does not wait for Commit.</span>

@@ -231,6 +231,11 @@ export interface Sprint {
   state: string;
   startDate: string;
   endDate: string;
+  // What the sprint is for. Empty for a sprint cached before schema version
+  // 7 added the column, since nothing back-fills it until the next boards
+  // refresh, which is why a reader cannot tell an absent goal from one Jira
+  // has none set on.
+  goal: string;
 }
 
 // SprintChoice mirrors boardrepo.SprintChoice field for field: every open
