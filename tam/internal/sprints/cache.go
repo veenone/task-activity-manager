@@ -117,12 +117,30 @@ func appended(cached, arrived []string) []string {
 // 400. The caller carries this back as a note beside its own success, which
 // is how the user finds out to press Refresh.
 func (s *Service) refreshSprints(ctx context.Context, b lifecycle, profileID string, boardID int) error {
+	return s.reReadSprints(ctx, b, profileID, boardID, "the ceremony", true)
+}
+
+// refreshSprintsAllowEmpty is the same re-read without the refusal, for the
+// one caller that can make an empty answer true: a delete that has just
+// removed a board's only sprint leaves BoardSprints with nothing left to
+// report, and that emptiness is the sprint's real absence rather than the
+// ambiguous 400 the refusal exists to distrust.
+func (s *Service) refreshSprintsAllowEmpty(ctx context.Context, b lifecycle, profileID string, boardID int) error {
+	return s.reReadSprints(ctx, b, profileID, boardID, "a sprint was deleted", false)
+}
+
+// reReadSprints is the body both of the above share, so the call, the write
+// and the two error sentences exist once rather than twice. occasion names
+// what has just happened, for the log lines; refuseEmpty is the only real
+// difference between the two callers, and the block it guards carries the
+// reason.
+func (s *Service) reReadSprints(ctx context.Context, b lifecycle, profileID string, boardID int, occasion string, refuseEmpty bool) error {
 	list, err := b.BoardSprints(ctx, boardID)
 	if err != nil {
-		log.Printf("tam: board %d sprints could not be re-read after the ceremony: %v", boardID, err)
+		log.Printf("tam: board %d sprints could not be re-read after %s: %v", boardID, occasion, err)
 		return fmt.Errorf("the board's sprint list could not be re-read: %w", err)
 	}
-	if len(list) == 0 {
+	if refuseEmpty && len(list) == 0 {
 		// A ceremony has just started or completed a sprint on this board, so
 		// the board demonstrably has one and an empty list is not the truth
 		// about it. It is what a single 400 on the sprint endpoint looks like
@@ -136,30 +154,7 @@ func (s *Service) refreshSprints(ctx context.Context, b lifecycle, profileID str
 		return fmt.Errorf("the board answered with no sprints at all, so its cached list was left as it was")
 	}
 	if err := s.store.ReplaceSprints(ctx, profileID, boardID, list); err != nil {
-		log.Printf("tam: board %d sprints could not be cached after the ceremony: %v", boardID, err)
-		return fmt.Errorf("the board's sprint list could not be cached: %w", err)
-	}
-	return nil
-}
-
-// refreshSprintsAllowEmpty is refreshSprints without its refusal of an
-// empty answer, for the one caller that can make an empty answer true: a
-// delete that has just removed a board's only sprint leaves BoardSprints
-// with nothing left to report, and that emptiness is the sprint's real
-// absence rather than the ambiguous 400 refreshSprints exists to distrust.
-// Everything else about the read and the write is unchanged, on purpose:
-// the same call, the same log line and wrapped error on a transport
-// failure, and the same write through ReplaceSprints. refreshSprints keeps
-// its comment and its own two callers exactly as they are; this is a
-// second path, not a loosened version of the first.
-func (s *Service) refreshSprintsAllowEmpty(ctx context.Context, b lifecycle, profileID string, boardID int) error {
-	list, err := b.BoardSprints(ctx, boardID)
-	if err != nil {
-		log.Printf("tam: board %d sprints could not be re-read after a sprint was deleted: %v", boardID, err)
-		return fmt.Errorf("the board's sprint list could not be re-read: %w", err)
-	}
-	if err := s.store.ReplaceSprints(ctx, profileID, boardID, list); err != nil {
-		log.Printf("tam: board %d sprints could not be cached after a sprint was deleted: %v", boardID, err)
+		log.Printf("tam: board %d sprints could not be cached after %s: %v", boardID, occasion, err)
 		return fmt.Errorf("the board's sprint list could not be cached: %w", err)
 	}
 	return nil

@@ -18,6 +18,11 @@ import (
 // every board move (applyMoveColumns), so an issue with a pending move to a
 // different sprint already carries that sprint's id here and does not match
 // the sprint being deleted; it is left alone, pending move and all.
+//
+// It runs AFTER boardrepo.DeleteSprintEverywhere, in its own transaction.
+// That comment carries the reason the two cannot share one and what a crash
+// between them leaves. sprintID is the string the issue cache stores, where
+// the board tables key the same sprint by an integer.
 func (r *Repository) ClearSprint(ctx context.Context, profileID, sprintID string) error {
 	if _, err := r.db.ExecContext(ctx,
 		`UPDATE issue SET sprint_id = '', sprint_name = '' WHERE profile_id = ? AND sprint_id = ?`,
