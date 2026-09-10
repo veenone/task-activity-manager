@@ -45,6 +45,9 @@ type RawSprint struct {
 	State     string `json:"state"`
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
+	// Goal has been on every sprint Jira answers with since the boards work
+	// landed in Phase 3a; this struct dropped it on the floor until now.
+	Goal string `json:"goal"`
 }
 
 // RawBoardConfig is /board/{id}/configuration. Jira nests the columns under
