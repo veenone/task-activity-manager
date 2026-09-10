@@ -5,29 +5,29 @@ it. What it cannot do is make one, rename one, fix the dates somebody typed wron
 was created by mistake, or look at a sprint's contents without first choosing the board that
 happens to carry it. This design adds the view that does those things.
 
-It is the fourth view, between Boards and Reports, and the first view in TAM that is not always
-there: a project with no scrum board cannot have sprints, and a menu entry that leads to a page
-explaining why it is empty is worse than no entry.
+It is the fourth view, between Boards and Reports.
 
 ## 1. What this delivers
 
 - A **Sprints view**: a board picker, then that board's sprints as a two level tree, each sprint
-  expanding to the issues in it, with a detail panel beside it exactly as the Epics view has.
+  expanding to the issues in it grouped by the person carrying them, with a detail panel beside it
+  exactly as the Epics view has.
 - **Creating a sprint**, with the name and dates the board's own history suggests.
-- **Editing a sprint**: its name, its goal, and its dates.
+- **Editing a sprint**: its name, its goal, and its dates, including clearing a goal.
 - **Deleting a sprint**, with a confirmation that says where its issues go.
+- **Filling a sprint**: selecting several issues and moving them in with one action, journaled the
+  way every other membership change is.
 - **Starting and completing** a sprint from here as well as from the Boards toolbar, sharing one
   definition of what "unfinished" means rather than growing a second.
-- **The view hiding itself** when the profile has no scrum board, in the view tabs, the nav rail,
-  and the native menu bar.
+- **A marker on every write that reaches Jira immediately**, because by this design five of them
+  do and nothing on screen tells them apart from the ones that wait for Commit.
 
 ## 2. What this does not deliver
 
 Creating or editing a board. Moving a sprint between boards, which Jira does not offer either.
-Adding several issues to a sprint at once from here, because the board's multi selection already
-does that and doing it twice would mean two selection models. Reordering sprints, which is not a
-thing Jira has. Any change to the burndown or velocity work, which is Phase 4 and reads the
-sprints this view will produce.
+Reordering sprints, which is not a thing Jira has. A team roster with capacity per person, which
+is Phase 4 work; the assignee grouping here is its seed. Any change to the burndown or velocity
+work, which is Phase 4 and reads the sprints this view will produce.
 
 ## 3. The decision that shapes this plan
 
@@ -55,9 +55,20 @@ cache, the Backlog's sprint filter, and the importer's Sprint column, all of whi
 to know that some sprint ids are not real.
 
 Membership is untouched by this: moving an issue into or out of a sprint stays journaled, through
-the same path the board drag and the detail panel already use. The line this design draws is that
-**the sprint is a Jira object and goes now; what is in it is the user's work and waits for
-Commit.**
+the same path the board drag and the detail panel already use, including the bulk move this design
+adds.
+
+The honest statement of the line is worth writing down, because the tempting one is wrong. It is
+not that a sprint is a Jira object and an issue is not: a new issue is every bit as much a Jira
+object a team plans around, and TAM journals it behind a `TAM-NEW-n` placeholder. The real rule is
+**a sprint's id has to be real before anything can point at it**, and TAM already carries the
+machinery to defer an issue's id and nothing that would defer a sprint's. That is a cost, not a
+principle, and calling it a principle is how a fourth exception gets added without an argument.
+
+So the rule is fenced structurally rather than by paragraph. The immediate writes are exactly the
+methods on the unexported `lifecycle` interface in `internal/sprints`, and a test asserts that
+method set by name. Growing it means editing a failing test whose message says what the list is
+for. The previous version of this rule lived in a spec sentence and lasted one phase.
 
 ## 4. Decisions
 
@@ -66,8 +77,8 @@ Commit.**
 | Where sprint management lives | Its own view, between Boards and Reports | It is about the sprint rather than the cards in it, and the Boards toolbar can only ever act on the sprint already selected there |
 | The view's shape | A board picker, then sprints as a two level tree with their issues beneath, and a detail panel | It is the Epics view's shape, which is the one TAM already teaches for "a thing and what hangs off it" |
 | Why a board picker rather than every board at once | A sprint belongs to a board, and creating one requires the board's id | Grouping by board would make a three level tree of what is really a filter, and the create dialog would still have to ask |
-| When the view appears | The profile has at least one board of type scrum in the cache | A kanban only project and an instance without Jira Software both genuinely cannot have sprints. Conditioning on "has sprints" instead would mean the first sprint could never be created, since this view is where it is created |
-| How the native menu learns the condition | The frontend tells Go through a bound setter that rebuilds the menu, the way the nav rail checkbox already does | Go has no notion of an active profile; the frontend is the only side that knows which profile is on screen |
+| When the view appears | Always | Hiding it would have cost a cross cutting navigation mechanism for one consumer, and shown a new user nothing at all on their first launch, because the condition reads a cache a fresh profile has not filled yet. TAM already ships Reports and Rituals as visible entries that lead nowhere useful; a fourth one that explains itself is better than one that vanishes |
+| What a project with no scrum board sees | An empty state saying sprints belong to a scrum board, that none is synced, and where to go | It teaches. A missing menu entry teaches nothing and cannot be asked about |
 | Creating a sprint | A dialog with name, goal, start and end, prefilled from the board's own numbering and its usual sprint length | The same prefill `SuggestSprintDates` already computes for the start dialog, and a sprint created with plausible dates is one fewer edit later |
 | The state a new sprint is in | Future, always | Jira's create endpoint makes a future sprint and offers no other option; starting it is a separate, deliberate act |
 | Editing a sprint | Name, goal and dates, on a future or an active sprint | These are the four fields Jira lets a client change, and they are the four the create dialog already has |
@@ -76,8 +87,13 @@ Commit.**
 | Deleting a sprint with pending journal rows | Refused, naming Commit as the thing to do first | The same guard a completion already takes, for the same reason: those rows point at a sprint that is about to stop existing |
 | Starting and completing from here | The same two dialogs the Boards toolbar opens | One dialog, one definition of unfinished, one place to fix a bug in either |
 | What "unfinished" means | An issue whose status id is not in the board's last column | Phase 3c's definition, which now has to be readable without a drawn board, so it moves into a helper both views call |
-| Membership | Read only here: expand a sprint to see its issues, and change one through the detail panel's Sprint field | That field was built in the previous branch and is journaled, reviewed, and already the answer everywhere else |
+| Membership | Read, grouped by assignee, and writable: one issue through the detail panel's Sprint field, several through a selection and one Move | Reaching a sprint without picking its board is why this view exists, and deferring the bulk move would send the user back to the board to fill it, which is the trip the view removes |
+| The bulk move's write path | The journaled `MoveManyToSprint` the board's selection already uses | One write path, already reviewed in Phase 3b, with a conflict story and a Discard case that already exist |
 | A closed sprint's contents | Shown as unavailable rather than as empty, with the reason | The boards sync deliberately never fetches a closed sprint's membership, so an empty list here would be a lie |
+| Deleting and the sprint cache | Delete removes the sprint's rows itself; it does not go through `refreshSprints` | That helper refuses to persist an empty answer, justified by a comment saying a ceremony proves the board has a sprint. Delete is the one write that makes the answer genuinely empty, so the refusal would leave a deleted sprint in the cache forever, and from there into the Backlog picker, the Epics tree, the New issue dialog and the importer's Sprint column |
+| Clearing a sprint's goal | Sent as an explicit empty string on edit, never on create | The partial update rule that stops an empty box wiping a real goal also makes a goal impossible to clear. The two cases are different and the code distinguishes them |
+| A local record of an immediate write | An audit row for each of create, edit and delete | Once Jira no longer has the sprint, an audit row is the only trace that will exist anywhere on the machine |
+| Telling immediate writes apart | A marker and a sentence on all five | An app whose promise is that you see every write before it happens must say which buttons break that promise |
 | Permissions | A 403 says the account cannot manage sprints on this board, and the buttons stay | Phase 3c's rule: guessing at permissions before trying is how tools hide capability from people who have it |
 
 ## 5. The view
@@ -159,29 +175,30 @@ and their cached issue keys, which is what the tree draws. `OpenSprints` is not 
 exists for a picker, drops the dates and the board id on purpose, and is deliberately folded to
 one row per sprint.
 
-## 9. Hiding the view
+## 9. The empty states
 
-Three places have to agree, and today none of them can express a condition.
+The view is always present. Three things it can find, and what each says.
 
-`ViewInfo` gains a flag saying the view is conditional. The tabs and the nav rail filter on it,
-and `App.tsx`'s `menu:view` guard filters on it too, because a hidden view that is still in
-`VIEWS` would otherwise be reachable from a stale accelerator.
+**No scrum board on this profile.** Sprints belong to a scrum board; this project has none synced.
+Go to the Boards view and refresh. This is the case an earlier draft of this design hid the whole
+view for, and hiding was wrong for three reasons: it needed a conditional navigation mechanism
+across `nav.ts`, `App.tsx` and the native menu for exactly one consumer; the condition reads a
+cache that a brand new profile has not filled, so a first launch on a perfectly ordinary scrum
+project would have shown nothing and explained nothing; and TAM already ships Reports and Rituals
+as visible entries leading to placeholder pages, so a fourth view that vanishes would have
+contradicted the app's own convention.
 
-The native menu is the awkward one. It is built in Go, once, at launch, before any profile is on
-screen, and Go has no notion of which profile the user is looking at. So the frontend tells it:
-one bound setter, called when the condition's query resolves and again on a profile switch, which
-stores the answer and rebuilds the menu. That is precisely the shape `SetNavRailVisible` already
-has, including the rebuild, which exists because Wails renders a menu item from the value it was
-built with.
+**A scrum board with no sprints.** Says so, and offers the create action. This is the state a new
+board is in, and it is the one moment the create button matters most.
 
-The answer is also persisted as a shared setting, so the next launch builds the menu right the
-first time instead of showing the view appearing a moment after the window opens. It is a hint,
-not a source of truth: the frontend corrects it as soon as it knows.
+**Loading.** A state, not an absence. The board picker and the tree each say they are loading
+rather than rendering as empty, because an empty render is a claim, and the previous branch
+shipped a defect that was exactly this: a Sprint select that stated there were no sprints for the
+first few frames.
 
-The condition itself is a cache read, whether the profile has a board of type scrum. A profile
-that has never refreshed its boards has none, so the view is absent until the first boards
-refresh, which happens in the Boards view. That is a real consequence and the Boards view is where
-a user would look anyway.
+The board picker itself is hidden when the profile has exactly one scrum board, with the board
+named in the heading instead. A select whose list has one entry is friction on every visit for a
+choice with no alternatives.
 
 ## 10. Errors
 
@@ -196,19 +213,22 @@ did happen.
 
 ## 11. Verification
 
-On the demo profile: create a sprint, see it appear as future with the suggested dates, edit its
-name and goal, start it, put an issue in it from the detail panel, Commit, complete it, then
-delete a future sprint and read the confirmation. Switch to a profile whose project has only a
-kanban board and confirm the view is gone from the tabs, the rail, and the View menu, and that
-Ctrl and the accelerator does nothing.
+**Before anything is built.** Three assumptions here are unverified against a real Data Center and
+three tasks are shaped by all of them: that create answers with the new sprint's id in the shape
+this expects, that a delete returns the issues to the backlog rather than deleting them, and that
+an account without Manage Sprints gets a 403 rather than a 200 that silently does nothing. They
+are three requests and ten minutes, and finding out after the code is written is the wrong order.
+The code tolerates a create answering with no body regardless, because that costs nothing.
 
-On a real Data Center, the three things no fixture proves: that the create endpoint answers with
-the sprint's id in the shape this expects, that a delete returns the issues to the backlog rather
-than deleting them, and that an account without Manage Sprints gets a 403 rather than a 200 that
-silently does nothing.
+**On the demo profile.** Create a sprint, see it appear as future with the suggested dates, edit
+its name and goal, clear the goal and confirm it stays cleared, start it, select three issues and
+move them in, Commit, complete it, then delete a future sprint and read the confirmation. Delete
+the last sprint on a board and confirm it does not come back. Switch to a profile whose project
+has only a kanban board and confirm the view is present and says why it is empty.
 
 ## 12. Out of scope, recorded
 
 Editing a closed sprint's dates, which velocity would silently reinterpret. Deleting an active
-sprint. Creating a board. A sprint's own goal shown anywhere outside its dialogs, which is a
-Reports question. Bulk adding issues to a sprint from this view.
+sprint. Creating a board. Carrying unfinished issues forward at create time, which is a completion
+behaviour. A team roster with capacity per person. Remembering a 403 for the session so a user
+without Manage Sprints is told once rather than once per action.
