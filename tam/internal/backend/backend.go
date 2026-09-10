@@ -273,7 +273,8 @@ type BoardColumn struct {
 
 // Sprint is one sprint of a board. State is Jira's own lowercase value
 // (active, future, closed), and BoardID is the board the sprint was read
-// from, not the board it was created on.
+// from, not the board it was created on. Goal is Jira's own sprint goal,
+// carried straight through from core/jira.RawSprint.
 type Sprint struct {
 	ID        int    `json:"id"`
 	BoardID   int    `json:"boardId"`
@@ -281,13 +282,14 @@ type Sprint struct {
 	State     string `json:"state"`
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
+	Goal      string `json:"goal"`
 }
 
-// SprintDraft is a sprint's fields for starting it: a name (prefilled from
-// the sprint's own), an optional goal, and start and end dates already in
-// the Agile API's own datetime format. Turning a bare date, the shape an
-// HTML date input produces, into that format is sprints.Service's job, not
-// the backend's.
+// SprintDraft is a sprint's fields for starting, creating, or editing one: a
+// name (prefilled from the sprint's own when one exists), an optional goal,
+// and start and end dates already in the Agile API's own datetime format.
+// Turning a bare date, the shape an HTML date input produces, into that
+// format is sprints.Service's job, not the backend's.
 type SprintDraft struct {
 	Name      string `json:"name"`
 	Goal      string `json:"goal"`
@@ -299,7 +301,8 @@ type SprintDraft struct {
 // backends that speak Jira's Agile API have to answer for it. The boards
 // sync pass and the commit pass's rank and sprint group both ask for it
 // with a type assertion and skip themselves when a backend does not have
-// it. Everything above RankIssue reads; the last two write.
+// it. Everything above RankIssue reads; RankIssue and everything below it
+// write.
 type BoardBackend interface {
 	// Boards lists the project's boards from Jira's Agile API, scrum and
 	// kanban only. It never writes.
@@ -340,6 +343,24 @@ type BoardBackend interface {
 	// the journal binding of the same underlying call); CompleteSprint only
 	// closes.
 	CompleteSprint(ctx context.Context, sprintID int) error
+	// CreateSprint creates a sprint on boardID with the draft's name, goal,
+	// and dates, and returns it as this package's own Sprint, BoardID set
+	// from the argument rather than from whatever the wire answered with.
+	// Like StartSprint, it reaches Jira immediately: creating a sprint is
+	// one of the writes TAM does not journal, for the reason written on
+	// core/jira's UpdateSprint.
+	CreateSprint(ctx context.Context, boardID int, d SprintDraft) (Sprint, error)
+	// EditSprint edits sprintID with the draft's name, dates, and goal,
+	// touching only the fields the draft carries. clearGoal is the
+	// exception: when true it sends an empty goal on purpose, since a goal
+	// otherwise can never be taken away, only overwritten by a new one. It
+	// reaches Jira immediately, the same as CreateSprint.
+	EditSprint(ctx context.Context, sprintID int, d SprintDraft, clearGoal bool) error
+	// DeleteSprint deletes sprintID. Jira returns the sprint's issues to
+	// the backlog rather than deleting them; nothing here removes them from
+	// TAM's own cache, which is the caller's job. It reaches Jira
+	// immediately, the same as CreateSprint.
+	DeleteSprint(ctx context.Context, sprintID int) error
 }
 
 // ErrNoTransition is what Transition returns when no workflow transition of

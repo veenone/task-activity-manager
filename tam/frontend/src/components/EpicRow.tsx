@@ -3,10 +3,7 @@ import type { EpicNode, Issue } from "../api";
 import { TypeChip } from "./TypeChip";
 import { statusClass } from "../lib/statusClass";
 import type { Row } from "../lib/epicTreeItems";
-
-function progressText(done: number, total: number, points: number): string {
-  return `${done} of ${total} done` + (points > 0 ? `, ${points} pts` : "");
-}
+import { progressText } from "../lib/format";
 
 interface EpicRowProps {
   kind: "epic" | "noepic";
@@ -32,7 +29,7 @@ export function EpicRow({
 }: EpicRowProps) {
   const isEpic = kind === "epic" && node;
   const typeIcon: ReactNode = isEpic ? <TypeChip type={node.issue.type} subtaskLabel={subtaskLabel} /> : <span />;
-  const countText = isEpic ? progressText(node.done, node.total, node.points) : String(count ?? 0);
+  const countText = isEpic ? progressText(node.done, node.total, node.donePoints, node.points) : String(count ?? 0);
   const ariaLabel = isEpic ? `${rowKey} ${node.issue.summary}` : undefined;
   const pending = isEpic && node.issue.pending;
   return (

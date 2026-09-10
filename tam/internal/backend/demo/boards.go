@@ -3,6 +3,7 @@ package demo
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -100,47 +101,114 @@ func (b *Backend) BoardSprints(_ context.Context, boardID int) ([]backend.Sprint
 // sprint move and the overlay can both build on the same list.
 func demoSprints() []backend.Sprint {
 	return []backend.Sprint{
-		{ID: 11, BoardID: scrumBoardID, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z", EndDate: "2026-08-18T09:00:00Z"},
-		{ID: 12, BoardID: scrumBoardID, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z", EndDate: "2026-09-01T09:00:00Z"},
-		{ID: 13, BoardID: scrumBoardID, Name: "Sprint 13", State: "future", StartDate: "2026-09-01T09:00:00Z", EndDate: "2026-09-15T09:00:00Z"},
+		{ID: 11, BoardID: scrumBoardID, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z", EndDate: "2026-08-18T09:00:00Z", Goal: "Ship the promo code redemption flow end to end"},
+		{ID: 12, BoardID: scrumBoardID, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z", EndDate: "2026-09-01T09:00:00Z", Goal: "Clear the checkout defect backlog before the freeze"},
+		{ID: 13, BoardID: scrumBoardID, Name: "Sprint 13", State: "future", StartDate: "2026-09-01T09:00:00Z", EndDate: "2026-09-15T09:00:00Z", Goal: "Start the loyalty points redesign"},
 	}
 }
 
-// findDemoSprint is one of the scrum board's three sprints by id, its own
-// dataset state, with nothing overlaid.
-func findDemoSprint(sprintID int) (backend.Sprint, bool) {
+// findDemoSprint is one of the scrum board's sprints by id, its own dataset
+// or created state, with nothing else overlaid: a tombstoned sprint is
+// never found, whether the id names a dataset literal or one this run
+// created, since DeleteSprint tombstones either kind the same way. Callers
+// hold b.mu.
+func (b *Backend) findDemoSprint(sprintID int) (backend.Sprint, bool) {
+	if b.sprintDeleted[sprintID] {
+		return backend.Sprint{}, false
+	}
 	for _, s := range demoSprints() {
 		if s.ID == sprintID {
 			return s, true
 		}
 	}
+	if s, ok := b.sprintCreated[sprintID]; ok {
+		return s, true
+	}
 	return backend.Sprint{}, false
 }
 
-// sprintsOverlay is demoSprints with StartSprint's and CompleteSprint's own
-// state changes applied, and a started sprint's name and dates taken from
-// the draft it was started with rather than the dataset's own, unstarted
-// ones: a demo start has nowhere else to show the reader what the dialog
-// just set. Callers hold b.mu.
+// createdSprints is every sprint CreateSprint has made this run, ordered by
+// id so the board's list is the same from one read to the next rather than
+// at the mercy of map order. Callers hold b.mu.
+func (b *Backend) createdSprints() []backend.Sprint {
+	ids := make([]int, 0, len(b.sprintCreated))
+	for id := range b.sprintCreated {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	out := make([]backend.Sprint, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, b.sprintCreated[id])
+	}
+	return out
+}
+
+// sprintEdit is what EditSprint recorded for one sprint: the fields it
+// touched, on the same partial update rule Jira's own endpoint follows
+// (empty means untouched), and clearGoal, the one deliberate exception that
+// sends an empty goal on purpose.
+type sprintEdit struct {
+	draft     backend.SprintDraft
+	clearGoal bool
+}
+
+// applyDraft is the one partial update rule every sprint draft follows,
+// Jira's own endpoint included: a field the draft carries wins over
+// whatever name, startDate, or endDate already holds, and goal follows a
+// switch of its own, since clearGoal is the one deliberate exception that
+// takes the goal away even though the draft's own is empty. clearGoalFlag
+// is where EditSprint remembers that exception for the next edit to merge
+// against; the two overlays that only ever apply a draft once, never pass
+// one, so a nil clearGoalFlag simply means there is nothing to remember.
+func applyDraft(name, startDate, endDate, goal *string, clearGoalFlag *bool, d backend.SprintDraft, clearGoal bool) {
+	if d.Name != "" {
+		*name = d.Name
+	}
+	if d.StartDate != "" {
+		*startDate = d.StartDate
+	}
+	if d.EndDate != "" {
+		*endDate = d.EndDate
+	}
+	switch {
+	case d.Goal != "":
+		*goal = d.Goal
+		if clearGoalFlag != nil {
+			*clearGoalFlag = false
+		}
+	case clearGoal:
+		*goal = ""
+		if clearGoalFlag != nil {
+			*clearGoalFlag = true
+		}
+	}
+}
+
+// sprintsOverlay is the dataset's three sprints and this run's own created
+// ones, tombstoned sprints dropped, with StartSprint's, CompleteSprint's,
+// and EditSprint's own changes applied on top. A started sprint's name,
+// dates, and goal come from the draft it was started with rather than the
+// dataset's own, unstarted ones, since a demo start has nowhere else to
+// show the reader what the dialog just set; an edited sprint's come from
+// EditSprint's own draft over that, so an edit made after a start still
+// wins. Callers hold b.mu.
 func (b *Backend) sprintsOverlay() []backend.Sprint {
-	base := demoSprints()
-	out := make([]backend.Sprint, len(base))
-	for i, s := range base {
+	base := append(demoSprints(), b.createdSprints()...)
+	out := make([]backend.Sprint, 0, len(base))
+	for _, s := range base {
+		if b.sprintDeleted[s.ID] {
+			continue
+		}
 		if state, ok := b.sprintState[s.ID]; ok {
 			s.State = state
 		}
 		if draft, ok := b.sprintDraft[s.ID]; ok {
-			if draft.Name != "" {
-				s.Name = draft.Name
-			}
-			if draft.StartDate != "" {
-				s.StartDate = draft.StartDate
-			}
-			if draft.EndDate != "" {
-				s.EndDate = draft.EndDate
-			}
+			applyDraft(&s.Name, &s.StartDate, &s.EndDate, &s.Goal, nil, draft, false)
 		}
-		out[i] = s
+		if e, ok := b.sprintEdits[s.ID]; ok {
+			applyDraft(&s.Name, &s.StartDate, &s.EndDate, &s.Goal, nil, e.draft, e.clearGoal)
+		}
+		out = append(out, s)
 	}
 	return out
 }
@@ -170,7 +238,7 @@ func stateOf(sprints []backend.Sprint, sprintID int) string {
 func (b *Backend) StartSprint(_ context.Context, sprintID int, draft backend.SprintDraft) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	target, ok := findDemoSprint(sprintID)
+	target, ok := b.findDemoSprint(sprintID)
 	if !ok {
 		return fmt.Errorf("demo: no sprint %d", sprintID)
 	}
@@ -201,7 +269,7 @@ func (b *Backend) StartSprint(_ context.Context, sprintID int, draft backend.Spr
 func (b *Backend) CompleteSprint(_ context.Context, sprintID int) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	target, ok := findDemoSprint(sprintID)
+	target, ok := b.findDemoSprint(sprintID)
 	if !ok {
 		return fmt.Errorf("demo: no sprint %d", sprintID)
 	}
@@ -217,6 +285,13 @@ func (b *Backend) CompleteSprint(_ context.Context, sprintID int) error {
 // Requirements are left out because neither demo board collects them: a
 // board holds the work items, and the demo's requirements have no sprint
 // and no status either column maps.
+//
+// A deleted sprint is never named here, but not because this filter knows
+// about deletion: DeleteSprint's own walk clears sprint_id and sprint_name
+// off every issue it held before the sprint's tombstone is set, so by the
+// time this runs no cached issue carries the deleted id any more, and those
+// same issues fall straight into the board's own list, sprintID empty,
+// exactly the board scope a real Jira returns them to.
 func (b *Backend) BoardIssueKeys(_ context.Context, boardID int, sprintID, _ string) ([]string, error) {
 	if err := knownBoard(boardID); err != nil {
 		return nil, err
@@ -349,7 +424,7 @@ func (b *Backend) MoveIssuesToSprint(_ context.Context, sprintID string, keys []
 	defer b.mu.Unlock()
 	name := ""
 	if sprintID != "" {
-		if name = demoSprintName(sprintID); name == "" {
+		if name = b.demoSprintName(sprintID); name == "" {
 			return fmt.Errorf("demo: no sprint %s", sprintID)
 		}
 	}
@@ -369,15 +444,98 @@ func (b *Backend) MoveIssuesToSprint(_ context.Context, sprintID string, keys []
 	return nil
 }
 
-// demoSprintName is the name of one of the scrum board's three sprints, or
-// "" for an id the demo does not have.
-func demoSprintName(sprintID string) string {
-	for _, s := range demoSprints() {
+// demoSprintName is the current name of one of the scrum board's sprints,
+// dataset, created, started, and edited alike, or "" for an id the demo
+// does not have or has deleted. It reads through sprintsOverlay rather than
+// the dataset's own three, which is what lets MoveIssuesToSprint accept a
+// sprint this run just created or renamed instead of refusing it as
+// unknown. Callers hold b.mu.
+func (b *Backend) demoSprintName(sprintID string) string {
+	for _, s := range b.sprintsOverlay() {
 		if strconv.Itoa(s.ID) == sprintID {
 			return s.Name
 		}
 	}
 	return ""
+}
+
+// CreateSprint makes a new sprint on boardID with the draft's name, dates,
+// and goal, future by convention since Jira never hands back a sprint any
+// other state. The kanban board is refused the same as BoardSprints refuses
+// to read from it: the dataset gives it no sprints, and a real board
+// without the Agile sprint field would refuse a create the same way.
+func (b *Backend) CreateSprint(_ context.Context, boardID int, d backend.SprintDraft) (backend.Sprint, error) {
+	if err := knownBoard(boardID); err != nil {
+		return backend.Sprint{}, err
+	}
+	if boardID != scrumBoardID {
+		return backend.Sprint{}, fmt.Errorf("demo: board %d has no sprints", boardID)
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	id := b.nextSprintID
+	b.nextSprintID++
+	s := backend.Sprint{
+		ID:        id,
+		BoardID:   boardID,
+		Name:      d.Name,
+		State:     "future",
+		StartDate: d.StartDate,
+		EndDate:   d.EndDate,
+		Goal:      d.Goal,
+	}
+	b.sprintCreated[id] = s
+	return s, nil
+}
+
+// EditSprint records the draft's changes against sprintID, on the same
+// partial update rule the Jira implementation follows: an empty field in
+// the draft is left alone, and clearGoal is the one deliberate exception
+// that takes the goal away even though the draft's own is empty.
+//
+// The change is merged into whatever this run already recorded, not
+// substituted for it: a second edit that only renames a sprint must not
+// undo an earlier edit's dates or an earlier clearGoal, the same way two
+// separate PATCHes to a real Jira sprint would not undo each other.
+func (b *Backend) EditSprint(_ context.Context, sprintID int, d backend.SprintDraft, clearGoal bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := b.findDemoSprint(sprintID); !ok {
+		return fmt.Errorf("demo: no sprint %d", sprintID)
+	}
+	e := b.sprintEdits[sprintID]
+	// A new goal cancels an earlier clear, and a new clear cancels an
+	// earlier goal: the two are mutually exclusive states of the one
+	// field, not two independent ones, which is what clearGoalFlag records.
+	applyDraft(&e.draft.Name, &e.draft.StartDate, &e.draft.EndDate, &e.draft.Goal, &e.clearGoal, d, clearGoal)
+	b.sprintEdits[sprintID] = e
+	return nil
+}
+
+// DeleteSprint removes sprintID, mirroring what a real Jira delete does to
+// its issues: every cached card carrying this sprint returns to the
+// board's own scope, sprint id and name both cleared, rather than being
+// deleted itself. The walk below matches issues by sprint id, not by
+// findDemoSprint, so the tombstone's placement relative to it is not load
+// bearing; it is set last only because that is the order the steps are
+// listed in here.
+func (b *Backend) DeleteSprint(_ context.Context, sprintID int) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := b.findDemoSprint(sprintID); !ok {
+		return fmt.Errorf("demo: no sprint %d", sprintID)
+	}
+	sid := strconv.Itoa(sprintID)
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, iss := range b.issues() {
+		if iss.SprintID != sid {
+			continue
+		}
+		iss.SprintID, iss.SprintName, iss.Updated = "", "", now
+		b.over[iss.Key] = iss
+	}
+	b.sprintDeleted[sprintID] = true
+	return nil
 }
 
 func knownBoard(boardID int) error {

@@ -35,6 +35,23 @@ type Backend struct {
 	// sprintState, so a demo start can show the reader what the dialog just
 	// set instead of falling back to the dataset's own, unstarted values.
 	sprintDraft map[int]backend.SprintDraft
+	// sprintCreated holds every sprint CreateSprint has made this run, keyed
+	// by id, beside the three the dataset already carries. findDemoSprint,
+	// sprintsOverlay, and demoSprintName all read through it, so a sprint
+	// this run created is a real sprint everywhere a dataset one is, and a
+	// card can be moved into it the same way.
+	sprintCreated map[int]backend.Sprint
+	// sprintDeleted is the tombstone DeleteSprint leaves. The same three
+	// lookups honour it, so a deleted sprint stops being findable, stops
+	// being listed, and stops being a name MoveIssuesToSprint will accept.
+	sprintDeleted map[int]bool
+	// sprintEdits holds what EditSprint changed, on the same partial
+	// update rule Jira's own endpoint follows: an empty field in the draft
+	// means untouched, and clearGoal is the one deliberate exception.
+	sprintEdits map[int]sprintEdit
+	// nextSprintID hands out ids for CreateSprint, starting past the
+	// dataset's own three.
+	nextSprintID int
 }
 
 // New returns a demo backend for the project key. An empty key uses the
@@ -44,14 +61,18 @@ func New(projectKey string) *Backend {
 		projectKey = demo.ProjectKey
 	}
 	b := &Backend{
-		project:     projectKey,
-		over:        map[string]backend.Issue{},
-		desc:        map[string]string{},
-		nextKey:     500,
-		conflict:    map[string]bool{},
-		links:       map[string][]backend.Link{},
-		sprintState: map[int]string{},
-		sprintDraft: map[int]backend.SprintDraft{},
+		project:       projectKey,
+		over:          map[string]backend.Issue{},
+		desc:          map[string]string{},
+		nextKey:       500,
+		conflict:      map[string]bool{},
+		links:         map[string][]backend.Link{},
+		sprintState:   map[int]string{},
+		sprintDraft:   map[int]backend.SprintDraft{},
+		sprintCreated: map[int]backend.Sprint{},
+		sprintDeleted: map[int]bool{},
+		sprintEdits:   map[int]sprintEdit{},
+		nextSprintID:  14,
 	}
 	b.conflict[b.ConflictKey()] = true
 	return b

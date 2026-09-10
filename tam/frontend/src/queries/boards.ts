@@ -3,6 +3,7 @@ import { call } from "@agile-suite/core";
 import {
   CanTransition,
   CompleteSprint,
+  CreateSprint,
   GetBoard,
   GetProfileSetting,
   JournalSprintMoves,
@@ -17,9 +18,10 @@ import {
   SuggestSprintDates,
   SyncBoards,
 } from "../api";
-import type { BoardSummary, SprintCompletion } from "../api";
+import type { BoardSummary, SprintCompletion, SprintCreated } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
+import { invalidateSprintWrites } from "./sprints";
 
 // useBoards lists the profile's cached boards for the board picker.
 export function useBoards(profileId: string) {
@@ -108,6 +110,7 @@ export function useSyncBoards(profileId: string, run: () => Promise<BoardSummary
         keys.boardsUnavailable(profileId),
         keys.syncState(profileId),
         keys.openSprints(profileId),
+        [profileId, "boardSprintDetails"] as const,
       ]) {
         qc.invalidateQueries({ queryKey });
       }
@@ -178,24 +181,17 @@ export function useSprintSuggestion(profileId: string, boardId: number, enabled:
   });
 }
 
-// The two ceremonies. Both push to Jira the moment they are called, so both
-// go through run, which is SyncContext's runSprintCeremony: it holds the
-// same per-profile lock a sync and a commit hold, injected rather than
-// reached for so this module stays free of the context.
+// The sprint writes that reach Jira the moment they are called. The two
+// ceremonies below go through run, which is SyncContext's runSprintCeremony:
+// it holds the same per-profile lock a sync and a commit hold, injected
+// rather than reached for so this module stays free of the context. Creating
+// a sprint takes that same lock through a quieter path, for the reason
+// useCreateSprint's own comment gives.
 //
-// Both refresh the board's sprint list, which the service itself re-read
-// into the cache, and the board under it, whose cards have moved.
-function invalidateSprints(qc: ReturnType<typeof useQueryClient>, profileId: string) {
-  if (!profileId) return;
-  for (const queryKey of [
-    keys.boards(profileId),
-    [profileId, "boardSprints"] as const,
-    [profileId, "board"] as const,
-    [profileId, "sprintSuggestion"] as const,
-  ]) {
-    qc.invalidateQueries({ queryKey });
-  }
-}
+// What each of them refreshes afterwards is queries/sprints.ts's
+// invalidateSprintWrites, shared with the edit and the delete: every one of
+// the five changes the same set of lists, and two lists of keys that had to
+// agree would be one review away from not agreeing.
 
 export interface StartSprintArgs {
   boardId: number;
@@ -211,7 +207,7 @@ export function useStartSprint(profileId: string, run: <T>(action: () => Promise
   return useMutation({
     mutationFn: (v: StartSprintArgs) =>
       run(() => call(() => StartSprint(profileId, v.boardId, v.sprintId, v.name, v.goal, v.start, v.end))),
-    onSettled: () => invalidateSprints(qc, profileId),
+    onSettled: () => invalidateSprintWrites(qc, profileId),
   });
 }
 
@@ -231,9 +227,33 @@ export function useCompleteSprint(profileId: string, run: <T>(action: () => Prom
   return useMutation<SprintCompletion, Error, CompleteSprintArgs>({
     mutationFn: (v) => run(() => call(() => CompleteSprint(profileId, v.boardId, v.sprintId, v.moveTo))),
     onSettled: () => {
-      invalidateSprints(qc, profileId);
+      invalidateSprintWrites(qc, profileId);
       invalidateWrites(qc, profileId);
     },
+  });
+}
+
+export interface CreateSprintArgs {
+  boardId: number;
+  name: string;
+  goal: string;
+  start: string;
+  end: string;
+}
+
+// useCreateSprint is the New sprint button, on the Boards toolbar and on the
+// Sprints view alike. It is a management write, not a ceremony: unlike Start
+// and Complete it does not go through runSprintCeremony, since making a
+// sprint is not something every other view needs to announce with the sync
+// banner. run is SyncContext's runQuietLock, injected the same way the
+// ceremonies' run is, and it still takes Go's per-profile lock for the
+// call's duration, so a create during a boards refresh is refused exactly as
+// a start would be, and the dialog is where that refusal is read.
+export function useCreateSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
+  const qc = useQueryClient();
+  return useMutation<SprintCreated, Error, CreateSprintArgs>({
+    mutationFn: (v) => run(() => call(() => CreateSprint(profileId, v.boardId, v.name, v.goal, v.start, v.end))),
+    onSettled: () => invalidateSprintWrites(qc, profileId),
   });
 }
 

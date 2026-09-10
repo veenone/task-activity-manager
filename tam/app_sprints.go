@@ -27,11 +27,15 @@ import (
 // the board cache, the way commitEngine builds the commit engine: the
 // backend belongs to a profile, so the service is built per call.
 //
-// Pending is wired here because the question it asks spans both
-// repositories, and app.go is the one place holding them both.
+// Pending and Issues are wired here because the service's store is the board
+// cache and both of them are the issue cache, and app.go is the one place
+// holding both repositories. Issues is what a delete blanks a vanished
+// sprint's name through, and where all three management writes leave their
+// audit row.
 func (a *App) sprintService(p profile.Profile, b backend.IssueBackend) *sprints.Service {
 	s := sprints.New(b, a.boards, p.ProjectKey)
 	s.Pending = a.pendingInSprint
+	s.Issues = a.repo
 	return s
 }
 
@@ -67,8 +71,9 @@ func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, s
 	return note, nil
 }
 
-// ceremonyError is what a ceremony's refusal reads as on screen. These two
-// are the bindings whose errors come straight off the wire, Jira's own
+// ceremonyError is what a sprint write's refusal reads as on screen. The two
+// ceremonies here and the three management bindings in app_sprintmanage.go
+// are the calls whose errors come straight off the wire, Jira's own
 // sentence about a second active sprint or a missing permission, and a Data
 // Center answering 403 with an HTML login page hands the transport a
 // kilobyte of markup that the start dialog renders inline beside its

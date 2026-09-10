@@ -82,6 +82,11 @@ export interface Issue {
   type: IssueType | "";
   summary: string;
   status: string;
+  // The status's own Jira id, which is what a board buckets a card into a
+  // column by and what lib/unfinished reads. Optional so fixtures written
+  // before anything on this side needed it still type-check; the backend
+  // has always sent it.
+  statusId?: string;
   assignee: string;
   reporter: string;
   priority: string;
@@ -231,6 +236,33 @@ export interface Sprint {
   state: string;
   startDate: string;
   endDate: string;
+  // What the sprint is for. Empty for a sprint cached before schema version
+  // 7 added the column, since nothing back-fills it until the next boards
+  // refresh, which is why a reader cannot tell an absent goal from one Jira
+  // has none set on.
+  goal: string;
+}
+
+// SprintChoice mirrors boardrepo.SprintChoice field for field: every open
+// sprint across every board the profile has synced, active ones first then
+// by start date, with the board's name since a caller without a board of its
+// own has no other way to tell two same-named sprints apart.
+export interface SprintChoice {
+  id: number;
+  name: string;
+  boardName: string;
+  state: string;
+}
+
+// SprintOption is the smallest shape the Sprint field actually reads. Sprint
+// and SprintChoice are both structurally assignable to it with no mapping
+// and no adapter, so a caller with either list passes it straight through.
+export interface SprintOption {
+  id: number;
+  name: string;
+  // The board this sprint belongs to, given only by the profile-wide list
+  // (SprintChoice); a board's own list needs no such disambiguation.
+  boardName?: string;
 }
 
 // SprintChoice mirrors boardrepo.SprintChoice field for field: every open
@@ -332,6 +364,58 @@ export interface SprintCompletion {
   note: string;
   message: string;
 }
+
+// SprintCreated is what CreateSprint answers with, mirroring the App-level
+// SprintCreated struct: the sprint Jira made, whose id is what the dialog
+// switches the board's picker to, and the note beside it when the board's
+// own re-read did not land.
+export interface SprintCreated {
+  sprint: Sprint;
+  note: string;
+}
+
+// SprintDetail is one node of the Sprints view, mirroring
+// boardrepo.SprintDetail field for field: a sprint's own row (the embedded
+// Sprint's fields are inlined by Go's encoder), the cards it holds, and the
+// four numbers a progress reading is drawn from. The board's own unassigned
+// work arrives as one more node of the same shape, with state
+// "unassigned" and the name "Board backlog".
+export interface SprintDetail extends Sprint {
+  // issues is the scope's cards, capped by the one budget the whole call
+  // spends across every node together. It can be shorter than total, which
+  // is why nothing on screen counts this array.
+  issues: Issue[];
+  // total, done, points and donePoints are counted over every card the
+  // scope holds, whether or not the cap let it into issues.
+  total: number;
+  done: number;
+  points: number;
+  donePoints: number;
+  // membershipCached says whether the sync fetches this scope's membership
+  // at all, which it does for an active or future sprint and never for a
+  // closed one. It cannot say whether the last attempt landed; notSynced is
+  // the field that says the read came up short.
+  membershipCached: boolean;
+  // notSynced counts the keys this scope names that the issue cache does
+  // not hold, so a sprint of thirty on a board synced before its issues
+  // does not quietly report a total of ten.
+  notSynced: number;
+  // truncated is set when the shared cap stopped this node's issues short.
+  // The four numbers above are unaffected: they are counted before the cap.
+  truncated: boolean;
+}
+
+// MAX_CARDS_PER_VIEW mirrors boardrepo.MaxCardsPerView, so a line saying
+// what a read stopped at names the number the backend actually stopped at.
+// Two reads spend it: a board spends it over its cells, and the Sprints
+// view's list spends one of these budgets across every sprint together.
+export const MAX_CARDS_PER_VIEW = 2000;
+
+// UNASSIGNED_SPRINT_STATE mirrors boardrepo.UnassignedSprintState. It is
+// deliberately not one of Jira's three states, so the one node in the list
+// that is not a sprint can be told from the ones that are without matching
+// on its name.
+export const UNASSIGNED_SPRINT_STATE = "unassigned";
 
 export interface BoardSummary {
   boards: number;
@@ -756,6 +840,42 @@ export const CompleteSprint = (
   App.CompleteSprint(profileId, boardId, sprintId, moveTo) as Promise<SprintCompletion>;
 export const SuggestSprintDates = (profileId: string, boardId: number): Promise<SprintSuggestion> =>
   App.SuggestSprintDates(profileId, boardId) as Promise<SprintSuggestion>;
+// CreateSprint, EditSprint and DeleteSprint make, change and destroy a
+// sprint, the same immediate writes the two ceremonies are: none of the
+// three is journaled, and all three take the same per-profile lock, so a
+// caller reaches them through the lock SyncContext holds rather than calling
+// them directly. CreateSprint's four fields are the dialog's whole draft;
+// EditSprint's clearGoal is the one argument the draft alone cannot carry,
+// since an empty goal box left alone and one asking to clear a goal that was
+// there are different requests.
+export const CreateSprint = (
+  profileId: string,
+  boardId: number,
+  name: string,
+  goal: string,
+  start: string,
+  end: string,
+): Promise<SprintCreated> =>
+  App.CreateSprint(profileId, boardId, name, goal, start, end) as Promise<SprintCreated>;
+export const EditSprint = (
+  profileId: string,
+  boardId: number,
+  sprintId: number,
+  name: string,
+  goal: string,
+  start: string,
+  end: string,
+  clearGoal: boolean,
+): Promise<string> => App.EditSprint(profileId, boardId, sprintId, name, goal, start, end, clearGoal);
+export const DeleteSprint: (profileId: string, boardId: number, sprintId: number) => Promise<string> =
+  App.DeleteSprint;
+// ListBoardSprintDetails is the Sprints view's whole read: one board's
+// sprints in the order that view wants them, each with its cards and its
+// progress numbers, and the board's own unassigned work as a last node. It
+// is cast for the same reason GetBoard is, since the generated cards type
+// their issue type as a plain string.
+export const ListBoardSprintDetails = (profileId: string, boardId: number): Promise<SprintDetail[]> =>
+  App.ListBoardSprintDetails(profileId, boardId) as Promise<SprintDetail[]>;
 // How many journal rows belong to cards staying in this sprint. The Complete
 // button asks before it opens its dialog: a card dragged to Done an hour ago
 // is Done on the board and not in Jira, and completing the sprint would move

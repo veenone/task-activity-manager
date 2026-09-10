@@ -52,8 +52,8 @@ function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[], issue: Issue = s
 // BOARD_SPRINTS are what a caller with a board hands down. Away from one
 // there is no such list, and the panel prints the sprint's name instead.
 const BOARD_SPRINTS: api.Sprint[] = [
-  { id: 12, boardId: 1, name: "Sprint 12", state: "active", startDate: "", endDate: "" },
-  { id: 13, boardId: 1, name: "Sprint 13", state: "future", startDate: "", endDate: "" },
+  { id: 12, boardId: 1, name: "Sprint 12", state: "active", startDate: "", endDate: "", goal: "" },
+  { id: 13, boardId: 1, name: "Sprint 13", state: "future", startDate: "", endDate: "", goal: "" },
 ];
 
 beforeEach(() => {

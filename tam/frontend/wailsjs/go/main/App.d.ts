@@ -5,8 +5,8 @@ import {importer} from '../models';
 import {committer} from '../models';
 import {sprints} from '../models';
 import {profile} from '../models';
-import {boardrepo} from '../models';
 import {main} from '../models';
+import {boardrepo} from '../models';
 import {issuerepo} from '../models';
 import {settings} from '../models';
 import {journal} from '../models';
@@ -29,13 +29,19 @@ export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function CreateProfileReusingToken(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
 
+export function CreateSprint(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string):Promise<main.SprintCreated>;
+
 export function DeleteProfile(arg1:string):Promise<void>;
+
+export function DeleteSprint(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function DiscardAllPendingChanges(arg1:string):Promise<number>;
 
 export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
 
 export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<string>;
 
 export function ExportProfile(arg1:string):Promise<string>;
 
@@ -68,6 +74,8 @@ export function ImportProfile():Promise<profile.Profile>;
 export function JournalSprintMoves(arg1:string,arg2:Array<string>,arg3:string):Promise<number>;
 
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
+
+export function ListBoardSprintDetails(arg1:string,arg2:number):Promise<Array<boardrepo.SprintDetail>>;
 
 export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrepo.Sprint>>;
 

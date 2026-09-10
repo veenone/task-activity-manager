@@ -10,6 +10,7 @@ import { cardAtPos, cardKeys, findCard, posId } from "../lib/boardCells";
 import { BoardBody } from "./BoardBody";
 import { BoardCeremonies, useCompleteGuard } from "./BoardCeremonies";
 import type { Ceremony } from "./BoardCeremonies";
+import { CreateSprintModal } from "./CreateSprintModal";
 import { BoardSelectionBar } from "./BoardSelectionBar";
 import { useBoardSelection } from "./useBoardSelection";
 import { useBoardKeys } from "./useBoardKeys";
@@ -43,6 +44,11 @@ export function BoardsView() {
   // thing on this screen worth keeping until the user moves on.
   const [ceremony, setCeremony] = useState<Ceremony>("");
   const [ceremonyLine, setCeremonyLine] = useState("");
+  // Whether the New sprint dialog is open. It is its own flag rather than a
+  // third Ceremony value: BoardCeremonies bails out with nothing rendered
+  // when no sprint is on screen, and a create needs no sprint already
+  // picked, so it cannot share that component's early return.
+  const [creatingSprint, setCreatingSprint] = useState(false);
 
   // The board, sprint, and swimlane choices belong to the profile they were
   // made for, so a switch clears them in the render that first sees the new
@@ -60,6 +66,7 @@ export function BoardsView() {
     setFocusId("");
     setCeremony("");
     setCeremonyLine("");
+    setCreatingSprint(false);
   }
 
   const boards = useBoards(activeId);
@@ -155,9 +162,11 @@ export function BoardsView() {
     select(issue, id);
   }
 
-  // afterCeremony is what both ceremonies leave behind: the picker on
-  // the sprint the action was about, nothing checked, and one sentence
-  // saying what happened.
+  // afterCeremony is what the two ceremonies and a create all leave behind:
+  // the picker on the sprint the action was about, nothing checked, and one
+  // sentence saying what happened. A create shares it rather than getting
+  // its own handler because there is nothing about the aftermath that is
+  // specific to how the sprint came to exist.
   function afterCeremony(nextSprintId: string, line: string) {
     setCeremony("");
     setCeremonyLine(line);
@@ -216,6 +225,7 @@ export function BoardsView() {
             if (ok) setCeremony("complete");
           });
         }}
+        onCreate={() => setCreatingSprint(true)}
       />
 
       <BoardsBanner
@@ -238,7 +248,7 @@ export function BoardsView() {
           live region and the two status regions are otherwise the same
           thing to anything reading the page. */}
       {ceremonyLine && (
-        <div className="pending-banner" role="status" aria-label="Sprint ceremony">
+        <div className="pending-banner" role="status" aria-label="Sprint outcome">
           <p>{ceremonyLine}</p>
         </div>
       )}
@@ -316,6 +326,15 @@ export function BoardsView() {
         onStarted={afterCeremony}
         onCompleted={afterCeremony}
       />
+
+      {creatingSprint && (
+        <CreateSprintModal
+          profileId={activeId}
+          boardId={board?.id ?? 0}
+          onClose={() => setCreatingSprint(false)}
+          onCreated={afterCeremony}
+        />
+      )}
     </section>
   );
 }

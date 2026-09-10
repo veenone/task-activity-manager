@@ -147,7 +147,7 @@ func writeSprints(ctx context.Context, tx *sql.Tx, profileID string, boardID int
 		return fmt.Errorf("clear sprints of board %d: %w", boardID, err)
 	}
 	for _, s := range sprints {
-		if _, err := tx.ExecContext(ctx, insertSprintSQL, profileID, s.ID, boardID, s.Name, s.State, s.StartDate, s.EndDate); err != nil {
+		if _, err := tx.ExecContext(ctx, insertSprintSQL, profileID, s.ID, boardID, s.Name, s.State, s.StartDate, s.EndDate, s.Goal); err != nil {
 			return fmt.Errorf("insert sprint %d: %w", s.ID, err)
 		}
 	}

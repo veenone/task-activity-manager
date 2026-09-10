@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useDialogs } from "../contexts/DialogContext";
 
 // useConfirm returns the app-wide async confirm dialog (an in-app, themed
@@ -7,7 +8,14 @@ import { useDialogs } from "../contexts/DialogContext";
 
 export interface ConfirmOptions {
   title: string;
-  message?: string;
+  // A node rather than a string, because a confirmation is sometimes more
+  // than one sentence about more than one thing: TAM's delete-a-sprint
+  // confirmation says what Jira does with the issues, marks itself as a
+  // write that does not wait for Commit, and warns that it cannot be undone,
+  // and running those together as one paragraph of plain text buries the
+  // half that matters. The notice dialog's message stays a string: it is
+  // read out verbatim through the live region, where markup has no meaning.
+  message?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   // danger styles the confirm button as destructive (the default for deletes).

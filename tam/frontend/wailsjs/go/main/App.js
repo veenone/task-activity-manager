@@ -34,8 +34,16 @@ export function CreateProfileReusingToken(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['CreateProfileReusingToken'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function CreateSprint(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['CreateSprint'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
+}
+
+export function DeleteSprint(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteSprint'](arg1, arg2, arg3);
 }
 
 export function DiscardAllPendingChanges(arg1) {
@@ -48,6 +56,10 @@ export function DiscardPendingChange(arg1, arg2) {
 
 export function EditIssue(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditIssue'](arg1, arg2, arg3, arg4);
+}
+
+export function EditSprint(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['EditSprint'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function ExportProfile(arg1) {
@@ -112,6 +124,10 @@ export function JournalSprintMoves(arg1, arg2, arg3) {
 
 export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
+}
+
+export function ListBoardSprintDetails(arg1, arg2) {
+  return window['go']['main']['App']['ListBoardSprintDetails'](arg1, arg2);
 }
 
 export function ListBoardSprints(arg1, arg2) {

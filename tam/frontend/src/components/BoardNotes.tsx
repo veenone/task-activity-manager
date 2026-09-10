@@ -1,25 +1,6 @@
 import type { BoardView, Sprint } from "../api";
-import { formatWhen, plural } from "../lib/format";
-
-// MAX_CARDS_PER_VIEW mirrors boardrepo.MaxCardsPerView, so the capped line
-// names the same number the backend stopped at.
-const MAX_CARDS_PER_VIEW = 2000;
-
-// day renders a sprint's own start or end as a calendar day. It is not a
-// second wording for the sync age, which formatWhen owns and this file uses
-// for exactly that.
-function day(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-}
-
-// points trims a float that is really a whole number, so 27 does not print
-// as 27.0 and 2.5 still prints as 2.5.
-function points(n: number): string {
-  return String(Math.round(n * 10) / 10);
-}
+import { MAX_CARDS_PER_VIEW } from "../api";
+import { day, formatWhen, plural, points } from "../lib/format";
 
 interface SummaryProps {
   view: BoardView;

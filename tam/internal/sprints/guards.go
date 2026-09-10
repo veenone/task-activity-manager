@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/sprintdate"
 )
 
@@ -93,17 +94,11 @@ func (s *Service) destination(ctx context.Context, profileID, sprintID string) (
 // cards staying in this sprint. Committing them first is what makes the
 // board and Jira agree about which cards finished.
 func (s *Service) refusePending(ctx context.Context, profileID string, sprintID int) error {
-	if s.Pending == nil {
-		return nil
-	}
-	n, err := s.Pending(ctx, profileID, sprintID)
-	if err != nil {
+	n, err := s.pendingInSprint(ctx, profileID, sprintID)
+	if err != nil || n == 0 {
 		return err
 	}
-	if n > 0 {
-		return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before completing it, or Jira will be asked which cards finished before it has been told", n)
-	}
-	return nil
+	return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before completing it, or Jira will be asked which cards finished before it has been told", n)
 }
 
 // completeStatuses is the set of status ids that count as finished: the ones
@@ -147,4 +142,166 @@ func dates(start, end string) (string, string, error) {
 		return "", "", errors.New("the sprint ends before it starts")
 	}
 	return sprintdate.Format(from), sprintdate.Format(to), nil
+}
+
+// What the management writes refuse: two states read from Jira rather than
+// from the cache, and one count of the journal.
+
+// jiraSprint is what Jira says about one sprint of a board right now,
+// deliberately read over the wire rather than out of the board cache.
+//
+// requireCompletable above reads the cache, and when that cache is stale it
+// refuses too much: a sprint started on the web an hour ago still reads
+// future locally, and a completion refused over that costs a Refresh. The
+// two guards built on this read would permit too much instead. A delete
+// would destroy a running sprint and an edit would rewrite a closed one's
+// dates, which is what velocity and burndown are computed from, so both pay
+// a round trip they cannot get back rather than trust a list that may be
+// minutes old.
+//
+// Whether Jira refuses a closed edit on its own is still an open question
+// (docs/superpowers/plans/assets/2026-09-10-sprint-wire-probe.md, probe 4);
+// until it is answered, this read is the only thing standing there.
+//
+// An empty list is an error and not an answer. core/jira turns any 400 on
+// the first page of the sprint endpoint into ErrNoSprints, for the kanban
+// board that genuinely has none, and the backend turns that into an empty
+// slice and no error. So from here one flaky 400 is indistinguishable from
+// "this board has no sprints", and a board being asked about a sprint of its
+// own demonstrably has one. Reading it as an absence is what would tell a
+// user at 2am that their sprint was already deleted, and then remove TAM's
+// copy of a sprint still running in Jira.
+//
+// The second return says whether the list held the sprint. False with no
+// error is a real absence in a real list, which each caller answers for
+// itself.
+func (s *Service) jiraSprint(ctx context.Context, b lifecycle, boardID, sprintID int) (backend.Sprint, bool, error) {
+	list, err := b.BoardSprints(ctx, boardID)
+	if err != nil {
+		return backend.Sprint{}, false, fmt.Errorf("board %d's sprints could not be read, so TAM cannot tell what state sprint %d is in and changed nothing: %w", boardID, sprintID, err)
+	}
+	if len(list) == 0 {
+		return backend.Sprint{}, false, fmt.Errorf("board %d answered with no sprints at all, which cannot be true of the board sprint %d belongs to, so nothing was changed; try again, and press Refresh if it keeps happening", boardID, sprintID)
+	}
+	for _, sp := range list {
+		if sp.ID == sprintID {
+			return sp, true, nil
+		}
+	}
+	return backend.Sprint{}, false, nil
+}
+
+// requireEditable is what Jira has to say about a sprint before its name,
+// goal or dates are rewritten: the board lists it, and it is not closed.
+//
+// A closed sprint is refused because its dates are what velocity and
+// burndown are computed from, and moving them changes charts nobody is
+// looking at. A sprint the board's list does not hold is refused too, since
+// a state nobody could read is not a state that was checked; the sentence
+// says which of the two happened, because pressing Refresh is the answer to
+// one of them and not the other.
+func (s *Service) requireEditable(ctx context.Context, b lifecycle, boardID, sprintID int) (backend.Sprint, error) {
+	sp, held, err := s.jiraSprint(ctx, b, boardID, sprintID)
+	if err != nil {
+		return backend.Sprint{}, err
+	}
+	if !held {
+		return backend.Sprint{}, fmt.Errorf("board %d no longer lists sprint %d, so TAM cannot tell whether it is closed and did not change it; press Refresh", boardID, sprintID)
+	}
+	if sprintState(sp) == "closed" {
+		return backend.Sprint{}, fmt.Errorf("sprint %d is closed, and its dates are what velocity and burndown are computed from, so TAM does not edit it", sprintID)
+	}
+	return sp, nil
+}
+
+// requireDeletable tells apart what a board's own answer can mean for the
+// one action in TAM that cannot be undone.
+//
+// A sprint the board holds as future is deleted. A sprint it holds in any
+// other state is refused by name, because deleting an active sprint strands
+// work a team is doing right now and deleting a closed one destroys the
+// record a chart is drawn from. A sprint the board's own list does not hold
+// is treated as already gone, which is a success: ordinarily that means
+// somebody deleted it elsewhere, and all that is left to do is remove TAM's
+// own copy.
+//
+// "Ordinarily" is doing real work in that sentence, and this comment used to
+// pretend it was not: the read above is board scoped, one board's
+// BoardSprints, while what a hit does next is not. forget below removes the
+// sprint from every board's cached rows and blanks it off every cached issue,
+// because Jira hands one sprint to every board whose filter reaches it and a
+// board scoped purge would leave another board's copy standing, an argument
+// boardrepo's own comment makes for DeleteSprintEverywhere. So a sprint board
+// 1's filter no longer reaches, while board 2 still lists it and Jira still
+// holds it, also reads as already gone from here: this method cannot tell
+// that case apart from a real deletion, and the delete purges board 2's cache
+// too and tells the user the sprint was gone before TAM asked, which is false
+// about Jira even though it was true of what board 1 could see.
+//
+// That does not destroy anything in Jira: DeleteSprint is skipped exactly as
+// it is for a real already-gone sprint, since there is nothing this method
+// believes needs deleting, and a boards sync repairs whichever board's cache
+// was purged too early. That is why purging stays the answer here instead of
+// growing a second, board scoped case for it: the only real cost is a
+// sentence that oversells its own certainty, not anything TAM cannot recover
+// from with a Refresh.
+//
+// A fourth case a real Jira read can produce, a list with nothing in it at
+// all, never reaches here: jiraSprint refuses it outright, and its own
+// comment says why that refusal is the whole point.
+func (s *Service) requireDeletable(ctx context.Context, b lifecycle, boardID, sprintID int) (backend.Sprint, bool, error) {
+	sp, held, err := s.jiraSprint(ctx, b, boardID, sprintID)
+	if err != nil {
+		return backend.Sprint{}, false, err
+	}
+	if !held {
+		return backend.Sprint{}, true, nil
+	}
+	if state := sprintState(sp); state != "future" {
+		return backend.Sprint{}, false, fmt.Errorf("sprint %d is %s, and only a sprint that has never been started can be deleted; complete it instead, or press Refresh if TAM still shows it as future", sprintID, statePhrase(state))
+	}
+	return sp, false, nil
+}
+
+// sprintState is the state Jira reported, in the lower case the cache stores
+// and the rest of this package compares against.
+func sprintState(sp backend.Sprint) string {
+	return strings.ToLower(strings.TrimSpace(sp.State))
+}
+
+// statePhrase is how a refusal names that state, since a sprint Jira
+// reported no state for still has to read as a sentence.
+func statePhrase(state string) string {
+	if state == "" {
+		return "in a state Jira did not name"
+	}
+	return state
+}
+
+// refusePendingDelete stops a delete while the journal still holds changes
+// for cards in the sprint. Those rows point at a sprint that is about to
+// stop existing, and Commit is the one thing that resolves them either way.
+//
+// It is a check and not a lock, and it cannot be made into one: the board's
+// own writes are journaled and deliberately take no lock, so a card can be
+// dragged into this sprint between this answer and the delete a moment
+// later. That is rare and it is recoverable: the stranded row is pushed at a
+// sprint Jira no longer has, the next Commit reports exactly that, and the
+// user discards it from the Pending changes dialog.
+func (s *Service) refusePendingDelete(ctx context.Context, profileID string, sprintID int) error {
+	n, err := s.pendingInSprint(ctx, profileID, sprintID)
+	if err != nil || n == 0 {
+		return err
+	}
+	return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before deleting it, or they will be pushed at a sprint that no longer exists", n)
+}
+
+// pendingInSprint is how many journal rows belong to cards staying in the
+// sprint, and zero when nothing is wired to answer. Both refusals above ask
+// it the same question and word the answer for their own action.
+func (s *Service) pendingInSprint(ctx context.Context, profileID string, sprintID int) (int, error) {
+	if s.Pending == nil {
+		return 0, nil
+	}
+	return s.Pending(ctx, profileID, sprintID)
 }

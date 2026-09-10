@@ -129,8 +129,8 @@ func (f *fakeJira) agile(w http.ResponseWriter, r *http.Request) {
 		// originBoardId is board 7, not the board being read: the mapping
 		// must take the board from the request, not from the payload.
 		_, _ = w.Write([]byte(`{"isLast":true,"values":[
-			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z"},
-			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z"}
+			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z","goal":"Ship the promo code flow"},
+			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z","goal":""}
 		]}`))
 	case "/rest/agile/1.0/board/2/sprint":
 		// Jira's way of saying a kanban board has no sprints.
@@ -312,6 +312,28 @@ func TestBoardSprintsTakeTheBoardFromTheRequestAndKanbanHasNone(t *testing.T) {
 	}
 	if len(none) != 0 {
 		t.Errorf("kanban sprints = %+v, want none", none)
+	}
+}
+
+// TestBoardSprintsCarryTheGoalJiraSent used to be a couple of assertions
+// bolted onto TestBoardSprintsTakeTheBoardFromTheRequestAndKanbanHasNone,
+// describing a second behaviour under a name that only promised the first.
+// It also covers the fixture's empty goal on sprint 12, which nothing used
+// to check.
+func TestBoardSprintsCarryTheGoalJiraSent(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	sprints, err := b.BoardSprints(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	if len(sprints) != 2 {
+		t.Fatalf("sprints = %+v, want 2", sprints)
+	}
+	if sprints[0].Goal != "Ship the promo code flow" {
+		t.Errorf("sprint goal dropped: %+v", sprints[0])
+	}
+	if sprints[1].Goal != "" {
+		t.Errorf("sprint goal = %q, want empty for Jira's own empty goal", sprints[1].Goal)
 	}
 }
 

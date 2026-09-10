@@ -18,6 +18,11 @@ export const keys = {
   boards: (profileId: string) => [profileId, "boards"] as const,
   boardSprints: (profileId: string, boardId: number) =>
     [profileId, "boardSprints", boardId] as const,
+  // One board's sprints with the cards in each, which is the Sprints view's
+  // whole read. It is separate from boardSprints, whose rows carry no cards
+  // and which the pickers and the ceremonies read.
+  boardSprintDetails: (profileId: string, boardId: number) =>
+    [profileId, "boardSprintDetails", boardId] as const,
   // Every open sprint across every board the profile has synced, the list a
   // caller with no board of its own offers the Sprint field.
   openSprints: (profileId: string) => [profileId, "openSprints"] as const,

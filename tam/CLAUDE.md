@@ -28,7 +28,14 @@ mid-write. This branch puts a sprint choice everywhere an issue appears
 rather than only on its board: the Backlog and the Epics tree, the New
 issue dialog, and a Sprint column in the spreadsheet importer, all
 reading the same profile-wide list of open sprints the board already
-drew from.
+drew from. It also adds the fourth view, Sprints: a board picker, that
+board's sprints as a two-level tree with the board's unassigned work
+folded in, and a detail panel beside it. Creating, editing and deleting a
+sprint live here, and reach Jira the moment they are pressed rather than
+waiting for Commit, the same exception Phase 3c carved out for starting
+and completing one. Filling a sprint, by contrast, is an ordinary
+journaled move. Schema version 7 adds the sprint's goal, which existed on
+the wire since Phase 3a and nowhere in TAM until now.
 
 ## Phase 3a: boards
 
@@ -243,7 +250,9 @@ journal. The bound methods, `StartSprint` and `CompleteSprint` in
 `app_sprints.go`, take the same per-profile lock (`a.acquire(p.ID, "sprint")`)
 a sync, a commit, and a boards refresh take, and the frontend reaches them
 through `SyncContext.runSprintCeremony`, which is the same reducer path
-`runBoardsRefresh` uses. Neither button has an offline state: TAM has no
+`runBoardsRefresh` uses. The three sprint management writes in
+`app_sprintmanage.go` take that same Go lock but reach it through
+`runQuietLock` instead, for the reason the sync section below gives. Neither button has an offline state: TAM has no
 connectivity signal to disable one from, so both stay enabled, the call is
 attempted, and a transport failure or a Jira refusal (a second active
 sprint, a missing Manage Sprints permission) is reported in the dialog,
@@ -408,6 +417,133 @@ change instead is the Backlog's sprint filter, the Backlog grid and
 detail panel, and `ListSprints`, whose `DISTINCT sprint_id` over cached
 rows can now surface a sprint id contributed only by a draft.
 
+## The Sprints view
+
+Phase 3c gave TAM sprints on a board: draw one, drag cards through it,
+start it, close it. It could not make one, rename one, fix a wrong date,
+delete one created by mistake, or look at a sprint's contents without
+first choosing the board that happens to carry it. This view is what does
+those things, between Boards and Reports in the tab order, and it is
+always present: hiding it for a project with no scrum board synced would
+have needed a cross-cutting navigation mechanism for one consumer, and
+would have shown a brand new profile nothing at all on its first launch,
+since the condition that would hide it reads a cache that profile has not
+filled yet. A project with no scrum board sees an empty state that says
+so and points at the Boards view instead.
+
+**Create, edit and delete reach Jira immediately, and the honest reason
+is a cost, not a principle.** The tempting explanation is that a sprint
+is more of a shared Jira object than an issue is, and it is not: a new
+issue is every bit as much a thing a whole team plans around, and TAM
+journals it behind a `TAM-NEW-n` placeholder and pushes it on Commit like
+everything else. The real reason is that TAM's journal is issue
+machinery. A pending change is keyed by issue key, a conflict is decided
+by comparing an issue's `updated` stamp, and Commit walks issues. A
+sprint has none of that: no cached version to rebase an edit on, no
+conflict card, no rekey path for an id Jira has not handed out yet.
+Journaling these three writes would mean building a second journal for a
+second kind of entity, with its own placeholder ids for create, its own
+conflict story for edit, and a queue holding a destructive intent for
+delete, for three calls a user makes a handful of times per sprint. The
+full argument is written on `UpdateSprint` in `core/jira/sprintwrite.go`,
+which is where a future exception should start reading rather than
+re-deriving the point from scratch.
+
+The fence is structural rather than a sentence in a spec, because the
+previous version of this rule lived in one sentence in the boards design
+and lasted one phase. `internal/sprints/exceptions_test.go` asserts, by
+name, that `sprints.Service`'s exported method set is exactly `Complete`,
+`Create`, `Delete`, `Edit`, `Start`; growing it means editing a failing
+test whose message says what the list is for. The fence is deliberately
+the service's own methods and not the `lifecycle` interface a ceremony
+uses internally: that interface also carries `BoardSprints`, a read, and
+`MoveIssuesToSprint`, whose other caller (the multi-select move) journals
+it like every other membership change, so asserting `lifecycle` as the
+immediate-write list would have been false the day it was written.
+Membership stays journaled everywhere in this view exactly as it does on
+the board: the detail panel's Sprint field and the tree's own multi-select
+move both go through the same journaled `MoveManyToSprint` path the
+board's selection uses, with the same conflict story and the same
+Discard case, because reaching a sprint without first picking its board
+is the whole reason this view exists, not a reason to grow a second write
+path.
+
+A closed sprint carries no cached membership, by design and not by
+accident: the boards sync never fetches a closed sprint's issue keys, on
+the reasoning that a chart Phase 4 draws from it should not depend on a
+mostly-idle poll of history nobody asked for. `SprintDetail.Issues` is
+therefore empty for a closed sprint for the same reason it would be
+empty right after a version 5 migration and before the next sync, and the
+view shows a closed sprint's contents as unavailable, with the reason,
+rather than as an empty sprint, which would be a lie the row cannot tell
+apart from the truth.
+
+**Delete spans two repositories in two transactions, board rows first.**
+`sprints.Service.Delete` calls Jira, then `boardrepo.DeleteSprintEverywhere`
+to remove the sprint's row and its membership from every board of the
+profile that holds a copy (Jira hands the same sprint to every board
+whose filter reaches it, so a delete scoped to one board would leave a
+second board's copy in `OpenSprints`, still offering a sprint Jira has
+already destroyed to the New issue dialog, the detail panel, and the
+importer's Sprint column), then `issuerepo.ClearSprint` to blank the
+sprint's name off the issues that carried it. The two are separate
+transactions in separate repositories on purpose: `dbtx.In` opens its own
+transaction from the handle, so nesting one repository's helper inside
+the other's takes a second pooled connection, blocks on the first's write
+lock, and dies on the driver's busy timeout, the same failure
+`MoveManyToSprint` already documents. A shared transaction helper
+spanning both is real work and is recorded as deferred. `boardrepo`'s own
+comment on `DeleteSprintEverywhere` carries the rest of the argument and
+what a crash between the two transactions leaves: board rows first means
+a crash leaves issues whose `sprint_id` and `sprint_name` still name a
+sprint that is gone, stale text on cards that already held it; the other
+order would leave the sprint alive in `OpenSprints`, offering it as a
+pickable destination everywhere an issue's Sprint field appears. Narrow
+stale text beats a dead sprint that can still be chosen, and only a full
+issue sync repairs either.
+
+**Scope `""` in `board_issue` is the board's own list, not a backlog.**
+It is every issue on the board, sprint issues included, which is what
+TAM's own code calls the board's own list; rendering it as-is would list
+every sprint's issues a second time and offer the fill bar work that is
+already in a sprint. So the tree's unassigned node, `UnassignedSprintName`
+("Board backlog", deliberately not "Unassigned": that word already names
+an assignee group two rows up in the same tree), is computed rather than
+read: `boardrepo.sprintDetails` builds it as the board's own list minus
+every key a sprint's journal-replayed scope holds, once the journal has
+been replayed over every sprint ahead of it in the same pass.
+
+**The delete confirmation's issue count says "at least" for three
+different reasons, never for one.** `notSynced` counts keys the sprint
+holds that the issue cache does not, so the true count is short by
+exactly them. `truncated` means the shared per-view card budget stopped
+this sprint's own list short, so the count cannot be checked against what
+is on screen. And the third is this view's own doing: a pending sprint
+move is replayed over the scope before the total is counted, so a card
+journaled out of the sprint but not yet committed has already left the
+count while Jira still holds it, and the reverse holds too, a card
+journaled in counts here before Commit has pushed it. Any one of the
+three turns the sentence into "at least N issues" with a line naming
+which; quoting an exact count that turns out to be low costs a sprint
+nobody can get back.
+
+Schema version 7 adds `goal` to the `sprint` table, `RawSprint`,
+`backend.Sprint`, and `boardrepo.Sprint`. It does not back-fill: unlike
+version 5's `status_id`, nothing here clears a sync watermark, because a
+sprint is not read by an issue sync and its only refresh is the Boards
+view's own Refresh button. A sprint cached before version 7 keeps an
+empty goal until the next boards refresh rewrites it. Clearing a goal is
+sent as an explicit empty string on edit and never on create, because the
+partial-update rule that stops an empty box from wiping a real goal on
+`UpdateSprint` is also what makes a goal impossible to clear otherwise;
+`clearGoal` is how `sprints.Service.Edit` tells the two apart.
+
+The three management writes reach their lock the same way the two
+ceremonies do, `a.acquire(p.ID, "sprint")` in Go, but the frontend reaches
+them through `SyncContext.runQuietLock` rather than `runSprintCeremony`:
+that is the exception the "One lock, both ends" section already
+documents, and what it costs is written there, not repeated here.
+
 ## The write path (plan 1b)
 
 Edits and creates go through the journal in `tam.db` (`pending_change` and
@@ -563,7 +699,7 @@ Fields is the only section open on mount, so the panel still starts short.
 
 A draft's parent comes from context. `parentKey` is fixed and stated (a
 sub-task's parent, from the issue it was drafted from); `initialEpic` is a
-default the picker may change, seeded from the epic on screen — the selected
+default the picker may change, seeded from the epic on screen: the selected
 row when it is an epic, else the epic it hangs off. Starting at "(none)" made
 every draft begun with an epic open an orphan that had to be reparented
 afterwards. A fixed parent wins over a seeded epic.
@@ -652,7 +788,24 @@ the reducer, so the shell stayed `idle`, kept offering Sync, and Go refused it
 with "a sync is already running for this profile" on a profile whose status
 still read "not synced yet". It runs through `SyncContext.runBoardsRefresh`
 now, which takes the same lock the sync does. **Anything new that calls a
-bound method taking `acquire` has to go through the reducer too.**
+bound method taking `acquire` has to take the frontend's lock too.**
+
+There is one deliberate exception, and it is narrower than it looks.
+`SyncContext.runQuietLock` takes the same `statusRef` guard every other `run*`
+takes, so a sync, a commit, a boards refresh and a ceremony all still refuse
+against it, but it dispatches no progress actions, so the reducer stays
+`idle`. Creating, editing and deleting a sprint go through it: those are one
+short call each, and flashing the whole app's sync banner for a rename would
+say something untrue about what is happening.
+
+What that costs is worth knowing, because it is the same shape as the bug the
+rule above was written about. For the length of the call the shell's Sync and
+Commit buttons stay enabled and do nothing when pressed, and the profile
+picker stays enabled, because all three read `state.status` rather than the
+ref. What keeps a user away from them is the dialog holding focus, which is
+why those dialogs refuse Escape while their write is in flight rather than
+merely disabling their own buttons. A fourth quiet write would have to earn
+the same treatment.
 
 `SyncBoards` acquires under its own name, so a refusal says which operation is
 actually running. The boards pass is also given the progress sink now: it
@@ -832,9 +985,12 @@ until one is entered. A Kiwi profile file is refused.
                           JournalSprintMoves, the selection's bulk move, with its guarded lookup
                           of the destination's name
     app_sprints.go       the two sprint ceremonies, SuggestSprintDates, and PendingInSprint
-    internal/tamstore/   TAM's own SQLite file (schema version 6: issue (with status_id), issue_link,
+    app_sprintmanage.go  Create, Edit and Delete sprint, and ListBoardSprintDetails for the
+                          Sprints view's tree, all under the "sprint" lock name the ceremonies use
+    internal/tamstore/   TAM's own SQLite file (schema version 7: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
-                          sprint, plus the shared journal tables pending_change and audit_log)
+                          sprint (with goal, added at version 7), plus the shared journal tables
+                          pending_change and audit_log)
     internal/backend/    IssueBackend and BoardBackend seams and DTOs; backend/jira on core/jira,
                           backend/demo on internal/demo
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile
@@ -848,12 +1004,18 @@ until one is entered. A Kiwi profile file is refused.
                           both in one deferred read transaction (tx.go); cellorder.go is the board's
                           final local order the commit pass ranks against, on the same kind of
                           transaction; sprintlength.go is the median-of-three-closed-sprints read
-                          the start dialog's date suggestion is built from
-    internal/sprints/    the sprint lifecycle service: Start and Complete, the two writes that
-                          reach Jira outside a Commit, and the only package that touches them;
-                          guards.go is what a ceremony refuses before it reaches Jira, cache.go
-                          the board cache's bookkeeping after it has, and suggest.go the start
-                          dialog's suggested name and dates
+                          the start dialog's date suggestion is built from; sprintlist.go is the
+                          Sprints view's own read, one board's sprints with their issues and the
+                          computed unassigned node; deletesprint.go is DeleteSprintEverywhere, the
+                          two-repository delete's first transaction, across every board that holds
+                          a copy of the sprint
+    internal/sprints/    the sprint writes that reach Jira outside a Commit: Start and Complete,
+                          the ceremonies, and Create, Edit and Delete, the management writes this
+                          view adds; exceptions_test.go fences the package's exported method set to
+                          exactly those five; guards.go is what a write refuses before it reaches
+                          Jira, cache.go the board cache's bookkeeping after it has, manage.go
+                          Create, Edit and Delete themselves, and suggest.go the start and create
+                          dialogs' suggested name and dates
     internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
                           datetime format, shared by the ceremonies and the suggestion
     internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
@@ -874,7 +1036,9 @@ until one is entered. A Kiwi profile file is refused.
                           gestures over an ordered key list, no React and no DOM
       src/queries/       TanStack Query keys, hooks, and the post-sync invalidation
       src/contexts/      SyncContext on the shared sync reducer; runSprintCeremony is the reducer
-                          path StartSprint and CompleteSprint run through, beside runBoardsRefresh
+                          path StartSprint and CompleteSprint run through, beside runBoardsRefresh;
+                          runQuietLock takes the same lock without the banner, for the three
+                          sprint management writes
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands
@@ -892,7 +1056,12 @@ until one is entered. A Kiwi profile file is refused.
                           PendingMoveRow, CommitBanner, BoardCeremonies (the two sprint dialogs'
                           shared context), StartSprintModal, CompleteSprintModal,
                           BoardSelectionBar (the multi-selection's count, destination, and Move
-                          action), useBoardSelection (the selection as React state)
+                          action), useBoardSelection (the selection as React state), SprintsView
+                          (the board picker and the tree), SprintList, SprintRow, SprintField (the
+                          goal, shown only while a sprint is expanded), SprintFillBar,
+                          CreateSprintModal, EditSprintModal, SprintDraftForm (the four fields the
+                          create and edit dialogs share), useSprintSelection (the tree's own
+                          multi-select, the board's under a different name)
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands

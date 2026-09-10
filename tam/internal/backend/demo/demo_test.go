@@ -3,6 +3,7 @@ package demo_test
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -331,6 +332,28 @@ func TestDemoSprintsAreOnTheScrumBoardOnly(t *testing.T) {
 	}
 }
 
+// TestDemoSprintsCarryTheDatasetsGoal is its own test rather than an extra
+// assertion here, because an empty goal proves nothing in a walk-through:
+// every demo sprint carries a real one so the field has something to show.
+func TestDemoSprintsCarryTheDatasetsGoal(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	want := map[int]string{
+		11: "Ship the promo code redemption flow end to end",
+		12: "Clear the checkout defect backlog before the freeze",
+		13: "Start the loyalty points redesign",
+	}
+	for _, s := range sprints {
+		if s.Goal != want[s.ID] {
+			t.Errorf("sprint %d goal = %q, want %q", s.ID, s.Goal, want[s.ID])
+		}
+	}
+}
+
 func TestDemoBoardIssueKeys(t *testing.T) {
 	b := demobackend.New("PLAT")
 	ctx := context.Background()
@@ -616,5 +639,173 @@ func TestARefusedSprintBatchMovesNothing(t *testing.T) {
 	}
 	if iss.SprintID == "13" {
 		t.Errorf("the first half of a refused batch was applied: %+v", iss)
+	}
+}
+
+// TestCreateSprintAddsAFutureSprintACardCanBeMovedInto pins the defect the
+// plan warns about by name: a demo create that only appended to the board's
+// own list would still leave demoSprintName answering "" for the new id,
+// and MoveIssuesToSprint would refuse a destination the picker just showed.
+func TestCreateSprintAddsAFutureSprintACardCanBeMovedInto(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+
+	created, err := b.CreateSprint(ctx, 1, backend.SprintDraft{
+		Name:      "Sprint 14",
+		Goal:      "Pilot the new onboarding flow",
+		StartDate: "2026-09-15T09:00:00.000+0000",
+		EndDate:   "2026-09-29T09:00:00.000+0000",
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.State != "future" || created.BoardID != 1 || created.Goal != "Pilot the new onboarding flow" {
+		t.Errorf("created = %+v, want a future sprint on board 1 carrying its goal", created)
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	var listed backend.Sprint
+	found := false
+	for _, s := range sprints {
+		if s.ID == created.ID {
+			listed, found = s, true
+		}
+	}
+	if !found {
+		t.Fatalf("sprint %d is not in the board's list: %+v", created.ID, sprints)
+	}
+	if listed.State != "future" || listed.Goal != created.Goal {
+		t.Errorf("listed = %+v, want the created sprint unchanged", listed)
+	}
+
+	sprintID := strconv.Itoa(created.ID)
+	if err := b.MoveIssuesToSprint(ctx, sprintID, []string{"ACME-412"}); err != nil {
+		t.Fatalf("a card could not be moved into the sprint this run just created: %v", err)
+	}
+	iss, err := b.GetIssue(ctx, "ACME-412")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iss.SprintID != sprintID || iss.SprintName != created.Name {
+		t.Errorf("moved card = %+v, want sprint %s named %q", iss, sprintID, created.Name)
+	}
+
+	if _, err := b.CreateSprint(ctx, 2, backend.SprintDraft{Name: "no sprints here"}); err == nil {
+		t.Error("creating a sprint on the kanban board is refused")
+	}
+}
+
+// TestEditSprintHonoursClearGoal is the partial update rule Jira's own
+// endpoint follows: an empty field in the draft is left alone, and
+// clearGoal is the one deliberate exception that takes the goal away even
+// though the draft's own goal is empty too.
+func TestEditSprintHonoursClearGoal(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+
+	sprintState := func() backend.Sprint {
+		t.Helper()
+		sprints, err := b.BoardSprints(ctx, 1)
+		if err != nil {
+			t.Fatalf("sprints: %v", err)
+		}
+		for _, s := range sprints {
+			if s.ID == 13 {
+				return s
+			}
+		}
+		t.Fatal("sprint 13 is missing")
+		return backend.Sprint{}
+	}
+
+	if err := b.EditSprint(ctx, 13, backend.SprintDraft{Name: "Sprint 13: renamed"}, false); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	got := sprintState()
+	if got.Name != "Sprint 13: renamed" || got.Goal != "Start the loyalty points redesign" {
+		t.Errorf("after a rename with no goal = %+v, want the dataset's own goal untouched", got)
+	}
+
+	if err := b.EditSprint(ctx, 13, backend.SprintDraft{}, true); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	got = sprintState()
+	if got.Goal != "" {
+		t.Errorf("goal = %q after clearGoal, want empty", got.Goal)
+	}
+	if got.Name != "Sprint 13: renamed" {
+		t.Errorf("clearing the goal must not undo the earlier rename: %+v", got)
+	}
+
+	if err := b.EditSprint(ctx, 9999, backend.SprintDraft{}, false); err == nil {
+		t.Error("editing a sprint the demo does not have is refused")
+	}
+}
+
+// TestDeleteSprintRemovesItAndReturnsItsIssuesToTheBoard mirrors what a
+// real Jira delete does: the sprint stops existing but its issues are not
+// deleted, they return to the board's own scope, which is why the whole
+// board's key count must not change even though the sprint's own count
+// drops to zero.
+func TestDeleteSprintRemovesItAndReturnsItsIssuesToTheBoard(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+
+	before, err := b.BoardIssueKeys(ctx, 1, "13", "PLAT")
+	if err != nil {
+		t.Fatalf("keys before delete: %v", err)
+	}
+	if len(before) == 0 {
+		t.Fatal("sprint 13 has no keys to begin with")
+	}
+	wholeBoardBefore, err := b.BoardIssueKeys(ctx, 1, "", "PLAT")
+	if err != nil {
+		t.Fatalf("board keys before delete: %v", err)
+	}
+
+	if err := b.DeleteSprint(ctx, 13); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	sprints, err := b.BoardSprints(ctx, 1)
+	if err != nil {
+		t.Fatalf("sprints after delete: %v", err)
+	}
+	for _, s := range sprints {
+		if s.ID == 13 {
+			t.Errorf("sprint 13 is still listed after delete: %+v", s)
+		}
+	}
+
+	afterInSprint, err := b.BoardIssueKeys(ctx, 1, "13", "PLAT")
+	if err != nil {
+		t.Fatalf("keys after delete: %v", err)
+	}
+	if len(afterInSprint) != 0 {
+		t.Errorf("sprint 13 still names %v after being deleted", afterInSprint)
+	}
+
+	wholeBoardAfter, err := b.BoardIssueKeys(ctx, 1, "", "PLAT")
+	if err != nil {
+		t.Fatalf("board keys after delete: %v", err)
+	}
+	if len(wholeBoardAfter) != len(wholeBoardBefore) {
+		t.Errorf("the board's own list changed size from %d to %d: the issues must stay on the board", len(wholeBoardBefore), len(wholeBoardAfter))
+	}
+	for _, key := range before {
+		iss, err := b.GetIssue(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if iss.SprintID != "" || iss.SprintName != "" {
+			t.Errorf("%s still carries the deleted sprint: %+v", key, iss)
+		}
+	}
+
+	if err := b.DeleteSprint(ctx, 13); err == nil {
+		t.Error("deleting an already-deleted sprint is refused")
 	}
 }

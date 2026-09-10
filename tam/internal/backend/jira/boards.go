@@ -83,6 +83,7 @@ func (b *Backend) BoardSprints(ctx context.Context, boardID int) ([]backend.Spri
 			State:     strings.ToLower(rs.State),
 			StartDate: rs.StartDate,
 			EndDate:   rs.EndDate,
+			Goal:      rs.Goal,
 		})
 	}
 	return out, nil

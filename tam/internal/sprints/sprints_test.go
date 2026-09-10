@@ -21,7 +21,22 @@ type moveCall struct {
 	keys   []string
 }
 
-// fakeBackend answers the issue search and the three Agile writes, and
+// createCall is one create the backend was asked for: the board it was made
+// on and the draft that reached it.
+type createCall struct {
+	boardID int
+	draft   backend.SprintDraft
+}
+
+// editCall is one edit, including the flag that tells an empty goal box
+// meaning "leave it alone" from one meaning "clear it".
+type editCall struct {
+	sprintID  int
+	draft     backend.SprintDraft
+	clearGoal bool
+}
+
+// fakeBackend answers the issue search and the Agile writes, and
 // records the order it was asked in. Nothing else: the service reaches for
 // the narrow lifecycle seam, so a fake does not have to answer for a board
 // configuration to close a sprint.
@@ -50,6 +65,18 @@ type fakeBackend struct {
 	sprints     []backend.Sprint
 	sprintErr   error
 	sprintReads int
+
+	// The three management writes: what Jira answers a create with, and what
+	// each of them was asked to do.
+	made      backend.Sprint
+	created   []createCall
+	createErr error
+
+	edited  []editCall
+	editErr error
+
+	deleted   []int
+	deleteErr error
 
 	// order is what happened, in the order it happened, so "moved first and
 	// closed second" is asserted rather than assumed.
@@ -130,6 +157,46 @@ func (f *fakeBackend) BoardSprints(context.Context, int) ([]backend.Sprint, erro
 	return f.sprints, nil
 }
 
+// The three management writes, recorded the way the ceremonies above are:
+// what was asked for, in the order it was asked, so a test can assert that a
+// refused write never reached Jira at all.
+func (f *fakeBackend) CreateSprint(_ context.Context, boardID int, d backend.SprintDraft) (backend.Sprint, error) {
+	f.order = append(f.order, "create")
+	if f.createErr != nil {
+		return backend.Sprint{}, f.createErr
+	}
+	f.created = append(f.created, createCall{boardID: boardID, draft: d})
+	return f.made, nil
+}
+
+func (f *fakeBackend) EditSprint(_ context.Context, sprintID int, d backend.SprintDraft, clearGoal bool) error {
+	f.order = append(f.order, "edit")
+	if f.editErr != nil {
+		return f.editErr
+	}
+	f.edited = append(f.edited, editCall{sprintID: sprintID, draft: d, clearGoal: clearGoal})
+	return nil
+}
+
+// DeleteSprint drops the sprint from the list this backend answers with as
+// well as recording the call, so the re-read that follows a delete sees what
+// Jira would really say afterwards rather than the sprint it just destroyed.
+func (f *fakeBackend) DeleteSprint(_ context.Context, sprintID int) error {
+	f.order = append(f.order, "delete")
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	f.deleted = append(f.deleted, sprintID)
+	left := make([]backend.Sprint, 0, len(f.sprints))
+	for _, sp := range f.sprints {
+		if sp.ID != sprintID {
+			left = append(left, sp)
+		}
+	}
+	f.sprints = left
+	return nil
+}
+
 // fakeStore is the board cache: the columns "complete" is defined against,
 // the destination's name, and the two writes the ceremonies make.
 type fakeStore struct {
@@ -144,6 +211,16 @@ type fakeStore struct {
 	sprints    []backend.Sprint
 	written    int
 	membership map[string][]string
+
+	// rows is the profile's cached sprint rows by board id. Jira hands one
+	// sprint to every board whose filter reaches it, so a delete has to
+	// reach every copy and not only the board it was made from, and a
+	// one board fixture would pass while that bug shipped.
+	rows map[int][]int
+	// ops is the cache work a delete did, in the order it did it, since the
+	// order is the part the two repositories cannot enforce between them.
+	ops       []string
+	deleteErr error
 }
 
 func newStore() *fakeStore {
@@ -156,6 +233,7 @@ func newStore() *fakeStore {
 		names:      map[string]string{"13": "Sprint 13"},
 		onBoard:    map[string]string{"1/12": "active", "1/13": "future"},
 		cached:     map[string][]string{},
+		rows:       map[int][]int{},
 		membership: map[string][]string{},
 	}
 }
@@ -195,6 +273,27 @@ func (s *fakeStore) SprintIssues(_ context.Context, _ string, _ int, sprintID st
 func (s *fakeStore) ReplaceSprints(_ context.Context, _ string, _ int, list []backend.Sprint) error {
 	s.sprints = list
 	s.written++
+	s.ops = append(s.ops, "board list")
+	return nil
+}
+
+// DeleteSprintEverywhere drops the sprint from every board that holds a copy
+// of it, which is what the real one does by keying on (profile, id) with no
+// board id anywhere in either statement.
+func (s *fakeStore) DeleteSprintEverywhere(_ context.Context, _ string, sprintID int) error {
+	s.ops = append(s.ops, "board rows")
+	if s.deleteErr != nil {
+		return s.deleteErr
+	}
+	for boardID, held := range s.rows {
+		left := make([]int, 0, len(held))
+		for _, id := range held {
+			if id != sprintID {
+				left = append(left, id)
+			}
+		}
+		s.rows[boardID] = left
+	}
 	return nil
 }
 

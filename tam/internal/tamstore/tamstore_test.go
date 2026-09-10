@@ -2,6 +2,7 @@ package tamstore_test
 
 import (
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -249,7 +250,7 @@ func TestVersionFiveMigrationIsIdempotent(t *testing.T) {
 
 // oldSprintDDL is the sprint table as version 4 created it, keyed by the
 // sprint id alone. A developer database built from that version still
-// carries it, which is what the version 5 migration is for.
+// carries it, which is what the version 6 migration is for.
 const oldSprintDDL = `CREATE TABLE sprint (
 	profile_id TEXT NOT NULL,
 	id         INTEGER NOT NULL,
@@ -261,9 +262,12 @@ const oldSprintDDL = `CREATE TABLE sprint (
 	PRIMARY KEY (profile_id, id)
 )`
 
-// openAtVersionFour writes a version 4 database at path: the sprint table
-// with its old key, holding one board's copy of sprint 12.
-func openAtVersionFour(t *testing.T, path string) {
+// openAtSprintKeyVersion writes a database at path recorded at version,
+// with the sprint table in the shape versions 4 and 5 both left it: keyed
+// by the sprint id alone, holding one board's copy of sprint 12. Neither
+// version's own migration touches sprint, so one fixture covers a database
+// rewound to either.
+func openAtSprintKeyVersion(t *testing.T, path string, version int) {
 	t.Helper()
 	db, err := tamstore.Open(path)
 	if err != nil {
@@ -273,7 +277,7 @@ func openAtVersionFour(t *testing.T, path string) {
 		`DROP TABLE sprint`,
 		oldSprintDDL,
 		`INSERT INTO sprint (profile_id, id, board_id, name, state) VALUES ('p1', 12, 1, 'Sprint 12', 'active')`,
-		`UPDATE meta SET value = '4' WHERE key = 'schema_version'`,
+		fmt.Sprintf(`UPDATE meta SET value = '%d' WHERE key = 'schema_version'`, version),
 	} {
 		if _, err := db.DB().Exec(stmt); err != nil {
 			t.Fatalf("%s: %v", stmt, err)
@@ -293,9 +297,9 @@ func insertSprintForBoard(db *sql.DB, boardID int) error {
 	return err
 }
 
-func TestVersionFiveMigrationRekeysSprintByBoard(t *testing.T) {
+func TestVersionSixMigrationRekeysSprintByBoard(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tam.db")
-	openAtVersionFour(t, path)
+	openAtSprintKeyVersion(t, path, 4)
 
 	db, err := tamstore.Open(path)
 	if err != nil {
@@ -335,5 +339,161 @@ func TestFreshDatabaseKeysSprintByBoard(t *testing.T) {
 		if err := insertSprintForBoard(db.DB(), boardID); err != nil {
 			t.Fatalf("board %d's copy of sprint 12: %v", boardID, err)
 		}
+	}
+}
+
+// sprintDDLVersionSix is the sprint table as version 6 left it: keyed by
+// board already, but before this plan's goal column existed. A developer
+// database built from that version still carries this shape, which is what
+// the version 7 migration is for.
+const sprintDDLVersionSix = `CREATE TABLE sprint (
+	profile_id TEXT NOT NULL,
+	id         INTEGER NOT NULL,
+	board_id   INTEGER NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	state      TEXT NOT NULL DEFAULT '',
+	start_date TEXT NOT NULL DEFAULT '',
+	end_date   TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, id)
+)`
+
+// openAtVersionSix writes a version 6 database at path: sprint already keyed
+// by board, holding one row, with no goal column yet.
+func openAtVersionSix(t *testing.T, path string) {
+	t.Helper()
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE sprint`,
+		sprintDDLVersionSix,
+		`INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date) VALUES ('p1', 12, 1, 'Sprint 12', 'active', '2026-08-18T09:00:00Z', '2026-09-01T09:00:00Z')`,
+		`UPDATE meta SET value = '6' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+}
+
+// TestVersionSevenMigrationAddsGoalAndKeepsARowAlreadyKeyedByBoard is the
+// plain case: sprint is already the shape version 6 left it, so the
+// migration is a single ALTER TABLE ADD COLUMN and the row it was called for
+// survives untouched.
+func TestVersionSevenMigrationAddsGoalAndKeepsARowAlreadyKeyedByBoard(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	openAtVersionSix(t, path)
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+	var name, goal string
+	if err := db.DB().QueryRow(`SELECT name, goal FROM sprint WHERE profile_id = 'p1' AND board_id = 1 AND id = 12`).Scan(&name, &goal); err != nil {
+		t.Fatalf("read migrated sprint: %v", err)
+	}
+	if name != "Sprint 12" {
+		t.Errorf("name = %q after the goal migration, want the row kept rather than rebuilt empty", name)
+	}
+	// Nothing backfills a sprint cached before this version: the sprint is
+	// not part of an issue sync, and its only refresh is the Boards view's
+	// own Refresh button, which this migration does not trigger.
+	if goal != "" {
+		t.Errorf("goal = %q, want empty until the next Boards Refresh fills it in", goal)
+	}
+}
+
+// TestOldSprintKeyDatabasesReachVersionSevenWithTheGoalColumn covers what a
+// database recorded at 4 or 5 goes through on its way to 7: migration 6
+// drops sprint and recreates it from sprintDDL before migration 7 ever
+// runs, and sprintDDL already carries the goal column, so migration 7's own
+// ALTER TABLE lands on a column that is already there and takes the same
+// duplicate-column no-op path a fresh install does. This does not pin
+// migration 7 itself: deleting its Apply body still leaves migration 6
+// supplying the column here. TestVersionSevenMigrationAddsGoalAndKeepsARowAlreadyKeyedByBoard,
+// below, is the one test that depends on migration 7's own body.
+func TestOldSprintKeyDatabasesReachVersionSevenWithTheGoalColumn(t *testing.T) {
+	for _, version := range []int{4, 5} {
+		path := filepath.Join(t.TempDir(), "tam.db")
+		openAtSprintKeyVersion(t, path, version)
+
+		db, err := tamstore.Open(path)
+		if err != nil {
+			t.Fatalf("version %d: reopen: %v", version, err)
+		}
+		if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+			t.Errorf("version %d: schema version = %d, want %d", version, v, tamstore.Schema.Version)
+		}
+		var rows int
+		if err := db.DB().QueryRow(`SELECT count(*) FROM sprint`).Scan(&rows); err != nil {
+			t.Fatalf("version %d: count sprints: %v", version, err)
+		}
+		if rows != 0 {
+			t.Errorf("version %d: sprint rows after migrating = %d, want the cache emptied by migration 6, as it always is", version, rows)
+		}
+		if _, err := db.DB().Exec(
+			`INSERT INTO sprint (profile_id, id, board_id, name, state, goal) VALUES ('p1', 12, 1, 'Sprint 12', 'active', 'Ship it')`,
+		); err != nil {
+			t.Errorf("version %d: insert naming the goal column: %v", version, err)
+		}
+		if err := db.Close(); err != nil {
+			t.Fatalf("version %d: close: %v", version, err)
+		}
+	}
+}
+
+// TestFreshDatabaseHasTheSprintGoalColumn pins sprintDDL itself, not the
+// version 7 migration. A plain fresh open cannot separate the two: a
+// database created at version 0 runs every migration in turn, and version
+// 7's own ALTER TABLE would supply the column even if sprintDDL never
+// carried it. So this test records the newest schema version directly into
+// a bare meta table before tamstore ever opens the file. apply's migration
+// loop then finds every migration already satisfied (current is read once,
+// already at or above every Version in the list) and runs none of them,
+// which leaves Base, meaning baseDDL, sprintDDL, and journal.DDL, as the
+// only statement that could have built the sprint table this insert relies
+// on.
+func TestFreshDatabaseHasTheSprintGoalColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open raw file: %v", err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+		fmt.Sprintf(`INSERT INTO meta (key, value) VALUES ('schema_version', '%d')`, tamstore.Schema.Version),
+	} {
+		if _, err := raw.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatalf("close raw file: %v", err)
+	}
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.DB().Exec(
+		`INSERT INTO sprint (profile_id, id, board_id, name, state, goal) VALUES ('p1', 1, 1, 'Sprint 1', 'active', 'Ship it')`,
+	); err != nil {
+		t.Fatalf("insert with goal: %v", err)
+	}
+	var goal string
+	if err := db.DB().QueryRow(`SELECT goal FROM sprint WHERE profile_id = 'p1' AND board_id = 1 AND id = 1`).Scan(&goal); err != nil {
+		t.Fatalf("read goal: %v", err)
+	}
+	if goal != "Ship it" {
+		t.Errorf("goal = %q, want what was inserted", goal)
 	}
 }

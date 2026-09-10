@@ -113,7 +113,9 @@ describe("EpicsView", () => {
     });
     renderView();
     expect(await screen.findByRole("treeitem", { name: "PLAT-100 Checkout revamp" })).toBeInTheDocument();
-    expect(screen.getByText("1 of 2 done, 10 pts")).toBeInTheDocument();
+    // Both trees print the same progress sentence, points landed of points
+    // estimated, so one column does not read two ways.
+    expect(screen.getByText("1 of 2 done, 5 of 10 pts")).toBeInTheDocument();
     expect(screen.getByText("Apply promo code")).toBeInTheDocument();
     expect(screen.getByText("Add coupon banner")).toBeInTheDocument();
   });
