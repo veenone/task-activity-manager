@@ -265,6 +265,28 @@ export interface SprintOption {
   boardName?: string;
 }
 
+// SprintChoice mirrors boardrepo.SprintChoice field for field: every open
+// sprint across every board the profile has synced, active ones first then
+// by start date, with the board's name since a caller without a board of its
+// own has no other way to tell two same-named sprints apart.
+export interface SprintChoice {
+  id: number;
+  name: string;
+  boardName: string;
+  state: string;
+}
+
+// SprintOption is the smallest shape the Sprint field actually reads. Sprint
+// and SprintChoice are both structurally assignable to it with no mapping
+// and no adapter, so a caller with either list passes it straight through.
+export interface SprintOption {
+  id: number;
+  name: string;
+  // The board this sprint belongs to, given only by the profile-wide list
+  // (SprintChoice); a board's own list needs no such disambiguation.
+  boardName?: string;
+}
+
 export interface ColumnView {
   name: string;
   // statusIds are the statuses the column collects, in the board's own
