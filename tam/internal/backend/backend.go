@@ -273,7 +273,8 @@ type BoardColumn struct {
 
 // Sprint is one sprint of a board. State is Jira's own lowercase value
 // (active, future, closed), and BoardID is the board the sprint was read
-// from, not the board it was created on.
+// from, not the board it was created on. Goal is Jira's own sprint goal,
+// carried straight through from core/jira.RawSprint.
 type Sprint struct {
 	ID        int    `json:"id"`
 	BoardID   int    `json:"boardId"`
@@ -281,6 +282,7 @@ type Sprint struct {
 	State     string `json:"state"`
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
+	Goal      string `json:"goal"`
 }
 
 // SprintDraft is a sprint's fields for starting it: a name (prefilled from

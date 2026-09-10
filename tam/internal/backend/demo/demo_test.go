@@ -321,6 +321,11 @@ func TestDemoSprintsAreOnTheScrumBoardOnly(t *testing.T) {
 			t.Errorf("sprint %d is on board %d", s.ID, s.BoardID)
 		}
 		states[s.ID] = s.State
+		// An empty goal proves nothing in a walk-through: every demo sprint
+		// carries a real one so the field has something to show.
+		if s.Goal == "" {
+			t.Errorf("sprint %d has no goal, want the dataset's own", s.ID)
+		}
 	}
 	if states[11] != "closed" || states[12] != "active" || states[13] != "future" {
 		t.Errorf("states = %v, want lowercase closed, active, future", states)

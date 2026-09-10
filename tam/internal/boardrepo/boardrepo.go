@@ -32,7 +32,10 @@ type Board struct {
 }
 
 // Sprint is one cached sprint. State is Jira's own lowercase value: active,
-// future, or closed.
+// future, or closed. Goal is empty both for a sprint Jira has none set on
+// and for one cached before schema version 7 added the column and never
+// refreshed since; the two are indistinguishable here; a caller that needs
+// to tell them apart wants a raw Jira read, not this cache.
 type Sprint struct {
 	ID        int    `json:"id"`
 	BoardID   int    `json:"boardId"`
@@ -40,6 +43,7 @@ type Sprint struct {
 	State     string `json:"state"`
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
+	Goal      string `json:"goal"`
 }
 
 // IssueSource is what the view needs from the issue cache. Keeping it an

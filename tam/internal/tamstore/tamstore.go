@@ -3,7 +3,8 @@
 // shared profiles.db. Version 1 carries no app tables. Version 2 adds the
 // issue tables, version 3 the shared journal tables, version 4 the
 // cached Jira user list, version 5 the board tables and the issue's status
-// id, and version 6 re-keys the sprint table by board.
+// id, version 6 re-keys the sprint table by board, and version 7 adds the
+// sprint's goal.
 package tamstore
 
 import (
@@ -23,9 +24,10 @@ import (
 // CREATE TABLE IF NOT EXISTS cannot add a column to a table that is
 // already there. Version 6 re-keys sprint by board, which needs a
 // migration for the same reason: CREATE TABLE IF NOT EXISTS leaves a table
-// that already exists exactly as it is, primary key included.
+// that already exists exactly as it is, primary key included. Version 7
+// adds the sprint's goal, the same shape as version 5's column add.
 var Schema = store.Schema{
-	Version: 6,
+	Version: 7,
 	Base:    baseDDL + sprintDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -71,6 +73,28 @@ var Schema = store.Schema{
 			}
 			_, err := db.Exec(sprintDDL)
 			return err
+		},
+	}, {
+		Version: 7,
+		// Jira has sent a sprint's goal on every read since the boards work
+		// landed in Phase 3a; nothing between here and the wire kept it.
+		// This follows version 5's shape rather than version 6's: a plain
+		// column add costs nothing a drop and recreate would also cost,
+		// and dropping sprint here would empty every board's sprint picker
+		// until the user next presses Refresh in the Boards view. On a
+		// database still at version 5, migration 6 runs first and rebuilds
+		// sprint from sprintDDL, which by then already carries this
+		// column, so this add lands as the duplicate-column no-op
+		// AddColumnIfMissing treats as success.
+		//
+		// Unlike version 5's status id, nothing here clears a watermark to
+		// backfill the column: a sprint is not read by an issue sync, and
+		// its only refresh is a board's own Refresh button. Every sprint
+		// cached before this version keeps an empty goal until the next
+		// Boards Refresh rewrites it, and that gap is deliberate, not an
+		// oversight left for later.
+		Apply: func(db *sql.DB) error {
+			return store.AddColumnIfMissing(db, "sprint", "goal TEXT NOT NULL DEFAULT ''")
 		},
 	}},
 	Indexes: indexDDL,
@@ -173,6 +197,7 @@ CREATE TABLE IF NOT EXISTS sprint (
 	state      TEXT NOT NULL DEFAULT '',
 	start_date TEXT NOT NULL DEFAULT '',
 	end_date   TEXT NOT NULL DEFAULT '',
+	goal       TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, board_id, id)
 );`
 

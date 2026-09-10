@@ -339,6 +339,49 @@ func TestSprintIssuesReadsTheBoardsOwnOrder(t *testing.T) {
 	}
 }
 
+// TestReplaceBoardCarriesTheSprintGoalThroughTheSyncPath is one of the two
+// write paths writeSprints serves. ReplaceBoard is what a regular sync
+// calls, and a goal added to only ReplaceSprints's path would still vanish
+// after every full sync overwrote it with nothing.
+func TestReplaceBoardCarriesTheSprintGoalThroughTheSyncPath(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	sprints := []backend.Sprint{{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active", Goal: "Ship the promo code flow"}}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), sprints, nil); err != nil {
+		t.Fatalf("replace board: %v", err)
+	}
+
+	got, err := r.ListSprints(ctx, "p1", 1)
+	if err != nil || len(got) != 1 || got[0].Goal != "Ship the promo code flow" {
+		t.Fatalf("sprints = %+v, %v, want the goal a sync wrote", got, err)
+	}
+}
+
+// TestReplaceSprintsCarriesTheSprintGoalThroughTheCeremonyPath is the other
+// of writeSprints's two callers. Every sprint ceremony writes through
+// ReplaceSprints rather than ReplaceBoard, so a goal missing from this path
+// would land on a full sync and vanish the moment a ceremony next touched
+// the same sprint.
+func TestReplaceSprintsCarriesTheSprintGoalThroughTheCeremonyPath(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "future"}}, nil); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	started := []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active", Goal: "Clear the checkout defects"}}
+	if err := r.ReplaceSprints(ctx, "p1", 1, started); err != nil {
+		t.Fatalf("replace sprints: %v", err)
+	}
+
+	got, err := r.ListSprints(ctx, "p1", 1)
+	if err != nil || len(got) != 1 || got[0].Goal != "Clear the checkout defects" {
+		t.Fatalf("sprints = %+v, %v, want the goal a ceremony wrote", got, err)
+	}
+}
+
 // TestBoardSprintStateAnswersForOneBoard is what a ceremony asks before it
 // acts. Jira hands the same sprint to every board whose filter reaches it,
 // so the question is never "does this sprint exist" but "is it this board's",

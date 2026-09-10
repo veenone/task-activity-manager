@@ -129,8 +129,8 @@ func (f *fakeJira) agile(w http.ResponseWriter, r *http.Request) {
 		// originBoardId is board 7, not the board being read: the mapping
 		// must take the board from the request, not from the payload.
 		_, _ = w.Write([]byte(`{"isLast":true,"values":[
-			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z"},
-			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z"}
+			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z","goal":"Ship the promo code flow"},
+			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z","goal":""}
 		]}`))
 	case "/rest/agile/1.0/board/2/sprint":
 		// Jira's way of saying a kanban board has no sprints.
@@ -305,6 +305,9 @@ func TestBoardSprintsTakeTheBoardFromTheRequestAndKanbanHasNone(t *testing.T) {
 	}
 	if sprints[1].StartDate == "" || sprints[1].EndDate == "" {
 		t.Errorf("sprint dates dropped: %+v", sprints[1])
+	}
+	if sprints[0].Goal != "Ship the promo code flow" {
+		t.Errorf("sprint goal dropped: %+v", sprints[0])
 	}
 	none, err := b.BoardSprints(ctx, 2)
 	if err != nil {

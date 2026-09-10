@@ -100,9 +100,9 @@ func (b *Backend) BoardSprints(_ context.Context, boardID int) ([]backend.Sprint
 // sprint move and the overlay can both build on the same list.
 func demoSprints() []backend.Sprint {
 	return []backend.Sprint{
-		{ID: 11, BoardID: scrumBoardID, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z", EndDate: "2026-08-18T09:00:00Z"},
-		{ID: 12, BoardID: scrumBoardID, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z", EndDate: "2026-09-01T09:00:00Z"},
-		{ID: 13, BoardID: scrumBoardID, Name: "Sprint 13", State: "future", StartDate: "2026-09-01T09:00:00Z", EndDate: "2026-09-15T09:00:00Z"},
+		{ID: 11, BoardID: scrumBoardID, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z", EndDate: "2026-08-18T09:00:00Z", Goal: "Ship the promo code redemption flow end to end"},
+		{ID: 12, BoardID: scrumBoardID, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z", EndDate: "2026-09-01T09:00:00Z", Goal: "Clear the checkout defect backlog before the freeze"},
+		{ID: 13, BoardID: scrumBoardID, Name: "Sprint 13", State: "future", StartDate: "2026-09-01T09:00:00Z", EndDate: "2026-09-15T09:00:00Z", Goal: "Start the loyalty points redesign"},
 	}
 }
 

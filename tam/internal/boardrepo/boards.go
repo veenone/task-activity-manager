@@ -21,7 +21,7 @@ const insertColumnSQL = `
 	INSERT INTO board_column (profile_id, board_id, position, name, status_ids) VALUES (?, ?, ?, ?, ?)`
 
 const insertSprintSQL = `
-	INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, goal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
 const insertIssueKeySQL = `
 	INSERT INTO board_issue (profile_id, board_id, sprint_id, key, position) VALUES (?, ?, ?, ?, ?)`
@@ -37,7 +37,7 @@ const columnsSQL = `
 // date. Jira sends the state lowercase and the backends keep it that way, so
 // the CASE matches without folding.
 const listSprintsSQL = `
-	SELECT id, board_id, name, state, start_date, end_date FROM sprint
+	SELECT id, board_id, name, state, start_date, end_date, goal FROM sprint
 	WHERE profile_id = ? AND board_id = ?
 	ORDER BY CASE state WHEN 'active' THEN 0 WHEN 'future' THEN 1 WHEN 'closed' THEN 2 ELSE 3 END, start_date, id`
 
@@ -135,7 +135,7 @@ func (r *Repository) ListSprints(ctx context.Context, profileID string, boardID 
 	out := []Sprint{}
 	for rows.Next() {
 		var s Sprint
-		if err := rows.Scan(&s.ID, &s.BoardID, &s.Name, &s.State, &s.StartDate, &s.EndDate); err != nil {
+		if err := rows.Scan(&s.ID, &s.BoardID, &s.Name, &s.State, &s.StartDate, &s.EndDate, &s.Goal); err != nil {
 			return nil, err
 		}
 		out = append(out, s)

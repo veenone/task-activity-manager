@@ -337,3 +337,156 @@ func TestFreshDatabaseKeysSprintByBoard(t *testing.T) {
 		}
 	}
 }
+
+// sprintDDLVersionSix is the sprint table as version 6 left it: keyed by
+// board already, but before this plan's goal column existed. A developer
+// database built from that version still carries this shape, which is what
+// the version 7 migration is for.
+const sprintDDLVersionSix = `CREATE TABLE sprint (
+	profile_id TEXT NOT NULL,
+	id         INTEGER NOT NULL,
+	board_id   INTEGER NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	state      TEXT NOT NULL DEFAULT '',
+	start_date TEXT NOT NULL DEFAULT '',
+	end_date   TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, id)
+)`
+
+// openAtVersionSix writes a version 6 database at path: sprint already keyed
+// by board, holding one row, with no goal column yet.
+func openAtVersionSix(t *testing.T, path string) {
+	t.Helper()
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE sprint`,
+		sprintDDLVersionSix,
+		`INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date) VALUES ('p1', 12, 1, 'Sprint 12', 'active', '2026-08-18T09:00:00Z', '2026-09-01T09:00:00Z')`,
+		`UPDATE meta SET value = '6' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+}
+
+// TestVersionSevenMigrationAddsGoalAndKeepsARowAlreadyKeyedByBoard is the
+// plain case: sprint is already the shape version 6 left it, so the
+// migration is a single ALTER TABLE ADD COLUMN and the row it was called for
+// survives untouched.
+func TestVersionSevenMigrationAddsGoalAndKeepsARowAlreadyKeyedByBoard(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	openAtVersionSix(t, path)
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+	var name, goal string
+	if err := db.DB().QueryRow(`SELECT name, goal FROM sprint WHERE profile_id = 'p1' AND board_id = 1 AND id = 12`).Scan(&name, &goal); err != nil {
+		t.Fatalf("read migrated sprint: %v", err)
+	}
+	if name != "Sprint 12" {
+		t.Errorf("name = %q after the goal migration, want the row kept rather than rebuilt empty", name)
+	}
+	// Nothing backfills a sprint cached before this version: the sprint is
+	// not part of an issue sync, and its only refresh is the Boards view's
+	// own Refresh button, which this migration does not trigger.
+	if goal != "" {
+		t.Errorf("goal = %q, want empty until the next Boards Refresh fills it in", goal)
+	}
+}
+
+// openAtVersionFive writes a version 5 database at path: sprint still keyed
+// the way version 4 left it, (profile_id, id), which is the shape version
+// 6's migration exists to fix. Version 5's own migration never touches
+// sprint, so a database recorded at 5 still carries this key.
+func openAtVersionFive(t *testing.T, path string) {
+	t.Helper()
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE sprint`,
+		oldSprintDDL,
+		`INSERT INTO sprint (profile_id, id, board_id, name, state) VALUES ('p1', 12, 1, 'Sprint 12', 'active')`,
+		`UPDATE meta SET value = '5' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+}
+
+// TestVersionFiveDatabaseGetsTheGoalColumnFromMigrationSixsRebuild covers the
+// interaction nothing else exercises: opening a version 5 database runs
+// migration 6 before migration 7 ever does. Migration 6 drops sprint and
+// recreates it from sprintDDL, which by then already carries the goal
+// column, so migration 7's ALTER TABLE lands on a column that is already
+// there and takes the same duplicate-column no-op path a fresh install
+// does. The row cached at version 5 does not survive; migration 6 empties
+// the table regardless of what version brought it there, and the next
+// boards sync refills it.
+func TestVersionFiveDatabaseGetsTheGoalColumnFromMigrationSixsRebuild(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	openAtVersionFive(t, path)
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+	var rows int
+	if err := db.DB().QueryRow(`SELECT count(*) FROM sprint`).Scan(&rows); err != nil {
+		t.Fatalf("count sprints: %v", err)
+	}
+	if rows != 0 {
+		t.Errorf("sprint rows after migrating from version 5 = %d, want the cache emptied by migration 6, as it always is", rows)
+	}
+	if _, err := db.DB().Exec(
+		`INSERT INTO sprint (profile_id, id, board_id, name, state, goal) VALUES ('p1', 12, 1, 'Sprint 12', 'active', 'Ship it')`,
+	); err != nil {
+		t.Errorf("insert naming the goal column after migrating from version 5: %v", err)
+	}
+}
+
+// TestFreshDatabaseHasTheSprintGoalColumn is a test of sprintDDL, not of the
+// version 7 migration: a database created fresh never runs the migration's
+// body for real, since AddColumnIfMissing treats the column baseDDL already
+// gave it as the expected duplicate.
+func TestFreshDatabaseHasTheSprintGoalColumn(t *testing.T) {
+	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.DB().Exec(
+		`INSERT INTO sprint (profile_id, id, board_id, name, state, goal) VALUES ('p1', 1, 1, 'Sprint 1', 'active', 'Ship it')`,
+	); err != nil {
+		t.Fatalf("insert with goal: %v", err)
+	}
+	var goal string
+	if err := db.DB().QueryRow(`SELECT goal FROM sprint WHERE profile_id = 'p1' AND board_id = 1 AND id = 1`).Scan(&goal); err != nil {
+		t.Fatalf("read goal: %v", err)
+	}
+	if goal != "Ship it" {
+		t.Errorf("goal = %q, want what was inserted", goal)
+	}
+}
