@@ -90,6 +90,45 @@ func TestARefreshAfterADeleteWritesAnEmptyAnswerBecauseItIsTrue(t *testing.T) {
 	}
 }
 
+// preLifecycleBackend answers the four methods a ceremony backend answered
+// before this package grew CreateSprint, EditSprint, and DeleteSprint. It
+// is what Service.board() must refuse: a backend that can start and
+// complete a sprint but cannot create, edit, or delete one is not the
+// lifecycle interface asks for, and the refusal has to say so in words that
+// cover all six writes, not just the two this double still answers.
+type preLifecycleBackend struct{}
+
+func (preLifecycleBackend) SearchIssuesPage(context.Context, string, string, string, []string, int, int) ([]backend.Issue, int, error) {
+	return nil, 0, nil
+}
+func (preLifecycleBackend) BoardSprints(context.Context, int) ([]backend.Sprint, error) {
+	return nil, nil
+}
+func (preLifecycleBackend) MoveIssuesToSprint(context.Context, string, []string) error { return nil }
+func (preLifecycleBackend) StartSprint(context.Context, int, backend.SprintDraft) error {
+	return nil
+}
+func (preLifecycleBackend) CompleteSprint(context.Context, int) error { return nil }
+
+// TestBoardRefusesABackendThatCannotCreateEditOrDeleteSprints pins down both
+// the refusal and its wording: a backend answering only the four methods
+// that existed before create, edit, and delete were added must still be
+// refused by Service.board(), with the one sentence a ceremony returns for
+// every kind of unsupported backend, wide enough now to cover all six
+// writes rather than only Start and Complete.
+func TestBoardRefusesABackendThatCannotCreateEditOrDeleteSprints(t *testing.T) {
+	s := &Service{b: preLifecycleBackend{}}
+
+	_, err := s.board()
+	if err == nil {
+		t.Fatal("board() = nil error, want a refusal: this backend cannot create, edit, or delete a sprint")
+	}
+	want := "this connection cannot manage sprints"
+	if err.Error() != want {
+		t.Errorf("board() error = %q, want %q", err.Error(), want)
+	}
+}
+
 func TestNeitherRefreshWritesWhenTheReadItselfFailed(t *testing.T) {
 	for _, tc := range []struct {
 		name string

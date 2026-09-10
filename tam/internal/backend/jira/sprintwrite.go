@@ -37,9 +37,16 @@ func (b *Backend) CreateSprint(ctx context.Context, boardID int, d backend.Sprin
 // EditSprint edits sprintID with the draft's name, dates, and goal,
 // touching only the fields the draft carries; clearGoal sends an empty goal
 // on purpose. It reaches Jira immediately, the same as StartSprint.
+//
+// The call below is named UpdateSprint, not EditSprint: core/jira names its
+// client methods for the wire operation, a partial update, while the layers
+// above it are named for the user's action, so the chain reads Service.Edit
+// to BoardBackend.EditSprint to Client.UpdateSprint. The wrapped error says
+// "edit" for the same reason, so it matches the method the caller invoked
+// rather than the one this file calls into.
 func (b *Backend) EditSprint(ctx context.Context, sprintID int, d backend.SprintDraft, clearGoal bool) error {
 	if err := b.c.UpdateSprint(ctx, sprintID, d.Name, d.Goal, d.StartDate, d.EndDate, clearGoal); err != nil {
-		return fmt.Errorf("update sprint %d: %w", sprintID, err)
+		return fmt.Errorf("edit sprint %d: %w", sprintID, err)
 	}
 	return nil
 }

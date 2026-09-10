@@ -285,11 +285,11 @@ type Sprint struct {
 	Goal      string `json:"goal"`
 }
 
-// SprintDraft is a sprint's fields for starting it: a name (prefilled from
-// the sprint's own), an optional goal, and start and end dates already in
-// the Agile API's own datetime format. Turning a bare date, the shape an
-// HTML date input produces, into that format is sprints.Service's job, not
-// the backend's.
+// SprintDraft is a sprint's fields for starting, creating, or editing one: a
+// name (prefilled from the sprint's own when one exists), an optional goal,
+// and start and end dates already in the Agile API's own datetime format.
+// Turning a bare date, the shape an HTML date input produces, into that
+// format is sprints.Service's job, not the backend's.
 type SprintDraft struct {
 	Name      string `json:"name"`
 	Goal      string `json:"goal"`
@@ -301,7 +301,8 @@ type SprintDraft struct {
 // backends that speak Jira's Agile API have to answer for it. The boards
 // sync pass and the commit pass's rank and sprint group both ask for it
 // with a type assertion and skip themselves when a backend does not have
-// it. Everything above RankIssue reads; the last two write.
+// it. Everything above RankIssue reads; RankIssue and everything below it
+// write.
 type BoardBackend interface {
 	// Boards lists the project's boards from Jira's Agile API, scrum and
 	// kanban only. It never writes.

@@ -35,7 +35,7 @@ const searchPage = 50
 // errNoLifecycle is what a backend that cannot speak Jira's Agile API
 // answers a ceremony with. It says nothing about permissions: TAM does not
 // guess at those before trying.
-var errNoLifecycle = errors.New("this connection cannot start or complete sprints")
+var errNoLifecycle = errors.New("this connection cannot manage sprints")
 
 // Backend is what a ceremony needs from the profile's backend before the
 // Agile capability is asked for: the issue search, which is how a sprint's
@@ -45,7 +45,7 @@ type Backend interface {
 	SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, since string, types []string, startAt, maxResults int) ([]backend.Issue, int, error)
 }
 
-// lifecycle is the part of backend.BoardBackend a ceremony uses: the three
+// lifecycle is the part of backend.BoardBackend a ceremony uses: the six
 // writes and the one read that records what they did. Like the committer's
 // own board writer, it asks for those and not for the board configuration,
 // so a test's backend does not have to answer for a board's columns to close

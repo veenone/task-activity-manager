@@ -109,9 +109,9 @@ func demoSprints() []backend.Sprint {
 
 // findDemoSprint is one of the scrum board's sprints by id, its own dataset
 // or created state, with nothing else overlaid: a tombstoned sprint is
-// never found, even under an id that also names a dataset literal, which
-// cannot happen since only a created sprint is ever deleted. Callers hold
-// b.mu.
+// never found, whether the id names a dataset literal or one this run
+// created, since DeleteSprint tombstones either kind the same way. Callers
+// hold b.mu.
 func (b *Backend) findDemoSprint(sprintID int) (backend.Sprint, bool) {
 	if b.sprintDeleted[sprintID] {
 		return backend.Sprint{}, false
@@ -152,6 +152,38 @@ type sprintEdit struct {
 	clearGoal bool
 }
 
+// applyDraft is the one partial update rule every sprint draft follows,
+// Jira's own endpoint included: a field the draft carries wins over
+// whatever name, startDate, or endDate already holds, and goal follows a
+// switch of its own, since clearGoal is the one deliberate exception that
+// takes the goal away even though the draft's own is empty. clearGoalFlag
+// is where EditSprint remembers that exception for the next edit to merge
+// against; the two overlays that only ever apply a draft once, never pass
+// one, so a nil clearGoalFlag simply means there is nothing to remember.
+func applyDraft(name, startDate, endDate, goal *string, clearGoalFlag *bool, d backend.SprintDraft, clearGoal bool) {
+	if d.Name != "" {
+		*name = d.Name
+	}
+	if d.StartDate != "" {
+		*startDate = d.StartDate
+	}
+	if d.EndDate != "" {
+		*endDate = d.EndDate
+	}
+	switch {
+	case d.Goal != "":
+		*goal = d.Goal
+		if clearGoalFlag != nil {
+			*clearGoalFlag = false
+		}
+	case clearGoal:
+		*goal = ""
+		if clearGoalFlag != nil {
+			*clearGoalFlag = true
+		}
+	}
+}
+
 // sprintsOverlay is the dataset's three sprints and this run's own created
 // ones, tombstoned sprints dropped, with StartSprint's, CompleteSprint's,
 // and EditSprint's own changes applied on top. A started sprint's name,
@@ -161,7 +193,7 @@ type sprintEdit struct {
 // EditSprint's own draft over that, so an edit made after a start still
 // wins. Callers hold b.mu.
 func (b *Backend) sprintsOverlay() []backend.Sprint {
-	base := append(append([]backend.Sprint{}, demoSprints()...), b.createdSprints()...)
+	base := append(demoSprints(), b.createdSprints()...)
 	out := make([]backend.Sprint, 0, len(base))
 	for _, s := range base {
 		if b.sprintDeleted[s.ID] {
@@ -171,35 +203,10 @@ func (b *Backend) sprintsOverlay() []backend.Sprint {
 			s.State = state
 		}
 		if draft, ok := b.sprintDraft[s.ID]; ok {
-			if draft.Name != "" {
-				s.Name = draft.Name
-			}
-			if draft.StartDate != "" {
-				s.StartDate = draft.StartDate
-			}
-			if draft.EndDate != "" {
-				s.EndDate = draft.EndDate
-			}
-			if draft.Goal != "" {
-				s.Goal = draft.Goal
-			}
+			applyDraft(&s.Name, &s.StartDate, &s.EndDate, &s.Goal, nil, draft, false)
 		}
 		if e, ok := b.sprintEdits[s.ID]; ok {
-			if e.draft.Name != "" {
-				s.Name = e.draft.Name
-			}
-			if e.draft.StartDate != "" {
-				s.StartDate = e.draft.StartDate
-			}
-			if e.draft.EndDate != "" {
-				s.EndDate = e.draft.EndDate
-			}
-			switch {
-			case e.draft.Goal != "":
-				s.Goal = e.draft.Goal
-			case e.clearGoal:
-				s.Goal = ""
-			}
+			applyDraft(&s.Name, &s.StartDate, &s.EndDate, &s.Goal, nil, e.draft, e.clearGoal)
 		}
 		out = append(out, s)
 	}
@@ -497,25 +504,10 @@ func (b *Backend) EditSprint(_ context.Context, sprintID int, d backend.SprintDr
 		return fmt.Errorf("demo: no sprint %d", sprintID)
 	}
 	e := b.sprintEdits[sprintID]
-	if d.Name != "" {
-		e.draft.Name = d.Name
-	}
-	if d.StartDate != "" {
-		e.draft.StartDate = d.StartDate
-	}
-	if d.EndDate != "" {
-		e.draft.EndDate = d.EndDate
-	}
-	switch {
-	case d.Goal != "":
-		// A new goal cancels an earlier clear: the two are mutually
-		// exclusive states of the one field, not two independent ones.
-		e.draft.Goal = d.Goal
-		e.clearGoal = false
-	case clearGoal:
-		e.draft.Goal = ""
-		e.clearGoal = true
-	}
+	// A new goal cancels an earlier clear, and a new clear cancels an
+	// earlier goal: the two are mutually exclusive states of the one
+	// field, not two independent ones, which is what clearGoalFlag records.
+	applyDraft(&e.draft.Name, &e.draft.StartDate, &e.draft.EndDate, &e.draft.Goal, &e.clearGoal, d, clearGoal)
 	b.sprintEdits[sprintID] = e
 	return nil
 }
@@ -523,9 +515,10 @@ func (b *Backend) EditSprint(_ context.Context, sprintID int, d backend.SprintDr
 // DeleteSprint removes sprintID, mirroring what a real Jira delete does to
 // its issues: every cached card carrying this sprint returns to the
 // board's own scope, sprint id and name both cleared, rather than being
-// deleted itself. The tombstone is set last, so findDemoSprint, which the
-// walk below still needs to have answered true, only stops finding this
-// sprint once its issues have already been moved back.
+// deleted itself. The walk below matches issues by sprint id, not by
+// findDemoSprint, so the tombstone's placement relative to it is not load
+// bearing; it is set last only because that is the order the steps are
+// listed in here.
 func (b *Backend) DeleteSprint(_ context.Context, sprintID int) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
