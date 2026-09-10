@@ -61,6 +61,9 @@ type lifecycle interface {
 	MoveIssuesToSprint(ctx context.Context, sprintID string, keys []string) error
 	StartSprint(ctx context.Context, sprintID int, d backend.SprintDraft) error
 	CompleteSprint(ctx context.Context, sprintID int) error
+	CreateSprint(ctx context.Context, boardID int, d backend.SprintDraft) (backend.Sprint, error)
+	EditSprint(ctx context.Context, sprintID int, d backend.SprintDraft, clearGoal bool) error
+	DeleteSprint(ctx context.Context, sprintID int) error
 }
 
 // Store is what a ceremony needs from the board cache: the columns, which

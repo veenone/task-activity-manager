@@ -151,6 +151,18 @@ func (f *fake) CompleteSprint(context.Context, int) error {
 	return errors.New("not used")
 }
 
+func (f *fake) CreateSprint(context.Context, int, backend.SprintDraft) (backend.Sprint, error) {
+	return backend.Sprint{}, errors.New("not used")
+}
+
+func (f *fake) EditSprint(context.Context, int, backend.SprintDraft, bool) error {
+	return errors.New("not used")
+}
+
+func (f *fake) DeleteSprint(context.Context, int) error {
+	return errors.New("not used")
+}
+
 func (f *fake) Transition(context.Context, string, []string) error {
 	return errors.New("not used")
 }

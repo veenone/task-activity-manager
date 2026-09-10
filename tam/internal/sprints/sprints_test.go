@@ -130,6 +130,21 @@ func (f *fakeBackend) BoardSprints(context.Context, int) ([]backend.Sprint, erro
 	return f.sprints, nil
 }
 
+// CreateSprint, EditSprint, and DeleteSprint are not exercised by this
+// package's own tests, which cover Start and Complete; they exist only so
+// fakeBackend keeps satisfying the lifecycle seam.
+func (f *fakeBackend) CreateSprint(context.Context, int, backend.SprintDraft) (backend.Sprint, error) {
+	return backend.Sprint{}, errors.New("not used")
+}
+
+func (f *fakeBackend) EditSprint(context.Context, int, backend.SprintDraft, bool) error {
+	return errors.New("not used")
+}
+
+func (f *fakeBackend) DeleteSprint(context.Context, int) error {
+	return errors.New("not used")
+}
+
 // fakeStore is the board cache: the columns "complete" is defined against,
 // the destination's name, and the two writes the ceremonies make.
 type fakeStore struct {

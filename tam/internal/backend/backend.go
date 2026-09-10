@@ -342,6 +342,24 @@ type BoardBackend interface {
 	// the journal binding of the same underlying call); CompleteSprint only
 	// closes.
 	CompleteSprint(ctx context.Context, sprintID int) error
+	// CreateSprint creates a sprint on boardID with the draft's name, goal,
+	// and dates, and returns it as this package's own Sprint, BoardID set
+	// from the argument rather than from whatever the wire answered with.
+	// Like StartSprint, it reaches Jira immediately: creating a sprint is
+	// one of the writes TAM does not journal, for the reason written on
+	// core/jira's UpdateSprint.
+	CreateSprint(ctx context.Context, boardID int, d SprintDraft) (Sprint, error)
+	// EditSprint edits sprintID with the draft's name, dates, and goal,
+	// touching only the fields the draft carries. clearGoal is the
+	// exception: when true it sends an empty goal on purpose, since a goal
+	// otherwise can never be taken away, only overwritten by a new one. It
+	// reaches Jira immediately, the same as CreateSprint.
+	EditSprint(ctx context.Context, sprintID int, d SprintDraft, clearGoal bool) error
+	// DeleteSprint deletes sprintID. Jira returns the sprint's issues to
+	// the backlog rather than deleting them; nothing here removes them from
+	// TAM's own cache, which is the caller's job. It reaches Jira
+	// immediately, the same as CreateSprint.
+	DeleteSprint(ctx context.Context, sprintID int) error
 }
 
 // ErrNoTransition is what Transition returns when no workflow transition of

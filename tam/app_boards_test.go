@@ -148,6 +148,15 @@ func (stubIssueBackend) StartSprint(context.Context, int, backend.SprintDraft) e
 func (stubIssueBackend) CompleteSprint(context.Context, int) error {
 	return errors.New("not used")
 }
+func (stubIssueBackend) CreateSprint(context.Context, int, backend.SprintDraft) (backend.Sprint, error) {
+	return backend.Sprint{}, errors.New("not used")
+}
+func (stubIssueBackend) EditSprint(context.Context, int, backend.SprintDraft, bool) error {
+	return errors.New("not used")
+}
+func (stubIssueBackend) DeleteSprint(context.Context, int) error {
+	return errors.New("not used")
+}
 func (stubIssueBackend) CanTransition(context.Context, string, []string) (backend.TransitionCheck, error) {
 	return backend.TransitionCheck{}, errors.New("not used")
 }
