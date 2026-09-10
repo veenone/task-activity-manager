@@ -470,6 +470,7 @@ export namespace boardrepo {
 	    points: number;
 	    donePoints: number;
 	    membershipCached: boolean;
+	    notSynced: number;
 	    truncated: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -491,6 +492,7 @@ export namespace boardrepo {
 	        this.points = source["points"];
 	        this.donePoints = source["donePoints"];
 	        this.membershipCached = source["membershipCached"];
+	        this.notSynced = source["notSynced"];
 	        this.truncated = source["truncated"];
 	    }
 	

@@ -33,10 +33,28 @@ const detailSprintsSQL = `
 // would read as if it were.
 const UnassignedSprintState = "unassigned"
 
+// UnassignedSprintName is the unassigned node's display name. It cannot
+// reuse laneUnassigned: that word already means "no assignee" on the
+// Boards view's assignee swimlane, and a view that can show both an
+// assignee swimlane and this node side by side needs the two to read as
+// different things, so this one names the board's own list rather than a
+// missing person.
+const UnassignedSprintName = "Board backlog"
+
 // SprintDetail is one sprint the Sprints view draws, or the board's own
-// unassigned work under the same shape: the row, its issues after the
-// journal has been replayed onto them exactly the way composeBoard replays
-// it onto a board's cards, and the four numbers a fill bar reads from.
+// unassigned work under the same shape: the row, its issues after
+// withMovedIn and applyMoves have replayed the journal onto them in the
+// same order composeBoard uses them in, and the four numbers a fill bar
+// reads from. It does not replay pending rank the way composeBoard does, so
+// cards come back in board_issue.position order with any pending reorder
+// ignored, and it draws no drafts: composeBoard draws every draft on every
+// board and every sprint regardless of the draft's own sprint id, since a
+// draft is project level there and DraftIssues answers unfiltered by scope.
+// Copying that same everywhere-placement into a per-sprint read would be no
+// better an answer, since it is not sprint-true either, so this read leaves
+// the exclusion explicit instead. A draft created into a sprint therefore
+// shows in neither its sprint nor the unassigned node, and this view's
+// counts can disagree with the Boards view's for the same sprint.
 type SprintDetail struct {
 	Sprint
 	// Issues is this scope's cards, capped by MaxCardsPerView, the same
@@ -65,6 +83,16 @@ type SprintDetail struct {
 	// unassigned node, whose cards come from the board's own list rather
 	// than from a sprint's membership.
 	MembershipCached bool `json:"membershipCached"`
+
+	// NotSynced counts this node's own scope keys the issue cache does not
+	// hold: IssuesByKeys silently drops a key it cannot find, so a sprint
+	// of thirty issues on a board synced before its issues were would
+	// otherwise report a Total of ten with nothing saying so. It differs
+	// from MembershipCached, which only says whether the sync tries to
+	// fetch this scope's membership at all; NotSynced says how many of the
+	// keys that scope actually named went missing from the count, the same
+	// way BoardView.NotSynced does for a board's own list.
+	NotSynced int `json:"notSynced"`
 
 	// Truncated is set when the shared MaxCardsPerView budget stopped this
 	// node's Issues short. The four numbers above are unaffected, since
@@ -131,16 +159,28 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 		// read; applyMoves then drops whatever the journal has moved back
 		// out. Skipping either step is what leaves a bulk move looking
 		// like it did nothing until the next boards sync.
-		scopeKeys = withMovedIn(scopeKeys, moves, sprintID)
-		cards, err := issues.IssuesByKeys(ctx, q, profileID, scopeKeys)
+		movedKeys := withMovedIn(scopeKeys, moves, sprintID)
+		cards, err := issues.IssuesByKeys(ctx, q, profileID, movedKeys)
 		if err != nil {
 			return nil, err
 		}
+		// Counted against scopeKeys, the sprint's own membership, and not
+		// movedKeys: a key withMovedIn added came from the journal, not
+		// from a sync that might have missed it, so it has nothing to do
+		// with what this scope failed to sync.
+		notSynced := countNotSynced(scopeKeys, cards)
 		cards = applyMoves(cards, moves, sprintID)
+		// claimed is built from cards after applyMoves has run, so a card
+		// the journal has just moved out of this sprint is not claimed by
+		// it: applyMoves already dropped it here, and the unassigned scope
+		// below is where it belongs instead. Building claimed from the
+		// pre-replay cards would claim it anyway and it would vanish from
+		// both.
 		for _, c := range cards {
 			claimed[c.Key] = true
 		}
 		detail := newSprintDetail(s)
+		detail.NotSynced = notSynced
 		fillDetail(&detail, cards, &rendered)
 		out = append(out, detail)
 	}
@@ -155,17 +195,21 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 	if err != nil {
 		return nil, err
 	}
+	unassignedNotSynced := countNotSynced(unassignedKeys, unassignedCards)
 	// applyMoves is still worth a pass here: a card can carry a pending
 	// transition without a pending sprint move, and this scope should draw
 	// it in its journaled status the same as every sprint's does. Passing
 	// "" as the scope is what a whole-board view passes too, and it drops
-	// nothing, since a card only leaves a scope it was read into, and this
-	// one was already filtered by claimed rather than by board_issue.
+	// nothing here for the same reason it drops nothing there: applyMoves'
+	// own drop branch only fires when sprintID != "", so an empty scope has
+	// no sprint to leave.
 	unassignedCards = applyMoves(unassignedCards, moves, "")
-	unassigned := SprintDetail{
-		Sprint:           Sprint{BoardID: boardID, Name: "Unassigned", State: UnassignedSprintState},
-		MembershipCached: true,
-	}
+	// Built through the same constructor as every sprint node, rather than
+	// a separate literal, so Issues starts as an empty slice on every path
+	// and fillDetail's nil guard has only one meaning to carry.
+	unassigned := newSprintDetail(Sprint{BoardID: boardID, Name: UnassignedSprintName, State: UnassignedSprintState})
+	unassigned.MembershipCached = true
+	unassigned.NotSynced = unassignedNotSynced
 	fillDetail(&unassigned, unassignedCards, &rendered)
 	out = append(out, unassigned)
 
@@ -186,11 +230,10 @@ func newSprintDetail(s Sprint) SprintDetail {
 
 // fillDetail counts every card into the four numbers, then appends it to
 // Issues until the shared MaxCardsPerView budget runs out, past which the
-// card is still counted but not rendered, and Truncated says so.
+// card is still counted but not rendered, and Truncated says so. It assumes
+// d.Issues already starts as an empty slice, the way newSprintDetail leaves
+// it on every caller.
 func fillDetail(d *SprintDetail, cards []backend.Issue, rendered *int) {
-	if d.Issues == nil {
-		d.Issues = []backend.Issue{}
-	}
 	for _, c := range cards {
 		d.Total++
 		done := backend.IsDone(c.Status)
