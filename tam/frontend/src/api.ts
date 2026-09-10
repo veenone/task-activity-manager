@@ -595,6 +595,10 @@ export interface ImportResult {
   created: string[];
   updated: string[];
   errors: ImportRowError[];
+  // sprintCellsIgnored counts the keyed rows whose mapped Sprint cell held a
+  // value: a sprint is a board write, not a field, so the cell is read by
+  // nothing and the row's other fields land without it.
+  sprintCellsIgnored: number;
 }
 
 // IMPORT_FIELDS are the fields a column can feed, in dialog order. Key comes

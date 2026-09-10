@@ -51,7 +51,7 @@ const mapping: api.ImportMapping = { key: "", type: "Issue Type", summary: "Summ
 // result fills in the halves a case does not care about, so a test names only
 // what it is actually asserting on.
 function result(r: Partial<api.ImportResult>): api.ImportResult {
-  return { rows: 0, created: [], updated: [], errors: [], ...r };
+  return { rows: 0, created: [], updated: [], errors: [], sprintCellsIgnored: 0, ...r };
 }
 
 beforeEach(() => {
@@ -143,6 +143,30 @@ describe("ImportIssuesModal", () => {
     // dialog still finishes rather than offering Import again.
     expect(onImported).toHaveBeenCalledWith([]);
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+  });
+
+  it("notes ignored Sprint cells in the preflight when the count is above zero, and stays quiet when it is zero", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ImportIssues).mockResolvedValue(result({ rows: 1, updated: ["PLAT-412"], sprintCellsIgnored: 2 }));
+    renderModal();
+    await pickFile(user);
+    expect(await screen.findByText("2 rows carry a Sprint value; import does not change an issue's sprint.")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Import" })).toBeEnabled();
+
+    vi.mocked(api.ImportIssues).mockResolvedValue(result({ rows: 1, updated: ["PLAT-412"], sprintCellsIgnored: 0 }));
+    await user.click(screen.getByRole("button", { name: "Validate" }));
+    await waitFor(() => expect(screen.queryByText(/carry a Sprint value/)).not.toBeInTheDocument());
+  });
+
+  it("notes ignored Sprint cells in the result summary after import", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ImportIssues).mockResolvedValue(result({ rows: 1, updated: ["PLAT-412"], sprintCellsIgnored: 1 }));
+    renderModal();
+    await pickFile(user);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    expect(await screen.findByText("✓ Imported 1 issue to update as pending changes. Commit them from the Pending changes dialog.")).toBeInTheDocument();
+    expect(screen.getByText("1 row carries a Sprint value; import does not change an issue's sprint.")).toBeInTheDocument();
   });
 
   it("shows the zero-drafts outcome when every row is skipped on import", async () => {

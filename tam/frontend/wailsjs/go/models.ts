@@ -658,6 +658,7 @@ export namespace importer {
 	    created: string[];
 	    updated: string[];
 	    errors: RowError[];
+	    sprintCellsIgnored: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
@@ -669,6 +670,7 @@ export namespace importer {
 	        this.created = source["created"];
 	        this.updated = source["updated"];
 	        this.errors = this.convertValues(source["errors"], RowError);
+	        this.sprintCellsIgnored = source["sprintCellsIgnored"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

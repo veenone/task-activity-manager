@@ -52,6 +52,15 @@ type Result struct {
 	Created []string   `json:"created"`
 	Updated []string   `json:"updated"`
 	Errors  []RowError `json:"errors"`
+	// SprintCellsIgnored counts the keyed rows whose mapped Sprint cell held
+	// a value. A sprint is a board write, not a field, so EditFields cannot
+	// carry one and the cell is read by nothing; the row's other fields are
+	// still applied. A blank cell, or no Sprint column at all, counts
+	// nothing, and neither does a create row, whose Sprint cell is honoured.
+	// A dry run fills this in too, since the preflight is where the user
+	// should learn a Sprint column will not move an existing issue, before
+	// they press Import rather than after.
+	SprintCellsIgnored int `json:"sprintCellsIgnored"`
 }
 
 // synonyms are the normalised header names each field accepts, first
@@ -324,6 +333,9 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 			if msg != "" {
 				fail(msg)
 				continue
+			}
+			if c.sprint != -1 && cell(row, c.sprint) != "" {
+				res.SprintCellsIgnored++
 			}
 			edits = append(edits, rowEdits...)
 			continue

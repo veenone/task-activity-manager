@@ -205,6 +205,83 @@ func TestRunIgnoresTheSprintCellOnAKeyedRowOnPurpose(t *testing.T) {
 	if story.SprintID != "" || story.SprintName != "" {
 		t.Errorf("the Sprint cell must not move the issue: %+v", story)
 	}
+	if res.SprintCellsIgnored != 1 {
+		t.Errorf("SprintCellsIgnored = %d, want 1", res.SprintCellsIgnored)
+	}
+}
+
+// A keyed row whose Sprint column is mapped but whose cell is blank counts
+// nothing: an empty cell means "leave the sprint alone", which is not a
+// request the import declined.
+func TestRunCountsNothingForABlankSprintCellOnAKeyedRow(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Key", "Summary", "Priority", "Sprint"},
+		{"PLAT-412", "Apply promo code, revised", "Low", ""},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || len(res.Updated) != 1 {
+		t.Fatalf("Run: %+v", res)
+	}
+	if res.SprintCellsIgnored != 0 {
+		t.Errorf("SprintCellsIgnored = %d, want 0 for a blank cell", res.SprintCellsIgnored)
+	}
+}
+
+// A create row's Sprint cell counts nothing, since a create honours it: the
+// counter is only for cells a keyed row's update could not act on.
+func TestRunCountsNothingForACreateRowsSprintCell(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Type", "Summary", "Sprint"},
+		{"Task", "Rotate the payment gateway keys", "Sprint 12"},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || len(res.Created) != 1 {
+		t.Fatalf("Run: %+v", res)
+	}
+	if res.SprintCellsIgnored != 0 {
+		t.Errorf("SprintCellsIgnored = %d, want 0 for a create row", res.SprintCellsIgnored)
+	}
+	created := detail(t, repo, res.Created[0])
+	if created.SprintID != "12" || created.SprintName != "Sprint 12" {
+		t.Errorf("the create row must still land in its sprint: %+v", created)
+	}
+}
+
+// The count survives a dry run, since the preflight is where the user should
+// learn about it, before Import rather than after.
+func TestRunCountsIgnoredSprintCellsOnADryRun(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Key", "Summary", "Priority", "Sprint"},
+		{"PLAT-412", "Apply promo code, revised", "Low", "Sprint 12"},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", true)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || res.SprintCellsIgnored != 1 {
+		t.Fatalf("dry run: %+v", res)
+	}
+	if len(res.Updated) != 0 {
+		t.Error("a dry run must write nothing")
+	}
 }
 
 // One file can create and update at once, which is what a planning sheet
