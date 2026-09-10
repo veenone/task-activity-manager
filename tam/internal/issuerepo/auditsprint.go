@@ -8,17 +8,18 @@ import (
 )
 
 // EntitySprint is the audit trail's entity type for a sprint TAM created,
-// edited or deleted in Jira. Unlike every other entity type in this file it
-// is not a journal entity type: nothing about a sprint is ever queued in
+// edited or deleted in Jira. Unlike every other entity type in this package
+// it is not a journal entity type: nothing about a sprint is ever queued in
 // pending_change, because those three writes reach Jira the moment they are
 // made.
 const EntitySprint = "sprint"
 
 // AuditSprint records one of those three writes. The entity key is the
 // sprint's numeric id, which no issue key can collide with since every one
-// of those carries its project's prefix, and before and after are the
-// sprint's name as it was and as it is: empty before a create, empty after a
-// delete.
+// of those carries its project's prefix; before and after are the sprint's
+// name as it was and as it is, empty before a create and empty after a
+// delete; and field names which of an edit's fields actually moved, empty
+// for a create or a delete, where there is only ever the one name to report.
 //
 // It lives here rather than in boardrepo, which owns the sprint rows,
 // because the audit_log table is this repository's: every other row in it is
@@ -35,6 +36,6 @@ const EntitySprint = "sprint"
 // The context is taken for the shape every other call here has and is not
 // used, the same way ListPendingChanges takes one journal.List does not
 // need.
-func (r *Repository) AuditSprint(_ context.Context, profileID string, sprintID int, action, before, after string) error {
-	return journal.Audit(r.db, profileID, EntitySprint, strconv.Itoa(sprintID), action, "", before, after, "")
+func (r *Repository) AuditSprint(_ context.Context, profileID string, sprintID int, action, field, before, after string) error {
+	return journal.Audit(r.db, profileID, EntitySprint, strconv.Itoa(sprintID), action, field, before, after, "")
 }

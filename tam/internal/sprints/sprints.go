@@ -115,7 +115,7 @@ type Store interface {
 // makes the delete's cache surgery an ordered pair rather than one write.
 type Issues interface {
 	ClearSprint(ctx context.Context, profileID, sprintID string) error
-	AuditSprint(ctx context.Context, profileID string, sprintID int, action, before, after string) error
+	AuditSprint(ctx context.Context, profileID string, sprintID int, action, field, before, after string) error
 }
 
 // Completion is what a completion did, and a push that failed partway is one
@@ -187,10 +187,28 @@ type Service struct {
 	// for the same reason, since app.go is the one place holding both
 	// repositories.
 	//
-	// Both of its calls are bookkeeping after Jira has already moved, so an
-	// unset seam is logged rather than refused: a build that forgot to wire
-	// it leaves stale sprint text on cached issues until the next full sync,
-	// which is the same damage a failed call would do.
+	// Create and Edit treat an unset seam as a footnote: both calls are
+	// bookkeeping after Jira has already moved, so a missing audit row is
+	// logged and nothing more. Delete does not get that leniency, because
+	// its call to Issues is not the same kind of afterthought: it is what
+	// keeps Jira's board tables and the issue cache from naming a sprint
+	// forever that Jira no longer has, the crash window boardrepo's own
+	// comment says a full sync repairs, made permanent instead of momentary,
+	// and it is what writes the one audit row that will be the only trace of
+	// the sprint left anywhere once Jira has destroyed it. Refusing before a
+	// delete touches Jira costs nothing; letting it through and losing both
+	// afterwards cannot be undone. So Delete checks this field for nil
+	// itself, before it calls Jira at all, rather than discovering the gap
+	// the way Create and Edit do, after there is nothing left to refuse.
+	//
+	// That check only catches the field being left unset. app.go's a.repo is
+	// a concrete *issuerepo.Repository, and assigning a nil one here would
+	// produce a typed nil interface, which s.Issues == nil does not see; a
+	// build that wired a nil repository would panic inside Issues' own
+	// calls rather than being caught here. Nothing in this package guards
+	// against that: app.go's startup sets a.repo before anything can reach a
+	// bound sprint method, and that ordering, not this field, is what keeps
+	// a nil repository from ever being wired in the first place.
 	Issues Issues
 }
 

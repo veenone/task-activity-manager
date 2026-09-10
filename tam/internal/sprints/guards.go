@@ -158,6 +158,7 @@ func dates(start, end string) (string, string, error) {
 // dates, which is what velocity and burndown are computed from, so both pay
 // a round trip they cannot get back rather than trust a list that may be
 // minutes old.
+//
 // Whether Jira refuses a closed edit on its own is still an open question
 // (docs/superpowers/plans/assets/2026-09-10-sprint-wire-probe.md, probe 4);
 // until it is answered, this read is the only thing standing there.
@@ -213,18 +214,41 @@ func (s *Service) requireEditable(ctx context.Context, b lifecycle, boardID, spr
 	return sp, nil
 }
 
-// requireDeletable tells apart the three things Jira's answer can mean for
-// the one action in TAM that cannot be undone.
+// requireDeletable tells apart what a board's own answer can mean for the
+// one action in TAM that cannot be undone.
 //
 // A sprint the board holds as future is deleted. A sprint it holds in any
 // other state is refused by name, because deleting an active sprint strands
 // work a team is doing right now and deleting a closed one destroys the
-// record a chart is drawn from. A sprint a real list does not hold is
-// already gone, which is a success: somebody deleted it elsewhere, and all
-// that is left to do is remove TAM's own copy.
+// record a chart is drawn from. A sprint the board's own list does not hold
+// is treated as already gone, which is a success: ordinarily that means
+// somebody deleted it elsewhere, and all that is left to do is remove TAM's
+// own copy.
 //
-// The fourth case, a list with nothing in it, never reaches here: jiraSprint
-// refuses it, and its comment says why that refusal is the whole point.
+// "Ordinarily" is doing real work in that sentence, and this comment used to
+// pretend it was not: the read above is board scoped, one board's
+// BoardSprints, while what a hit does next is not. forget below removes the
+// sprint from every board's cached rows and blanks it off every cached issue,
+// because Jira hands one sprint to every board whose filter reaches it and a
+// board scoped purge would leave another board's copy standing, an argument
+// boardrepo's own comment makes for DeleteSprintEverywhere. So a sprint board
+// 1's filter no longer reaches, while board 2 still lists it and Jira still
+// holds it, also reads as already gone from here: this method cannot tell
+// that case apart from a real deletion, and the delete purges board 2's cache
+// too and tells the user the sprint was gone before TAM asked, which is false
+// about Jira even though it was true of what board 1 could see.
+//
+// That does not destroy anything in Jira: DeleteSprint is skipped exactly as
+// it is for a real already-gone sprint, since there is nothing this method
+// believes needs deleting, and a boards sync repairs whichever board's cache
+// was purged too early. That is why purging stays the answer here instead of
+// growing a second, board scoped case for it: the only real cost is a
+// sentence that oversells its own certainty, not anything TAM cannot recover
+// from with a Refresh.
+//
+// A fourth case a real Jira read can produce, a list with nothing in it at
+// all, never reaches here: jiraSprint refuses it outright, and its own
+// comment says why that refusal is the whole point.
 func (s *Service) requireDeletable(ctx context.Context, b lifecycle, boardID, sprintID int) (backend.Sprint, bool, error) {
 	sp, held, err := s.jiraSprint(ctx, b, boardID, sprintID)
 	if err != nil {

@@ -67,9 +67,9 @@ machinery to defer an issue's id and nothing that would defer a sprint's. That i
 principle, and calling it a principle is how a fourth exception gets added without an argument.
 
 So the rule is fenced structurally rather than by paragraph. The immediate writes are exactly the
-methods on the unexported `lifecycle` interface in `internal/sprints`, and a test asserts that
-method set by name. Growing it means editing a failing test whose message says what the list is
-for. The previous version of this rule lived in a spec sentence and lasted one phase.
+exported methods on `sprints.Service`, and a test asserts that method set by name. Growing it means
+editing a failing test whose message says what the list is for. The previous version of this rule
+lived in a spec sentence and lasted one phase.
 
 ## 4. Decisions
 

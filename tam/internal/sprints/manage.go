@@ -2,18 +2,31 @@ package sprints
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/sprintdate"
 )
 
 // Managing a sprint rather than running one: making it, changing it, and
 // destroying it. The package doc carries the argument for why these three
 // reach Jira immediately like the two ceremonies beside them; what follows
 // is what each of them refuses first.
+
+// errNoIssueCache is what Delete refuses with when the issue cache seam is
+// not wired. Create and Edit let the same gap through and only log it,
+// because their Issues calls are bookkeeping after Jira has already moved.
+// Delete's are not: losing them loses the cache surgery that keeps Jira's
+// board tables and issue rows from naming a sprint that no longer exists,
+// and the one audit row that will be the only trace of the sprint left once
+// Jira has destroyed it. Refusing here, before Jira is asked anything,
+// costs nothing; letting the delete through and discovering the gap
+// afterwards cannot be undone.
+var errNoIssueCache = errors.New("the issue cache is not wired, so this delete could not finish its cache work; nothing was sent to Jira")
 
 // Create makes the sprint on the board and answers with the sprint Jira
 // made, which is where its real id comes from and the whole reason this call
@@ -44,7 +57,7 @@ func (s *Service) Create(ctx context.Context, profileID string, boardID int, d b
 	if err != nil {
 		return backend.Sprint{}, "", err
 	}
-	s.audit(ctx, profileID, made.ID, "create", "", createdName(made, d))
+	s.audit(ctx, profileID, made.ID, "create", "", "", createdName(made, d))
 	return made, note(s.refreshSprints(ctx, b, profileID, boardID)), nil
 }
 
@@ -75,14 +88,78 @@ func (s *Service) Edit(ctx context.Context, profileID string, boardID, sprintID 
 	if err := b.EditSprint(ctx, sprintID, d, clearGoal); err != nil {
 		return "", err
 	}
-	s.audit(ctx, profileID, sprintID, "edit", was.Name, d.Name)
+	s.audit(ctx, profileID, sprintID, "edit", editedFields(was, d, clearGoal), was.Name, d.Name)
 	return note(s.refreshSprints(ctx, b, profileID, boardID)), nil
+}
+
+// editedFields names which of an edit's fields actually moved, so the audit
+// row says more than "an edit happened" when the name was left alone and
+// only the dates moved or the goal was cleared: before and after otherwise
+// carry nothing but the name, which is identical on both sides of exactly
+// that edit.
+//
+// was is what Jira held before the write; d and clearGoal are what was sent.
+// Dates are compared by the moment they name rather than by their text,
+// through datesChanged, since Jira's own report and the value this package
+// just ran through sprintdate.Format do not have to be byte for byte
+// identical to name the same instant.
+func editedFields(was backend.Sprint, d backend.SprintDraft, clearGoal bool) string {
+	var changed []string
+	if was.Name != d.Name {
+		changed = append(changed, "name")
+	}
+	if clearGoal {
+		if was.Goal != "" {
+			changed = append(changed, "goal")
+		}
+	} else if was.Goal != d.Goal {
+		changed = append(changed, "goal")
+	}
+	if datesChanged(was.StartDate, was.EndDate, d.StartDate, d.EndDate) {
+		changed = append(changed, "dates")
+	}
+	return strings.Join(changed, ", ")
+}
+
+// datesChanged is the moment-based comparison editedFields needs. A pair
+// this package cannot parse is taken as changed rather than as equal, since
+// an unreadable date is not evidence that nothing moved; a sprint Jira has
+// already agreed to hold a name for always carries readable dates by the
+// time Edit reaches here; a value that does not, one of Store's own test
+// doubles say for instance, has nothing this comparison could trust anyway.
+func datesChanged(wasStart, wasEnd, start, end string) bool {
+	ws, err := sprintdate.Parse(wasStart)
+	if err != nil {
+		return true
+	}
+	we, err := sprintdate.Parse(wasEnd)
+	if err != nil {
+		return true
+	}
+	s, err := sprintdate.Parse(start)
+	if err != nil {
+		return true
+	}
+	e, err := sprintdate.Parse(end)
+	if err != nil {
+		return true
+	}
+	return !ws.Equal(s) || !we.Equal(e)
 }
 
 // Delete destroys the sprint in Jira and then removes TAM's copies of it. It
 // is the one action in this application that cannot be undone from anywhere,
 // so it asks Jira what the sprint is before it touches anything and refuses
-// everything but a sprint that has never been started.
+// every state but a sprint that has never been started or one that is
+// already gone.
+//
+// It also refuses before Jira is asked anything at all when the issue cache
+// is not wired. Unlike Create and Edit, whose Issues calls are a footnote
+// logged after Jira has already moved, this delete needs that seam to blank
+// the vanished sprint off every cached card and to write the one audit row
+// that will be the only trace of the sprint left anywhere once Jira has
+// destroyed it; letting the delete through without it would cost both for
+// good, where refusing costs nothing.
 //
 // The string it answers with is the note a cache write that did not land
 // leaves, or the sentence a sprint that was already gone leaves, either of
@@ -90,6 +167,9 @@ func (s *Service) Edit(ctx context.Context, profileID string, boardID, sprintID 
 // what follows is local bookkeeping that may not fail the write it is
 // bookkeeping for.
 func (s *Service) Delete(ctx context.Context, profileID string, boardID, sprintID int) (string, error) {
+	if s.Issues == nil {
+		return "", errNoIssueCache
+	}
 	b, err := s.board()
 	if err != nil {
 		return "", err
@@ -106,12 +186,33 @@ func (s *Service) Delete(ctx context.Context, profileID string, boardID, sprintI
 			return "", err
 		}
 	}
-	s.audit(ctx, profileID, sprintID, "delete", doomed.Name, "")
+	s.audit(ctx, profileID, sprintID, "delete", "", s.doomedName(ctx, profileID, sprintID, doomed, gone), "")
 	line := note(s.forget(ctx, b, profileID, boardID, sprintID))
 	if gone {
 		return strings.TrimSpace(fmt.Sprintf("sprint %d was already gone from Jira, so only TAM's own copy of it was removed. %s", sprintID, line)), nil
 	}
 	return line, nil
+}
+
+// doomedName is the name the delete's audit row carries as its before
+// value. requireDeletable hands back a real backend.Sprint, name and all,
+// for a sprint it found and is about to delete; for one that was already
+// gone it hands back a zero backend.Sprint, since there was nothing left in
+// Jira's list to read a name off. That second case is the one branch where
+// keeping the name matters most, since Jira no longer has it to ask again,
+// so it is read from the board cache instead. A cache miss leaves the row
+// carrying an empty name rather than failing the delete over it: Jira has
+// already been asked, in both branches, and the delete cannot be undone by
+// refusing to finish recording it.
+func (s *Service) doomedName(ctx context.Context, profileID string, sprintID int, doomed backend.Sprint, gone bool) string {
+	if !gone {
+		return doomed.Name
+	}
+	name, err := s.store.SprintName(ctx, profileID, strconv.Itoa(sprintID))
+	if err != nil {
+		return ""
+	}
+	return name
 }
 
 // forget removes the sprint from the places TAM keeps it, in the order
@@ -154,11 +255,11 @@ func (s *Service) forget(ctx context.Context, b lifecycle, profileID string, boa
 // still carries it, so the Backlog and Epics sprint filters and the detail
 // panel's Sprint field stop offering it the moment the delete lands rather
 // than after the next full sync.
+//
+// It does not check s.Issues for nil: Delete already refused before Jira was
+// touched at all if that field was unset, so by the time forget calls this,
+// the only way in here is with the seam wired.
 func (s *Service) clearIssues(ctx context.Context, profileID string, sprintID int) error {
-	if s.Issues == nil {
-		log.Printf("tam: sprint %d was deleted with no issue cache wired, so cached cards still name it until the next sync", sprintID)
-		return nil
-	}
 	if err := s.Issues.ClearSprint(ctx, profileID, strconv.Itoa(sprintID)); err != nil {
 		log.Printf("tam: sprint %d was deleted in Jira but the cards carrying its name could not be cleared: %v", sprintID, err)
 		return fmt.Errorf("the cards that were in the sprint could not be updated: %w", err)
@@ -180,12 +281,15 @@ func (s *Service) clearIssues(ctx context.Context, profileID string, sprintID in
 // A row that cannot be written is logged and nothing more. Jira has already
 // been changed by the time it is attempted, and failing the write over its
 // own footnote would report a sprint that exists as one that does not.
-func (s *Service) audit(ctx context.Context, profileID string, sprintID int, action, before, after string) {
+// Delete's own seam check means this path is reachable with s.Issues nil
+// only from Create and Edit, where that is still the right answer: an unset
+// seam there is a missed footnote, not a missed refusal.
+func (s *Service) audit(ctx context.Context, profileID string, sprintID int, action, field, before, after string) {
 	if s.Issues == nil {
 		log.Printf("tam: the %s of sprint %d was not recorded in the audit trail: no issue cache is wired", action, sprintID)
 		return
 	}
-	if err := s.Issues.AuditSprint(ctx, profileID, sprintID, action, before, after); err != nil {
+	if err := s.Issues.AuditSprint(ctx, profileID, sprintID, action, field, before, after); err != nil {
 		log.Printf("tam: the %s of sprint %d could not be recorded in the audit trail: %v", action, sprintID, err)
 	}
 }

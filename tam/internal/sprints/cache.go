@@ -164,9 +164,16 @@ func (s *Service) reReadSprints(ctx context.Context, b lifecycle, profileID stri
 // bookkeeping after it did not land: one line, and the one thing the user
 // can do about it. Jira's own words reach here off the wire, so they go
 // through the same reduction a sync summary's do.
+//
+// It says "TAM's local copy" rather than naming the sprint list specifically,
+// because it wraps more than one failure: refreshSprints and
+// refreshSprintsAllowEmpty leave the list stale, but a delete's note can also
+// carry a failed clearIssues, where what is stale is the sprint name still
+// showing on the cards that were in it rather than anything in the list
+// itself.
 func note(err error) string {
 	if err == nil {
 		return ""
 	}
-	return errtext.Line(err) + ", so the sprint list on screen may be out of date; press Refresh."
+	return errtext.Line(err) + ", so TAM's local copy may be out of date; press Refresh."
 }

@@ -15,6 +15,7 @@ import (
 type auditCall struct {
 	sprintID int
 	action   string
+	field    string
 	before   string
 	after    string
 }
@@ -51,8 +52,8 @@ func (i *fakeIssues) ClearSprint(_ context.Context, _, sprintID string) error {
 	return nil
 }
 
-func (i *fakeIssues) AuditSprint(_ context.Context, _ string, sprintID int, action, before, after string) error {
-	i.audits = append(i.audits, auditCall{sprintID: sprintID, action: action, before: before, after: after})
+func (i *fakeIssues) AuditSprint(_ context.Context, _ string, sprintID int, action, field, before, after string) error {
+	i.audits = append(i.audits, auditCall{sprintID: sprintID, action: action, field: field, before: before, after: after})
 	return i.auditErr
 }
 
@@ -178,7 +179,10 @@ func TestEditSendsTheDraftAndTheClearGoalFlagAndRecordsTheRename(t *testing.T) {
 	if !strings.HasPrefix(got.draft.StartDate, "2026-09-09T09:00:00.000") {
 		t.Errorf("start sent = %q, want Jira's own datetime format", got.draft.StartDate)
 	}
-	want := auditCall{sprintID: 13, action: "edit", before: "Sprint 13", after: "Sprint 13 renamed"}
+	// The fixture's sprint 13 carries no dates, so the ones just sent read as
+	// having moved beside the rename: this is the row saying so, not only
+	// that an edit happened.
+	want := auditCall{sprintID: 13, action: "edit", field: "name, dates", before: "Sprint 13", after: "Sprint 13 renamed"}
 	if len(issues.audits) != 1 || issues.audits[0] != want {
 		t.Errorf("audit rows = %+v, want one %+v", issues.audits, want)
 	}
@@ -315,6 +319,14 @@ func TestDeleteOfASprintJiraNoLongerHasIsAlreadyGoneAndStillCleansTheCache(t *te
 	if issues.carrying["PLAT-1"] != "" {
 		t.Errorf("PLAT-1 still carries sprint %q, want its sprint columns blanked", issues.carrying["PLAT-1"])
 	}
+	// requireDeletable hands back a zero backend.Sprint for a sprint that was
+	// already gone, so the name has to come from the board cache instead;
+	// this is the one branch where losing it would matter most, since Jira
+	// no longer has a copy to ask again.
+	want := auditCall{sprintID: 13, action: "delete", before: "Sprint 13"}
+	if len(issues.audits) != 1 || issues.audits[0] != want {
+		t.Errorf("audit rows = %+v, want one %+v naming the sprint that was already gone", issues.audits, want)
+	}
 }
 
 // TestDeleteRefusesWhilePendingChangesTargetTheSprintAndNamesCommit stops
@@ -419,9 +431,10 @@ func TestADeleteWhoseCacheWorkFailsIsStillADeleteWithANote(t *testing.T) {
 }
 
 // TestAManagementWriteWithNoIssueCacheWiredStillLandsInJira is the shape of
-// the seam: the audit row and the cached sprint columns are bookkeeping
-// after the fact, so a service without them writes to Jira and logs what it
-// could not record, rather than refusing the write.
+// the seam for Create and Edit: their audit row is bookkeeping after the
+// fact, so a service without the issue cache writes to Jira and logs what it
+// could not record, rather than refusing the write. Delete is not this
+// shape, and the test below it is why.
 func TestAManagementWriteWithNoIssueCacheWiredStillLandsInJira(t *testing.T) {
 	made := backend.Sprint{ID: 14, BoardID: 1, Name: "Sprint 14", State: "future"}
 	b := &fakeBackend{made: made, sprints: []backend.Sprint{made}}
@@ -433,5 +446,26 @@ func TestAManagementWriteWithNoIssueCacheWiredStillLandsInJira(t *testing.T) {
 	}
 	if got.ID != 14 || len(b.created) != 1 {
 		t.Errorf("create = %+v after %d calls, want the sprint made in Jira anyway", got, len(b.created))
+	}
+}
+
+// TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked is the other
+// side of that seam. A delete's Issues calls are not a footnote the way
+// Create and Edit's are: they are what keeps Jira's board tables and the
+// cached issues from naming a sprint forever that Jira no longer has, and
+// the one audit row that will be the only trace of the sprint left anywhere
+// once Jira has destroyed it. Both are lost for good if the delete is let
+// through without them, so this is refused before Jira is asked anything at
+// all, not logged afterwards.
+func TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked(t *testing.T) {
+	b := &fakeBackend{sprints: []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "future"}}}
+	store := newStore()
+
+	_, err := newService(b, store).Delete(context.Background(), "p1", 1, 13)
+	if err == nil {
+		t.Fatal("delete = nil error, want it refused with no issue cache wired")
+	}
+	if b.sprintReads != 0 || len(b.deleted) != 0 {
+		t.Errorf("Jira was called (%d sprint reads, %v deletes), want the refusal to happen before any of it", b.sprintReads, b.deleted)
 	}
 }

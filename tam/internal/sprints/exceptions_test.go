@@ -40,7 +40,10 @@ func TestTheImmediateWritesAreExactlyTheFiveThatWereArguedFor(t *testing.T) {
 			"(docs/superpowers/specs/2026-09-10-tam-sprints-view-design.md) with the argument for "+
 			"it and then add its name above, deliberately. If what you are adding is not an "+
 			"immediate write, it does not belong on Service: Suggest is a package function for "+
-			"exactly that reason.",
+			"exactly that reason. This fence only ever sees methods, and cannot: a sixth immediate "+
+			"write hung off an exported func field instead, the way Pending and Issues already sit "+
+			"on Service, would reach Jira without tripping it, so a reviewer still has to read every "+
+			"new exported field on this type as carefully as a new method.",
 			strings.Join(got, ", "), strings.Join(immediateWrites, ", "))
 	}
 }
