@@ -114,7 +114,7 @@ Sprint 12, day 6 of 14, 8 of 14 done, 21 of 34 pts
 |     [ ] PLAT-455  Audit the tax table To Do        |  |                                      |
 | > Sprint 13  Future  1 Sep to 15 Sep     6   [...] |  |                                      |
 | > Sprint 11  Closed  4 Aug to 18 Aug         [...] |  |                                      |
-| > Backlog                               31         |  |                                      |
+| > Unassigned on this board              31         |  |                                      |
 +---------------------------------------------------+  +--------------------------------------+
 ```
 
@@ -147,11 +147,18 @@ off, because a board two years old has fifty of them and none of them are what t
 Only the active sprint starts expanded, because a board with twelve future sprints would otherwise
 paint twelve open branches.
 
-**The backlog is in the tree because otherwise a sprint cannot be filled here.** A tree of sprints
-holds only issues that are already in a sprint, so a selection over it could move work between
-sprints and never into a new one, and filling the sprint you just made would still mean leaving
-for the board. The cache already stores the backlog as a scope with an empty sprint id, so it is
-one more read rather than a new idea.
+**The board's unassigned work is in the tree because otherwise a sprint cannot be filled here.** A
+tree of sprints holds only issues already in a sprint, so a selection over it could move work
+between sprints and never into a new one, and filling the sprint you just made would still mean
+leaving for the board.
+
+The cache does not store that work as a scope, and it is worth being exact about why, because the
+obvious reading of the schema is wrong. `board_issue` does hold a scope with an empty sprint id,
+but that scope is `BoardIssueKeys(board, "", project)`, the board's **entire** issue list with its
+sprint issues included, which is what TAM's own code calls "the board's own list". Rendering it as
+a backlog would list every sprint's issues a second time and would offer the fill bar work that is
+already in a sprint. So the unassigned node is computed: the board's own list, minus every key the
+sprint scopes hold once the journal has been replayed over them.
 
 Selecting an issue opens the detail panel, which is the same `IssueDetailPanel` the Backlog and
 the Epics tree use, and it receives the profile wide open sprint list so its Sprint field is a
@@ -185,9 +192,12 @@ is refused with a sentence rather than a panic. The guards live beside the ones 
 `guards.go`: a closed sprint refuses an edit, a non future sprint refuses a delete, and a delete
 refuses while journal rows point at the sprint.
 
-Every one of the three re reads the board's sprints into the cache afterwards through the existing
-`refreshSprints`, which already refuses to persist an empty answer, because a single 400 on that
-endpoint is indistinguishable from "no sprints" and would otherwise delete the board's history.
+Create and edit re read the board's sprints into the cache afterwards through the existing
+`refreshSprints`, which refuses to persist an empty answer because a single 400 on that endpoint
+is indistinguishable from "no sprints" and would otherwise delete the board's history. **Delete
+uses a variant that permits an empty answer**, because deleting a board's only sprint makes the
+empty answer true; everything else about the path is shared, including the orphan membership
+cleanup `ReplaceSprints` already does.
 
 The bound methods go in a new file rather than growing `app_sprints.go`, and they take the same
 per profile lock under the same `"sprint"` label, which means the frontend reaches them through
