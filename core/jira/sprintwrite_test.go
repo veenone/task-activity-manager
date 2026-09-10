@@ -119,6 +119,44 @@ func TestCreateSprintOnAnEmptyBodyReturnsTheZeroValue(t *testing.T) {
 	}
 }
 
+// TestCreateSprintOnABodyWithNoIDReturnsTheZeroValue is the other half of the
+// rule above: a body that is real JSON but carries no id is the same kind of
+// nothing as no body at all, and neither fails a create Jira accepted.
+func TestCreateSprintOnABodyWithNoIDReturnsTheZeroValue(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	sprint, err := c.CreateSprint(context.Background(), 1, "Sprint 13", "", "2026-09-09T09:00:00.000+0000", "2026-09-23T09:00:00.000+0000")
+	if err != nil {
+		t.Fatalf("create sprint: %v, want no error for a body with no id", err)
+	}
+	if sprint.ID != 0 {
+		t.Errorf("sprint = %+v, want the zero value", sprint)
+	}
+}
+
+// TestCreateSprintOnAnAnswerThatIsNotJSONFails draws the line the comment on
+// CreateSprint draws: a shape difference in Jira's echo is tolerable, but an
+// HTML page answered with a 200, which is what a proxy in front of Jira
+// produces, is evidence the request never reached Jira and the caller has to
+// hear about it.
+func TestCreateSprintOnAnAnswerThatIsNotJSONFails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body>Sign in to continue</body></html>`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if _, err := c.CreateSprint(context.Background(), 1, "Sprint 13", "", "2026-09-09T09:00:00.000+0000", "2026-09-23T09:00:00.000+0000"); err == nil {
+		t.Fatal("create sprint = nil error, want a failure for an answer that is not JSON")
+	}
+}
+
 // TestUpdateSprintSendsOnlyTheGivenKeys pins down the same partial-update
 // trap StartSprint's own comment explains: an edit changing only the name
 // must send only the name, and state must never be sent since a rename is
