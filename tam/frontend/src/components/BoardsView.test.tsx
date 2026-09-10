@@ -1479,3 +1479,25 @@ describe("BoardsView sprint ceremonies", () => {
     expect(api.CompleteSprint).not.toHaveBeenCalled();
   });
 });
+
+describe("BoardsView detail panel sprint field", () => {
+  // A scrum board whose open sprints are all closed, the state right after a
+  // completion, used to make the panel infer "no sprints yet" from the empty
+  // array and go read-only, which took away a destination (the backlog) the
+  // panel could reach before this branch. The board hands its array over
+  // unconditionally now, empty or not, so the field stays a choice.
+  it("keeps the sprint field a choice when every sprint on the board has closed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListBoardSprints).mockResolvedValue([
+      { id: 12, boardId: 1, name: "Sprint 12", state: "closed", startDate: "", endDate: "" },
+    ]);
+    renderView();
+    await user.click(await screen.findByRole("gridcell", { name: /PLAT-412/ }));
+    const panel = await screen.findByRole("complementary");
+    const picker = within(panel).getByRole("combobox", { name: "Sprint" });
+    expect(picker).not.toBeDisabled();
+    expect(within(picker).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
+    await user.selectOptions(picker, "");
+    await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-412", ""));
+  });
+});

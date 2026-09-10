@@ -75,6 +75,48 @@ func TestADraftWithNoSprintPushesNoMove(t *testing.T) {
 	}
 }
 
+// TestChangingADraftsSprintBeforeCommitPushesTheLaterChoice is the
+// interaction the whole draft-sprint design rests on: a draft's sprint moves
+// through moveDraft (issuerepo/boardwrites.go), which rewrites the draft's
+// own JSON in place and journals nothing, rather than through
+// journal.Put. If a draft's sprint were ever journaled directly, Rekey's
+// unconditional call to journalDraftSprint would overwrite it with the
+// create JSON's original sprint the moment the draft got its real key.
+func TestChangingADraftsSprintBeforeCommitPushesTheLaterChoice(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	temp, err := h.repo.CreateDraft(ctx, "p1", "PLAT", draftInSprint("42", "Sprint 42"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The ordinary panel path: the same MoveToSprint the card's own move menu
+	// and the detail panel's Sprint field both call.
+	if err := h.repo.MoveToSprint(ctx, "p1", temp, "43", "Sprint 43"); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Created) != 1 || res.Created[0].TempKey != temp || res.Created[0].Key != "PLAT-501" {
+		t.Fatalf("the draft was created: %+v", res)
+	}
+	if len(h.jira.pushed) != 1 || h.jira.pushed[0] != "sprint 43 PLAT-501" {
+		t.Fatalf("the later choice is what gets pushed, not the one the draft was created with: %v", h.jira.pushed)
+	}
+	if len(res.Failures) != 0 || len(res.Conflicts) != 0 || res.Remaining != 0 {
+		t.Fatalf("nothing was left behind: %+v", res)
+	}
+	if remote := h.jira.rows["PLAT-501"]; remote.SprintID != "43" {
+		t.Errorf("Jira holds the issue in the second sprint: %+v", remote)
+	}
+	iss, err := h.repo.GetIssue(ctx, "p1", "PLAT-501")
+	if err != nil || iss.Pending || iss.SprintID != "43" || iss.SprintName != "Sprint 43" {
+		t.Errorf("the local row settled in the second sprint: %+v %v", iss, err)
+	}
+}
+
 func TestACreateThatFailedLeavesItsSprintForTheNextCommit(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

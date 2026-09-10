@@ -443,6 +443,18 @@ describe("NewIssueModal", () => {
     expect(draft.parentKey).toBe("PLAT-412");
   });
 
+  // A sub-task has no sprint of its own in Jira: it follows its parent, and
+  // the Agile move endpoint refuses one aimed at it, so the dialog offers no
+  // control that could only ever fail.
+  it("offers no Sprint picker for a sub-task, which has none of its own", async () => {
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "subtask", true, "PLAT-412");
+    const dialog = await screen.findByRole("dialog", { name: "New technical task" });
+    expect(within(dialog).queryByLabelText("Sprint")).not.toBeInTheDocument();
+  });
+
   // The dialog names the level the instance uses, not TAM's own word.
   it("falls back to sub-task when the instance's name cannot be read", async () => {
     vi.mocked(api.GetSubtaskTypeName).mockRejectedValue(new Error("GET failed: 503"));

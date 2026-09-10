@@ -77,6 +77,17 @@ func (r *Repository) MoveToColumn(ctx context.Context, profileID, key, statusID 
 // own destination: app.go holds both repositories and asks the one that
 // owns the sprints. A caller with no name to give falls back to the name a
 // cached issue in that sprint carries.
+//
+// A sub-task cannot be moved to a sprint in Jira, but this method takes no
+// guard for it: readBoardRow, the one read this call makes before it
+// journals anything, selects status, status_id, sprint_id, sprint_name, and
+// updated, never type, so refusing here would mean widening that read for
+// every board write to serve one type check. The three frontend surfaces
+// that can offer a sprint move (the Backlog, the Epics tree, and the New
+// issue dialog) all exclude a sub-task instead, which is where the guard
+// lives today; a sub-task's move is refused at Commit if one ever reaches
+// this call by another path, since the Agile endpoint itself has no
+// sub-task exception.
 func (r *Repository) MoveToSprint(ctx context.Context, profileID, key, sprintID, sprintName string) error {
 	sprintID = strings.TrimSpace(sprintID)
 	sprintName = strings.TrimSpace(sprintName)

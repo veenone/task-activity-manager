@@ -21,11 +21,11 @@ function issue(over: Partial<Issue>): Issue {
   };
 }
 
-function renderField(sprints: SprintOption[], iss: Issue = issue({}), busy = false) {
+function renderField(sprints: SprintOption[], iss: Issue = issue({}), busy = false, emptyNote?: string) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
-        <SprintField profileId="p1" issue={iss} sprints={sprints} busy={busy} />
+        <SprintField profileId="p1" issue={iss} sprints={sprints} busy={busy} emptyNote={emptyNote} />
       </DialogProvider>
     </QueryClientProvider>,
   );
@@ -37,23 +37,30 @@ beforeEach(() => {
 });
 
 describe("SprintField", () => {
-  it("says the empty-list sentence beside the select rather than instead of it", () => {
-    renderField([]);
+  it("says the caller's empty-list note beside the select rather than instead of it", () => {
+    renderField([], issue({}), false, "No sprints yet, sync a board first");
     expect(screen.getByText("No sprints yet, sync a board first")).toBeInTheDocument();
     const select = screen.getByRole("combobox", { name: "Sprint" });
     expect(within(select).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
   });
 
+  it("says nothing beside an empty list when the caller passes no note", () => {
+    renderField([]);
+    expect(screen.queryByText(/sync a board/)).not.toBeInTheDocument();
+    const select = screen.getByRole("combobox", { name: "Sprint" });
+    expect(within(select).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
+  });
+
   it("lets a card already in a sprint still leave it when the list is empty", () => {
-    renderField([], issue({ sprintId: "12", sprintName: "Sprint 12" }));
+    renderField([], issue({ sprintId: "12", sprintName: "Sprint 12" }), false, "No sprints yet, sync a board first");
     const select = screen.getByRole("combobox", { name: "Sprint" });
     expect(within(select).getByRole("option", { name: "Sprint 12" })).toBeInTheDocument();
     expect(within(select).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
     expect(screen.getByText("No sprints yet, sync a board first")).toBeInTheDocument();
   });
 
-  it("shows no sentence once the list has sprints", () => {
-    renderField([{ id: 12, name: "Sprint 12" }]);
+  it("shows no note once the list has sprints, even when the caller passed one", () => {
+    renderField([{ id: 12, name: "Sprint 12" }], issue({}), false, "No sprints yet, sync a board first");
     expect(screen.queryByText(/No sprints yet/)).not.toBeInTheDocument();
   });
 

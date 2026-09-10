@@ -179,6 +179,9 @@ export function EpicsView() {
             // session): both fall back to the panel's read-only branch with
             // nothing said, a known limit rather than a bug.
             sprints={openSprints.data}
+            // The profile-wide list, so an empty one really does mean this
+            // profile has never synced a board, unlike a board's own list.
+            emptyNote="No sprints yet, sync a board first"
             onClose={() => setSelectedKey("")}
           />
         )}

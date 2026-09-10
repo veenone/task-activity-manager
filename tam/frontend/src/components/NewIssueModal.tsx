@@ -67,9 +67,11 @@ function hasParentPicker(type: IssueType): boolean {
 
 // hasSprintPicker says whether the type can belong to a sprint at all. An
 // epic cannot: it is not a card a board carries, and Jira has no sprint
-// field on it.
+// field on it. A sub-task cannot either: it has no sprint of its own in
+// Jira, it follows its parent's, and the Agile move endpoint refuses one
+// aimed at it.
 function hasSprintPicker(type: IssueType): boolean {
-  return type !== "epic";
+  return type !== "epic" && type !== "subtask";
 }
 
 // hasPoints says whether a type carries story points. An epic is measured by

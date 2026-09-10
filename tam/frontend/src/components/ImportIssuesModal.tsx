@@ -20,7 +20,7 @@ interface Picked {
   isXlsx: boolean;
 }
 
-const EMPTY: ImportMapping = { key: "", type: "", summary: "", description: "", priority: "", labels: "", assignee: "", storyPoints: "", parentKey: "" };
+const EMPTY: ImportMapping = { key: "", type: "", summary: "", description: "", priority: "", labels: "", assignee: "", storyPoints: "", parentKey: "", sprint: "" };
 const PREFLIGHT_DELAY_MS = 250;
 
 // Preflight is the automatic dry run that keeps the Import button and the

@@ -289,14 +289,17 @@ export function BoardsView() {
             key={selected.key}
             profileId={activeId}
             issue={selected}
-            // An empty list here is not "the profile has no open sprints",
-            // the way the Backlog and Epics tree's profile-wide list can say:
-            // it is also a kanban board's disabled sprint query, or a scrum
-            // board whose list has not loaded yet, or one whose sprints are
-            // all closed. Only a caller reading the profile-wide list is in
-            // a position to print that sentence, so this one falls back to
-            // undefined and the panel's pre-existing read-only branch.
-            sprints={openSprints.length > 0 ? openSprints : undefined}
+            // Handed over unconditionally, empty or not: an empty list here
+            // is not "the profile has no open sprints", the way the Backlog
+            // and Epics tree's profile-wide list can say. It is also a
+            // kanban board's disabled sprint query, a scrum board whose list
+            // has not loaded yet, or one whose sprints are all closed right
+            // after a completion, and none of those should turn the field
+            // read-only: the backlog is still a destination the panel can
+            // reach. Passing no emptyNote is what keeps this view silent
+            // about why the list is empty, which only the profile-wide
+            // callers are in a position to explain.
+            sprints={openSprints}
             onClose={() => setSelectedKey("")}
           />
         )}

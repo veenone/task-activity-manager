@@ -33,6 +33,19 @@ import (
 //
 // A draft with no sprint journals nothing at all.
 //
+// A draft can never already hold its own issue_sprint row when this runs,
+// and that matters: journal.Put upserts on (profile, entity_type,
+// entity_key, field), and Rekey repoints every pending row from the temp key
+// to the real one before calling here, so a row under the real key at this
+// point would be overwritten with the create JSON's original sprint, undoing
+// whatever the user chose afterwards, and the board pass would then see
+// before equal to after and different from remote and raise a bogus
+// conflict on an issue created seconds ago. It cannot happen only because a
+// drag or a menu move on a draft goes through moveDraft (boardwrites.go)
+// instead: that rewrites the draft's own JSON in place and journals nothing,
+// so the create row this function reads always carries the draft's current
+// sprint, whichever choice was made last.
+//
 // The applyMoveColumns call below writes the two columns CreateDrafts has
 // already written from the same draft. Neither write is dead: the create
 // writes what the Backlog and the panel read before Commit, and this one is

@@ -31,12 +31,19 @@ type SprintChoice struct {
 // offered under no name: the sync writes a board and its sprints together,
 // so that only happens to a half-removed board, and a choice nobody can
 // place is worse than one fewer.
+//
+// board.id is the final tie-break, not decoration: for one sprint reaching
+// two boards the state, start date, and sprint id are all equal between the
+// two rows (the sprint id is the same sprint), so without it which BoardName
+// the fold below keeps is whatever order SQLite happens to return them in.
+// The lowest board id winning is as good a rule as any and, unlike an
+// unordered one, gives the same answer on every read.
 const openSprintsSQL = `
 	SELECT sprint.id, sprint.name, board.name, sprint.state
 	FROM sprint
 	JOIN board ON board.profile_id = sprint.profile_id AND board.id = sprint.board_id
 	WHERE sprint.profile_id = ? AND sprint.state IN ('active', 'future')
-	ORDER BY CASE sprint.state WHEN 'active' THEN 0 ELSE 1 END, sprint.start_date, sprint.id`
+	ORDER BY CASE sprint.state WHEN 'active' THEN 0 ELSE 1 END, sprint.start_date, sprint.id, board.id`
 
 // OpenSprints returns the open sprints of every board the profile has
 // synced, active before future and each group by start date.

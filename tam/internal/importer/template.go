@@ -215,7 +215,7 @@ var notes = [][]string{
 	{"Assignee", "The Jira username, not the display name. It is what appears in the user's profile URL, for example jdoe, not John Doe."},
 	{"Story Points", "A number. Leave empty for no estimate."},
 	{"Parent", "The epic this issue belongs to, by key. An epic row must leave it empty. An epic named here has to exist in the project already, or be created by an earlier row of this same file."},
-	{"Sprint", "The sprint name, exactly as your Jira spells it, from any board this profile has synced. Empty means the backlog. Ignored on a row that has a Key: move an existing issue between sprints on the Boards view."},
+	{"Sprint", "The sprint name, exactly as your Jira spells it, from any board this profile has synced. Empty means the backlog. Ignored on a row that has a Key: a sprint is a board write, not a field, so move an existing issue between sprints from the Backlog, the Epics tree, or a board instead. The dropdown on this column can come up empty on a profile with many open sprints (past 255 combined characters) or leave out a sprint whose own name has a comma; the column still accepts a typed name in either case."},
 	{"", ""},
 	{"Rules", ""},
 	{"Empty cells", "On a row with a Key, an empty cell means leave that field alone. It never clears a value; clear a field in the app instead."},

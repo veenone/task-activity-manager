@@ -121,3 +121,38 @@ func TestOpenSprintsFoldsOneSprintOnTwoBoardsButKeepsTwoSprintsSharingAName(t *t
 		t.Errorf("sprint 20 board = %q, want the first board in the query's order (PLAT Scrum)", open[0].BoardName)
 	}
 }
+
+// TestOpenSprintsBreaksATieOnBoardIdWhenEverythingElseMatches is the case the
+// test above avoids by giving its two copies of Sprint 20 different start
+// dates: a sprint Jira hands to two boards ordinarily carries the very same
+// state, start date, and id in both copies, since it is one sprint. Without
+// board.id as a last ORDER BY term, which BoardName the fold above keeps
+// would be whatever order SQLite happened to return two otherwise identical
+// rows in.
+func TestOpenSprintsBreaksATieOnBoardIdWhenEverythingElseMatches(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+
+	for _, b := range sampleBoards() {
+		sprint := backend.Sprint{
+			ID: 20, BoardID: b.ID, Name: "Cross-team", State: "active",
+			StartDate: "2026-08-18T09:00:00Z", EndDate: "2026-09-01T09:00:00Z",
+		}
+		if err := r.ReplaceBoard(ctx, "p1", b, sampleColumns(), []backend.Sprint{sprint}, nil); err != nil {
+			t.Fatalf("replace board %d: %v", b.ID, err)
+		}
+	}
+
+	open, err := r.OpenSprints(ctx, "p1")
+	if err != nil {
+		t.Fatalf("open sprints: %v", err)
+	}
+	if len(open) != 1 {
+		t.Fatalf("one sprint folds to one row: %+v", open)
+	}
+	// The lower board id wins, deterministically, regardless of sampleBoards
+	// writing the Kanban board (id 2) first.
+	if open[0].BoardName != "PLAT Scrum" {
+		t.Errorf("open sprint board = %q, want the lower board id's name (PLAT Scrum)", open[0].BoardName)
+	}
+}

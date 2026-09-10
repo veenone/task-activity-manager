@@ -46,7 +46,7 @@ function renderModal(onImported = vi.fn(), onClose = vi.fn()) {
 }
 
 const csv = "Issue Type,Summary,Points\nStory,Apply promo,5\nTask,,\n";
-const mapping: api.ImportMapping = { key: "", type: "Issue Type", summary: "Summary", description: "", priority: "", labels: "", assignee: "", storyPoints: "Points", parentKey: "" };
+const mapping: api.ImportMapping = { key: "", type: "Issue Type", summary: "Summary", description: "", priority: "", labels: "", assignee: "", storyPoints: "Points", parentKey: "", sprint: "" };
 
 // result fills in the halves a case does not care about, so a test names only
 // what it is actually asserting on.
@@ -167,6 +167,19 @@ describe("ImportIssuesModal", () => {
     await user.click(screen.getByRole("button", { name: "Import" }));
     expect(await screen.findByText("✓ Imported 1 issue to update as pending changes. Commit them from the Pending changes dialog.")).toBeInTheDocument();
     expect(screen.getByText("1 row carries a Sprint value; import does not change an issue's sprint.")).toBeInTheDocument();
+  });
+
+  it("renders a Sprint mapping select and lets it be remapped like any other field", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ImportIssues).mockResolvedValue(result({ rows: 2, created: ["TAM-NEW-1"] }));
+    const { onImported } = renderModal();
+    await pickFile(user);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Import" })).toBeEnabled());
+    expect(screen.getByLabelText("Sprint")).toHaveValue("");
+    await user.selectOptions(screen.getByLabelText("Sprint"), "Points");
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    await waitFor(() => expect(api.ImportIssues).toHaveBeenCalledWith("p1", expect.any(String), false, "backlog.csv", { ...mapping, sprint: "Points" }, false));
+    expect(onImported).toHaveBeenCalledWith(["TAM-NEW-1"]);
   });
 
   it("shows the zero-drafts outcome when every row is skipped on import", async () => {

@@ -15,13 +15,21 @@ interface Props {
   // busy is a sync or a commit in flight, the same guard the edit form takes:
   // the row refresh that follows either one would land on top of the move.
   busy: boolean;
+  // emptyNote is what to say beside the select when sprints is empty. This
+  // field never infers that sentence from the list being empty: an empty
+  // list means different things to different callers (a profile that has
+  // never synced a board, a kanban board with no sprint query, a scrum
+  // board still loading, or one whose sprints are all closed), and only a
+  // caller that knows which one it is can put it into words. No prop means
+  // no sentence, not a guess.
+  emptyNote?: string;
 }
 
 // SprintField is the detail panel's sprint, as a choice rather than a fact.
 // It journals through the same MoveIssueToSprint binding the card's own move
 // menu uses, so the pending row, the discard, and the commit path are the
 // ones Phase 3b already built; nothing here reaches Jira.
-export function SprintField({ profileId, issue, sprints, busy }: Props) {
+export function SprintField({ profileId, issue, sprints, busy, emptyNote }: Props) {
   const move = useMoveToSprint(profileId);
   const { notice } = useNotice();
   // The issue's own sprint may be a closed one, which the board's picker
@@ -58,9 +66,10 @@ export function SprintField({ profileId, issue, sprints, busy }: Props) {
       </select>
       {/* Guidance beside the select, not a replacement for it: the backlog
           and the issue's own sprint are always there to choose, even on a
-          profile whose boards have never been synced. */}
-      {sprints.length === 0 && (
-        <span className="muted small sprint-field-empty">No sprints yet, sync a board first</span>
+          profile whose boards have never been synced. Only shown when a
+          caller in a position to explain the empty list passed a note. */}
+      {sprints.length === 0 && emptyNote && (
+        <span className="muted small">{emptyNote}</span>
       )}
     </span>
   );

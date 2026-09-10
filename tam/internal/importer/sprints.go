@@ -81,12 +81,15 @@ func (idx sprintIndex) lookup(raw string) (boardrepo.SprintChoice, string) {
 // profile with thirty open sprints would turn a row error into a paragraph.
 const offerListLimit = 10
 
+// Entries join on "; ", not ",": each one is already "Name (Board)", and a
+// sprint whose own name carries a comma would otherwise turn the joined
+// list into a run of commas nobody could parse back into sprints.
 func (idx sprintIndex) offerList() string {
 	if len(idx.offered) <= offerListLimit {
-		return strings.Join(idx.offered, ", ")
+		return strings.Join(idx.offered, "; ")
 	}
 	return fmt.Sprintf("%s, and %d more",
-		strings.Join(idx.offered[:offerListLimit], ", "), len(idx.offered)-offerListLimit)
+		strings.Join(idx.offered[:offerListLimit], "; "), len(idx.offered)-offerListLimit)
 }
 
 // sprintNames are the names the import will actually accept, in offer order.

@@ -461,10 +461,14 @@ export interface IssueDraft {
   // backend and the repository validate it; only the form was missing it, so
   // a story could not be born under its epic.
   parentKey: string;
-  // Where a drag has put the draft on the board. A draft has no Jira state
-  // to journal a move against, so a board drag rewrites these on the draft
-  // itself; without them the Pending changes dialog could not say a draft
-  // had been moved at all, while the same move on a real issue gets a row.
+  // Where a drag has put the draft on the board, or where the New issue
+  // dialog's Sprint picker or the importer's Sprint column said it belongs.
+  // A draft has no Jira state to journal a move against, so a board drag
+  // rewrites these on the draft itself; without them the Pending changes
+  // dialog could not say a draft had been moved at all, while the same move
+  // on a real issue gets a row. The create sends neither: the Sprint field
+  // is missing from most Data Center create screens, so Rekey journals the
+  // sprint as a move under the key Jira hands back once the create lands.
   // Optional for the reason Issue.pending is: the backend always sends
   // them, and fixtures written before the board writes do not.
   statusId?: string;
@@ -583,6 +587,7 @@ export interface ImportMapping {
   assignee: string;
   storyPoints: string;
   parentKey: string;
+  sprint: string;
 }
 
 export interface ImportRowError {
@@ -614,6 +619,7 @@ export const IMPORT_FIELDS: { id: keyof ImportMapping; label: string }[] = [
   { id: "assignee", label: "Assignee" },
   { id: "storyPoints", label: "Story points" },
   { id: "parentKey", label: "Parent key" },
+  { id: "sprint", label: "Sprint" },
 ];
 
 // readFileAsBase64 reads a browser File into the base64 the import
