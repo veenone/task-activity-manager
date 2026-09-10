@@ -19,8 +19,9 @@ It is the fourth view, between Boards and Reports.
   way every other membership change is.
 - **Starting and completing** a sprint from here as well as from the Boards toolbar, sharing one
   definition of what "unfinished" means rather than growing a second.
-- **A marker on every write that reaches Jira immediately**, because by this design five of them
-  do and nothing on screen tells them apart from the ones that wait for Commit.
+- **A marker wherever the point of no return is**, because five writes here reach Jira the moment
+  they are pressed, in an app where everything else waits for Commit, and nothing on screen tells
+  them apart.
 
 ## 2. What this does not deliver
 
@@ -93,37 +94,64 @@ for. The previous version of this rule lived in a spec sentence and lasted one p
 | Deleting and the sprint cache | Delete removes the sprint's rows itself; it does not go through `refreshSprints` | That helper refuses to persist an empty answer, justified by a comment saying a ceremony proves the board has a sprint. Delete is the one write that makes the answer genuinely empty, so the refusal would leave a deleted sprint in the cache forever, and from there into the Backlog picker, the Epics tree, the New issue dialog and the importer's Sprint column |
 | Clearing a sprint's goal | Sent as an explicit empty string on edit, never on create | The partial update rule that stops an empty box wiping a real goal also makes a goal impossible to clear. The two cases are different and the code distinguishes them |
 | A local record of an immediate write | An audit row for each of create, edit and delete | Once Jira no longer has the sprint, an audit row is the only trace that will exist anywhere on the machine |
-| Telling immediate writes apart | A marker and a sentence on all five | An app whose promise is that you see every write before it happens must say which buttons break that promise |
+| Telling immediate writes apart | One chip and one sentence, in the four dialogs and the confirmation, never on a menu item that only opens one of them | An app whose promise is that you see every write before it happens must say which buttons break that promise, and the point of no return is the honest place to say it |
+| What colour that marker is | The accent, never amber | Amber already means "held locally, waiting for Commit" in this app: the pending dot, the draft chip, the moved row flash. A marker meaning the opposite, painted amber, would invert the app's own vocabulary and read as a warning about a normal action |
+| A sprint's goal | Added to `RawSprint`, `backend.Sprint`, `boardrepo.Sprint` and the `sprint` table, at schema version 7 | It existed at no layer. Without it the row cannot show a goal, the edit dialog overwrites one blind, and clearing a goal cannot be told from leaving it alone |
 | Permissions | A 403 says the account cannot manage sprints on this board, and the buttons stay | Phase 3c's rule: guessing at permissions before trying is how tools hide capability from people who have it |
 
 ## 5. The view
 
 ```
-Sprints                                                    [Board: PLAT Scrum v]  [+ New sprint]
-+--------------------------------------------------+  +--------------------------------------+
-| v  Sprint 12          ACTIVE   18 Aug - 1 Sep     |  |  PLAT-412                            |
-|      8 of 14 done, 21 of 34 points                |  |  [Story]  In Progress                |
-|      [Complete]  [Edit]                           |  |                                      |
-|      PLAT-412   Apply promo code       In Progress|  |  FIELDS                              |
-|      PLAT-418   Refund a part order    To Do      |  |  Sprint    [Sprint 12          v]    |
-|      ...                                          |  |  Assignee  ...                       |
-| >  Sprint 13          FUTURE   1 Sep - 15 Sep     |  |                                      |
-|      6 issues                                     |  |                                      |
-|      [Start]  [Edit]  [Delete]                    |  |                                      |
-| >  Sprint 11          CLOSED   4 Aug - 18 Aug     |  |                                      |
-|      Contents are not cached for a closed sprint  |  |                                      |
-+--------------------------------------------------+  +--------------------------------------+
+Sprints                                                   [Board: PLAT Scrum v]  [+ New sprint]
+Sprint 12, day 6 of 14, 8 of 14 done, 21 of 34 pts
++---------------------------------------------------+  +--------------------------------------+
+| v Sprint 12  Active  18 Aug to 1 Sep  8/14   [...] |  |  PLAT-412                            |
+|     Ship the promo engine before pricing lands     |  |  [Story]  In Progress                |
+|     Ana Silva, 4 issues, 13 pts                    |  |                                      |
+|     [ ] PLAT-412  Apply promo code    In Progress  |  |  FIELDS                              |
+|     [ ] PLAT-418  Refund a part order To Do        |  |  Sprint    [Sprint 12          v]    |
+|     Unassigned, 2 issues, 5 pts                    |  |  Assignee  ...                       |
+|     [ ] PLAT-455  Audit the tax table To Do        |  |                                      |
+| > Sprint 13  Future  1 Sep to 15 Sep     6   [...] |  |                                      |
+| > Sprint 11  Closed  4 Aug to 18 Aug         [...] |  |                                      |
+| > Backlog                               31         |  |                                      |
++---------------------------------------------------+  +--------------------------------------+
 ```
 
-The tree is `folder-tree` and its rows are `folder-item`, the classes the Epics tree already uses,
-so the two views read as one app. A sprint row carries its name, a state chip, its dates, and a
-progress line built the way `EpicNode` already builds one: done of total, and points of points.
-The row's actions appear on the row rather than in a menu, because there are at most three of them
-and they differ by state, so a menu would be three items long and mostly disabled.
+The tree is `folder-tree` and its rows share `folder-item`, `folder-selected` and `folder-caret`
+with the Epics tree, so the two views read as one app. The sprint row's own cells are
+`.sprint-row` and `.sprint-cell`, because `.epic-row`'s grid tracks are fixed and genuinely
+different; reusing them would mean sizing sprint content to an epic's columns.
+
+A sprint row carries five things and a caret: name, a state chip, its dates, a progress line built
+the way `EpicNode` already builds one, and a menu trigger. **The goal is not one of them.** It is
+the only field of a sprint that is a sentence rather than a token, every cell in these trees clips
+with an ellipsis, and opening the detail panel narrows the pane, so a goal column would be empty
+on most rows and clipped to nothing on the rest. It renders instead as the first line inside an
+expanded sprint, where it has the width to be read once, which is how a goal is read.
+
+**The actions are a menu, not buttons on the row.** Inline buttons would need fixed tracks sized
+for their widest label and empty on every row that does not offer them; the existing on-row action
+pattern reveals itself only on hover, which would hide the app's one irreversible action from
+every keyboard user; and the tree is a roving tabindex with a single tab stop, which is the exact
+constraint `CardMoveMenu` was built for and already solves.
+
+**An assignee group is a separator, not a node.** A person has no detail panel to open, no
+children to expand, and no sensible answer for the arrow keys, so making one a tree item would put
+the first member in the tree that neither opens nor toggles. The issues stay the only tree items
+under a sprint, which is what keeps this a two level tree.
 
 Order is active first, then future by start date, then closed by start date with the most recent
-first. Closed sprints are behind a "Show closed" toggle that starts off, because a board two years
-old has fifty of them and none of them are what the view is for.
+first, then the board's backlog last. Closed sprints are behind a "Show closed" toggle that starts
+off, because a board two years old has fifty of them and none of them are what the view is for.
+Only the active sprint starts expanded, because a board with twelve future sprints would otherwise
+paint twelve open branches.
+
+**The backlog is in the tree because otherwise a sprint cannot be filled here.** A tree of sprints
+holds only issues that are already in a sprint, so a selection over it could move work between
+sprints and never into a new one, and filling the sprint you just made would still mean leaving
+for the board. The cache already stores the backlog as a scope with an empty sprint id, so it is
+one more read rather than a new idea.
 
 Selecting an issue opens the detail panel, which is the same `IssueDetailPanel` the Backlog and
 the Epics tree use, and it receives the profile wide open sprint list so its Sprint field is a
@@ -167,13 +195,27 @@ per profile lock under the same `"sprint"` label, which means the frontend reach
 
 ## 8. The store
 
-No schema change. The `sprint` table already holds everything the view lists, and the three writes
-refresh it through the existing replace path.
+**One column, and it is one this app should always have had.** A sprint's goal does not exist
+anywhere in TAM: not in `core/jira`'s `RawSprint`, not in `backend.Sprint`, not in
+`boardrepo.Sprint`, and not in the `sprint` table. Jira has been sending it on every sprint read
+since Phase 3a and TAM has been dropping it on the floor.
 
-One new read, in its own file in `internal/boardrepo`: the sprints of one board with their dates
-and their cached issue keys, which is what the tree draws. `OpenSprints` is not it: that read
-exists for a picker, drops the dates and the board id on purpose, and is deliberately folded to
-one row per sprint.
+Nothing here works without it. The row cannot show a goal, the edit dialog opens with an empty box
+over a goal the sprint already has and the user types over it blind, and clearing a goal is
+impossible to implement honestly, because the code cannot tell "the user left this alone" from
+"the user emptied it" without knowing what it was. So the column is added at all four layers, with
+schema version 7 and a migration that adds it in place rather than dropping the table: this is a
+cache, but dropping it would empty every board's sprint picker until the next sync, for a column
+that back fills itself on the first read.
+
+Everything else the view needs is already stored. One new read, in its own file in
+`internal/boardrepo`: one board's sprints with their dates, their goal, and **their issues**,
+which is what the tree draws. Keys alone would not do: a row shows a summary and a status, the
+grouping needs an assignee, and the detail panel needs a whole issue, so returning keys would
+force a second query and lose the single snapshot the read exists for. The board's backlog comes
+back as one more scope, which the cache already stores with an empty sprint id. `OpenSprints` is
+not this read: it exists for a picker, drops the dates and the board id on purpose, and is folded
+to one row per sprint.
 
 ## 9. The empty states
 
