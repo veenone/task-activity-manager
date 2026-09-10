@@ -18,13 +18,43 @@
 - **A report is reconstructed from the changelog, never from Jira's internal chart endpoints.** `/rest/greenhopper/1.0/rapid/charts/...` would be quicker and is undocumented, unversioned Jira Software internals: the one thing in this app that could break on an upgrade with no warning and no recourse. The public search with `expand=changelog` is the source.
 - **A chart never invents a number.** A sprint with no dates cannot be charted and says so; a changelog that could not be read leaves the previous report on screen with the failure named; a live sprint stops its line at today rather than drawing the future.
 - Scope changes are drawn, not absorbed. A card added mid-sprint raises the line on the day it arrived.
-- "Done" is the same rule the board and the sprint completion use: a status id in the board's last column.
+- "Done" is the same rule the board and the sprint completion use: a status id in the board's last column. That rule now has one home on each side, `lib/unfinished.ts` on the frontend and the completion's own status set in `internal/sprints/guards.go`. Call one of them; do not write a third.
 - A closed sprint's series is cached and never refetched. A live sprint's is never cached.
 - No charting dependency. Two chart shapes do not justify one, and this frontend has four runtime dependencies.
 - Reports are read-only. Nothing in this phase writes to Jira or to the journal.
 - The PAT stays in the Jira client's Authorization header only.
 - Files stay small and single purpose; a helper used from two places lives in its own module. TAM mirrors XTM's design language where XTM has a counterpart.
 - UI text uses no em dashes. No AI attribution or mentions anywhere, in code, comments, commit messages, or documents. Conventional commit prefixes, no trailers. Never add, commit, or delete untracked local tooling files; revert Wails churn under `tam/frontend/wailsjs/runtime` and `tam/frontend/package.json.md5` with `git checkout --`.
+
+## What shipped after this plan was written
+
+This plan was drafted the day Phase 3c merged. The sprint work that followed changed four things
+it assumes, and each one is folded into the tasks below rather than left for an implementer to
+trip over:
+
+- **Schema version 7 is taken.** It added a sprint's `goal`. The `sprint_report` table is version 8.
+- **The Reports view already exists in the navigation.** It has a `VIEWS` entry, a blurb and the
+  native menu item at accelerator 5, and it renders a `Placeholder`. This phase replaces what it
+  renders; it does not add a view.
+- **The Sprints view exists**, with a board picker that hides itself when the profile has one scrum
+  board, an assignee grouping, and a read (`BoardSprintDetails`) that returns a board's sprints
+  with their issues and four computed numbers. Reports should borrow that picker's behaviour, and
+  should check whether that read answers its sprint picker before adding a third way to list
+  sprints.
+- **A closed sprint has no cached membership**, by design: the boards sync fetches issue keys for
+  active and future sprints only. That is not a problem for this phase, because a report is built
+  from a changelog search by JQL rather than from the cache, but it does mean the sprint picker
+  must come from the `sprint` table and not from anything membership-shaped.
+
+Two lessons from the branch that just shipped are worth carrying, because both cost a fix wave
+there:
+
+- **A count read from a cache can understate silently.** A sprint's cached membership can be
+  capped, or hold keys whose issues were never synced. Anything this phase reports as a total must
+  either come from the changelog search, which is authoritative, or say that it might be low.
+- **A comment must be true.** Eight consecutive reviews on the previous branch each found at least
+  one that was not, including one that credited the wrong mechanism for a safety property and one
+  that described protection the code did not provide.
 
 ## Decisions
 
@@ -38,7 +68,7 @@
 
 **Created:** `tam/internal/reports/reports.go`, `series.go`, `velocity.go`, and their tests; `tam/app_reports.go`, `app_reports_test.go`; `tam/frontend/src/components/ReportsView.tsx`, `BurndownChart.tsx`, `VelocityChart.tsx`, `SprintSummary.tsx`; `tam/frontend/src/lib/chartScale.ts`, `chartScale.test.ts`; `tam/frontend/src/queries/reports.ts`.
 
-**Modified:** `core/jira/issues.go`, `issues_test.go`; `tam/internal/backend/backend.go`, `backend/jira/jira.go` or its issue file, `jira_test.go`, `backend/demo/demo.go`, `demo_test.go`; `tam/internal/tamstore/tamstore.go`, `tamstore_test.go` (the `sprint_report` table at schema version 7); `tam/internal/boardrepo/` (the reader and writer for it); `tam/app.go`; `tam/frontend/wailsjs/**` (regenerated); `tam/frontend/src/api.ts`, `queries/keys.ts`, `App.tsx`, `App.test.tsx`, `nav.ts`, `App.css`; `frontend/core/styles/primitives.css`; `tam/CLAUDE.md`, `README.md`.
+**Modified:** `core/jira/issues.go`, `issues_test.go`; `tam/internal/backend/backend.go`, `backend/jira/jira.go` or its issue file, `jira_test.go`, `backend/demo/demo.go`, `demo_test.go`; `tam/internal/tamstore/tamstore.go`, `tamstore_test.go` (the `sprint_report` table at schema version 8); `tam/internal/boardrepo/` (the reader and writer for it); `tam/app.go`; `tam/frontend/wailsjs/**` (regenerated); `tam/frontend/src/api.ts`, `queries/keys.ts`, `App.tsx`, `App.test.tsx`, `nav.ts`, `App.css`; `frontend/core/styles/primitives.css`; `tam/CLAUDE.md`, `README.md`.
 
 ---
 
@@ -88,7 +118,7 @@
 
 **Files:** modify `tam/internal/tamstore/tamstore.go`, `tamstore_test.go`, `tam/internal/boardrepo/` (a reader and writer for the new table), `tam/app.go`; create `tam/app_reports.go`, `app_reports_test.go`; regenerate `tam/frontend/wailsjs/**`.
 
-**Produces:** schema version 7 with `sprint_report(profile_id, sprint_id, unit, built_at, series_json, PRIMARY KEY (profile_id, sprint_id))`; `boardrepo.SavedReport` and `SaveReport`; bound methods `GetBurndown(profileID string, boardID, sprintID int) (reports.Series, error)` and `GetVelocity(profileID string, boardID int) ([]reports.VelocityRow, error)`.
+**Produces:** schema version 8 with `sprint_report(profile_id, sprint_id, unit, built_at, series_json, PRIMARY KEY (profile_id, sprint_id))`; `boardrepo.SavedReport` and `SaveReport`; bound methods `GetBurndown(profileID string, boardID, sprintID int) (reports.Series, error)` and `GetVelocity(profileID string, boardID int) ([]reports.VelocityRow, error)`.
 
 - [ ] **Step 1: The table.** Version 7 adds it through `baseDDL`, which needs no migration because it is a new table, and the existing version tests get a case for it the way version 6 did.
 
@@ -107,8 +137,8 @@
 - [ ] **Step 2: The burndown.** Hand-written SVG: the remaining line, the ideal line behind it in a muted stroke, a marker on each day scope changed, and axes labelled with the unit `Series.Unit` names. A live sprint draws a today line and stops. Every colour comes from a token that exists in `tokens.css`; check before using one, since there is no `--surface-1` in this design system.
 - [ ] **Step 3: The summary.** Committed, added, removed, completed and carried over, as the sentence a review starts with, plus the note when some cards had no estimate.
 - [ ] **Step 4: Velocity.** A bar pair per sprint, committed against completed, with the mean across, oldest on the left.
-- [ ] **Step 5: The view.** A board picker and a sprint picker matching the Boards view's, the three pieces stacked, and the empty states the spec names: no closed sprint on this board, no estimates so the chart counts cards, no dates so it cannot be charted, and a failed changelog read that keeps the last chart and names the failure with a retry.
-- [ ] **Step 6: Wire it in.** `App.tsx`'s switch gains Reports, `nav.ts`'s blurb stops promising what this does not do, and `App.test.tsx` mocks the two new bindings.
+- [ ] **Step 5: The view.** A board picker and a sprint picker following the Sprints view's rather than the Boards view's, which means hiding the board picker when the profile has exactly one scrum board and naming the board in the heading instead, the three pieces stacked, and the empty states the spec names: no closed sprint on this board, no estimates so the chart counts cards, no dates so it cannot be charted, and a failed changelog read that keeps the last chart and names the failure with a retry.
+- [ ] **Step 6: Wire it in.** `App.tsx`'s switch gains Reports in place of its `Placeholder` fall-through, and `nav.ts`'s blurb stops promising what this does not do. The `VIEWS` entry and the native menu item already exist and already carry accelerator 5, so nothing is added there and nothing is renumbered. `App.test.tsx` mocks the two new bindings.
 - [ ] **Step 7: Tests.** `chartScale.test.ts` for the arithmetic including a zero-range series and a single-day sprint. `ReportsView.test.tsx`: both charts render from a fixture; the summary reads its sentence; a live sprint stops at today; the unit label follows `Series.Unit`; each empty state; and a failed fetch keeping the previous chart. Commit as `feat(tam): the Reports view`.
 
 ---
