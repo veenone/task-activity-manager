@@ -9,6 +9,7 @@ import { Placeholder } from "./components/Placeholder";
 import { BacklogView } from "./components/BacklogView";
 import { EpicsView } from "./components/EpicsView";
 import { BoardsView } from "./components/BoardsView";
+import { SprintsView } from "./components/SprintsView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { PendingChangesModal } from "./components/PendingChangesModal";
@@ -253,6 +254,8 @@ export default function App() {
               <EpicsView />
             ) : current.id === "boards" ? (
               <BoardsView />
+            ) : current.id === "sprints" ? (
+              <SprintsView />
             ) : (
               <Placeholder view={current} />
             )

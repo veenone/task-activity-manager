@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { Modal, announce, errMsg } from "@agile-suite/core";
 import { useCreateSprint, useSprintSuggestion } from "../queries/boards";
 import { useSync } from "../contexts/SyncContext";
+import { ImmediateWriteChip } from "./ImmediateWriteChip";
 import { SprintDraftFields, useSprintDraft } from "./SprintDraftForm";
 
 interface Props {
@@ -81,7 +82,14 @@ export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Pr
     >
       <div className="pending-head">
         <h2 id="create-sprint-title">New sprint</h2>
-        <span className="muted">Jira makes it now. This does not wait for Commit.</span>
+        <span className="immediate-write">
+          <ImmediateWriteChip />
+          {/* The chip is the marker, and this is the word it cannot fit: a
+              user who has learned that nothing in TAM reaches Jira until
+              Commit is owed the sentence that names Commit, and it is the
+              sentence this chip replaced. */}
+          <span className="muted small">This does not wait for Commit.</span>
+        </span>
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

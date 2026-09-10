@@ -3,6 +3,7 @@ import { PendingInSprint } from "../api";
 import type { BoardView, Issue, Sprint } from "../api";
 import { useModal } from "../modals";
 import { plural } from "../lib/format";
+import { unfinished } from "../lib/unfinished";
 import { CompleteSprintModal } from "./CompleteSprintModal";
 import { StartSprintModal } from "./StartSprintModal";
 
@@ -29,18 +30,14 @@ interface Props {
   onCompleted: (moveTo: string, line: string) => void;
 }
 
-// incompleteCards are the cards outside the board's last column, which is
-// what "not finished" means here, on the wire, and in the dialog's own
-// sentence. A board with one column has no last column to judge against and
-// answers with nothing rather than with everything.
-function incompleteCards(view: BoardView): Issue[] {
-  const last = view.columns.length - 1;
-  if (last < 1) return [];
+// drawnCards is every card the board has in a cell, lane by lane and column
+// by column. Which of them are unfinished is lib/unfinished's answer, shared
+// with the Sprints view so one rule decides it on both screens; this is only
+// the list to ask it about.
+function drawnCards(view: BoardView): Issue[] {
   const out: Issue[] = [];
   for (const lane of view.lanes) {
-    (lane.cells ?? []).forEach((cell, col) => {
-      if (col !== last) out.push(...cell);
-    });
+    for (const cell of lane.cells ?? []) out.push(...cell);
   }
   return out;
 }
@@ -129,7 +126,7 @@ export function BoardCeremonies({
         boardId={boardId}
         sprint={sprint}
         futures={sprints.filter((s) => s.state === "future")}
-        incomplete={view ? incompleteCards(view) : []}
+        incomplete={view ? unfinished(drawnCards(view), view.columns) : []}
         hidden={view ? hiddenCards(view) : 0}
         lastColumn={view?.columns[view.columns.length - 1]?.name ?? "the last column"}
         onClose={onClose}

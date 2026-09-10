@@ -3,6 +3,7 @@ import { Modal, announce, errMsg } from "@agile-suite/core";
 import type { Sprint } from "../api";
 import { useSprintSuggestion, useStartSprint } from "../queries/boards";
 import { useSync } from "../contexts/SyncContext";
+import { ImmediateWriteChip } from "./ImmediateWriteChip";
 import { SprintDraftFields, useSprintDraft } from "./SprintDraftForm";
 
 interface Props {
@@ -33,7 +34,17 @@ export function StartSprintModal({ profileId, boardId, sprint, active, onClose, 
   const suggestion = useSprintSuggestion(profileId, boardId, true);
   const start = useStartSprint(profileId, runSprintCeremony);
   const suggested = suggestion.data;
-  const draft = useSprintDraft({ idPrefix: "start-sprint", initialName: sprint.name, suggestion: suggested });
+  // The goal comes from the sprint. Starting one sends the goal box back to
+  // Jira whatever is in it, so a dialog that opened empty over a real goal
+  // was a blank field the user typed into without ever seeing what they were
+  // replacing. It is empty for a sprint cached before the goal column
+  // existed, which a boards refresh fills in.
+  const draft = useSprintDraft({
+    idPrefix: "start-sprint",
+    initialName: sprint.name,
+    initialGoal: sprint.goal,
+    suggestion: suggested,
+  });
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (start.isPending) return;
@@ -67,7 +78,14 @@ export function StartSprintModal({ profileId, boardId, sprint, active, onClose, 
     <Modal onClose={onClose} className="modal pending-modal" labelledBy="start-sprint-title" closeOnOverlayClick={false}>
       <div className="pending-head">
         <h2 id="start-sprint-title">{`Start ${sprint.name}`}</h2>
-        <span className="muted">Jira starts it now. This does not wait for Commit.</span>
+        <span className="immediate-write">
+          <ImmediateWriteChip />
+          {/* The chip is the marker, and this is the word it cannot fit: a
+              user who has learned that nothing in TAM reaches Jira until
+              Commit is owed the sentence that names Commit, and it is the
+              sentence this chip replaced. */}
+          <span className="muted small">This does not wait for Commit.</span>
+        </span>
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

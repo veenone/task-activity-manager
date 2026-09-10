@@ -59,6 +59,7 @@ vi.mock("./api", async () => {
     GetProfileSetting: vi.fn(),
     ListBoards: vi.fn(),
     ListBoardSprints: vi.fn(),
+    ListBoardSprintDetails: vi.fn(),
     GetBoard: vi.fn(),
     SyncBoards: vi.fn(),
     SetProfileSetting: vi.fn(),
@@ -111,6 +112,7 @@ beforeEach(() => {
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
   vi.mocked(api.ListBoards).mockResolvedValue([]);
   vi.mocked(api.ListBoardSprints).mockResolvedValue([]);
+  vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([]);
   vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
 });
 
@@ -145,6 +147,18 @@ describe("App shell", () => {
       await screen.findByText("This project has no boards in Jira, or the sync has not run"),
     ).toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Boards" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
+  it("switches to the Sprints view, which the View menu now carries too", async () => {
+    renderApp();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    await menuBus.emit("menu:view", "sprints" as never);
+    expect(screen.getByRole("region", { name: "Sprints" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("No scrum board has been synced for this project, so there are no sprints to show."),
+    ).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Sprints" }))
       .toHaveAttribute("aria-current", "page");
   });
 

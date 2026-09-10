@@ -22,6 +22,7 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     keys.boards(profileId),
     [profileId, "boardSprints"] as const,
     [profileId, "board"] as const,
+    [profileId, "boardSprintDetails"] as const,
     keys.boardsUnavailable(profileId),
     keys.openSprints(profileId),
   ]) {
@@ -39,6 +40,9 @@ export function invalidateWrites(qc: QueryClient, profileId: string, key?: strin
   qc.invalidateQueries({ queryKey: key ? [profileId, "issue", key] : [profileId, "issue"] });
   qc.invalidateQueries({ queryKey: [profileId, "tree"] });
   qc.invalidateQueries({ queryKey: keys.epics(profileId) });
-  // A pending edit shows on the card too, so the board repaints with it.
+  // A pending edit shows on the card too, so the board repaints with it,
+  // and so does the Sprints view: a journaled sprint move is replayed into
+  // that read, which is how a bulk fill lands there before the next sync.
   qc.invalidateQueries({ queryKey: [profileId, "board"] });
+  qc.invalidateQueries({ queryKey: [profileId, "boardSprintDetails"] });
 }

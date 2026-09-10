@@ -82,6 +82,11 @@ export interface Issue {
   type: IssueType | "";
   summary: string;
   status: string;
+  // The status's own Jira id, which is what a board buckets a card into a
+  // column by and what lib/unfinished reads. Optional so fixtures written
+  // before anything on this side needed it still type-check; the backend
+  // has always sent it.
+  statusId?: string;
   assignee: string;
   reporter: string;
   priority: string;
@@ -346,6 +351,49 @@ export interface SprintCreated {
   sprint: Sprint;
   note: string;
 }
+
+// SprintDetail is one node of the Sprints view, mirroring
+// boardrepo.SprintDetail field for field: a sprint's own row (the embedded
+// Sprint's fields are inlined by Go's encoder), the cards it holds, and the
+// four numbers a progress reading is drawn from. The board's own unassigned
+// work arrives as one more node of the same shape, with state
+// "unassigned" and the name "Board backlog".
+export interface SprintDetail extends Sprint {
+  // issues is the scope's cards, capped by the one budget the whole call
+  // spends across every node together. It can be shorter than total, which
+  // is why nothing on screen counts this array.
+  issues: Issue[];
+  // total, done, points and donePoints are counted over every card the
+  // scope holds, whether or not the cap let it into issues.
+  total: number;
+  done: number;
+  points: number;
+  donePoints: number;
+  // membershipCached says whether the sync fetches this scope's membership
+  // at all, which it does for an active or future sprint and never for a
+  // closed one. It cannot say whether the last attempt landed; notSynced is
+  // the field that says the read came up short.
+  membershipCached: boolean;
+  // notSynced counts the keys this scope names that the issue cache does
+  // not hold, so a sprint of thirty on a board synced before its issues
+  // does not quietly report a total of ten.
+  notSynced: number;
+  // truncated is set when the shared cap stopped this node's issues short.
+  // The four numbers above are unaffected: they are counted before the cap.
+  truncated: boolean;
+}
+
+// MAX_CARDS_PER_VIEW mirrors boardrepo.MaxCardsPerView, so a line saying
+// what a read stopped at names the number the backend actually stopped at.
+// Two reads spend it: a board spends it over its cells, and the Sprints
+// view's list spends one of these budgets across every sprint together.
+export const MAX_CARDS_PER_VIEW = 2000;
+
+// UNASSIGNED_SPRINT_STATE mirrors boardrepo.UnassignedSprintState. It is
+// deliberately not one of Jira's three states, so the one node in the list
+// that is not a sprint can be told from the ones that are without matching
+// on its name.
+export const UNASSIGNED_SPRINT_STATE = "unassigned";
 
 export interface BoardSummary {
   boards: number;
@@ -799,6 +847,13 @@ export const EditSprint = (
 ): Promise<string> => App.EditSprint(profileId, boardId, sprintId, name, goal, start, end, clearGoal);
 export const DeleteSprint: (profileId: string, boardId: number, sprintId: number) => Promise<string> =
   App.DeleteSprint;
+// ListBoardSprintDetails is the Sprints view's whole read: one board's
+// sprints in the order that view wants them, each with its cards and its
+// progress numbers, and the board's own unassigned work as a last node. It
+// is cast for the same reason GetBoard is, since the generated cards type
+// their issue type as a plain string.
+export const ListBoardSprintDetails = (profileId: string, boardId: number): Promise<SprintDetail[]> =>
+  App.ListBoardSprintDetails(profileId, boardId) as Promise<SprintDetail[]>;
 // How many journal rows belong to cards staying in this sprint. The Complete
 // button asks before it opens its dialog: a card dragged to Done an hour ago
 // is Done on the board and not in Jira, and completing the sprint would move

@@ -126,6 +126,10 @@ export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
 }
 
+export function ListBoardSprintDetails(arg1, arg2) {
+  return window['go']['main']['App']['ListBoardSprintDetails'](arg1, arg2);
+}
+
 export function ListBoardSprints(arg1, arg2) {
   return window['go']['main']['App']['ListBoardSprints'](arg1, arg2);
 }

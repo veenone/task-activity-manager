@@ -3,7 +3,8 @@ import { Modal, announce, errMsg } from "@agile-suite/core";
 import type { Issue, Sprint, SprintCompletion } from "../api";
 import { useCompleteSprint } from "../queries/boards";
 import { useSync } from "../contexts/SyncContext";
-import { plural } from "../lib/format";
+import { plural, sprintDates } from "../lib/format";
+import { ImmediateWriteChip } from "./ImmediateWriteChip";
 
 interface Props {
   profileId: string;
@@ -34,22 +35,6 @@ interface Props {
   // the sprint the cards went to rather than falling back to whatever is
   // first, and the sentence the banner prints.
   onCompleted: (moveTo: string, line: string) => void;
-}
-
-// day renders a sprint's own start or end as a calendar day, the way the
-// board's summary line does.
-function day(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-}
-
-function sprintDates(s: Sprint): string {
-  const from = day(s.startDate);
-  const to = day(s.endDate);
-  if (from && to) return `${from} to ${to}`;
-  return to ? `ends ${to}` : from ? `started ${from}` : "";
 }
 
 // CompleteSprintModal closes one sprint on Jira and says, before it does,
@@ -130,6 +115,10 @@ export function CompleteSprintModal({
       <div className="pending-head">
         <h2 id="complete-sprint-title">{`Complete ${sprint.name}`}</h2>
         {dates && <span className="muted">{dates}</span>}
+        {/* The banner below says the completion cannot be reversed, which is
+            a different claim from this one: the chip says when Jira hears
+            about it, the banner says what happens once it has. */}
+        <ImmediateWriteChip />
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

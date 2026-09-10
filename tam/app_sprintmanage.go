@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 )
 
 // Managing a sprint from the board, rather than running one: making it,
@@ -121,4 +122,25 @@ func (a *App) DeleteSprint(profileID string, boardID, sprintID int) (string, err
 		log.Printf("tam: sprint %d for %s deleted, with a note: %s", sprintID, p.Name, line)
 	}
 	return line, nil
+}
+
+// ListBoardSprintDetails composes the Sprints view's data: one board's
+// sprints and its own unassigned work, each carrying its issues and the four
+// progress numbers a fill bar draws from. a.repo is the IssueSource, the
+// same one GetBoard passes: the cards themselves live in the issue cache,
+// not in boardrepo's own tables. Unlike the three writes above, it takes no
+// acquire lock: it is a local read that never reaches Jira, the same as
+// GetBoard and the other board reads in app_boards.go.
+func (a *App) ListBoardSprintDetails(profileID string, boardID int) ([]boardrepo.SprintDetail, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	details, err := a.boards.BoardSprintDetails(a.ctx, a.repo, profileID, boardID)
+	if err != nil {
+		return nil, err
+	}
+	if details == nil {
+		details = []boardrepo.SprintDetail{}
+	}
+	return details, nil
 }
