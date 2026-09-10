@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { plural } from "../lib/format";
 import type { SprintSuggestion } from "../api";
 
@@ -31,7 +31,18 @@ interface Options {
   // initialName is the name a sprint already has. Empty when creating, since
   // there is no sprint yet and the board's numbering fills the gap instead.
   initialName?: string;
+  // initialGoal is the goal the sprint already has. It is not decoration on
+  // the start dialog: that dialog sends the goal box back to Jira whatever
+  // is in it, so opening empty over a real goal meant the user overwrote a
+  // goal they never saw. Empty when creating, and when the goal column has
+  // not been filled in yet, which a boards refresh does.
   initialGoal?: string;
+  // initialFrom and initialTo are the dates a sprint already has, as bare
+  // days. Only the edit dialog has any: a sprint being created or started
+  // takes its dates from the suggestion below, and one being edited must not
+  // be shown a suggested fortnight over the dates it is actually running to.
+  initialFrom?: string;
+  initialTo?: string;
   suggestion: SprintSuggestion | undefined;
 }
 
@@ -60,11 +71,13 @@ export interface SprintDraft {
   clearError: () => void;
 }
 
-export function useSprintDraft({ idPrefix, initialName = "", initialGoal = "", suggestion }: Options): SprintDraft {
+export function useSprintDraft({
+  idPrefix, initialName = "", initialGoal = "", initialFrom = "", initialTo = "", suggestion,
+}: Options): SprintDraft {
   const [name, setName] = useState(initialName);
   const [goal, setGoal] = useState(initialGoal);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState(initialFrom);
+  const [to, setTo] = useState(initialTo);
   const [error, setError] = useState("");
   const [invalidField, setInvalidField] = useState("");
   // seeded keeps the suggestion from overwriting a date the user has already
@@ -78,15 +91,17 @@ export function useSprintDraft({ idPrefix, initialName = "", initialGoal = "", s
   useEffect(() => {
     if (!suggestion || seeded) return;
     setSeeded(true);
-    setFrom(suggestion.start);
-    setTo(suggestion.end);
+    // A date the sprint already has is a fact about the sprint, so it wins
+    // over a suggestion the way its name does.
+    if (!initialFrom) setFrom(suggestion.start);
+    if (!initialTo) setTo(suggestion.end);
     // A name the sprint already has is what Jira calls it, so it wins; the
     // board's numbering only fills a gap.
     if (!initialName && suggestion.name) setName(suggestion.name);
     // A length nobody measured is a plausible wrong date nobody checks, so
     // the field the user has to look at is the one that takes focus.
     (suggestion.fromHistory ? nameRef : endRef).current?.focus();
-  }, [suggestion, seeded, initialName]);
+  }, [suggestion, seeded, initialName, initialFrom, initialTo]);
 
   function fail(message: string, field: string): null {
     setError(message);
@@ -134,13 +149,23 @@ interface FieldsProps {
   draft: SprintDraft;
   suggestion: SprintSuggestion | undefined;
   suggestionError: Error | null;
+  // nameNote is a remark under the name field that is not a refusal: the
+  // edit dialog's nudge about a name another sprint on this board already
+  // has. A duplicate is legal in Jira and often deliberate, so it is said
+  // and not enforced.
+  nameNote?: ReactNode;
+  // suggesting says whether this dialog asked for a suggestion at all. The
+  // edit dialog does not, because the sprint it is about already has dates,
+  // and the caption under them would otherwise sit there saying it was
+  // reading a sprint length nobody had asked for.
+  suggesting?: boolean;
 }
 
 // SprintDraftFields renders the four fields and the caption under the dates.
 // It takes the suggestion's error separately from the suggestion itself,
 // because a dialog whose dates could not be suggested is still usable and has
 // to say so rather than silently offering two empty boxes.
-export function SprintDraftFields({ draft, suggestion, suggestionError }: FieldsProps) {
+export function SprintDraftFields({ draft, suggestion, suggestionError, nameNote, suggesting = true }: FieldsProps) {
   const { values, set, invalidField, idPrefix } = draft;
   const days = suggestion ? plural(suggestion.length, "day", "days") : "";
 
@@ -148,15 +173,18 @@ export function SprintDraftFields({ draft, suggestion, suggestionError }: Fields
     <>
       <label className="edit-row" htmlFor={`${idPrefix}-name`}>
         <span className="muted small">Name</span>
-        <input
-          id={`${idPrefix}-name`}
-          ref={draft.nameRef}
-          className="detail-input"
-          type="text"
-          aria-invalid={invalidField === `${idPrefix}-name` || undefined}
-          value={values.name}
-          onChange={(e) => set.name(e.target.value)}
-        />
+        <span className="edit-cell">
+          <input
+            id={`${idPrefix}-name`}
+            ref={draft.nameRef}
+            className="detail-input"
+            type="text"
+            aria-invalid={invalidField === `${idPrefix}-name` || undefined}
+            value={values.name}
+            onChange={(e) => set.name(e.target.value)}
+          />
+          {nameNote && <span className="muted small">{nameNote}</span>}
+        </span>
       </label>
       <label className="edit-row" htmlFor={`${idPrefix}-goal`}>
         <span className="muted small">Goal</span>
@@ -204,9 +232,9 @@ export function SprintDraftFields({ draft, suggestion, suggestionError }: Fields
                 ? `Suggested ${days} from this board's last sprints. Change either date.`
                 : `No closed sprint on this board to measure, so this is the ${days} default. Check the end date.`}
             </span>
-          ) : (
+          ) : suggesting ? (
             <span className="muted small">Reading this board's sprint length.</span>
-          )}
+          ) : null}
         </span>
       </div>
     </>

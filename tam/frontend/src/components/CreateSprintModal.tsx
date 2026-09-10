@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { Modal, announce, errMsg } from "@agile-suite/core";
 import { useCreateSprint, useSprintSuggestion } from "../queries/boards";
 import { useSync } from "../contexts/SyncContext";
+import { ImmediateWriteChip } from "./ImmediateWriteChip";
 import { SprintDraftFields, useSprintDraft } from "./SprintDraftForm";
 
 interface Props {
@@ -81,7 +82,7 @@ export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Pr
     >
       <div className="pending-head">
         <h2 id="create-sprint-title">New sprint</h2>
-        <span className="muted">Jira makes it now. This does not wait for Commit.</span>
+        <ImmediateWriteChip />
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

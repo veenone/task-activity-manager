@@ -518,6 +518,72 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-incomplete { max-height: 260px; overflow-y: auto; gap: 6px; }
 .sprint-incomplete-card { display: flex; align-items: baseline; gap: 10px; padding: 6px 10px; }
 
+/* Phase 3c: the Sprints view. The tree reuses the Epics view's pane and the
+   shared folder-tree classes; what it adds is its own two row shapes, the
+   assignee bands between them, and the marker for a write that does not wait
+   for Commit. */
+
+/* Painted in the accent, never in amber: amber already means held locally
+   and waiting for Commit (the pending dot, the draft chip, a flashed row),
+   and this chip is that claim's opposite. */
+.chip-now {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  white-space: nowrap;
+}
+
+/* One scrum board is named rather than picked, so the heading sits where the
+   picker would have and reads at the same weight as its label. */
+.board-head-name { font-size: 13px; font-weight: 600; color: var(--text-strong); margin: 0; }
+
+/* Both row shapes fill the pane and clip, rather than sizing to their
+   content the way the Epics tree's rows do. The Epics tree scrolls sideways
+   because its rows share one track list and a long key has to go somewhere;
+   these two shapes share no tracks (a sprint has dates and progress where a
+   card has a status and points), so there is nothing to keep in step and a
+   horizontal scrollbar would buy nothing. */
+.sprint-row, .sprint-issue-row { width: 100%; gap: 8px; align-items: center; }
+.sprint-row {
+  display: grid;
+  grid-template-columns: 12px minmax(120px, 1fr) 72px 150px 190px 40px;
+}
+.sprint-issue-row {
+  display: grid;
+  grid-template-columns: 16px 44px var(--sprint-key-w, 92px) minmax(120px, 1fr) 132px 44px 13px;
+}
+/* Every cell clips to its track, so no cell can paint over its neighbour. */
+.sprint-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sprint-cell-name { font-weight: 600; }
+.sprint-cell-dates, .sprint-cell-progress { color: var(--text-muted); font-size: 11px; }
+.sprint-cell-progress { font-variant-numeric: tabular-nums; margin-left: 0; }
+.sprint-cell-actions { display: flex; justify-content: flex-end; }
+.sprint-check { margin: 0; cursor: pointer; }
+/* The goal is a sentence, so it gets a line of its own under the sprint
+   rather than a cell that would clip it. */
+.sprint-goal { padding: 2px 0 6px; white-space: normal; }
+.sprint-children > p { padding: 2px 0; }
+/* A band heading, not a row: it labels the cards under it and answers to
+   nothing, so it is quieter than they are. */
+.sprint-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.sprint-group-name { font-weight: 600; color: var(--text); }
+
+/* The pane keeps the detail panel's width while a multi-selection has taken
+   the panel away, so checking a second row does not slide every row sideways
+   in the middle of the gesture. The reserve is the panel's box with nothing
+   in it, and it answers the same :has() rule the panel does so the pane's own
+   edge does not change either. */
+.detail-panel-reserve { width: 352px; min-width: 300px; flex: none; align-self: stretch; }
+.epics-body:has(.detail-panel-reserve) .epics-tree-pane { border-right: none; border-radius: 6px 0 0 6px; }
+
 /* Assignee combobox: an input with a clear button and a floating result
    list, so a person is picked rather than a username remembered. */
 .assignee-picker { position: relative; min-width: 0; }

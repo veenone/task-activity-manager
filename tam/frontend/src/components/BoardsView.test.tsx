@@ -69,9 +69,14 @@ const sync = vi.hoisted(() => ({
 }));
 vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
 
+// statusId defaults to the To Do column's, because it is not decoration on
+// this board: the completion dialog decides which cards are unfinished by
+// whether the last column collects a card's status id, so a card drawn in
+// Done without one would be listed as unfinished.
 function issue(over: Partial<Issue>): Issue {
   return {
-    key: "PLAT-1", id: "1", project: "PLAT", type: "task", summary: "x", status: "To Do", assignee: "", reporter: "",
+    key: "PLAT-1", id: "1", project: "PLAT", type: "task", summary: "x", status: "To Do", statusId: "1",
+    assignee: "", reporter: "",
     priority: "", labels: [], sprintId: "12", sprintName: "Sprint 12", parentKey: "", storyPoints: null, rank: "",
     created: "", updated: "",
     ...over,
@@ -101,9 +106,9 @@ const COLUMNS = [
   { name: "Done", statusIds: ["5"], total: 3, points: 27 },
 ];
 
-const PROMO = issue({ key: "PLAT-412", type: "story", summary: "Checkout: apply promo code", status: "In Progress", assignee: "R. Anand", storyPoints: 8 });
+const PROMO = issue({ key: "PLAT-412", type: "story", summary: "Checkout: apply promo code", status: "In Progress", statusId: "3", assignee: "R. Anand", storyPoints: 8 });
 const KEYS = issue({ key: "PLAT-409", summary: "Rotate payment gateway API keys", assignee: "M. Ortiz", storyPoints: 2 });
-const RETRO = issue({ key: "PLAT-347", summary: "Write retro notes template", storyPoints: 1 });
+const RETRO = issue({ key: "PLAT-347", summary: "Write retro notes template", status: "Done", statusId: "5", storyPoints: 1 });
 
 // oneLane is the swimlane-none shape: a single catch-all band with one cell
 // per column.
