@@ -111,6 +111,13 @@ This task exists because Task 5's delete has to remove a sprint from four places
 
 **Files:** modify `tam/internal/backend/backend.go` (three interface lines), create `tam/internal/backend/jira/sprintwrite.go`, modify `tam/internal/backend/demo/boards.go` and its test, modify `tam/internal/sprints/sprints.go` (the `lifecycle` interface only).
 
+**Produces**, on both `backend.BoardBackend` and the unexported `lifecycle`:
+`CreateSprint(ctx, boardID int, d SprintDraft) (Sprint, error)`,
+`EditSprint(ctx, sprintID int, d SprintDraft, clearGoal bool) error`,
+`DeleteSprint(ctx, sprintID int) error`.
+
+The middle one is `EditSprint` here while `core/jira`'s client method is `UpdateSprint`, and that is deliberate rather than a slip: the client is named for the wire operation, which is a partial update, and the two layers above it are named for the user's action, which is an edit. The chain reads `Service.Edit` to `BoardBackend.EditSprint` to `Client.UpdateSprint`, and the Jira implementation carries a one line comment saying where the name changes and why.
+
 - [ ] **Step 1: The seam.** Three methods on `backend.BoardBackend` and on `lifecycle`, so a backend that cannot manage sprints is refused through `errNoLifecycle`. The Jira implementation delegates to Task 1 and maps `RawSprint` the way `BoardSprints` does, taking `BoardID` from the argument rather than the wire.
 
 - [ ] **Step 2: The demo implementation, which is five edits and not one.** `demoSprints()` is a pure function over three literals, consumed by `findDemoSprint`, `sprintsOverlay`, `demoSprintName` and the state lookup. Create needs a new overlay entry that **all four** consult, or `MoveIssuesToSprint` refuses to move a card into a sprint the demo just made, because `demoSprintName` answers empty and the move errors. Delete needs a tombstone the same four honour, a walk returning the sprint's issues to the board's own scope, and a `BoardIssueKeys` filter that stops naming them. All under the existing mutex. This is a real implementation: the walk through runs on this backend, and Phase 3c's worst defect was a demo backend that ignored an argument. Test: create then list shows it as future with its goal, and a card can be moved into it; edit honours `clearGoal`; delete removes it and its issues are still on the board. Commit as `feat(tam): a backend that can manage sprints`.
