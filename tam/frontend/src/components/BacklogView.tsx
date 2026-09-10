@@ -3,6 +3,7 @@ import { useProfile } from "@agile-suite/core";
 import { GRID_COLUMNS, ISSUE_TYPES } from "../api";
 import type { IssueQuery, Profile, Settings, SortColumn } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
+import { useOpenSprints } from "../queries/boards";
 import { IssueTable } from "./IssueTable";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { useModal } from "../modals";
@@ -67,6 +68,9 @@ export function BacklogView() {
   );
   const issues = useIssues(activeId, query);
   const sprints = useSprints(activeId);
+  // The detail panel's own Sprint field, not the filter bar above: away from
+  // a board this is the only sprint list an issue here can be moved through.
+  const openSprints = useOpenSprints(activeId);
   const subtaskType = useSubtaskType(activeId);
   const { isOpen, openModal, closeModal } = useModal();
 
@@ -223,7 +227,21 @@ export function BacklogView() {
           </div>
         </div>
         {selected && (
-          <IssueDetailPanel key={selected.key} profileId={activeId} issue={selected} jiraUrl={activeProfile?.jiraUrl} onClose={() => setSelectedKey("")} />
+          <IssueDetailPanel
+            key={selected.key}
+            profileId={activeId}
+            issue={selected}
+            jiraUrl={activeProfile?.jiraUrl}
+            // undefined here covers a read still in flight and one that
+            // failed alike (retry is off, so a failure is permanent for the
+            // session): both fall back to the panel's read-only branch with
+            // nothing said, a known limit rather than a bug.
+            sprints={openSprints.data}
+            // The profile-wide list, so an empty one really does mean this
+            // profile has never synced a board, unlike a board's own list.
+            emptyNote="No sprints yet, sync a board first"
+            onClose={() => setSelectedKey("")}
+          />
         )}
       </div>
 

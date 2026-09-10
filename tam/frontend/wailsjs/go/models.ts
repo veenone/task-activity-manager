@@ -412,6 +412,24 @@ export namespace boardrepo {
 	        this.endDate = source["endDate"];
 	    }
 	}
+	export class SprintChoice {
+	    id: number;
+	    name: string;
+	    boardName: string;
+	    state: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprintChoice(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.boardName = source["boardName"];
+	        this.state = source["state"];
+	    }
+	}
 
 }
 
@@ -601,6 +619,7 @@ export namespace importer {
 	    assignee: string;
 	    storyPoints: string;
 	    parentKey: string;
+	    sprint: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Mapping(source);
@@ -617,6 +636,7 @@ export namespace importer {
 	        this.assignee = source["assignee"];
 	        this.storyPoints = source["storyPoints"];
 	        this.parentKey = source["parentKey"];
+	        this.sprint = source["sprint"];
 	    }
 	}
 	export class RowError {
@@ -638,6 +658,7 @@ export namespace importer {
 	    created: string[];
 	    updated: string[];
 	    errors: RowError[];
+	    sprintCellsIgnored: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
@@ -649,6 +670,7 @@ export namespace importer {
 	        this.created = source["created"];
 	        this.updated = source["updated"];
 	        this.errors = this.convertValues(source["errors"], RowError);
+	        this.sprintCellsIgnored = source["sprintCellsIgnored"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

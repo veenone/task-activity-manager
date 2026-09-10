@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
 )
 
@@ -31,6 +33,7 @@ type Mapping struct {
 	Assignee    string `json:"assignee"`
 	StoryPoints string `json:"storyPoints"`
 	ParentKey   string `json:"parentKey"`
+	Sprint      string `json:"sprint"`
 }
 
 // RowError is one row that was skipped. Row is the file row: the header is
@@ -49,6 +52,15 @@ type Result struct {
 	Created []string   `json:"created"`
 	Updated []string   `json:"updated"`
 	Errors  []RowError `json:"errors"`
+	// SprintCellsIgnored counts the keyed rows whose mapped Sprint cell held
+	// a value. A sprint is a board write, not a field, so EditFields cannot
+	// carry one and the cell is read by nothing; the row's other fields are
+	// still applied. A blank cell, or no Sprint column at all, counts
+	// nothing, and neither does a create row, whose Sprint cell is honoured.
+	// A dry run fills this in too, since the preflight is where the user
+	// should learn a Sprint column will not move an existing issue, before
+	// they press Import rather than after.
+	SprintCellsIgnored int `json:"sprintCellsIgnored"`
 }
 
 // synonyms are the normalised header names each field accepts, first
@@ -63,6 +75,7 @@ var synonyms = map[string][]string{
 	"assignee":    {"assignee"},
 	"storyPoints": {"storypoints", "points", "estimate"},
 	"parentKey":   {"parent", "parentkey", "epic", "epiclink"},
+	"sprint":      {"sprint"},
 }
 
 // normalize lowercases a header and drops spaces, underscores, and hyphens.
@@ -96,12 +109,13 @@ func AutoMap(headers []string) Mapping {
 		Assignee:    pick("assignee"),
 		StoryPoints: pick("storyPoints"),
 		ParentKey:   pick("parentKey"),
+		Sprint:      pick("sprint"),
 	}
 }
 
 // columns resolves the mapping to header indexes; -1 means unmapped.
 type columns struct {
-	key, typ, summary, description, priority, labels, assignee, points, parent int
+	key, typ, summary, description, priority, labels, assignee, points, parent, sprint int
 }
 
 func resolve(headers []string, m Mapping) (columns, error) {
@@ -130,6 +144,7 @@ func resolve(headers []string, m Mapping) (columns, error) {
 	}{
 		{m.Key, &c.key}, {m.Type, &c.typ}, {m.Summary, &c.summary}, {m.Description, &c.description}, {m.Priority, &c.priority},
 		{m.Labels, &c.labels}, {m.Assignee, &c.assignee}, {m.StoryPoints, &c.points}, {m.ParentKey, &c.parent},
+		{m.Sprint, &c.sprint},
 	}
 	for _, f := range fields {
 		if *f.dst, err = index(f.name); err != nil {
@@ -150,7 +165,7 @@ func cell(row []string, i int) string {
 // blank across the columns the mapping actually reads can be skipped rather
 // than counted and reported as a missing summary.
 func blank(row []string, c columns) bool {
-	for _, i := range []int{c.key, c.typ, c.summary, c.description, c.priority, c.labels, c.assignee, c.points, c.parent} {
+	for _, i := range []int{c.key, c.typ, c.summary, c.description, c.priority, c.labels, c.assignee, c.points, c.parent, c.sprint} {
 		if cell(row, i) != "" {
 			return false
 		}
@@ -220,11 +235,18 @@ func parseKey(raw string) (string, error) {
 // are skipped and listed; a file of good rows and bad ones still lands its
 // good ones.
 //
-// On an update row the Type cell is ignored. An issue's type is not one of
-// the fields the journal can edit, and a file exported from Jira carries the
-// type of every row, so reading it would fail rows that only restate what
-// the issue already is. An empty cell on an update row means "leave this
-// field alone" rather than "clear it": a spreadsheet routinely carries only
+// open is the profile's open sprints, which is what a Sprint cell is
+// matched against, by name and without regard for case. An empty cell is
+// the backlog; a name no open sprint answers to fails the row and lists
+// what was on offer.
+//
+// On an update row the Type and Sprint cells are ignored. An issue's type
+// is not one of the fields the journal can edit, and a sprint is a board
+// write rather than a field edit, so neither is something EditFields can
+// carry; a file exported from Jira holds both for every row, so reading
+// them would fail rows that only restate where the issue already is. An
+// empty cell on an update row means "leave this field alone" rather than
+// "clear it": a spreadsheet routinely carries only
 // the columns someone cared to fill in, and clearing the rest would be a
 // destructive reading of an omission.
 //
@@ -236,7 +258,7 @@ func parseKey(raw string) (string, error) {
 // epic rows must come before the children that point at them, since a
 // child's row is checked against the file's own epics in the order they
 // appear, not the order they are typed.
-func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey, requirementType string, records [][]string, m Mapping, fileName string, dryRun bool) (Result, error) {
+func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey, requirementType string, open []boardrepo.SprintChoice, records [][]string, m Mapping, fileName string, dryRun bool) (Result, error) {
 	if len(records) < 2 {
 		return Result{}, errors.New("the file has a header row but no data rows")
 	}
@@ -244,6 +266,7 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 	if err != nil {
 		return Result{}, err
 	}
+	sprints := newSprintIndex(open)
 	drafted, err := repo.DraftIndex(ctx, profileID)
 	if err != nil {
 		return Result{}, err
@@ -311,6 +334,9 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 				fail(msg)
 				continue
 			}
+			if c.sprint != -1 && cell(row, c.sprint) != "" {
+				res.SprintCellsIgnored++
+			}
 			edits = append(edits, rowEdits...)
 			continue
 		}
@@ -356,6 +382,15 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 				continue
 			}
 		}
+		sprint, msg := sprints.lookup(cell(row, c.sprint))
+		if msg != "" {
+			fail(msg + ".")
+			continue
+		}
+		sprintID := ""
+		if sprint.ID != 0 {
+			sprintID = strconv.Itoa(sprint.ID)
+		}
 		drafts = append(drafts, backend.IssueDraft{
 			Type:        typ,
 			Summary:     summary,
@@ -365,6 +400,8 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 			Assignee:    cell(row, c.assignee),
 			StoryPoints: points,
 			ParentKey:   parent,
+			SprintID:    sprintID,
+			SprintName:  sprint.Name,
 			Extra:       map[string]string{},
 		})
 		if typ == backend.TypeEpic {

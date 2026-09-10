@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { errMsg, useNotice } from "@agile-suite/core";
-import type { Issue, Link, Sprint } from "../api";
+import type { Issue, Link, SprintOption } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { useDiscardById } from "../queries/pending";
 import { formatWhen } from "../lib/format";
@@ -88,18 +88,25 @@ interface Props {
   profileId: string;
   issue: Issue;
   jiraUrl?: string;
-  // sprints are the board's open sprints, given only by a caller that has a
-  // board: with them, Sprint is a choice that journals a move; without them
-  // it stays the fact it has always been. The Backlog and the Epics tree
-  // belong to a project, not to a board, and have no such list to offer.
-  sprints?: Sprint[];
+  // sprints are every open sprint the panel can offer: the board's own list
+  // from BoardsView, or the profile-wide list from BacklogView and
+  // EpicsView. With a list, however empty, Sprint is a choice that journals
+  // a move; undefined keeps the panel's read-only fact, which is what a
+  // caller passes while its own sprint query is still in flight.
+  sprints?: SprintOption[];
+  // emptyNote is what SprintField says beside its select when sprints is
+  // empty. Only a caller reading the profile-wide list is in a position to
+  // say why: a board's own empty list can mean a kanban board's disabled
+  // sprint query, a scrum board still loading, or one whose sprints are all
+  // closed, and none of those is "this profile has never synced a board".
+  emptyNote?: string;
   onClose: () => void;
 }
 
 // IssueDetailPanel shows one issue beside the grid. The grid row's fields
 // render at once; the description, links, and linked tests load through the
 // backend's detail cache. Nothing here writes; the actions arrive in plan 1b.
-export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, onClose }: Props) {
+export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote, onClose }: Props) {
   // Fields open, everything else closed: the panel starts on what a reader
   // came for and lets them reach the rest without leaving the column.
   const [open, setOpen] = useState<Record<string, boolean>>({ fields: true });
@@ -183,8 +190,15 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, onClose }
       <dl className="detail-fields">
         <dt>Sprint</dt>
         <dd>
-          {sprints
-            ? <SprintField profileId={profileId} issue={issue} sprints={sprints} busy={busy} />
+          {/* A sub-task is not a card a board carries either, the same
+              reason an epic gets no picker in the New issue dialog: it has
+              no sprint of its own, it follows its parent's, and the Agile
+              move endpoint refuses one aimed at it. So it keeps the
+              read-only fact regardless of what sprints the caller has,
+              which is what this panel already falls back to when it has no
+              list at all. */}
+          {sprints && issue.type !== "subtask"
+            ? <SprintField profileId={profileId} issue={issue} sprints={sprints} busy={busy} emptyNote={emptyNote} />
             : issue.sprintName || "-"}
         </dd>
         <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>

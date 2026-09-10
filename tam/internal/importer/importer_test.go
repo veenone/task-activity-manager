@@ -65,7 +65,7 @@ func TestRunDryRunValidatesEveryRuleAndCreatesNothing(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()
 	m := importer.AutoMap(records()[0])
-	res, err := importer.Run(ctx, repo, "p1", "PLAT", "Business Requirement", records(), m, "backlog.csv", true)
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "Business Requirement", nil, records(), m, "backlog.csv", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestRunImportsTheValidRowsAsDrafts(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()
 	m := importer.AutoMap(records()[0])
-	res, err := importer.Run(ctx, repo, "p1", "PLAT", "Business Requirement", records(), m, "backlog.csv", false)
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "Business Requirement", nil, records(), m, "backlog.csv", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestRunOnlyResolvesAnInFileEpicWhenItComesFirst(t *testing.T) {
 		{"Task", "Child of a new epic", "TAM-NEW-1"},
 		{"Epic", "New team epic", ""},
 	}
-	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", childFirst, m, "f.csv", false)
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", nil, childFirst, m, "f.csv", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestRunOnlyResolvesAnInFileEpicWhenItComesFirst(t *testing.T) {
 		{"Epic", "Another new epic", ""},
 		{"Task", "Second child", "TAM-NEW-2"},
 	}
-	res2, err := importer.Run(ctx, repo, "p1", "PLAT", "", epicFirst, m, "f.csv", false)
+	res2, err := importer.Run(ctx, repo, "p1", "PLAT", "", nil, epicFirst, m, "f.csv", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestRunRefusesADraftAsAParent(t *testing.T) {
 		records()[0],
 		{"Task", "Child of a draft", "", "", "", "", "", draft},
 	}
-	res, err := importer.Run(ctx, repo, "p1", "PLAT", "Business Requirement", rows, m, "backlog.csv", true)
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "Business Requirement", nil, rows, m, "backlog.csv", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -193,13 +193,13 @@ func TestRunRefusesADraftAsAParent(t *testing.T) {
 
 func TestRunRefusesAMappingWithoutSummaryOrWithAMissingColumn(t *testing.T) {
 	repo := newRepo(t)
-	if _, err := importer.Run(context.Background(), repo, "p1", "PLAT", "", records(), importer.Mapping{Type: "Issue Type"}, "f.csv", true); err == nil || !strings.Contains(err.Error(), "Summary") {
+	if _, err := importer.Run(context.Background(), repo, "p1", "PLAT", "", nil, records(), importer.Mapping{Type: "Issue Type"}, "f.csv", true); err == nil || !strings.Contains(err.Error(), "Summary") {
 		t.Errorf("no summary mapping: %v", err)
 	}
-	if _, err := importer.Run(context.Background(), repo, "p1", "PLAT", "", records(), importer.Mapping{Summary: "Nope"}, "f.csv", true); err == nil || !strings.Contains(err.Error(), `"Nope"`) {
+	if _, err := importer.Run(context.Background(), repo, "p1", "PLAT", "", nil, records(), importer.Mapping{Summary: "Nope"}, "f.csv", true); err == nil || !strings.Contains(err.Error(), `"Nope"`) {
 		t.Errorf("missing column: %v", err)
 	}
-	if _, err := importer.Run(context.Background(), repo, "p1", "PLAT", "", [][]string{{"Summary"}}, importer.Mapping{Summary: "Summary"}, "f.csv", true); err == nil {
+	if _, err := importer.Run(context.Background(), repo, "p1", "PLAT", "", nil, [][]string{{"Summary"}}, importer.Mapping{Summary: "Summary"}, "f.csv", true); err == nil {
 		t.Error("a file with only a header has nothing to import")
 	}
 }
@@ -231,7 +231,7 @@ func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 	}
 	defer db.Close()
 	repo := issuerepo.New(db.DB())
-	res, err := importer.Run(context.Background(), repo, "p1", "PLAT", "Business Requirement", records, m, "template.csv", true)
+	res, err := importer.Run(context.Background(), repo, "p1", "PLAT", "Business Requirement", nil, records, m, "template.csv", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 // The workbook has to be a workbook the importer itself can read back, or
 // the round trip the template exists for does not close.
 func TestTemplateXLSXParsesBackIntoTheSameRows(t *testing.T) {
-	data, err := importer.TemplateXLSX("Business Requirement")
+	data, err := importer.TemplateXLSX("Business Requirement", nil)
 	if err != nil {
 		t.Fatalf("TemplateXLSX: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestTemplateXLSXParsesBackIntoTheSameRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	res, err := importer.Run(context.Background(), issuerepo.New(db.DB()), "p1", "PLAT", "Business Requirement", records, m, "template.xlsx", true)
+	res, err := importer.Run(context.Background(), issuerepo.New(db.DB()), "p1", "PLAT", "Business Requirement", nil, records, m, "template.xlsx", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestRunSkipsRowsAlreadyDraftedOrRepeatedInTheFile(t *testing.T) {
 		{"Task", "Brand new row", "", "", "", "", "", ""}, // repeats row 3
 	}
 	m := importer.AutoMap(rows[0])
-	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", rows, m, "f.csv", true)
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", nil, rows, m, "f.csv", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

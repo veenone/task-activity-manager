@@ -20,7 +20,7 @@ interface Picked {
   isXlsx: boolean;
 }
 
-const EMPTY: ImportMapping = { key: "", type: "", summary: "", description: "", priority: "", labels: "", assignee: "", storyPoints: "", parentKey: "" };
+const EMPTY: ImportMapping = { key: "", type: "", summary: "", description: "", priority: "", labels: "", assignee: "", storyPoints: "", parentKey: "", sprint: "" };
 const PREFLIGHT_DELAY_MS = 250;
 
 // Preflight is the automatic dry run that keeps the Import button and the
@@ -37,6 +37,16 @@ function validationLine(r: ImportResult): string {
   const skipped = r.errors.length;
   const valid = r.rows - skipped;
   return `${valid} valid ${valid === 1 ? "row" : "rows"}${skipped > 0 ? `, ${skipped} skipped` : ""}.`;
+}
+
+// sprintNoticeLine says how many rows carried a Sprint value that a keyed
+// row's update cannot act on: a sprint is a board write, not a field, so the
+// cell is read by nothing. It is information rather than a problem, shown
+// beside the validation and result lines but never merged into either, so it
+// keeps its own even tone regardless of whether those lines are warning
+// about skipped rows.
+function sprintNoticeLine(n: number): string {
+  return `${plural(n, "row carries", "rows carry")} a Sprint value; import does not change an issue's sprint.`;
 }
 
 // resultLine words a finished import. A file can create, update, or do both,
@@ -230,6 +240,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
                 {preflight.kind === "ready" && (
                   <>
                     <p className={preflight.r.errors.length ? "warn-text" : "ok-text"}>{validationLine(preflight.r)}</p>
+                    {preflight.r.sprintCellsIgnored > 0 && <p className="ok-text">{sprintNoticeLine(preflight.r.sprintCellsIgnored)}</p>}
                     {preflight.r.errors.length > 0 && (
                       <ul className="commit-fail-list">
                         {preflight.r.errors.slice(0, 20).map((er, i) => (
@@ -259,7 +270,12 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
           </>
         )}
 
-        {success && result && <p className="ok-text">{resultLine(result)}</p>}
+        {success && result && (
+          <>
+            <p className="ok-text">{resultLine(result)}</p>
+            {result.sprintCellsIgnored > 0 && <p className="ok-text">{sprintNoticeLine(result.sprintCellsIgnored)}</p>}
+          </>
+        )}
       </div>
 
       <div className="pending-actions">

@@ -27,6 +27,8 @@ vi.mock("../api", async () => {
     ImportIssues: vi.fn(),
     SaveImportTemplate: vi.fn(),
     ListEpics: vi.fn(),
+    ListOpenSprints: vi.fn(),
+    MoveIssueToSprint: vi.fn(),
   };
 });
 
@@ -90,6 +92,8 @@ beforeEach(() => {
   vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
+  vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
+  vi.mocked(api.MoveIssueToSprint).mockResolvedValue();
 });
 
 const lastQuery = () => vi.mocked(api.ListIssues).mock.calls.at(-1)?.[1];
@@ -307,6 +311,22 @@ describe("BacklogView", () => {
     expect(within(rows[1]).getByText("Draft")).toBeInTheDocument();
     expect(within(rows[2]).getByLabelText("Pending changes")).toBeInTheDocument();
     expect(within(rows[3]).queryByLabelText("Pending changes")).not.toBeInTheDocument();
+  });
+
+  it("offers the profile's open sprints in the detail panel and journals a move", async () => {
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+      { id: 13, name: "Sprint 13", boardName: "Platform board", state: "future" },
+    ]);
+    renderView();
+    await userEvent.click(await screen.findByRole("row", { name: /PLAT-409/ }));
+    // The filter bar has its own select with the same "Sprint" label, so the
+    // query is scoped to the detail panel, the element the test is about.
+    const panel = await screen.findByRole("complementary");
+    const picker = await within(panel).findByRole("combobox", { name: "Sprint" });
+    expect(within(picker).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
+    await userEvent.selectOptions(picker, "13");
+    await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-409", "13"));
   });
 
   it("opens the Import issues dialog from the toolbar", async () => {

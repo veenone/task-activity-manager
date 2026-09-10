@@ -18,6 +18,7 @@ vi.mock("../api", async () => {
     SetDefaultProfile: vi.fn(),
     GetCreateFields: vi.fn(),
     ListEpics: vi.fn(),
+    ListOpenSprints: vi.fn(),
     SearchUsers: vi.fn(),
     ListPriorities: vi.fn(),
     GetSubtaskTypeName: vi.fn(),
@@ -77,7 +78,7 @@ const epic = (key: string, summary: string): api.Issue => ({
 // The draft every test expects, minus whatever that test changes.
 const baseDraft = {
   type: "task", summary: "", description: "", priority: "", labels: [] as string[],
-  assignee: "", storyPoints: null as number | null, parentKey: "", extra: {},
+  assignee: "", storyPoints: null as number | null, parentKey: "", sprintId: "", sprintName: "", extra: {},
 };
 
 beforeEach(() => {
@@ -95,6 +96,7 @@ beforeEach(() => {
     epic("PLAT-350", "Promotions and discounts"),
     epic("PLAT-360", "Checkout revamp"),
   ]);
+  vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
   vi.mocked(api.SearchUsers).mockResolvedValue([
     { name: "mortiz", displayName: "M. Ortiz" },
     { name: "ranand", displayName: "R. Anand" },
@@ -148,6 +150,74 @@ describe("NewIssueModal", () => {
     await user.click(await submitButton(dialog));
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
     expect(vi.mocked(api.CreateIssue).mock.calls[0][1].parentKey).toBe("PLAT-350");
+  });
+
+  it("lists the open sprints and sends the chosen one on the draft", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+      { id: 13, name: "Sprint 13", boardName: "Platform board", state: "future" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "story");
+    const dialog = await screen.findByRole("dialog", { name: "New story" });
+    const sprint = await within(dialog).findByLabelText("Sprint");
+    // The label is on screen before useOpenSprints settles, so the select's
+    // own loading state, not a bare timeout, is the real thing to wait for.
+    await waitFor(() => expect(sprint).not.toBeDisabled());
+    expect(within(sprint).getByRole("option", { name: "The backlog" })).toBeInTheDocument();
+    expect(within(sprint).getByRole("option", { name: "Sprint 12" })).toBeInTheDocument();
+    expect(within(sprint).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
+    await user.selectOptions(sprint, "13");
+    await user.type(within(dialog).getByLabelText("Summary *"), "Apply a promo code");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.sprintId).toBe("13");
+    expect(draft.sprintName).toBe("Sprint 13");
+  });
+
+  it("has no sprint select for an epic", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "story");
+    const dialog = await screen.findByRole("dialog", { name: "New story" });
+    const sprint = await within(dialog).findByLabelText("Sprint");
+    await waitFor(() => expect(sprint).not.toBeDisabled());
+    await user.selectOptions(sprint, "12");
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
+    expect(within(dialog).queryByLabelText("Sprint")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Summary *"), "Checkout revamp");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.sprintId).toBe("");
+    expect(draft.sprintName).toBe("");
+  });
+
+  // This is what changeType's own setSprintId("") owns: the draft's
+  // type === "epic" ternary already empties the sprint on an epic draft, so
+  // only a round trip through epic and back proves this line does anything.
+  it("drops a chosen sprint when the type becomes one, even after switching back", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "story");
+    const dialog = await screen.findByRole("dialog", { name: "New story" });
+    const sprint = await within(dialog).findByLabelText("Sprint");
+    await waitFor(() => expect(sprint).not.toBeDisabled());
+    await user.selectOptions(sprint, "12");
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "story");
+    expect(within(dialog).getByLabelText("Sprint")).toHaveValue("");
+    await user.type(within(dialog).getByLabelText("Summary *"), "Checkout revamp");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.sprintId).toBe("");
+    expect(draft.sprintName).toBe("");
   });
 
   it("has no epic picker for an epic, and drops a parent when the type becomes one", async () => {
@@ -371,6 +441,18 @@ describe("NewIssueModal", () => {
     const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
     expect(draft.type).toBe("subtask");
     expect(draft.parentKey).toBe("PLAT-412");
+  });
+
+  // A sub-task has no sprint of its own in Jira: it follows its parent, and
+  // the Agile move endpoint refuses one aimed at it, so the dialog offers no
+  // control that could only ever fail.
+  it("offers no Sprint picker for a sub-task, which has none of its own", async () => {
+    vi.mocked(api.ListOpenSprints).mockResolvedValue([
+      { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "subtask", true, "PLAT-412");
+    const dialog = await screen.findByRole("dialog", { name: "New technical task" });
+    expect(within(dialog).queryByLabelText("Sprint")).not.toBeInTheDocument();
   });
 
   // The dialog names the level the instance uses, not TAM's own word.

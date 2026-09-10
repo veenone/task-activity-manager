@@ -4,8 +4,12 @@ import { keys } from "./keys";
 // invalidateProfileData refreshes everything a sync can change for one
 // profile: every issues page, the sprint list, the sync state, and the
 // boards, their sprint lists, and the composed board view, which a sync
-// refreshes as surely as it does the grid. Issue details are left alone;
-// the backend's own cache decides their freshness.
+// refreshes as surely as it does the grid. openSprints is here too: a
+// regular sync runs the boards pass as well as the issues pass, so it can
+// bring sprints the profile-wide list has never seen, not only a Boards
+// Refresh (which invalidates the same key itself, in queries/boards.ts).
+// Issue details are left alone; the backend's own cache decides their
+// freshness.
 export function invalidateProfileData(qc: QueryClient, profileId: string) {
   if (!profileId) return;
   for (const queryKey of [
@@ -19,6 +23,7 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     [profileId, "boardSprints"] as const,
     [profileId, "board"] as const,
     keys.boardsUnavailable(profileId),
+    keys.openSprints(profileId),
   ]) {
     qc.invalidateQueries({ queryKey });
   }

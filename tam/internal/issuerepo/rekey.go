@@ -12,7 +12,8 @@ import (
 // Rekey moves a draft to the key Jira assigned, across the row, its links,
 // its journal rows, and its audit trail, and repoints any issue or pending
 // edit that named the temporary key, the parent of an edit and the
-// neighbour of a rank alike, and audits the creation.
+// neighbour of a rank alike, journals the sprint the draft was created with
+// as a move under the real key, and audits the creation.
 func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -34,6 +35,12 @@ func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey stri
 	// A rank's neighbour is packed into after_val beside the side it was
 	// dropped on, so no UPDATE over the whole column can repoint it.
 	if err := rekeyRankNeighbours(ctx, tx, profileID, tempKey, realKey); err != nil {
+		return err
+	}
+	// The sprint is the one piece of a draft the create cannot carry, so it
+	// becomes a move under the real key here, beside the repointing, and the
+	// board pass of the same Commit pushes it. draftsprint.go says why.
+	if err := journalDraftSprint(ctx, tx, profileID, realKey); err != nil {
 		return err
 	}
 	if err := journal.Audit(tx, profileID, EntityIssue, realKey, "created", "", tempKey, realKey, "created in Jira"); err != nil {
@@ -91,6 +98,12 @@ func (r *Repository) SetBaseVersion(ctx context.Context, profileID, key, version
 // audits the creation under the temp key with the real key in the note, so a
 // retry sees nothing pending and does not post the draft again. The draft
 // row keeps its temporary key; the next sync brings the real row in.
+//
+// A sprint the draft was created into is lost here, the same way the rank
+// repointing is: journalDraftSprint runs inside Rekey, which is the call that
+// failed, so nothing was written under the real key and there is no row left
+// to push. The note says so, because Jira holds an issue in its backlog that
+// the user asked to be in a sprint and no other record of that ask survives.
 func (r *Repository) MarkCreatedWithoutRekey(ctx context.Context, profileID, tempKey, realKey string, rows []journal.PendingChange) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -107,7 +120,7 @@ func (r *Repository) MarkCreatedWithoutRekey(ctx context.Context, profileID, tem
 	if err := journal.Delete(tx, profileID, ids); err != nil {
 		return err
 	}
-	note := fmt.Sprintf("created in Jira as %s but the local rename failed; the row keeps its temporary key until the next sync", realKey)
+	note := fmt.Sprintf("created in Jira as %s but the local rename failed; the row keeps its temporary key until the next sync, and any sprint the draft was created into went with the rename, so the issue is in Jira's backlog", realKey)
 	if err := journal.Audit(tx, profileID, EntityIssue, tempKey, "created", "", tempKey, realKey, note); err != nil {
 		return err
 	}

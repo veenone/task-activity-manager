@@ -18,6 +18,9 @@ export const keys = {
   boards: (profileId: string) => [profileId, "boards"] as const,
   boardSprints: (profileId: string, boardId: number) =>
     [profileId, "boardSprints", boardId] as const,
+  // Every open sprint across every board the profile has synced, the list a
+  // caller with no board of its own offers the Sprint field.
+  openSprints: (profileId: string) => [profileId, "openSprints"] as const,
   board: (profileId: string, boardId: number, sprintId: string, swimlane: string) =>
     [profileId, "board", boardId, sprintId, swimlane] as const,
   // What the start dialog opens with: the next sprint's name and the dates

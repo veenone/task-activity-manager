@@ -233,6 +233,28 @@ export interface Sprint {
   endDate: string;
 }
 
+// SprintChoice mirrors boardrepo.SprintChoice field for field: every open
+// sprint across every board the profile has synced, active ones first then
+// by start date, with the board's name since a caller without a board of its
+// own has no other way to tell two same-named sprints apart.
+export interface SprintChoice {
+  id: number;
+  name: string;
+  boardName: string;
+  state: string;
+}
+
+// SprintOption is the smallest shape the Sprint field actually reads. Sprint
+// and SprintChoice are both structurally assignable to it with no mapping
+// and no adapter, so a caller with either list passes it straight through.
+export interface SprintOption {
+  id: number;
+  name: string;
+  // The board this sprint belongs to, given only by the profile-wide list
+  // (SprintChoice); a board's own list needs no such disambiguation.
+  boardName?: string;
+}
+
 export interface ColumnView {
   name: string;
   // statusIds are the statuses the column collects, in the board's own
@@ -439,10 +461,14 @@ export interface IssueDraft {
   // backend and the repository validate it; only the form was missing it, so
   // a story could not be born under its epic.
   parentKey: string;
-  // Where a drag has put the draft on the board. A draft has no Jira state
-  // to journal a move against, so a board drag rewrites these on the draft
-  // itself; without them the Pending changes dialog could not say a draft
-  // had been moved at all, while the same move on a real issue gets a row.
+  // Where a drag has put the draft on the board, or where the New issue
+  // dialog's Sprint picker or the importer's Sprint column said it belongs.
+  // A draft has no Jira state to journal a move against, so a board drag
+  // rewrites these on the draft itself; without them the Pending changes
+  // dialog could not say a draft had been moved at all, while the same move
+  // on a real issue gets a row. The create sends neither: the Sprint field
+  // is missing from most Data Center create screens, so Rekey journals the
+  // sprint as a move under the key Jira hands back once the create lands.
   // Optional for the reason Issue.pending is: the backend always sends
   // them, and fixtures written before the board writes do not.
   statusId?: string;
@@ -561,6 +587,7 @@ export interface ImportMapping {
   assignee: string;
   storyPoints: string;
   parentKey: string;
+  sprint: string;
 }
 
 export interface ImportRowError {
@@ -573,6 +600,10 @@ export interface ImportResult {
   created: string[];
   updated: string[];
   errors: ImportRowError[];
+  // sprintCellsIgnored counts the keyed rows whose mapped Sprint cell held a
+  // value: a sprint is a board write, not a field, so the cell is read by
+  // nothing and the row's other fields land without it.
+  sprintCellsIgnored: number;
 }
 
 // IMPORT_FIELDS are the fields a column can feed, in dialog order. Key comes
@@ -588,6 +619,7 @@ export const IMPORT_FIELDS: { id: keyof ImportMapping; label: string }[] = [
   { id: "assignee", label: "Assignee" },
   { id: "storyPoints", label: "Story points" },
   { id: "parentKey", label: "Parent key" },
+  { id: "sprint", label: "Sprint" },
 ];
 
 // readFileAsBase64 reads a browser File into the base64 the import
@@ -684,6 +716,12 @@ export const GetProfileSetting: (profileId: string, key: string) => Promise<stri
 export const ListBoards: (profileId: string) => Promise<Board[]> = App.ListBoards;
 export const ListBoardSprints: (profileId: string, boardId: number) => Promise<Sprint[]> =
   App.ListBoardSprints;
+// ListOpenSprints is every active or future sprint across every board the
+// profile has synced, for a caller with no board of its own: the Backlog and
+// the Epics tree belong to a project, not to a board, and this is what lets
+// their Sprint field offer a choice instead of only printing a fact.
+export const ListOpenSprints: (profileId: string) => Promise<SprintChoice[]> =
+  App.ListOpenSprints;
 export const GetBoard = (
   profileId: string,
   boardId: number,

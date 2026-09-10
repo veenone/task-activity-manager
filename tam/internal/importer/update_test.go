@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/importer"
 	"agile-suite/tam/internal/issuerepo"
 )
@@ -24,7 +25,7 @@ func updateRecords() [][]string {
 func run(t *testing.T, repo *issuerepo.Repository, recs [][]string, dryRun bool) importer.Result {
 	t.Helper()
 	m := importer.AutoMap(recs[0])
-	res, err := importer.Run(context.Background(), repo, "p1", "PLAT", "Business Requirement", recs, m, "kanban.xlsx", dryRun)
+	res, err := importer.Run(context.Background(), repo, "p1", "PLAT", "Business Requirement", nil, recs, m, "kanban.xlsx", dryRun)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -174,6 +175,112 @@ func TestRunReportsBadKeyedRows(t *testing.T) {
 	}
 	if detail(t, repo, "PLAT-412").Summary != "Apply promo code" {
 		t.Error("a rejected row edited the issue anyway")
+	}
+}
+
+// A keyed row's Sprint cell is read by nothing on purpose: a sprint is a
+// board write EditFields cannot carry, so the row edits its other fields
+// and leaves the issue's sprint alone even when the cell names a real open
+// sprint, rather than failing the row or moving it.
+func TestRunIgnoresTheSprintCellOnAKeyedRowOnPurpose(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Key", "Summary", "Priority", "Sprint"},
+		{"PLAT-412", "Apply promo code, revised", "Low", "Sprint 12"},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || len(res.Updated) != 1 || res.Updated[0] != "PLAT-412" {
+		t.Fatalf("a real open sprint in the Sprint cell must not fail the row: %+v", res)
+	}
+	story := detail(t, repo, "PLAT-412")
+	if story.Summary != "Apply promo code, revised" || story.Priority != "Low" {
+		t.Errorf("the row's other fields still land: %+v", story)
+	}
+	if story.SprintID != "" || story.SprintName != "" {
+		t.Errorf("the Sprint cell must not move the issue: %+v", story)
+	}
+	if res.SprintCellsIgnored != 1 {
+		t.Errorf("SprintCellsIgnored = %d, want 1", res.SprintCellsIgnored)
+	}
+}
+
+// A keyed row whose Sprint column is mapped but whose cell is blank counts
+// nothing: an empty cell means "leave the sprint alone", which is not a
+// request the import declined.
+func TestRunCountsNothingForABlankSprintCellOnAKeyedRow(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Key", "Summary", "Priority", "Sprint"},
+		{"PLAT-412", "Apply promo code, revised", "Low", ""},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || len(res.Updated) != 1 {
+		t.Fatalf("Run: %+v", res)
+	}
+	if res.SprintCellsIgnored != 0 {
+		t.Errorf("SprintCellsIgnored = %d, want 0 for a blank cell", res.SprintCellsIgnored)
+	}
+}
+
+// A create row's Sprint cell counts nothing, since a create honours it: the
+// counter is only for cells a keyed row's update could not act on.
+func TestRunCountsNothingForACreateRowsSprintCell(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Type", "Summary", "Sprint"},
+		{"Task", "Rotate the payment gateway keys", "Sprint 12"},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || len(res.Created) != 1 {
+		t.Fatalf("Run: %+v", res)
+	}
+	if res.SprintCellsIgnored != 0 {
+		t.Errorf("SprintCellsIgnored = %d, want 0 for a create row", res.SprintCellsIgnored)
+	}
+	created := detail(t, repo, res.Created[0])
+	if created.SprintID != "12" || created.SprintName != "Sprint 12" {
+		t.Errorf("the create row must still land in its sprint: %+v", created)
+	}
+}
+
+// The count survives a dry run, since the preflight is where the user should
+// learn about it, before Import rather than after.
+func TestRunCountsIgnoredSprintCellsOnADryRun(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	open := []boardrepo.SprintChoice{{ID: 12, Name: "Sprint 12", BoardName: "PLAT Scrum", State: "active"}}
+	recs := [][]string{
+		{"Key", "Summary", "Priority", "Sprint"},
+		{"PLAT-412", "Apply promo code, revised", "Low", "Sprint 12"},
+	}
+	m := importer.AutoMap(recs[0])
+	res, err := importer.Run(ctx, repo, "p1", "PLAT", "", open, recs, m, "plan.csv", true)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(res.Errors) != 0 || res.SprintCellsIgnored != 1 {
+		t.Fatalf("dry run: %+v", res)
+	}
+	if len(res.Updated) != 0 {
+		t.Error("a dry run must write nothing")
 	}
 }
 

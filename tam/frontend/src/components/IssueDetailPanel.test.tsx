@@ -36,12 +36,12 @@ const epics: Issue[] = [
 
 // The panel opens the create dialog for a sub-task, and that dialog reads the
 // active profile, so the harness carries a provider the way the app does.
-function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[]) {
+function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[], issue: Issue = story, emptyNote?: string) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <IssueDetailPanel profileId="p1" issue={story} sprints={sprints} onClose={onClose} />
+          <IssueDetailPanel profileId="p1" issue={issue} sprints={sprints} emptyNote={emptyNote} onClose={onClose} />
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
@@ -423,5 +423,20 @@ describe("IssueDetailPanel sprint field", () => {
     const picker = await screen.findByRole("combobox", { name: "Sprint" });
     expect(picker).toHaveValue("12");
     expect(within(picker).getByRole("option", { name: "Sprint 12 - Checkout polish" })).toBeInTheDocument();
+  });
+
+  // A sub-task has no sprint of its own in Jira: it follows its parent, and
+  // the Agile move endpoint refuses one aimed at it, so the panel keeps the
+  // read-only fact even where a board hands down a list to pick from.
+  it("keeps the sprint a read-only fact for a sub-task, even with a list to pick from", async () => {
+    renderPanel(vi.fn(), BOARD_SPRINTS, { ...story, type: "subtask" });
+    expect(await screen.findByText("Sprint 12 - Checkout polish")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Sprint" })).not.toBeInTheDocument();
+  });
+
+  it("passes the caller's empty-list note through to the select", async () => {
+    renderPanel(vi.fn(), [], story, "No sprints yet, sync a board first");
+    await screen.findByRole("combobox", { name: "Sprint" });
+    expect(screen.getByText("No sprints yet, sync a board first")).toBeInTheDocument();
   });
 });
