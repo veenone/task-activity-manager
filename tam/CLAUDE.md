@@ -19,12 +19,16 @@ editable field, and epic creation. Phase 3a adds the Boards view: boards,
 columns, and sprints synced from Jira's Agile API, read only. Phase 3b
 makes the board writable: a card dragged or keyboard-moved across
 columns, within a column, or into another sprint journals the same way
-every other TAM write does, and Commit pushes it. Phase 3c (this branch)
+every other TAM write does, and Commit pushes it. Phase 3c
 closes Phase 3 with the sprint ceremonies: starting and completing a
 sprint from the Boards toolbar, moving several selected cards into a
 sprint at once, and the sprint field in the detail panel, plus the board
 read now taking one transaction so a reader can never observe a board
-mid-write.
+mid-write. This branch puts a sprint choice everywhere an issue appears
+rather than only on its board: the Backlog and the Epics tree, the New
+issue dialog, and a Sprint column in the spreadsheet importer, all
+reading the same profile-wide list of open sprints the board already
+drew from.
 
 ## Phase 3a: boards
 
@@ -362,6 +366,48 @@ sprint list, so the dialog can open with a plausible date before any
 network call and say plainly whether the date came from history or from a
 two-week default.
 
+## A sprint from anywhere an issue appears
+
+The sprint list away from a board is profile-wide. `boardrepo.OpenSprints`
+reads every active or future sprint across every board the profile has
+synced, each carrying its board's name, and the detail panel offers that
+list in the Backlog and the Epics tree. A user in the Backlog is thinking
+about an issue, not about a board, so making them pick a board first to
+reach a sprint would be the app's own model leaking into their task. Two
+boards can hold a sprint of the same name, which is why a choice carries
+its board's name when the name alone would be a guess.
+
+A draft's sprint is pushed after its create, not sent with it. The Sprint
+field is missing from most Data Center create screens, and the create
+path already sends none of the board state for that reason.
+`journalDraftSprint` runs inside `Rekey`, in the same transaction that
+repoints the draft's other rows, and writes an `issue_sprint` row under
+the real key with an empty before value, so the board pass of the same
+Commit classifies it as a push rather than a conflict and lands it right
+after the create. The one path that loses it is
+`MarkCreatedWithoutRekey`, where Jira accepted the create and the local
+rename failed: it drops the sprint the same way it drops the rank
+repointing, and says so in its audit note.
+
+The importer's Sprint column is matched by name against the profile's
+open sprints, case insensitively. An empty cell is the backlog; a name
+that matches nothing fails the row and lists what was available; a name
+two different sprints share is refused rather than guessed at, and for
+that reason is left out of the template's dropdown entirely. On a row
+that carries a Key the cell is ignored, and the result now says how many
+rows that happened to.
+
+Writing a draft's sprint onto its row does not change what the board
+draws. `CreateDrafts` writes `sprint_id` and `sprint_name` onto the draft
+row, the same two columns `moveDraft` already writes when a draft is
+dragged into a sprint, but `composeBoard` appends `DraftIssues`
+unfiltered, so a draft was already drawn in every board and every sprint
+of the profile, and `applyMoves` only drops a card carrying a pending
+sprint-move journal row, which a draft never has. What those two columns
+change instead is the Backlog's sprint filter, the Backlog grid and
+detail panel, and `ListSprints`, whose `DISTINCT sprint_id` over cached
+rows can now surface a sprint id contributed only by a draft.
+
 ## The write path (plan 1b)
 
 Edits and creates go through the journal in `tam.db` (`pending_change` and
@@ -385,25 +431,26 @@ bugs, and requirements. Excel import and cross-project links are plan 1c.
 ## The write features (plan 1c)
 
 Import: the Backlog's Import button takes a CSV or XLSX (parsed by
-`core/importfile`, XTM's parser lifted out), maps columns to the eight draft
+`core/importfile`, XTM's parser lifted out), maps columns to the nine draft
 fields (`internal/importer`), validates rows with file row numbers, and
 creates the valid rows as drafts in one transaction (`CreateDrafts`, audited
 "imported from <file>").
 
-A ninth column, Key, decides what a row does. Empty, the row creates a
+A tenth column, Key, decides what a row does. Empty, the row creates a
 draft. Filled with an issue key or a `.../browse/KEY` URL, it journals edits
 to that cached issue instead (`EditFields`, one transaction, all or
 nothing), so a sheet exported from Jira round-trips rather than duplicating
-every row. On such a row the Type cell is ignored (an issue's type is not
-editable) and an empty cell means "leave this field alone", never "clear
-it"; a value that already matches is not journaled, so re-importing an
-unchanged file leaves nothing pending. Summary is required only when no Key
-column is mapped. `SaveImportTemplate` writes a real workbook
-(`internal/importer/template.go`, excelize): an Issues sheet with the nine
+every row. On such a row the Type and Sprint cells are ignored (an issue's
+type is not editable, and a sprint is a board write EditFields cannot
+carry) and an empty cell means "leave this field alone", never "clear it";
+a value that already matches is not journaled, so re-importing an unchanged
+file leaves nothing pending. Summary is required only when no Key column is
+mapped. `SaveImportTemplate` writes a real workbook
+(`internal/importer/template.go`, excelize): an Issues sheet with the ten
 columns, a Type dropdown carrying the profile's own requirement type name,
-five examples, and a "How to use" sheet; naming the file `.csv` in the save
-dialog writes the same columns as CSV. Assignee is the Jira username, not
-the display name.
+a Sprint dropdown carrying the profile's open sprints, five examples, and a
+"How to use" sheet; naming the file `.csv` in the save dialog writes the
+same columns as CSV. Assignee is the Jira username, not the display name.
 
 Links: the Links tab's Add link form journals a
 link (entity type `link`, field `<type>|<direction>|<target>`); the
