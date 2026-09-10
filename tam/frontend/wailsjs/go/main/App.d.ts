@@ -75,6 +75,8 @@ export function JournalSprintMoves(arg1:string,arg2:Array<string>,arg3:string):P
 
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
 
+export function ListBoardSprintDetails(arg1:string,arg2:number):Promise<Array<boardrepo.SprintDetail>>;
+
 export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrepo.Sprint>>;
 
 export function ListBoards(arg1:string):Promise<Array<boardrepo.Board>>;
