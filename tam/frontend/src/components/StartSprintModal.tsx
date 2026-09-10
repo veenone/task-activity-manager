@@ -78,7 +78,14 @@ export function StartSprintModal({ profileId, boardId, sprint, active, onClose, 
     <Modal onClose={onClose} className="modal pending-modal" labelledBy="start-sprint-title" closeOnOverlayClick={false}>
       <div className="pending-head">
         <h2 id="start-sprint-title">{`Start ${sprint.name}`}</h2>
-        <ImmediateWriteChip />
+        <span className="immediate-write">
+          <ImmediateWriteChip />
+          {/* The chip is the marker, and this is the word it cannot fit: a
+              user who has learned that nothing in TAM reaches Jira until
+              Commit is owed the sentence that names Commit, and it is the
+              sentence this chip replaced. */}
+          <span className="muted small">This does not wait for Commit.</span>
+        </span>
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

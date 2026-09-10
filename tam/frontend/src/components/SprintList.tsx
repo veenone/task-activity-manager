@@ -124,15 +124,28 @@ export function SprintList({
     });
   }, [details]);
 
-  // A sprint the view has just written scrolls into view and flashes, which
-  // is the one report a create gets on this screen besides its announcement.
+  // A sprint the view has just written flashes, which is the one report a
+  // create gets on this screen besides its announcement.
   useEffect(() => {
     if (!movedRowId) return;
     setFlashId(movedRowId);
-    rootRef.current?.querySelector<HTMLElement>(`[data-tree-key="${movedRowId}"]`)?.scrollIntoView({ block: "nearest" });
     const t = setTimeout(() => setFlashId(""), MOVED_FLASH_MS);
     return () => clearTimeout(t);
   }, [movedRowId]);
+
+  // The scroll is an effect of its own because a created sprint is named
+  // before this tree has it: the write invalidates the board's sprints and
+  // the row arrives with that refetch, a round trip after the id does, so
+  // a scroll that ran only on the id would look for a row that is not there
+  // yet and quietly do nothing. Watching the details as well means the row
+  // is scrolled to when it turns up. A row already in view is not moved,
+  // so the repeat a refetch causes costs nothing.
+  useEffect(() => {
+    if (!movedRowId) return;
+    rootRef.current
+      ?.querySelector<HTMLElement>(`[data-tree-key="${movedRowId}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [movedRowId, details]);
 
   const rows = visibleRows(details, expanded);
   const indexOf = new Map(rows.map((r, i) => [r.id, i] as const));
@@ -288,9 +301,11 @@ export function SprintList({
 
   function body(detail: SprintDetail, id: string) {
     const isSprint = detail.state !== UNASSIGNED_SPRINT_STATE;
-    // Total, never issues.length: the read spends one card budget across
-    // every sprint and the unassigned node together, so a node whose share
-    // ran out draws nothing while still holding everything it counted.
+    // The gap between what this node holds and what the view drew of it,
+    // which is the one thing issues.length is the right number for: the
+    // read spends one card budget across every sprint and the unassigned
+    // node together, so a node whose share ran out draws fewer cards than
+    // it counted. Every other number on this screen comes from total.
     const notDrawn = detail.total - detail.issues.length;
     return (
       <div className="folder-children sprint-children" role="group">

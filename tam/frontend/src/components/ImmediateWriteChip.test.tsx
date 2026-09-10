@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { ImmediateWriteChip } from "./ImmediateWriteChip";
 
 describe("ImmediateWriteChip", () => {
-  it("says in words that the write does not wait for Commit", () => {
+  it("says in words that the write is sent to Jira now", () => {
     render(<ImmediateWriteChip />);
     // The sentence itself is the point: a chip that only tests as "present"
     // could say anything at all and still pass.

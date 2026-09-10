@@ -9,7 +9,9 @@
 // meaning already: held locally, waiting for Commit, which is the pending
 // dot, the draft chip and the moved-row flash. This chip says the exact
 // opposite, so wearing that colour would teach the wrong thing at the one
-// moment it matters.
+// moment it matters. The accent carries no opposite claim of its own, and a
+// journaled move's dot is painted in it too: it is the colour left over
+// once amber is ruled out, and the words on the chip are what say the rest.
 //
 // It belongs in a dialog's head, beside the title, and in the confirmation
 // that stands in for one. It is never put on a menu item: a menu item is a

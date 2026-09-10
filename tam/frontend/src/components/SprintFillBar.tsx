@@ -62,9 +62,11 @@ export function SprintFillBar({ count, sprints, busy, onFill, onClear }: Props) 
         type="button"
         className="btn btn-primary"
         disabled={busy || !ready}
-        // The guard is repeated here and not only on the button: a second
-        // press while the first is still in flight would journal the same
-        // cards twice, and disabled is a paint, not a promise.
+        // This is not what stops a second press: a disabled button
+        // dispatches no click at all, so the line never runs while a fill
+        // is in flight. It guards the handler rather than the button, and
+        // the view's own onFill guards the mutation again before it sends,
+        // which is the check a second press actually meets.
         onClick={() => !busy && ready && onFill(chosen ? String(chosen.id) : "")}
       >
         {`Move ${plural(count, "card", "cards")}`}

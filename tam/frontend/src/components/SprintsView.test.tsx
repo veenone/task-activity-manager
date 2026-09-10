@@ -83,6 +83,10 @@ function detail(over: Partial<SprintDetail>): SprintDetail {
   };
 }
 
+// Sprint 13's own card, for the gesture that tries to run into it from
+// Sprint 12.
+const DRAFT = issue({ key: "PLAT-500", summary: "Draft the migration", sprintId: "13", sprintName: "Sprint 13" });
+
 const ACTIVE = detail({ issues: [PROMO, KEYS, RETRO] });
 const FUTURE = detail({ id: 13, name: "Sprint 13", state: "future", goal: "", startDate: "", endDate: "", issues: [] });
 const CLOSED = detail({ id: 11, name: "Sprint 11", state: "closed", goal: "", issues: [], membershipCached: false });
@@ -188,6 +192,17 @@ describe("SprintsView", () => {
     expect(await screen.findByText(/^Sprint 12, day \d+ of 14, 1 of 3 done, 3 of 13 pts$/)).toBeInTheDocument();
   });
 
+  it("says in the summary line what the running sprint's progress does not count", async () => {
+    vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([
+      detail({ issues: [PROMO, KEYS, RETRO], notSynced: 2 }), BACKLOG,
+    ]);
+    renderView();
+    // Neither half of the progress counts a key the cache does not hold, and
+    // the line is always on screen, so it says so rather than reading as a
+    // complete count of the sprint.
+    expect(await screen.findByText(/plus 2 cards this cache does not hold$/)).toBeInTheDocument();
+  });
+
   it("names the board instead of offering a picker when there is one scrum board", async () => {
     renderView();
     expect(await screen.findByRole("heading", { name: "Acme Platform Scrum" })).toBeInTheDocument();
@@ -274,6 +289,31 @@ describe("SprintsView", () => {
     expect(container.querySelector(".detail-panel-reserve")).not.toBeNull();
   });
 
+  it("stops a shift gesture at the sprint it started in", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([
+      ACTIVE,
+      detail({ id: 13, name: "Sprint 13", state: "future", goal: "", startDate: "", endDate: "", issues: [DRAFT] }),
+      BACKLOG,
+    ]);
+    renderView();
+    // Only the active sprint opens by itself, so Sprint 13 is opened by
+    // hand to put its card on screen under Sprint 12's three.
+    await user.click(await screen.findByRole("treeitem", { name: "Sprint 13, Future" }));
+    await user.click(await screen.findByRole("treeitem", { name: "PLAT-412 Apply promo code" }));
+    await user.keyboard("{Shift>}");
+    await user.click(screen.getByRole("treeitem", { name: "PLAT-500 Draft the migration" }));
+    await user.keyboard("{/Shift}");
+    // The anchor is in another sprint's list, so the run cannot be measured
+    // and the gesture falls back to checking the one card it landed on. A
+    // run measured over the whole tree instead would have taken all three
+    // of Sprint 12's cards with it.
+    expect(screen.getByText("1 card selected")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Check PLAT-500" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Check PLAT-412" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Check PLAT-409" })).not.toBeChecked();
+  });
+
   it("fills a sprint from the checked cards, and sends no row that is not a card", async () => {
     const user = userEvent.setup();
     renderView();
@@ -340,6 +380,25 @@ describe("SprintsView", () => {
     // an admitted floor.
     expect(within(ask).getByText(/Jira moves at least 1 issue back to the backlog/)).toBeInTheDocument();
     expect(within(ask).getByText(/Some of this sprint's issues are not in this cache/)).toBeInTheDocument();
+  });
+
+  it("counts a delete's issues as a floor when a card has been journaled out of the sprint", async () => {
+    const user = userEvent.setup();
+    // What the fill bar on this very screen leaves behind: the card is out
+    // of Sprint 12 in the cache and still in it in Jira, so the total the
+    // read counts is already short of what a delete would move.
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      {
+        id: 7, entityType: api.ENTITY_SPRINT_MOVE, entityKey: "PLAT-409", field: api.FIELD_SPRINT_ID,
+        beforeVal: "12|Sprint 12", afterVal: "13|Sprint 13", baseVersion: "", createdAt: "",
+      },
+    ]);
+    renderView();
+    const menu = await openMenu(user, "Sprint 12");
+    await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
+    const ask = await screen.findByRole("alertdialog", { name: "Delete Sprint 12?" });
+    expect(within(ask).getByText(/Jira moves at least 3 issues back to the backlog/)).toBeInTheDocument();
+    expect(within(ask).getByText(/Cards are waiting for Commit to move in or out of this sprint/)).toBeInTheDocument();
   });
 
   it("reports a refused delete, which arrives after the confirmation has closed", async () => {
@@ -423,6 +482,17 @@ describe("SprintsView", () => {
     // banner above is the named one.
     const live = screen.getAllByRole("status").find((el) => el.classList.contains("sr-only"));
     await waitFor(() => expect(live).toHaveTextContent("Sprint 14 was created"));
+  });
+
+  it("marks the create dialog as sending to Jira now, and still names Commit under it", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await user.click(await screen.findByRole("button", { name: "New sprint" }));
+    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    expect(within(dialog).getByText("Sends to Jira now")).toBeInTheDocument();
+    // Commit is the concept the whole app is built on and the word the user
+    // has been trained on, so the chip carries the sentence naming it.
+    expect(within(dialog).getByText("This does not wait for Commit.")).toBeInTheDocument();
   });
 
   it("carries a partial success's note into the banner beside the sentence", async () => {

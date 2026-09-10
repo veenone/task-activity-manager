@@ -70,7 +70,7 @@ describe("SprintRow", () => {
     expect(actions.onEdit).toHaveBeenCalled();
   });
 
-  it("closes its own menu while its own write is in flight", async () => {
+  it("greys out its own actions while its own write is in flight, and stays open", async () => {
     const user = userEvent.setup();
     const { actions } = renderRow({}, true);
     await user.click(screen.getByRole("button", { name: "Actions on Sprint 12" }));
@@ -78,6 +78,10 @@ describe("SprintRow", () => {
     expect(within(menu).getByRole("menuitem", { name: "Delete sprint…" })).toBeDisabled();
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
     expect(actions.onDelete).not.toHaveBeenCalled();
+    // A disabled item dispatches no click, so the menu is not dismissed
+    // either: it stays open with every action greyed, which is what says
+    // the sprint is busy rather than the actions having gone away.
+    expect(screen.getByRole("menu")).toBeInTheDocument();
   });
 
   it("keeps the menu trigger out of the tab order, the way a card's menu does", () => {

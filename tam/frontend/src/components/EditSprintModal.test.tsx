@@ -64,7 +64,7 @@ describe("EditSprintModal", () => {
     expect(screen.queryByText("Reading this board's sprint length.")).not.toBeInTheDocument();
   });
 
-  it("says the write does not wait for Commit", () => {
+  it("marks the write as one that is sent to Jira now", () => {
     renderModal();
     expect(screen.getByText("Sends to Jira now")).toBeInTheDocument();
   });

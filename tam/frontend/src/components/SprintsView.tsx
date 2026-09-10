@@ -3,10 +3,12 @@ import { announce, errMsg, useConfirm, useNotice, useProfile } from "@agile-suit
 import type { Issue, Profile, Settings, SprintDetail } from "../api";
 import { UNASSIGNED_SPRINT_STATE } from "../api";
 import { useBoard, useBoards, useJournalSprintMoves } from "../queries/boards";
+import { usePendingChanges } from "../queries/pending";
 import { useBoardSprintDetails, useDeleteSprint } from "../queries/sprints";
 import { useSync } from "../contexts/SyncContext";
 import { MOVED_FLASH_MS } from "../lib/flash";
 import { dayOfSprint, plural, progressText } from "../lib/format";
+import { journalTouchesSprint } from "../lib/moveValue";
 import { unfinished } from "../lib/unfinished";
 import { useCompleteGuard } from "./BoardCeremonies";
 import { CompleteSprintModal } from "./CompleteSprintModal";
@@ -101,6 +103,11 @@ export function SprintsView() {
   const order = useMemo(() => issueOrder(visible), [visible]);
   const selection = useSprintSelection(order, activeId);
   const fill = useJournalSprintMoves(activeId);
+  // The profile's journal, read here for one sentence: the delete
+  // confirmation has to know whether a pending move has moved the count it
+  // is about to quote. It is the same query the shell's pending badge runs,
+  // so this view joins a read that is already in the cache.
+  const pending = usePendingChanges(activeId);
   const del = useDeleteSprint(activeId, runQuietLock);
   const askBeforeCompleting = useCompleteGuard(activeId);
 
@@ -156,14 +163,21 @@ export function SprintsView() {
   }
 
   async function askDelete(detail: SprintDetail) {
-    // The count is a floor whenever this view knows the read came up short:
-    // notSynced counts keys this sprint holds that the issue cache does not,
-    // so the total genuinely undercounts them, and truncated means the
-    // shared card budget stopped this sprint's list short, so the number
-    // cannot be checked against what is on screen. In the one confirmation
-    // TAM cannot undo, a number nobody can verify is worse than an admitted
-    // floor.
-    const floor = detail.truncated || detail.notSynced > 0;
+    // The count is a floor whenever this view knows it cannot be checked,
+    // and three separate things make it so, not one. notSynced counts keys
+    // this sprint holds that the issue cache does not, so the total is
+    // short by exactly them. truncated means the shared card budget stopped
+    // this sprint's list short, so the number cannot be checked against
+    // what is on screen. And the third is this view's own doing: a pending
+    // sprint move is replayed over the scope before the total is counted,
+    // so a card the fill bar has journaled out of this sprint has already
+    // left the count while Jira still holds it. The replay runs the other
+    // way too, which is why any pending move naming this sprint counts,
+    // whichever end of it the sprint is on: saying "at least" over a count
+    // that turns out to be right costs a word, and quoting a count that
+    // turns out to be low costs a sprint nobody can get back.
+    const moving = journalTouchesSprint(pending.data ?? [], detail.id);
+    const floor = detail.truncated || detail.notSynced > 0 || moving;
     const issues = plural(detail.total, "issue", "issues");
     const ok = await confirm({
       title: `Delete ${detail.name}?`,
@@ -173,9 +187,11 @@ export function SprintsView() {
           <p>{`Jira moves ${floor ? `at least ${issues}` : `its ${issues}`} back to the backlog. The issues themselves are not deleted.`}</p>
           {floor && (
             <p className="muted small">
-              {detail.notSynced > 0
-                ? "Some of this sprint's issues are not in this cache, so it holds more than the number above."
-                : "This view stopped short of drawing all of this sprint's issues, so the number above cannot be checked against the list."}
+              {moving
+                ? "Cards are waiting for Commit to move in or out of this sprint, so the number above is the one TAM holds and not the one Jira does."
+                : detail.notSynced > 0
+                  ? "Some of this sprint's issues are not in this cache, so it holds more than the number above."
+                  : "This view stopped short of drawing all of this sprint's issues, so the number above cannot be checked against the list."}
             </p>
           )}
           <p>This cannot be undone, from TAM or from Jira.</p>
@@ -216,11 +232,20 @@ export function SprintsView() {
   }
 
   const active = sprints.find((d) => d.state === "active");
+  // The line carries the qualification the tree prints under an expanded
+  // sprint, for the same reason it prints it: a key this sprint holds that
+  // the cache does not is counted in neither half of the progress. This
+  // line is on screen whether or not the sprint is open, so quoting the
+  // numbers bare here would claim a completeness the tree refuses to claim
+  // about the same sprint.
   const summary = active
     ? [
         active.name,
         dayOfSprint(active.startDate, active.endDate),
         active.total > 0 ? progressText(active.done, active.total, active.donePoints, active.points) : "",
+        active.notSynced > 0
+          ? `plus ${plural(active.notSynced, "card", "cards")} this cache does not hold`
+          : "",
       ].filter(Boolean).join(", ")
     : "No sprint is running on this board.";
 

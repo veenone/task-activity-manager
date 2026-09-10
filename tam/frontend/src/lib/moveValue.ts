@@ -1,4 +1,5 @@
 import { ENTITY_RANK, ENTITY_SPRINT_MOVE, ENTITY_TRANSITION, MOVE_LABELS } from "../api";
+import type { PendingChange } from "../api";
 
 // moveValue reads the values a board move journals. issuerepo packs a
 // transition and a sprint move as "id|Name" and a rank as
@@ -17,6 +18,28 @@ export function moveName(value: string): string {
   if (at < 0) return value;
   const name = value.slice(at + 1);
   return name || value.slice(0, at);
+}
+
+// moveId is the id half of an "id|Name" value, the mirror of issuerepo's
+// MoveID and here for the reason Go's exists: a name can differ between the
+// cached row and the board configuration, so the id is the only half that
+// says whether two values name the same place. moveName is the half to read
+// when the value is being printed rather than compared.
+export function moveId(value: string): string {
+  const at = value.indexOf(SEP);
+  return at < 0 ? value : value.slice(0, at);
+}
+
+// journalTouchesSprint says whether the journal holds a sprint move with this
+// sprint at either end of it: a card on its way in, or a card on its way out.
+// Either one puts the sprint's cached membership out of step with Jira's,
+// because the pending move is replayed over the cache and Jira has not seen
+// it yet, so a surface quoting a sprint's size has to say so.
+export function journalTouchesSprint(rows: readonly PendingChange[], sprintId: number): boolean {
+  const id = String(sprintId);
+  return rows.some(
+    (r) => r.entityType === ENTITY_SPRINT_MOVE && (moveId(r.beforeVal) === id || moveId(r.afterVal) === id),
+  );
 }
 
 // Rank is a rank row's after value read back: the card it was dropped

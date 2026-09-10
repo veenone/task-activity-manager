@@ -533,16 +533,24 @@ input, button, select { font-family: inherit; font-size: inherit; }
   white-space: nowrap;
 }
 
+/* The chip with the sentence that was there before it. The chip is the
+   marker the eye finds; the line under it names Commit, which is what the
+   marker is about and what the reader has been trained on everywhere else
+   in the app. */
+.immediate-write { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+
 /* One scrum board is named rather than picked, so the heading sits where the
    picker would have and reads at the same weight as its label. */
 .board-head-name { font-size: 13px; font-weight: 600; color: var(--text-strong); margin: 0; }
 
 /* Both row shapes fill the pane and clip, rather than sizing to their
-   content the way the Epics tree's rows do. The Epics tree scrolls sideways
-   because its rows share one track list and a long key has to go somewhere;
-   these two shapes share no tracks (a sprint has dates and progress where a
-   card has a status and points), so there is nothing to keep in step and a
-   horizontal scrollbar would buy nothing. */
+   content the way the Epics tree's rows do, and that is why nothing here
+   scrolls sideways: in each shape every track is a fixed width except the
+   one that takes up the slack, the sprint's name and the card's summary,
+   and that one is a minmax which stops at its floor. The issue rows do
+   share a track with each other, the key: every row is its own grid
+   container, so --sprint-key-w is measured once for the whole tree and set
+   on the tree, which is what keeps the columns lining up down the list. */
 .sprint-row, .sprint-issue-row { width: 100%; gap: 8px; align-items: center; }
 .sprint-row {
   display: grid;
@@ -579,8 +587,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The pane keeps the detail panel's width while a multi-selection has taken
    the panel away, so checking a second row does not slide every row sideways
    in the middle of the gesture. The reserve is the panel's box with nothing
-   in it, and it answers the same :has() rule the panel does so the pane's own
-   edge does not change either. */
+   in it, and the rule under it is the panel's own :has() rule written a
+   second time against the reserve, so the pane's edge does not change
+   either. */
 .detail-panel-reserve { width: 352px; min-width: 300px; flex: none; align-self: stretch; }
 .epics-body:has(.detail-panel-reserve) .epics-tree-pane { border-right: none; border-radius: 6px 0 0 6px; }
 
