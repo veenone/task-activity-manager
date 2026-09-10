@@ -27,11 +27,15 @@ import (
 // the board cache, the way commitEngine builds the commit engine: the
 // backend belongs to a profile, so the service is built per call.
 //
-// Pending is wired here because the question it asks spans both
-// repositories, and app.go is the one place holding them both.
+// Pending and Issues are wired here because the service's store is the board
+// cache and both of them are the issue cache, and app.go is the one place
+// holding both repositories. Issues is what a delete blanks a vanished
+// sprint's name through, and where all three management writes leave their
+// audit row.
 func (a *App) sprintService(p profile.Profile, b backend.IssueBackend) *sprints.Service {
 	s := sprints.New(b, a.boards, p.ProjectKey)
 	s.Pending = a.pendingInSprint
+	s.Issues = a.repo
 	return s
 }
 

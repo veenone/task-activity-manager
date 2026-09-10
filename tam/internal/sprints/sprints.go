@@ -1,13 +1,33 @@
-// Package sprints owns the two sprint ceremonies: starting one and
-// completing one. They are the only writes in TAM that do not go through the
-// journal, because a sprint's start is a timestamped fact a whole team reads
-// and what a completion does with the cards that did not finish depends on
-// the sprint's contents at the moment it closes, not at whatever moment a
-// Commit next runs. That exception has one home here, and one place to test.
+// Package sprints owns the five writes that reach Jira the moment they are
+// made: starting a sprint, completing one, and creating, editing and
+// deleting one. They are the only writes in TAM that do not go through the
+// journal, and the reason is a cost rather than a principle.
 //
-// Nothing in this package touches the journal. The bulk move the board's
-// selection makes is an ordinary journal write and lives in issuerepo, where
-// every other one does.
+// A sprint's id has to be real before anything can point at it. TAM carries
+// the machinery to defer an issue's id, the TAM-NEW- draft key and the
+// commit pass that swaps it for Jira's, and carries nothing that would defer
+// a sprint's: journaling a create would mean inventing a local sprint id,
+// teaching the commit pass to rekey every issue_sprint row aimed at it, and
+// putting an id that is not real into the board cache, the Backlog's sprint
+// filter and the importer's Sprint column. Calling that a principle is how a
+// sixth exception gets added without an argument, so it is written down as
+// what it is.
+//
+// The other four follow the first. A sprint is a container a whole team
+// plans into, so one that exists on a single laptop is one nobody else can
+// move an issue into, and there is nothing to reconcile later either: a card
+// move can be rebased onto a status that shifted underneath it, while a
+// sprint somebody else has already deleted cannot be renamed.
+//
+// The exception has one home here, one place to test, and a fence:
+// exceptions_test.go names the Service's own exported methods, so a sixth
+// immediate write arrives with a failing test rather than quietly.
+//
+// This package writes no journal rows. It reads their count, to refuse a
+// completion or a delete while changes are queued against the sprint, and it
+// leaves an audit row behind each of the three management writes. Moving an
+// issue into or out of a sprint stays an ordinary journal write and lives in
+// issuerepo, where every other one does.
 package sprints
 
 import (
@@ -66,9 +86,15 @@ type lifecycle interface {
 	DeleteSprint(ctx context.Context, sprintID int) error
 }
 
-// Store is what a ceremony needs from the board cache: the columns, which
+// Store is what these writes need from the board cache: the columns, which
 // are what "complete" is defined against, the destination's name, and the
-// two writes that keep the cache honest once Jira has moved.
+// writes that keep the cache honest once Jira has moved.
+//
+// DeleteSprintEverywhere is the last of those and the only one that carries
+// no board id, because Jira hands one sprint to every board whose filter
+// reaches it and a delete that cleaned one board would leave the other
+// board's copy standing in OpenSprints. boardrepo's own comment holds the
+// rest of that argument, and the order it has to be called in.
 type Store interface {
 	Columns(ctx context.Context, profileID string, boardID int) ([]backend.BoardColumn, error)
 	BoardSprintState(ctx context.Context, profileID string, boardID int, sprintID string) (string, bool, error)
@@ -76,6 +102,20 @@ type Store interface {
 	SprintIssues(ctx context.Context, profileID string, boardID int, sprintID string) ([]string, error)
 	ReplaceSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error
 	ReplaceSprintIssues(ctx context.Context, profileID string, boardID int, sprintID string, keys []string) error
+	DeleteSprintEverywhere(ctx context.Context, profileID string, sprintID int) error
+}
+
+// Issues is the issue cache's side of a sprint write, which is a different
+// repository from the board cache Store is: the cached sprint columns a
+// delete has to blank, and the audit row each of the three management writes
+// leaves behind. issuerepo.Repository satisfies it.
+//
+// It is its own seam rather than two more methods on Store because the two
+// caches are two repositories with two transactions, which is exactly what
+// makes the delete's cache surgery an ordered pair rather than one write.
+type Issues interface {
+	ClearSprint(ctx context.Context, profileID, sprintID string) error
+	AuditSprint(ctx context.Context, profileID string, sprintID int, action, before, after string) error
 }
 
 // Completion is what a completion did, and a push that failed partway is one
@@ -140,6 +180,18 @@ type Service struct {
 	// dialog, but the board's writes are deliberately unguarded, so a drag
 	// can land between that answer and this one.
 	Pending func(ctx context.Context, profileID string, sprintID int) (int, error)
+
+	// Issues, when set, is the issue cache: where a deleted sprint's name is
+	// blanked off the cards that carried it, and where the audit row of a
+	// create, an edit or a delete is written. It is wired beside Pending and
+	// for the same reason, since app.go is the one place holding both
+	// repositories.
+	//
+	// Both of its calls are bookkeeping after Jira has already moved, so an
+	// unset seam is logged rather than refused: a build that forgot to wire
+	// it leaves stale sprint text on cached issues until the next full sync,
+	// which is the same damage a failed call would do.
+	Issues Issues
 }
 
 // New builds the service over a profile's backend, the board cache, and the
