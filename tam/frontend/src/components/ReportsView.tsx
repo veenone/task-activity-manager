@@ -25,7 +25,7 @@ import { VelocityTable } from "./VelocityTable";
 // and Commit enabled and inert for the whole of it.
 export function ReportsView() {
   const { activeId } = useProfile<Profile, Settings>();
-  const { runReport, progress } = useSync();
+  const { runReport, progress, running } = useSync();
   const [boardId, setBoardId] = useState(0);
   // A sprint id of 0 asks the backend for the board's most recent closed
   // sprint, which is the report the morning after a sprint closes starts
@@ -87,17 +87,22 @@ export function ReportsView() {
   const shownSprintId = report.data?.series.sprintId || sprintId || closed[0]?.id || 0;
 
   function loading() {
-    // While this view's own read is in flight it holds the per-profile
-    // lock, so nothing else can be reporting progress and the frame on
-    // screen is this report's.
-    const stage = progress?.stage || "Building the sprint report";
-    const count = progress && progress.total > 0 ? `, ${progress.fetched} of ${progress.total} issues` : "";
+    // The frame in the shell belongs to whichever operation holds the
+    // per-profile lock, and this read being in flight does not mean that
+    // is this one: a report refused because a sync holds the lock waits
+    // out its one retry with the sync's own frames still arriving. So a
+    // frame is read only while the operation running is this view's
+    // report, and otherwise this says the one thing it knows.
+    const frame = running === "report" ? progress : null;
+    const stage = frame?.stage || "Building the sprint report";
+    const count = frame && frame.total > 0 ? `, ${frame.fetched} of ${frame.total} issues` : "";
     return (
       <div className="report-loading">
         <p className="muted" role="status">{`${stage}${count}`}</p>
         <p className="muted small">
           A report fetches each sprint's issues together with their changelogs, which is the heaviest read TAM
-          makes, so a table covering several sprints takes minutes against a real instance.
+          makes. A sprint already in the store comes back at once; one that has to be read from Jira, and a
+          table of several of them, can take minutes.
         </p>
       </div>
     );
@@ -200,7 +205,13 @@ export function ReportsView() {
         {/* Only closed sprints are offered. A report is the numbers a
             review starts with and the velocity table is closed sprints, so
             a live sprint here would be a fifth thing on screen counting
-            something else. */}
+            something else.
+
+            This list and the backend's are the same rule but not the same
+            data: a sprint whose end date this frontend cannot read is
+            still offered here, and the backend drops it, so a board can
+            answer noClosedSprint with rows in this picker. That is what
+            unavailableLine's wording for that reason has to survive. */}
         {closed.length > 0 && (
           <label className="board-picker">
             <span>Sprint</span>
@@ -229,16 +240,25 @@ export function ReportsView() {
 // opens on, and the control never points at one sprint while the numbers
 // below it describe another.
 //
-// A sprint whose end date this frontend cannot read sinks to the bottom
-// rather than being dropped: it is still pickable, and picking it is
-// answered with the sprintHasNoDates state, which says more than leaving it
-// out of the list would.
+// A sprint whose start date will not parse is dropped, because Go drops it
+// too: it parses both dates and skips a sprint that fails either. Sorting
+// on the end date alone let a sprint with a readable end and an unreadable
+// start sit at the top of this list while a sprint id of 0 resolved past
+// it, so the picker and the numbers disagreed about which sprint was the
+// newest one. Nothing was ever mis-titled, since the heading follows the
+// response, but the two should agree without that backstop.
+//
+// A sprint whose end date will not parse sinks to the bottom instead of
+// being dropped. It cannot be the first row from there, so it costs the
+// agreement above nothing, and picking it is answered with the
+// sprintHasNoDates state, which says more than leaving it out would.
 function closedNewestFirst(sprints: Sprint[]): Sprint[] {
+  const readable = (d: string) => !Number.isNaN(new Date(d).getTime());
   const ended = (s: Sprint) => {
     const t = new Date(s.endDate).getTime();
     return Number.isNaN(t) ? -Infinity : t;
   };
   return sprints
-    .filter((s) => s.state === "closed")
+    .filter((s) => s.state === "closed" && readable(s.startDate))
     .sort((a, b) => (ended(b) === ended(a) ? b.id - a.id : ended(b) - ended(a)));
 }

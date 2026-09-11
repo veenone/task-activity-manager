@@ -61,6 +61,9 @@ function Probe() {
   const { status, progress, syncError, canSync, runSync, runBoardsRefresh, runReport, runQuietLock, lastBoards } = useSync();
   const state = useSyncState("p1");
   const [quiet, setQuiet] = React.useState("idle");
+  // The report's own outcome, so a refusal can be read as the sentence
+  // the caller is handed rather than only as the absence of a run.
+  const [reported, setReported] = React.useState("idle");
   return (
     <div>
       <span data-testid="status">{status}</span>
@@ -70,6 +73,7 @@ function Probe() {
       <span data-testid="boards">{lastBoards ? lastBoards.dropped.join(", ") || "none dropped" : "no pass"}</span>
       <span data-testid="quiet">{quiet}</span>
       <span data-testid="stage">{progress?.stage ?? "none"}</span>
+      <span data-testid="report">{reported}</span>
       <button onClick={() => void runSync(false)} disabled={!canSync}>Sync</button>
       <button onClick={() => void runSync(true)}>Full sync</button>
       <button onClick={() => void runBoardsRefresh().catch(() => {})}>Refresh boards</button>
@@ -85,7 +89,10 @@ function Probe() {
       </button>
       <button
         onClick={() => {
-          void runReport(() => new Promise<void>((resolve) => { finishReport = resolve; })).catch(() => {});
+          setReported("running");
+          void runReport(() => new Promise<void>((resolve) => { finishReport = resolve; }))
+            .then(() => setReported("done"))
+            .catch((e) => setReported(String(e)));
         }}
       >
         Report
@@ -314,7 +321,7 @@ describe("SyncProvider", () => {
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
   });
 
-  it("refuses a report while a sync is running, and names what is holding the lock", async () => {
+  it("refuses a report while a sync is running, and says a sync is what is holding the lock", async () => {
     let finishSync: (v: api.SyncSummary) => void = () => {};
     vi.mocked(api.SyncIssues).mockImplementation(
       () => new Promise<api.SyncSummary>((resolve) => { finishSync = resolve; }),
@@ -325,13 +332,35 @@ describe("SyncProvider", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sync" }));
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
 
-    // The Probe's Report button swallows the rejection, so what is asserted
-    // is the outcome a user sees: the report never starts and the sync's own
-    // stage is still what the shell is showing.
     await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("report")).toHaveTextContent("a sync is already running for this profile"),
+    );
+    // The report never started, so the sync's own stage is still what the
+    // shell is showing.
     expect(screen.getByTestId("stage")).toHaveTextContent("Starting");
 
     await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" }); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+  });
+
+  // The Reports view cancels the running report and starts the next one in
+  // the same commit on a sprint switch, so the second read can meet a lock
+  // the first is still holding. Calling that a sync would name an
+  // operation the user never started.
+  it("calls a report a report when a report is what is holding the lock", async () => {
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("report")).toHaveTextContent("a report is already running for this profile"),
+    );
+
+    await act(async () => { finishReport(); });
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
   });
 });

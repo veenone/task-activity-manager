@@ -62,8 +62,8 @@ export function unitLine(unit: string, unitReason: string): string {
   if (unit !== "cards") return "";
   if (unitReason === "nothingEstimated") {
     return (
-      "These figures count cards rather than points: story points are in evidence on this board, " +
-      "and nothing inside this sprint's window ever carried a value. " +
+      "These figures count cards rather than points: story points are in evidence somewhere in this sprint's issues or their history, " +
+      "and nothing inside the sprint's own window ever carried a value. " +
       "Estimating the cards would give this board a points report."
     );
   }
@@ -75,6 +75,19 @@ export function unitLine(unit: string, unitReason: string): string {
     );
   }
   return "These figures count cards rather than points.";
+}
+
+// velocityFloorLine is floorLine's rule worded for a table of sprints. The
+// Committed column is a floor in every row for the same reason one sprint's
+// figure is, and the table is read on its own: Phase 5's Rituals publishes
+// these rows to Confluence out of this module, where there is no paragraph
+// beside them to borrow the qualification from.
+export function velocityFloorLine(): string {
+  return (
+    "Committed is a floor in every row rather than a total. A sprint's issues are read with a search for its " +
+    "current members, so a card taken out while the sprint ran and left out was never fetched and is counted " +
+    "in no row here."
+  );
 }
 
 // methodLine is printed with the numbers rather than kept in a document,
@@ -97,11 +110,12 @@ const MAX_NAMED_KEYS = 8;
 export function nameList(keys: string[]): string {
   const named = keys.slice(0, MAX_NAMED_KEYS);
   const rest = keys.length - named.length;
-  const head =
-    named.length > 1
-      ? `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`
-      : named.join("");
-  return rest === 0 ? head : `${head} and ${rest} more`;
+  // The and belongs to whichever item is last in the sentence. When the
+  // list is cut short that is the count, so the named keys are all
+  // separated by commas and "PLAT-7 and PLAT-8 and 3 more" never happens.
+  if (rest > 0) return `${named.join(", ")} and ${rest} more`;
+  if (named.length < 2) return named.join("");
+  return `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
 }
 
 // truncationLine names the cards whose history Jira would not give in full
@@ -132,8 +146,10 @@ export function unavailableLine(reason: string): string {
   switch (reason) {
     case "boardNotSynced":
       return (
-        "This board's columns are not in the cache, so TAM cannot tell which statuses count as finished " +
-        "and has nothing to build a report from. The Boards view's Refresh fetches them."
+        "TAM cannot tell which statuses count as finished on this board, so it has nothing to build a report " +
+        "from: either the board's columns are not in the cache, or its last column collects no status at all. " +
+        "The Boards view's Refresh fetches the columns; a last column that collects nothing is fixed in Jira's " +
+        "own board configuration."
       );
     case "sprintNotFound":
       return (
@@ -146,7 +162,11 @@ export function unavailableLine(reason: string): string {
         "so this sprint cannot be reported on at all."
       );
     case "noClosedSprint":
-      return "This board has never closed a sprint, so there is no report to open on and no velocity table yet.";
+      return (
+        "This board has no closed sprint a report can be built from, so there is no report to open on and no " +
+        "velocity table yet. Either it has never closed one, or every sprint it has closed carries a start or " +
+        "an end date TAM cannot read."
+      );
     default:
       // A reason a later backend adds is printed rather than swallowed: an
       // empty pane saying nothing is worse than an unfamiliar word.
@@ -155,9 +175,12 @@ export function unavailableLine(reason: string): string {
 }
 
 // isBusyRefusal recognises the refusal App.acquire makes in Go and the one
-// SyncContext makes in front of it. Both are worded "a <what> is already
-// running for this profile", naming the operation that holds the lock, so
-// the phrase they share is what tells a refusal from a failed read.
+// SyncContext makes in front of it. Both end "is already running for this
+// profile" and both name the operation holding the lock in front of it, Go
+// from its own busy map and SyncContext from the operation name it carries
+// beside the lock, so the phrase they share is what tells a refusal from a
+// failed read. The one refusal that names nothing says "another operation",
+// which this matches too.
 export function isBusyRefusal(message: string): boolean {
   return / is already running for this profile/.test(message);
 }
@@ -166,8 +189,11 @@ export function isBusyRefusal(message: string): boolean {
 // queues, so the only thing to do is wait for the other operation and ask
 // again, and quoting the refusal is what says which operation that is.
 export function busyLine(message: string): string {
+  // The message is Go's, or SyncContext's in front of it, and both are
+  // worded to sit inside an error rather than to open a paragraph.
+  const opening = message.charAt(0).toUpperCase() + message.slice(1);
   return (
-    `${message}. A report takes the same per-profile lock a sync and a commit do, ` +
+    `${opening}. A report takes the same per-profile lock a sync and a commit do, ` +
     "and that lock refuses rather than waits, so ask again once the other one has finished."
   );
 }

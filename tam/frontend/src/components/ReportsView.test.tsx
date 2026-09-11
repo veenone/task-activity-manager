@@ -8,6 +8,7 @@ import type { SyncProgress } from "@agile-suite/core";
 import * as api from "../api";
 import type { ReportSeries, Sprint, SprintReport } from "../api";
 import { profileBackend } from "../profileBackend";
+import type { LockedOperation } from "../contexts/SyncContext";
 import { ReportsView } from "./ReportsView";
 
 vi.mock("../api", async () => {
@@ -25,12 +26,15 @@ vi.mock("../api", async () => {
   };
 });
 
-// The view takes Go's per-profile lock through SyncContext.runReport and
-// reads the shell's progress back off it. Both are stood in for here, with
-// the lock as the passthrough it is when nothing else holds it;
-// SyncContext.test.tsx is where the lock and the stage wording are tested.
+// The view takes Go's per-profile lock through SyncContext.runReport, and
+// reads two things back off the context: the progress frame the shell is
+// drawing, and the name of the operation that frame belongs to. All three
+// are stood in for here, with the lock as the passthrough it is when
+// nothing else holds it; SyncContext.test.tsx is where the lock itself,
+// the stage wording and the names are tested.
 const sync = vi.hoisted(() => ({
   progress: null as SyncProgress | null,
+  running: null as LockedOperation | null,
   runReport: <T,>(action: () => Promise<T>) => action(),
 }));
 
@@ -117,6 +121,7 @@ const SENTENCE = "Sprint 11 committed 34 points, added 5, removed 2, completed 2
 beforeEach(() => {
   vi.clearAllMocks();
   sync.progress = null;
+  sync.running = null;
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Acme Platform", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
   ]);
@@ -239,6 +244,29 @@ describe("ReportsView", () => {
     expect(names).toEqual(["Sprint 11", "Sprint 10"]);
   });
 
+  // Go builds its velocity table from VelocitySprints, which parses both
+  // dates and drops a sprint that fails either. A picker ordered on the end
+  // date alone put a sprint Go had dropped at the top of the list, where a
+  // sprint id of 0 resolves past it.
+  it("leaves out a closed sprint whose start date cannot be read, the way the backend's own table does", async () => {
+    vi.mocked(api.ListBoardSprints).mockResolvedValue([
+      sprint({ id: 13, name: "Sprint 13", startDate: "", endDate: "2026-09-12T09:00:00.000+0000" }),
+      ...SPRINTS,
+    ]);
+    renderView();
+    const picker = await screen.findByRole("combobox", { name: "Sprint" });
+    const names = Array.from(picker.querySelectorAll("option")).map((o) => o.textContent);
+    expect(names).toEqual(["Sprint 11", "Sprint 10"]);
+  });
+
+  // Phase 5 publishes this table on its own, and the summary's own
+  // qualification is a paragraph away in a pane that scrolls.
+  it("qualifies the velocity table's Committed column beside the table itself", async () => {
+    renderView();
+    await screen.findByText(SENTENCE);
+    expect(screen.getByText(/Committed is a floor in every row/)).toBeInTheDocument();
+  });
+
   it("reads the sprint the user picks", async () => {
     const user = userEvent.setup();
     renderView();
@@ -291,7 +319,7 @@ describe("ReportsView's eight states", () => {
   it("state 4: a board that has never closed a sprint has no table either", async () => {
     vi.mocked(api.GetSprintReport).mockResolvedValue(unavailable("noClosedSprint"));
     renderView();
-    expect(await screen.findByText(/never closed a sprint/)).toBeInTheDocument();
+    expect(await screen.findByText(/no closed sprint a report can be built from/)).toBeInTheDocument();
   });
 
   it("state 5: a failed read keeps the previous report on screen, correct, and offers a retry", async () => {
@@ -331,17 +359,41 @@ describe("ReportsView's eight states", () => {
     vi.mocked(api.GetSprintReport).mockRejectedValue(new Error("a sync is already running for this profile"));
     renderView();
     const banner = await screen.findByRole("alert");
-    expect(banner).toHaveTextContent("a sync is already running for this profile");
+    expect(banner).toHaveTextContent("A sync is already running for this profile");
     expect(banner).toHaveTextContent(/refuses rather than waits/);
     expect(banner).not.toHaveTextContent(/could not be read/);
   });
 
   it("state 8: a report being built says which sprint is being read and how far along it is", async () => {
+    sync.running = "report";
     sync.progress = { phase: "velocity", fetched: 25, total: 200, done: false, stage: "Reading Sprint 10 for the velocity table" };
     // A promise that never settles is what a minutes-long read looks like
     // from here, and a silent wait is the thing this state exists to avoid.
     vi.mocked(api.GetSprintReport).mockReturnValue(new Promise<SprintReport>(() => {}));
     renderView();
     expect(await screen.findByText("Reading Sprint 10 for the velocity table, 25 of 200 issues")).toBeInTheDocument();
+  });
+
+  // Most reports are served out of the store in a second, and this copy is
+  // printed on every one of them.
+  it("state 8 does not promise minutes for a report the store can answer at once", async () => {
+    sync.running = "report";
+    vi.mocked(api.GetSprintReport).mockReturnValue(new Promise<SprintReport>(() => {}));
+    renderView();
+    expect(await screen.findByText(/comes back at once/)).toBeInTheDocument();
+  });
+
+  // The frames on the shell belong to whoever holds the lock. Opening this
+  // view during a sync puts the read in its retry window with the sync
+  // still reporting, and drawing that frame here presented the sync's
+  // issue count as the report's own progress.
+  it("state 8, refused: a report waiting on another operation shows none of that operation's progress", async () => {
+    sync.running = "sync";
+    sync.progress = { phase: "issues", fetched: 120, total: 4000, done: false, stage: "Fetching issues" };
+    vi.mocked(api.GetSprintReport).mockReturnValue(new Promise<SprintReport>(() => {}));
+    renderView();
+    expect(await screen.findByText("Building the sprint report")).toBeInTheDocument();
+    expect(screen.queryByText(/Fetching issues/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/120 of 4000 issues/)).not.toBeInTheDocument();
   });
 });

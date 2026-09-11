@@ -37,11 +37,18 @@ const RETRY_AFTER_CANCEL_MS = 250;
 // the length of a read is worse than a loading state that says what it is
 // doing.
 //
-// staleTime is infinite because this is the heaviest read TAM makes and
-// nothing but Jira's own history can change a closed sprint's answer. A
-// report that went stale on the usual thirty seconds would refetch every
-// time the user came back to the view, for minutes, to rebuild figures that
-// had not moved. rebuild is the way a reader asks for it again.
+// staleTime is infinite because this is the heaviest read TAM makes and a
+// closed sprint's answer rarely moves. A report that went stale on the
+// usual thirty seconds would refetch every time the user came back to the
+// view, for minutes, to rebuild figures that had not moved.
+//
+// Two things do move it, and neither is Jira's history. The board's last
+// column is what done means, so a boards refresh that changes it changes
+// every completed figure; and a sprint id of 0 is a question, not an
+// answer, so completing a sprint makes it resolve to a different sprint.
+// Both invalidate this key (queries/boards.ts, queries/sprints.ts,
+// queries/invalidate.ts), which is what an infinite staleTime leans on.
+// rebuild is the way a reader asks for it again for any other reason.
 export function useSprintReport(profileId: string, boardId: number, sprintId: number, run: RunLocked) {
   // The rebuild flag rides on a ref rather than on the query key, so a
   // rebuilt report replaces the stored one in the same cache entry instead

@@ -14,6 +14,7 @@ import {
   unavailableLine,
   unitLine,
   unitWord,
+  velocityFloorLine,
 } from "./reportText";
 
 function series(over: Partial<ReportSeries> = {}): ReportSeries {
@@ -81,6 +82,11 @@ describe("unitLine", () => {
   it("tells the team it can fix this one by estimating", () => {
     expect(unitLine("cards", "nothingEstimated")).toContain("Estimating the cards");
   });
+  it("claims story points only where the backend looked, which is this sprint and its history", () => {
+    const line = unitLine("cards", "nothingEstimated");
+    expect(line).toContain("in evidence somewhere in this sprint's issues or their history");
+    expect(line).not.toContain("in evidence on this board");
+  });
   it("does not claim the instance has no story points field, because the backend cannot know that", () => {
     const line = unitLine("cards", "noPointsFieldSeen");
     expect(line).toContain("nothing in this sprint's issues or their history mentions story points");
@@ -103,7 +109,9 @@ describe("nameList and truncationLine", () => {
   });
   it("counts the keys past the eighth instead of printing a paragraph of them", () => {
     const keys = Array.from({ length: 11 }, (_, i) => `PLAT-${i + 1}`);
-    expect(nameList(keys)).toContain("and 3 more");
+    expect(nameList(keys)).toBe(
+      "PLAT-1, PLAT-2, PLAT-3, PLAT-4, PLAT-5, PLAT-6, PLAT-7, PLAT-8 and 3 more",
+    );
   });
   it("is empty when every changelog came back whole", () => {
     expect(truncationLine([])).toBe("");
@@ -130,10 +138,25 @@ describe("unavailableLine", () => {
   it("words each of the four reasons differently", () => {
     const lines = ["boardNotSynced", "sprintNotFound", "sprintHasNoDates", "noClosedSprint"].map(unavailableLine);
     expect(new Set(lines).size).toBe(4);
-    expect(lines[0]).toContain("columns are not in the cache");
+    expect(lines[0]).toContain("which statuses count as finished");
     expect(lines[1]).toContain("cached sprint list does not hold that sprint");
     expect(lines[2]).toContain("no start or end date");
-    expect(lines[3]).toContain("never closed a sprint");
+    expect(lines[3]).toContain("no closed sprint a report can be built from");
+  });
+  // Go answers boardNotSynced for two shapes, and a message naming only
+  // the first sends a user with the second to a Refresh that cannot help.
+  it("gives both halves of the reason a board cannot say what finished means", () => {
+    const line = unavailableLine("boardNotSynced");
+    expect(line).toContain("board's columns are not in the cache");
+    expect(line).toContain("last column collects no status");
+  });
+  // Go answers noClosedSprint whenever VelocitySprints is empty, which a
+  // board with closed sprints and unreadable dates also is, and in that
+  // shape the picker beside this sentence is listing those sprints.
+  it("is true of a board that closed nothing and of one whose closed sprints have no readable dates", () => {
+    const line = unavailableLine("noClosedSprint");
+    expect(line).toContain("has never closed one");
+    expect(line).toContain("carries a start or an end date TAM cannot read");
   });
   it("prints a reason it has no wording for rather than showing an empty pane", () => {
     expect(unavailableLine("somethingLater")).toContain("somethingLater");
@@ -154,8 +177,23 @@ describe("isBusyRefusal", () => {
 describe("busyLine", () => {
   it("quotes the refusal and says the lock refuses rather than queues", () => {
     const line = busyLine("a sync is already running for this profile");
-    expect(line).toContain("a sync is already running for this profile");
+    expect(line).toContain("sync is already running for this profile");
     expect(line).toContain("refuses rather than waits");
+  });
+  // The message is written to sit inside an error, and this is the first
+  // thing the reader sees in the banner.
+  it("opens the sentence with a capital rather than with Go's lowercase word", () => {
+    expect(busyLine("a report is already running for this profile")).toMatch(/^A report is already running/);
+  });
+});
+
+describe("velocityFloorLine", () => {
+  // The table is published on its own by Phase 5's Rituals, so the
+  // qualification cannot live in a paragraph beside it.
+  it("says the Committed column is a floor in every row, not only in the sprint above it", () => {
+    const line = velocityFloorLine();
+    expect(line).toContain("Committed is a floor in every row");
+    expect(line).toContain("never fetched");
   });
 });
 
