@@ -35,7 +35,16 @@ sprint live here, and reach Jira the moment they are pressed rather than
 waiting for Commit, the same exception Phase 3c carved out for starting
 and completing one. Filling a sprint, by contrast, is an ordinary
 journaled move. Schema version 7 adds the sprint's goal, which existed on
-the wire since Phase 3a and nowhere in TAM until now.
+the wire since Phase 3a and nowhere in TAM until now. Phase 4 fills in the
+fifth view, Reports: the numbers a sprint review starts with, committed,
+added, removed, completed and carried over, reconstructed from Jira's own
+changelog rather than from its internal chart endpoints, with the last six
+closed sprints as a velocity table beside them. Schema version 8 adds
+`sprint_report`, where a closed sprint's reconstruction is kept so the view
+is readable offline, and `complete_date` on `sprint`. The charts those
+numbers would be drawn into are deliberately the next plan; what ships here
+is the figures, the method printed under them, and a plain statement of what
+the reconstruction cannot see.
 
 ## Phase 4: the sprint report, the reconstruction
 
@@ -117,6 +126,132 @@ written through `writeSprints`, the one seam both `ReplaceBoard` and
 field. `Build`'s own walk does not read it yet: it still stops at `endDate`
 (or at `now`, for a sprint still running), so wiring the actual close date
 into the reconstruction is separate, later work.
+
+## Phase 4: where the report is kept, asked for, and read
+
+**What the report cannot see is the most important paragraph in this
+section.** The issues come from a `sprint = N` search, which is the only
+membership JQL Jira offers and which answers with whoever is in the sprint
+**now**. A card dragged out on day four no longer carries sprint N, so it is
+never fetched, its changelog is never read, and the removal leaves no trace.
+Jira's own report gets this right only because it keeps private sprint-change
+records the public API does not expose. So `Removed` can only ever hold cards
+that left and came back, `Committed` is a floor rather than a total, and every
+surface that prints either one carries the qualification: `SprintSummary`
+under the sentence, and `VelocityTable` under its own Committed column, which
+is not redundancy but the same rule applied twice, because Phase 5's Rituals
+publishes those figures out of `lib/reportText.ts` where there is no
+neighbouring paragraph to borrow a caveat from. Querying the whole project to
+recover removed cards is recorded as the upgrade and is not built.
+
+**The method is printed with the numbers, and that is a product decision
+rather than a documentation one.** TAM's figures and Jira's will differ, in
+public, during a review, because they come from different sources: Jira from
+its private sprint records, TAM from the public changelog, with its own done
+rule and the blind spot above. One line under the summary says what done
+means here, that the history is reconstructed from the public changelog
+rather than Jira's stored sprint records, and that removals are only visible
+for cards that came back. It costs a sentence and it turns an argument in
+front of a team into a footnote. Nobody reads documentation during a sprint
+review.
+
+**Where a report is kept.** `sprint_report` arrives at schema version 8,
+keyed `(profile_id, board_id, sprint_id)`. The board is in that key for the
+same reason version 6 put it in `sprint`'s: Jira hands one sprint to every
+board whose filter reaches it, and a report's done rule comes from its own
+board's last column, so a key without the board would serve board B a series
+built for board A and neither board would ever find out. The row carries
+`algo_version`, stamped on write from `reports.AlgoVersion` and compared on
+read, so the first reconstruction bug is not baked into every user's database
+with no way out but deleting the file. The table is in both purge lists,
+`PurgeProfile` and `RemoveBoards`.
+
+**A closed sprint's series is stored and served from the store; a live one's
+is neither stored nor served.** A live sprint changed an hour ago, so a
+stored copy would be a confident wrong answer. A closed sprint's numbers are
+steady enough to keep, which is not the same as fixed, and the two things
+that can still move them are worth knowing because neither is obvious:
+membership, since the series is built from `sprint = N` and a card can be
+moved into or out of a closed sprint, and the board's own done rule, since a
+column rearranged in Jira changes what `donerule` answers without touching a
+single issue. Status and estimate changes after the close move nothing, which
+is what the rewind is for. `refresh` is how a caller asks for the series
+again, and it is the only invalidation path short of bumping `AlgoVersion`:
+without it a report built while Jira was returning cut-short changelogs would
+keep its truncation marker forever.
+
+**One binding, not two.** The first draft had the view ask for the burndown
+and the velocity separately. `App.acquire` refuses rather than waits, and
+TanStack Query fires every `useQuery` on a component's mount, so two bindings
+would have failed one of them with "a report is already running for this
+profile" every single time the view opened. `GetSprintReport` returns both
+under one lock, sharing one fetch, and the velocity table reuses stored
+reports for the sprints it has already built rather than refetching six.
+`CancelSprintReport` is the other half: Wails hands a bound method no
+per-call context, so the cancel func lives on `App` under the same mutex
+`busy` does, and the view calls it on unmount and on every board or sprint
+switch. Without it a report nobody is looking at holds the profile lock for
+minutes.
+
+**The cost of opening the view is real and is reported.** A page is 25
+issues against the sync's 50, because the changelog expansion makes each
+issue's payload several times the size of the row the grid syncs. **That is
+a considered default and not a measured one**: step 4 of this phase's wire
+probe, which would have timed 50 against 25 on a real instance, has not been
+run, so nobody knows where the real knee is. Progress goes on
+`tam:report-progress` with its own frame type rather than on
+`tam:sync-progress`, because the shell's banner reads the latter and a read
+that is not a sync must not announce one.
+
+**`reports.Velocity` is gone, and the shape it had could not survive
+reusing the store.** It took a map of every sprint's fetched history and
+returned the whole table, which is the right shape when every row is
+reconstructed and the wrong one when five of six are read back out of
+`sprint_report`. Splitting it in two is what let the store in:
+`VelocitySprints` picks which closed sprints the table covers and in what
+order, `Row` turns one series into one row, and `internal/sprintreport`
+calls both, so a sprint built just now and the same sprint read back from
+the store give the identical row by construction rather than by two code
+paths agreeing. `VelocitySprints` parses both dates and not just the end,
+which is what stops a sprint it already knows it cannot reconstruct from
+costing a full changelog fetch first; the end-before-start case it cannot
+see is caught later by `ErrNoDates`, and each layer's comment says which
+fault is whose.
+
+`internal/sprintreport` is the orchestration and `internal/reports` stays
+pure. The split is not tidiness: `reports` takes issues and a clock and
+touches no I/O, which is what makes its tests cheap, and everything that
+costs something (the done rule, the paged fetch, the store, the progress
+frames) lives on the other side of it. `app_reports.go` does what every
+other `app*.go` does and no more.
+
+**A condition the view has to render beside the report travels in the
+result, not as a Go error.** Wails fills in either a bound method's value or
+its error and never both, the limit `sprints.Completion` is already built
+around. So a board that was never synced, a sprint the cache does not hold,
+a sprint with no readable dates and a board that has never closed a sprint
+come back as a `Report` carrying an `Unavailable` reason and nothing else,
+while a refused lock, a transport failure and a database that will not
+answer stay Go errors. The reasons are constants because the frontend words
+them, in `lib/reportText.ts`, which is the one home for every sentence the
+report prints and is tested without rendering anything.
+
+**A sprint id of 0 means the board's most recent closed sprint**, which is
+the call the view makes before its picker has anything in it and is what
+makes `noClosedSprint` reachable at all. A negative id is not that and
+answers `sprintNotFound`. `api.ts` refuses a sprint id that is not a
+non-negative whole number before the call, because Wails marshals arguments
+with `JSON.stringify` and both `undefined` and `NaN` arrive in Go as `0`: an
+uninitialised picker would otherwise get the newest closed sprint's report
+under whatever heading happened to be on screen. The heading is drawn from
+`series.sprintName`, the sprint the backend answered about, never from
+picker state, which is the second line of defence for the same failure.
+
+**The charts are not here and are the next plan.** `Series.Days` carries the
+day by day line and nothing draws it. There is no SVG anywhere in this
+frontend, so axis ticks, label collision, empty ranges, single day sprints,
+colour tokens and screen reader access are all new surface, and splitting
+means the numbers get trusted before anything is drawn from them.
 
 ## Phase 3a: boards
 
@@ -889,6 +1024,38 @@ why those dialogs refuse Escape while their write is in flight rather than
 merely disabling their own buttons. A fourth quiet write would have to earn
 the same treatment.
 
+**A sprint report is not a quiet write and does not go through
+`runQuietLock`.** `SyncContext.runReport` dispatches `SYNC_START` and
+`SYNC_END` the way `runBoardsRefresh` does, so the shell genuinely enters its
+running state and Sync, Commit and the profile picker are all disabled. The
+three sprint management writes get away with staying quiet only because each
+is one short call behind a modal dialog holding focus; a report is minutes
+long, has no modal, and the user is looking straight at the window, so
+leaving Sync enabled and inert would have been the exact bug the rule above
+was written about. What the status bar says while a report runs comes from
+the report's own frames through `reportText.progressStage`, so it reads
+"Reading Sprint 10 for the velocity table" rather than borrowing the sync's
+sentence. The reducer's internal field is still called `syncing`; nothing
+renders that word.
+
+**`SyncContext` carries a `running` value beside `statusRef`, and the two are
+not redundant.** `statusRef` is a ref because it is the synchronous guard: a
+state update would be a render too late and two operations could both pass
+it. But it only ever holds `idle`, `syncing` or `committing`, and every one of
+`runSync`, `runBoardsRefresh`, `runSprintCeremony`, `runQuietLock` and
+`runReport` sets `syncing`, so the frontend could not say what was actually
+holding its own lock. It told a user a sync was running when the holder was
+their own previous report, and the Reports view rendered whichever progress
+frame was in context as if it were its own, so a sync's issue counter
+appeared under the report's copy. `running` holds the `acquire` names
+spelled Go's way, though only the five this client can take: `import` is
+Go's sixth and the import dialog does not run through this context, so
+putting it in the type would have claimed a state that can never be set.
+It is set and cleared in the same two places the ref moves, and is state rather
+than a ref because the view re-renders on it: the refusal words itself from
+it, and the Reports view shows a progress frame only while `running` is
+`"report"`.
+
 `SyncBoards` acquires under its own name, so a refusal says which operation is
 actually running. The boards pass is also given the progress sink now: it
 walks every board's columns, sprints, and each sprint's issue keys, which
@@ -1069,6 +1236,9 @@ until one is entered. A Kiwi profile file is refused.
     app_sprints.go       the two sprint ceremonies, SuggestSprintDates, and PendingInSprint
     app_sprintmanage.go  Create, Edit and Delete sprint, and ListBoardSprintDetails for the
                           Sprints view's tree, all under the "sprint" lock name the ceremonies use
+    app_reports.go       GetSprintReport, the one binding the Reports view calls, and
+                          CancelSprintReport, which is how a view that has been left cancels a read
+                          still holding the profile lock; both under the "report" lock name
     internal/tamstore/   TAM's own SQLite file (schema version 8: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
                           sprint (with goal, added at version 7, and complete_date, added at
@@ -1110,6 +1280,11 @@ until one is entered. A Kiwi profile file is refused.
                           it counts in, series.go the rewind and the day by day walk, velocity.go
                           which six closed sprints a velocity table covers and what one row of
                           it says
+    internal/sprintreport/  the orchestration around internal/reports, kept out of it so that
+                          package stays pure: build.go is the one exported entry point, series.go
+                          the store-or-fetch rule a closed sprint is served by, fetch.go the paged
+                          changelog search with its progress frames, velocity.go the table
+                          assembled from stored series plus whatever has to be read
     internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
                           InRead for a deferred read-only transaction, and the Querier interface a
                           read helper takes so it can run on the handle or inside either kind
@@ -1130,7 +1305,13 @@ until one is entered. A Kiwi profile file is refused.
       src/contexts/      SyncContext on the shared sync reducer; runSprintCeremony is the reducer
                           path StartSprint and CompleteSprint run through, beside runBoardsRefresh;
                           runQuietLock takes the same lock without the banner, for the three
-                          sprint management writes
+                          sprint management writes; runReport is the sprint report's path, which
+                          does show the banner, and `running` is what lets a refusal name the
+                          operation actually holding the lock
+      src/lib/reportText.ts  every sentence the sprint report prints: the summary, the floor and
+                          removal qualifications, the method line, the four unavailable reasons,
+                          the unit and its reason, and the progress wording, all testable without
+                          rendering anything and all reused by Phase 5's Rituals
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands
@@ -1153,7 +1334,10 @@ until one is entered. A Kiwi profile file is refused.
                           goal, shown only while a sprint is expanded), SprintFillBar,
                           CreateSprintModal, EditSprintModal, SprintDraftForm (the four fields the
                           create and edit dialogs share), useSprintSelection (the tree's own
-                          multi-select, the board's under a different name)
+                          multi-select, the board's under a different name), ReportsView (the two
+                          pickers, the eight states a report can be in, and the rebuild),
+                          SprintSummary (the sentence, its qualification, and the method line),
+                          VelocityTable (the last six closed sprints, each row with its own unit)
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands
