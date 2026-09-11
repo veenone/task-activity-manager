@@ -120,7 +120,7 @@ there:
 
 **Produces:** schema version 8 with `sprint_report(profile_id, sprint_id, unit, built_at, series_json, PRIMARY KEY (profile_id, sprint_id))`; `boardrepo.SavedReport` and `SaveReport`; bound methods `GetBurndown(profileID string, boardID, sprintID int) (reports.Series, error)` and `GetVelocity(profileID string, boardID int) ([]reports.VelocityRow, error)`.
 
-- [ ] **Step 1: The table.** Version 7 adds it through `baseDDL`, which needs no migration because it is a new table, and the existing version tests get a case for it the way version 6 did.
+- [ ] **Step 1: The table.** Version 8 adds it through `baseDDL`, which needs no migration because it is a new table, and the existing version tests get a case for it the way version 6 did.
 
 - [ ] **Step 2: The read path.** `GetBurndown` reads the cached series when the sprint is closed and one is stored; otherwise it fetches the sprint's issues with their changelogs, builds the series, stores it when the sprint is closed, and returns it. The board is needed for the done rule, so the binding takes it. Both bindings run under `a.acquire(p.ID, "report")`, because a changelog fetch is a long read against Jira and the app already serialises those per profile.
 
