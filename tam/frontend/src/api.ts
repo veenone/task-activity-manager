@@ -405,6 +405,96 @@ export interface SprintDetail extends Sprint {
   truncated: boolean;
 }
 
+// The sprint report, as internal/sprintreport hands it over. Every number
+// is a float64 in Go, because a board counting story points routinely
+// carries halves.
+
+export interface ReportDay {
+  // The local calendar date, bucketed in the zone the backend built the
+  // series in, as 2006-01-02.
+  date: string;
+  scope: number;
+  completed: number;
+  remaining: number;
+  ideal: number;
+}
+
+export interface ReportSeries {
+  sprintId: number;
+  sprintName: string;
+  // "points" or "cards". unitReason says why when it is cards, and is one
+  // of REPORT_UNIT_REASONS; it is empty for points.
+  unit: string;
+  unitReason: string;
+  committed: number;
+  added: number;
+  removed: number;
+  completed: number;
+  carriedOver: number;
+  // The day by day line behind the totals. Phase 4 prints the totals and
+  // does not draw this; the charts are the next plan.
+  days: ReportDay[];
+  // The keys of the issues whose changelog came back cut short, so the
+  // numbers above rest in part on a partial history.
+  truncated: string[];
+}
+
+export interface VelocityRow {
+  sprintId: number;
+  sprintName: string;
+  // The unit rides on the row and not on the table, because a board that
+  // moved from points to cards mid-history holds two different quantities.
+  unit: string;
+  unitReason: string;
+  committed: number;
+  completed: number;
+  truncated: boolean;
+}
+
+export interface SprintReport {
+  series: ReportSeries;
+  velocity: VelocityRow[];
+  // When the series was reconstructed, in RFC 3339, and the chosen sprint's
+  // stamp only. The velocity rows carry no age of their own and most of
+  // them are usually served from the store, so nothing here describes how
+  // old the table is.
+  builtAt: string;
+  // One of REPORT_UNAVAILABLE_REASONS when there is no report, and empty
+  // otherwise. When it is set, series and velocity are empty.
+  unavailable: string;
+}
+
+// The four reasons a report has nothing to show, mirroring the constants in
+// internal/sprintreport. Each is a property of the data rather than a
+// failure of the call, which is why they travel in the answer.
+export const REPORT_UNAVAILABLE_REASONS = [
+  "boardNotSynced",
+  "sprintNotFound",
+  "sprintHasNoDates",
+  "noClosedSprint",
+] as const;
+
+// The two reasons a series counts cards, mirroring internal/reports.
+export const REPORT_UNIT_REASONS = ["nothingEstimated", "noPointsFieldSeen"] as const;
+
+// REPORT_PROGRESS_EVENT carries sprintreport.Progress while a report runs.
+// It is not the sync's event: the shell's banner reads that one, and a
+// report announcing itself there would say a sync was running.
+export const REPORT_PROGRESS_EVENT = "tam:report-progress";
+
+export interface ReportProgress {
+  // "sprint" for the sprint the user asked for, "velocity" for one of the
+  // older sprints the table needs and the store did not hold.
+  phase: string;
+  sprintId: number;
+  sprintName: string;
+  // Issues of this one sprint, not of the whole report.
+  fetched: number;
+  total: number;
+  // The last frame of one sprint's fetch, not of the report.
+  done: boolean;
+}
+
 // MAX_CARDS_PER_VIEW mirrors boardrepo.MaxCardsPerView, so a line saying
 // what a read stopped at names the number the backend actually stopped at.
 // Two reads spend it: a board spends it over its cells, and the Sprints
@@ -876,6 +966,36 @@ export const DeleteSprint: (profileId: string, boardId: number, sprintId: number
 // their issue type as a plain string.
 export const ListBoardSprintDetails = (profileId: string, boardId: number): Promise<SprintDetail[]> =>
   App.ListBoardSprintDetails(profileId, boardId) as Promise<SprintDetail[]>;
+// GetSprintReport is one sprint's reconstructed series and its board's
+// velocity table together, in the one call that takes the per-profile lock
+// once. sprintId of 0 asks for the board's most recent closed sprint, and
+// refresh rebuilds from Jira instead of from the stored series, for the
+// whole table rather than only the sprint on screen. It takes Go's
+// per-profile lock, so a caller reaches it through SyncContext the way the
+// sprint writes do rather than calling it directly.
+//
+// The sprint id is checked here rather than in a component so every future
+// caller inherits the check. Wails marshals arguments with JSON.stringify,
+// which turns both undefined and NaN into null, and Go decodes that as 0:
+// an uninitialised picker would otherwise be served the newest closed
+// sprint's report under whatever heading the view happened to be showing.
+export const GetSprintReport = async (
+  profileId: string,
+  boardId: number,
+  sprintId: number,
+  refresh: boolean,
+): Promise<SprintReport> => {
+  if (!Number.isInteger(sprintId) || sprintId < 0) {
+    throw new Error(`a sprint report needs a sprint id that is zero or more, not ${String(sprintId)}`);
+  }
+  return App.GetSprintReport(profileId, boardId, sprintId, refresh) as Promise<SprintReport>;
+};
+// CancelSprintReport stops whatever report this profile has running, so a
+// fetch of six sprints of changelog does not hold the lock against the next
+// sync for a screen nobody is looking at. It does nothing when none is
+// running, which is why the view can call it on every unmount.
+export const CancelSprintReport: (profileId: string) => Promise<void> = App.CancelSprintReport;
+
 // How many journal rows belong to cards staying in this sprint. The Complete
 // button asks before it opens its dialog: a card dragged to Done an hour ago
 // is Done on the board and not in Jira, and completing the sprint would move

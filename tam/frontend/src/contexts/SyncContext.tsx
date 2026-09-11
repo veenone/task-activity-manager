@@ -13,8 +13,9 @@ import {
   errMsg,
 } from "@agile-suite/core";
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
-import { CommitPendingChanges, EventsOn, SyncBoards, SyncIssues } from "../api";
-import type { BoardSummary, CommitResult, Profile, Settings } from "../api";
+import { CommitPendingChanges, EventsOn, REPORT_PROGRESS_EVENT, SyncBoards, SyncIssues } from "../api";
+import type { BoardSummary, CommitResult, Profile, ReportProgress, Settings } from "../api";
+import { progressStage } from "../lib/reportText";
 import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
 // SyncProvider owns the one reducer that keeps sync and commit from
@@ -44,6 +45,16 @@ interface SyncApi {
   // shell that still offered Sync. It rejects rather than swallowing: the
   // dialog is what reports a ceremony's failure, word for word.
   runSprintCeremony: <T>(action: () => Promise<T>) => Promise<T>;
+  // runReport is how the Reports view takes Go's per-profile lock. It is
+  // not runQuietLock: a report runs for minutes with no dialog over it and
+  // the user looking straight at the window, so leaving the reducer idle
+  // would leave Sync and Commit offered and inert for the whole of it,
+  // which is the bug tam/CLAUDE.md's "One lock, both ends" section records.
+  // It puts the shell in its running state the way runBoardsRefresh does,
+  // and the frames arriving on the report's own event give the status bar a
+  // stage that says a report is what is running. It rejects rather than
+  // swallowing, so the view can tell a refusal from a failed read.
+  runReport: <T>(action: () => Promise<T>) => Promise<T>;
   // runQuietLock is what a fast management write (creating, renaming, or
   // destroying a sprint) takes Go's per-profile lock through without reading
   // as a ceremony. It guards against overlapping a sync, a commit, a boards
@@ -103,6 +114,33 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     () =>
       EventsOn(PROGRESS_EVENT, (p: SyncProgress) =>
         dispatch({ type: "SYNC_PROGRESS", progress: p }),
+      ),
+    [],
+  );
+
+  // A report's frames arrive on their own event, and they are turned into
+  // the same progress the status bar already draws, with a stage of their
+  // own so the bar names a report rather than a sync.
+  //
+  // done is dropped on purpose. sprintreport.Progress marks the last frame
+  // of *one sprint's* fetch, and a report covering six sprints sends six of
+  // them; the reducer reads done as "the pull is over" and clears the bar,
+  // so forwarding it would blank the status bar after the first sprint and
+  // leave the rest of a minutes-long read silent. runReport's own finally
+  // is what ends the run.
+  useEffect(
+    () =>
+      EventsOn(REPORT_PROGRESS_EVENT, (p: ReportProgress) =>
+        dispatch({
+          type: "SYNC_PROGRESS",
+          progress: {
+            phase: p.phase,
+            fetched: p.fetched,
+            total: p.total,
+            done: false,
+            stage: progressStage(p),
+          },
+        }),
       ),
     [],
   );
@@ -181,6 +219,29 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [activeId]);
 
+  // A report is the heaviest read this app makes, so it starts the bar with
+  // a stage that is true before the first frame lands: nothing has been
+  // fetched yet and no total is known, and a bar with no count draws no
+  // track and trails off, which is what the boards refresh does too.
+  const runReport = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
+    if (!activeId) throw new Error("no profile selected");
+    if (statusRef.current !== "idle") {
+      throw new Error(`a ${statusRef.current === "committing" ? "commit" : "sync"} is already running for this profile`);
+    }
+    statusRef.current = "syncing";
+    dispatch({
+      type: "SYNC_START",
+      clearError: true,
+      initialProgress: { phase: "report", fetched: 0, total: 0, done: false, stage: "Building the sprint report" },
+    });
+    try {
+      return await action();
+    } finally {
+      statusRef.current = "idle";
+      dispatch({ type: "SYNC_END" });
+    }
+  }, [activeId]);
+
   // A quiet lock is the same statusRef guard every other run function
   // checks, so it still refuses while any of them is in flight, but it never
   // touches the reducer: no SYNC_START, no SYNC_END, no progress frame. The
@@ -248,6 +309,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       runSync,
       runBoardsRefresh,
       runSprintCeremony,
+      runReport,
       runQuietLock,
       runCommit,
       lastCommit,
@@ -255,7 +317,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, activeId, runSync, runBoardsRefresh, runSprintCeremony, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
+    [state, activeId, runSync, runBoardsRefresh, runSprintCeremony, runReport, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;
