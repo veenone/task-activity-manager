@@ -20,7 +20,7 @@ import (
 // once by giving each direction its own column instead of trying to flip the
 // sign of a text column.
 const detailSprintsSQL = `
-	SELECT id, board_id, name, state, start_date, end_date, goal FROM sprint
+	SELECT id, board_id, name, state, start_date, end_date, goal, complete_date FROM sprint
 	WHERE profile_id = ? AND board_id = ?
 	ORDER BY CASE state WHEN 'active' THEN 0 WHEN 'future' THEN 1 WHEN 'closed' THEN 2 ELSE 3 END,
 	         CASE WHEN state = 'closed' THEN NULL ELSE start_date END ASC,
@@ -267,7 +267,7 @@ func sprintsForDetail(ctx context.Context, q dbtx.Querier, profileID string, boa
 	out := []Sprint{}
 	for rows.Next() {
 		var s Sprint
-		if err := rows.Scan(&s.ID, &s.BoardID, &s.Name, &s.State, &s.StartDate, &s.EndDate, &s.Goal); err != nil {
+		if err := rows.Scan(&s.ID, &s.BoardID, &s.Name, &s.State, &s.StartDate, &s.EndDate, &s.Goal, &s.CompleteDate); err != nil {
 			return nil, err
 		}
 		out = append(out, s)

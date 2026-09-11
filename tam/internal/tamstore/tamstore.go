@@ -3,8 +3,9 @@
 // shared profiles.db. Version 1 carries no app tables. Version 2 adds the
 // issue tables, version 3 the shared journal tables, version 4 the
 // cached Jira user list, version 5 the board tables and the issue's status
-// id, version 6 re-keys the sprint table by board, and version 7 adds the
-// sprint's goal.
+// id, version 6 re-keys the sprint table by board, version 7 adds the
+// sprint's goal, and version 8 adds the sprint_report table and the
+// sprint's complete_date.
 package tamstore
 
 import (
@@ -26,9 +27,12 @@ import (
 // migration for the same reason: CREATE TABLE IF NOT EXISTS leaves a table
 // that already exists exactly as it is, primary key included. Version 7
 // adds the sprint's goal, the same shape as version 5's column add.
+// Version 8 adds two things: sprint_report, a plain CREATE TABLE IF NOT
+// EXISTS that needs no migration entry at all, and the sprint's
+// complete_date, a column add in version 7's own shape.
 var Schema = store.Schema{
-	Version: 7,
-	Base:    baseDDL + sprintDDL + journal.DDL,
+	Version: 8,
+	Base:    baseDDL + sprintDDL + sprintReportDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -94,6 +98,28 @@ var Schema = store.Schema{
 		// Boards Refresh rewrites it.
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "sprint", "goal TEXT NOT NULL DEFAULT ''")
+		},
+	}, {
+		Version: 8,
+		// sprint_report is a brand new table, so it needs nothing here:
+		// sprintReportDDL is already part of Base, and CREATE TABLE IF NOT
+		// EXISTS picks it up on an older database's next open the same way
+		// the journal tables and the user cache did at versions 3 and 4.
+		// complete_date is the one piece of this version that does need a
+		// migration entry, for the same reason goal did at version 7: a
+		// table that already exists is not touched by CREATE TABLE IF NOT
+		// EXISTS, primary key or columns alike. On a database still behind
+		// version 6, migration 6 runs first and rebuilds sprint from
+		// sprintDDL, which by then already carries this column, so this add
+		// lands as the duplicate-column no-op AddColumnIfMissing treats as
+		// success.
+		//
+		// Nothing here backfills a sprint cached before this version, the
+		// same as goal before it: a sprint is not read by an issue sync, so
+		// complete_date stays empty until the Boards view's own Refresh
+		// rewrites it.
+		Apply: func(db *sql.DB) error {
+			return store.AddColumnIfMissing(db, "sprint", "complete_date TEXT NOT NULL DEFAULT ''")
 		},
 	}},
 	Indexes: indexDDL,
@@ -189,15 +215,35 @@ CREATE TABLE IF NOT EXISTS board_issue (
 // board whose filter reaches it, and each board caches its own copy.
 const sprintDDL = `
 CREATE TABLE IF NOT EXISTS sprint (
-	profile_id TEXT NOT NULL,
-	id         INTEGER NOT NULL,
-	board_id   INTEGER NOT NULL,
-	name       TEXT NOT NULL DEFAULT '',
-	state      TEXT NOT NULL DEFAULT '',
-	start_date TEXT NOT NULL DEFAULT '',
-	end_date   TEXT NOT NULL DEFAULT '',
-	goal       TEXT NOT NULL DEFAULT '',
+	profile_id    TEXT NOT NULL,
+	id            INTEGER NOT NULL,
+	board_id      INTEGER NOT NULL,
+	name          TEXT NOT NULL DEFAULT '',
+	state         TEXT NOT NULL DEFAULT '',
+	start_date    TEXT NOT NULL DEFAULT '',
+	end_date      TEXT NOT NULL DEFAULT '',
+	goal          TEXT NOT NULL DEFAULT '',
+	complete_date TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, board_id, id)
+);`
+
+// sprintReportDDL is a sprint's reconstructed report, one row per board's
+// copy of a sprint for the same reason sprintDDL's key carries board_id:
+// Jira hands one sprint to every board whose filter reaches it, and a
+// report's own done rule comes from its board's last column, so a key
+// without the board would let one board's report answer for another's.
+// algo_version is compared against internal/reports.AlgoVersion on read,
+// so a row a lower version wrote is rebuilt rather than served.
+const sprintReportDDL = `
+CREATE TABLE IF NOT EXISTS sprint_report (
+	profile_id   TEXT NOT NULL,
+	board_id     INTEGER NOT NULL,
+	sprint_id    INTEGER NOT NULL,
+	unit         TEXT NOT NULL DEFAULT '',
+	algo_version INTEGER NOT NULL DEFAULT 0,
+	built_at     TEXT NOT NULL DEFAULT '',
+	series_json  TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, sprint_id)
 );`
 
 const indexDDL = `

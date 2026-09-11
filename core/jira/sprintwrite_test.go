@@ -25,6 +25,33 @@ func TestRawSprintDecodesItsGoal(t *testing.T) {
 	}
 }
 
+// TestRawSprintDecodesItsCompleteDate pins down the other field this task
+// adds: the moment a sprint actually closed, which a report needs instead of
+// the planned end date because the two routinely differ by days.
+func TestRawSprintDecodesItsCompleteDate(t *testing.T) {
+	var sprint RawSprint
+	payload := []byte(`{"id":12,"name":"Sprint 12","state":"closed","startDate":"2026-09-09T09:00:00.000+0000","endDate":"2026-09-23T09:00:00.000+0000","completeDate":"2026-09-26T14:00:00.000+0000"}`)
+	if err := json.Unmarshal(payload, &sprint); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if sprint.CompleteDate != "2026-09-26T14:00:00.000+0000" {
+		t.Errorf("completeDate = %q, want the closed date three days after endDate", sprint.CompleteDate)
+	}
+}
+
+// TestRawSprintDecodesANullCompleteDateAsEmpty is the ordinary case: a
+// sprint still open sends completeDate as JSON null, not as an absent key.
+func TestRawSprintDecodesANullCompleteDateAsEmpty(t *testing.T) {
+	var sprint RawSprint
+	payload := []byte(`{"id":13,"name":"Sprint 13","state":"active","completeDate":null}`)
+	if err := json.Unmarshal(payload, &sprint); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if sprint.CompleteDate != "" {
+		t.Errorf("completeDate = %q, want empty for a sprint still open", sprint.CompleteDate)
+	}
+}
+
 func TestCreateSprintSendsBoardIDNameAndDates(t *testing.T) {
 	var gotPath, gotMethod string
 	var gotBody map[string]any

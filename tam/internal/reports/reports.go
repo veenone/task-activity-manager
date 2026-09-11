@@ -45,6 +45,14 @@ const (
 	UnitCards  = "cards"
 )
 
+// AlgoVersion is bumped whenever a change to this package's reconstruction
+// would give an old cached series a different answer today. boardrepo
+// stores it beside every report it saves and compares it against this
+// constant on read, rebuilding rather than serving a row a lower version
+// wrote, so the first reconstruction bug is not permanent in every user's
+// database.
+const AlgoVersion = 1
+
 // Why a series counts cards instead of points. The two are a different
 // problem and only one of them is the user's to fix, which is the whole
 // reason the reason is carried rather than just the unit.

@@ -24,13 +24,14 @@ func (b *Backend) CreateSprint(ctx context.Context, boardID int, d backend.Sprin
 		return backend.Sprint{}, fmt.Errorf("create sprint on board %d: %w", boardID, err)
 	}
 	return backend.Sprint{
-		ID:        raw.ID,
-		BoardID:   boardID,
-		Name:      raw.Name,
-		State:     strings.ToLower(raw.State),
-		StartDate: raw.StartDate,
-		EndDate:   raw.EndDate,
-		Goal:      raw.Goal,
+		ID:           raw.ID,
+		BoardID:      boardID,
+		Name:         raw.Name,
+		State:        strings.ToLower(raw.State),
+		StartDate:    raw.StartDate,
+		EndDate:      raw.EndDate,
+		Goal:         raw.Goal,
+		CompleteDate: raw.CompleteDate,
 	}, nil
 }
 

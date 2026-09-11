@@ -108,11 +108,13 @@ visible: a user comparing the Sprints view's done count against a report's
 completed figure is looking at two different questions. `donerule`'s
 package comment is where that is written down.
 
-One thing this phase wants and does not have: Jira's `completeDate`. The
-design says a sprint closed three days late should be measured at the date
-it actually closed, and `backend.Sprint` carries only `endDate`, so the walk
-stops at the end date (or at `now`, for a sprint still running). Adding the
-field is a `core/jira` change and is not in this task.
+Jira's `completeDate` now reaches TAM: `core/jira.RawSprint`, `backend.Sprint`,
+`boardrepo.Sprint`, and the `sprint` table (schema version 8) all carry it,
+written through `writeSprints`, the one seam both `ReplaceBoard` and
+`ReplaceSprints` call, so a sprint completed through either path keeps the
+field. `Build`'s own walk does not read it yet: it still stops at `endDate`
+(or at `now`, for a sprint still running), so wiring the actual close date
+into the reconstruction is separate, later work.
 
 ## Phase 3a: boards
 
@@ -1064,10 +1066,11 @@ until one is entered. A Kiwi profile file is refused.
     app_sprints.go       the two sprint ceremonies, SuggestSprintDates, and PendingInSprint
     app_sprintmanage.go  Create, Edit and Delete sprint, and ListBoardSprintDetails for the
                           Sprints view's tree, all under the "sprint" lock name the ceremonies use
-    internal/tamstore/   TAM's own SQLite file (schema version 7: issue (with status_id), issue_link,
+    internal/tamstore/   TAM's own SQLite file (schema version 8: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
-                          sprint (with goal, added at version 7), plus the shared journal tables
-                          pending_change and audit_log)
+                          sprint (with goal, added at version 7, and complete_date, added at
+                          version 8), sprint_report (a sprint's saved report, added at version 8),
+                          plus the shared journal tables pending_change and audit_log)
     internal/backend/    IssueBackend and BoardBackend seams and DTOs; backend/jira on core/jira,
                           backend/demo on internal/demo
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile

@@ -138,8 +138,8 @@ func (f *fakeJira) agile(w http.ResponseWriter, r *http.Request) {
 		// originBoardId is board 7, not the board being read: the mapping
 		// must take the board from the request, not from the payload.
 		_, _ = w.Write([]byte(`{"isLast":true,"values":[
-			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z","goal":"Ship the promo code flow"},
-			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z","goal":""}
+			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z","completeDate":"2026-08-21T10:00:00.000Z","goal":"Ship the promo code flow"},
+			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z","completeDate":null,"goal":""}
 		]}`))
 	case "/rest/agile/1.0/board/2/sprint":
 		// Jira's way of saying a kanban board has no sprints.
@@ -356,6 +356,23 @@ func TestBoardSprintsCarryTheGoalJiraSent(t *testing.T) {
 	}
 	if sprints[1].Goal != "" {
 		t.Errorf("sprint goal = %q, want empty for Jira's own empty goal", sprints[1].Goal)
+	}
+}
+
+// TestBoardSprintsCarryTheCompleteDateJiraSent covers the field this task
+// adds beside the goal: Jira's completeDate, which is the moment a sprint
+// actually closed and routinely differs from its planned endDate.
+func TestBoardSprintsCarryTheCompleteDateJiraSent(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	sprints, err := b.BoardSprints(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	if sprints[0].CompleteDate != "2026-08-21T10:00:00.000Z" {
+		t.Errorf("sprint 11 completeDate = %q, want the closed date three days after endDate", sprints[0].CompleteDate)
+	}
+	if sprints[1].CompleteDate != "" {
+		t.Errorf("sprint 12 completeDate = %q, want empty for a sprint still active", sprints[1].CompleteDate)
 	}
 }
 
