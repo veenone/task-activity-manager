@@ -56,6 +56,14 @@ func TestVelocityCoversTheLastSixClosedSprintsOldestFirst(t *testing.T) {
 	sprints = append(sprints, live)
 	histories[10] = held(10, 3, 0, points(2))
 
+	// Pinned against the literal the design settled on, not just against
+	// the constant: comparing len(rows) to reports.Depth alone would still
+	// pass if Depth changed, and the fixed-length table below would then
+	// panic indexing past a shorter rows instead of failing with a message
+	// that says what changed.
+	if reports.Depth != 6 {
+		t.Fatalf("this test's table of six sprints assumes Depth is 6; it is %d", reports.Depth)
+	}
 	rows := reports.Velocity(sprints, doneRule(), histories, afterTheSprint, time.UTC)
 	if len(rows) != reports.Depth {
 		t.Fatalf("nine closed sprints give the last %d; got %d", reports.Depth, len(rows))

@@ -32,6 +32,16 @@
 // and it is recorded rather than smoothed over, because a user comparing
 // the Sprints view's done count against a sprint report's completed figure
 // deserves to find the reason written down.
+//
+// The two implementations are not one rule at every edge, either. A board
+// with a single column has no column ahead of its last one, so
+// lib/unfinished.ts refuses it outright rather than call every card on it
+// finished, with a comment on why. Done below has no such guard: a
+// one-column board's one column is still its last, so Done hands back a
+// rule that marks every status on it done. Nothing currently acts on that
+// answer against a one-column board, but a caller that started to should
+// not assume this package already refuses the case the way the frontend
+// does.
 package donerule
 
 import "agile-suite/tam/internal/backend"

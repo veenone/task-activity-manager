@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/donerule"
+	"agile-suite/tam/internal/reports"
 )
 
 func TestAnIssueChangedAfterTheSprintClosedLeavesTheSeriesUnmoved(t *testing.T) {
@@ -222,5 +224,105 @@ func TestAStatusNoCardStillSitsInReadsAsUnfinished(t *testing.T) {
 	}
 	if s.CarriedOver != 4 {
 		t.Errorf("the card ended the sprint unfinished either way; carried over %v", s.CarriedOver)
+	}
+}
+
+func TestACardDoneInsideTheSprintAndArchivedAfterItClosedReportsCompletedNotCarried(t *testing.T) {
+	// The reviewer's own case. The card moves to a done status inside the
+	// sprint and on to an archived one a fortnight after the sprint closed,
+	// and nothing currently sits in the done status any more, so the name
+	// based fallback alone has nothing to translate it with. The changelog
+	// carries the status id on both sides of the change, which is what
+	// lets the card be read as done without needing another card to still
+	// be sitting there.
+	done := donerule.Done([]backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "In Progress", StatusIDs: []string{"3"}},
+		{Name: "Done", StatusIDs: []string{"10001", "10002"}},
+	})
+	c := card("PLAT-1", "Archived", "20000", "11", points(4),
+		backend.Change{At: on("2026-08-06", 9), Field: "status", From: "To Do", To: "Done", FromID: "1", ToID: "10001"},
+		backend.Change{At: on("2026-08-25", 9), Field: "status", From: "Done", To: "Archived", FromID: "10001", ToID: "20000"},
+	)
+	s, err := reports.Build(sprint11(), done, []backend.IssueHistory{c}, afterTheSprint, time.UTC)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if s.Committed != 4 || s.Completed != 4 || s.CarriedOver != 0 {
+		t.Errorf("a card done inside the sprint and archived afterwards still finished it; got %+v", s)
+	}
+}
+
+func TestACardWhoseCachedSprintFieldNamesALaterSprintIsStillCommittedHere(t *testing.T) {
+	// parseSprint keeps only the last entry of Jira's Sprint array, so a
+	// card sitting in both sprint 12 and sprint 13 at once, ordinary during
+	// a rollover, has a cached row that names 13 even while Jira still
+	// counts it in 12. The card came back from a "sprint = 12" search, so
+	// it is in sprint 12 by construction; nothing here ever changes that
+	// membership inside the window, which is what makes the card's row
+	// value irrelevant to whether it should count.
+	twelve := backend.Sprint{ID: 12, Name: "Sprint 12", State: "closed", StartDate: sprintStart, EndDate: sprintEnd}
+	s := build(t, twelve, afterTheSprint, time.UTC, card("PLAT-1", "To Do", "1", "13", points(5)))
+	if s.Committed != 5 {
+		t.Errorf("a card whose row names a later sprint is still committed to this one; got %v", s.Committed)
+	}
+}
+
+func TestAChangeDatedExactlyAtTheSprintsStartIsNotUndone(t *testing.T) {
+	// A single change landing on the sprint's opening instant, moving the
+	// card into a done status. rewound only undoes a change dated strictly
+	// after start; if that were "at or after" instead, this one would be
+	// undone too and the card would open the sprint in In Progress rather
+	// than Done, reading day one as unfinished instead of finished. Only
+	// one card is in the sprint, so nothing besides this one change
+	// decides which it is. Until now the only fixture that ever put a
+	// change on this exact boundary was the demo dataset's, by accident of
+	// which date its author picked, so nothing here failed on purpose if
+	// the boundary moved.
+	done := donerule.Done([]backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "In Progress", StatusIDs: []string{"3"}},
+		{Name: "Done", StatusIDs: []string{"10001"}},
+	})
+	c := card("PLAT-1", "Done", "10001", "11", points(4),
+		backend.Change{At: sprintStart, Field: "status", From: "In Progress", To: "Done", FromID: "3", ToID: "10001"},
+	)
+	s, err := reports.Build(sprint11(), done, []backend.IssueHistory{c}, afterTheSprint, time.UTC)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if d := day(t, s, "2026-08-03"); d.Completed != 4 || d.Remaining != 0 {
+		t.Errorf("day one opens already in the change's \"to\" state, Done, not undone back to In Progress; %+v", d)
+	}
+}
+
+func TestALateSecondLocalMorningChangeInAPositiveOffsetZoneLandsOnDayTwo(t *testing.T) {
+	// Every other test in this file runs in UTC, where local midnight and
+	// UTC midnight are the same instant, so a walker that bucketed in UTC
+	// regardless of loc would still pass every one of them. This is the one
+	// test that cannot: 09:00 on the sprint's second local morning is
+	// 23:00 the previous day in UTC, so bucketing in UTC would apply this
+	// change a full day early.
+	sydney := time.FixedZone("test/+1000", 10*60*60)
+	sp := sprint11()
+	sp.StartDate = "2026-08-03T09:00:00.000+1000"
+	sp.EndDate = "2026-08-14T17:00:00.000+1000"
+
+	done := donerule.Done([]backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "Done", StatusIDs: []string{"10001"}},
+	})
+	c := card("PLAT-1", "Done", "10001", "11", points(4),
+		backend.Change{At: "2026-08-04T09:00:00.000+1000", Field: "status", From: "To Do", To: "Done", FromID: "1", ToID: "10001"},
+	)
+	s, err := reports.Build(sp, done, []backend.IssueHistory{c}, afterTheSprint, sydney)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if d := day(t, s, "2026-08-03"); d.Completed != 0 {
+		t.Errorf("day one, before the change, is not yet finished; completed %v", d.Completed)
+	}
+	if d := day(t, s, "2026-08-04"); d.Completed != 4 {
+		t.Errorf("the change happened on day two's local morning and has to land there; completed %v", d.Completed)
 	}
 }

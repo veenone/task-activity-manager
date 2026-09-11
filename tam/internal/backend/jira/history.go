@@ -65,10 +65,12 @@ func normalizeChanges(histories []corejira.RawHistory, ids fieldIDs) []backend.C
 				continue
 			}
 			out = append(out, backend.Change{
-				At:    h.Created,
-				Field: field,
-				From:  stringOrRaw(item.FromString, item.From),
-				To:    stringOrRaw(item.ToString, item.To),
+				At:     h.Created,
+				Field:  field,
+				From:   stringOrRaw(item.FromString, item.From),
+				To:     stringOrRaw(item.ToString, item.To),
+				FromID: item.From,
+				ToID:   item.To,
 			})
 		}
 	}

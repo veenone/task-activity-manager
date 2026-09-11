@@ -23,15 +23,26 @@ const (
 
 // change is one changelog entry with its timestamp already read.
 type change struct {
-	at    time.Time
-	field string
-	from  string
-	to    string
+	at     time.Time
+	field  string
+	from   string
+	to     string
+	fromID string
+	toID   string
 }
 
 // card is one issue's reconstructed state as the walk moves through the
-// sprint: whether it is in the sprint, the name of the status it is in,
-// and the estimate it carries.
+// sprint: whether it is in the sprint, the status it is in (by name and,
+// when the changelog carried one, by id), and the estimate it carries.
+//
+// statusID travels with status rather than being derived from it, because
+// the two do not always change together: a change that carried no id
+// (an older cached changelog, or a backend that cannot supply one) still
+// moves status by name and leaves statusID exactly as informed as it was,
+// which is empty the moment such a change has happened, not whatever the
+// issue row happened to say. done reads statusID first and falls back to
+// the name only when it is empty, which is what keeps a card's finished
+// state from being decided on a guess when the id is actually known.
 //
 // The two charged flags are what keep a card that left and came back from
 // being counted as scope twice. A crossing is charged the first time it
@@ -41,10 +52,22 @@ type change struct {
 type card struct {
 	in             bool
 	status         string
+	statusID       string
 	points         *float64
 	changes        []change
 	addedCharged   bool
 	removedCharged bool
+}
+
+// done reports whether c's current tracked state counts as finished. The
+// id is the primary answer, since a board's rule is keyed by status id;
+// the name is the fallback, for the state left behind by a change whose
+// id could not be read.
+func (c *card) done(byID func(string) bool, byName map[string]bool) bool {
+	if c.statusID != "" {
+		return byID(c.statusID)
+	}
+	return byName[c.status]
 }
 
 // rewound is the one place the reconstruction runs backwards, and the
@@ -60,15 +83,23 @@ type card struct {
 //
 // Changes dated exactly at the start are deliberately not undone. Their
 // "to" side is the value the sprint opened with.
+//
+// Membership starts true for every card, not from a comparison against the
+// issue row's own Sprint field. Every issue Build ever sees came back from
+// a "sprint = N" search, so it is in sprint N right now by construction;
+// the row's own field can still name a different sprint; parseSprint keeps
+// only the last entry of Jira's array, and a card sits in two at once
+// during a rollover. Trusting that field here, the way an earlier version
+// of this function did, took the older of two sprints a card was still in
+// and erased it from that sprint's report entirely.
 func rewound(sprint backend.Sprint, issues []backend.IssueHistory, start time.Time) ([]*card, error) {
-	id := strconv.Itoa(sprint.ID)
 	out := make([]*card, 0, len(issues))
 	for _, h := range issues {
 		chs, err := parseChanges(h)
 		if err != nil {
 			return nil, err
 		}
-		c := &card{in: h.Issue.SprintID == id, status: h.Issue.Status, changes: chs}
+		c := &card{in: true, status: h.Issue.Status, statusID: h.Issue.StatusID, changes: chs}
 		if p := h.Issue.StoryPoints; p != nil {
 			v := *p
 			c.points = &v
@@ -82,7 +113,7 @@ func rewound(sprint backend.Sprint, issues []backend.IssueHistory, start time.Ti
 			case fieldSprint:
 				c.in = inSprint(ch.from, sprint)
 			case fieldStatus:
-				c.status = ch.from
+				c.status, c.statusID = ch.from, ch.fromID
 			case fieldPoints:
 				c.points = parsePoints(ch.from)
 			}
@@ -112,7 +143,7 @@ func parseChanges(h backend.IssueHistory) ([]change, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%s: a changelog entry is dated %q, which TAM cannot read, and a report missing one change is wrong without saying so: %w", h.Issue.Key, ch.At, err)
 		}
-		out = append(out, change{at: at, field: ch.Field, from: ch.From, to: ch.To})
+		out = append(out, change{at: at, field: ch.Field, from: ch.From, to: ch.To, fromID: ch.FromID, toID: ch.ToID})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].at.Before(out[j].at) })
 	return out, nil
@@ -178,6 +209,7 @@ type pending struct {
 type walker struct {
 	sprint   backend.Sprint
 	cards    []*card
+	doneID   func(string) bool
 	doneName map[string]bool
 	points   bool
 	loc      *time.Location
@@ -208,7 +240,7 @@ func (w *walker) totals() (scope, completed float64) {
 		}
 		v := w.value(c)
 		scope += v
-		if w.doneName[c.status] {
+		if c.done(w.doneID, w.doneName) {
 			completed += v
 		}
 	}
@@ -236,7 +268,7 @@ func (w *walker) apply(c *card, ch change) {
 			c.removedCharged = true
 		}
 	case fieldStatus:
-		c.status = ch.to
+		c.status, c.statusID = ch.to, ch.toID
 	case fieldPoints:
 		c.points = parsePoints(ch.to)
 	}
@@ -309,15 +341,16 @@ func (w *walker) queue(start, last time.Time) []pending {
 // that has working of them, which is the committed total run down to zero
 // in equal steps. A sprint with no working day at all, a weekend hackathon
 // for instance, keeps its guide flat rather than dividing by zero.
+//
+// elapsed can never exceed working: run only ever calls this with elapsed
+// counted up to the same civil date, stop, that working's own upper bound,
+// end, is at or after, so the fraction below never passes one and the
+// result never needs clamping off zero.
 func ideal(committed float64, elapsed, working int) float64 {
 	if working <= 0 {
 		return committed
 	}
-	v := committed * (1 - float64(elapsed)/float64(working))
-	if v < 0 {
-		return 0
-	}
-	return v
+	return committed * (1 - float64(elapsed)/float64(working))
 }
 
 // civil is the calendar date t falls on in loc, carried as a UTC midnight.

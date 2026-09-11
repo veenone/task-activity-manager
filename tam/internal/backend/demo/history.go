@@ -8,6 +8,13 @@ import (
 	"agile-suite/tam/internal/demo"
 )
 
+// statusChange is one status transition in curatedHistory, with the id
+// pair filled in from the same demoStatusIDs table the boards read, the
+// way a real changelog carries a status id on both sides of the change.
+func statusChange(at, from, to string) backend.Change {
+	return backend.Change{At: at, Field: "status", From: from, To: to, FromID: StatusID(from), ToID: StatusID(to)}
+}
+
 // Nothing calls this method outside a test yet; its future caller reaches
 // it through a type assertion, so drift here would silently drop the
 // offline sprint report before that caller exists to notice. This line
@@ -51,13 +58,13 @@ var _ backend.HistoryBackend = (*Backend)(nil)
 var curatedHistory = map[string][]backend.Change{
 	"PLAT-331": {
 		{At: "2026-07-21T09:00:00.000+0000", Field: "sprint", From: "", To: "Sprint 11"},
-		{At: "2026-08-01T09:00:00.000+0000", Field: "status", From: "In Progress", To: "Done"},
+		statusChange("2026-08-01T09:00:00.000+0000", "In Progress", "Done"),
 	},
 	"PLAT-385": {
 		{At: "2026-08-04T09:00:00.000+0000", Field: "sprint", From: "", To: "Sprint 11"},
 		{At: "2026-08-08T09:00:00.000+0000", Field: "sprint", From: "Sprint 11", To: ""},
 		{At: "2026-08-11T09:00:00.000+0000", Field: "sprint", From: "", To: "Sprint 11"},
-		{At: "2026-08-15T09:00:00.000+0000", Field: "status", From: "In Progress", To: "Done"},
+		statusChange("2026-08-15T09:00:00.000+0000", "In Progress", "Done"),
 	},
 	"PLAT-347": {
 		{At: "2026-08-06T09:00:00.000+0000", Field: "sprint", From: "", To: "Sprint 11"},

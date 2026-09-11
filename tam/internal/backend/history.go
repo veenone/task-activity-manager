@@ -21,6 +21,17 @@ type Change struct {
 	Field string `json:"field"`
 	From  string `json:"from"`
 	To    string `json:"to"`
+	// FromID and ToID are the same change's raw id pair, populated only
+	// when the backend read one: a status change carries a status id on
+	// both sides, which is what a board's own definition of finished is
+	// keyed by, since a board column holds status ids and never names. From
+	// and To above prefer the readable name, so a report that needs to know
+	// what a card's status *was* rather than merely what it was called
+	// reads these instead, and falls back to matching by name only when a
+	// change carried none. Both are kept, not just the "from" side, because
+	// a forward replay reads To the same way the rewind reads From.
+	FromID string `json:"fromId"`
+	ToID   string `json:"toId"`
 }
 
 // IssueHistory is one issue with the changes a sprint report needs to

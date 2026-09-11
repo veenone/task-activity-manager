@@ -174,6 +174,7 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	w := &walker{
 		sprint:   sprint,
 		cards:    cards,
+		doneID:   done,
 		doneName: doneNames(issues, done),
 		loc:      loc,
 	}
@@ -230,19 +231,26 @@ func cardsReason(issues []backend.IssueHistory) string {
 	return ReasonNoPointsFieldSeen
 }
 
-// doneNames is the board's rule translated from status ids to status
-// names, because a changelog says an issue moved to "In Review" and never
-// which id that was: the backend's normaliser keeps the readable half of
-// each change, and the ids live only on the issue rows.
+// doneNames is the fallback for a status a card carried at some point in
+// the walk whose id was never recorded. A status transition's changelog
+// entry ordinarily does carry the id on both sides, the same way Jira's
+// wire sends it, and card.done reads that id first; this map is what is
+// left for the change that came from a backend, or a cached changelog
+// entry, that predates FromID/ToID and so kept only the name.
 //
 // The pairs come from the sprint's own issues, each of which carries its
 // current status beside the id that goes with it. A historical status no
-// card in this sprint currently sits in cannot be translated and reads as
-// not done, which keeps that card's work on the burndown for the days it
-// was in that status rather than retiring it on a guess. It is a real
-// limit, and it bites hardest on a small sprint whose cards have all since
-// moved on; the alternative, carrying status ids through the changelog, is
-// a change to backend.Change and to both backends that implement it.
+// card in this sprint currently sits in still cannot be translated by
+// name, which keeps that card's work on the burndown for the days it was
+// in that status rather than retiring it on a guess; that limit no longer
+// applies to a card whose changelog actually carried the id, which is the
+// ordinary case now.
+//
+// Two issues sharing a status name with different ids would resolve to
+// whichever one this loop visits last, since the map is keyed by name
+// alone. Jira refuses to create two statuses with the same name, so the
+// case cannot arise; nothing here orders the issues to make the resolution
+// deterministic if it ever did.
 func doneNames(issues []backend.IssueHistory, done func(string) bool) map[string]bool {
 	out := map[string]bool{}
 	for _, h := range issues {
