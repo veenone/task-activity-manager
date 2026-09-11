@@ -37,6 +37,83 @@ and completing one. Filling a sprint, by contrast, is an ordinary
 journaled move. Schema version 7 adds the sprint's goal, which existed on
 the wire since Phase 3a and nowhere in TAM until now.
 
+## Phase 4: the sprint report, the reconstruction
+
+`internal/reports` turns a sprint's issues and their changelogs into its
+numbers: committed, added, removed, completed, carried over, and the day by
+day line behind them. `Build` takes one sprint, a rule for what counts as
+finished, the issues with their history, a clock, and a location;
+`Velocity` runs the same reconstruction over the last `Depth` (six) closed
+sprints and gives each row its own unit. Nothing stores or draws either yet;
+the design is
+`docs/superpowers/specs/2026-09-09-tam-reports-design.md`, sections 3 and 7.
+
+**It runs backwards before it runs forwards, and everything else here is
+detail beside that.** A changelog is today's field values plus a list of
+deltas, so status, estimate and sprint membership *at the sprint's start*
+are not given: they are derived by undoing every change dated after the
+start, taking each one's "from" side, and only then replayed forward one
+local day at a time. A forward replay seeded from today's values draws a
+sprint that never happened, and it looks entirely plausible while doing it:
+an issue reopened, re-estimated and moved to the next sprint a week after
+this one closed would start the reconstruction already finished, with an
+estimate nobody had agreed to. `rewound` in `series.go` is that pass, and
+the walk never replays a change dated after the sprint's end, which is what
+keeps the two halves consistent.
+
+Three smaller things that each look like a one line simplification and are
+not:
+
+- **Every timestamp goes through `internal/sprintdate`.** Jira's offsets
+  carry no colon, so `time.RFC3339` rejects the real thing outright while a
+  fixture written with a `Z` passes. The fixtures in
+  `internal/reports/*_test.go` are written in Jira's format for that reason.
+- **A day is a local day in the location `Build` was handed.** Day one is
+  the local date of the sprint's start and boundaries are local midnight.
+  Bucketing in UTC gives a team ten hours ahead a day one that begins the
+  previous afternoon.
+- **The Sprint field's changelog values are comma separated lists.** A card
+  sits in two sprints at once during a rollover, so `"12, 13"` to `"13"`
+  means it left 12 and stayed in 13; membership is a set test per change,
+  never a toggle. Both the id and the name are matched, because the
+  backend's normaliser keeps whichever half of Jira's parallel id/name pair
+  the field populated.
+
+What the reconstruction cannot see is section 3 of the design and is not a
+footnote: the issues come from a `sprint = N` search, which answers with
+whoever is in the sprint now, so a card dragged out on day four and left out
+is never fetched. Committed is a floor, and Removed can only ever hold cards
+that left and came back. Every surface that prints either number has to say
+so.
+
+**`internal/donerule` is one definition of done, not a new one.** The
+board's last column rule was unexported on `sprints.Service`, and the report
+needs the same answer the sprint completion acts on. It moved to its own
+package, `sprints.completeStatuses` calls it, and `donerule.Done` returns
+nil rather than a silent false when the columns cannot answer, since a board
+that was never synced is not a board where nothing is finished; the caller
+words that refusal, and `donerule.LastColumn` is what it words it from.
+
+**The name based rule still exists and is still right where it is.**
+`backend.IsDone` matches on the status *name* and powers the Backlog grid's
+chip, the Epics tree's counts, the board's done points and the Sprints
+view's per-sprint numbers, with the frontend's `statusClass` mirroring that
+list for the chip. It answers a question about one issue with no board in
+hand, from a name the cache already carries. The frontend's
+`lib/unfinished.ts` is the other rule, the column one, written again in
+TypeScript for the views that decide what to draw. So the name rule and the
+column rule can disagree, on a board whose last column collects a status
+named something else, and the sprint report is the surface that makes it
+visible: a user comparing the Sprints view's done count against a report's
+completed figure is looking at two different questions. `donerule`'s
+package comment is where that is written down.
+
+One thing this phase wants and does not have: Jira's `completeDate`. The
+design says a sprint closed three days late should be measured at the date
+it actually closed, and `backend.Sprint` carries only `endDate`, so the walk
+stops at the end date (or at `now`, for a sprint still running). Adding the
+field is a `core/jira` change and is not in this task.
+
 ## Phase 3a: boards
 
 `core/jira/agile.go` is the Agile 1.0 transport: `Boards`, `BoardConfiguration`,
@@ -1017,7 +1094,15 @@ until one is entered. A Kiwi profile file is refused.
                           Create, Edit and Delete themselves, and suggest.go the start and create
                           dialogs' suggested name and dates
     internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
-                          datetime format, shared by the ceremonies and the suggestion
+                          datetime format, shared by the ceremonies, the suggestion, and every
+                          timestamp the sprint report reads off a changelog
+    internal/donerule/   the board's own definition of finished, a status its last column
+                          collects, shared by the sprint completion and the sprint report;
+                          backend.IsDone, the status-name rule, is a different question and
+                          stays where it is
+    internal/reports/    the sprint report's reconstruction: reports.go is Build and the unit
+                          it counts in, series.go the rewind and the day by day walk, velocity.go
+                          the last six closed sprints with each row's own unit
     internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
                           InRead for a deferred read-only transaction, and the Querier interface a
                           read helper takes so it can run on the handle or inside either kind
