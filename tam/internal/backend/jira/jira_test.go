@@ -37,6 +37,13 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			atomic.AddInt32(&f.fieldCalls, 1)
 			_, _ = w.Write([]byte(f.fields))
 		case r.URL.Path == "/rest/api/2/search":
+			// The sync path must never ask for a changelog: url.Values.Encode
+			// sorts its keys, so adding expand only when it is set cannot
+			// move any other test's query string, and this guard is what
+			// catches it if a later change threads one through anyway.
+			if _, has := r.URL.Query()["expand"]; has {
+				t.Errorf("the issue sync's search must never carry expand: %s", r.URL.RawQuery)
+			}
 			f.searches = append(f.searches, r.URL.Query().Get("jql")+" | fields="+r.URL.Query().Get("fields"))
 			_, _ = w.Write([]byte(`{"total":2,"issues":[
 				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5}},
@@ -219,6 +226,20 @@ func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	if n := atomic.LoadInt32(&f.fieldCalls); n != 1 {
 		t.Errorf("/rest/api/2/field fetched %d times across two searches, want 1", n)
 	}
+}
+
+func TestTheSyncsSearchAsksForNoChangelog(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	if _, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 50); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(f.searches) != 1 {
+		t.Fatalf("searches = %v", f.searches)
+	}
+	// The fake's handler already fails the test if expand was present; this
+	// is the same fact stated as its own test, so a reviewer sees directly
+	// that the sync path was exercised and passed rather than inferring it
+	// from a shared guard several tests rely on.
 }
 
 func TestMissingCustomFieldsLeaveColumnsEmpty(t *testing.T) {
