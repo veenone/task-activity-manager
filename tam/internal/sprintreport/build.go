@@ -24,11 +24,22 @@ import (
 // sprint closes, and it is what the view has to ask for before its own
 // sprint picker has anything in it.
 //
+// refresh throws the stored copies away and builds every series in the
+// report again from the wire, writing each closed one back over the row it
+// replaces. It is the only way a report that is wrong can be made right:
+// reports.AlgoVersion invalidates a stored row when this app's own
+// reconstruction changes, and nothing invalidates one that was built while
+// Jira was handing back cut short changelogs, so without this a table
+// carrying a truncation marker would carry it forever however many times
+// the view was reopened. It costs the whole table's fetch, six sprints of
+// changelog and the most expensive thing TAM does, so it is what a user
+// asks for and never what a view does on mount.
+//
 // The order matters in one place. The board's rule for what counts as
 // finished is read first, before a single request goes out, because a
 // changelog TAM cannot classify is worth nothing and a sprint's changelog
 // takes minutes to fetch.
-func (s *Service) Build(ctx context.Context, profileID string, boardID, sprintID int) (Report, error) {
+func (s *Service) Build(ctx context.Context, profileID string, boardID, sprintID int, refresh bool) (Report, error) {
 	cols, err := s.store.Columns(ctx, profileID, boardID)
 	if err != nil {
 		return Report{}, err
@@ -48,7 +59,7 @@ func (s *Service) Build(ctx context.Context, profileID string, boardID, sprintID
 		return unavailable(reason), nil
 	}
 
-	series, builtAt, err := s.seriesFor(ctx, profileID, boardID, sprint, done, PhaseSprint)
+	series, builtAt, err := s.seriesFor(ctx, profileID, boardID, sprint, done, PhaseSprint, refresh)
 	if err != nil {
 		if errors.Is(err, reports.ErrNoDates) {
 			return unavailable(ReasonNoDates), nil
@@ -56,7 +67,7 @@ func (s *Service) Build(ctx context.Context, profileID string, boardID, sprintID
 		return Report{}, err
 	}
 
-	rows, err := s.velocity(ctx, profileID, boardID, all, done, series)
+	rows, err := s.velocity(ctx, profileID, boardID, all, done, series, refresh)
 	if err != nil {
 		return Report{}, err
 	}
@@ -66,13 +77,28 @@ func (s *Service) Build(ctx context.Context, profileID string, boardID, sprintID
 // choose is the sprint a report is about: the one named, or the board's
 // most recent closed sprint when none was.
 //
-// The default reads the last row of reports.VelocitySprints rather than
-// sorting the sprints again here. That function is already the one place
-// that decides which sprints are reportable and in what order, oldest
-// first, so its last row is the newest closed sprint by definition and the
-// report a call with no sprint id opens on can never be a sprint the
-// velocity table below would leave out.
+// Zero means the board's most recent closed sprint, deliberately and not
+// by falling through. It is the call the view makes before its own sprint
+// picker has anything in it, and it is what makes ReasonNoClosedSprint
+// reachable at all, since a named sprint is either in the cache or it is
+// not. The default reads the last row of reports.VelocitySprints rather
+// than sorting the sprints again here. That function is already the one
+// place that decides which sprints are reportable and in what order,
+// oldest first, so its last row is the newest closed sprint by definition
+// and the report a call with no sprint id opens on can never be a sprint
+// the velocity table below would leave out.
+//
+// A negative id is not that, and is answered as a sprint that does not
+// exist. Wails marshals a bound method's arguments with JSON.stringify, so
+// an undefined or a NaN from the frontend arrives as null and decodes into
+// this int as zero; that much is indistinguishable from asking for the
+// default and has to be. A number that was actually negative is a caller
+// with a real bug, and quietly reporting on a different sprint than the
+// one it named is the worst available answer.
 func choose(all []backend.Sprint, sprintID int) (backend.Sprint, string) {
+	if sprintID < 0 {
+		return backend.Sprint{}, ReasonSprintNotFound
+	}
 	if sprintID > 0 {
 		for _, sp := range all {
 			if sp.ID == sprintID {

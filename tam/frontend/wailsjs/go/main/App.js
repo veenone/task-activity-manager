@@ -102,8 +102,8 @@ export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
 }
 
-export function GetSprintReport(arg1, arg2, arg3) {
-  return window['go']['main']['App']['GetSprintReport'](arg1, arg2, arg3);
+export function GetSprintReport(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetSprintReport'](arg1, arg2, arg3, arg4);
 }
 
 export function GetSubtaskTypeName(arg1) {

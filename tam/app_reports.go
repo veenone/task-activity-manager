@@ -43,7 +43,16 @@ var _ sprintreport.Store = (*boardrepo.Repository)(nil)
 // would have been refused every single time the view opened.
 //
 // sprintID may be zero, which asks for the board's most recent closed
-// sprint, the report the morning after a sprint closes starts from.
+// sprint, the report the morning after a sprint closes starts from. A
+// negative one is answered as a sprint that does not exist rather than as
+// that default, for the reason choose in internal/sprintreport gives.
+//
+// refresh builds the report again from Jira instead of from whatever is
+// stored, and writes what it built back. It is what a user presses when a
+// report is wrong: a stored series is only ever as good as the fetch that
+// made it, and nothing else in TAM can replace one that reports.AlgoVersion
+// still considers current. It costs the whole table's fetch, so it belongs
+// on a control the user reaches for and not on the view's mount.
 //
 // A board that was never synced, a sprint the cache does not hold and a
 // sprint whose dates cannot be read all come back as a Report naming that
@@ -61,7 +70,7 @@ var _ sprintreport.Store = (*boardrepo.Repository)(nil)
 // writes, so it gets its own, and what that buys is a sync or a commit
 // refused during a report reading "a report is already running for this
 // profile" rather than naming an operation nobody started.
-func (a *App) GetSprintReport(profileID string, boardID, sprintID int) (sprintreport.Report, error) {
+func (a *App) GetSprintReport(profileID string, boardID, sprintID int, refresh bool) (sprintreport.Report, error) {
 	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
 		return sprintreport.Report{}, err
@@ -88,7 +97,7 @@ func (a *App) GetSprintReport(profileID string, boardID, sprintID int) (sprintre
 	log.Printf("tam: report for sprint %d on board %d started for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
 	service := sprintreport.New(history, a.boards)
 	service.Progress = a.emitReportProgress
-	report, err := service.Build(ctx, p.ID, boardID, sprintID)
+	report, err := service.Build(ctx, p.ID, boardID, sprintID, refresh)
 	if err != nil {
 		log.Printf("tam: report for sprint %d on board %d for %s failed: %v", sprintID, boardID, p.Name, err)
 		return sprintreport.Report{}, errors.New(errtext.Line(err))
@@ -135,8 +144,19 @@ func (a *App) CancelSprintReport(profileID string) {
 // one entry per profile to begin with, since the lock this runs under
 // refuses a second report, and a cancel that has already fired removed its
 // own entry on the way through.
+//
+// a.ctx is nil until Wails calls startup, which is the same thing
+// emitReportProgress below guards for and the same thing app.go's menu
+// helpers guard for. context.WithCancel panics on a nil parent rather than
+// returning an error, so the report gets a background context instead: a
+// report with no Wails runtime behind it cannot emit a frame, but it can
+// still be run and still be cancelled, and that is what a unit test holds.
 func (a *App) beginReport(profileID string) (context.Context, func()) {
-	ctx, cancel := context.WithCancel(a.ctx)
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
 	a.backendMu.Lock()
 	if a.reportCancels == nil {
 		a.reportCancels = map[string]context.CancelFunc{}

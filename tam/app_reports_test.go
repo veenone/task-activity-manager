@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/reports"
 	"agile-suite/tam/internal/sprintreport"
 )
 
@@ -67,7 +68,7 @@ func blockingHistory() *blockingHistoryBackend {
 func TestGetSprintReportRequiresAProfile(t *testing.T) {
 	a := newTestApp(t)
 
-	if _, err := a.GetSprintReport("", reportBoard, 11); err == nil {
+	if _, err := a.GetSprintReport("", reportBoard, 11, false); err == nil {
 		t.Error("GetSprintReport with no profile = nil error, want a refusal")
 	}
 }
@@ -87,7 +88,7 @@ func TestGetSprintReportIsRefusedWhileASyncHoldsTheLock(t *testing.T) {
 	}
 	defer a.release(p.ID)
 
-	_, err := a.GetSprintReport(p.ID, reportBoard, 11)
+	_, err := a.GetSprintReport(p.ID, reportBoard, 11, false)
 	if err == nil || !strings.Contains(err.Error(), "sync") {
 		t.Errorf("GetSprintReport err = %v, want it to name the operation that is running", err)
 	}
@@ -103,7 +104,7 @@ func TestAConnectionThatCannotReadAChangelogIsRefused(t *testing.T) {
 	a.backends[p.ID] = twoBoards("PLAT Scrum", "PLAT Kanban", "To Do")
 	seedReportBoard(t, a, p.ID)
 
-	_, err := a.GetSprintReport(p.ID, reportBoard, 11)
+	_, err := a.GetSprintReport(p.ID, reportBoard, 11, false)
 	if err == nil || !strings.Contains(err.Error(), "history") {
 		t.Errorf("GetSprintReport err = %v, want it to say the connection cannot read an issue's history", err)
 	}
@@ -120,7 +121,7 @@ func TestABoardThatWasNeverSyncedNamesItsReasonRatherThanFailing(t *testing.T) {
 	p := newTestProfile(t, a)
 	a.backends[p.ID] = blockingHistory()
 
-	got, err := a.GetSprintReport(p.ID, reportBoard, 11)
+	got, err := a.GetSprintReport(p.ID, reportBoard, 11, false)
 	if err != nil {
 		t.Fatalf("GetSprintReport: %v, want the reason in the report", err)
 	}
@@ -143,7 +144,7 @@ func TestACancelledReportReleasesTheProfileLock(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := a.GetSprintReport(p.ID, reportBoard, 11)
+		_, err := a.GetSprintReport(p.ID, reportBoard, 11, false)
 		done <- err
 	}()
 
@@ -183,4 +184,82 @@ func TestCancellingWithNoReportRunningDoesNothing(t *testing.T) {
 		t.Fatalf("acquire: %v, want the profile untouched", err)
 	}
 	a.release(p.ID)
+}
+
+// quietHistoryBackend answers the changelog search with nothing at all,
+// which is what a sprint whose issues were every one of them deleted looks
+// like, and is enough to take a report all the way through a build without
+// a fixture.
+type quietHistoryBackend struct {
+	simpleBoardBackend
+}
+
+func (b *quietHistoryBackend) SearchIssuesWithHistory(context.Context, string, int, int) ([]backend.IssueHistory, int, error) {
+	return nil, 0, nil
+}
+
+var (
+	_ backend.IssueBackend   = (*quietHistoryBackend)(nil)
+	_ backend.HistoryBackend = (*quietHistoryBackend)(nil)
+)
+
+func quietHistory() *quietHistoryBackend {
+	return &quietHistoryBackend{simpleBoardBackend: *twoBoards("PLAT Scrum", "PLAT Kanban", "To Do")}
+}
+
+// TestAReportRunsWithNoWailsRuntimeBehindIt pins the two halves of this
+// file agreeing about a nil a.ctx. It is nil until Wails calls startup, and
+// it is nil in a test; emitReportProgress has always dropped its frame for
+// that, and context.WithCancel panics on a nil parent rather than returning
+// an error, so the report has to be given a parent of its own.
+func TestAReportRunsWithNoWailsRuntimeBehindIt(t *testing.T) {
+	a := newTestApp(t)
+	a.ctx = nil
+	p := newTestProfile(t, a)
+	a.backends[p.ID] = quietHistory()
+	seedReportBoard(t, a, p.ID)
+
+	got, err := a.GetSprintReport(p.ID, reportBoard, 11, false)
+	if err != nil {
+		t.Fatalf("GetSprintReport: %v", err)
+	}
+	if got.Unavailable != "" {
+		t.Errorf("unavailable = %q, want a report: the sprint is closed, dated and in the cache", got.Unavailable)
+	}
+	if got.Series.SprintID != 11 {
+		t.Errorf("the report is of sprint %d, want 11", got.Series.SprintID)
+	}
+}
+
+// TestRefreshReachesTheServiceFromTheBinding. The two directions are the
+// service's own to test and are tested there; what this pins is that the
+// argument travels, because a binding that dropped it would leave the
+// control Task 5 builds doing nothing at all and every test below it would
+// still pass.
+func TestRefreshReachesTheServiceFromTheBinding(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	a.backends[p.ID] = quietHistory()
+	seedReportBoard(t, a, p.ID)
+	// A stored report saying something the backend above never would.
+	stored := reports.Series{SprintID: 11, SprintName: "Sprint 11", Unit: reports.UnitPoints, Committed: 99}
+	if err := a.boards.SaveReport(context.Background(), p.ID, reportBoard, stored); err != nil {
+		t.Fatalf("seed the stored report: %v", err)
+	}
+
+	served, err := a.GetSprintReport(p.ID, reportBoard, 11, false)
+	if err != nil {
+		t.Fatalf("GetSprintReport: %v", err)
+	}
+	if served.Series.Committed != 99 {
+		t.Errorf("committed = %v without a refresh, want 99 from the store", served.Series.Committed)
+	}
+
+	rebuilt, err := a.GetSprintReport(p.ID, reportBoard, 11, true)
+	if err != nil {
+		t.Fatalf("GetSprintReport with a refresh: %v", err)
+	}
+	if rebuilt.Series.Committed != 0 {
+		t.Errorf("committed = %v with a refresh, want 0 from the fetch: the stored row is the thing being replaced", rebuilt.Series.Committed)
+	}
 }

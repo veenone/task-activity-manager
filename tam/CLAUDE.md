@@ -42,10 +42,12 @@ the wire since Phase 3a and nowhere in TAM until now.
 `internal/reports` turns a sprint's issues and their changelogs into its
 numbers: committed, added, removed, completed, carried over, and the day by
 day line behind them. `Build` takes one sprint, a rule for what counts as
-finished, the issues with their history, a clock, and a location;
-`Velocity` runs the same reconstruction over the last `Depth` (six) closed
-sprints and gives each row its own unit. Nothing stores or draws either yet;
-the design is
+finished, the issues with their history, a clock, and a location.
+`VelocitySprints` is which closed sprints a velocity table covers, the last
+`Depth` (six) of them, oldest first, and `Row` is what one of them says,
+with its own unit per row; `internal/sprintreport` calls both, because half
+a table is usually read back out of the store rather than reconstructed.
+The design is
 `docs/superpowers/specs/2026-09-09-tam-reports-design.md`, sections 3 and 7.
 
 **It runs backwards before it runs forwards, and everything else here is
@@ -860,7 +862,8 @@ cannot reach its list must not be the reason an issue cannot be assigned.
 ## One lock, both ends
 
 Go holds a single per-profile lock (`App.acquire`) for a sync, a commit, an
-import, and a boards refresh alike, so whichever starts second is refused.
+import, a boards refresh, a sprint operation and a sprint report alike, so
+whichever starts second is refused.
 The frontend models the same invariant in the shared sync reducer, and the two
 have to agree: the Boards view's Refresh used to be a plain mutation outside
 the reducer, so the shell stayed `idle`, kept offering Sync, and Go refused it
@@ -1105,7 +1108,8 @@ until one is entered. A Kiwi profile file is refused.
                           stays where it is
     internal/reports/    the sprint report's reconstruction: reports.go is Build and the unit
                           it counts in, series.go the rewind and the day by day walk, velocity.go
-                          the last six closed sprints with each row's own unit
+                          which six closed sprints a velocity table covers and what one row of
+                          it says
     internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
                           InRead for a deferred read-only transaction, and the Querier interface a
                           read helper takes so it can run on the handle or inside either kind

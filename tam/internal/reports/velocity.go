@@ -42,20 +42,30 @@ type VelocityRow struct {
 }
 
 // VelocitySprints is which sprints a velocity table is built from and in
-// what order: the closed ones whose end date can be read, the last Depth
-// of those, oldest row first, which is the order a bar chart is read in.
+// what order: the closed ones whose start and end dates can both be read,
+// the last Depth of those, oldest row first, which is the order a bar
+// chart is read in.
 //
-// It is exported because a caller assembling the same table out of stored
+// It is exported because a caller assembling the table out of stored
 // reports has to know which sprints to look for before it has any of them
 // in hand, and a second copy of this rule would be a table whose rows and
-// whose order could drift from the one Velocity below produces. Velocity
-// calls it too, so there is one implementation and not two.
+// whose order could drift from the one it was built against. It is the
+// only place the rule is written.
 //
 // Two kinds of sprint are dropped here rather than shown as zeros. One
-// with dates TAM cannot read cannot be reconstructed at all, and one that
-// is not closed does not belong in a table of finished work. A zero row
-// would read as a sprint that delivered nothing, which is a worse answer
-// than a shorter table.
+// that is not closed does not belong in a table of finished work, and one
+// whose dates TAM cannot read cannot be reconstructed at all. Both dates
+// are parsed, not only the end, because a sprint dropped here is a sprint
+// nobody fetches: an unreadable start that got through would cost several
+// pages of the heaviest read in the app before Build refused the series
+// anyway. A zero row would read as a sprint that delivered nothing, which
+// is a worse answer than a shorter table.
+//
+// One unreportable sprint still gets through: one whose dates both parse
+// and run backwards, an end before its start. Build refuses that with the
+// same ErrNoDates, and a caller assembling a table has to drop it there,
+// because nothing short of parsing both dates here would tell it apart
+// from a sprint that is fine.
 func VelocitySprints(sprints []backend.Sprint) []backend.Sprint {
 	type dated struct {
 		sprint backend.Sprint
@@ -64,6 +74,9 @@ func VelocitySprints(sprints []backend.Sprint) []backend.Sprint {
 	var closed []dated
 	for _, sp := range sprints {
 		if !Closed(sp) {
+			continue
+		}
+		if _, err := sprintdate.Parse(sp.StartDate); err != nil {
 			continue
 		}
 		end, err := sprintdate.Parse(sp.EndDate)
@@ -109,36 +122,6 @@ func Row(s Series) VelocityRow {
 		Completed:  s.Completed,
 		Truncated:  len(s.Truncated) > 0,
 	}
-}
-
-// Velocity reconstructs the last Depth closed sprints, oldest row first.
-//
-// histories is each sprint's issues with their changelogs, keyed by sprint
-// id. A sprint with no entry at all was not fetched and is left out of the
-// table; a sprint with an entry holding no issues was fetched and found
-// empty, and gets its row. The sprints are chosen by VelocitySprints
-// before that check, so a table whose newest sprint was never fetched is
-// one row shorter rather than reaching further back for a seventh.
-//
-// It returns no error, deliberately. Every reason a sprint drops out is a
-// property of that one sprint, and failing the whole table because the
-// oldest of six has an unreadable start date would take away five good
-// rows to report one bad one.
-func Velocity(sprints []backend.Sprint, done func(string) bool, histories map[int][]backend.IssueHistory, now time.Time, loc *time.Location) []VelocityRow {
-	picked := VelocitySprints(sprints)
-	rows := make([]VelocityRow, 0, len(picked))
-	for _, sp := range picked {
-		h, ok := histories[sp.ID]
-		if !ok {
-			continue
-		}
-		s, err := Build(sp, done, h, now, loc)
-		if err != nil {
-			continue
-		}
-		rows = append(rows, Row(s))
-	}
-	return rows
 }
 
 // Closed matches Jira's own sprint state the way internal/sprints does,

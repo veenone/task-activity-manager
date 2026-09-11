@@ -217,7 +217,7 @@ func TestABoardWhoseColumnsCannotSayWhatIsFinishedIsARefusalAndNotAnError(t *tes
 	history := newHistory()
 	store := newStore(nil, closedSprint(1))
 
-	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1)
+	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1, false)
 	if err != nil {
 		t.Fatalf("Build: %v, want the reason in the report rather than an error", err)
 	}
@@ -234,7 +234,7 @@ func TestABoardWhoseColumnsCannotSayWhatIsFinishedIsARefusalAndNotAnError(t *tes
 func TestASprintTheCacheDoesNotHoldIsARefusalAndNotAnError(t *testing.T) {
 	store := newStore(columns(), closedSprint(1))
 
-	got, err := service(newHistory(), store).Build(context.Background(), testProfile, testBoard, 99)
+	got, err := service(newHistory(), store).Build(context.Background(), testProfile, testBoard, 99, false)
 	if err != nil {
 		t.Fatalf("Build: %v, want the reason in the report rather than an error", err)
 	}
@@ -250,7 +250,7 @@ func TestASprintWithNoReadableDatesIsARefusalAndNotAnError(t *testing.T) {
 	history.issues[1] = held(1, 2, 1, points(3))
 	store := newStore(columns(), undated)
 
-	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1)
+	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1, false)
 	if err != nil {
 		t.Fatalf("Build: %v, want the reason in the report rather than an error", err)
 	}
@@ -262,7 +262,7 @@ func TestASprintWithNoReadableDatesIsARefusalAndNotAnError(t *testing.T) {
 func TestABoardThatHasNeverClosedASprintHasNoReportToOpenOn(t *testing.T) {
 	store := newStore(columns(), liveSprint(1))
 
-	got, err := service(newHistory(), store).Build(context.Background(), testProfile, testBoard, 0)
+	got, err := service(newHistory(), store).Build(context.Background(), testProfile, testBoard, 0, false)
 	if err != nil {
 		t.Fatalf("Build: %v, want the reason in the report rather than an error", err)
 	}
@@ -281,7 +281,7 @@ func TestNamingNoSprintOpensOnTheBoardsMostRecentClosedSprint(t *testing.T) {
 	}
 	store := newStore(columns(), closedSprint(1), closedSprint(2), closedSprint(3), liveSprint(4))
 
-	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 0)
+	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 0, false)
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -297,7 +297,7 @@ func TestASprintOfMoreThanOnePageComesBackWhole(t *testing.T) {
 	svc := service(history, store)
 	svc.PageSize = 2
 
-	got, err := svc.Build(context.Background(), testProfile, testBoard, 1)
+	got, err := svc.Build(context.Background(), testProfile, testBoard, 1, false)
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestAClosedSprintsSeriesIsStored(t *testing.T) {
 	history.issues[1] = held(1, 3, 1, points(2))
 	store := newStore(columns(), closedSprint(1))
 
-	if _, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1); err != nil {
+	if _, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1, false); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	if len(store.saved) != 1 || store.saved[0] != 1 {
@@ -334,7 +334,7 @@ func TestALiveSprintsSeriesIsNeitherStoredNorServedFromTheStore(t *testing.T) {
 	store.hold(reports.Series{SprintID: 1, SprintName: "Sprint 1", Unit: reports.UnitPoints, Committed: 99},
 		reports.AlgoVersion, "2026-11-01T09:00:00Z")
 
-	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1)
+	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1, false)
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestAFailedFetchIsAnErrorAndNotAReason(t *testing.T) {
 	history.fail = errors.New("the connection was reset")
 	store := newStore(columns(), closedSprint(1))
 
-	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1)
+	got, err := service(history, store).Build(context.Background(), testProfile, testBoard, 1, false)
 	if err == nil {
 		t.Fatalf("Build = %+v, want an error: a transport failure is a failure of the call and not a fact about the sprint", got)
 	}
@@ -369,7 +369,7 @@ func TestEachPageOfASprintsFetchReportsItsProgress(t *testing.T) {
 	var frames []sprintreport.Progress
 	svc.Progress = func(p sprintreport.Progress) { frames = append(frames, p) }
 
-	if _, err := svc.Build(context.Background(), testProfile, testBoard, 1); err != nil {
+	if _, err := svc.Build(context.Background(), testProfile, testBoard, 1, false); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	if len(frames) < 2 {
@@ -398,7 +398,7 @@ func TestAReportAsksForSmallerPagesThanTheSyncDoes(t *testing.T) {
 	store := newStore(columns(), closedSprint(1))
 
 	// New's own page size, not one this test set.
-	if _, err := sprintreport.New(history, store).Build(context.Background(), testProfile, testBoard, 1); err != nil {
+	if _, err := sprintreport.New(history, store).Build(context.Background(), testProfile, testBoard, 1, false); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	if history.seen != 25 {

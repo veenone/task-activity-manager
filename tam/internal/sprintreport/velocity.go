@@ -26,12 +26,15 @@ import (
 // sprint twice in a single call.
 //
 // A sprint whose dates cannot be read is dropped from the table rather than
-// shown as a zero, which is what reports.Velocity does with the same sprint
-// and for the same reason: a zero row reads as a sprint that delivered
-// nothing. Anything else that goes wrong, a failed fetch or a database that
-// will not answer, fails the whole call instead of quietly returning a
-// shorter table that looks complete.
-func (s *Service) velocity(ctx context.Context, profileID string, boardID int, all []backend.Sprint, done func(string) bool, have reports.Series) ([]reports.VelocityRow, error) {
+// shown as a zero, for the reason reports.VelocitySprints gives about the
+// sprints it drops for the same fault: a zero row reads as a sprint that
+// delivered nothing. VelocitySprints has already dropped the ones whose
+// start or end will not parse; what reaches this drop is the one it cannot
+// see, a sprint whose dates both parse and run backwards. Anything else
+// that goes wrong, a failed fetch or a database that will not answer, fails
+// the whole call instead of quietly returning a shorter table that looks
+// complete.
+func (s *Service) velocity(ctx context.Context, profileID string, boardID int, all []backend.Sprint, done func(string) bool, have reports.Series, refresh bool) ([]reports.VelocityRow, error) {
 	picked := reports.VelocitySprints(all)
 	rows := make([]reports.VelocityRow, 0, len(picked))
 	for _, sprint := range picked {
@@ -39,7 +42,7 @@ func (s *Service) velocity(ctx context.Context, profileID string, boardID int, a
 			rows = append(rows, reports.Row(have))
 			continue
 		}
-		series, _, err := s.seriesFor(ctx, profileID, boardID, sprint, done, PhaseVelocity)
+		series, _, err := s.seriesFor(ctx, profileID, boardID, sprint, done, PhaseVelocity, refresh)
 		if err != nil {
 			if errors.Is(err, reports.ErrNoDates) {
 				continue

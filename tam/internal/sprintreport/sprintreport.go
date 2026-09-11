@@ -15,10 +15,12 @@
 // Two rules run through the whole package.
 //
 // A closed sprint's series is stored and served from the store; a live
-// sprint's is neither. A closed sprint cannot change, so reading yesterday's
-// copy answers the same question today for none of the cost. A live sprint
-// changed an hour ago, so the stored copy would be a confident wrong answer,
-// and that is the case the guard in series.go is written about.
+// sprint's is neither. A live sprint changed an hour ago, so a stored copy
+// would be a confident wrong answer, and that is the case the guard in
+// series.go is written about. A closed sprint's numbers are steady enough
+// to be worth keeping, which is not the same as fixed: series.go says
+// exactly what can still move them, and a refresh is how a caller asks for
+// the series again when something has.
 //
 // A condition the view has to render beside the report travels in the
 // result, not as a Go error. Wails fills in either a bound method's value or
@@ -116,10 +118,18 @@ type Progress struct {
 type Report struct {
 	Series   reports.Series        `json:"series"`
 	Velocity []reports.VelocityRow `json:"velocity"`
-	// BuiltAt is when the series was reconstructed, in RFC 3339, which for
-	// a closed sprint served from the store is when it was first built and
+	// BuiltAt is when Series was reconstructed, in RFC 3339, which for a
+	// closed sprint served from the store is when it was first built and
 	// not now. It is carried because a user reading a report cannot
 	// otherwise tell a fresh answer from one this profile stored weeks ago.
+	//
+	// It is that one sprint's stamp and nobody else's. The velocity rows
+	// carry no age of their own, and most of them are usually served from
+	// the store, so a table built out of rows this profile stored weeks ago
+	// still comes back beside a BuiltAt of now whenever the sprint on
+	// screen was the one that had to be fetched. A view that wants to say
+	// how old the table is has nothing here to say it from, and a refresh
+	// is what makes the whole thing current.
 	BuiltAt     string `json:"builtAt"`
 	Unavailable string `json:"unavailable"`
 }
@@ -177,6 +187,15 @@ func (s *Service) emit(p Progress) {
 }
 
 // unavailable is a report that is only its reason.
+//
+// Every slice in it is empty rather than nil, the velocity rows and the
+// series' own days and truncated list alike, because a nil slice marshals
+// to null and the view would otherwise have to guard three fields three
+// different ways for the one state where none of them holds anything.
 func unavailable(reason string) Report {
-	return Report{Velocity: []reports.VelocityRow{}, Unavailable: reason}
+	return Report{
+		Series:      reports.Series{Days: []reports.Day{}, Truncated: []string{}},
+		Velocity:    []reports.VelocityRow{},
+		Unavailable: reason,
+	}
 }
