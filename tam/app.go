@@ -42,9 +42,16 @@ type App struct {
 	boards    *boardrepo.Repository
 	backendMu sync.Mutex
 	backends  map[string]backend.IssueBackend
-	// busy names the operation running for a profile ("sync", "commit", or
-	// "import"), so none of them overlap; the frontend reducer mirrors this.
-	busy       map[string]string
+	// busy names the operation running for a profile, one of "sync",
+	// "commit", "import", "sprint", "boards refresh" and "report", so none
+	// of them overlap; the frontend reducer mirrors this.
+	busy map[string]string
+	// reportCancels holds the cancel func of the sprint report running for
+	// a profile, so the view can stop one it has walked away from. It is
+	// guarded by backendMu, the same mutex busy is, and app_reports.go is
+	// the only file that touches it.
+	reportCancels map[string]context.CancelFunc
+
 	dbPath     string
 	sharedPath string
 	logPath    string

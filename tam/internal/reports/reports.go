@@ -53,6 +53,18 @@ const (
 // database.
 const AlgoVersion = 1
 
+// ErrNoDates says a sprint cannot be reconstructed because its own dates
+// cannot be read: no start, no end, or an end before its start. Build
+// wraps it around each of those three refusals so a caller can tell them
+// apart from the rest.
+//
+// The distinction is not cosmetic. A sprint whose dates are unusable is a
+// property of the data on screen, which a view reports beside the board it
+// belongs to; every other refusal Build makes is a fault in the call
+// itself. A caller that treated the two the same would either hide a real
+// failure or dress a readable sprint's missing dates up as one.
+var ErrNoDates = errors.New("unreadable sprint dates")
+
 // Why a series counts cards instead of points. The two are a different
 // problem and only one of them is the user's to fix, which is the whole
 // reason the reason is carried rather than just the unit.
@@ -152,14 +164,14 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	}
 	start, err := sprintdate.Parse(sprint.StartDate)
 	if err != nil {
-		return Series{}, fmt.Errorf("sprint %d has no start date TAM can read, so there is nothing to reconstruct: %w", sprint.ID, err)
+		return Series{}, fmt.Errorf("sprint %d has no start date TAM can read, so there is nothing to reconstruct: %w: %w", sprint.ID, ErrNoDates, err)
 	}
 	end, err := sprintdate.Parse(sprint.EndDate)
 	if err != nil {
-		return Series{}, fmt.Errorf("sprint %d has no end date TAM can read, so there is nothing to reconstruct: %w", sprint.ID, err)
+		return Series{}, fmt.Errorf("sprint %d has no end date TAM can read, so there is nothing to reconstruct: %w: %w", sprint.ID, ErrNoDates, err)
 	}
 	if end.Before(start) {
-		return Series{}, fmt.Errorf("sprint %d ends before it starts, so it has no days to walk", sprint.ID)
+		return Series{}, fmt.Errorf("sprint %d ends before it starts, so it has no days to walk: %w", sprint.ID, ErrNoDates)
 	}
 
 	cards, err := rewound(sprint, issues, start)

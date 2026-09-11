@@ -41,35 +41,29 @@ type VelocityRow struct {
 	Truncated bool `json:"truncated"`
 }
 
-// Velocity reconstructs the last Depth closed sprints, oldest row first,
-// which is the order a bar chart is read in.
+// VelocitySprints is which sprints a velocity table is built from and in
+// what order: the closed ones whose end date can be read, the last Depth
+// of those, oldest row first, which is the order a bar chart is read in.
 //
-// histories is each sprint's issues with their changelogs, keyed by sprint
-// id. A sprint with no entry at all was not fetched and is left out; a
-// sprint with an entry holding no issues was fetched and found empty, and
-// gets its row.
+// It is exported because a caller assembling the same table out of stored
+// reports has to know which sprints to look for before it has any of them
+// in hand, and a second copy of this rule would be a table whose rows and
+// whose order could drift from the one Velocity below produces. Velocity
+// calls it too, so there is one implementation and not two.
 //
-// Two kinds of sprint are dropped rather than shown as zeros. One with
-// dates TAM cannot read cannot be reconstructed at all, and one that is
-// not closed does not belong in a velocity table, whose whole point is
-// finished work. A zero row would read as a sprint that delivered nothing,
-// which is a worse answer than a shorter table.
-//
-// It returns no error, deliberately. Every reason a sprint drops out is a
-// property of that one sprint, and failing the whole table because the
-// oldest of six has an unreadable start date would take away five good
-// rows to report one bad one.
-func Velocity(sprints []backend.Sprint, done func(string) bool, histories map[int][]backend.IssueHistory, now time.Time, loc *time.Location) []VelocityRow {
+// Two kinds of sprint are dropped here rather than shown as zeros. One
+// with dates TAM cannot read cannot be reconstructed at all, and one that
+// is not closed does not belong in a table of finished work. A zero row
+// would read as a sprint that delivered nothing, which is a worse answer
+// than a shorter table.
+func VelocitySprints(sprints []backend.Sprint) []backend.Sprint {
 	type dated struct {
 		sprint backend.Sprint
 		end    time.Time
 	}
 	var closed []dated
 	for _, sp := range sprints {
-		if !isClosed(sp) {
-			continue
-		}
-		if _, ok := histories[sp.ID]; !ok {
+		if !Closed(sp) {
 			continue
 		}
 		end, err := sprintdate.Parse(sp.EndDate)
@@ -91,29 +85,70 @@ func Velocity(sprints []backend.Sprint, done func(string) bool, histories map[in
 	if len(closed) > Depth {
 		closed = closed[:Depth]
 	}
-
-	rows := make([]VelocityRow, 0, len(closed))
+	out := make([]backend.Sprint, 0, len(closed))
 	for i := len(closed) - 1; i >= 0; i-- {
-		sp := closed[i].sprint
-		s, err := Build(sp, done, histories[sp.ID], now, loc)
+		out = append(out, closed[i].sprint)
+	}
+	return out
+}
+
+// Row is the one place a reconstructed series becomes a velocity row.
+//
+// It is exported for the same reason VelocitySprints is: a table whose
+// rows come partly from series built just now and partly from series read
+// back out of the store has to turn both into a row the same way, or the
+// two halves of one table can disagree about a sprint for no reason a
+// reader could see.
+func Row(s Series) VelocityRow {
+	return VelocityRow{
+		SprintID:   s.SprintID,
+		SprintName: s.SprintName,
+		Unit:       s.Unit,
+		UnitReason: s.UnitReason,
+		Committed:  s.Committed,
+		Completed:  s.Completed,
+		Truncated:  len(s.Truncated) > 0,
+	}
+}
+
+// Velocity reconstructs the last Depth closed sprints, oldest row first.
+//
+// histories is each sprint's issues with their changelogs, keyed by sprint
+// id. A sprint with no entry at all was not fetched and is left out of the
+// table; a sprint with an entry holding no issues was fetched and found
+// empty, and gets its row. The sprints are chosen by VelocitySprints
+// before that check, so a table whose newest sprint was never fetched is
+// one row shorter rather than reaching further back for a seventh.
+//
+// It returns no error, deliberately. Every reason a sprint drops out is a
+// property of that one sprint, and failing the whole table because the
+// oldest of six has an unreadable start date would take away five good
+// rows to report one bad one.
+func Velocity(sprints []backend.Sprint, done func(string) bool, histories map[int][]backend.IssueHistory, now time.Time, loc *time.Location) []VelocityRow {
+	picked := VelocitySprints(sprints)
+	rows := make([]VelocityRow, 0, len(picked))
+	for _, sp := range picked {
+		h, ok := histories[sp.ID]
+		if !ok {
+			continue
+		}
+		s, err := Build(sp, done, h, now, loc)
 		if err != nil {
 			continue
 		}
-		rows = append(rows, VelocityRow{
-			SprintID:   s.SprintID,
-			SprintName: s.SprintName,
-			Unit:       s.Unit,
-			UnitReason: s.UnitReason,
-			Committed:  s.Committed,
-			Completed:  s.Completed,
-			Truncated:  len(s.Truncated) > 0,
-		})
+		rows = append(rows, Row(s))
 	}
 	return rows
 }
 
-// isClosed matches Jira's own sprint state the way internal/sprints does,
+// Closed matches Jira's own sprint state the way internal/sprints does,
 // without regard to case and with the spaces trimmed off.
-func isClosed(sp backend.Sprint) bool {
+//
+// It is exported because storing a sprint's series and putting that sprint
+// in a velocity table are the same question asked twice: a caller that
+// caches what this package calls closed, on its own reading of the word,
+// could cache a sprint the table below will not show and refuse to cache
+// one it will.
+func Closed(sp backend.Sprint) bool {
 	return strings.EqualFold(strings.TrimSpace(sp.State), "closed")
 }

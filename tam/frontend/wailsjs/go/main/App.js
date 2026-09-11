@@ -14,6 +14,10 @@ export function CanTransition(arg1, arg2, arg3) {
   return window['go']['main']['App']['CanTransition'](arg1, arg2, arg3);
 }
 
+export function CancelSprintReport(arg1) {
+  return window['go']['main']['App']['CancelSprintReport'](arg1);
+}
+
 export function CommitPendingChanges(arg1) {
   return window['go']['main']['App']['CommitPendingChanges'](arg1);
 }
@@ -96,6 +100,10 @@ export function GetProfileSetting(arg1, arg2) {
 
 export function GetSettings() {
   return window['go']['main']['App']['GetSettings']();
+}
+
+export function GetSprintReport(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetSprintReport'](arg1, arg2, arg3);
 }
 
 export function GetSubtaskTypeName(arg1) {
