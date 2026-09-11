@@ -1,12 +1,14 @@
-# Task Activity Manager Phase 4: reports
+# Task Activity Manager Phase 4: the sprint report
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan runs under the lean cycle: implementers build and write the tests named here but do not run suites, except one Go suite run at the end of Task 3. Task 5 runs every gate once, then one fix wave.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax. Lean cycle: implementers write the tests named here but run no suites, **except that every task ends with `go build ./... && go vet ./...` in `tam/`**, because Task 1 widens a seam and a plan that does not compile until Task 3 is a plan that debugs itself in the wrong place. Task 6 runs every gate once.
 
-**Goal:** a sprint's burndown, a board's velocity, and the summary a sprint review starts with, all reconstructed from Jira's changelog rather than invented, and readable offline once fetched.
+**Goal:** the numbers a sprint review starts with, reconstructed from Jira's changelog rather than invented, honest about what they cannot see, and readable offline once fetched.
 
-**Succeeds when** a scrum master opens Reports the morning after a sprint closes and gets the three things a review needs, including an honest account of what was added and removed mid-sprint, without opening a browser.
+**Succeeds when** a scrum master opens Reports the morning after a sprint closes and gets committed, added, removed, completed and carried over, with a line saying how they were computed and what they miss, without opening a browser.
 
-**Architecture:** `core/jira`'s search learns an `expand` parameter so a caller can ask for the changelog. A new `tam/internal/reports` replays those changelogs into a day-by-day series and a velocity table. A new `sprint_report` table keeps a closed sprint's series forever, because a closed sprint's history cannot change; a live sprint is recomputed every time. The Reports view draws two charts in hand-written SVG, with no charting dependency.
+**Not in this plan: the charts.** A burndown line and a velocity bar chart are drawn from exactly this data and add no new facts. They are the next plan, for the reasons the spec's section 1 gives.
+
+**Architecture:** `core/jira`'s search learns an `expand` parameter. A new capability interface carries it, rather than widening `IssueBackend`, which nine types implement. A new `tam/internal/reports` rewinds each issue's changelog to the sprint's start and walks it forward into a series. A new `sprint_report` table keeps a closed sprint's series, keyed by board as well as sprint, stamped with the algorithm version that built it. One binding returns the sprint's report and the board's velocity together.
 
 **Tech Stack:** Go 1.25 with `go.work`, Wails v2.15.0, `modernc.org/sqlite`, React 19, TanStack Query 5, Vite 8, Vitest 4.
 
@@ -14,138 +16,153 @@
 
 ## Global Constraints
 
-- Go modules stay `agile-suite/core`, `agile-suite/xtm`, `agile-suite/tam`; run Go commands from inside the module directory. Nothing under `xtm/` changes.
-- **A report is reconstructed from the changelog, never from Jira's internal chart endpoints.** `/rest/greenhopper/1.0/rapid/charts/...` would be quicker and is undocumented, unversioned Jira Software internals: the one thing in this app that could break on an upgrade with no warning and no recourse. The public search with `expand=changelog` is the source.
-- **A chart never invents a number.** A sprint with no dates cannot be charted and says so; a changelog that could not be read leaves the previous report on screen with the failure named; a live sprint stops its line at today rather than drawing the future.
-- Scope changes are drawn, not absorbed. A card added mid-sprint raises the line on the day it arrived.
-- "Done" is the same rule the board and the sprint completion use: a status id in the board's last column. That rule now has one home on each side, `lib/unfinished.ts` on the frontend and the completion's own status set in `internal/sprints/guards.go`. Call one of them; do not write a third.
-- A closed sprint's series is cached and never refetched. A live sprint's is never cached.
-- No charting dependency. Two chart shapes do not justify one, and this frontend has four runtime dependencies.
-- Reports are read-only. Nothing in this phase writes to Jira or to the journal.
+- Nothing under `xtm/` changes. Go commands run from inside the module directory.
+- **A report is reconstructed from the changelog, never from Jira's internal chart endpoints.**
+- **A number that might be low says so.** Removed counts only cards that left and returned; committed is a floor; a truncated changelog is named. Every surface showing one of these carries the qualification. This replaces the first draft's "a chart never invents a number", which was the right instinct aimed at the wrong risk.
+- **The method is printed with the numbers**, not only in the docs: what done means, that history comes from the public changelog rather than Jira's stored sprint records, and what it cannot see.
+- A closed sprint's series is cached and refetched only when its stored `algo_version` no longer matches. A live sprint's is never cached.
+- Reports are read only. Nothing in this phase writes to Jira or to the journal.
 - The PAT stays in the Jira client's Authorization header only.
-- Files stay small and single purpose; a helper used from two places lives in its own module. TAM mirrors XTM's design language where XTM has a counterpart.
-- UI text uses no em dashes. No AI attribution or mentions anywhere, in code, comments, commit messages, or documents. Conventional commit prefixes, no trailers. Never add, commit, or delete untracked local tooling files; revert Wails churn under `tam/frontend/wailsjs/runtime` and `tam/frontend/package.json.md5` with `git checkout --`.
+- Files stay small and single purpose; a helper used from two places lives in its own module.
+- UI text uses no em dashes. No AI attribution anywhere. Conventional commit prefixes, no trailers. Never add, commit or delete untracked local tooling files; revert Wails churn with `git checkout --` after checking `git diff -w`.
+- **A comment must be true.** Eight consecutive reviews on the previous branch each found at least one that was not, including one that credited the wrong mechanism for a safety property and one that described protection the code did not provide.
 
-## What shipped after this plan was written
+## What shipped after this plan was first written
 
-This plan was drafted the day Phase 3c merged. The sprint work that followed changed four things
-it assumes, and each one is folded into the tasks below rather than left for an implementer to
-trip over:
-
-- **Schema version 7 is taken.** It added a sprint's `goal`. The `sprint_report` table is version 8.
-- **The Reports view already exists in the navigation.** It has a `VIEWS` entry, a blurb and the
-  native menu item at accelerator 5, and it renders a `Placeholder`. This phase replaces what it
-  renders; it does not add a view.
-- **The Sprints view exists**, with a board picker that hides itself when the profile has one scrum
-  board, an assignee grouping, and a read (`BoardSprintDetails`) that returns a board's sprints
-  with their issues and four computed numbers. Reports should borrow that picker's behaviour, and
-  should check whether that read answers its sprint picker before adding a third way to list
-  sprints.
-- **A closed sprint has no cached membership**, by design: the boards sync fetches issue keys for
-  active and future sprints only. That is not a problem for this phase, because a report is built
-  from a changelog search by JQL rather than from the cache, but it does mean the sprint picker
-  must come from the `sprint` table and not from anything membership-shaped.
-
-Two lessons from the branch that just shipped are worth carrying, because both cost a fix wave
-there:
-
-- **A count read from a cache can understate silently.** A sprint's cached membership can be
-  capped, or hold keys whose issues were never synced. Anything this phase reports as a total must
-  either come from the changelog search, which is authoritative, or say that it might be low.
-- **A comment must be true.** Eight consecutive reviews on the previous branch each found at least
-  one that was not, including one that credited the wrong mechanism for a safety property and one
-  that described protection the code did not provide.
+- **Schema version 7 is taken**, by a sprint's `goal`. This phase is version 8.
+- **The Reports view already exists** in `VIEWS`, in the native menu at accelerator 5, rendering a `Placeholder`. This phase replaces what it renders and adds nothing to the navigation.
+- **The Sprints view exists**, with a board picker that hides itself when the profile has one scrum board. Reports follows that, not the Boards view's.
+- **A closed sprint has no cached membership.** The boards sync fetches keys for active and future sprints only. Harmless here, since a report is built from a search, but it means the sprint picker comes from the `sprint` table.
 
 ## Decisions
 
-1. **The changelog is fetched with the issues, not per issue.** One paged search with `expand=changelog` brings back a page of issues and their whole history together. Per-issue fetching would be one call per card and would make a report unusable on a sprint of any size.
-2. **A report is fetched when it is opened, not on every sync.** The boards pass already takes minutes on a real project, and a user who never opens Reports should not pay for it.
-3. **A closed sprint's series is stored; a live one is not.** A closed sprint's history cannot change, so it is fetched once and then works offline forever. A live sprint changes hourly, and a stale burndown is worse than a slow one.
-4. **An estimate that changed mid-sprint takes effect on the day it changed.** A team that re-estimates has changed the work, not the past, and back-dating a new estimate to day one would draw a sprint that never happened.
-5. **The ideal line runs over working days.** A fortnight with a weekend in it is eight or nine days of work, and an ideal line that slopes through Saturday makes every team look behind on Monday.
-
-## File structure
-
-**Created:** `tam/internal/reports/reports.go`, `series.go`, `velocity.go`, and their tests; `tam/app_reports.go`, `app_reports_test.go`; `tam/frontend/src/components/ReportsView.tsx`, `BurndownChart.tsx`, `VelocityChart.tsx`, `SprintSummary.tsx`; `tam/frontend/src/lib/chartScale.ts`, `chartScale.test.ts`; `tam/frontend/src/queries/reports.ts`.
-
-**Modified:** `core/jira/issues.go`, `issues_test.go`; `tam/internal/backend/backend.go`, `backend/jira/jira.go` or its issue file, `jira_test.go`, `backend/demo/demo.go`, `demo_test.go`; `tam/internal/tamstore/tamstore.go`, `tamstore_test.go` (the `sprint_report` table at schema version 8); `tam/internal/boardrepo/` (the reader and writer for it); `tam/app.go`; `tam/frontend/wailsjs/**` (regenerated); `tam/frontend/src/api.ts`, `queries/keys.ts`, `App.tsx`, `App.test.tsx`, `nav.ts`, `App.css`; `frontend/core/styles/primitives.css`; `tam/CLAUDE.md`, `README.md`.
+1. **The changelog is fetched with the issues, not per issue.** Per issue would be one call per card.
+2. **A report is fetched when it is opened, not on every sync.**
+3. **A closed sprint's series is stored, a live one is not**, and a stored one is rebuilt when the algorithm that made it has moved on.
+4. **An estimate that changed mid-sprint takes effect on the day it changed**, unless the card was outside the sprint that day, in which case the estimate in force when it re-enters is the one that enters with it.
+5. **The ideal line runs over working days.**
+6. **`sprint = N` stays, and the blind spot is labelled** rather than queried around. Spec section 3.
+7. **A capability interface, not a wider `IssueBackend`.** `SyncBoards` already set this precedent: a capability off the backend, reached by type assertion, so a backend that cannot do it is skipped rather than forced to stub. Widening `IssueBackend` would touch nine implementers, seven of them test stubs in four packages.
 
 ---
 
-### Task 1: The changelog on the wire
+### Task 0: probe the wire before building on it
 
-**Files:** modify `core/jira/issues.go`, `issues_test.go`, `tam/internal/backend/backend.go`, `backend/jira` (the issue search), `jira_test.go`, `backend/demo/demo.go`, `demo_test.go`.
+**Files:** create `docs/superpowers/plans/assets/2026-09-11-report-wire-probe.md`.
 
-**Produces:** `SearchIssues` gains an `expand []string` parameter; `jira.RawIssue` gains `Changelog` with `Histories []RawHistory`, `RawHistory{Created string; Items []RawHistoryItem}`, `RawHistoryItem{Field, FieldID, From, FromString, To, ToString string}`; on `IssueBackend`: `SearchIssuesWithHistory(ctx, jql string, startAt, maxResults int) ([]backend.IssueHistory, int, error)`; `backend.IssueHistory{Issue Issue; Changes []Change}`, `backend.Change{At, Field, From, To string}`.
+Four behaviours this phase rests on are unverified, and three of the reviews' findings resolve to "we guessed" without them. The previous phase's probe is the model.
 
-- [ ] **Step 1: The tests.** Extend `issues_test.go`'s httptest server to answer a search carrying `expand=changelog` with two pages, each issue holding histories with several items. Cover: the expand reaching the query string only when asked for, so every existing caller's request is byte-for-byte unchanged; the histories decoding in order; an issue with no changelog decoding to an empty slice rather than a nil panic; and paging carrying the changelog on both pages. Assert on the request's query string, not only the response.
+- [ ] **Step 1: Write the probe.** Four requests against the user's own instance, each beside the answer this plan assumes.
+  1. `GET /rest/api/2/search?jql=sprint=N&expand=changelog&maxResults=50`. **Assumed:** each issue carries a `changelog` object with `startAt`, `maxResults`, `total` and `histories`, and for a long lived card `total` exceeds the histories returned. Record what the cap actually is.
+  2. In that answer, find a Sprint field change. **Assumed:** `field` is `Sprint`, `fieldId` is a `customfield_NNNNN`, and `from`/`to` are comma separated lists of sprint ids while `fromString`/`toString` are comma separated names. Record the real shape, because the reconstruction's membership rule is built on it.
+  3. Take a card known to have been removed from sprint N and confirm `sprint = N` does not return it. **Assumed:** it does not. This is the blind spot the spec labels; prove it rather than asserting it.
+  4. Time the same search at `maxResults` 50 and 25, on the largest sprint available. **Assumed:** noticeably slower than a search without the expansion. Record both.
 
-- [ ] **Step 2: The call.** Add the parameter and the raw shapes. Every existing caller passes nil, which must produce exactly the request it produces today: this call is on the sync's hot path and a changed query string is a changed sync.
-
-- [ ] **Step 3: The seam.** `SearchIssuesWithHistory` on `IssueBackend`, mapping the raw histories into `backend.Change` with the field name normalised (Jira calls the sprint field `Sprint` and the status field `status`; both arrive with a `fieldId` on Data Center, which is the more reliable of the two). The Jira backend maps; the demo backend answers from a curated history over its own dataset, so the offline walk-through draws a real chart. Test both.
-
-- [ ] **Step 4: Commit** as `feat(core): the issue search can ask for a changelog`.
-
----
-
-### Task 2: The reconstruction
-
-**Files:** create `tam/internal/reports/reports.go`, `series.go`, `velocity.go`, `series_test.go`, `velocity_test.go`.
-
-**Produces:** `reports.Series` and `reports.Day` as the spec names them; `reports.Build(sprint backend.Sprint, done func(statusID string) bool, issues []backend.IssueHistory) (Series, error)`; `reports.Velocity(sprints []backend.Sprint, per map[int][]backend.IssueHistory, done func(string) bool) ([]VelocityRow, error)`; `VelocityRow{SprintID int; Name string; Committed, Completed float64}`.
-
-- [ ] **Step 1: The walk.** `Build` replays each issue's changes forward from the sprint's start. For every day from start to end inclusive it records what was still open. Four rules, each with its own test:
-- A card in the sprint at the start counts from day one; one whose Sprint change added it later counts from that day, and into `Added`.
-- A card removed from the sprint stops counting on that day, and into `Removed`.
-- A card whose status entered the done set stops counting from that moment; one that came back out counts again. A card can cross more than once and the last crossing before the end of a day is what that day records.
-- An estimate that changed mid-sprint applies from the day it changed, never backwards.
-
-- [ ] **Step 2: The unit.** Points when any issue in the sprint carries an estimate, cards when none does, named in `Series.Unit` so the view can label the axis. A sprint where some cards have points and some do not counts the ones that do and says so in the summary, because silently treating an unestimated card as zero is how a burndown lies.
-
-- [ ] **Step 3: The ideal line.** From the committed total on the first day to zero on the last, dropping only on working days, so a weekend is flat. State the definition of a working day in the doc comment: Monday to Friday, no holiday calendar, because Jira does not carry one and inventing one per team is worse than a stated simplification.
-
-- [ ] **Step 4: A live sprint.** `Build` fills days up to today and no further, and the caller can tell where the data stops. The view draws that as a line that ends rather than a line that reaches zero.
-
-- [ ] **Step 5: Velocity.** Committed is what was in the sprint when it started, which the same replay answers; completed is what was done when it closed. Six sprints, oldest first, and a board with fewer returns what it has.
-
-- [ ] **Step 6: Tests.** Every rule above, plus: a sprint with no dates returning an error rather than a chart; a card added and removed in the same sprint; a card done before the sprint started; an issue whose changelog is empty; and a velocity over zero closed sprints.
-
-- [ ] **Step 7: Commit** as `feat(tam): reconstruct a sprint's history from its changelog`.
+- [ ] **Step 2: Say what each answer changes.** 1 shapes the truncation handling in Task 1 and the "incomplete" state in Task 5. 2 shapes the membership rule in Task 2 and is the one most likely to differ. 3 confirms or refutes the spec's section 3; if a card that left *is* returned, that section is wrong and this phase gets better. 4 sets the page size in Task 4. The PAT goes in a header and never into a committed file. Commit as `docs(tam): a probe for the changelog read`.
 
 ---
 
-### Task 3: The store and the bindings
+### Task 1: the changelog on the wire
 
-**Files:** modify `tam/internal/tamstore/tamstore.go`, `tamstore_test.go`, `tam/internal/boardrepo/` (a reader and writer for the new table), `tam/app.go`; create `tam/app_reports.go`, `app_reports_test.go`; regenerate `tam/frontend/wailsjs/**`.
+**Files:** modify `core/jira/issues.go` and its test; create `tam/internal/backend/history.go`, `tam/internal/backend/jira/history.go` and its test; modify `tam/internal/backend/demo/` for the curated history and its test.
 
-**Produces:** schema version 8 with `sprint_report(profile_id, sprint_id, unit, built_at, series_json, PRIMARY KEY (profile_id, sprint_id))`; `boardrepo.SavedReport` and `SaveReport`; bound methods `GetBurndown(profileID string, boardID, sprintID int) (reports.Series, error)` and `GetVelocity(profileID string, boardID int) ([]reports.VelocityRow, error)`.
+**Produces:** `SearchIssues` gains an `expand []string` parameter; `jira.RawChangelog{StartAt, MaxResults, Total int; Histories []RawHistory}`; `backend.HistoryBackend` with `SearchIssuesWithHistory(ctx, jql string, startAt, maxResults int) ([]backend.IssueHistory, int, error)`; `backend.IssueHistory{Issue Issue; Changes []Change; Truncated bool}`; `backend.Change{At, Field, From, To string}`.
 
-- [ ] **Step 1: The table.** Version 8 adds it through `baseDDL`, which needs no migration because it is a new table, and the existing version tests get a case for it the way version 6 did.
+- [ ] **Step 1: The expand.** One parameter, set only when non empty. `url.Values.Encode` sorts keys, so an unchanged caller's query string cannot move; the test that matters is not in `core` but in the backend, asserting the **sync's** search carries no `expand` key at all, which is the test that fails if someone later threads changelog through the sync's paging.
 
-- [ ] **Step 2: The read path.** `GetBurndown` reads the cached series when the sprint is closed and one is stored; otherwise it fetches the sprint's issues with their changelogs, builds the series, stores it when the sprint is closed, and returns it. The board is needed for the done rule, so the binding takes it. Both bindings run under `a.acquire(p.ID, "report")`, because a changelog fetch is a long read against Jira and the app already serialises those per profile.
+- [ ] **Step 2: Truncation is a first class answer.** Decode `startAt`, `maxResults` and `total` on the changelog object, and set `IssueHistory.Truncated` when `total` exceeds what came back. A cut history decodes identically to a complete one otherwise, and the numbers built from it would be presented as exact. Test: an issue whose `total` exceeds its `histories` is marked; one whose does not is not.
 
-- [ ] **Step 3: Tests, then the one Go suite run.** `app_reports_test.go`: a closed sprint served from the cache without touching the backend; a live sprint never cached; a fetch failure leaving any previous cached series intact; the guard refusing a second report while one runs. Then, inside `tam/`: `go build ./... && go vet ./... && go test ./... -count=1`, and inside `core/`: `go test ./jira/ -count=1`. Fix what fails, rerun at most twice, and report. Commit as `feat(tam): serve a sprint's burndown and a board's velocity`.
+- [ ] **Step 3: The capability, not a wider seam.** `backend.HistoryBackend` in its own file, reached by type assertion the way `SyncBoards` reaches `BoardBackend`, so no existing stub changes and a backend without it is refused with a sentence. **Do not add the method to `IssueBackend`.**
 
----
+- [ ] **Step 4: The field rule, which is backwards in the first draft.** `status` matches on `fieldId == "status"`. **Sprint and Story Points are custom fields**, so their ids are `customfield_NNNNN` and differ per instance: match them on the ids the backend already resolves per instance, falling back to the display name only when discovery failed. A normaliser keyed on a literal id matches `status`, never matches the other two, and draws a flat line on every real instance while every fixture test passes. The mapping lives in `backend/jira`, beside the id discovery, not in `internal/reports`. Test with a fixture whose Sprint change carries a `customfield_` id and no recognisable name.
 
-### Task 4: The view
+- [ ] **Step 5: The demo.** A curated history over the demo dataset, enough for one closed sprint's report to be real: an add, a card that left and returned, a re-estimate, and a card done before the start. The dataset has one closed sprint and no history at all today, so this is its own piece of work rather than a clause. Say in the report whether velocity is demonstrable offline or needs a real instance.
 
-**Files:** create `tam/frontend/src/components/ReportsView.tsx`, `BurndownChart.tsx`, `VelocityChart.tsx`, `SprintSummary.tsx`, `tam/frontend/src/lib/chartScale.ts`, `chartScale.test.ts`, `queries/reports.ts`; modify `api.ts`, `queries/keys.ts`, `App.tsx`, `App.test.tsx`, `nav.ts`, `App.css`, `frontend/core/styles/primitives.css`, and `ReportsView.test.tsx`.
-
-- [ ] **Step 1: The scale.** `chartScale.ts` is pure: given a series and a pixel box it returns the point arrays, the ticks and the label positions. No React, no DOM, and it is the part worth testing directly. Both charts use it.
-
-- [ ] **Step 2: The burndown.** Hand-written SVG: the remaining line, the ideal line behind it in a muted stroke, a marker on each day scope changed, and axes labelled with the unit `Series.Unit` names. A live sprint draws a today line and stops. Every colour comes from a token that exists in `tokens.css`; check before using one, since there is no `--surface-1` in this design system.
-- [ ] **Step 3: The summary.** Committed, added, removed, completed and carried over, as the sentence a review starts with, plus the note when some cards had no estimate.
-- [ ] **Step 4: Velocity.** A bar pair per sprint, committed against completed, with the mean across, oldest on the left.
-- [ ] **Step 5: The view.** A board picker and a sprint picker following the Sprints view's rather than the Boards view's, which means hiding the board picker when the profile has exactly one scrum board and naming the board in the heading instead, the three pieces stacked, and the empty states the spec names: no closed sprint on this board, no estimates so the chart counts cards, no dates so it cannot be charted, and a failed changelog read that keeps the last chart and names the failure with a retry.
-- [ ] **Step 6: Wire it in.** `App.tsx`'s switch gains Reports in place of its `Placeholder` fall-through, and `nav.ts`'s blurb stops promising what this does not do. The `VIEWS` entry and the native menu item already exist and already carry accelerator 5, so nothing is added there and nothing is renumbered. `App.test.tsx` mocks the two new bindings.
-- [ ] **Step 7: Tests.** `chartScale.test.ts` for the arithmetic including a zero-range series and a single-day sprint. `ReportsView.test.tsx`: both charts render from a fixture; the summary reads its sentence; a live sprint stops at today; the unit label follows `Series.Unit`; each empty state; and a failed fetch keeping the previous chart. Commit as `feat(tam): the Reports view`.
+- [ ] **Step 6: Build, vet, commit** as `feat(core): the issue search can ask for a changelog`.
 
 ---
 
-### Task 5: Docs, the single gate run, and the fix wave
+### Task 2: the reconstruction
 
-- [ ] **Step 1: Docs.** `tam/CLAUDE.md` gains a "Phase 4: reports" section saying where a report's history comes from and why not the internal chart endpoints, what is cached and what never is, what a working day means, and that a report never invents a number. Update Status and Layout. `README.md` gains a sentence. Reconcile the spec with what shipped, saying which side changed.
+**Files:** create `tam/internal/donerule/donerule.go` and its test; create `tam/internal/reports/reports.go`, `series.go`, `velocity.go` and their tests; modify `tam/internal/sprints/guards.go` to call the new package.
+
+**Produces:** `donerule.Done(cols []backend.BoardColumn) func(statusID string) bool`; `reports.Build(sprint backend.Sprint, done func(string) bool, issues []backend.IssueHistory, now time.Time, loc *time.Location) (Series, error)`; `reports.Velocity(...) []VelocityRow` with `Unit` on each row.
+
+- [ ] **Step 1: One definition of done.** There are three in this codebase: the board's last column, unexported on `sprints.Service`; `backend.IsDone`, which matches on status name and powers the Sprints view's numbers; and the frontend's `lib/unfinished.ts`. This phase needs the first and cannot reach it. Extract it to `internal/donerule`, have the completion call it, and record in the docs that the name based rule still exists and where, because two screens disagreeing about one closed sprint's done count is exactly what this phase makes visible.
+
+- [ ] **Step 2: Rewind, then walk.** The changelog gives today's fields plus deltas, so status, estimate and membership **at the sprint's start are not known**: derive them by unwinding from the present back to the start, then walk forward. A forward replay from today's values draws a sprint that never happened. Test: an issue whose status, points and sprint all changed **after** the sprint closed leaves the series unmoved.
+
+- [ ] **Step 3: Time, explicitly.** `Build` takes its clock and its location rather than reaching for them, the way the syncer's engine already does. Every timestamp parses through `internal/sprintdate`, because Jira's are not RFC 3339: the offset carries no colon, this repo learned that once already, and a hand written fixture using `Z` passes while every real instance returns nothing. Days bucket in the given zone at local midnight, day one being the local date of the sprint's start, and `Day.Date` is the `2006-01-02` form. Test: a sprint starting at `+1000` has day one on its own local date, not the day before.
+
+- [ ] **Step 4: Membership is a set, not a toggle.** The Sprint field's changelog `from` and `to` are comma separated lists, because a card can be in two sprints at once during a rollover. Membership is "is this sprint's id in the `to` set", computed per change. Test: a card moving from `"12, 13"` to `"13"` has left sprint 12 and not sprint 13.
+
+- [ ] **Step 5: The rest of the rules, each with its test.** An estimate changed inside the sprint takes effect that day; one changed while the card was outside takes effect when it re-enters. A card done before the sprint started counts into committed with nothing to burn. A sprint whose start date was edited after it began computes committed at the current start date, and days before the earliest evidence report day one's value. A card with no estimate contributes nothing in points mode.
+
+- [ ] **Step 6: The unit, and why.** Points when any card in the sprint has one, cards otherwise, and the series carries **which reason**: no Story Points field on this instance is a different problem from nothing estimated, and only one of them is the user's to fix.
+
+- [ ] **Step 7: Velocity.** The same reconstruction over the last six closed sprints, each row carrying its own `Unit` so a board that changed from points to cards is not averaged into nonsense. Six is the number Jira shows minus one and nothing better was argued; if it is a placeholder, say so in the comment rather than implying it was measured. Test: six sprints, none, a sprint closed with cards still open, and a board whose unit changed mid-history.
+
+- [ ] **Step 8: Build, vet, commit** as `feat(tam): a sprint's history, reconstructed`.
+
+---
+
+### Task 3: the store
+
+**Files:** modify `tam/internal/tamstore/tamstore.go` and its test; create `tam/internal/boardrepo/reportstore.go` and its test; modify `tam/internal/boardrepo/boardrepo.go` and `boards.go` (the two purge lists); modify `tam/internal/backend/backend.go`, `backend/jira` and the `sprint` table for `CompleteDate`.
+
+**Produces:** schema version 8: `sprint_report(profile_id, board_id, sprint_id, unit, algo_version, built_at, series_json, PRIMARY KEY (profile_id, board_id, sprint_id))`, and a `complete_date` column on `sprint`; `boardrepo.SavedReport`, `SaveReport`, `Report`.
+
+- [ ] **Step 1: Keyed by board, and here is why.** Jira hands one sprint to every board whose filter reaches it, which is why the `sprint` table is keyed `(profile_id, board_id, id)` and why version 6 exists at all. A report's done rule comes from its board's last column, so a key without the board serves board B the chart built for board A, forever, because a closed sprint's series is never refetched. Same mistake, same table family, one version later.
+
+- [ ] **Step 2: `algo_version`.** A constant in `internal/reports`, stored on write, compared on read, rebuilt on mismatch. Without it the first reconstruction bug is permanent in every user's database. Bump it whenever the reconstruction changes. Test: a row written at an older version is rebuilt rather than served.
+
+- [ ] **Step 3: `completeDate`.** Jira carries the moment a sprint actually closed, routinely days from its planned end, and TAM carries it nowhere: not on `backend.Sprint`, not in the table. Velocity measured at the planned end mis-reports every sprint closed late or early. Add it to the Agile decode, the type and the table. That makes version 8 a real migration in version 7's shape, not only a new table.
+
+- [ ] **Step 4: The new table in both purge lists.** `PurgeProfile` and `RemoveBoards` each hold a hardcoded table list, and `PurgeProfile`'s own comment predicts this exact failure "when a fifth table arrives". It is arriving. Test: purging a profile that has a stored report leaves none behind.
+
+- [ ] **Step 5: The migration's shape.** A new table needs no migration entry, because `Base` runs before migrations on every open; the version bump records the change. Follow the version 3 and 4 tests, which drop the table, rewind the recorded version, reopen and assert it came back, rather than version 6's rewrite fixture. The `complete_date` column does need an entry, in version 7's `AddColumnIfMissing` shape.
+
+- [ ] **Step 6: Build, vet, commit** as `feat(tam): where a sprint's report is kept`.
+
+---
+
+### Task 4: one binding
+
+**Files:** create `tam/app_reports.go` and its test; regenerate `tam/frontend/wailsjs/**`.
+
+**Produces:** `GetSprintReport(profileID string, boardID, sprintID int) (reports.Report, error)` where `Report` carries the series, the velocity rows, and what the read could not see.
+
+- [ ] **Step 1: One call, not two.** The first draft had the view ask for the burndown and the velocity separately, each taking the per profile lock. **That lock refuses rather than waits**, so two concurrent calls on mount would fail one of them with "a report is already running for this profile" every single time the view opened. One call returns both, under one lock, sharing one fetch, and velocity reuses stored reports for the sprints already built rather than refetching six.
+
+- [ ] **Step 2: The cost, handled rather than hoped about.** A page size smaller than the sync's, stated in the code with its reason. Progress reported the way every other long read reports it, because a silent freeze on opening a view is the worst version of this. Cancellation honoured when the user leaves, so a slow report does not hold the profile lock after nobody is looking.
+
+- [ ] **Step 3: The guards, tested.** `requireProfile`, the lock including its refusal, and the backend that cannot expand a changelog. Test the refusal, not only the happy path: the previous branch shipped a task where only `requireProfile` was covered and a review had to ask for the rest.
+
+- [ ] **Step 4: Regenerate, build, vet, commit** as `feat(tam): the binding a sprint report needs`.
+
+---
+
+### Task 5: the view
+
+**Files:** create `tam/frontend/src/components/ReportsView.tsx`, `SprintSummary.tsx`, `queries/reports.ts` and a test for each; modify `api.ts`, `queries/keys.ts`, `App.tsx`, `App.test.tsx`, `nav.ts`, `App.css`.
+
+- [ ] **Step 1: Pickers that already have an answer.** A board picker and a sprint picker following the Sprints view's: hidden when the profile has one scrum board, with the board named in the heading instead.
+
+- [ ] **Step 2: The sentence.** Committed, added, removed, completed, carried over, in the words a review starts with, with the unit and its reason.
+
+- [ ] **Step 3: The method line**, beneath it: what done means here, that history is reconstructed from the public changelog rather than Jira's stored sprint records, and that removals are only visible for cards that came back. This is the answer to a disagreement in front of a team, and it is worth a sentence on screen rather than a paragraph in a document nobody opens mid-review.
+
+- [ ] **Step 4: Every empty state, each distinguishable.** No closed sprint on this board. No estimates, saying which of the two reasons. No dates, so the sprint cannot be reported on. A failed read, keeping the last report and naming the failure with a retry. A report containing truncated histories, naming the cards. **And a read refused because the profile is busy syncing or committing**, which the first draft missed and which is the one a user hits by accident.
+
+- [ ] **Step 5: Wire it in.** `App.tsx` renders `ReportsView` in place of its `Placeholder`, and `nav.ts`'s blurb stops promising charts this plan does not build. The `VIEWS` entry and the menu item already exist at accelerator 5; nothing is added or renumbered.
+
+- [ ] **Step 6: Tests, then the one frontend run.** The sentence; the method line; the unit label against **two** fixtures, points and cards, since one fixture passes against a hardcoded word; every empty state including busy; a failed fetch keeping the previous report *and that report still being correct afterwards*. Then `npx vitest run` and `npx tsc --noEmit`. Commit as `feat(tam): the sprint report view`.
+
+---
+
+### Task 6: docs and the single gate run
+
+- [ ] **Step 1: Docs.** `tam/CLAUDE.md` gains the phase: where history comes from and why not the alternatives, what the report cannot see and why the labels exist, the three definitions of done and which lives where now, that reports are keyed by board and stamped with an algorithm version, and the cost of opening the view. Update the Status paragraph and the Layout tree.
 
 - [ ] **Step 2: Every gate, once.**
 
@@ -159,12 +176,12 @@ cd tam && wails build && cd ..
 git status --short --untracked-files=no
 ```
 
-Record each result, fix what fails, rerun only what failed. Do not lower an assertion to make a test pass. Vitest before this plan: 46 in `frontend/core`, 159 in `xtm`, 270 in `tam`.
+Vitest before this plan: 46 in `frontend/core`, 159 in `xtm`, 395 in `tam`. Do not lower an assertion to make a test pass.
 
-- [ ] **Step 3: The walk-through for the user** (not run by agents): on the demo profile open Reports, read the closed sprint's burndown and the velocity chart. Then on a real Data Center, the two things no fixture proves: a sprint whose cards were added and removed mid-flight, to see the scope line move on the right days, and a project large enough to show what a changelog expansion costs.
+- [ ] **Step 3: The walk-through for the user** (not run by agents): on the demo profile, open Reports for the closed sprint and read the summary and the method line. On a real Data Center, the four probe answers confirmed against the built app, and the one thing no fixture proves: that the numbers are recognisably the sprint that happened.
 
-- [ ] **Step 4: Commit** as `docs(tam): Phase 4 notes for reports`, then push and open the PR against `main` titled "Task Activity Manager Phase 4: reports" with the tasks, the gates, and the walk-through. No AI attribution anywhere.
+- [ ] **Step 4: Commit** as `docs(tam): the sprint report`, then push and open the PR against `main`.
 
 ## Deferred
 
-A cumulative flow diagram, a control chart, an epic burndown, cross-project reporting, exporting a chart as an image, a holiday calendar for the ideal line, and any report not about a sprint. Rituals is Phase 5, and is where a report gets written up and published.
+The burndown and velocity charts, which are the next plan and draw from this data. Querying the whole project to recover cards removed from a sprint. Daily membership snapshots, which would make removals visible going forward and are the one asset Jira cannot reproduce. A cumulative flow diagram, a control chart, an epic burndown, cross project reporting, and exporting anything as an image.
