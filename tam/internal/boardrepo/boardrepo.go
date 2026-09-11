@@ -35,15 +35,19 @@ type Board struct {
 // future, or closed. Goal reads empty in two cases this cache cannot tell
 // apart: a sprint with no goal set in Jira, and one cached before schema
 // version 7 added the column and not refreshed since. A caller that needs
-// to distinguish them wants a raw Jira read, not this cache.
+// to distinguish them wants a raw Jira read, not this cache. CompleteDate is
+// the moment the sprint actually closed, empty for one that has not, and
+// carries the same schema version 8 caveat goal carries for version 7: a
+// sprint cached before this column existed reads empty until refreshed.
 type Sprint struct {
-	ID        int    `json:"id"`
-	BoardID   int    `json:"boardId"`
-	Name      string `json:"name"`
-	State     string `json:"state"`
-	StartDate string `json:"startDate"`
-	EndDate   string `json:"endDate"`
-	Goal      string `json:"goal"`
+	ID           int    `json:"id"`
+	BoardID      int    `json:"boardId"`
+	Name         string `json:"name"`
+	State        string `json:"state"`
+	StartDate    string `json:"startDate"`
+	EndDate      string `json:"endDate"`
+	Goal         string `json:"goal"`
+	CompleteDate string `json:"completeDate"`
 }
 
 // IssueSource is what the view needs from the issue cache. Keeping it an
@@ -72,10 +76,12 @@ type IssueSource interface {
 
 // PurgeProfile drops everything the board tables hold for a profile. The
 // issue cache is issuerepo's to purge: two purges naming the same tables is
-// the drift that leaves one behind when a fifth table arrives.
+// the drift that used to leave one behind when a fifth table arrived, and
+// sprint_report is that fifth table, added alongside RemoveBoards's own
+// list in boards.go.
 func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		for _, table := range []string{"board", "board_column", "board_issue", "sprint"} {
+		for _, table := range []string{"board", "board_column", "board_issue", "sprint", "sprint_report"} {
 			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
 				return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
 			}

@@ -497,3 +497,134 @@ func TestFreshDatabaseHasTheSprintGoalColumn(t *testing.T) {
 		t.Errorf("goal = %q, want what was inserted", goal)
 	}
 }
+
+func TestSchemaVersionEightAddsTheReportTableToAnOlderDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	// Turn the fresh database into a version 7 one: drop sprint_report,
+	// which does not exist before this version at all, and rewind the
+	// recorded version.
+	for _, stmt := range []string{
+		`DROP TABLE sprint_report`,
+		`UPDATE meta SET value = '7' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var name string
+	if err := db.DB().QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sprint_report'`).Scan(&name); err != nil {
+		t.Errorf("sprint_report after upgrade: %v", err)
+	}
+	// The upgrade records the current schema version, not the one the
+	// table was added in, the same as the journal tables and the user
+	// cache before it.
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}
+
+// sprintDDLVersionSeven is the sprint table as version 7 left it: keyed by
+// board with a goal column, but before this plan's complete_date column
+// existed. A developer database built from that version still carries this
+// shape, which is what the version 8 migration's column add is for.
+const sprintDDLVersionSeven = `CREATE TABLE sprint (
+	profile_id TEXT NOT NULL,
+	id         INTEGER NOT NULL,
+	board_id   INTEGER NOT NULL,
+	name       TEXT NOT NULL DEFAULT '',
+	state      TEXT NOT NULL DEFAULT '',
+	start_date TEXT NOT NULL DEFAULT '',
+	end_date   TEXT NOT NULL DEFAULT '',
+	goal       TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, id)
+)`
+
+// openAtVersionSeven writes a version 7 database at path: sprint already
+// keyed by board with a goal, holding one closed sprint's row, with no
+// complete_date column yet.
+func openAtVersionSeven(t *testing.T, path string) {
+	t.Helper()
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE sprint`,
+		sprintDDLVersionSeven,
+		`INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, goal) VALUES ('p1', 12, 1, 'Sprint 12', 'closed', '2026-08-18T09:00:00Z', '2026-09-01T09:00:00Z', 'Ship the promo code flow')`,
+		`UPDATE meta SET value = '7' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+}
+
+// TestVersionEightMigrationAddsCompleteDateAndKeepsARowAlreadyCarryingAGoal
+// is the plain case: sprint is already the shape version 7 left it, so the
+// migration is a single ALTER TABLE ADD COLUMN and the row it was called
+// for survives untouched.
+func TestVersionEightMigrationAddsCompleteDateAndKeepsARowAlreadyCarryingAGoal(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	openAtVersionSeven(t, path)
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+	var name, goal, completeDate string
+	if err := db.DB().QueryRow(`SELECT name, goal, complete_date FROM sprint WHERE profile_id = 'p1' AND board_id = 1 AND id = 12`).Scan(&name, &goal, &completeDate); err != nil {
+		t.Fatalf("read migrated sprint: %v", err)
+	}
+	if name != "Sprint 12" || goal != "Ship the promo code flow" {
+		t.Errorf("name = %q goal = %q after the complete_date migration, want the row kept rather than rebuilt empty", name, goal)
+	}
+	// Nothing backfills a sprint cached before this version, the same as
+	// goal before it: a sprint is not part of an issue sync, and its only
+	// refresh is the Boards view's own Refresh button, which this
+	// migration does not trigger.
+	if completeDate != "" {
+		t.Errorf("complete_date = %q, want empty until the next Boards Refresh fills it in", completeDate)
+	}
+}
+
+// TestFreshDatabaseHasTheReportTableAndTheSprintCompleteDateColumn pins
+// sprintReportDDL and sprintDDL themselves, the same way
+// TestFreshDatabaseHasTheSprintGoalColumn pinned goal: a plain fresh open
+// runs every migration in the list, so only inserting straight into both
+// shapes proves Base itself carries them.
+func TestFreshDatabaseHasTheReportTableAndTheSprintCompleteDateColumn(t *testing.T) {
+	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.DB().Exec(
+		`INSERT INTO sprint (profile_id, id, board_id, name, state, complete_date) VALUES ('p1', 1, 1, 'Sprint 1', 'closed', '2026-08-21T10:00:00Z')`,
+	); err != nil {
+		t.Fatalf("insert sprint with complete_date: %v", err)
+	}
+	if _, err := db.DB().Exec(
+		`INSERT INTO sprint_report (profile_id, board_id, sprint_id, unit, algo_version, built_at, series_json) VALUES ('p1', 1, 1, 'points', 1, '2026-09-10T00:00:00Z', '{}')`,
+	); err != nil {
+		t.Fatalf("insert sprint_report: %v", err)
+	}
+}

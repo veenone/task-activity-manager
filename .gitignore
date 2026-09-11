@@ -29,6 +29,13 @@ Thumbs.db
 .playwright-mcp/
 .superpowers/
 .gstack/
+.claude/
+.claude-flow/
+.agents/
+.impeccable/
+skills-lock.json
+agentdb.rvf
+agentdb.rvf.lock
 
 docs/dist/
 docs/.env

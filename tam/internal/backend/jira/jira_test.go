@@ -20,6 +20,7 @@ import (
 type fakeJira struct {
 	fieldCalls int32
 	searches   []string
+	rawSearch  []string // the raw query string of every /rest/api/2/search request, in order
 	fields     string   // the /rest/api/2/field body
 	writes     []string // "METHOD path body" for every PUT and POST
 	createKey  string   // key the POST /issue answers with
@@ -37,6 +38,14 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			atomic.AddInt32(&f.fieldCalls, 1)
 			_, _ = w.Write([]byte(f.fields))
 		case r.URL.Path == "/rest/api/2/search":
+			// expand is only ever added to the query when a caller passes a
+			// non-empty slice; the sync path always passes nil, so this
+			// guard catches it directly if a later change threads a
+			// changelog expansion through the sync path anyway.
+			if _, has := r.URL.Query()["expand"]; has {
+				t.Errorf("the issue sync's search must never carry expand: %s", r.URL.RawQuery)
+			}
+			f.rawSearch = append(f.rawSearch, r.URL.RawQuery)
 			f.searches = append(f.searches, r.URL.Query().Get("jql")+" | fields="+r.URL.Query().Get("fields"))
 			_, _ = w.Write([]byte(`{"total":2,"issues":[
 				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5}},
@@ -129,8 +138,8 @@ func (f *fakeJira) agile(w http.ResponseWriter, r *http.Request) {
 		// originBoardId is board 7, not the board being read: the mapping
 		// must take the board from the request, not from the payload.
 		_, _ = w.Write([]byte(`{"isLast":true,"values":[
-			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z","goal":"Ship the promo code flow"},
-			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z","goal":""}
+			{"id":11,"name":"Sprint 11","state":"closed","originBoardId":7,"startDate":"2026-08-04T09:00:00.000Z","endDate":"2026-08-18T09:00:00.000Z","completeDate":"2026-08-21T10:00:00.000Z","goal":"Ship the promo code flow"},
+			{"id":12,"name":"Sprint 12","state":"active","originBoardId":7,"startDate":"2026-08-18T09:00:00.000Z","endDate":"2026-09-01T09:00:00.000Z","completeDate":null,"goal":""}
 		]}`))
 	case "/rest/agile/1.0/board/2/sprint":
 		// Jira's way of saying a kanban board has no sprints.
@@ -218,6 +227,19 @@ func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	}
 	if n := atomic.LoadInt32(&f.fieldCalls); n != 1 {
 		t.Errorf("/rest/api/2/field fetched %d times across two searches, want 1", n)
+	}
+}
+
+func TestTheSyncsSearchAsksForNoChangelog(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	if _, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 50); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(f.searches) != 1 {
+		t.Fatalf("searches = %v", f.searches)
+	}
+	if strings.Contains(f.rawSearch[0], "expand=") {
+		t.Errorf("search query = %q, must not carry expand", f.rawSearch[0])
 	}
 }
 
@@ -334,6 +356,23 @@ func TestBoardSprintsCarryTheGoalJiraSent(t *testing.T) {
 	}
 	if sprints[1].Goal != "" {
 		t.Errorf("sprint goal = %q, want empty for Jira's own empty goal", sprints[1].Goal)
+	}
+}
+
+// TestBoardSprintsCarryTheCompleteDateJiraSent covers the field this task
+// adds beside the goal: Jira's completeDate, which is the moment a sprint
+// actually closed and routinely differs from its planned endDate.
+func TestBoardSprintsCarryTheCompleteDateJiraSent(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	sprints, err := b.BoardSprints(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("sprints: %v", err)
+	}
+	if sprints[0].CompleteDate != "2026-08-21T10:00:00.000Z" {
+		t.Errorf("sprint 11 completeDate = %q, want the closed date three days after endDate", sprints[0].CompleteDate)
+	}
+	if sprints[1].CompleteDate != "" {
+		t.Errorf("sprint 12 completeDate = %q, want empty for a sprint still active", sprints[1].CompleteDate)
 	}
 }
 

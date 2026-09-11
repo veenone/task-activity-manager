@@ -634,3 +634,27 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .assignee-option-active { background: var(--accent-soft); }
 .detail-activity-head { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+
+/* Phase 4: the sprint report. One scrolling column of prose and one table,
+   inside the bounded box .main gives every view, so the body is the
+   scroller rather than the window. The type scale, the muted lines and the
+   table rules are the ones the rest of TAM already uses; nothing here is a
+   second visual idiom. */
+.report-body { flex: 1; min-height: 0; overflow: auto; padding-right: 4px; }
+.report-summary { max-width: 70ch; }
+.report-heading { margin: 18px 0 6px; font-size: 15px; font-weight: 600; }
+.report-summary .report-heading { margin-top: 0; }
+/* The one line a review is read off, so it carries the weight the muted
+   qualifications under it deliberately do not. */
+.report-sentence { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
+.report-summary p.muted, .report-summary p.warn-text { margin: 0 0 6px; line-height: 1.45; }
+.report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; max-width: 70ch; }
+.report-unavailable, .report-loading { max-width: 70ch; line-height: 1.45; }
+.report-loading p { margin: 0 0 6px; }
+/* The velocity rows, on the same rules .conflict-table draws with: a table
+   in this app is a header rule and padded cells, not a box. */
+.report-table { border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.report-table th { text-align: left; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 16px 4px 0; }
+.report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
+.report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
+.report-row-note { display: block; font-weight: 400; }

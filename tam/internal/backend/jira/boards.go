@@ -77,13 +77,14 @@ func (b *Backend) BoardSprints(ctx context.Context, boardID int) ([]backend.Spri
 	out := make([]backend.Sprint, 0, len(raw))
 	for _, rs := range raw {
 		out = append(out, backend.Sprint{
-			ID:        rs.ID,
-			BoardID:   boardID,
-			Name:      rs.Name,
-			State:     strings.ToLower(rs.State),
-			StartDate: rs.StartDate,
-			EndDate:   rs.EndDate,
-			Goal:      rs.Goal,
+			ID:           rs.ID,
+			BoardID:      boardID,
+			Name:         rs.Name,
+			State:        strings.ToLower(rs.State),
+			StartDate:    rs.StartDate,
+			EndDate:      rs.EndDate,
+			Goal:         rs.Goal,
+			CompleteDate: rs.CompleteDate,
 		})
 	}
 	return out, nil

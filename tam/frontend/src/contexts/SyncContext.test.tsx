@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import * as api from "../api";
-import type { SyncProgress } from "../api";
+import type { ReportProgress, SyncProgress } from "../api";
 import { profileBackend } from "../profileBackend";
 import { SyncProvider, useSync } from "./SyncContext";
 import { useSyncState } from "../queries/issues";
@@ -26,6 +26,13 @@ vi.mock("../api", async () => {
 });
 
 let progressListener: ((p: SyncProgress) => void) | null = null;
+// The report's frames arrive on their own event, so the provider registers a
+// second listener and this is the handle on it.
+let reportListener: ((p: ReportProgress) => void) | null = null;
+// finishReport resolves the Probe's own report promise, for the same reason
+// finishQuiet exists: runReport wraps an arbitrary action rather than one
+// bound method.
+let finishReport: () => void = () => {};
 // finishQuiet resolves the Probe's own quiet-write promise, the way finish
 // resolves a mocked api call in the other tests below; runQuietLock wraps
 // an arbitrary action rather than one particular bound method, so there is
@@ -35,9 +42,12 @@ let finishQuiet: () => void = () => {};
 beforeEach(() => {
   vi.clearAllMocks();
   progressListener = null;
+  reportListener = null;
   finishQuiet = () => {};
+  finishReport = () => {};
   vi.mocked(api.EventsOn).mockImplementation((name: string, cb: (p: SyncProgress) => void) => {
     if (name === "tam:sync-progress") progressListener = cb;
+    if (name === "tam:report-progress") reportListener = cb as (p: ReportProgress) => void;
     return () => {};
   });
   vi.mocked(api.ListProfiles).mockResolvedValue([
@@ -48,9 +58,12 @@ beforeEach(() => {
 });
 
 function Probe() {
-  const { status, progress, syncError, canSync, runSync, runBoardsRefresh, runQuietLock, lastBoards } = useSync();
+  const { status, progress, syncError, canSync, runSync, runBoardsRefresh, runReport, runQuietLock, lastBoards } = useSync();
   const state = useSyncState("p1");
   const [quiet, setQuiet] = React.useState("idle");
+  // The report's own outcome, so a refusal can be read as the sentence
+  // the caller is handed rather than only as the absence of a run.
+  const [reported, setReported] = React.useState("idle");
   return (
     <div>
       <span data-testid="status">{status}</span>
@@ -59,6 +72,8 @@ function Probe() {
       <span data-testid="count">{state.data?.issueCount ?? "?"}</span>
       <span data-testid="boards">{lastBoards ? lastBoards.dropped.join(", ") || "none dropped" : "no pass"}</span>
       <span data-testid="quiet">{quiet}</span>
+      <span data-testid="stage">{progress?.stage ?? "none"}</span>
+      <span data-testid="report">{reported}</span>
       <button onClick={() => void runSync(false)} disabled={!canSync}>Sync</button>
       <button onClick={() => void runSync(true)}>Full sync</button>
       <button onClick={() => void runBoardsRefresh().catch(() => {})}>Refresh boards</button>
@@ -71,6 +86,16 @@ function Probe() {
         }}
       >
         Quiet write
+      </button>
+      <button
+        onClick={() => {
+          setReported("running");
+          void runReport(() => new Promise<void>((resolve) => { finishReport = resolve; }))
+            .then(() => setReported("done"))
+            .catch((e) => setReported(String(e)));
+        }}
+      >
+        Report
       </button>
     </div>
   );
@@ -240,6 +265,102 @@ describe("SyncProvider", () => {
     await waitFor(() => expect(screen.getByTestId("quiet")).toHaveTextContent(/already running/));
 
     await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" }); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+  });
+  // The sharpest thing in the Reports view is this: a report takes the same
+  // per-profile lock a sync does, so the shell has to say a report is
+  // running rather than staying idle with Sync offered and inert.
+  it("locks sync while a report is being built", async () => {
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+    expect(screen.getByRole("button", { name: "Sync" })).toBeDisabled();
+    // What the shell says before the first frame lands has to be true too.
+    expect(screen.getByTestId("stage")).toHaveTextContent("Building the sprint report");
+
+    await act(async () => { finishReport(); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+    expect(screen.getByRole("button", { name: "Sync" })).toBeEnabled();
+    expect(screen.getByTestId("stage")).toHaveTextContent("none");
+  });
+
+  it("says a sprint is being read for a report rather than that a sync is running", async () => {
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+
+    await act(async () => {
+      reportListener?.({ phase: "velocity", sprintId: 10, sprintName: "Sprint 10", fetched: 25, total: 200, done: false });
+    });
+    expect(screen.getByTestId("stage")).toHaveTextContent("Reading Sprint 10 for the velocity table");
+    expect(screen.getByTestId("progress")).toHaveTextContent("25/200");
+
+    await act(async () => { finishReport(); });
+  });
+
+  // sprintreport.Progress marks the end of one sprint's fetch, and a report
+  // covering six sprints sends six of those. The reducer reads done as "the
+  // pull is over" and clears the bar, so a report that forwarded it would go
+  // silent after its first sprint.
+  it("keeps the bar up when one sprint of a report finishes", async () => {
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+
+    await act(async () => {
+      reportListener?.({ phase: "sprint", sprintId: 11, sprintName: "Sprint 11", fetched: 200, total: 200, done: true });
+    });
+    expect(screen.getByTestId("stage")).toHaveTextContent("Reading Sprint 11");
+    expect(screen.getByTestId("progress")).toHaveTextContent("200/200");
+
+    await act(async () => { finishReport(); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+  });
+
+  it("refuses a report while a sync is running, and says a sync is what is holding the lock", async () => {
+    let finishSync: (v: api.SyncSummary) => void = () => {};
+    vi.mocked(api.SyncIssues).mockImplementation(
+      () => new Promise<api.SyncSummary>((resolve) => { finishSync = resolve; }),
+    );
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Sync" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("report")).toHaveTextContent("a sync is already running for this profile"),
+    );
+    // The report never started, so the sync's own stage is still what the
+    // shell is showing.
+    expect(screen.getByTestId("stage")).toHaveTextContent("Starting");
+
+    await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" }); });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+  });
+
+  // The Reports view cancels the running report and starts the next one in
+  // the same commit on a sprint switch, so the second read can meet a lock
+  // the first is still holding. Calling that a sync would name an
+  // operation the user never started.
+  it("calls a report a report when a report is what is holding the lock", async () => {
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("syncing"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Report" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("report")).toHaveTextContent("a report is already running for this profile"),
+    );
+
+    await act(async () => { finishReport(); });
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
   });
 });

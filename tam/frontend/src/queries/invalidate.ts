@@ -9,7 +9,10 @@ import { keys } from "./keys";
 // bring sprints the profile-wide list has never seen, not only a Boards
 // Refresh (which invalidates the same key itself, in queries/boards.ts).
 // Issue details are left alone; the backend's own cache decides their
-// freshness.
+// freshness. The sprint report is here for the same reason the Boards
+// view's own Refresh invalidates it: a regular sync runs the boards pass
+// too, so it can move a status into or out of the board's last column,
+// which is what a report counts as done.
 export function invalidateProfileData(qc: QueryClient, profileId: string) {
   if (!profileId) return;
   for (const queryKey of [
@@ -25,6 +28,7 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     [profileId, "boardSprintDetails"] as const,
     keys.boardsUnavailable(profileId),
     keys.openSprints(profileId),
+    [profileId, "sprintReport"] as const,
   ]) {
     qc.invalidateQueries({ queryKey });
   }

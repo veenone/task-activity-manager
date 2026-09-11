@@ -241,6 +241,7 @@ export namespace backend {
 	    startDate: string;
 	    endDate: string;
 	    goal: string;
+	    completeDate: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Sprint(source);
@@ -255,6 +256,7 @@ export namespace backend {
 	        this.startDate = source["startDate"];
 	        this.endDate = source["endDate"];
 	        this.goal = source["goal"];
+	        this.completeDate = source["completeDate"];
 	    }
 	}
 	export class TransitionCheck {
@@ -422,6 +424,7 @@ export namespace boardrepo {
 	    startDate: string;
 	    endDate: string;
 	    goal: string;
+	    completeDate: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Sprint(source);
@@ -436,6 +439,7 @@ export namespace boardrepo {
 	        this.startDate = source["startDate"];
 	        this.endDate = source["endDate"];
 	        this.goal = source["goal"];
+	        this.completeDate = source["completeDate"];
 	    }
 	}
 	export class SprintChoice {
@@ -464,6 +468,7 @@ export namespace boardrepo {
 	    startDate: string;
 	    endDate: string;
 	    goal: string;
+	    completeDate: string;
 	    issues: backend.Issue[];
 	    total: number;
 	    done: number;
@@ -486,6 +491,7 @@ export namespace boardrepo {
 	        this.startDate = source["startDate"];
 	        this.endDate = source["endDate"];
 	        this.goal = source["goal"];
+	        this.completeDate = source["completeDate"];
 	        this.issues = this.convertValues(source["issues"], backend.Issue);
 	        this.total = source["total"];
 	        this.done = source["done"];
@@ -1206,6 +1212,105 @@ export namespace profile {
 
 }
 
+export namespace reports {
+	
+	export class Day {
+	    date: string;
+	    scope: number;
+	    completed: number;
+	    remaining: number;
+	    ideal: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Day(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.scope = source["scope"];
+	        this.completed = source["completed"];
+	        this.remaining = source["remaining"];
+	        this.ideal = source["ideal"];
+	    }
+	}
+	export class Series {
+	    sprintId: number;
+	    sprintName: string;
+	    unit: string;
+	    unitReason: string;
+	    committed: number;
+	    added: number;
+	    removed: number;
+	    completed: number;
+	    carriedOver: number;
+	    days: Day[];
+	    truncated: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Series(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sprintId = source["sprintId"];
+	        this.sprintName = source["sprintName"];
+	        this.unit = source["unit"];
+	        this.unitReason = source["unitReason"];
+	        this.committed = source["committed"];
+	        this.added = source["added"];
+	        this.removed = source["removed"];
+	        this.completed = source["completed"];
+	        this.carriedOver = source["carriedOver"];
+	        this.days = this.convertValues(source["days"], Day);
+	        this.truncated = source["truncated"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class VelocityRow {
+	    sprintId: number;
+	    sprintName: string;
+	    unit: string;
+	    unitReason: string;
+	    committed: number;
+	    completed: number;
+	    truncated: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new VelocityRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sprintId = source["sprintId"];
+	        this.sprintName = source["sprintName"];
+	        this.unit = source["unit"];
+	        this.unitReason = source["unitReason"];
+	        this.committed = source["committed"];
+	        this.completed = source["completed"];
+	        this.truncated = source["truncated"];
+	    }
+	}
+
+}
+
 export namespace settings {
 	
 	export class Settings {
@@ -1229,6 +1334,47 @@ export namespace settings {
 	        this.tourSeenVersion = source["tourSeenVersion"];
 	        this.showNavRail = source["showNavRail"];
 	    }
+	}
+
+}
+
+export namespace sprintreport {
+	
+	export class Report {
+	    series: reports.Series;
+	    velocity: reports.VelocityRow[];
+	    builtAt: string;
+	    unavailable: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Report(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.series = this.convertValues(source["series"], reports.Series);
+	        this.velocity = this.convertValues(source["velocity"], reports.VelocityRow);
+	        this.builtAt = source["builtAt"];
+	        this.unavailable = source["unavailable"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

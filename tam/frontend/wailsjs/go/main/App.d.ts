@@ -9,6 +9,7 @@ import {main} from '../models';
 import {boardrepo} from '../models';
 import {issuerepo} from '../models';
 import {settings} from '../models';
+import {sprintreport} from '../models';
 import {journal} from '../models';
 import {importfile} from '../models';
 import {syncer} from '../models';
@@ -18,6 +19,8 @@ export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<
 export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
 
 export function CanTransition(arg1:string,arg2:string,arg3:string):Promise<backend.TransitionCheck>;
+
+export function CancelSprintReport(arg1:string):Promise<void>;
 
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
@@ -60,6 +63,8 @@ export function GetLinkTypes(arg1:string):Promise<Array<backend.LinkType>>;
 export function GetProfileSetting(arg1:string,arg2:string):Promise<string>;
 
 export function GetSettings():Promise<settings.Settings>;
+
+export function GetSprintReport(arg1:string,arg2:number,arg3:number,arg4:boolean):Promise<sprintreport.Report>;
 
 export function GetSubtaskTypeName(arg1:string):Promise<string>;
 
