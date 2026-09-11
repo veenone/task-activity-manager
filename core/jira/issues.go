@@ -33,10 +33,11 @@ type SearchPage struct {
 // RawChangelog is the changelog Jira embeds in a search or get-issue
 // response when the request expands "changelog": the page of histories
 // that came back plus the total the issue's full changelog holds. Data
-// Center caps how many histories one request answers with regardless of
-// the issue search's own maxResults, so Total can exceed len(Histories)
-// even on an issue with no more issues left to page through; that gap is
-// what a caller checks to know a history is a partial one.
+// Center caps how many histories one request answers with, per issue,
+// regardless of the issue search's own maxResults or how many pages of
+// issues remain, so Total can exceed len(Histories) even on the search's
+// very last page; that gap is what a caller checks to know one issue's
+// history came back partial.
 type RawChangelog struct {
 	StartAt    int          `json:"startAt"`
 	MaxResults int          `json:"maxResults"`
@@ -59,7 +60,10 @@ type RawHistory struct {
 // custom field whose id discovery could not resolve. From/To and
 // FromString/ToString are both kept because which pair a field populates
 // depends on the field: most send the readable pair, some only the raw
-// one.
+// one. A reader that wants one value per side, such as
+// tam/internal/backend/jira/history.go, falls back to From/To whenever
+// FromString/ToString came back empty rather than trusting the string pair
+// alone.
 type RawHistoryItem struct {
 	Field      string `json:"field"`
 	FieldID    string `json:"fieldId"`
@@ -83,9 +87,9 @@ var ErrFieldNotFound = errors.New("jira: custom field not found")
 // SearchIssues runs one page of /rest/api/2/search. fields names the fields
 // to return, an empty list asking Jira for its default set; expand names
 // what to expand beyond fields ("changelog" is the one this package uses),
-// left unset by an empty list. url.Values.Encode sorts its keys, so a
-// caller that always passes an empty expand can never move its own query
-// string by this parameter existing: the key is simply never added.
+// left unset by an empty list: a caller that always passes an empty expand
+// never adds the "expand" parameter to the query at all, so its own query
+// string can never be affected by this parameter existing.
 func (c *Client) SearchIssues(ctx context.Context, jql string, fields, expand []string, startAt, maxResults int) (SearchPage, error) {
 	q := url.Values{}
 	q.Set("jql", jql)

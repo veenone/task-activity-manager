@@ -4,11 +4,14 @@ import "context"
 
 // Change is one field change read off an issue's changelog, normalised to
 // the logical field names the rest of TAM already uses for the same field:
-// "status" and "storyPoints" match the names UpdateIssue's field map takes,
-// and "sprint" matches issuerepo's EntitySprint. A backend that speaks raw
-// Jira ids (customfield_NNNNN, which differs per instance) is responsible
-// for that translation itself; nothing downstream of HistoryBackend ever
-// sees a raw id.
+// "storyPoints" matches the name UpdateIssue's field map takes, and
+// "sprint" matches issuerepo's EntitySprint. "status" names a transition
+// target, not a field: Jira moves an issue's status through a transition,
+// never through a field write, so UpdateIssue's map has no entry for it and
+// none is expected here. A backend that speaks raw Jira ids
+// (customfield_NNNNN, which differs per instance) is responsible for that
+// translation itself; nothing downstream of HistoryBackend ever sees a raw
+// id.
 type Change struct {
 	// At is the changelog entry's own timestamp, left exactly as the wire
 	// sent it. Jira's changelog timestamps are not RFC 3339 (the offset
@@ -32,12 +35,14 @@ type IssueHistory struct {
 	// it cannot recognise, and carrying it along would only invite a
 	// caller to guess.
 	Changes []Change
-	// Truncated is true when the issue's changelog holds more entries than
-	// this page carries, which decoding it plainly and asking for the next
-	// page is the whole reason a caller has to check: a truncated history
-	// decodes exactly like a complete one except for this flag, and a
-	// report built from it while ignoring the flag would present partial
-	// numbers as exact ones.
+	// Truncated is true when the issue's changelog carries more entries
+	// than this page of the search returned: a search expansion caps how
+	// many histories one request answers with, per issue, and a truncated
+	// changelog decodes exactly like a complete one except for the
+	// startAt/maxResults/total mismatch this flag is computed from. A
+	// caller has to check it before trusting a count built from Changes,
+	// since presenting a partial history's numbers as exact ones is
+	// exactly what this field exists to prevent.
 	Truncated bool
 }
 

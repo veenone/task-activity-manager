@@ -13,8 +13,14 @@ import (
 
 // historyFields is the field discovery body for the history tests: Sprint
 // and Story Points behind their own per-instance customfield ids, the
-// shape fields.go already resolves for every other read.
-const historyFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true}]`
+// shape fields.go already resolves for every other read. The ids are
+// deliberately not Jira's own defaults (customfield_10020 and
+// customfield_10016): those are exactly what a normaliser hardcoded
+// against the defaults would still match, which would pass every test
+// below without actually reading the discovered ids. An instance that
+// numbers its custom fields differently, which is any instance that is
+// not a brand new Jira install, is what these ids stand in for.
+const historyFields = `[{"id":"customfield_11701","name":"Sprint","custom":true},{"id":"customfield_11702","name":"Story Points","custom":true}]`
 
 func newHistoryServer(t *testing.T, searchBody string) (*jirabackend.Backend, *[]string) {
 	t.Helper()
@@ -102,8 +108,8 @@ func TestSprintAndStoryPointsChangesMatchByTheDiscoveredCustomFieldId(t *testing
 	b, _ := newHistoryServer(t, `{"total":1,"issues":[
 		{"id":"1","key":"PLAT-1","fields":{"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[]},
 		 "changelog":{"startAt":0,"maxResults":100,"total":2,"histories":[
-			{"created":"2026-09-09T10:42:00.000+0000","items":[{"field":"Iteration","fieldId":"customfield_10020","fromString":"","toString":"Sprint 11"}]},
-			{"created":"2026-09-09T11:00:00.000+0000","items":[{"field":"Story Points","fieldId":"customfield_10016","fromString":"2","toString":"3"}]}
+			{"created":"2026-09-09T10:42:00.000+0000","items":[{"field":"Iteration","fieldId":"customfield_11701","fromString":"","toString":"Sprint 11"}]},
+			{"created":"2026-09-09T11:00:00.000+0000","items":[{"field":"Story Points","fieldId":"customfield_11702","fromString":"2","toString":"3"}]}
 		 ]}}
 	]}`)
 	out, _, err := b.SearchIssuesWithHistory(context.Background(), "sprint = 11", 0, 50)
@@ -118,6 +124,13 @@ func TestSprintAndStoryPointsChangesMatchByTheDiscoveredCustomFieldId(t *testing
 	}
 	if out[0].Changes[1].Field != "storyPoints" || out[0].Changes[1].From != "2" || out[0].Changes[1].To != "3" {
 		t.Errorf("story points change = %+v", out[0].Changes[1])
+	}
+	// Changes is documented oldest first; this fixture's two histories carry
+	// different timestamps precisely so an accidental reorder is caught here
+	// rather than by the next task that computes deltas over Changes in
+	// order.
+	if out[0].Changes[0].At >= out[0].Changes[1].At {
+		t.Errorf("changes must stay oldest first: %+v", out[0].Changes)
 	}
 }
 
@@ -134,6 +147,22 @@ func TestAFieldTheNormaliserDoesNotRecogniseIsDropped(t *testing.T) {
 	}
 	if len(out[0].Changes) != 0 {
 		t.Errorf("changes = %+v, want none: assignee is not a field this report reads", out[0].Changes)
+	}
+}
+
+func TestAChangeFallsBackToTheRawPairWhenTheStringPairIsEmpty(t *testing.T) {
+	b, _ := newHistoryServer(t, `{"total":1,"issues":[
+		{"id":"1","key":"PLAT-1","fields":{"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[]},
+		 "changelog":{"startAt":0,"maxResults":100,"total":1,"histories":[
+			{"created":"2026-09-09T10:42:00.000+0000","items":[{"field":"status","fieldId":"status","from":"1","to":"3","fromString":"","toString":""}]}
+		 ]}}
+	]}`)
+	out, _, err := b.SearchIssuesWithHistory(context.Background(), "sprint = 11", 0, 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(out[0].Changes) != 1 || out[0].Changes[0].From != "1" || out[0].Changes[0].To != "3" {
+		t.Errorf("changes = %+v, want the raw pair since the string pair came back empty", out[0].Changes)
 	}
 }
 

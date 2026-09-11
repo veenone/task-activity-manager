@@ -9,38 +9,70 @@ import (
 	demobackend "agile-suite/tam/internal/backend/demo"
 )
 
-func TestSearchIssuesWithHistoryFindsEveryCardThatEverPassedThroughTheClosedSprint(t *testing.T) {
+// sprint11Start is the same instant boards.go's curated Sprint 11 carries as
+// its StartDate ("2026-08-04T09:00:00Z"), written here in the changelog
+// wire's own offset form instead of the Agile API's: Jira's two endpoints
+// really do format a timestamp differently, so the two literals are meant
+// to differ and are not a typo to reconcile. If Sprint 11's start ever
+// moves, this constant has to move with it.
+const sprint11Start = "2026-08-04T09:00:00.000+0000"
+
+func TestSearchIssuesWithHistoryFindsExactlyWhatSearchIssuesPageFinds(t *testing.T) {
 	b := demobackend.New("PLAT")
-	// The filler dataset is seeded but still assigns some of its own rows
-	// to Sprint 11, so the total is not a fixed four: what matters here is
-	// that the four curated cards are found, two of them (PLAT-347 and
-	// PLAT-401) only findable through their history since the dataset's
-	// own current fields have already moved them on.
-	out, total, err := b.SearchIssuesWithHistory(context.Background(), "sprint = 11", 0, 50)
+	withHistory, historyTotal, err := b.SearchIssuesWithHistory(context.Background(), "sprint = 11", 0, 50)
 	if err != nil {
-		t.Fatalf("search: %v", err)
+		t.Fatalf("history search: %v", err)
 	}
-	if total != len(out) {
-		t.Fatalf("total %d, rows %d, want a page covering the whole scope", total, len(out))
+	page, pageTotal, err := b.SearchIssuesPage(context.Background(), "PLAT", "sprint = 11", "", nil, 0, 50)
+	if err != nil {
+		t.Fatalf("page search: %v", err)
 	}
+	if historyTotal != pageTotal {
+		t.Fatalf("history total %d, page total %d, want the same scope", historyTotal, pageTotal)
+	}
+	pageKeys := map[string]bool{}
+	for _, iss := range page {
+		pageKeys[iss.Key] = true
+	}
+	if len(withHistory) != len(pageKeys) {
+		t.Fatalf("history rows %d, page rows %d", len(withHistory), len(pageKeys))
+	}
+	for _, h := range withHistory {
+		if !pageKeys[h.Issue.Key] {
+			t.Errorf("%s came back from SearchIssuesWithHistory but not from SearchIssuesPage for the same jql", h.Issue.Key)
+		}
+	}
+
+	// The curated cards this task's report cases are built on must all be
+	// present: each one's cached sprint is 11 today, which is the only
+	// reason a "sprint = 11" search, real or demo, can still see it.
 	byKey := map[string]backend.IssueHistory{}
-	for _, h := range out {
+	for _, h := range withHistory {
 		byKey[h.Issue.Key] = h
 	}
 	for _, key := range []string{"PLAT-331", "PLAT-385", "PLAT-347", "PLAT-401"} {
 		if _, ok := byKey[key]; !ok {
-			t.Errorf("%s missing from sprint = 11, got keys %v", key, keysOf(out))
+			t.Errorf("%s missing from sprint = 11, got keys %v", key, keysOf(withHistory))
 		}
 	}
+}
 
-	// PLAT-347 and PLAT-401 are cached with a later sprint today; the scope
-	// still finds them because their curated history says they were once in
-	// Sprint 11, the same as Jira's own multi-valued Sprint field would.
-	if byKey["PLAT-347"].Issue.SprintID == "11" {
-		t.Errorf("PLAT-347's current sprint should already have moved on")
+func TestACardThatLeftTheSprintAndNeverReturnedIsInvisibleToTheHistorySearch(t *testing.T) {
+	b := demobackend.New("PLAT")
+	out, _, err := b.SearchIssuesWithHistory(context.Background(), "sprint = 11", 0, 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
 	}
-	if byKey["PLAT-401"].Issue.SprintID == "11" {
-		t.Errorf("PLAT-401's current sprint should already have moved on")
+	// PLAT-398's curated history shows it passing through Sprint 11 before
+	// moving on to Sprint 13 for good, exactly the case a real instance
+	// cannot see either: `sprint = 11` only returns whoever is in the
+	// sprint now, so a card that left mid-flight is never fetched and its
+	// changelog is never read. This dataset has the history on file and
+	// still does not return it, which is the point.
+	for _, h := range out {
+		if h.Issue.Key == "PLAT-398" {
+			t.Fatalf("PLAT-398 left Sprint 11 and never came back; it must not be in the result, got %+v", h)
+		}
 	}
 }
 
@@ -60,7 +92,7 @@ func TestTheCuratedHistoryCoversAnAddALeaveAndReturnAReestimateAndAnEarlyFinish(
 	if len(done.Changes) != 2 || done.Changes[1].Field != "status" || done.Changes[1].To != "Done" {
 		t.Fatalf("PLAT-331 changes = %+v", done.Changes)
 	}
-	if done.Changes[1].At >= "2026-08-04T09:00:00.000+0000" {
+	if done.Changes[1].At >= sprint11Start {
 		t.Errorf("PLAT-331 should finish before the sprint starts, finished at %s", done.Changes[1].At)
 	}
 
@@ -79,16 +111,17 @@ func TestTheCuratedHistoryCoversAnAddALeaveAndReturnAReestimateAndAnEarlyFinish(
 		t.Errorf("PLAT-385 sprint moves = %+v", sprintMoves)
 	}
 
-	// PLAT-347: added to the sprint after it had already started.
+	// PLAT-347: added to the sprint after it had already started, and it
+	// stays, which is what keeps the scope increase visible at all.
 	add := byKey["PLAT-347"]
-	if len(add.Changes) == 0 || add.Changes[0].Field != "sprint" || add.Changes[0].From != "" || add.Changes[0].To != "Sprint 11" {
+	if len(add.Changes) != 1 || add.Changes[0].Field != "sprint" || add.Changes[0].From != "" || add.Changes[0].To != "Sprint 11" {
 		t.Fatalf("PLAT-347 changes = %+v", add.Changes)
 	}
-	if add.Changes[0].At <= "2026-08-04T09:00:00.000+0000" {
+	if add.Changes[0].At <= sprint11Start {
 		t.Errorf("PLAT-347 should be added after the sprint starts, added at %s", add.Changes[0].At)
 	}
 
-	// PLAT-401: re-estimated mid-sprint.
+	// PLAT-401: re-estimated mid-sprint, and it stays too.
 	reestimate := byKey["PLAT-401"]
 	var points *backend.Change
 	for i, c := range reestimate.Changes {

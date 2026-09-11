@@ -9,14 +9,17 @@ import (
 )
 
 // changelogExpand is what SearchIssuesWithHistory asks Jira to expand,
-// beside the fields the row itself is built from. It is its own slice, not
-// shared with SearchIssuesPage: the sync path must never carry it, since a
-// changelog nobody reads there would cost every synced row a second
-// Jira-side lookup for nothing.
+// beside the fields the row itself is built from. The sync path's own
+// search passes nil instead: expand=changelog costs no second request, it
+// makes the one search response carry every row's full history, which
+// Jira has to assemble at real cost and which a sync never reads, so
+// asking for it there would only make every page slower for nothing.
 var changelogExpand = []string{"changelog"}
 
-// The only consumer is a type assertion, so drift here would silently fail
-// the report open to a real Jira; this fails the build instead.
+// Nothing calls this method outside a test yet; its future caller reaches
+// it through a type assertion, so drift here would silently fail the
+// report open to a real Jira before that caller exists to notice. This
+// line fails the build instead.
 var _ backend.HistoryBackend = (*Backend)(nil)
 
 // SearchIssuesWithHistory runs jql with the changelog expanded and maps
@@ -29,20 +32,16 @@ func (b *Backend) SearchIssuesWithHistory(ctx context.Context, jql string, start
 	if err != nil {
 		return nil, 0, err
 	}
-	// projectTypes are resolved per project rather than assumed from a
-	// single call: a jql spanning more than one project (a programme-wide
-	// scope JQL, for instance) still needs each hit's own instance-specific
-	// task and sub-task names, and resolveTypes already caches per project
-	// so a jql that stays inside one project costs nothing extra here.
-	types := map[string]projectTypes{}
+	// Each hit resolves its own project's types rather than assuming a
+	// single call's worth: a jql spanning more than one project (a
+	// programme-wide scope JQL, for instance) still needs each hit's own
+	// instance-specific task and sub-task names. resolveTypes already
+	// caches per project on the backend itself, so a jql that stays inside
+	// one project costs nothing extra here, and a second cache in front of
+	// it would only be duplicate bookkeeping.
 	out := make([]backend.IssueHistory, 0, len(page.Issues))
 	for _, raw := range page.Issues {
-		project := projectOf(raw.Key)
-		pt, ok := types[project]
-		if !ok {
-			pt = b.typesOrEmpty(ctx, project)
-			types[project] = pt
-		}
+		pt := b.typesOrEmpty(ctx, projectOf(raw.Key))
 		out = append(out, backend.IssueHistory{
 			Issue:     parseIssue(raw, ids, b.requirementType, pt),
 			Changes:   normalizeChanges(raw.Changelog.Histories, ids),
@@ -65,10 +64,28 @@ func normalizeChanges(histories []corejira.RawHistory, ids fieldIDs) []backend.C
 			if field == "" {
 				continue
 			}
-			out = append(out, backend.Change{At: h.Created, Field: field, From: item.FromString, To: item.ToString})
+			out = append(out, backend.Change{
+				At:    h.Created,
+				Field: field,
+				From:  stringOrRaw(item.FromString, item.From),
+				To:    stringOrRaw(item.ToString, item.To),
+			})
 		}
 	}
 	return out
+}
+
+// stringOrRaw is the readable half of a changelog item's from/to pair,
+// falling back to the raw half when Jira left the readable one empty: core's
+// RawHistoryItem keeps both because which pair a field populates depends on
+// the field, and a caller that only ever read the string pair would see two
+// empty values on a field that only sent the raw one, indistinguishable from
+// a change that genuinely carried no value on that side.
+func stringOrRaw(readable, raw string) string {
+	if readable != "" {
+		return readable
+	}
+	return raw
 }
 
 // logicalChangeField maps one changelog item's raw field identity to the
@@ -83,10 +100,11 @@ func normalizeChanges(histories []corejira.RawHistory, ids fieldIDs) []backend.C
 // already discovered for the instance it is talking to. The display name
 // is a fallback for the two custom fields only, and only when discovery
 // could not resolve an id (the instance renamed the field, or this
-// backend's field lookup failed): a normaliser keyed on a literal
-// customfield_NNNNN id would match nothing on any other instance, and
-// silently reading it as "matches status" is exactly the mistake this
-// method exists to avoid.
+// backend's field lookup failed): a normaliser keyed on literal
+// customfield_NNNNN ids copied from one instance would still match status,
+// whose id really is a stable literal, and would never match sprint or
+// story points on any instance whose discovered ids differ from those
+// literals, which is every instance but the one they were copied from.
 func logicalChangeField(item corejira.RawHistoryItem, ids fieldIDs) string {
 	switch {
 	case item.FieldID == "status":
