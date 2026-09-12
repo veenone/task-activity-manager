@@ -37,10 +37,9 @@ const RETRY_AFTER_CANCEL_MS = 250;
 // the length of a read is worse than a loading state that says what it is
 // doing.
 //
-// staleTime is infinite because this is the heaviest read TAM makes and a
-// closed sprint's answer rarely moves. A report that went stale on the
-// usual thirty seconds would refetch every time the user came back to the
-// view, for minutes, to rebuild figures that had not moved.
+// staleTime is infinite for a closed sprint because this is the heaviest read
+// TAM makes and its answer rarely moves. A live sprint is stale immediately,
+// with no polling: reopening the view reads its changing report again.
 //
 // Two things do move it, and neither is Jira's history. The board's last
 // column is what done means, so a boards refresh that changes it changes
@@ -49,25 +48,26 @@ const RETRY_AFTER_CANCEL_MS = 250;
 // Both invalidate this key (queries/boards.ts, queries/sprints.ts,
 // queries/invalidate.ts), which is what an infinite staleTime leans on.
 // rebuild is the way a reader asks for it again for any other reason.
-export function useSprintReport(profileId: string, boardId: number, sprintId: number, run: RunLocked) {
-  // The rebuild flag rides on a ref rather than on the query key, so a
+export function useSprintReport(profileId: string, boardId: number, sprintId: number, run: RunLocked, live = false) {
+  // The rebuild intent rides on a ref rather than on the query key, so a
   // rebuilt report replaces the stored one in the same cache entry instead
-  // of becoming a second one the next plain read would flip back from. It
-  // is cleared as the read starts, so only the read the user asked for
-  // carries it.
-  const rebuilding = useRef(false);
+  // of becoming a second one the next plain read would flip back from. The
+  // scope keeps an in-flight rebuild from leaking to a new profile, board or
+  // sprint, and the operation object lets an older request's cleanup leave a
+  // newer rebuild alone.
+  const scope = JSON.stringify(keys.sprintReport(profileId, boardId, sprintId));
+  const rebuilding = useRef<{ scope: string } | null>(null);
   const query = useQuery({
     queryKey: keys.sprintReport(profileId, boardId, sprintId),
     queryFn: () => {
-      const refresh = rebuilding.current;
-      rebuilding.current = false;
+      const refresh = rebuilding.current?.scope === scope;
       return run(() => call(() => GetSprintReport(profileId, boardId, sprintId, refresh)));
     },
     // A sprint id of 0 is a real request: it asks for the board's most
     // recent closed sprint. A negative or fractional one is not, and the
     // api guard would refuse it, so the read is never made.
     enabled: !!profileId && boardId > 0 && Number.isInteger(sprintId) && sprintId >= 0,
-    staleTime: Infinity,
+    staleTime: live ? 0 : Infinity,
     retry: (failures, error) => failures < 1 && isBusyRefusal(error.message),
     retryDelay: RETRY_AFTER_CANCEL_MS,
   });
@@ -77,9 +77,12 @@ export function useSprintReport(profileId: string, boardId: number, sprintId: nu
   // stable across renders, so the callback is too.
   const { refetch } = query;
   const rebuild = useCallback(() => {
-    rebuilding.current = true;
-    return refetch();
-  }, [refetch]);
+    const operation = { scope };
+    rebuilding.current = operation;
+    return refetch().finally(() => {
+      if (rebuilding.current === operation) rebuilding.current = null;
+    });
+  }, [refetch, scope]);
 
   return { report: query, rebuild };
 }

@@ -647,10 +647,16 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The one line a review is read off, so it carries the weight the muted
    qualifications under it deliberately do not. */
 .report-sentence { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
+.report-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 14px 0 12px; }
+.report-metric { min-width: 0; border-top: 2px solid var(--border); padding-top: 6px; }
+.report-metric dt { color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+.report-metric dd span { color: var(--text-muted); font-size: 11px; }
 .report-summary p.muted, .report-summary p.warn-text { margin: 0 0 6px; line-height: 1.45; }
 .report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; max-width: 70ch; }
 .report-unavailable, .report-loading { max-width: 70ch; line-height: 1.45; }
 .report-loading p { margin: 0 0 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 /* The velocity rows, on the same rules .conflict-table draws with: a table
    in this app is a header rule and padded cells, not a box. */
 .report-table { border-collapse: collapse; margin-top: 8px; font-size: 13px; }
@@ -658,3 +664,4 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
 .report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
 .report-row-note { display: block; font-weight: 400; }
+@media (max-width: 720px) { .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

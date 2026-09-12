@@ -258,7 +258,7 @@ export default function App() {
             ) : current.id === "sprints" ? (
               <SprintsView />
             ) : current.id === "reports" ? (
-              <ReportsView />
+              <ReportsView onOpenBoards={() => setView("boards")} />
             ) : (
               <Placeholder view={current} />
             )

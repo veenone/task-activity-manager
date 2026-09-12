@@ -33,12 +33,14 @@ export function amount(n: number, unit: string): string {
 // summarySentence is the sentence a sprint review starts with. The unit is
 // named once, on the first figure, because every figure in it counts the
 // same thing.
-export function summarySentence(s: ReportSeries): string {
+export function summarySentence(s: ReportSeries, live = false): string {
   const name = s.sprintName || "This sprint";
   return (
     `${name} committed ${amount(s.committed, s.unit)}, ` +
     `added ${trimPoints(s.added)}, removed ${trimPoints(s.removed)}, ` +
-    `completed ${trimPoints(s.completed)} and carried over ${trimPoints(s.carriedOver)}.`
+    (live
+      ? `completed ${trimPoints(s.completed)} so far and has ${trimPoints(s.carriedOver)} remaining.`
+      : `completed ${trimPoints(s.completed)} and carried over ${trimPoints(s.carriedOver)}.`)
   );
 }
 

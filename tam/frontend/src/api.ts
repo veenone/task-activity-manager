@@ -236,6 +236,8 @@ export interface Sprint {
   state: string;
   startDate: string;
   endDate: string;
+  // Absent on older cached sprints and fixtures; Reports then uses endDate.
+  completeDate?: string;
   // What the sprint is for. Empty for a sprint cached before schema version
   // 7 added the column, since nothing back-fills it until the next boards
   // refresh, which is why a reader cannot tell an absent goal from one Jira

@@ -342,13 +342,14 @@ func (w *walker) queue(start, last time.Time) []pending {
 // in equal steps. A sprint with no working day at all, a weekend hackathon
 // for instance, keeps its guide flat rather than dividing by zero.
 //
-// elapsed can never exceed working: run only ever calls this with elapsed
-// counted up to the same civil date, stop, that working's own upper bound,
-// end, is at or after, so the fraction below never passes one and the
-// result never needs clamping off zero.
+// An overdue active sprint continues past its planned end. Its ideal line
+// stays at zero rather than turning negative while actual work continues.
 func ideal(committed float64, elapsed, working int) float64 {
 	if working <= 0 {
 		return committed
+	}
+	if elapsed >= working {
+		return 0
 	}
 	return committed * (1 - float64(elapsed)/float64(working))
 }

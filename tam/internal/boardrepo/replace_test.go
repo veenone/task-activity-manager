@@ -19,6 +19,204 @@ func twoColumns() []backend.BoardColumn {
 	}
 }
 
+func reportExists(t *testing.T, r *boardrepo.Repository, profileID string, boardID, sprintID int) bool {
+	t.Helper()
+	_, ok, err := r.Report(context.Background(), profileID, boardID, sprintID)
+	if err != nil {
+		t.Fatalf("read report for %s board %d sprint %d: %v", profileID, boardID, sprintID, err)
+	}
+	return ok
+}
+
+func TestReplaceBoardDropsOnlyThatBoardsReportsWhenTheDoneRuleChanges(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	boardOne := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	boardTwo := backend.Board{ID: 2, Name: "PLAT Delivery", Type: backend.BoardTypeScrum}
+	before := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "Done", StatusIDs: []string{"5", "6"}},
+	}
+	for _, seed := range []struct {
+		profile string
+		board   backend.Board
+	}{
+		{profile: "p1", board: boardOne},
+		{profile: "p1", board: boardTwo},
+		{profile: "p2", board: boardOne},
+	} {
+		if err := r.ReplaceBoard(ctx, seed.profile, seed.board, before, nil, nil); err != nil {
+			t.Fatalf("seed %s board %d: %v", seed.profile, seed.board.ID, err)
+		}
+		if err := r.SaveReport(ctx, seed.profile, seed.board.ID, sampleSeries(12)); err != nil {
+			t.Fatalf("save %s board %d report: %v", seed.profile, seed.board.ID, err)
+		}
+	}
+
+	after := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "Done", StatusIDs: []string{"7"}},
+	}
+	if err := r.ReplaceBoard(ctx, "p1", boardOne, after, nil, nil); err != nil {
+		t.Fatalf("replace board with a new done rule: %v", err)
+	}
+
+	if reportExists(t, r, "p1", 1, 12) {
+		t.Error("changed board's report still exists, want it invalidated with the old done rule")
+	}
+	if !reportExists(t, r, "p1", 2, 12) {
+		t.Error("other board's report was removed")
+	}
+	if !reportExists(t, r, "p2", 1, 12) {
+		t.Error("other profile's report was removed")
+	}
+}
+
+func TestReplaceBoardKeepsReportsWhenTheDoneStatusSetIsUnchanged(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	before := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "Done", StatusIDs: []string{"5", "6"}},
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, before, nil, nil); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	if err := r.SaveReport(ctx, "p1", 1, sampleSeries(12)); err != nil {
+		t.Fatalf("save report: %v", err)
+	}
+
+	after := []backend.BoardColumn{
+		{Name: "Ready", StatusIDs: []string{"2", "1"}},
+		{Name: "Released", StatusIDs: []string{"6", "5"}},
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, after, nil, nil); err != nil {
+		t.Fatalf("replace board without changing its done rule: %v", err)
+	}
+
+	if !reportExists(t, r, "p1", 1, 12) {
+		t.Error("report was removed for reordered done status IDs and unrelated column changes")
+	}
+}
+
+func TestReplaceBoardRollsBackReportInvalidationWhenTheReplacementFails(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	before := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "Done", StatusIDs: []string{"5"}},
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, before, nil, nil); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	if err := r.SaveReport(ctx, "p1", 1, sampleSeries(12)); err != nil {
+		t.Fatalf("save report: %v", err)
+	}
+
+	after := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}},
+		{Name: "Done", StatusIDs: []string{"6"}},
+	}
+	duplicateSprints := []backend.Sprint{
+		{ID: 12, BoardID: 1, Name: "Sprint 12"},
+		{ID: 12, BoardID: 1, Name: "Sprint 12 again"},
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, after, duplicateSprints, nil); err == nil {
+		t.Fatal("replace with duplicate sprint IDs = nil error, want the transaction to fail")
+	}
+
+	if !reportExists(t, r, "p1", 1, 12) {
+		t.Error("report invalidation survived a failed replacement, want it rolled back")
+	}
+	cols, err := r.Columns(ctx, "p1", 1)
+	if err != nil {
+		t.Fatalf("read columns after failed replacement: %v", err)
+	}
+	if len(cols) != 2 || len(cols[1].StatusIDs) != 1 || cols[1].StatusIDs[0] != "5" {
+		t.Errorf("columns after failed replacement = %+v, want the original done rule", cols)
+	}
+}
+
+func TestReplaceBoardDropsASprintReportWhenItsCompleteDateArrives(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	closed := backend.Sprint{
+		ID: 12, BoardID: 1, Name: "Sprint 12", State: "closed",
+		StartDate: "2026-08-18T09:00:00.000+0000",
+		EndDate:   "2026-09-01T09:00:00.000+0000",
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, twoColumns(), []backend.Sprint{closed}, nil); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	if err := r.SaveReport(ctx, "p1", 1, sampleSeries(12)); err != nil {
+		t.Fatalf("save report: %v", err)
+	}
+
+	closed.CompleteDate = "2026-09-03T14:30:00.000+0000"
+	if err := r.ReplaceBoard(ctx, "p1", board, twoColumns(), []backend.Sprint{closed}, nil); err != nil {
+		t.Fatalf("replace board with the actual complete date: %v", err)
+	}
+
+	if reportExists(t, r, "p1", 1, 12) {
+		t.Error("report built to the planned end still exists after the actual complete date arrived")
+	}
+}
+
+func TestReplaceSprintsInvalidatesOnlyReportsWhoseReconstructionInputsChanged(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	before := []backend.Sprint{
+		{ID: 11, BoardID: 1, Name: "Start moved", State: "closed", StartDate: "2026-07-01", EndDate: "2026-07-14"},
+		{ID: 12, BoardID: 1, Name: "Complete arrived", State: "closed", StartDate: "2026-07-15", EndDate: "2026-07-28"},
+		{ID: 13, BoardID: 1, Name: "State changed", State: "active", StartDate: "2026-07-29", EndDate: "2026-08-11"},
+		{ID: 14, BoardID: 1, Name: "Effective end unchanged", State: "closed", StartDate: "2026-08-12", EndDate: "2026-08-25", CompleteDate: "2026-08-27"},
+		{ID: 15, BoardID: 1, Name: "Removed", State: "closed", StartDate: "2026-08-28", EndDate: "2026-09-10"},
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, twoColumns(), before, nil); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	for _, sprint := range before {
+		if err := r.SaveReport(ctx, "p1", 1, sampleSeries(sprint.ID)); err != nil {
+			t.Fatalf("save sprint %d report: %v", sprint.ID, err)
+		}
+	}
+	if err := r.SaveReport(ctx, "p1", 2, sampleSeries(12)); err != nil {
+		t.Fatalf("save other board report: %v", err)
+	}
+	if err := r.SaveReport(ctx, "p2", 1, sampleSeries(12)); err != nil {
+		t.Fatalf("save other profile report: %v", err)
+	}
+
+	after := []backend.Sprint{
+		{ID: 11, BoardID: 1, Name: "Start moved", State: "closed", StartDate: "2026-07-02", EndDate: "2026-07-14"},
+		{ID: 12, BoardID: 1, Name: "Complete arrived", State: "closed", StartDate: "2026-07-15", EndDate: "2026-07-28", CompleteDate: "2026-07-30"},
+		{ID: 13, BoardID: 1, Name: "State changed", State: "closed", StartDate: "2026-07-29", EndDate: "2026-08-11"},
+		{ID: 14, BoardID: 1, Name: "Effective end unchanged", State: "closed", StartDate: "2026-08-12", EndDate: "2026-08-26", CompleteDate: "2026-08-27"},
+	}
+	if err := r.ReplaceSprints(ctx, "p1", 1, after); err != nil {
+		t.Fatalf("replace sprints: %v", err)
+	}
+
+	for _, sprintID := range []int{11, 12, 13, 15} {
+		if reportExists(t, r, "p1", 1, sprintID) {
+			t.Errorf("sprint %d report still exists after its reconstruction inputs changed", sprintID)
+		}
+	}
+	if !reportExists(t, r, "p1", 1, 14) {
+		t.Error("report was removed when the planned end changed but the closed sprint's effective complete date did not")
+	}
+	if !reportExists(t, r, "p1", 2, 12) {
+		t.Error("other board's report was removed")
+	}
+	if !reportExists(t, r, "p2", 1, 12) {
+		t.Error("other profile's report was removed")
+	}
+}
+
 // cardsIn is how many cards the view drew, over every column. The reader
 // below compares it against the number of columns, which is the invariant
 // the two board shapes hold.

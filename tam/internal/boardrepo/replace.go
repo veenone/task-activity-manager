@@ -30,11 +30,20 @@ import (
 func (r *Repository) ReplaceBoard(ctx context.Context, profileID string, b backend.Board, cols []backend.BoardColumn, sprints []backend.Sprint, keys map[string][]string) error {
 	stamp := time.Now().UTC().Format(time.RFC3339)
 	return r.inTx(ctx, func(tx *sql.Tx) error {
+		before, err := columnsOf(ctx, tx, profileID, b.ID)
+		if err != nil {
+			return err
+		}
 		if err := writeBoardRow(ctx, tx, profileID, b, stamp); err != nil {
 			return err
 		}
 		if err := writeColumns(ctx, tx, profileID, b.ID, cols); err != nil {
 			return err
+		}
+		if !sameDoneStatusSet(before, cols) {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM sprint_report WHERE profile_id = ? AND board_id = ?`, profileID, b.ID); err != nil {
+				return fmt.Errorf("clear reports built with board %d's old done rule: %w", b.ID, err)
+			}
 		}
 		if err := writeSprints(ctx, tx, profileID, b.ID, sprints); err != nil {
 			return err
@@ -49,6 +58,33 @@ func (r *Repository) ReplaceBoard(ctx context.Context, profileID string, b backe
 		}
 		return nil
 	})
+}
+
+// sameDoneStatusSet compares the status ids collected by each board's last
+// column. Their order, duplicates, and every earlier column are irrelevant:
+// donerule.Done turns only this last slice into a set, and a saved report
+// needs rebuilding exactly when that set changes.
+func sameDoneStatusSet(before, after []backend.BoardColumn) bool {
+	set := func(cols []backend.BoardColumn) map[string]struct{} {
+		out := map[string]struct{}{}
+		if len(cols) == 0 {
+			return out
+		}
+		for _, id := range cols[len(cols)-1].StatusIDs {
+			out[id] = struct{}{}
+		}
+		return out
+	}
+	a, b := set(before), set(after)
+	if len(a) != len(b) {
+		return false
+	}
+	for id := range a {
+		if _, ok := b[id]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // ReplaceSprints rewrites one board's sprint list and nothing else. It is
@@ -143,6 +179,9 @@ func writeColumns(ctx context.Context, tx *sql.Tx, profileID string, boardID int
 
 // writeSprints replaces one board's sprints, delete then insert.
 func writeSprints(ctx context.Context, tx *sql.Tx, profileID string, boardID int, sprints []backend.Sprint) error {
+	if err := invalidateChangedSprintReports(ctx, tx, profileID, boardID, sprints); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM sprint WHERE profile_id = ? AND board_id = ?`, profileID, boardID); err != nil {
 		return fmt.Errorf("clear sprints of board %d: %w", boardID, err)
 	}

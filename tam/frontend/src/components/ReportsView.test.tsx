@@ -103,13 +103,13 @@ function Loader() {
   return null;
 }
 
-function renderView() {
+function renderView(props: Partial<React.ComponentProps<typeof ReportsView>> = {}) {
   return render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
           <Loader />
-          <ReportsView />
+          <ReportsView {...props} />
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
@@ -155,6 +155,29 @@ describe("ReportsView", () => {
     await screen.findByText(SENTENCE);
     expect(screen.getByText(/Committed is a floor rather than a total/)).toBeInTheDocument();
     expect(screen.getByText(/left and came back/)).toBeInTheDocument();
+  });
+
+  it("shows five labeled figures for quick sprint-review scanning", async () => {
+    renderView();
+    await screen.findByText(SENTENCE);
+    const metrics = document.querySelector(".report-metrics");
+    expect(metrics).not.toBeNull();
+    expect(metrics).toHaveTextContent("Committed34 points");
+    expect(metrics).toHaveTextContent("Added5 points");
+    expect(metrics).toHaveTextContent("Removed2 points");
+    expect(metrics).toHaveTextContent("Completed29 points");
+    expect(metrics).toHaveTextContent("Carried over10 points");
+  });
+
+  it("offers cancel while a report is loading", async () => {
+    const user = userEvent.setup();
+    let release: () => void = () => {};
+    vi.mocked(api.GetSprintReport).mockImplementation(() => new Promise((resolve) => { release = () => resolve(report()); }));
+    renderView();
+    expect(await screen.findByRole("button", { name: "Cancel report" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel report" }));
+    await waitFor(() => expect(api.CancelSprintReport).toHaveBeenCalledWith("p1"));
+    release();
   });
 
   it("prints the method line with the numbers", async () => {
@@ -237,11 +260,66 @@ describe("ReportsView", () => {
     expect(screen.queryByRole("option", { name: "Ops Kanban" })).not.toBeInTheDocument();
   });
 
-  it("offers only the board's closed sprints, newest first", async () => {
+  it("announces board failures and offers both retry and Boards recovery", async () => {
+    const openBoards = vi.fn();
+    vi.mocked(api.ListBoards).mockRejectedValue(new Error("network down"));
+    renderView({ onOpenBoards: openBoards });
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Could not load the boards");
+    expect(alert).not.toHaveTextContent("network down");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Boards" })).toBeInTheDocument();
+  });
+
+  it("keeps a stable Reports heading when the board picker is shown", async () => {
+    renderView();
+    expect(await screen.findByRole("heading", { name: "Reports", level: 2 })).toBeInTheDocument();
+  });
+
+  it("orders closed sprints by actual completion, with planned end as fallback", async () => {
+    vi.mocked(api.ListBoardSprints).mockResolvedValue([
+      sprint({ id: 10, name: "Closed late", endDate: "2026-08-22T09:00:00Z", completeDate: "2026-09-08T09:00:00Z" }),
+      sprint({ id: 11, name: "Older cache", endDate: "2026-09-05T09:00:00Z" }),
+      sprint({ id: 12, name: "No planned end", endDate: "", completeDate: "2026-09-06T09:00:00Z" }),
+    ]);
+    renderView();
+    const picker = await screen.findByRole("combobox", { name: "Sprint" });
+    expect(Array.from(picker.querySelectorAll("option")).map((o) => o.textContent))
+      .toEqual(["Closed late", "No planned end", "Older cache"]);
+  });
+
+  it("offers closed sprints newest first and labeled active sprints, excluding future sprints", async () => {
+    vi.mocked(api.ListBoardSprints).mockResolvedValue([...SPRINTS, sprint({ id: 13, name: "Future", state: "future" })]);
     renderView();
     const picker = await screen.findByRole("combobox", { name: "Sprint" });
     const names = Array.from(picker.querySelectorAll("option")).map((o) => o.textContent);
-    expect(names).toEqual(["Sprint 11", "Sprint 10"]);
+    expect(names).toEqual(["Sprint 11", "Sprint 10", "Sprint 12 (in progress)"]);
+  });
+
+  it("opens an active sprint with provisional wording and refreshes it on demand", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetSprintReport).mockImplementation(async (_profile, _board, id) =>
+      id === 12 ? report({ series: series({ sprintId: 12, sprintName: "Sprint 12" }) }) : report());
+    renderView();
+    await screen.findByText(SENTENCE);
+    await user.selectOptions(screen.getByRole("combobox", { name: "Sprint" }), "12");
+    expect(await screen.findByText(/In progress: these figures are provisional/)).toBeInTheDocument();
+    expect(screen.getByText(/completed 29 so far and has 10 remaining/)).toBeInTheDocument();
+    expect(api.GetSprintReport).toHaveBeenCalledWith("p1", 1, 12, false);
+    await user.click(screen.getByRole("button", { name: "Refresh report" }));
+    await waitFor(() => expect(api.GetSprintReport).toHaveBeenCalledWith("p1", 1, 12, true));
+    expect(screen.getByRole("table", { name: /Velocity/ })).toBeInTheDocument();
+  });
+
+  it("defaults to an active sprint when the board has no closed sprints", async () => {
+    vi.mocked(api.ListBoardSprints).mockResolvedValue([SPRINTS[2]]);
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ sprintId: 12, sprintName: "Sprint 12" }), velocity: [] }));
+    renderView();
+    expect(await screen.findByText(/In progress: these figures are provisional/)).toBeInTheDocument();
+    expect(api.GetSprintReport).toHaveBeenCalledWith("p1", 1, 12, false);
+    expect(api.GetSprintReport).not.toHaveBeenCalledWith("p1", 1, 0, false);
+    expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("12");
+    expect(api.CancelSprintReport).not.toHaveBeenCalled();
   });
 
   // Go builds its velocity table from VelocitySprints, which parses both
@@ -256,7 +334,7 @@ describe("ReportsView", () => {
     renderView();
     const picker = await screen.findByRole("combobox", { name: "Sprint" });
     const names = Array.from(picker.querySelectorAll("option")).map((o) => o.textContent);
-    expect(names).toEqual(["Sprint 11", "Sprint 10"]);
+    expect(names).toEqual(["Sprint 11", "Sprint 10", "Sprint 12 (in progress)"]);
   });
 
   // Phase 5 publishes this table on its own, and the summary's own

@@ -42,7 +42,8 @@ type VelocityRow struct {
 }
 
 // VelocitySprints is which sprints a velocity table is built from and in
-// what order: the closed ones whose start and end dates can both be read,
+// what order: the closed ones whose start and actual completion dates can
+// both be read (planned end is the fallback when completion is absent),
 // the last Depth of those, oldest row first, which is the order a bar
 // chart is read in.
 //
@@ -63,9 +64,7 @@ type VelocityRow struct {
 //
 // One unreportable sprint still gets through: one whose dates both parse
 // and run backwards, an end before its start. Build refuses that with the
-// same ErrNoDates, and a caller assembling a table has to drop it there,
-// because nothing short of parsing both dates here would tell it apart
-// from a sprint that is fine.
+// same ErrNoDates, and a caller assembling a table drops it there.
 func VelocitySprints(sprints []backend.Sprint) []backend.Sprint {
 	type dated struct {
 		sprint backend.Sprint
@@ -79,7 +78,7 @@ func VelocitySprints(sprints []backend.Sprint) []backend.Sprint {
 		if _, err := sprintdate.Parse(sp.StartDate); err != nil {
 			continue
 		}
-		end, err := sprintdate.Parse(sp.EndDate)
+		end, err := sprintEnd(sp)
 		if err != nil {
 			continue
 		}

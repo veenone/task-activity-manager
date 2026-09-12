@@ -54,6 +54,11 @@ describe("amount", () => {
 });
 
 describe("summarySentence", () => {
+  it("describes active sprint work as remaining rather than carried over", () => {
+    expect(summarySentence(series(), true)).toBe(
+      "Sprint 11 committed 34 points, added 5, removed 2, completed 29 so far and has 10 remaining.",
+    );
+  });
   it("names the sprint, the unit, and the five figures a review starts with", () => {
     expect(summarySentence(series())).toBe(
       "Sprint 11 committed 34 points, added 5, removed 2, completed 29 and carried over 10.",

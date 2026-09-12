@@ -33,6 +33,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"agile-suite/tam/internal/backend"
@@ -51,7 +52,7 @@ const (
 // constant on read, rebuilding rather than serving a row a lower version
 // wrote, so the first reconstruction bug is not permanent in every user's
 // database.
-const AlgoVersion = 1
+const AlgoVersion = 2
 
 // ErrNoDates says a sprint cannot be reconstructed because its own dates
 // cannot be read: no start, no end, or an end before its start. Build
@@ -166,7 +167,7 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	if err != nil {
 		return Series{}, fmt.Errorf("sprint %d has no start date TAM can read, so there is nothing to reconstruct: %w: %w", sprint.ID, ErrNoDates, err)
 	}
-	end, err := sprintdate.Parse(sprint.EndDate)
+	end, err := sprintEnd(sprint)
 	if err != nil {
 		return Series{}, fmt.Errorf("sprint %d has no end date TAM can read, so there is nothing to reconstruct: %w: %w", sprint.ID, ErrNoDates, err)
 	}
@@ -179,12 +180,12 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 		return Series{}, err
 	}
 
-	// The walk stops at the sprint's end or at now, whichever comes
-	// first, so a sprint still running is not drawn with days that have
-	// not happened yet. A sprint whose start is still in the future gets
-	// the single day it starts on rather than an empty series.
+	// Active sprints include work through now, even past their planned end.
+	// Closed sprints stop at their close, capped at now for inconsistent
+	// future timestamps. The planned end still anchors an active sprint's
+	// ideal line. A future start yields its single day rather than no series.
 	last := end
-	if now.Before(last) {
+	if strings.EqualFold(strings.TrimSpace(sprint.State), "active") || now.Before(last) {
 		last = now
 	}
 	if last.Before(start) {

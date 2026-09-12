@@ -7,6 +7,7 @@ import {
   truncationLine,
   unitLine,
 } from "../lib/reportText";
+import { ReportMetrics } from "./ReportMetrics";
 
 // SprintSummary is the sentence a sprint review starts with, and everything
 // that sentence is not allowed to be read without.
@@ -21,14 +22,16 @@ import {
 // optional. Committed is a floor and removed sees only the cards that came
 // back, so both figures can be low, and a number that might be low and does
 // not say so is the failure this whole phase was written to avoid.
-export function SprintSummary({ series, builtAt }: { series: ReportSeries; builtAt: string }) {
+export function SprintSummary({ series, builtAt, live = false }: { series: ReportSeries; builtAt: string; live?: boolean }) {
   const unit = unitLine(series.unit, series.unitReason);
   const truncation = truncationLine(series.truncated);
   const built = builtAtLine(builtAt);
   return (
     <div className="report-summary">
       <h3 className="report-heading">{series.sprintName || "This sprint"}</h3>
-      <p className="report-sentence">{summarySentence(series)}</p>
+      {live && <p role="status">In progress: these figures are provisional. Refresh the report for the latest work.</p>}
+      <p className="report-sentence">{summarySentence(series, live)}</p>
+      <ReportMetrics series={series} live={live} />
       <p className="muted small">{floorLine()}</p>
       {unit && <p className="muted small">{unit}</p>}
       {truncation && <p className="warn-text small">{truncation}</p>}

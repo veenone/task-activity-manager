@@ -23,16 +23,15 @@ import { VelocityTable } from "./VelocityTable";
 // rather than runQuietLock. A report runs for minutes with no dialog over
 // it, so the shell has to say so: leaving the reducer idle would leave Sync
 // and Commit enabled and inert for the whole of it.
-export function ReportsView() {
+export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}) {
   const { activeId } = useProfile<Profile, Settings>();
   const { runReport, progress, running } = useSync();
   const [boardId, setBoardId] = useState(0);
   // A sprint id of 0 asks the backend for the board's most recent closed
   // sprint, which is the report the morning after a sprint closes starts
-  // from. It is also what lets this view open before the sprint list has
-  // arrived, rather than waiting for a second read to learn a number the
-  // backend can work out for itself.
+  // from. When none has closed yet, the first active sprint is the default.
   const [sprintId, setSprintId] = useState(0);
+  const [canceling, setCanceling] = useState(false);
 
   // Both belong to the profile they were chosen for, so a switch clears
   // them in the render that first sees the new id, the way SprintsView
@@ -52,8 +51,17 @@ export function ReportsView() {
   const board = scrumBoards.find((b) => b.id === boardId) ?? scrumBoards[0];
   const sprints = useBoardSprints(activeId, board?.id ?? 0);
   const closed = useMemo(() => closedNewestFirst(sprints.data ?? []), [sprints.data]);
+  const active = (sprints.data ?? []).filter((s) => s.state === "active");
+  const offered = [...closed, ...active];
+  const requestedSprintId = sprintId || (closed.length ? 0 : active[0]?.id ?? 0);
+  const live = active.some((s) => s.id === requestedSprintId);
+  const reportBoardId = sprints.isSuccess ? board?.id ?? 0 : 0;
 
-  const { report, rebuild } = useSprintReport(activeId, board?.id ?? 0, sprintId, runReport);
+  // Wait for the list so a board running its first sprint never asks for
+  // a nonexistent closed report before resolving its active default.
+  const { report, rebuild } = useSprintReport(
+    activeId, reportBoardId, requestedSprintId, runReport, live,
+  );
 
   // A report left running in Go after the view has moved on holds the
   // profile against the user's next sync or commit for minutes, for a
@@ -63,11 +71,11 @@ export function ReportsView() {
   // let go of the lock, which is what the one retry in queries/reports.ts
   // is for.
   useEffect(() => {
-    if (!activeId) return;
+    if (!activeId || !reportBoardId) return;
     return () => {
       void call(() => CancelSprintReport(activeId)).catch(() => {});
     };
-  }, [activeId, board?.id, sprintId]);
+  }, [activeId, reportBoardId, requestedSprintId]);
 
   const failure = report.isError ? errMsg(report.error) : "";
   const busy = !!failure && isBusyRefusal(failure);
@@ -84,7 +92,7 @@ export function ReportsView() {
   // there is one, so the control and the heading above the numbers always
   // name the same sprint; before that, 0 means the newest closed sprint,
   // which closedNewestFirst puts first.
-  const shownSprintId = report.data?.series.sprintId || sprintId || closed[0]?.id || 0;
+  const shownSprintId = report.data?.series.sprintId || requestedSprintId || closed[0]?.id || 0;
 
   function loading() {
     // The frame in the shell belongs to whichever operation holds the
@@ -104,6 +112,20 @@ export function ReportsView() {
           makes. A sprint already in the store comes back at once; one that has to be read from Jira, and a
           table of several of them, can take minutes.
         </p>
+        <div className="report-actions">
+          <button
+            type="button"
+            className="btn"
+            disabled={canceling}
+            onClick={() => {
+              setCanceling(true);
+              void call(() => CancelSprintReport(activeId)).finally(() => setCanceling(false));
+            }}
+          >
+            {canceling ? "Canceling report" : "Cancel report"}
+          </button>
+          {canceling && <span className="muted small" role="status">Canceling report…</span>}
+        </div>
       </div>
     );
   }
@@ -112,21 +134,22 @@ export function ReportsView() {
     if (r.unavailable) {
       return <p className="muted report-unavailable" role="status">{unavailableLine(r.unavailable)}</p>;
     }
+    const inProgress = active.some((s) => s.id === r.series.sprintId);
     return (
       <>
-        <SprintSummary series={r.series} builtAt={r.builtAt} />
+        <SprintSummary series={r.series} builtAt={r.builtAt} live={inProgress} />
         {/* Directly under the summary, because the line that says these
             figures are not exact is the last thing the reader saw, and a
             rebuild is the only thing that can replace a report built while
             Jira was cutting changelogs short. */}
         <div className="report-actions">
           <button type="button" className="btn" disabled={report.isFetching} onClick={() => void rebuild()}>
-            Rebuild from Jira
+            {inProgress ? "Refresh report" : "Rebuild from Jira"}
           </button>
           <span className="muted small">
             Reads this sprint and every sprint in the table again instead of serving the stored ones.
           </span>
-          {report.isFetching && <span className="muted small">Rebuilding</span>}
+        {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
         </div>
         <h3 className="report-heading">Velocity</h3>
         <p className="muted small">
@@ -141,21 +164,30 @@ export function ReportsView() {
   function body() {
     if (boards.isError) {
       return (
-        <p className="error-text">
-          Could not load the boards: {boards.error.message}{" "}
+        <p className="error-text" role="alert">
+          Could not load the boards. Retry the request or open Boards to sync them.{" "}
           <button type="button" className="btn" onClick={() => void boards.refetch()}>Retry</button>
+          {onOpenBoards && <button type="button" className="btn" onClick={onOpenBoards}>Open Boards</button>}
         </p>
       );
     }
-    if (boards.isLoading) return <p className="muted">Loading the boards</p>;
+    if (boards.isLoading) return <p className="muted" role="status">Loading the boards</p>;
     if (!board) {
       return (
-        <p className="muted">
-          No scrum board has been synced for this project, so there is no sprint to report on. The Boards view
-          fetches them.
+        <p className="muted" role="status">
+          No scrum board has been synced for this project, so there is no sprint to report on. Open Boards to
+          sync one.
+          {onOpenBoards && <>{" "}<button type="button" className="btn" onClick={onOpenBoards}>Open Boards</button></>}
         </p>
       );
     }
+    if (sprints.isError) {
+      return <p className="error-text" role="alert">
+        Could not load the sprints: {sprints.error.message}{" "}
+        <button type="button" className="btn" onClick={() => void sprints.refetch()}>Retry</button>
+      </p>;
+    }
+    if (sprints.isLoading) return <p className="muted" role="status">Loading the sprints</p>;
     return (
       <>
         {failure && (
@@ -184,6 +216,7 @@ export function ReportsView() {
 
   return (
     <section className="backlog" aria-label="Reports">
+      <h2 className="sr-only">Reports</h2>
       <div className="board-head">
         {/* One scrum board needs no picker, and a select holding one option
             is a control that cannot be used. The board is still named,
@@ -202,17 +235,8 @@ export function ReportsView() {
           board && <h2 className="board-head-name">{board.name}</h2>
         )}
 
-        {/* Only closed sprints are offered. A report is the numbers a
-            review starts with and the velocity table is closed sprints, so
-            a live sprint here would be a fifth thing on screen counting
-            something else.
-
-            This list and the backend's are the same rule but not the same
-            data: a sprint whose end date this frontend cannot read is
-            still offered here, and the backend drops it, so a board can
-            answer noClosedSprint with rows in this picker. That is what
-            unavailableLine's wording for that reason has to survive. */}
-        {closed.length > 0 && (
+        {/* Active sprints are provisional reports; velocity stays closed-only. */}
+        {offered.length > 0 && (
           <label className="board-picker">
             <span>Sprint</span>
             <select
@@ -220,8 +244,8 @@ export function ReportsView() {
               value={String(shownSprintId)}
               onChange={(e) => setSprintId(Number(e.target.value))}
             >
-              {closed.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              {offered.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}{s.state === "active" ? " (in progress)" : ""}</option>
               ))}
             </select>
           </label>
@@ -234,7 +258,8 @@ export function ReportsView() {
 }
 
 // closedNewestFirst is the sprint picker's order, and it mirrors
-// reports.VelocitySprints in Go: closed sprints by end date, newest first,
+// reports.VelocitySprints in Go: closed sprints by actual completion date
+// (planned end when completion is absent), newest first,
 // with the higher id breaking a tie. That is the rule a sprint id of 0
 // resolves through, so the first row of this list is the sprint the view
 // opens on, and the control never points at one sprint while the numbers
@@ -255,7 +280,7 @@ export function ReportsView() {
 function closedNewestFirst(sprints: Sprint[]): Sprint[] {
   const readable = (d: string) => !Number.isNaN(new Date(d).getTime());
   const ended = (s: Sprint) => {
-    const t = new Date(s.endDate).getTime();
+    const t = new Date(s.completeDate?.trim() ? s.completeDate : s.endDate).getTime();
     return Number.isNaN(t) ? -Infinity : t;
   };
   return sprints

@@ -94,6 +94,72 @@ describe("useSprintReport's one retry", () => {
     await settle();
     expect(api.GetSprintReport).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps a rebuild fresh through a busy retry, then clears it for an ordinary refetch", async () => {
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+    const { result } = renderHook(() => useSprintReport("p1", 1, 0, run), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.report.isSuccess).toBe(true));
+
+    vi.mocked(api.GetSprintReport).mockReset()
+      .mockRejectedValueOnce(new Error(BUSY))
+      .mockResolvedValueOnce(report())
+      .mockResolvedValueOnce(report());
+    await act(async () => { await result.current.rebuild(); });
+
+    expect(api.GetSprintReport).toHaveBeenNthCalledWith(1, "p1", 1, 0, true);
+    expect(api.GetSprintReport).toHaveBeenNthCalledWith(2, "p1", 1, 0, true);
+
+    await act(async () => { await result.current.report.refetch(); });
+    expect(api.GetSprintReport).toHaveBeenNthCalledWith(3, "p1", 1, 0, false);
+  });
+
+  it("clears a rebuild after its final busy refusal", async () => {
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+    const { result } = renderHook(() => useSprintReport("p1", 1, 0, run), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.report.isSuccess).toBe(true));
+
+    vi.mocked(api.GetSprintReport).mockReset().mockRejectedValue(new Error(BUSY));
+    await act(async () => { await result.current.rebuild(); });
+    await waitFor(() => expect(result.current.report.isError).toBe(true));
+
+    vi.mocked(api.GetSprintReport).mockReset().mockResolvedValue(report());
+    await act(async () => { await result.current.report.refetch(); });
+    expect(api.GetSprintReport).toHaveBeenCalledWith("p1", 1, 0, false);
+  });
+
+  it("does not carry a running rebuild intent to another report key", async () => {
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+    const { result, rerender } = renderHook(
+      ({ profileId, boardId, sprintId }) => useSprintReport(profileId, boardId, sprintId, run),
+      { wrapper: wrapper(), initialProps: { profileId: "p1", boardId: 1, sprintId: 11 } },
+    );
+    await waitFor(() => expect(result.current.report.isSuccess).toBe(true));
+
+    let finishOld: (value: SprintReport) => void = () => {};
+    vi.mocked(api.GetSprintReport).mockReset()
+      .mockImplementationOnce(() => new Promise<SprintReport>((resolve) => { finishOld = resolve; }))
+      .mockResolvedValue(report());
+    void result.current.rebuild();
+    await waitFor(() => expect(api.GetSprintReport).toHaveBeenCalledWith("p1", 1, 11, true));
+
+    rerender({ profileId: "p2", boardId: 2, sprintId: 22 });
+    await waitFor(() => expect(api.GetSprintReport).toHaveBeenCalledWith("p2", 2, 22, false));
+    finishOld(report());
+  });
+});
+
+describe("live report freshness", () => {
+  it("reads an active sprint again when the view is reopened", async () => {
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+    const qc = createQueryClient();
+    const first = renderHook(() => useSprintReport("p1", 1, 12, run, true), { wrapper: wrapper(qc) });
+    await waitFor(() => expect(first.result.current.report.isSuccess).toBe(true));
+    first.unmount();
+
+    const second = renderHook(() => useSprintReport("p1", 1, 12, run, true), { wrapper: wrapper(qc) });
+    await waitFor(() => expect(api.GetSprintReport).toHaveBeenCalledTimes(2));
+    second.unmount();
+  });
 });
 
 // The report is the one read in TAM with an infinite staleTime, so nothing
