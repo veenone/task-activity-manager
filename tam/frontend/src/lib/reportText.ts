@@ -44,6 +44,14 @@ export function summarySentence(s: ReportSeries, live = false): string {
   );
 }
 
+export function completionLine(s: ReportSeries, live = false): string {
+  if (s.committed <= 0) return live ? "No committed estimate is available yet." : "No committed estimate is available for a completion rate.";
+  const rate = Math.round((s.completed / s.committed) * 100);
+  return live
+    ? `${trimPoints(s.completed)} of ${trimPoints(s.committed)} ${unitWord(s.unit, s.committed)} completed so far (${rate}%).`
+    : `${trimPoints(s.completed)} of ${trimPoints(s.committed)} ${unitWord(s.unit, s.committed)} completed (${rate}%).`;
+}
+
 // floorLine is the qualification that rides with every one of those
 // figures. It is on the surface and not in a footnote because two of them
 // can be low and nothing else on screen would say so.

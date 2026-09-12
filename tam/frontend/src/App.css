@@ -647,12 +647,19 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The one line a review is read off, so it carries the weight the muted
    qualifications under it deliberately do not. */
 .report-sentence { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
+.report-mode { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.report-mode-live { color: var(--accent); }
+.report-mode-closed { color: var(--text-muted); }
+.report-outcome { margin: 0 0 10px; font-weight: 600; }
 .report-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 14px 0 12px; }
 .report-metric { min-width: 0; border-top: 2px solid var(--border); padding-top: 6px; }
 .report-metric dt { color: var(--text-muted); font-size: 11px; font-weight: 600; }
 .report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
 .report-metric dd span { color: var(--text-muted); font-size: 11px; }
 .report-summary p.muted, .report-summary p.warn-text { margin: 0 0 6px; line-height: 1.45; }
+.report-details { margin: 8px 0 0; max-width: 70ch; }
+.report-details summary { color: var(--text-muted); cursor: pointer; font-size: 12px; }
+.report-details p:first-of-type { margin-top: 8px; }
 .report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; max-width: 70ch; }
 .report-unavailable, .report-loading { max-width: 70ch; line-height: 1.45; }
 .report-loading p { margin: 0 0 6px; }
@@ -664,4 +671,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
 .report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
 .report-row-note { display: block; font-weight: 400; }
-@media (max-width: 720px) { .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+  .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-body .board-picker { width: 100%; }
+  .report-body .board-picker select { min-width: 0; width: 100%; }
+  .report-actions .btn { min-height: 44px; }
+}

@@ -1,6 +1,7 @@
 import type { ReportSeries } from "../api";
 import {
   builtAtLine,
+  completionLine,
   floorLine,
   methodLine,
   summarySentence,
@@ -29,13 +30,19 @@ export function SprintSummary({ series, builtAt, live = false }: { series: Repor
   return (
     <div className="report-summary">
       <h3 className="report-heading">{series.sprintName || "This sprint"}</h3>
-      {live && <p role="status">In progress: these figures are provisional. Refresh the report for the latest work.</p>}
+      <p className={`report-mode ${live ? "report-mode-live" : "report-mode-closed"}`} role={live ? "status" : undefined}>
+        {live ? "In progress: these figures are provisional. Refresh the report for the latest work." : "Closed sprint · retrospective report"}
+      </p>
       <p className="report-sentence">{summarySentence(series, live)}</p>
+      <p className="report-outcome">{completionLine(series, live)}</p>
       <ReportMetrics series={series} live={live} />
-      <p className="muted small">{floorLine()}</p>
-      {unit && <p className="muted small">{unit}</p>}
       {truncation && <p className="warn-text small">{truncation}</p>}
-      <p className="muted small">{methodLine()}</p>
+      <details className="report-details">
+        <summary>How this report is calculated</summary>
+        <p className="muted small">{floorLine()}</p>
+        {unit && <p className="muted small">{unit}</p>}
+        <p className="muted small">{methodLine()}</p>
+      </details>
       {built && <p className="muted small">{built}</p>}
     </div>
   );

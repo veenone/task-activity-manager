@@ -160,8 +160,7 @@ describe("ReportsView", () => {
   it("shows five labeled figures for quick sprint-review scanning", async () => {
     renderView();
     await screen.findByText(SENTENCE);
-    const metrics = document.querySelector(".report-metrics");
-    expect(metrics).not.toBeNull();
+    const metrics = screen.getByLabelText("Sprint report figures");
     expect(metrics).toHaveTextContent("Committed34 points");
     expect(metrics).toHaveTextContent("Added5 points");
     expect(metrics).toHaveTextContent("Removed2 points");
