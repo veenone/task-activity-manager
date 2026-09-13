@@ -19,6 +19,8 @@ import (
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/ritualrepo"
+	"agile-suite/tam/internal/suiteprofiles"
 	"agile-suite/tam/internal/tamstore"
 )
 
@@ -131,6 +133,20 @@ func (a *App) initStore() error {
 	a.profiles = profile.NewManager(shared.DB())
 	a.creds = profile.NewCredentialStore()
 	a.settings = settings.NewManager(shared.DB())
+	// Keep the offline preview useful for demo profiles created by an older
+	// build as well as profiles created today. SeedDemo is idempotent and never
+	// replaces a locally edited document.
+	if demoProfiles, listErr := a.profiles.List(); listErr == nil {
+		for _, p := range demoProfiles {
+			if suiteprofiles.IsDemoURL(p.JiraURL) {
+				if seedErr := ritualrepo.New(local.DB()).SeedDemo(context.Background(), p.ID, p.ProjectKey); seedErr != nil {
+					return fmt.Errorf("seed demo rituals for %s: %w", p.ID, seedErr)
+				}
+			}
+		}
+	} else {
+		return fmt.Errorf("list profiles for demo ritual seed: %w", listErr)
+	}
 	log.Printf("tam: local store ready at %s; shared profiles at %s", dbPath, sharedPath)
 	return nil
 }

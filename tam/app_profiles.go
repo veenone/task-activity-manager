@@ -16,6 +16,7 @@ import (
 	"agile-suite/tam/internal/backend"
 	demobackend "agile-suite/tam/internal/backend/demo"
 	jirabackend "agile-suite/tam/internal/backend/jira"
+	"agile-suite/tam/internal/ritualrepo"
 	"agile-suite/tam/internal/suiteprofiles"
 )
 
@@ -69,6 +70,11 @@ func (a *App) CreateProfile(name, jiraURL, projectKey, scopeJQL, token, caCert s
 	if suiteprofiles.IsDemoURL(jiraURL) {
 		if err := a.profiles.SetConfluenceConfig(p.ID, profile.ConfluenceConfig{BaseURL: "demo", SpaceKey: "DEMO", RootPageID: "demo-root"}); err != nil {
 			return profile.Profile{}, fmt.Errorf("save demo Confluence configuration: %w", err)
+		}
+		if a.local != nil {
+			if err := ritualrepo.New(a.local.DB()).SeedDemo(a.ctx, p.ID, p.ProjectKey); err != nil {
+				return profile.Profile{}, fmt.Errorf("seed demo rituals: %w", err)
+			}
 		}
 	}
 	return p, nil
@@ -160,6 +166,11 @@ func (a *App) DeleteProfile(id string) error {
 	if err := a.creds.Delete(id); err != nil {
 		log.Printf("tam: delete credentials for %s: %v", id, err)
 	}
+	if err := a.creds.Delete(profile.ConfluenceCredentialID(id)); err != nil {
+		// Profiles without Confluence configured have no second credential;
+		// credential-store misses are intentionally non-fatal during deletion.
+		log.Printf("tam: delete Confluence credentials for %s: %v", id, err)
+	}
 	if s, err := a.settings.Get(); err == nil && s.DefaultProfileID == id {
 		if err := a.settings.SetDefaultProfileID(""); err != nil {
 			log.Printf("tam: clear default profile after delete: %v", err)
@@ -219,14 +230,17 @@ func testBackend(jiraURL, token, caCert string, allowUntrustedTLS bool) backend.
 // credential, which never leaves the OS credential manager. The field names
 // match XTM's exporter, so a file written by either app imports into the other.
 type profileConfig struct {
-	Name           string `json:"name"`
-	JiraURL        string `json:"jiraUrl"`
-	ProjectKey     string `json:"projectKey"`
-	ScopeJQL       string `json:"scopeJql"`
-	BugIssueType   string `json:"bugIssueType"`
-	BugProjectMode string `json:"bugProjectMode"`
-	BugProjectKey  string `json:"bugProjectKey"`
-	Backend        string `json:"backend"`
+	Name                 string `json:"name"`
+	JiraURL              string `json:"jiraUrl"`
+	ProjectKey           string `json:"projectKey"`
+	ScopeJQL             string `json:"scopeJql"`
+	BugIssueType         string `json:"bugIssueType"`
+	BugProjectMode       string `json:"bugProjectMode"`
+	BugProjectKey        string `json:"bugProjectKey"`
+	Backend              string `json:"backend"`
+	ConfluenceURL        string `json:"confluenceUrl,omitempty"`
+	ConfluenceSpace      string `json:"confluenceSpace,omitempty"`
+	ConfluenceRootPageID string `json:"confluenceRootPageId,omitempty"`
 }
 
 // ExportProfile writes a profile's configuration, without its token, to a
@@ -240,10 +254,15 @@ func (a *App) ExportProfile(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	cc, err := a.profiles.ConfluenceConfig(id)
+	if err != nil {
+		return "", err
+	}
 	data, err := json.MarshalIndent(profileConfig{
 		Name: p.Name, JiraURL: p.JiraURL, ProjectKey: p.ProjectKey, ScopeJQL: p.ScopeJQL,
 		BugIssueType: p.BugIssueType, BugProjectMode: p.BugProjectMode,
 		BugProjectKey: p.BugProjectKey, Backend: p.Backend,
+		ConfluenceURL: cc.BaseURL, ConfluenceSpace: cc.SpaceKey, ConfluenceRootPageID: cc.RootPageID,
 	}, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("encode profile: %w", err)
@@ -296,11 +315,20 @@ func (a *App) ImportProfile() (profile.Profile, error) {
 	if strings.EqualFold(strings.TrimSpace(cfg.Backend), "kiwi") {
 		return profile.Profile{}, errors.New("that is a Kiwi TCMS profile; Task Activity Manager talks to Jira only")
 	}
-	return a.profiles.Create(
+	created, err := a.profiles.Create(
 		strings.TrimSpace(cfg.Name), strings.TrimSpace(cfg.JiraURL), strings.TrimSpace(cfg.ProjectKey),
 		strings.TrimSpace(cfg.ScopeJQL), cfg.BugIssueType, cfg.BugProjectMode, cfg.BugProjectKey,
 		"", false, suiteprofiles.Backend,
 	)
+	if err != nil {
+		return profile.Profile{}, err
+	}
+	if cfg.ConfluenceURL != "" || cfg.ConfluenceSpace != "" || cfg.ConfluenceRootPageID != "" {
+		if err := a.profiles.SetConfluenceConfig(created.ID, profile.ConfluenceConfig{BaseURL: cfg.ConfluenceURL, SpaceKey: cfg.ConfluenceSpace, RootPageID: cfg.ConfluenceRootPageID}); err != nil {
+			return profile.Profile{}, err
+		}
+	}
+	return created, nil
 }
 
 // sanitizeFilename strips the characters a profile name may carry that a
