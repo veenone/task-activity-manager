@@ -4,8 +4,8 @@
 // issue tables, version 3 the shared journal tables, version 4 the
 // cached Jira user list, version 5 the board tables and the issue's status
 // id, version 6 re-keys the sprint table by board, version 7 adds the
-// sprint's goal, and version 8 adds the sprint_report table and the
-// sprint's complete_date.
+// sprint's goal, version 8 adds the sprint_report table and the sprint's
+// complete_date, and version 9 adds local ritual documents.
 package tamstore
 
 import (
@@ -30,9 +30,11 @@ import (
 // Version 8 adds two things: sprint_report, a plain CREATE TABLE IF NOT
 // EXISTS that needs no migration entry at all, and the sprint's
 // complete_date, a column add in version 7's own shape.
+// Version 9 adds ritual_document through the same idempotent base DDL path
+// as sprint_report.
 var Schema = store.Schema{
-	Version: 8,
-	Base:    baseDDL + sprintDDL + sprintReportDDL + journal.DDL,
+	Version: 9,
+	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -246,11 +248,34 @@ CREATE TABLE IF NOT EXISTS sprint_report (
 	PRIMARY KEY (profile_id, board_id, sprint_id)
 );`
 
+// ritualDocumentDDL holds one locally editable document for each ritual in
+// one board's copy of a sprint. The four-part key keeps profiles, boards,
+// sprints, and ritual types from overwriting one another. Publish metadata
+// stays with the draft so an explicit publish can update its existing page.
+const ritualDocumentDDL = `
+CREATE TABLE IF NOT EXISTS ritual_document (
+	profile_id        TEXT NOT NULL,
+	board_id          INTEGER NOT NULL,
+	sprint_id         INTEGER NOT NULL,
+	ritual_type       TEXT NOT NULL,
+	title             TEXT NOT NULL DEFAULT '',
+	remark            TEXT NOT NULL DEFAULT '',
+	body              TEXT NOT NULL DEFAULT '',
+	issue_keys_json   TEXT NOT NULL DEFAULT '[]',
+	confluence_page_id TEXT NOT NULL DEFAULT '',
+	confluence_version INTEGER NOT NULL DEFAULT 0,
+	status            TEXT NOT NULL DEFAULT '',
+	updated_at        TEXT NOT NULL DEFAULT '',
+	published_at      TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, sprint_id, ritual_type)
+);`
+
 const indexDDL = `
 CREATE INDEX IF NOT EXISTS issue_profile_type   ON issue (profile_id, type);
 CREATE INDEX IF NOT EXISTS issue_profile_sprint ON issue (profile_id, sprint_id);
 CREATE INDEX IF NOT EXISTS jira_user_profile_display ON jira_user (profile_id, display_name);
-CREATE INDEX IF NOT EXISTS board_issue_lookup    ON board_issue (profile_id, board_id, sprint_id);`
+CREATE INDEX IF NOT EXISTS board_issue_lookup    ON board_issue (profile_id, board_id, sprint_id);
+CREATE INDEX IF NOT EXISTS ritual_document_profile ON ritual_document (profile_id);`
 
 // Open opens (or creates) TAM's database at path.
 func Open(path string) (*store.DB, error) { return store.Open(path, Schema) }
