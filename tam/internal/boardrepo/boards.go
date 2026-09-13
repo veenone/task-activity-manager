@@ -59,7 +59,7 @@ func (r *Repository) RemoveBoards(ctx context.Context, profileID string, boardID
 	}
 	return r.inTx(ctx, func(tx *sql.Tx) error {
 		for _, id := range boardIDs {
-			for _, table := range []string{"board_column", "board_issue", "sprint", "sprint_report", "board"} {
+			for _, table := range []string{"board_column", "board_issue", "sprint", "sprint_report", "ritual_document", "board"} {
 				column := "board_id"
 				if table == "board" {
 					column = "id"

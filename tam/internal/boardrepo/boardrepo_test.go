@@ -233,6 +233,39 @@ func TestRemoveBoardsTakesTheChildrenWithIt(t *testing.T) {
 	}
 }
 
+func TestRemoveBoardsClearsRitualDocuments(t *testing.T) {
+	ctx := context.Background()
+	r, db := newRepo(t)
+
+	for _, boardID := range []int{1, 2} {
+		if _, err := db.Exec(`INSERT INTO ritual_document
+			(profile_id, board_id, sprint_id, ritual_type, status)
+			VALUES ('p1', ?, 12, 'review', 'draft')`, boardID); err != nil {
+			t.Fatalf("seed board %d: %v", boardID, err)
+		}
+	}
+
+	if err := r.RemoveBoards(ctx, "p1", []int{1}); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE board_id = 1`).Scan(&remaining); err != nil {
+		t.Fatalf("count board 1: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("board 1 left %d ritual rows behind", remaining)
+	}
+
+	var untouched int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE board_id = 2`).Scan(&untouched); err != nil {
+		t.Fatalf("count board 2: %v", err)
+	}
+	if untouched != 1 {
+		t.Fatalf("board 2 has %d ritual rows, want 1", untouched)
+	}
+}
+
 func TestBoardTablesAreScopedToTheProfile(t *testing.T) {
 	r, db := newRepo(t)
 	ctx := context.Background()
