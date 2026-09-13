@@ -56,11 +56,7 @@ export function completionLine(s: ReportSeries, live = false): string {
 // figures. It is on the surface and not in a footnote because two of them
 // can be low and nothing else on screen would say so.
 export function floorLine(): string {
-  return (
-    "Committed is a floor rather than a total, and removed counts only the cards that left and came back. " +
-    "A sprint's issues are read with a search for the sprint's current members, " +
-    "so a card taken out while the sprint ran and left out was never fetched and leaves no trace here."
-  );
+  return "Committed is a minimum estimate. Removed counts cards that left and later returned; cards removed for good are not visible.";
 }
 
 // unitLine says why a report counts cards, and is empty for one counting
@@ -72,16 +68,12 @@ export function unitLine(unit: string, unitReason: string): string {
   if (unit !== "cards") return "";
   if (unitReason === "nothingEstimated") {
     return (
-      "These figures count cards rather than points: story points are in evidence somewhere in this sprint's issues or their history, " +
-      "and nothing inside the sprint's own window ever carried a value. " +
-      "Estimating the cards would give this board a points report."
+      "This report counts cards because points appear in the sprint or its history, but none were set during the sprint. Estimate the cards to report points."
     );
   }
   if (unitReason === "noPointsFieldSeen") {
     return (
-      "These figures count cards rather than points: nothing in this sprint's issues or their history mentions story points at all. " +
-      "That is what an instance without a story points field looks like from here, " +
-      "and it is also what a board that has one and has never used it looks like, so TAM cannot tell those two apart."
+      "This report counts cards because no story points appear in the sprint or its history. TAM cannot tell whether the field is missing or unused."
     );
   }
   return "These figures count cards rather than points.";
@@ -93,22 +85,14 @@ export function unitLine(unit: string, unitReason: string): string {
 // these rows to Confluence out of this module, where there is no paragraph
 // beside them to borrow the qualification from.
 export function velocityFloorLine(): string {
-  return (
-    "Committed is a floor in every row rather than a total. A sprint's issues are read with a search for its " +
-    "current members, so a card taken out while the sprint ran and left out was never fetched and is counted " +
-    "in no row here."
-  );
+  return "Committed is a minimum estimate in every row. Cards removed for good are not visible in the table.";
 }
 
 // methodLine is printed with the numbers rather than kept in a document,
 // because TAM's figures and Jira's are computed from different sources and
 // the disagreement surfaces in the middle of a review.
 export function methodLine(): string {
-  return (
-    "How this is counted: done means a status the board's last column collects; " +
-    "the history is reconstructed from Jira's public changelog rather than from Jira's own stored sprint records, " +
-    "so these figures can differ from Jira's; and a removal is only visible for a card that came back."
-  );
+  return "Done means the board's last column. TAM uses Jira history, so totals may differ from Jira. Removed cards count only when they return.";
 }
 
 // MAX_NAMED_KEYS caps the keys truncationLine prints, so a sprint where

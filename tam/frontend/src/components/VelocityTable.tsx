@@ -25,6 +25,7 @@ export function VelocityTable({ rows }: { rows: VelocityRow[] }) {
   }
   return (
     <>
+      <div className="report-table-wrap">
       <table className="report-table">
         <caption className="sr-only">Velocity, oldest sprint first</caption>
         <thead>
@@ -52,6 +53,7 @@ export function VelocityTable({ rows }: { rows: VelocityRow[] }) {
           ))}
         </tbody>
       </table>
+      </div>
       <p className="muted small">{velocityFloorLine()}</p>
     </>
   );

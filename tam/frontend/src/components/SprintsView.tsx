@@ -315,7 +315,7 @@ export function SprintsView() {
           board && <h2 className="board-head-name">{board.name}</h2>
         )}
 
-        <label className="check-row" htmlFor="sprints-show-closed">
+        <label className="check-row sprints-show-closed" htmlFor="sprints-show-closed">
           <input
             id="sprints-show-closed"
             type="checkbox"

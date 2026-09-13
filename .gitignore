@@ -36,6 +36,7 @@ Thumbs.db
 skills-lock.json
 agentdb.rvf
 agentdb.rvf.lock
+.python-version
 
 docs/dist/
 docs/.env

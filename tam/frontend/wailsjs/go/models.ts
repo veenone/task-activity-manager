@@ -697,6 +697,226 @@ export namespace committer {
 
 }
 
+export namespace confluence {
+	
+	export class PageLinks {
+	    webui: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageLinks(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.webui = source["webui"];
+	    }
+	}
+	export class ChildPage {
+	    id: string;
+	    title: string;
+	    type: string;
+	    status: string;
+	    _links: PageLinks;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChildPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.type = source["type"];
+	        this.status = source["status"];
+	        this._links = this.convertValues(source["_links"], PageLinks);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ChildPageResult {
+	    results: ChildPage[];
+	    start: number;
+	    limit: number;
+	    size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChildPageResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.results = this.convertValues(source["results"], ChildPage);
+	        this.start = source["start"];
+	        this.limit = source["limit"];
+	        this.size = source["size"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PageView {
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.value = source["value"];
+	    }
+	}
+	export class PageStorage {
+	    value: string;
+	    representation: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageStorage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.value = source["value"];
+	        this.representation = source["representation"];
+	    }
+	}
+	export class PageBody {
+	    storage: PageStorage;
+	    view: PageView;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageBody(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.storage = this.convertValues(source["storage"], PageStorage);
+	        this.view = this.convertValues(source["view"], PageView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PageVersion {
+	    number: number;
+	    when: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageVersion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.number = source["number"];
+	        this.when = source["when"];
+	    }
+	}
+	export class PageSpace {
+	    key: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageSpace(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	    }
+	}
+	export class Page {
+	    id: string;
+	    title: string;
+	    space: PageSpace;
+	    version: PageVersion;
+	    _links: PageLinks;
+	    body: PageBody;
+	
+	    static createFrom(source: any = {}) {
+	        return new Page(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.space = this.convertValues(source["space"], PageSpace);
+	        this.version = this.convertValues(source["version"], PageVersion);
+	        this._links = this.convertValues(source["_links"], PageLinks);
+	        this.body = this.convertValues(source["body"], PageBody);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
+
+}
+
 export namespace importer {
 	
 	export class Mapping {
@@ -1154,6 +1374,22 @@ export namespace main {
 
 export namespace profile {
 	
+	export class ConfluenceConfig {
+	    baseURL: string;
+	    spaceKey: string;
+	    rootPageID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConfluenceConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.baseURL = source["baseURL"];
+	        this.spaceKey = source["spaceKey"];
+	        this.rootPageID = source["rootPageID"];
+	    }
+	}
 	export class Profile {
 	    id: string;
 	    name: string;
@@ -1208,6 +1444,26 @@ export namespace profile {
 		    }
 		    return a;
 		}
+	}
+	export class RitualAssociation {
+	    boardID: number;
+	    sprintID: number;
+	    ritualType: string;
+	    pageID: string;
+	    pageTitle: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RitualAssociation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.boardID = source["boardID"];
+	        this.sprintID = source["sprintID"];
+	        this.ritualType = source["ritualType"];
+	        this.pageID = source["pageID"];
+	        this.pageTitle = source["pageTitle"];
+	    }
 	}
 
 }

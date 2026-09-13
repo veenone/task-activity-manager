@@ -56,6 +56,31 @@ CREATE TABLE IF NOT EXISTS app_setting (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS confluence_profile (
+	profile_id TEXT PRIMARY KEY,
+	base_url TEXT NOT NULL DEFAULT '',
+	space_key TEXT NOT NULL DEFAULT '',
+	root_page_id TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS confluence_association (
+	profile_id TEXT NOT NULL,
+	board_id INTEGER NOT NULL DEFAULT 0,
+	sprint_id INTEGER NOT NULL DEFAULT 0,
+	ritual_type TEXT NOT NULL,
+	page_id TEXT NOT NULL,
+	page_title TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, sprint_id, ritual_type, page_id)
+);
+
+CREATE TABLE IF NOT EXISTS confluence_page_cache (
+	profile_id TEXT NOT NULL,
+	page_id TEXT NOT NULL,
+	fetched_at TEXT NOT NULL,
+	payload TEXT NOT NULL,
+	PRIMARY KEY (profile_id, page_id)
+);
 `,
 }
 

@@ -66,6 +66,11 @@ func (a *App) CreateProfile(name, jiraURL, projectKey, scopeJQL, token, caCert s
 			return profile.Profile{}, fmt.Errorf("save credentials: %w", err)
 		}
 	}
+	if suiteprofiles.IsDemoURL(jiraURL) {
+		if err := a.profiles.SetConfluenceConfig(p.ID, profile.ConfluenceConfig{BaseURL: "demo", SpaceKey: "DEMO", RootPageID: "demo-root"}); err != nil {
+			return profile.Profile{}, fmt.Errorf("save demo Confluence configuration: %w", err)
+		}
+	}
 	return p, nil
 }
 

@@ -11,6 +11,7 @@ import { EpicsView } from "./components/EpicsView";
 import { BoardsView } from "./components/BoardsView";
 import { SprintsView } from "./components/SprintsView";
 import { ReportsView } from "./components/ReportsView";
+import { RitualsView } from "./components/RitualsView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
 import { PendingChangesModal } from "./components/PendingChangesModal";
@@ -259,6 +260,8 @@ export default function App() {
               <SprintsView />
             ) : current.id === "reports" ? (
               <ReportsView onOpenBoards={() => setView("boards")} />
+            ) : current.id === "rituals" ? (
+              <RitualsView />
             ) : (
               <Placeholder view={current} />
             )

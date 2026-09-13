@@ -53,13 +53,25 @@ export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClos
   const duplicate = otherNames.some(
     (n) => n.trim().toLowerCase() === draft.values.name.trim().toLowerCase() && draft.values.name.trim() !== "",
   );
+  const originalStart = dayInput(sprint.startDate);
   const originalEnd = dayInput(sprint.endDate);
+  const dateChanged = draft.values.from !== originalStart || draft.values.to !== originalEnd;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (edit.isPending) return;
     const values = draft.validate();
     if (!values) return;
+    if (duplicate) {
+      const ok = await confirm({
+        title: "Use a duplicate sprint name?",
+        message: `Another sprint on this board is already called ${values.name}. Jira allows duplicate names, but they can make reports and picker choices harder to tell apart.`,
+        confirmLabel: "Use this name",
+        cancelLabel: "Keep editing",
+        danger: false,
+      });
+      if (!ok) return;
+    }
     // Moving a running sprint's end date is the one edit here with a
     // consequence outside this window: Jira takes the new date at once, and
     // every burndown and every board reading that sprint moves with it. It
@@ -123,13 +135,16 @@ export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClos
     // once its observer is gone.
     <Modal
       onClose={onClose}
-      className="modal pending-modal"
+      className="modal pending-modal edit-sprint-modal"
       labelledBy="edit-sprint-title"
       closeOnOverlayClick={false}
       closeOnEsc={!edit.isPending}
     >
       <div className="pending-head">
-        <h2 id="edit-sprint-title">{`Edit ${sprint.name}`}</h2>
+        <div className="edit-sprint-title">
+          <h2 id="edit-sprint-title">{`Edit ${sprint.name}`}</h2>
+          <p>Changes save to Jira immediately.</p>
+        </div>
         <ImmediateWriteChip />
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
@@ -140,6 +155,7 @@ export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClos
           suggestion={undefined}
           suggestionError={null}
           suggesting={false}
+          dateChanged={dateChanged}
           nameNote={duplicate ? "Another sprint on this board is already called that." : undefined}
         />
       </form>

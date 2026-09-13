@@ -108,9 +108,8 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
       <div className="report-loading">
         <p className="muted" role="status">{`${stage}${count}`}</p>
         <p className="muted small">
-          A report fetches each sprint's issues together with their changelogs, which is the heaviest read TAM
-          makes. A sprint already in the store comes back at once; one that has to be read from Jira, and a
-          table of several of them, can take minutes.
+          This can take a little longer because TAM reads each issue's history. A sprint already in the store
+          comes back at once; a fresh read from Jira may take a few minutes.
         </p>
         <div className="report-actions">
           <button
@@ -147,14 +146,14 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             {inProgress ? "Refresh report" : "Rebuild from Jira"}
           </button>
           <span className="muted small">
-            Reads this sprint and every sprint in the table again instead of serving the stored ones.
+            Reads this sprint and the comparison rows again instead of using saved results.
           </span>
         {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
         </div>
         <h3 className="report-heading">Velocity</h3>
         <p className="muted small">
-          This board's last closed sprints, oldest first. Each row carries its own unit, because a board that
-          moved from story points to counting cards holds two quantities rather than one column of numbers.
+          Recent closed sprints on this board, oldest first. Each row shows its own unit so points and cards stay
+          distinct when a board changes how it estimates work.
         </p>
         <VelocityTable rows={r.velocity} />
       </>
@@ -217,7 +216,8 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   return (
     <section className="backlog" aria-label="Reports">
       <h2 className="sr-only">Reports</h2>
-      <div className="board-head">
+      <div className="report-frame">
+        <div className="board-head">
         {/* One scrum board needs no picker, and a select holding one option
             is a control that cannot be used. The board is still named,
             since the report on screen belongs to it and nothing else says
@@ -250,9 +250,10 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             </select>
           </label>
         )}
-      </div>
+        </div>
 
-      <div className="report-body">{body()}</div>
+        <div className="report-body">{body()}</div>
+      </div>
     </section>
   );
 }

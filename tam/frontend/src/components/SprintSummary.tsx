@@ -31,10 +31,10 @@ export function SprintSummary({ series, builtAt, live = false }: { series: Repor
     <div className="report-summary">
       <h3 className="report-heading">{series.sprintName || "This sprint"}</h3>
       <p className={`report-mode ${live ? "report-mode-live" : "report-mode-closed"}`} role={live ? "status" : undefined}>
-        {live ? "In progress: these figures are provisional. Refresh the report for the latest work." : "Closed sprint · retrospective report"}
+        {live ? "In progress: these figures are provisional. They may change as work moves." : "Closed sprint · final results"}
       </p>
       <p className="report-sentence">{summarySentence(series, live)}</p>
-      <p className="report-outcome">{completionLine(series, live)}</p>
+      <p className="report-outcome"><span className="report-outcome-label">Sprint outcome</span>{completionLine(series, live)}</p>
       <ReportMetrics series={series} live={live} />
       {truncation && <p className="warn-text small">{truncation}</p>}
       <details className="report-details">

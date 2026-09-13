@@ -153,8 +153,8 @@ describe("ReportsView", () => {
   it("says under the sentence that committed is a floor and removed sees only the cards that came back", async () => {
     renderView();
     await screen.findByText(SENTENCE);
-    expect(screen.getByText(/Committed is a floor rather than a total/)).toBeInTheDocument();
-    expect(screen.getByText(/left and came back/)).toBeInTheDocument();
+    expect(screen.getByText(/Committed is a minimum estimate\. Removed counts cards that left and later returned/)).toBeInTheDocument();
+    expect(screen.getByText(/left and later returned/)).toBeInTheDocument();
   });
 
   it("shows five labeled figures for quick sprint-review scanning", async () => {
@@ -182,8 +182,8 @@ describe("ReportsView", () => {
   it("prints the method line with the numbers", async () => {
     renderView();
     await screen.findByText(SENTENCE);
-    expect(screen.getByText(/done means a status the board's last column collects/)).toBeInTheDocument();
-    expect(screen.getByText(/public changelog rather than from Jira's own stored sprint records/)).toBeInTheDocument();
+    expect(screen.getByText(/Done means the board's last column/)).toBeInTheDocument();
+    expect(screen.getByText(/TAM uses Jira history, so totals may differ from Jira/)).toBeInTheDocument();
   });
 
   it("counts points and explains nothing when that is what the sprint was estimated in", async () => {
@@ -198,7 +198,7 @@ describe("ReportsView", () => {
     );
     renderView();
     expect(await screen.findByText(/Sprint 11 committed 12 cards/)).toBeInTheDocument();
-    expect(screen.getByText(/Estimating the cards would give this board a points report/)).toBeInTheDocument();
+    expect(screen.getByText(/Estimate the cards to report points/)).toBeInTheDocument();
   });
 
   it("counts cards and does not claim the instance has no story points field", async () => {
@@ -207,7 +207,7 @@ describe("ReportsView", () => {
     );
     renderView();
     expect(await screen.findByText(/Sprint 11 committed 12 cards/)).toBeInTheDocument();
-    expect(screen.getByText(/cannot tell those two apart/)).toBeInTheDocument();
+    expect(screen.getByText(/field is missing or unused/)).toBeInTheDocument();
   });
 
   it("names the cards whose changelog came back cut short and refuses to call the figures exact", async () => {
@@ -341,7 +341,7 @@ describe("ReportsView", () => {
   it("qualifies the velocity table's Committed column beside the table itself", async () => {
     renderView();
     await screen.findByText(SENTENCE);
-    expect(screen.getByText(/Committed is a floor in every row/)).toBeInTheDocument();
+    expect(screen.getByText(/Committed is a minimum estimate in every row/)).toBeInTheDocument();
   });
 
   it("reads the sprint the user picks", async () => {
@@ -411,7 +411,7 @@ describe("ReportsView's eight states", () => {
     // Not merely still present: still the report it was, figure for figure,
     // with its velocity rows and its qualification intact.
     expect(screen.getByText(SENTENCE)).toBeInTheDocument();
-    expect(screen.getByText(/Committed is a floor rather than a total/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Committed is a minimum estimate/).length).toBeGreaterThan(0);
     expect(screen.getByRole("row", { name: /Sprint 10/ })).toHaveTextContent("30 points");
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });

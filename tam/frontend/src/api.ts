@@ -9,7 +9,7 @@
 // class's createFrom so the binding receives the shape it declares.
 
 import * as App from "../wailsjs/go/main/App";
-import { backend, importer, issuerepo } from "../wailsjs/go/models";
+import { backend, confluence, importer, issuerepo, profile } from "../wailsjs/go/models";
 
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 export type { SyncProgress } from "@agile-suite/core";
@@ -38,6 +38,11 @@ export interface Settings {
   // that predate it.
   showNavRail?: boolean;
 }
+
+export interface ConfluenceConfig { baseURL: string; spaceKey: string; rootPageID: string }
+export type ConfluencePage = confluence.Page;
+export type ConfluenceChildPageResult = confluence.ChildPageResult;
+export interface RitualAssociation { boardID: number; sprintID: number; ritualType: string; pageID: string; pageTitle: string }
 
 export interface HealthInfo {
   ok: boolean;
@@ -1075,6 +1080,15 @@ export const GetSubtaskTypeName: (profileId: string) => Promise<string> =
   App.GetSubtaskTypeName;
 
 export const GetLinkTypes: (profileId: string) => Promise<LinkType[]> = App.GetLinkTypes;
+export const GetConfluenceConfig: (profileId: string) => Promise<ConfluenceConfig> = App.GetConfluenceConfig as any;
+export const SetConfluenceConfig = (profileId: string, config: ConfluenceConfig, token: string): Promise<void> =>
+  App.SetConfluenceConfig(profileId, profile.ConfluenceConfig.createFrom(config), token);
+export const GetConfluencePage: (profileId: string, pageId: string) => Promise<ConfluencePage> = App.GetConfluencePage as any;
+export const ListConfluenceChildPages: (profileId: string, parentId: string, start: number, limit: number) => Promise<ConfluenceChildPageResult> = App.ListConfluenceChildPages as any;
+export const GetRitualPage: (profileId: string, pageId: string) => Promise<ConfluencePage> = App.GetRitualPage as any;
+export const ListRitualAssociations: (profileId: string, boardId: number, sprintId: number) => Promise<RitualAssociation[]> = App.ListRitualAssociations as any;
+export const SetRitualAssociation = (profileId: string, association: RitualAssociation): Promise<void> => App.SetRitualAssociation(profileId, profile.RitualAssociation.createFrom(association));
+export const DeleteRitualAssociation = (profileId: string, association: RitualAssociation): Promise<void> => App.DeleteRitualAssociation(profileId, profile.RitualAssociation.createFrom(association));
 // LookupIssue is cast the same way ListIssues is above: the generated
 // binding types the issue type as a plain string, narrowed to IssueType here.
 export const LookupIssue = (profileId: string, key: string): Promise<Issue> =>

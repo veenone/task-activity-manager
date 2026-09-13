@@ -24,11 +24,11 @@ var ErrNotFound = errors.New("profile not found")
 // the OS credential manager (see CredentialStore) — never in this struct or the
 // database.
 type Profile struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	JiraURL      string `json:"jiraUrl"`
-	ProjectKey   string `json:"projectKey"`
-	ScopeJQL     string `json:"scopeJql"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	JiraURL    string `json:"jiraUrl"`
+	ProjectKey string `json:"projectKey"`
+	ScopeJQL   string `json:"scopeJql"`
 	// CrossProjectSources is a comma-separated list of project keys this profile
 	// may link preconditions, test calls, and cloned steps from (across
 	// projects, RND_P_4TFINT_05-322). Empty disables cross-project linking.
@@ -56,6 +56,93 @@ type Profile struct {
 	// not a PAT.
 	Backend   string    `json:"backend"`
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+// ConfluenceConfig is the non-secret Confluence connection configuration for a profile.
+type ConfluenceConfig struct {
+	BaseURL    string `json:"baseURL"`
+	SpaceKey   string `json:"spaceKey"`
+	RootPageID string `json:"rootPageID"`
+}
+
+type RitualAssociation struct {
+	BoardID    int    `json:"boardID"`
+	SprintID   int    `json:"sprintID"`
+	RitualType string `json:"ritualType"`
+	PageID     string `json:"pageID"`
+	PageTitle  string `json:"pageTitle"`
+}
+
+func (m *Manager) CacheConfluencePage(profileID, pageID, payload, fetchedAt string) error {
+	_, err := m.db.Exec(`INSERT INTO confluence_page_cache(profile_id, page_id, fetched_at, payload) VALUES(?, ?, ?, ?) ON CONFLICT(profile_id, page_id) DO UPDATE SET fetched_at=excluded.fetched_at, payload=excluded.payload`, profileID, pageID, fetchedAt, payload)
+	if err != nil {
+		return fmt.Errorf("cache Confluence page: %w", err)
+	}
+	return nil
+}
+
+func (m *Manager) CachedConfluencePage(profileID, pageID string) (payload, fetchedAt string, err error) {
+	err = m.db.QueryRow(`SELECT payload, fetched_at FROM confluence_page_cache WHERE profile_id = ? AND page_id = ?`, profileID, pageID).Scan(&payload, &fetchedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("read cached Confluence page: %w", err)
+	}
+	return payload, fetchedAt, nil
+}
+
+func (m *Manager) ListRitualAssociations(profileID string, boardID, sprintID int) ([]RitualAssociation, error) {
+	rows, err := m.db.Query(`SELECT board_id, sprint_id, ritual_type, page_id, page_title FROM confluence_association WHERE profile_id = ? AND board_id = ? AND sprint_id = ? ORDER BY ritual_type, page_title`, profileID, boardID, sprintID)
+	if err != nil {
+		return nil, fmt.Errorf("list ritual associations: %w", err)
+	}
+	defer rows.Close()
+	out := []RitualAssociation{}
+	for rows.Next() {
+		var a RitualAssociation
+		if err := rows.Scan(&a.BoardID, &a.SprintID, &a.RitualType, &a.PageID, &a.PageTitle); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+func (m *Manager) SetRitualAssociation(profileID string, a RitualAssociation) error {
+	_, err := m.db.Exec(`INSERT INTO confluence_association(profile_id, board_id, sprint_id, ritual_type, page_id, page_title) VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(profile_id, board_id, sprint_id, ritual_type, page_id) DO UPDATE SET page_title=excluded.page_title`, profileID, a.BoardID, a.SprintID, strings.TrimSpace(a.RitualType), strings.TrimSpace(a.PageID), strings.TrimSpace(a.PageTitle))
+	if err != nil {
+		return fmt.Errorf("set ritual association: %w", err)
+	}
+	return nil
+}
+
+func (m *Manager) DeleteRitualAssociation(profileID string, a RitualAssociation) error {
+	_, err := m.db.Exec(`DELETE FROM confluence_association WHERE profile_id = ? AND board_id = ? AND sprint_id = ? AND ritual_type = ? AND page_id = ?`, profileID, a.BoardID, a.SprintID, strings.TrimSpace(a.RitualType), strings.TrimSpace(a.PageID))
+	if err != nil {
+		return fmt.Errorf("delete ritual association: %w", err)
+	}
+	return nil
+}
+
+func (m *Manager) ConfluenceConfig(profileID string) (ConfluenceConfig, error) {
+	var c ConfluenceConfig
+	err := m.db.QueryRow(`SELECT base_url, space_key, root_page_id FROM confluence_profile WHERE profile_id = ?`, profileID).Scan(&c.BaseURL, &c.SpaceKey, &c.RootPageID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ConfluenceConfig{}, nil
+	}
+	if err != nil {
+		return ConfluenceConfig{}, fmt.Errorf("get Confluence settings: %w", err)
+	}
+	return c, nil
+}
+
+func (m *Manager) SetConfluenceConfig(profileID string, c ConfluenceConfig) error {
+	_, err := m.db.Exec(`INSERT INTO confluence_profile(profile_id, base_url, space_key, root_page_id) VALUES(?, ?, ?, ?) ON CONFLICT(profile_id) DO UPDATE SET base_url=excluded.base_url, space_key=excluded.space_key, root_page_id=excluded.root_page_id`, profileID, strings.TrimRight(strings.TrimSpace(c.BaseURL), "/"), strings.TrimSpace(c.SpaceKey), strings.TrimSpace(c.RootPageID))
+	if err != nil {
+		return fmt.Errorf("set Confluence settings: %w", err)
+	}
+	return nil
 }
 
 // Manager is the profile CRUD service backed by the local store (FR-5.1).

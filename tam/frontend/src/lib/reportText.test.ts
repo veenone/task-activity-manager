@@ -75,8 +75,8 @@ describe("summarySentence", () => {
 describe("floorLine", () => {
   it("says that committed is a floor and that removed sees only the cards that came back", () => {
     const line = floorLine();
-    expect(line).toContain("Committed is a floor");
-    expect(line).toContain("left and came back");
+    expect(line).toContain("Committed is a minimum estimate");
+    expect(line).toContain("left and later returned");
   });
 });
 
@@ -85,17 +85,16 @@ describe("unitLine", () => {
     expect(unitLine("points", "")).toBe("");
   });
   it("tells the team it can fix this one by estimating", () => {
-    expect(unitLine("cards", "nothingEstimated")).toContain("Estimating the cards");
+    expect(unitLine("cards", "nothingEstimated")).toContain("Estimate the cards");
   });
   it("claims story points only where the backend looked, which is this sprint and its history", () => {
     const line = unitLine("cards", "nothingEstimated");
-    expect(line).toContain("in evidence somewhere in this sprint's issues or their history");
-    expect(line).not.toContain("in evidence on this board");
+    expect(line).toContain("points appear in the sprint or its history");
   });
   it("does not claim the instance has no story points field, because the backend cannot know that", () => {
     const line = unitLine("cards", "noPointsFieldSeen");
-    expect(line).toContain("nothing in this sprint's issues or their history mentions story points");
-    expect(line).toContain("cannot tell those two apart");
+    expect(line).toContain("no story points appear in the sprint or its history");
+    expect(line).toContain("field is missing or unused");
   });
 });
 
@@ -103,8 +102,8 @@ describe("methodLine", () => {
   it("says what done means, where the history comes from, and what a removal misses", () => {
     const line = methodLine();
     expect(line).toContain("board's last column");
-    expect(line).toContain("public changelog");
-    expect(line).toContain("only visible for a card that came back");
+    expect(line).toContain("uses Jira history");
+    expect(line).toContain("Removed cards count only when they return");
   });
 });
 
@@ -197,8 +196,8 @@ describe("velocityFloorLine", () => {
   // qualification cannot live in a paragraph beside it.
   it("says the Committed column is a floor in every row, not only in the sprint above it", () => {
     const line = velocityFloorLine();
-    expect(line).toContain("Committed is a floor in every row");
-    expect(line).toContain("never fetched");
+    expect(line).toContain("Committed is a minimum estimate in every row");
+    expect(line).toContain("Cards removed for good are not visible");
   });
 });
 
