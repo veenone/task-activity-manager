@@ -3,11 +3,14 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
 	"agile-suite/core/confluence"
 	"agile-suite/core/profile"
+	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/ritualdefaults"
 	"agile-suite/tam/internal/ritualrepo"
 )
@@ -194,4 +197,81 @@ func (a *App) DeleteRitualDraft(profileID string, boardID, sprintID int, ritualT
 	}
 	ritualType = strings.TrimSpace(strings.ToLower(ritualType))
 	return a.rituals.Delete(a.ctx, profileID, boardID, sprintID, ritualType)
+}
+
+// ScaffoldSprintRituals creates whatever of a sprint's four rituals does not
+// exist yet, each with the issues its type asks for. It never touches a ritual
+// that is already there: running it twice must be safe, because the button sits
+// next to documents somebody has been editing.
+func (a *App) ScaffoldSprintRituals(profileID string, boardID, sprintID int) ([]ritualrepo.Draft, error) {
+	if err := a.requireRituals(); err != nil {
+		return nil, err
+	}
+	if _, err := a.profiles.Get(profileID); err != nil {
+		return nil, err
+	}
+
+	page, err := a.repo.ListIssues(a.ctx, profileID, issuerepo.IssueQuery{
+		SprintID: strconv.Itoa(sprintID),
+		Limit:    500,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// A sprint whose name cannot be read still gets its rituals, titled by
+	// ritual alone, because a scaffold must not fail on a cosmetic lookup.
+	sprintName, err := a.boards.SprintName(a.ctx, profileID, strconv.Itoa(sprintID))
+	if err != nil {
+		sprintName = ""
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	for _, ritualType := range ritualdefaults.Types {
+		existing, err := a.rituals.Get(a.ctx, profileID, boardID, sprintID, ritualType)
+		if err != nil {
+			return nil, err
+		}
+		if existing.RitualType != "" {
+			continue
+		}
+		issues, err := ritualrepo.EncodeIssues(ritualdefaults.Select(ritualType, page.Issues))
+		if err != nil {
+			return nil, err
+		}
+		if err := a.rituals.Upsert(a.ctx, ritualrepo.Draft{
+			ProfileID:  profileID,
+			BoardID:    boardID,
+			SprintID:   sprintID,
+			RitualType: ritualType,
+			Title:      ritualdefaults.Title(ritualType, sprintName),
+			IssuesJSON: issues,
+			Status:     "draft",
+			UpdatedAt:  now,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return a.rituals.ListDrafts(a.ctx, profileID, boardID, sprintID)
+}
+
+// ListSprintIssues returns the sprint's issues for the wizard to choose from.
+// It is a read of the local cache and takes no lock: the wizard opens while a
+// sync may be running, and a picker that refuses to open because the profile is
+// busy is worse than one showing slightly stale issues.
+func (a *App) ListSprintIssues(profileID string, boardID, sprintID int) ([]backend.Issue, error) {
+	if err := a.requireRituals(); err != nil {
+		return nil, err
+	}
+	if _, err := a.profiles.Get(profileID); err != nil {
+		return nil, err
+	}
+	page, err := a.repo.ListIssues(a.ctx, profileID, issuerepo.IssueQuery{
+		SprintID: strconv.Itoa(sprintID),
+		Limit:    500,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return page.Issues, nil
 }

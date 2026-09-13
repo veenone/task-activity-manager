@@ -2,8 +2,10 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"agile-suite/core/profile"
+	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/ritualrepo"
 )
 
@@ -170,5 +172,80 @@ func TestDeletingARitualDraftLeavesItsSiblings(t *testing.T) {
 	}
 	if len(drafts) != 1 || drafts[0].RitualType != "planning" {
 		t.Fatalf("drafts = %#v, want only planning", drafts)
+	}
+}
+
+// seedSprintIssues puts four issues in a sprint so the defaults have something
+// to choose between.
+func seedSprintIssues(t *testing.T, a *App, profileID string, sprintID int) {
+	t.Helper()
+	issues := []backend.Issue{
+		{Key: "PLAT-1", Project: "PLAT", Type: "story", Summary: "Checkout", Status: "To Do", SprintID: "12"},
+		{Key: "PLAT-2", Project: "PLAT", Type: "story", Summary: "Payments", Status: "In Progress", SprintID: "12"},
+		{Key: "PLAT-3", Project: "PLAT", Type: "bug", Summary: "Timeout", Status: "Done", SprintID: "12"},
+		{Key: "PLAT-4", Project: "PLAT", Type: "story", Summary: "Search", Status: "Blocked", SprintID: "12"},
+	}
+	if err := a.repo.UpsertPage(a.ctx, profileID, issues, time.Now().UTC(), false); err != nil {
+		t.Fatalf("seed issues: %v", err)
+	}
+}
+
+func TestScaffoldingASprintCreatesTheFourRituals(t *testing.T) {
+	a, p := newTestAppWithRituals(t)
+	seedSprintIssues(t, a, p.ID, 12)
+
+	drafts, err := a.ScaffoldSprintRituals(p.ID, 1, 12)
+	if err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+	if len(drafts) != 4 {
+		t.Fatalf("got %d drafts, want 4", len(drafts))
+	}
+	for _, d := range drafts {
+		if d.Status != "draft" {
+			t.Fatalf("%s status = %q, want draft", d.RitualType, d.Status)
+		}
+		if d.Title == "" {
+			t.Fatalf("%s has no title", d.RitualType)
+		}
+	}
+}
+
+func TestScaffoldingTwiceDoesNotOverwriteEditedRituals(t *testing.T) {
+	a, p := newTestAppWithRituals(t)
+	seedSprintIssues(t, a, p.ID, 12)
+
+	if _, err := a.ScaffoldSprintRituals(p.ID, 1, 12); err != nil {
+		t.Fatalf("first scaffold: %v", err)
+	}
+	if err := a.SaveRitualDraft(p.ID, ritualrepo.Draft{
+		BoardID: 1, SprintID: 12, RitualType: "review",
+		Title: "Sprint 12 Review", Remark: "written by a human",
+	}); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	if _, err := a.ScaffoldSprintRituals(p.ID, 1, 12); err != nil {
+		t.Fatalf("second scaffold: %v", err)
+	}
+
+	got, err := a.GetRitualDraft(p.ID, 1, 12, "review")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Remark != "written by a human" {
+		t.Fatalf("remark = %q; scaffolding must not overwrite an existing ritual", got.Remark)
+	}
+}
+
+func TestListSprintIssuesReturnsOnlyThatSprint(t *testing.T) {
+	a, p := newTestAppWithRituals(t)
+	seedSprintIssues(t, a, p.ID, 12)
+
+	issues, err := a.ListSprintIssues(p.ID, 1, 12)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(issues) != 4 {
+		t.Fatalf("got %d issues, want the 4 seeded into sprint 12", len(issues))
 	}
 }
