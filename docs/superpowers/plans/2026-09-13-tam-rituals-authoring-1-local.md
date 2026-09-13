@@ -10,6 +10,35 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-13-tam-rituals-authoring-design.md`
 
+## This plan supersedes an earlier one
+
+`docs/superpowers/plans/2026-09-13-tam-ritual-authoring.md` covers the same
+feature and was written the same day. It is superseded by this plan and part 2,
+and should not be executed. Its Task 1 is already committed as
+`73ee848 feat: store local ritual drafts`, which created `ritual_document` at
+schema version 9 and the `Get`/`Upsert`/`Delete` repository this plan builds on.
+That commit stands; nothing here rewrites it.
+
+The rest of that plan contradicts four decisions taken in the approved design:
+
+1. **It overwrites the whole Confluence page.** Its publish step calls
+   `UpdatePage` with freshly generated storage HTML and never reads what is
+   already there. Any note a teammate typed during the meeting is destroyed on
+   the next publish. The approved design gives TAM three marked blocks and
+   leaves every other byte alone.
+2. **It publishes straight from the app seam**, rather than journaling the
+   change and pushing it on Commit.
+3. **It requires a non-empty stored `body`**, making the draft the authored
+   document. In the approved design nothing authors a body: the blocks are
+   derived from inputs, and `body` holds only the last published render.
+4. **Its `SaveRitualDraft(draft)` drops `profileID`** from the first position,
+   which every other method on the app seam carries.
+
+Two things in it are worth keeping, and both are folded in here: the
+`ListSprintIssues` app method, which this plan's wizard needs and did not
+previously specify, and rejecting a non-positive version before an update
+reaches the network, which belongs in part 2 with `UpdatePage`.
+
 ## Global Constraints
 
 - Schema version becomes **10**. A column on an existing table needs a migration entry in the `AddColumnIfMissing` shape used by versions 7 and 8.
@@ -1058,12 +1087,61 @@ Add `"strconv"` and `"agile-suite/tam/internal/issuerepo"` to the imports.
 It takes the sprint id as a string and does not take a board id, which is why
 `strconv.Itoa` appears twice in this function.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 4: Give the wizard its issues**
 
-Run: `cd tam && go test . -run TestScaffolding -count=1 -v`
-Expected: PASS, both tests.
+The wizard in Task 8 shows every issue in the sprint so the user can adjust the
+selection. Nothing exposes that list yet, so add it beside the scaffold:
 
-- [ ] **Step 5: Commit**
+```go
+// ListSprintIssues returns the sprint's issues for the wizard to choose from.
+// It is a read of the local cache and takes no lock: the wizard opens while a
+// sync may be running, and a picker that refuses to open because the profile is
+// busy is worse than one showing slightly stale issues.
+func (a *App) ListSprintIssues(profileID string, boardID, sprintID int) ([]backend.Issue, error) {
+	if err := a.requireRituals(); err != nil {
+		return nil, err
+	}
+	if _, err := a.profiles.Get(profileID); err != nil {
+		return nil, err
+	}
+	page, err := a.repo.ListIssues(a.ctx, profileID, issuerepo.IssueQuery{
+		SprintID: strconv.Itoa(sprintID),
+		Limit:    500,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return page.Issues, nil
+}
+```
+
+Add `"agile-suite/tam/internal/backend"` to the imports. `boardID` is accepted
+and unused so the frontend calls every ritual method with the same three
+arguments; name it `_ int` if the linter objects.
+
+Add its test to `tam/app_rituals_test.go`:
+
+```go
+func TestListSprintIssuesReturnsOnlyThatSprint(t *testing.T) {
+	a, p := newTestAppWithProfile(t)
+	seedSprintIssues(t, a, p.ID, 12)
+
+	issues, err := a.ListSprintIssues(p.ID, 1, 12)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(issues) != 4 {
+		t.Fatalf("got %d issues, want the 4 seeded into sprint 12", len(issues))
+	}
+}
+```
+
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run: `cd tam && go test . -run "TestScaffolding|TestListSprintIssues" -count=1 -v`
+Expected: PASS, all three tests.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add tam/app_rituals.go tam/app_rituals_test.go
@@ -1164,7 +1242,7 @@ git commit -m "fix(tam): a deleted profile takes its rituals with it"
 - Produces, from `src/api.ts`:
   - `export interface RitualIssue { key: string; remark: string }`
   - `export interface RitualDraft { profileId: string; boardId: number; sprintId: number; ritualType: string; title: string; remark: string; body: string; issuesJson: string; confluencePageId: string; confluenceVersion: number; status: string; updatedAt: string; publishedAt: string }`
-  - `ListRitualDrafts`, `GetRitualDraft`, `SaveRitualDraft`, `DeleteRitualDraft`, `ScaffoldSprintRituals`
+  - `ListRitualDrafts`, `GetRitualDraft`, `SaveRitualDraft`, `DeleteRitualDraft`, `ScaffoldSprintRituals`, `ListSprintIssues`
   - `parseRitualIssues(json: string): RitualIssue[]` and `encodeRitualIssues(issues: RitualIssue[]): string`
 
 - [ ] **Step 1: Regenerate the bindings**
