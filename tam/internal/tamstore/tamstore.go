@@ -10,6 +10,8 @@ package tamstore
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -33,7 +35,7 @@ import (
 // Version 9 adds ritual_document through the same idempotent base DDL path
 // as sprint_report.
 var Schema = store.Schema{
-	Version: 9,
+	Version: 10,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -123,8 +125,88 @@ var Schema = store.Schema{
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "sprint", "complete_date TEXT NOT NULL DEFAULT ''")
 		},
+	}, {
+		Version: 10,
+		// ritual_document arrived whole at version 9, so Base created it and
+		// no migration was needed. issues_json is a column on a table that now
+		// exists, which CREATE TABLE IF NOT EXISTS will not touch, so it needs
+		// the same treatment goal and complete_date got at versions 7 and 8.
+		//
+		// The old issue_keys_json is left in place and unread rather than
+		// dropped: SQLite makes column removal a table rebuild, and a rebuild
+		// here would risk a user's unpublished drafts to reclaim nothing.
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "ritual_document", "issues_json TEXT NOT NULL DEFAULT '[]'"); err != nil {
+				return err
+			}
+			return convertRitualIssueKeys(db)
+		},
 	}},
 	Indexes: indexDDL,
+}
+
+// convertRitualIssueKeys rewrites version 9's bare key array into version 10's
+// objects, so a draft written before per-issue remarks existed keeps its issues
+// and their order. Only rows that have not already been converted are touched.
+func convertRitualIssueKeys(db *sql.DB) error {
+	rows, err := db.Query(`SELECT profile_id, board_id, sprint_id, ritual_type, issue_keys_json
+		FROM ritual_document WHERE issues_json = '[]' AND issue_keys_json <> '[]'`)
+	if err != nil {
+		return fmt.Errorf("read ritual issue keys: %w", err)
+	}
+	type target struct {
+		profileID  string
+		boardID    int
+		sprintID   int
+		ritualType string
+		issuesJSON string
+	}
+	var targets []target
+	for rows.Next() {
+		var t target
+		var keysJSON string
+		if err := rows.Scan(&t.profileID, &t.boardID, &t.sprintID, &t.ritualType, &keysJSON); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan ritual issue keys: %w", err)
+		}
+		var keys []string
+		if err := json.Unmarshal([]byte(keysJSON), &keys); err != nil {
+			// A row nobody can parse is left exactly as it is rather than
+			// emptied: the draft is the user's unpublished work.
+			continue
+		}
+		converted := make([]struct {
+			Key    string `json:"key"`
+			Remark string `json:"remark"`
+		}, 0, len(keys))
+		for _, k := range keys {
+			converted = append(converted, struct {
+				Key    string `json:"key"`
+				Remark string `json:"remark"`
+			}{Key: k})
+		}
+		encoded, err := json.Marshal(converted)
+		if err != nil {
+			rows.Close()
+			return fmt.Errorf("encode ritual issues: %w", err)
+		}
+		t.issuesJSON = string(encoded)
+		targets = append(targets, t)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("iterate ritual issue keys: %w", err)
+	}
+	rows.Close()
+
+	for _, t := range targets {
+		if _, err := db.Exec(`UPDATE ritual_document SET issues_json = ?
+			WHERE profile_id = ? AND board_id = ? AND sprint_id = ? AND ritual_type = ?`,
+			t.issuesJSON, t.profileID, t.boardID, t.sprintID, t.ritualType); err != nil {
+			return fmt.Errorf("write ritual issues for %s: %w", t.ritualType, err)
+		}
+	}
+	return nil
 }
 
 const baseDDL = `
@@ -262,6 +344,7 @@ CREATE TABLE IF NOT EXISTS ritual_document (
 	remark            TEXT NOT NULL DEFAULT '',
 	body              TEXT NOT NULL DEFAULT '',
 	issue_keys_json   TEXT NOT NULL DEFAULT '[]',
+	issues_json       TEXT NOT NULL DEFAULT '[]',
 	confluence_page_id TEXT NOT NULL DEFAULT '',
 	confluence_version INTEGER NOT NULL DEFAULT 0,
 	status            TEXT NOT NULL DEFAULT '',

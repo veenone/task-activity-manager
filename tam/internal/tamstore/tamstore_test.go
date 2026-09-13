@@ -628,3 +628,43 @@ func TestFreshDatabaseHasTheReportTableAndTheSprintCompleteDateColumn(t *testing
 		t.Fatalf("insert sprint_report: %v", err)
 	}
 }
+
+func TestVersionTenAddsIssuesJSONAndConvertsOldKeys(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "tam.db")
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if _, err := db.DB().Exec(`INSERT INTO ritual_document
+		(profile_id, board_id, sprint_id, ritual_type, issue_keys_json, issues_json)
+		VALUES ('p1', 1, 12, 'review', '["PLAT-14","PLAT-22"]', '[]')`); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	// The recorded version lives as a row in meta, not in a table of its own.
+	// Every existing migration test rewinds this way; see
+	// openAtSprintKeyVersion in this file.
+	if _, err := db.DB().Exec(`UPDATE meta SET value = '9' WHERE key = 'schema_version'`); err != nil {
+		t.Fatalf("rewind: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	reopened, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer reopened.Close()
+
+	var got string
+	if err := reopened.DB().QueryRow(`SELECT issues_json FROM ritual_document
+		WHERE profile_id = 'p1' AND board_id = 1 AND sprint_id = 12 AND ritual_type = 'review'`).Scan(&got); err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	want := `[{"key":"PLAT-14","remark":""},{"key":"PLAT-22","remark":""}]`
+	if got != want {
+		t.Fatalf("issues_json = %s, want %s", got, want)
+	}
+}
