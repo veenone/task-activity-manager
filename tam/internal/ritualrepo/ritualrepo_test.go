@@ -34,7 +34,7 @@ func sampleDraft() ritualrepo.Draft {
 		Title:             "Sprint 12 review",
 		Remark:            "Bring customer feedback",
 		Body:              "## Delivered\n\n- Checkout recovery",
-		IssueKeysJSON:     `["PLAT-41","PLAT-52"]`,
+		IssuesJSON:        `["PLAT-41","PLAT-52"]`,
 		ConfluencePageID:  "92814",
 		ConfluenceVersion: 3,
 		Status:            "published",
@@ -63,7 +63,7 @@ func TestUpsertRoundTripsAndReplacesTheSameDraft(t *testing.T) {
 
 	want.Title = "Sprint 12 review: revised"
 	want.Body = "## Delivered\n\n- Checkout recovery\n- Invoice export"
-	want.IssueKeysJSON = `["PLAT-41","PLAT-52","PLAT-60"]`
+	want.IssuesJSON = `["PLAT-41","PLAT-52","PLAT-60"]`
 	want.ConfluenceVersion = 4
 	want.UpdatedAt = "2026-09-13T10:30:00Z"
 	if err := r.Upsert(ctx, want); err != nil {
@@ -210,7 +210,7 @@ func TestSeedDemoProvidesTwoSprintCyclesAndPreservesEdits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if draft.Status != "draft" || draft.Remark == "" || draft.IssueKeysJSON == "[]" {
+	if draft.Status != "draft" || draft.Remark == "" || draft.IssuesJSON == "[]" {
 		t.Fatalf("demo draft lacks preview metadata: %+v", draft)
 	}
 	draft.Title = "My edited retrospective"
@@ -226,5 +226,68 @@ func TestSeedDemoProvidesTwoSprintCyclesAndPreservesEdits(t *testing.T) {
 	}
 	if got.Title != "My edited retrospective" {
 		t.Fatalf("seed overwrote edit with %q", got.Title)
+	}
+}
+
+func TestIssuesRoundTripThroughADraft(t *testing.T) {
+	ctx := context.Background()
+	r := newRepo(t)
+
+	issues := []ritualrepo.Issue{
+		{Key: "PLAT-14", Remark: "demoed, docs follow-up"},
+		{Key: "PLAT-22", Remark: "blocked on infra"},
+	}
+	encoded, err := ritualrepo.EncodeIssues(issues)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	if err := r.Upsert(ctx, ritualrepo.Draft{
+		ProfileID: "p1", BoardID: 1, SprintID: 12, RitualType: "review",
+		IssuesJSON: encoded, Status: "draft",
+	}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	got, err := r.Get(ctx, "p1", 1, 12, "review")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	back, err := ritualrepo.DecodeIssues(got.IssuesJSON)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(back) != 2 || back[0].Key != "PLAT-14" || back[1].Remark != "blocked on infra" {
+		t.Fatalf("issues = %#v, want the two seeded in order", back)
+	}
+}
+
+func TestListDraftsReturnsOneSprintsRitualsInTypeOrder(t *testing.T) {
+	ctx := context.Background()
+	r := newRepo(t)
+
+	for _, ritualType := range []string{"review", "planning", "standup"} {
+		if err := r.Upsert(ctx, ritualrepo.Draft{
+			ProfileID: "p1", BoardID: 1, SprintID: 12, RitualType: ritualType, Status: "draft",
+		}); err != nil {
+			t.Fatalf("upsert %s: %v", ritualType, err)
+		}
+	}
+	// A different sprint, which must not appear.
+	if err := r.Upsert(ctx, ritualrepo.Draft{
+		ProfileID: "p1", BoardID: 1, SprintID: 13, RitualType: "planning", Status: "draft",
+	}); err != nil {
+		t.Fatalf("upsert other sprint: %v", err)
+	}
+
+	drafts, err := r.ListDrafts(ctx, "p1", 1, 12)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(drafts) != 3 {
+		t.Fatalf("got %d drafts, want 3", len(drafts))
+	}
+	if drafts[0].RitualType != "planning" || drafts[2].RitualType != "standup" {
+		t.Fatalf("order = %s, %s, %s; want planning, review, standup",
+			drafts[0].RitualType, drafts[1].RitualType, drafts[2].RitualType)
 	}
 }

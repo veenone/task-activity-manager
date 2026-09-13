@@ -4,9 +4,49 @@ package ritualrepo
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
+
+// Issue is one Jira issue chosen for a ritual, with the remark the team made
+// about it. The slice order is the order the published table uses, so it is
+// preserved exactly as stored and never re-sorted from a query result.
+type Issue struct {
+	Key    string `json:"key"`
+	Remark string `json:"remark"`
+}
+
+// EncodeIssues renders the chosen issues for storage. A nil slice encodes as an
+// empty array rather than null, so the column's default and a cleared selection
+// are the same value.
+func EncodeIssues(issues []Issue) (string, error) {
+	if issues == nil {
+		issues = []Issue{}
+	}
+	encoded, err := json.Marshal(issues)
+	if err != nil {
+		return "", fmt.Errorf("encode ritual issues: %w", err)
+	}
+	return string(encoded), nil
+}
+
+// DecodeIssues reads stored issues. An empty column decodes as an empty slice.
+func DecodeIssues(encoded string) ([]Issue, error) {
+	trimmed := strings.TrimSpace(encoded)
+	if trimmed == "" {
+		return []Issue{}, nil
+	}
+	var issues []Issue
+	if err := json.Unmarshal([]byte(trimmed), &issues); err != nil {
+		return nil, fmt.Errorf("decode ritual issues: %w", err)
+	}
+	if issues == nil {
+		issues = []Issue{}
+	}
+	return issues, nil
+}
 
 // Draft is one ritual document and its Confluence publication state.
 type Draft struct {
@@ -17,7 +57,7 @@ type Draft struct {
 	Title             string `json:"title"`
 	Remark            string `json:"remark"`
 	Body              string `json:"body"`
-	IssueKeysJSON     string `json:"issueKeysJson"`
+	IssuesJSON        string `json:"issuesJson"`
 	ConfluencePageID  string `json:"confluencePageId"`
 	ConfluenceVersion int    `json:"confluenceVersion"`
 	Status            string `json:"status"`
@@ -35,7 +75,7 @@ func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
 const selectDraftSQL = `
 	SELECT profile_id, board_id, sprint_id, ritual_type, title, remark, body,
-		issue_keys_json, confluence_page_id, confluence_version, status,
+		issues_json, confluence_page_id, confluence_version, status,
 		updated_at, published_at
 	FROM ritual_document
 	WHERE profile_id = ? AND board_id = ? AND sprint_id = ? AND ritual_type = ?`
@@ -46,7 +86,7 @@ func (r *Repository) Get(ctx context.Context, profileID string, boardID, sprintI
 	var draft Draft
 	err := r.db.QueryRowContext(ctx, selectDraftSQL, profileID, boardID, sprintID, ritualType).Scan(
 		&draft.ProfileID, &draft.BoardID, &draft.SprintID, &draft.RitualType,
-		&draft.Title, &draft.Remark, &draft.Body, &draft.IssueKeysJSON,
+		&draft.Title, &draft.Remark, &draft.Body, &draft.IssuesJSON,
 		&draft.ConfluencePageID, &draft.ConfluenceVersion, &draft.Status,
 		&draft.UpdatedAt, &draft.PublishedAt,
 	)
@@ -62,14 +102,14 @@ func (r *Repository) Get(ctx context.Context, profileID string, boardID, sprintI
 const upsertDraftSQL = `
 	INSERT INTO ritual_document (
 		profile_id, board_id, sprint_id, ritual_type, title, remark, body,
-		issue_keys_json, confluence_page_id, confluence_version, status,
+		issues_json, confluence_page_id, confluence_version, status,
 		updated_at, published_at
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, board_id, sprint_id, ritual_type) DO UPDATE SET
 		title = excluded.title,
 		remark = excluded.remark,
 		body = excluded.body,
-		issue_keys_json = excluded.issue_keys_json,
+		issues_json = excluded.issues_json,
 		confluence_page_id = excluded.confluence_page_id,
 		confluence_version = excluded.confluence_version,
 		status = excluded.status,
@@ -81,7 +121,7 @@ const upsertDraftSQL = `
 func (r *Repository) Upsert(ctx context.Context, draft Draft) error {
 	_, err := r.db.ExecContext(ctx, upsertDraftSQL,
 		draft.ProfileID, draft.BoardID, draft.SprintID, draft.RitualType,
-		draft.Title, draft.Remark, draft.Body, draft.IssueKeysJSON,
+		draft.Title, draft.Remark, draft.Body, draft.IssuesJSON,
 		draft.ConfluencePageID, draft.ConfluenceVersion, draft.Status,
 		draft.UpdatedAt, draft.PublishedAt,
 	)
@@ -102,4 +142,40 @@ func (r *Repository) Delete(ctx context.Context, profileID string, boardID, spri
 		return fmt.Errorf("delete %s ritual for board %d sprint %d: %w", ritualType, boardID, sprintID, err)
 	}
 	return nil
+}
+
+const listDraftsSQL = `
+	SELECT profile_id, board_id, sprint_id, ritual_type, title, remark, body,
+		issues_json, confluence_page_id, confluence_version, status,
+		updated_at, published_at
+	FROM ritual_document
+	WHERE profile_id = ? AND board_id = ? AND sprint_id = ?
+	ORDER BY ritual_type`
+
+// ListDrafts returns every ritual document stored for one sprint, ordered by
+// ritual type so the view's slots do not reshuffle between reads.
+func (r *Repository) ListDrafts(ctx context.Context, profileID string, boardID, sprintID int) ([]Draft, error) {
+	rows, err := r.db.QueryContext(ctx, listDraftsSQL, profileID, boardID, sprintID)
+	if err != nil {
+		return nil, fmt.Errorf("list rituals for board %d sprint %d: %w", boardID, sprintID, err)
+	}
+	defer rows.Close()
+
+	drafts := []Draft{}
+	for rows.Next() {
+		var draft Draft
+		if err := rows.Scan(
+			&draft.ProfileID, &draft.BoardID, &draft.SprintID, &draft.RitualType,
+			&draft.Title, &draft.Remark, &draft.Body, &draft.IssuesJSON,
+			&draft.ConfluencePageID, &draft.ConfluenceVersion, &draft.Status,
+			&draft.UpdatedAt, &draft.PublishedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan ritual for board %d sprint %d: %w", boardID, sprintID, err)
+		}
+		drafts = append(drafts, draft)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate rituals for board %d sprint %d: %w", boardID, sprintID, err)
+	}
+	return drafts, nil
 }

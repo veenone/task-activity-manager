@@ -2,7 +2,6 @@ package ritualrepo
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -27,7 +26,12 @@ func (r *Repository) SeedDemo(ctx context.Context, profileID, projectKey string)
 		{13, "draft", "Use this draft to prepare the next sprint ceremony."},
 	} {
 		for _, typ := range types {
-			keys, err := json.Marshal(demoIssueKeys(projectKey, sprint.id, typ))
+			issueKeys := demoIssueKeys(projectKey, sprint.id, typ)
+			issues := make([]Issue, len(issueKeys))
+			for i, key := range issueKeys {
+				issues[i] = Issue{Key: key}
+			}
+			issuesJSON, err := EncodeIssues(issues)
 			if err != nil {
 				return fmt.Errorf("encode demo %s issues: %w", typ, err)
 			}
@@ -36,10 +40,10 @@ func (r *Repository) SeedDemo(ctx context.Context, profileID, projectKey string)
 			_, err = r.db.ExecContext(ctx, `
 				INSERT OR IGNORE INTO ritual_document (
 					profile_id, board_id, sprint_id, ritual_type, title, remark, body,
-					issue_keys_json, confluence_page_id, confluence_version, status,
+					issues_json, confluence_page_id, confluence_version, status,
 					updated_at, published_at
 				) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				profileID, sprint.id, typ, title, sprint.remark, body, string(keys),
+				profileID, sprint.id, typ, title, sprint.remark, body, issuesJSON,
 				fmt.Sprintf("demo-ritual-%s-%d", typ, sprint.id), 1, sprint.status,
 				"2026-09-13T09:00:00Z", map[string]string{"published": "2026-09-12T16:00:00Z"}[sprint.status],
 			)
