@@ -191,3 +191,40 @@ func TestVersionEightDatabaseGainsRitualDocumentsOnOpen(t *testing.T) {
 		t.Fatalf("upgraded draft = %+v, err = %v; want %+v", got, err, want)
 	}
 }
+
+func TestSeedDemoProvidesTwoSprintCyclesAndPreservesEdits(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	if err := r.SeedDemo(ctx, "demo-profile", "DEMO"); err != nil {
+		t.Fatal(err)
+	}
+	for _, sprint := range []int{12, 13} {
+		for _, typ := range []string{"planning", "standup", "review", "retro"} {
+			d, err := r.Get(ctx, "demo-profile", 1, sprint, typ)
+			if err != nil || d.ProfileID == "" {
+				t.Fatalf("missing demo %s sprint %d: %+v (err=%v)", typ, sprint, d, err)
+			}
+		}
+	}
+	draft, err := r.Get(ctx, "demo-profile", 1, 13, "retro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft.Status != "draft" || draft.Remark == "" || draft.IssueKeysJSON == "[]" {
+		t.Fatalf("demo draft lacks preview metadata: %+v", draft)
+	}
+	draft.Title = "My edited retrospective"
+	if err := r.Upsert(ctx, draft); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SeedDemo(ctx, "demo-profile", "DEMO"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Get(ctx, "demo-profile", 1, 13, "retro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "My edited retrospective" {
+		t.Fatalf("seed overwrote edit with %q", got.Title)
+	}
+}
