@@ -136,6 +136,7 @@ func (a *App) GetRitualDraft(profileID string, boardID, sprintID int, ritualType
 	if _, err := a.profiles.Get(profileID); err != nil {
 		return ritualrepo.Draft{}, err
 	}
+	ritualType = strings.TrimSpace(strings.ToLower(ritualType))
 	return a.rituals.Get(a.ctx, profileID, boardID, sprintID, ritualType)
 }
 
@@ -155,6 +156,12 @@ func (a *App) SaveRitualDraft(profileID string, draft ritualrepo.Draft) error {
 	if _, err := ritualrepo.DecodeIssues(draft.IssuesJSON); err != nil {
 		return err
 	}
+	// Normalised once, before any repository call: the lookup below, the
+	// write, and every other method's lookup must all agree with
+	// knownRitualType's own case-insensitive check, or a caller passing
+	// "Review" against a stored "review" row misses the existing document
+	// entirely and silently wipes its publication fields.
+	draft.RitualType = strings.TrimSpace(strings.ToLower(draft.RitualType))
 
 	// The publication fields belong to the publish path, so they are carried
 	// from the stored row rather than trusted from the caller.
@@ -163,7 +170,6 @@ func (a *App) SaveRitualDraft(profileID string, draft ritualrepo.Draft) error {
 		return err
 	}
 	draft.ProfileID = profileID
-	draft.RitualType = strings.TrimSpace(strings.ToLower(draft.RitualType))
 	draft.ConfluencePageID = stored.ConfluencePageID
 	draft.ConfluenceVersion = stored.ConfluenceVersion
 	draft.Body = stored.Body
@@ -186,5 +192,6 @@ func (a *App) DeleteRitualDraft(profileID string, boardID, sprintID int, ritualT
 	if _, err := a.profiles.Get(profileID); err != nil {
 		return err
 	}
+	ritualType = strings.TrimSpace(strings.ToLower(ritualType))
 	return a.rituals.Delete(a.ctx, profileID, boardID, sprintID, ritualType)
 }

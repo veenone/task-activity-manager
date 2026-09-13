@@ -60,6 +60,96 @@ func TestARitualDraftNeedsAKnownRitualType(t *testing.T) {
 	}
 }
 
+// TestSavingADraftCannotForgePublicationState is the proof the first test
+// cannot give: a brand-new draft lands as "draft" whether or not the
+// carry-from-stored-row logic exists at all, because there is nothing
+// stored yet to compare against. This test seeds a real published row
+// directly through the repository, then calls SaveRitualDraft with a
+// caller-supplied draft that claims different values for every publication
+// field, and checks the stored row afterwards still carries what was
+// there before the call, not what the caller sent.
+func TestSavingADraftCannotForgePublicationState(t *testing.T) {
+	a, p := newTestAppWithRituals(t)
+
+	published := ritualrepo.Draft{
+		ProfileID: p.ID, BoardID: 1, SprintID: 12, RitualType: "review",
+		Title: "Sprint 12 Review", Remark: "already published",
+		ConfluencePageID: "42", ConfluenceVersion: 3, Body: "<p>real body</p>",
+		Status: "published", UpdatedAt: "2025-06-01T00:00:00Z", PublishedAt: "2025-06-01T00:00:00Z",
+	}
+	if err := a.rituals.Upsert(a.ctx, published); err != nil {
+		t.Fatalf("seed published row: %v", err)
+	}
+
+	forged := ritualrepo.Draft{
+		BoardID: 1, SprintID: 12, RitualType: "review",
+		Title: "Sprint 12 Review", Remark: "trying to forge",
+		ConfluencePageID: "999", ConfluenceVersion: 7, Body: "forged",
+		Status: "published", PublishedAt: "2026-01-01T00:00:00Z",
+	}
+	if err := a.SaveRitualDraft(p.ID, forged); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	got, err := a.GetRitualDraft(p.ID, 1, 12, "review")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Status != "draft" {
+		t.Fatalf("status = %q, want draft; a save must never publish", got.Status)
+	}
+	if got.ConfluencePageID != "42" {
+		t.Fatalf("confluencePageId = %q, want the stored 42, not the forged 999", got.ConfluencePageID)
+	}
+	if got.ConfluenceVersion != 3 {
+		t.Fatalf("confluenceVersion = %d, want the stored 3, not the forged 7", got.ConfluenceVersion)
+	}
+	if got.Body != "<p>real body</p>" {
+		t.Fatalf("body = %q, want the stored body, not the forged one", got.Body)
+	}
+	if got.PublishedAt != "2025-06-01T00:00:00Z" {
+		t.Fatalf("publishedAt = %q, want the stored timestamp, not the forged one", got.PublishedAt)
+	}
+}
+
+// TestSavingARitualDraftMatchesAnExistingRowRegardlessOfCase guards the case
+// mismatch that used to look up the stored row by the caller's raw-case
+// ritual type. ritual_type has no COLLATE NOCASE, so "Review" against a
+// stored "review" row used to match nothing, and the save then overwrote a
+// real publication field with the zero value.
+func TestSavingARitualDraftMatchesAnExistingRowRegardlessOfCase(t *testing.T) {
+	a, p := newTestAppWithRituals(t)
+
+	if err := a.SaveRitualDraft(p.ID, ritualrepo.Draft{
+		BoardID: 1, SprintID: 12, RitualType: "review",
+	}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	stored, err := a.rituals.Get(a.ctx, p.ID, 1, 12, "review")
+	if err != nil {
+		t.Fatalf("get stored: %v", err)
+	}
+	stored.ConfluencePageID = "42"
+	if err := a.rituals.Upsert(a.ctx, stored); err != nil {
+		t.Fatalf("seed page id: %v", err)
+	}
+
+	if err := a.SaveRitualDraft(p.ID, ritualrepo.Draft{
+		BoardID: 1, SprintID: 12, RitualType: "Review",
+		Remark: "case mismatch",
+	}); err != nil {
+		t.Fatalf("save with different case: %v", err)
+	}
+
+	got, err := a.GetRitualDraft(p.ID, 1, 12, "review")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.ConfluencePageID != "42" {
+		t.Fatalf("confluencePageId = %q, want the stored 42 to survive a differently-cased save", got.ConfluencePageID)
+	}
+}
+
 func TestDeletingARitualDraftLeavesItsSiblings(t *testing.T) {
 	a, p := newTestAppWithRituals(t)
 
