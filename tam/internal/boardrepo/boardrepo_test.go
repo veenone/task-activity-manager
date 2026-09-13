@@ -285,6 +285,39 @@ func TestPurgeProfileClearsTheFourBoardTables(t *testing.T) {
 	}
 }
 
+func TestPurgeProfileClearsRitualDocuments(t *testing.T) {
+	ctx := context.Background()
+	r, db := newRepo(t)
+
+	for _, profileID := range []string{"p1", "p2"} {
+		if _, err := db.Exec(`INSERT INTO ritual_document
+			(profile_id, board_id, sprint_id, ritual_type, status)
+			VALUES (?, 1, 12, 'review', 'draft')`, profileID); err != nil {
+			t.Fatalf("seed %s: %v", profileID, err)
+		}
+	}
+
+	if err := r.PurgeProfile(ctx, "p1"); err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE profile_id = 'p1'`).Scan(&remaining); err != nil {
+		t.Fatalf("count p1: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("p1 left %d ritual rows behind", remaining)
+	}
+
+	var untouched int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE profile_id = 'p2'`).Scan(&untouched); err != nil {
+		t.Fatalf("count p2: %v", err)
+	}
+	if untouched != 1 {
+		t.Fatalf("p2 has %d ritual rows, want 1", untouched)
+	}
+}
+
 // seedTwoBoards writes both sample boards for a profile, with columns,
 // sprints, and one issue key each, the way one boards pass writes them.
 func seedTwoBoards(t *testing.T, r *boardrepo.Repository, profileID string) {

@@ -81,7 +81,7 @@ type IssueSource interface {
 // list in boards.go.
 func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		for _, table := range []string{"board", "board_column", "board_issue", "sprint", "sprint_report"} {
+		for _, table := range []string{"board", "board_column", "board_issue", "sprint", "sprint_report", "ritual_document"} {
 			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE profile_id = ?`, profileID); err != nil {
 				return fmt.Errorf("purge %s for %s: %w", table, profileID, err)
 			}
