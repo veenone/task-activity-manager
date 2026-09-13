@@ -63,7 +63,7 @@ export function BacklogView() {
   const search = useDebounced(text, SEARCH_DELAY_MS, activeId);
 
   const query = useMemo<IssueQuery>(
-    () => ({ text: search, types, sprintId, offset: page * pageSize, limit: pageSize, sort, desc }),
+    () => ({ text: search, types, sprintId, offset: page * pageSize, limit: pageSize, sort, desc, groupSubtasks: true }),
     [search, types, sprintId, page, pageSize, sort, desc],
   );
   const issues = useIssues(activeId, query);
@@ -178,7 +178,7 @@ export function BacklogView() {
             <IssueTable issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={setSelectedKey} sort={sort} desc={desc} onSort={toggleSort} />
           )}
           <div className="pager">
-            <label className="sr-only" htmlFor="pager-size">Rows per page</label>
+            <label className="sr-only" htmlFor="pager-size">Issue groups per page</label>
             <select
               id="pager-size"
               className="detail-input pager-size"
@@ -189,7 +189,7 @@ export function BacklogView() {
               }}
             >
               {PAGE_SIZES.map((n) => (
-                <option key={n} value={n}>{`${n} / page`}</option>
+                <option key={n} value={n}>{`${n} groups / page`}</option>
               ))}
             </select>
             <span className="pager-buttons">

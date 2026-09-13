@@ -1105,6 +1105,7 @@ export namespace issuerepo {
 	    sprintId: string;
 	    offset: number;
 	    limit: number;
+	    groupSubtasks: boolean;
 	    sort: string;
 	    desc: boolean;
 	
@@ -1119,6 +1120,7 @@ export namespace issuerepo {
 	        this.sprintId = source["sprintId"];
 	        this.offset = source["offset"];
 	        this.limit = source["limit"];
+	        this.groupSubtasks = source["groupSubtasks"];
 	        this.sort = source["sort"];
 	        this.desc = source["desc"];
 	    }

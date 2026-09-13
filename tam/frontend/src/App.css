@@ -230,6 +230,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-row-selected, .issue-row-selected:hover { background: var(--accent-soft); }
 .issue-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .issue-key { font-weight: 600; font-variant-numeric: tabular-nums; }
+.issue-row-subtask .issue-summary { padding-inline-start: 18px; }
+.issue-child-branch { display: inline-block; margin-inline-end: 8px; color: var(--text-muted); }
 /* The detail panel's title is the one key that links out to the instance:
    in a grid the row already owns the click. */
 .issue-key-link {

@@ -56,6 +56,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
 
   const keyWidth = keyColumnWidth(issues.map((i) => i.key), PENDING_DOT_PX);
   const sortedLabel = GRID_COLUMNS.find((c) => c.id === sort)?.label;
+  const parentKeys = new Set(issues.filter((i) => i.type !== "subtask" && i.type !== "epic").map((i) => i.key));
 
   return (
     <div
@@ -72,6 +73,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
         {sortedLabel
           ? `Sorted by ${sortedLabel} ${desc ? "descending" : "ascending"}, drafts first. Click the column again to clear.`
           : "In Jira rank order, drafts first."}
+        {" Subtasks stay under their parent. Filters include the whole group."}
       </p>
       <div className="issue-body" ref={bodyRef} role="rowgroup">
         <div className="issue-row issue-head" role="row" aria-rowindex={1}>
@@ -107,15 +109,16 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
         </div>
         {issues.map((iss, index) => {
           const selected = iss.key === selectedKey;
+          const nested = iss.type === "subtask" && parentKeys.has(iss.parentKey);
           return (
             <div
               key={iss.key}
               role="row"
               aria-selected={selected}
               aria-rowindex={index + 2}
-              aria-label={`${iss.key} ${iss.summary}`}
+              aria-label={`${iss.key} ${iss.summary}${iss.type === "subtask" && iss.parentKey ? `, subtask of ${iss.parentKey}` : ""}`}
               data-row-index={index}
-              className={`issue-row${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
+              className={`issue-row${nested ? " issue-row-subtask" : ""}${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
               onClick={() => onSelect(iss.key)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -136,7 +139,10 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
                 {iss.pending && <span className="pending-dot" role="img" aria-label="Pending changes" title="Has pending changes" />}
               </span>
               <span role="gridcell"><TypeChip type={iss.type} subtaskLabel={subtaskLabel} /></span>
-              <span role="gridcell" className="issue-summary" title={iss.summary}>{iss.summary}</span>
+              <span role="gridcell" className="issue-summary" title={iss.summary}>
+                {nested && <span className="issue-child-branch" aria-hidden="true">↳</span>}
+                {iss.summary}
+              </span>
               <span role="gridcell">
                 {iss.draft
                   ? <span className="chip chip-draft">Draft</span>

@@ -127,6 +127,8 @@ export interface IssueDetail {
 }
 
 export interface IssueQuery {
+  // Page parent groups and return each group's subtasks beneath its parent.
+  groupSubtasks?: boolean;
   text: string;
   types: string[];
   sprintId: string;

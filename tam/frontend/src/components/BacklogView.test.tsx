@@ -29,6 +29,11 @@ vi.mock("../api", async () => {
     ListEpics: vi.fn(),
     ListOpenSprints: vi.fn(),
     MoveIssueToSprint: vi.fn(),
+    GetSubtaskTypeName: vi.fn(),
+    CreateIssue: vi.fn(),
+    ListPriorities: vi.fn(),
+    SearchUsers: vi.fn(),
+    ListActivity: vi.fn(),
   };
 });
 
@@ -94,6 +99,10 @@ beforeEach(() => {
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
   vi.mocked(api.MoveIssueToSprint).mockResolvedValue();
+  vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
+  vi.mocked(api.ListPriorities).mockResolvedValue(["High", "Medium", "Low"]);
+  vi.mocked(api.SearchUsers).mockResolvedValue([]);
+  vi.mocked(api.ListActivity).mockResolvedValue([]);
 });
 
 const lastQuery = () => vi.mocked(api.ListIssues).mock.calls.at(-1)?.[1];
@@ -104,6 +113,35 @@ const showing = (first: number, last: number, total: number) =>
   `${first.toLocaleString()} to ${last.toLocaleString()} of ${total.toLocaleString()}`;
 
 describe("BacklogView", () => {
+  it("creates a technical task from a backlog issue and displays it under its parent", async () => {
+    const user = userEvent.setup();
+    const child = issue({ key: "TAM-NEW-1", type: "subtask", parentKey: "PLAT-412", summary: "Wire the promo input", draft: true, pending: true });
+    vi.mocked(api.CreateIssue).mockImplementation(async () => {
+      vi.mocked(api.ListIssues).mockResolvedValue({ issues: [rows[0], child, ...rows.slice(1)], total: 3 });
+      return child.key;
+    });
+    renderView();
+    await user.click(await screen.findByRole("row", { name: /PLAT-412 Checkout/ }));
+    await user.click(await screen.findByRole("button", { name: "+ Technical task" }));
+    const dialog = await screen.findByRole("dialog", { name: "New technical task" });
+    await user.type(within(dialog).getByLabelText("Summary *"), child.summary);
+    const submit = within(dialog).getByRole("button", { name: "Create draft" });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await user.click(submit);
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalledWith("p1", expect.objectContaining({ type: "subtask", parentKey: "PLAT-412", summary: child.summary })));
+    const childRow = await screen.findByRole("row", { name: /TAM-NEW-1.*subtask of PLAT-412/ });
+    const parentRow = screen.getByRole("row", { name: /PLAT-412 Checkout/ });
+    expect(parentRow.nextElementSibling).toBe(childRow);
+    expect(childRow).toHaveClass("issue-row-subtask");
+    expect(within(childRow).getByText("Technical task")).toBeInTheDocument();
+    parentRow.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(childRow).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(childRow).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("button", { name: "+ Technical task" })).not.toBeInTheDocument();
+  });
+
   it("renders the page with the seven columns and the count", async () => {
     renderView();
     await waitFor(() => expect(screen.getByText("PLAT-412")).toBeInTheDocument());
@@ -119,7 +157,7 @@ describe("BacklogView", () => {
     expect(within(row).getByText("Sprint 12")).toBeInTheDocument();
     expect(within(row).getByText("5")).toBeInTheDocument();
     expect(screen.getByText(showing(1, 25, 1248))).toBeInTheDocument();
-    expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false });
+    expect(lastQuery()).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false, groupSubtasks: true });
     expect(screen.getByRole("button", { name: "+ New" })).toBeInTheDocument();
   });
 
@@ -186,7 +224,7 @@ describe("BacklogView", () => {
       expect(vi.mocked(api.ListIssues).mock.calls.some((c) => c[0] === "p2")).toBe(true),
     );
     const firstForP2 = vi.mocked(api.ListIssues).mock.calls.find((c) => c[0] === "p2");
-    expect(firstForP2?.[1]).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false });
+    expect(firstForP2?.[1]).toEqual({ text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false, groupSubtasks: true });
     // No query for the new profile may carry the old profile's filters.
     for (const c of vi.mocked(api.ListIssues).mock.calls) {
       if (c[0] === "p2") expect(c[1].text).toBe("");
@@ -281,7 +319,7 @@ describe("BacklogView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() => expect(lastQuery()?.offset).toBe(25));
 
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Rows per page" }), "100");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Issue groups per page" }), "100");
     await waitFor(() => expect(lastQuery()?.limit).toBe(100));
     expect(lastQuery()?.offset).toBe(0);
     // 1,248 at 100 a page is 13 pages, not 50.

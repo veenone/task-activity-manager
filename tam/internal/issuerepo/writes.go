@@ -25,7 +25,7 @@ var fieldColumns = map[string]string{
 }
 
 // draftTypes are the logical types a draft may have.
-var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true, backend.TypeEpic: true}
+var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true, backend.TypeEpic: true, backend.TypeSubtask: true}
 
 // staleDetailStamp backdates a fabricated detail cache (one writeField built
 // from nothing, rather than a real fetch) so it reads as stale at once.
@@ -461,7 +461,7 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 	for i := range drafts {
 		d := &drafts[i]
 		if !draftTypes[d.Type] {
-			return nil, fmt.Errorf("type %q cannot be created here; tasks, stories, bugs, requirements, and epics can", d.Type)
+			return nil, fmt.Errorf("type %q cannot be created here; tasks, stories, bugs, requirements, epics, and subtasks can", d.Type)
 		}
 		if strings.TrimSpace(d.Summary) == "" {
 			return nil, errors.New("summary cannot be empty")
@@ -494,10 +494,8 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 	for _, d := range drafts {
 		last++
 		key := fmt.Sprintf("%s%d", DraftPrefix, last)
-		if d.ParentKey != "" {
-			if err := validateParent(ctx, tx, profileID, key, d.Type, d.ParentKey); err != nil {
-				return nil, err
-			}
+		if err := validateParent(ctx, tx, profileID, key, d.Type, d.ParentKey); err != nil {
+			return nil, err
 		}
 		encoded, err := json.Marshal(d)
 		if err != nil {
