@@ -42,6 +42,7 @@ type App struct {
 	settings  *settings.Manager
 	repo      *issuerepo.Repository
 	boards    *boardrepo.Repository
+	rituals   *ritualrepo.Repository
 	backendMu sync.Mutex
 	backends  map[string]backend.IssueBackend
 	// busy names the operation running for a profile, one of "sync",
@@ -116,6 +117,7 @@ func (a *App) initStore() error {
 	a.dbPath = dbPath
 	a.repo = issuerepo.New(local.DB())
 	a.boards = boardrepo.New(local.DB())
+	a.rituals = ritualrepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
 
