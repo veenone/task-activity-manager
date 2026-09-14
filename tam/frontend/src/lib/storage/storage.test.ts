@@ -24,6 +24,36 @@ const handWritten: Record<string, string> = {
   inlineMacro: `<p>State: <ac:structured-macro ac:name="status"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">On track</ac:parameter></ac:structured-macro></p>`,
   marksAndLinks: `<p>a <strong>b <em>c</em></strong> <a href="https://example.com" title="x">d</a><br/>e <s>gone</s> <u>under</u> <code>x()</code></p>`,
   headingsAndRule: `<h1>One</h1><h4 style="text-align: center;">Four</h4><hr/><blockquote><p>Quoted</p></blockquote>`,
+  // A shape parse.ts cannot hold exactly must stay opaque rather than drop
+  // or rewrite content. Round 1 fix: an attribute on any of the four task
+  // elements, a task-id or task-status with anything but a single text node
+  // (or an empty task-id), a status that is not exactly "complete" or
+  // "incomplete", and an unknown element before task-id all keep the whole
+  // task list opaque; a properly empty task-id still round-trips.
+  taskAttrs: `<ac:task-list><ac:task data-x="1"><ac:task-id>1</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskIdAttrs: `<ac:task-list><ac:task><ac:task-id data-x="1">1</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskStatusAttrs: `<ac:task-list><ac:task><ac:task-id>1</ac:task-id><ac:task-status data-x="1">incomplete</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskBodyAttrs: `<ac:task-list><ac:task><ac:task-id>1</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body data-x="1"><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskEmptyId: `<ac:task-list><ac:task><ac:task-id/><ac:task-status>incomplete</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskStatusPadded: `<ac:task-list><ac:task><ac:task-id>1</ac:task-id><ac:task-status> complete </ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskStatusUnknown: `<ac:task-list><ac:task><ac:task-id>1</ac:task-id><ac:task-status>unknown</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskIdComment: `<ac:task-list><ac:task><ac:task-id><!--c--></ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  taskIdOutOfOrder: `<ac:task-list><ac:task><ac:task-uuid>u</ac:task-uuid><ac:task-id>1</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>`,
+  // Round 1 fix: colspan/rowspan only lift into the numeric attr when the
+  // raw value is a plain positive integer other than "1"; otherwise the
+  // raw text stays in extra, untouched, rather than being lost or rewritten.
+  cellColspanOne: `<table><tbody><tr><td colspan="1">a</td><td>b</td></tr></tbody></table>`,
+  cellColspanZero: `<table><tbody><tr><td colspan="0">a</td><td>b</td></tr></tbody></table>`,
+  cellColspanNaN: `<table><tbody><tr><td colspan="abc">a</td><td>b</td></tr></tbody></table>`,
+  cellColspanPadded: `<table><tbody><tr><td colspan=" 2">a</td><td>b</td></tr></tbody></table>`,
+  // Round 1 fix: a mark element or a[href] with no child nodes goes to
+  // opaqueInline rather than being dropped along with its tags.
+  emptyStrong: `<p>a<strong></strong>b</p>`,
+  emptyLink: `<p>a<a href="#x"></a>b</p>`,
+  // Round 1 fix: stripNamespaces must only touch start tags, never text or
+  // CDATA content that happens to look like a namespace declaration.
+  xmlnsInCdata: `<p>Before</p><ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[<ac:x xmlns:ac="http://atlassian.com/content"/>]]></ac:plain-text-body></ac:structured-macro><p>After</p>`,
+  xmlnsLookalikeText: `<p><span style="x">write xmlns:ac="u" here</span></p>`,
 };
 
 const corpus: Record<string, string> = { sprint, planning, standup, review, retro, ...handWritten };

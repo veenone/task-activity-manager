@@ -41,8 +41,22 @@ export function parseXml(body: string): Element | null {
   return doc.documentElement;
 }
 
+// stripNamespaces removes the declarations only from start and self-closing
+// tags. Running the same regex over the whole serialized string would also
+// match text or CDATA content that merely looks like a declaration (a code
+// macro documenting its own XML, a sentence about attribute syntax), and
+// silently rewrite content that is meant to survive byte for byte.
 export function stripNamespaces(xml: string): string {
-  return xml.replace(/\s+xmlns:(ac|ri|at)="[^"]*"/g, "");
+  const CDATA = /<!\[CDATA\[[\s\S]*?\]\]>/g;
+  const stripTags = (segment: string) => segment.replace(/<[^>]*>/g, (tag) => tag.replace(/\s+xmlns:(ac|ri|at)="[^"]*"/g, ""));
+  let out = "";
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = CDATA.exec(xml))) {
+    out += stripTags(xml.slice(last, m.index)) + m[0];
+    last = CDATA.lastIndex;
+  }
+  return out + stripTags(xml.slice(last));
 }
 
 export function outerXml(node: Node): string {

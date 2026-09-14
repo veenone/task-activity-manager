@@ -27,6 +27,15 @@ describe("storage XML", () => {
     expect(outerXml(root.firstChild!)).toBe(xml);
   });
 
+  it("strips a namespace declaration only from a start tag, never from text or CDATA that merely looks like one", () => {
+    const withCdata = '<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[<ac:x xmlns:ac="http://atlassian.com/content"/>]]></ac:plain-text-body></ac:structured-macro>';
+    const root = parseXml(withCdata)!;
+    expect(outerXml(root.firstChild!)).toBe(withCdata);
+
+    const withText = parseXml('<p>write xmlns:ac="u" here</p>')!;
+    expect(outerXml(withText.firstChild!)).toBe('<p>write xmlns:ac="u" here</p>');
+  });
+
   it("escapes text and attribute values", () => {
     expect(escapeText(`a & <b> "c"`)).toBe(`a &amp; &lt;b&gt; "c"`);
     expect(escapeAttr(`a & "c"`)).toBe("a &amp; &quot;c&quot;");

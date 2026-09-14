@@ -146,43 +146,91 @@ function table(el: Element): JSONContent {
   for (const r of rows) {
     const cells = elementChildren(r);
     if (!cells || cells.length === 0 || cells.some((c) => c.nodeName !== "td" && c.nodeName !== "th")) return opaque("opaqueBlock", el);
-    rowNodes.push(node("tableRow", { extra: attrsOf(r) }, cells.map((c) => node(c.nodeName === "th" ? "tableHeader" : "tableCell", {
-      colspan: Number(c.getAttribute("colspan") ?? 1),
-      rowspan: Number(c.getAttribute("rowspan") ?? 1),
-      extra: attrsOf(c, ["colspan", "rowspan"]),
-    }, nonEmpty(blockChildren(c))))));
+    rowNodes.push(node("tableRow", { extra: attrsOf(r) }, cells.map((c) => {
+      const colspan = cellSpan(c.getAttribute("colspan"));
+      const rowspan = cellSpan(c.getAttribute("rowspan"));
+      const skip: string[] = [];
+      if (colspan.lifted) skip.push("colspan");
+      if (rowspan.lifted) skip.push("rowspan");
+      return node(c.nodeName === "th" ? "tableHeader" : "tableCell", {
+        colspan: colspan.value,
+        rowspan: rowspan.value,
+        extra: attrsOf(c, skip),
+      }, nonEmpty(blockChildren(c)));
+    })));
   }
   return node("table", { extra: attrsOf(el), colgroup, tbody }, rowNodes);
 }
 
-// taskList reads ac:task-list. A task's own children are an optional task-id,
-// any elements Confluence adds before the status (kept as raw XML in their
-// place), the status, and the body. Any other shape stays opaque.
+// cellSpan only lifts a colspan/rowspan value into the numeric attr the
+// editor reads when it is exactly a plain positive integer greater than 1: a
+// raw "1" is redundant but authored, "0" and "abc" are not integers at all,
+// and " 2" carries whitespace no editor wrote. Anything not lifted stays in
+// extra exactly as written rather than being rounded, defaulted away, or
+// silently rewritten.
+function cellSpan(raw: string | null): { value: number; lifted: boolean } {
+  if (raw !== null && raw !== "1" && /^[1-9]\d*$/.test(raw)) return { value: Number(raw), lifted: true };
+  return { value: 1, lifted: false };
+}
+
+// taskList reads ac:task-list. A task's own children are an optional task-id
+// (nothing before it), any elements Confluence adds between the id and the
+// status (kept as raw XML in their place), the status, and the body. An
+// attribute anywhere in the four elements, a task-id or task-status holding
+// anything but a single text node (an empty task-id is the one exception), a
+// status that is not exactly "complete" or "incomplete", or an unknown
+// element ahead of task-id are all shapes this cannot hold exactly, so the
+// whole list stays opaque rather than dropping or rewriting a byte of it.
 function taskList(el: Element): JSONContent {
   const tasks = elementChildren(el);
   if (!tasks || tasks.length === 0 || tasks.some((t) => t.nodeName !== "ac:task")) return opaque("opaqueBlock", el);
   const items: JSONContent[] = [];
   for (const t of tasks) {
-    const parts = elementChildren(t);
-    if (!parts) return opaque("opaqueBlock", el);
-    let taskId = "";
-    let checked = false;
-    let extraXml = "";
-    let sawStatus = false;
-    let body: Element | null = null;
-    for (const p of parts) {
-      if (p.nodeName === "ac:task-id" && !sawStatus && !body) taskId = p.textContent ?? "";
-      else if (p.nodeName === "ac:task-status" && !sawStatus && !body) {
-        sawStatus = true;
-        checked = (p.textContent ?? "").trim() === "complete";
-      } else if (p.nodeName === "ac:task-body" && sawStatus && !body) body = p;
-      else if (!sawStatus && !body) extraXml += outerXml(p);
-      else return opaque("opaqueBlock", el);
-    }
-    if (!body) return opaque("opaqueBlock", el);
-    items.push(node("taskItem", { checked, taskId, extraXml }, paragraphFirst(nonEmpty(blockChildren(body)))));
+    const item = taskItem(t);
+    if (!item) return opaque("opaqueBlock", el);
+    items.push(item);
   }
   return node("taskList", { extra: attrsOf(el) }, items);
+}
+
+// singleTextChild reads an element meant to hold nothing but text: null
+// means the element cannot be read exactly (an unexpected child, whether
+// that is a comment, another element, or more than one text node).
+// allowEmpty lets task-id, and only task-id, be genuinely empty.
+function singleTextChild(el: Element, allowEmpty: boolean): string | null {
+  const kids = Array.from(el.childNodes);
+  if (kids.length === 0) return allowEmpty ? "" : null;
+  return kids.length === 1 && kids[0].nodeType === Node.TEXT_NODE ? kids[0].textContent ?? "" : null;
+}
+
+function taskItem(t: Element): JSONContent | null {
+  if (t.attributes.length > 0) return null;
+  const parts = elementChildren(t);
+  if (!parts) return null;
+  const idIndex = parts.findIndex((p) => p.nodeName === "ac:task-id");
+  if (idIndex > 0) return null;
+  let taskId: string | undefined;
+  let i = 0;
+  if (idIndex === 0) {
+    const idEl = parts[0];
+    if (idEl.attributes.length > 0) return null;
+    const text = singleTextChild(idEl, true);
+    if (text === null) return null;
+    taskId = text;
+    i = 1;
+  }
+  let extraXml = "";
+  while (i < parts.length && parts[i].nodeName !== "ac:task-status") extraXml += outerXml(parts[i++]);
+  const statusEl = parts[i];
+  if (!statusEl || statusEl.attributes.length > 0) return null;
+  const statusText = singleTextChild(statusEl, false);
+  let checked: boolean;
+  if (statusText === "complete") checked = true;
+  else if (statusText === "incomplete") checked = false;
+  else return null;
+  const bodyEl = parts[i + 1];
+  if (!bodyEl || bodyEl.nodeName !== "ac:task-body" || bodyEl.attributes.length > 0 || i + 2 !== parts.length) return null;
+  return node("taskItem", { checked, taskId, extraXml }, paragraphFirst(nonEmpty(blockChildren(bodyEl))));
 }
 
 function inlineNodes(nodes: Node[], marks: Mark[]): JSONContent[] {
@@ -203,12 +251,16 @@ function inlineNodes(nodes: Node[], marks: Mark[]): JSONContent[] {
       out.push(withMarks({ type: "hardBreak" }));
       continue;
     }
-    if (name === "a" && n.hasAttribute("href")) {
+    // An empty mark or link has no text to carry the mark on, so there is
+    // nothing to map it onto: keep it opaque rather than dropping it (and,
+    // with it, whichever side of a and b in "a<strong></strong>b" it sat
+    // between).
+    if (name === "a" && n.hasAttribute("href") && n.childNodes.length > 0) {
       out.push(...inlineNodes(Array.from(n.childNodes), [...marks, { type: "link", attrs: { href: n.getAttribute("href"), extra: attrsOf(n, ["href"]) } }]));
       continue;
     }
     const mark = MARKS[name];
-    if (mark && n.attributes.length === 0) {
+    if (mark && n.attributes.length === 0 && n.childNodes.length > 0) {
       out.push(...inlineNodes(Array.from(n.childNodes), [...marks, TAGGED.has(mark) ? { type: mark, attrs: { tag: name } } : { type: mark }]));
       continue;
     }
