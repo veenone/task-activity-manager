@@ -115,6 +115,54 @@ func TestDraftsAreIsolatedByEveryCompositeKeyField(t *testing.T) {
 	}
 }
 
+// TestGetUpsertAndDeleteNormalizeTheRitualTypeCase guards the bug that was
+// found and fixed once already at the app layer: ritual_type carries no
+// COLLATE NOCASE, so a caller passing "Review" against a stored "review" row
+// would otherwise match nothing on a raw-case lookup, and a write that
+// followed such a miss would then blank a real row's publication fields.
+// Normalization now lives in the repository's key-taking methods themselves,
+// so every caller gets the same answer regardless of case without having to
+// normalize first.
+func TestGetUpsertAndDeleteNormalizeTheRitualTypeCase(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+
+	stored := sampleDraft()
+	stored.RitualType = "review"
+	if err := r.Upsert(ctx, stored); err != nil {
+		t.Fatalf("upsert lowercase: %v", err)
+	}
+
+	got, err := r.Get(ctx, stored.ProfileID, stored.BoardID, stored.SprintID, "Review")
+	if err != nil {
+		t.Fatalf("get mixed case: %v", err)
+	}
+	if got.Title != stored.Title || got.ConfluencePageID != stored.ConfluencePageID {
+		t.Fatalf("mixed-case get = %+v, want the lowercase row %+v", got, stored)
+	}
+
+	upserted := stored
+	upserted.RitualType = "REVIEW"
+	upserted.Title = "updated via upper case"
+	if err := r.Upsert(ctx, upserted); err != nil {
+		t.Fatalf("upsert upper case: %v", err)
+	}
+	afterUpsert, err := r.Get(ctx, stored.ProfileID, stored.BoardID, stored.SprintID, "review")
+	if err != nil {
+		t.Fatalf("get after mixed-case upsert: %v", err)
+	}
+	if afterUpsert.Title != "updated via upper case" {
+		t.Fatalf("upper-case upsert did not update the lowercase row, got %+v", afterUpsert)
+	}
+
+	if err := r.Delete(ctx, stored.ProfileID, stored.BoardID, stored.SprintID, "Review"); err != nil {
+		t.Fatalf("delete mixed case: %v", err)
+	}
+	if after, err := r.Get(ctx, stored.ProfileID, stored.BoardID, stored.SprintID, "review"); err != nil || after != (ritualrepo.Draft{}) {
+		t.Fatalf("after mixed-case delete = %+v, err = %v; want zero Draft and no error", after, err)
+	}
+}
+
 func TestDeleteRemovesOnlyTheSelectedDraft(t *testing.T) {
 	r := newRepo(t)
 	ctx := context.Background()

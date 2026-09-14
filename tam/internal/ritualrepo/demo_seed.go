@@ -3,7 +3,6 @@ package ritualrepo
 import (
 	"context"
 	"fmt"
-	"strings"
 )
 
 // SeedDemo creates the local ritual documents used by the offline demo. It is
@@ -19,11 +18,10 @@ func (r *Repository) SeedDemo(ctx context.Context, profileID, projectKey string)
 	types := []string{"planning", "standup", "review", "retro"}
 	for _, sprint := range []struct {
 		id     int
-		status string
 		remark string
 	}{
-		{12, "published", "Sprint 12 is the reference cycle for the demo walkthrough."},
-		{13, "draft", "Use this draft to prepare the next sprint ceremony."},
+		{12, "Sprint 12 is the reference cycle for the demo walkthrough."},
+		{13, "Use this draft to prepare the next sprint ceremony."},
 	} {
 		for _, typ := range types {
 			issueKeys := demoIssueKeys(projectKey, sprint.id, typ)
@@ -36,16 +34,19 @@ func (r *Repository) SeedDemo(ctx context.Context, profileID, projectKey string)
 				return fmt.Errorf("encode demo %s issues: %w", typ, err)
 			}
 			title := fmt.Sprintf("Sprint %d · %s", sprint.id, ritualTitle(typ))
-			body := demoBody(projectKey, sprint.id, typ)
+			// Publication fields (body, confluence_page_id,
+			// confluence_version, published_at) stay empty and status stays
+			// "draft": publishing is a separate, gated part 2, and a demo
+			// preview must never fabricate the state that only a real publish
+			// should ever produce.
 			_, err = r.db.ExecContext(ctx, `
 				INSERT OR IGNORE INTO ritual_document (
 					profile_id, board_id, sprint_id, ritual_type, title, remark, body,
 					issues_json, confluence_page_id, confluence_version, status,
 					updated_at, published_at
-				) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				profileID, sprint.id, typ, title, sprint.remark, body, issuesJSON,
-				fmt.Sprintf("demo-ritual-%s-%d", typ, sprint.id), 1, sprint.status,
-				"2026-09-13T09:00:00Z", map[string]string{"published": "2026-09-12T16:00:00Z"}[sprint.status],
+				) VALUES (?, 1, ?, ?, ?, ?, '', ?, '', 0, 'draft', ?, '')`,
+				profileID, sprint.id, typ, title, sprint.remark, issuesJSON,
+				"2026-09-13T09:00:00Z",
 			)
 			if err != nil {
 				return fmt.Errorf("seed demo %s sprint %d: %w", typ, sprint.id, err)
@@ -77,13 +78,4 @@ func demoIssueKeys(projectKey string, sprint int, typ string) []string {
 	default:
 		return []string{projectKey + "-398", projectKey + "-390"}
 	}
-}
-
-func demoBody(projectKey string, sprint int, typ string) string {
-	return fmt.Sprintf("<h2>%s · Sprint %d</h2><p>Use this workspace to capture the team's notes, decisions, and follow-ups.</p><h3>Checklist</h3><ul><li>Review the sprint goal and current progress.</li><li>Record decisions and owners while the conversation is fresh.</li><li>Link follow-up work before closing the ritual.</li></ul><h3>Related Jira issues</h3><p>%s</p>", ritualTitle(typ), sprint, joinIssueLinks(projectKey, sprint, typ))
-}
-
-func joinIssueLinks(projectKey string, sprint int, typ string) string {
-	keys := demoIssueKeys(projectKey, sprint, typ)
-	return strings.Join(keys, ", ")
 }

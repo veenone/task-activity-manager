@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import * as api from "../api";
@@ -23,6 +24,7 @@ vi.mock("../api", async () => {
     ListRitualDrafts: vi.fn(),
     ListSprintIssues: vi.fn(),
     ScaffoldSprintRituals: vi.fn(),
+    DeleteRitualDraft: vi.fn(),
   };
 });
 
@@ -78,5 +80,59 @@ describe("RitualsView", () => {
     renderView();
     expect(await screen.findByText("Sprint 12 Planning")).toBeInTheDocument();
     expect(screen.getAllByText("draft")).toHaveLength(2);
+  });
+
+  it("shows the other two slots as not started, each offering to fill the gap", async () => {
+    vi.mocked(api.ListRitualDrafts).mockResolvedValue([
+      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
+      { ritualType: "review", title: "Sprint 12 Review", status: "draft" },
+    ] as never);
+    vi.mocked(api.ScaffoldSprintRituals).mockResolvedValue([
+      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
+      { ritualType: "standup", title: "Sprint 12 Standup", status: "draft" },
+      { ritualType: "review", title: "Sprint 12 Review", status: "draft" },
+      { ritualType: "retro", title: "Sprint 12 Retrospective", status: "draft" },
+    ] as never);
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("Sprint 12 Planning");
+    // A scaffold that only ran partway leaves standup and retro with nothing
+    // stored; both slots still render, distinct from the two that did land.
+    expect(screen.getAllByText("Not started")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Set up Standup" }));
+    await waitFor(() => expect(api.ScaffoldSprintRituals).toHaveBeenCalledWith("p1", 1, 12));
+    expect(await screen.findByText("Sprint 12 Standup")).toBeInTheDocument();
+  });
+
+  it("deletes a stored ritual once the confirmation is answered", async () => {
+    vi.mocked(api.ListRitualDrafts).mockResolvedValue([
+      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
+    ] as never);
+    vi.mocked(api.DeleteRitualDraft).mockResolvedValue();
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("Sprint 12 Planning");
+
+    await user.click(screen.getByRole("button", { name: "Delete Planning" }));
+    const ask = await screen.findByRole("alertdialog", { name: "Delete Planning?" });
+    await user.click(within(ask).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(api.DeleteRitualDraft).toHaveBeenCalledWith("p1", 1, 12, "planning"));
+  });
+
+  it("keeps a stored ritual when the delete confirmation is declined", async () => {
+    vi.mocked(api.ListRitualDrafts).mockResolvedValue([
+      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
+    ] as never);
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("Sprint 12 Planning");
+
+    await user.click(screen.getByRole("button", { name: "Delete Planning" }));
+    const ask = await screen.findByRole("alertdialog", { name: "Delete Planning?" });
+    await user.click(within(ask).getByRole("button", { name: "Keep it" }));
+
+    expect(api.DeleteRitualDraft).not.toHaveBeenCalled();
   });
 });

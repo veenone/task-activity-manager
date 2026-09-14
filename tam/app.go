@@ -137,17 +137,21 @@ func (a *App) initStore() error {
 	a.settings = settings.NewManager(shared.DB())
 	// Keep the offline preview useful for demo profiles created by an older
 	// build as well as profiles created today. SeedDemo is idempotent and never
-	// replaces a locally edited document.
-	if demoProfiles, listErr := a.profiles.List(); listErr == nil {
+	// replaces a locally edited document. Neither a listing failure nor a
+	// seeding failure should keep the app from opening: this is a nice-to-have
+	// preview refresh, not something the rest of startup depends on, so it is
+	// logged and skipped the same way shutdown logs a close failure rather
+	// than treating it as fatal.
+	if demoProfiles, listErr := a.profiles.List(); listErr != nil {
+		log.Printf("tam: list profiles for demo ritual seed: %v", listErr)
+	} else {
 		for _, p := range demoProfiles {
 			if suiteprofiles.IsDemoURL(p.JiraURL) {
-				if seedErr := ritualrepo.New(local.DB()).SeedDemo(context.Background(), p.ID, p.ProjectKey); seedErr != nil {
-					return fmt.Errorf("seed demo rituals for %s: %w", p.ID, seedErr)
+				if seedErr := a.rituals.SeedDemo(context.Background(), p.ID, p.ProjectKey); seedErr != nil {
+					log.Printf("tam: seed demo rituals for %s: %v", p.ID, seedErr)
 				}
 			}
 		}
-	} else {
-		return fmt.Errorf("list profiles for demo ritual seed: %w", listErr)
 	}
 	log.Printf("tam: local store ready at %s; shared profiles at %s", dbPath, sharedPath)
 	return nil

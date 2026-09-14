@@ -53,6 +53,27 @@ export function RitualWizard({
 
   if (!draft) return <p className="muted">{error || "Loading the ritual..."}</p>;
 
+  // Issue order is the published order, so the wizard has to show it rather
+  // than the sprint's own order: chosen issues render first, in the order
+  // `chosen` itself carries, followed by the sprint's remaining unselected
+  // issues. A key `chosen` carries that `sprintIssues` no longer does (the
+  // card left the sprint since this draft was last saved) still renders,
+  // marked so the user can tell it is gone, and can still be deselected;
+  // dropping it silently would re-save a selection the user never saw.
+  const sprintByKey = new Map(sprintIssues.map((issue) => [issue.key, issue] as const));
+  const chosenKeys = new Set(chosen.map((i) => i.key));
+  const rows = [
+    ...chosen.map((c) => {
+      const issue = sprintByKey.get(c.key);
+      return issue
+        ? { key: c.key, summary: issue.summary, status: issue.status, missing: false }
+        : { key: c.key, summary: "", status: "", missing: true };
+    }),
+    ...sprintIssues
+      .filter((issue) => !chosenKeys.has(issue.key))
+      .map((issue) => ({ key: issue.key, summary: issue.summary, status: issue.status, missing: false })),
+  ];
+
   return (
     <section className="ritual-wizard" aria-label={`Edit ${ritualType}`}>
       <h3>{draft.title || ritualType}</h3>
@@ -64,19 +85,19 @@ export function RitualWizard({
 
       <h4>Issues</h4>
       <ul className="ritual-issues">
-        {sprintIssues.map((issue) => {
-          const picked = chosen.find((i) => i.key === issue.key);
+        {rows.map((row) => {
+          const picked = chosen.find((i) => i.key === row.key);
           return (
-            <li key={issue.key} role="group" aria-label={`${issue.key} ${issue.summary}`}>
+            <li key={row.key} role="group" aria-label={`${row.key} ${row.summary}`}>
               <label>
-                <input type="checkbox" checked={!!picked} onChange={() => toggle(issue.key)} />
-                <span>{issue.key} {issue.summary}</span>
-                <span className="muted small">{issue.status}</span>
+                <input type="checkbox" checked={!!picked} onChange={() => toggle(row.key)} />
+                <span>{row.key} {row.summary}</span>
+                {row.missing ? <span className="warn-text small">No longer in the sprint</span> : <span className="muted small">{row.status}</span>}
               </label>
               {picked && (
                 <label className="field">
                   <span>Issue remark</span>
-                  <input value={picked.remark} onChange={(e) => setIssueRemark(issue.key, e.target.value)} />
+                  <input value={picked.remark} onChange={(e) => setIssueRemark(row.key, e.target.value)} />
                 </label>
               )}
             </li>

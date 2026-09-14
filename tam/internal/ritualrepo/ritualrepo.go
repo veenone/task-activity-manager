@@ -80,9 +80,22 @@ const selectDraftSQL = `
 	FROM ritual_document
 	WHERE profile_id = ? AND board_id = ? AND sprint_id = ? AND ritual_type = ?`
 
+// normalizeRitualType matches ritual_type's case-insensitive treatment
+// everywhere in this package: the column carries no COLLATE NOCASE, so a
+// caller passing "Review" against a stored "review" row would otherwise
+// match nothing, and a write that follows such a miss would silently blank
+// a real row's publication fields instead of updating it. Every key-taking
+// method normalizes here rather than trusting a caller that has already
+// validated the type against knownRitualType, so Get, Upsert, and Delete can
+// never disagree about which row a given type names.
+func normalizeRitualType(ritualType string) string {
+	return strings.TrimSpace(strings.ToLower(ritualType))
+}
+
 // Get returns the selected draft, or a zero Draft when no document has been
 // stored for the composite key.
 func (r *Repository) Get(ctx context.Context, profileID string, boardID, sprintID int, ritualType string) (Draft, error) {
+	ritualType = normalizeRitualType(ritualType)
 	var draft Draft
 	err := r.db.QueryRowContext(ctx, selectDraftSQL, profileID, boardID, sprintID, ritualType).Scan(
 		&draft.ProfileID, &draft.BoardID, &draft.SprintID, &draft.RitualType,
@@ -119,6 +132,7 @@ const upsertDraftSQL = `
 // Upsert inserts a new document or replaces the editable and publication
 // fields of the document with the same composite key.
 func (r *Repository) Upsert(ctx context.Context, draft Draft) error {
+	draft.RitualType = normalizeRitualType(draft.RitualType)
 	_, err := r.db.ExecContext(ctx, upsertDraftSQL,
 		draft.ProfileID, draft.BoardID, draft.SprintID, draft.RitualType,
 		draft.Title, draft.Remark, draft.Body, draft.IssuesJSON,
@@ -133,6 +147,7 @@ func (r *Repository) Upsert(ctx context.Context, draft Draft) error {
 
 // Delete removes only the document identified by the full composite key.
 func (r *Repository) Delete(ctx context.Context, profileID string, boardID, sprintID int, ritualType string) error {
+	ritualType = normalizeRitualType(ritualType)
 	_, err := r.db.ExecContext(ctx, `
 		DELETE FROM ritual_document
 		WHERE profile_id = ? AND board_id = ? AND sprint_id = ? AND ritual_type = ?`,

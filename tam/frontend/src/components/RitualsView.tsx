@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useProfile } from "@agile-suite/core";
+import { errMsg, useConfirm, useProfile } from "@agile-suite/core";
 import {
-  GetConfluenceConfig, GetRitualPage, GetSprintReport, ListBoards, ListBoardSprints,
+  DeleteRitualDraft, GetConfluenceConfig, GetRitualPage, GetSprintReport, ListBoards, ListBoardSprints,
   ListConfluenceChildPages, ListRitualAssociations, ListRitualDrafts, ListSprintIssues, ScaffoldSprintRituals,
 } from "../api";
 import type {
@@ -41,6 +41,7 @@ const RITUAL_ORDER = ["planning", "standup", "review", "retro"];
 
 export function RitualsView() {
   const { activeId } = useProfile<Profile, Settings>();
+  const { confirm } = useConfirm();
   const [config, setConfig] = useState<ConfluenceConfig | null>(null);
   const [associations, setAssociations] = useState<RitualAssociation[]>([]);
   const [page, setPage] = useState<ConfluencePage | null>(null);
@@ -146,6 +147,28 @@ export function RitualsView() {
       .finally(() => setScaffolding(false));
   }
 
+  // deleteRitual removes only the local document. It is offered on a slot
+  // that has one, never on a "Not started" slot, which has nothing to
+  // delete; the confirmation says so plainly since there is no undo.
+  async function deleteRitual(type: string) {
+    const meta = RITUAL_META[type] ?? { label: type, icon: "calendar" as const };
+    const ok = await confirm({
+      title: `Delete ${meta.label}?`,
+      message: "This removes the local document. It cannot be undone.",
+      confirmLabel: "Delete",
+      cancelLabel: "Keep it",
+      danger: true,
+    });
+    if (!ok) return;
+    setRitualError("");
+    try {
+      await DeleteRitualDraft(activeId, ritualBoardId, ritualSprintId, type);
+      void loadRitualSlots();
+    } catch (e) {
+      setRitualError(errMsg(e));
+    }
+  }
+
   function openAssociation(association: RitualAssociation) {
     setSelectedID(association.pageID); setError(""); setLoadingPage(true); setReport(null);
     void Promise.all([GetRitualPage(activeId, association.pageID), association.sprintID ? GetSprintReport(activeId, association.boardID, association.sprintID, false) : Promise.resolve(null)])
@@ -192,27 +215,59 @@ export function RitualsView() {
 
         {ritualBoardId > 0 && ritualSprintId > 0 && (
           ritualDrafts === null ? <p className="muted" role="status">Loading this sprint's rituals</p>
-            : ritualDrafts.length === 0 ? (
-              <button className="btn" disabled={scaffolding} onClick={scaffoldSprint}>
-                {scaffolding ? "Setting up rituals" : `Set up ${ritualSprint?.name ?? "this sprint"}'s rituals`}
-              </button>
-            ) : (
-              <ul className="ritual-slots">
-                {RITUAL_ORDER.map((type) => {
-                  const draft = ritualDrafts.find((d) => d.ritualType === type);
-                  if (!draft) return null;
-                  const meta = RITUAL_META[type] ?? { label: type, icon: "calendar" as const };
-                  return (
-                    <li key={type} className="ritual-slot">
-                      <button className="ritual-slot-open" onClick={() => setWizardType(type)}>
-                        <span className="ritual-icon" aria-hidden="true"><RitualIcon name={meta.icon} /></span>
-                        <span className="ritual-link-copy"><strong>{draft.title || meta.label}</strong><small>{meta.label}</small></span>
-                      </button>
-                      <span className="status">{draft.status}</span>
-                    </li>
-                  );
-                })}
-              </ul>
+            : (
+              <>
+                {/* Scaffolding is deliberately not transactional, so a run
+                    that stops partway can leave some slots filled and some
+                    not; every slot in RITUAL_ORDER renders regardless, and
+                    ScaffoldSprintRituals is idempotent, so this button (and
+                    each empty slot's own) always offers a way to finish it. */}
+                {ritualDrafts.length === 0 && (
+                  <button className="btn" disabled={scaffolding} onClick={scaffoldSprint}>
+                    {scaffolding ? "Setting up rituals" : `Set up ${ritualSprint?.name ?? "this sprint"}'s rituals`}
+                  </button>
+                )}
+                <ul className="ritual-slots">
+                  {RITUAL_ORDER.map((type) => {
+                    const draft = ritualDrafts.find((d) => d.ritualType === type);
+                    const meta = RITUAL_META[type] ?? { label: type, icon: "calendar" as const };
+                    if (!draft) {
+                      return (
+                        <li key={type} className="ritual-slot ritual-slot-empty">
+                          <span className="ritual-slot-info">
+                            <span className="ritual-icon" aria-hidden="true"><RitualIcon name={meta.icon} /></span>
+                            <span className="ritual-link-copy"><strong>{meta.label}</strong><small>Not started</small></span>
+                          </span>
+                          <button
+                            className="btn btn-ghost"
+                            aria-label={`Set up ${meta.label}`}
+                            disabled={scaffolding}
+                            onClick={scaffoldSprint}
+                          >
+                            {scaffolding ? "Setting up" : "Set up"}
+                          </button>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={type} className="ritual-slot">
+                        <button className="ritual-slot-open" onClick={() => setWizardType(type)}>
+                          <span className="ritual-icon" aria-hidden="true"><RitualIcon name={meta.icon} /></span>
+                          <span className="ritual-link-copy"><strong>{draft.title || meta.label}</strong><small>{meta.label}</small></span>
+                        </button>
+                        <span className="status">{draft.status}</span>
+                        <button
+                          className="btn btn-ghost ritual-slot-delete"
+                          aria-label={`Delete ${meta.label}`}
+                          onClick={() => void deleteRitual(type)}
+                        >
+                          Delete
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
             )
         )}
 

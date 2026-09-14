@@ -5,7 +5,14 @@
 // cached Jira user list, version 5 the board tables and the issue's status
 // id, version 6 re-keys the sprint table by board, version 7 adds the
 // sprint's goal, version 8 adds the sprint_report table and the sprint's
-// complete_date, and version 9 adds local ritual documents.
+// complete_date, and version 9 adds local ritual documents. Version 10 adds
+// ritual_document's issues_json column and converts version 9's bare key
+// arrays into it as {"key","remark"} objects, so a draft written before
+// per-issue remarks existed keeps its issues and their order. Version 11
+// repeats that same column add and conversion, guarded to be a no-op on a
+// healthy version 10 database: some development builds recorded the version
+// 10 stamp before the issues_json migration actually ran, and this repairs
+// those files without re-running the conversion where it already happened.
 package tamstore
 
 import (

@@ -56,6 +56,9 @@ func TestReviewTakesOnlyWhatIsDone(t *testing.T) {
 func TestRetroLeadsWithWhatDidNotFinish(t *testing.T) {
 	got := keys(ritualdefaults.Select("retro", sample()))
 	want := []string{"PLAT-1", "PLAT-2", "PLAT-4", "PLAT-3"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("got %v, want %v", got, want)

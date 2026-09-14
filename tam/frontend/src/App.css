@@ -722,6 +722,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-slot:last-child { border-bottom: none; }
 .ritual-slot .status { font-size: 11px; color: var(--text-muted); text-transform: capitalize; }
 .ritual-slot-open { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; padding: 2px 0; }
+.ritual-slot-info { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.ritual-slot-empty .ritual-icon { opacity: 0.6; }
+.ritual-slot-empty .ritual-link-copy small { font-style: italic; }
 .ritual-wizard { margin-top: 12px; }
 .ritual-wizard .ritual-issues { list-style: none; padding: 0; display: grid; gap: 6px; margin: 8px 0 0; }
 .ritual-wizard .ritual-issues li { padding: 6px 0; border-bottom: 1px solid var(--border); }
