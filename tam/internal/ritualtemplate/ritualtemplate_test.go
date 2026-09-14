@@ -148,7 +148,7 @@ func TestParseJQLReadsTheThreeFormsAndNothingElse(t *testing.T) {
 	if _, _, ok := ParseJQL("  SPRINT = 3  and statuscategory != done "); !ok {
 		t.Error("case and spacing should not matter")
 	}
-	for _, other := range []string{"project = PLAT", "sprint = 14 AND assignee = currentUser()", "sprint in openSprints()"} {
+	for _, other := range []string{"sprint = 14", "project = PLAT", "sprint = 14 AND assignee = currentUser()", "sprint in openSprints()"} {
 		if _, _, ok := ParseJQL(other); ok {
 			t.Errorf("%q should not be previewable", other)
 		}

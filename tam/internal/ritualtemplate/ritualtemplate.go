@@ -86,7 +86,7 @@ func JQL(sprintID int, f Filter) string {
 	return fmt.Sprintf("sprint = %d ORDER BY Rank", sprintID)
 }
 
-var jqlForm = regexp.MustCompile(`(?i)^\s*sprint\s*=\s*(\d+)\s*(?:AND\s+statusCategory\s*(!=|=)\s*Done|ORDER\s+BY\s+Rank)?\s*$`)
+var jqlForm = regexp.MustCompile(`(?i)^\s*sprint\s*=\s*(\d+)\s*(?:AND\s+statusCategory\s*(!=|=)\s*Done|ORDER\s+BY\s+Rank)\s*$`)
 
 // ParseJQL reads a macro's query back. ok is false for anything but the
 // three forms JQL writes, however reasonable the query.
