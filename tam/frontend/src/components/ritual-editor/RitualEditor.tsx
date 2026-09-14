@@ -57,7 +57,20 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
   const editable = !readOnly && parsed.ok;
   const extensions = useMemo(() => ritualExtensions(), []);
   const pending = useRef<string | null>(null);
+  // The text a successful save last actually persisted. This is the store's
+  // side of the "does the screen match the store" question `onUpdate` and
+  // `reconcile` both ask.
   const lastSaved = useRef<string>("");
+  // The text the save currently in flight was sent with, or null when no
+  // save is running. `onUpdate` compares against this, not `lastSaved`,
+  // while a save is running: comparing against `lastSaved` alone let an
+  // undo back to the stored text, arriving after the network call for a
+  // newer edit had already started, read as "nothing changed" and clear
+  // `pending` — and then the in-flight save would still land, moving the
+  // store to the newer text with nothing left to correct it, so store and
+  // screen would disagree until the next unrelated edit happened to notice.
+  const inFlightText = useRef<string | null>(null);
+  const editorRef = useRef<Editor | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Saves run one at a time, in the order they were asked for: a call
   // chains onto whatever is already in flight rather than firing beside it,
@@ -71,10 +84,29 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
 
   const save = useCallback((): Promise<void> => {
     clearTimeout(timer.current);
+    // Runs after a save settles, success or failure. The store (`lastSaved`)
+    // and the screen can disagree at this point even when `onUpdate`'s own
+    // in-flight comparison already caught most cases (see the comment on
+    // `inFlightText`); this is the backstop, not the primary mechanism, so
+    // it only acts when nothing is already queued to fix the drift and it
+    // always saves what the editor currently holds, never the text that was
+    // just attempted, which is exactly what "restore the current text, not
+    // the attempted one" means for a failed save whose text was undone
+    // before it settled.
+    const reconcile = () => {
+      const current = editorRef.current;
+      if (!current || current.isDestroyed || pending.current !== null) return;
+      const now = serializeStorage(current.getJSON());
+      if (now !== lastSaved.current) {
+        pending.current = now;
+        void saveRef.current();
+      }
+    };
     const runOne = async () => {
       const next = pending.current;
       if (next === null) return;
       pending.current = null;
+      inFlightText.current = next;
       setSaving(true);
       setSaveError("");
       try {
@@ -83,10 +115,10 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
         setSavedAt(new Date().toISOString());
         onSaved?.(saved);
       } catch (e) {
-        // Keep the text for the next try, unless a newer edit already replaced it.
-        if (pending.current === null) pending.current = next;
         setSaveError(errMsg(e));
       } finally {
+        inFlightText.current = null;
+        reconcile();
         setSaving(false);
       }
     };
@@ -107,7 +139,8 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
     },
     onUpdate: ({ editor: current }) => {
       const next = serializeStorage(current.getJSON());
-      if (next === lastSaved.current) {
+      const target = inFlightText.current ?? lastSaved.current;
+      if (next === target) {
         pending.current = null;
         clearTimeout(timer.current);
         return;
@@ -120,7 +153,6 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
     // this editor's identity.
   }, [editable]);
 
-  const editorRef = useRef<Editor | null>(null);
   useEffect(() => { editorRef.current = editor; }, [editor]);
 
   useImperativeHandle(ref, () => ({ flush: () => saveRef.current(), editor }), [editor]);

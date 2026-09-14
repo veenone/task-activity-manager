@@ -76,17 +76,64 @@ describe("RitualEditor", () => {
   });
 
   it("survives its own save: the editor instance is not rebuilt when the saved row comes back", async () => {
+    const onSavedSpy = vi.fn();
     function Harness({ handleRef }: { handleRef: React.RefObject<RitualEditorHandle | null> }) {
       const [d, setD] = useState<api.RitualDocument>(doc());
-      return <RitualEditor ref={handleRef} profileId="p1" doc={d} onSaved={setD} saveDelayMs={10} />;
+      return <RitualEditor ref={handleRef} profileId="p1" doc={d}
+        onSaved={(saved) => { onSavedSpy(saved); setD(saved); }} saveDelayMs={10} />;
     }
     const ref = createRef<RitualEditorHandle>();
     render(<Harness handleRef={ref} />);
     await screen.findByText("ship it");
     const before = ref.current!.editor;
     act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>more</p>"); });
+    // Wait for the save's effect on the parent (onSaved, which also updates
+    // Harness's own doc state) to have actually landed before checking
+    // identity with a plain expect: a waitFor around the identity check
+    // itself would pass on its very first poll, before the save or the
+    // re-render it triggers have happened at all, proving nothing.
+    await waitFor(() => expect(onSavedSpy).toHaveBeenCalledTimes(1));
+    expect(ref.current!.editor).toBe(before);
+  });
+
+  it("saves again if an undo lands back on the stored text while a save is in flight", async () => {
+    const ref = createRef<RitualEditorHandle>();
+    let resolveSave: ((saved: api.RitualDocument) => void) | null = null;
+    vi.mocked(api.SaveRitualBody).mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve; }));
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} saveDelayMs={10} />);
+    await screen.findByText("ship it");
+    const originalBody = doc().body;
+    act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>hello</p>"); });
     await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(ref.current!.editor).toBe(before));
+    // Undo back to the original text while that first save is still in flight.
+    act(() => { ref.current!.editor!.commands.undo(); });
+    await act(async () => { resolveSave!(doc({ body: "<h2>Decisions</h2><ul><li>ship it</li></ul><p>hello</p>", status: "local" })); });
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.SaveRitualBody).mock.calls[1][4]).toBe(originalBody);
+  });
+
+  it("does not resend the undone text if the in-flight save fails", async () => {
+    const ref = createRef<RitualEditorHandle>();
+    let rejectSave: ((e: unknown) => void) | null = null;
+    vi.mocked(api.SaveRitualBody).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSave = reject; }));
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} saveDelayMs={10} />);
+    await screen.findByText("ship it");
+    act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>hello</p>"); });
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
+    act(() => { ref.current!.editor!.commands.undo(); });
+    await act(async () => { rejectSave!(new Error("network down")); });
+    // The undo already differs from the stored text (still the original,
+    // since the failed save never persisted anything), so it retries with
+    // the original body; confirm that retry actually happens, not just that
+    // it carries the right text, or this test would pass just as well if
+    // nothing were sent at all.
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(2));
+    // The first call is the failed attempt itself, and legitimately carries
+    // "hello": what must never happen is a later call resending it after
+    // the user undid it back out.
+    for (const call of vi.mocked(api.SaveRitualBody).mock.calls.slice(1)) {
+      expect(call[4]).not.toContain("hello");
+    }
   });
 
   it("opens a page it cannot read as read only, with the page link", async () => {
