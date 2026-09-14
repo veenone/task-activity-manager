@@ -1,8 +1,11 @@
-// Package confluence provides the read-only Confluence Data Center transport
-// used by TAM's Rituals view.
+// Package confluence is the Confluence Data Center transport behind TAM's
+// Rituals view: reading a page's storage body, finding a page by title, and
+// creating and updating pages. TAM's ritualsync decides when each is called;
+// nothing here keeps state between calls.
 package confluence
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -120,13 +123,33 @@ func (r responseDecoder) Decode(out any) error {
 	defer r.body.Close()
 	return json.NewDecoder(r.body).Decode(out)
 }
+
 func (c *Client) get(ctx context.Context, path string) responseDecoder {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	return c.send(ctx, http.MethodGet, path, nil)
+}
+
+// send is every request this client makes. A nil payload sends no body; any
+// other payload is JSON. A non-2xx answer becomes *HTTPError carrying
+// Confluence's own message, which is what errors.Is matches ErrNotFound and
+// ErrVersionConflict against.
+func (c *Client) send(ctx context.Context, method, path string, payload any) responseDecoder {
+	var body io.Reader
+	if payload != nil {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return responseDecoder{err: err}
+		}
+		body = bytes.NewReader(encoded)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return responseDecoder{err: err}
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return responseDecoder{err: err}
