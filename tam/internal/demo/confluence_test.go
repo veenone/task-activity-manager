@@ -63,6 +63,13 @@ func TestFailNextAndAfterFireOnce(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("after ran %d times", calls)
 	}
+	findCalls := 0
+	c.After("find", "Sprint 14", func() { findCalls++ })
+	_, _, _ = c.FindPageByTitle(ctx, "DEMO", "Sprint 14")
+	_, _, _ = c.FindPageByTitle(ctx, "DEMO", "Sprint 14")
+	if findCalls != 1 {
+		t.Fatalf("find after ran %d times", findCalls)
+	}
 }
 
 func TestTheStagedConflictBumpsOnlyTheFirstStandup(t *testing.T) {

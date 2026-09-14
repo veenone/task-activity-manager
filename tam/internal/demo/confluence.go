@@ -124,11 +124,14 @@ func (c *Confluence) GetPageStorage(_ context.Context, id string) (confluence.St
 // FindPageByTitle looks through the whole space, lowest id first.
 func (c *Confluence) FindPageByTitle(_ context.Context, spaceKey, title string) (confluence.StoredPage, bool, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if err := c.failure("find", title); err != nil {
+		c.mu.Unlock()
 		return confluence.StoredPage{}, false, err
 	}
 	if spaceKey != c.space {
+		hook := c.afterHook("find", title)
+		c.mu.Unlock()
+		hook()
 		return confluence.StoredPage{}, false, nil
 	}
 	ids := make([]string, 0, len(c.pages))
@@ -136,12 +139,19 @@ func (c *Confluence) FindPageByTitle(_ context.Context, spaceKey, title string) 
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
+	var out confluence.StoredPage
+	var found bool
 	for _, id := range ids {
 		if c.pages[id].title == title {
-			return c.stored(c.pages[id]), true, nil
+			out = c.stored(c.pages[id])
+			found = true
+			break
 		}
 	}
-	return confluence.StoredPage{}, false, nil
+	hook := c.afterHook("find", title)
+	c.mu.Unlock()
+	hook()
+	return out, found, nil
 }
 
 func (c *Confluence) titleTaken(title string) bool {
