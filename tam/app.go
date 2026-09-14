@@ -18,6 +18,7 @@ import (
 	"agile-suite/core/store"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/demo"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/ritualrepo"
 	"agile-suite/tam/internal/suiteprofiles"
@@ -54,6 +55,10 @@ type App struct {
 	// guarded by backendMu, the same mutex busy is, and app_reports.go is
 	// the only file that touches it.
 	reportCancels map[string]context.CancelFunc
+	// demoConfluence holds the in-memory Confluence space of each profile
+	// whose Confluence URL is "demo". Guarded by backendMu; app_rituals.go is
+	// the only file that touches it.
+	demoConfluence map[string]*demo.Confluence
 
 	dbPath     string
 	sharedPath string
@@ -120,6 +125,7 @@ func (a *App) initStore() error {
 	a.rituals = ritualrepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
+	a.demoConfluence = map[string]*demo.Confluence{}
 
 	sharedPath, err := shareddb.DefaultPath()
 	if err != nil {

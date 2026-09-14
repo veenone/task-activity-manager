@@ -6,15 +6,16 @@ import {committer} from '../models';
 import {sprints} from '../models';
 import {profile} from '../models';
 import {main} from '../models';
+import {ritualrepo} from '../models';
 import {boardrepo} from '../models';
 import {confluence} from '../models';
 import {issuerepo} from '../models';
-import {ritualrepo} from '../models';
 import {settings} from '../models';
 import {sprintreport} from '../models';
 import {journal} from '../models';
 import {importfile} from '../models';
 import {syncer} from '../models';
+import {ritualsync} from '../models';
 
 export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<void>;
 
@@ -40,6 +41,8 @@ export function DeleteProfile(arg1:string):Promise<void>;
 
 export function DeleteRitualAssociation(arg1:string,arg2:profile.RitualAssociation):Promise<void>;
 
+export function DeleteRitualDocument(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
+
 export function DeleteRitualDraft(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
 export function DeleteSprint(arg1:string,arg2:number,arg3:number):Promise<string>;
@@ -52,7 +55,11 @@ export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promi
 
 export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<string>;
 
+export function EnsureSprintRituals(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
+
 export function ExportProfile(arg1:string):Promise<string>;
+
+export function ForgetRitualPage(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
 export function GetBoard(arg1:string,arg2:number,arg3:string,arg4:string):Promise<boardrepo.BoardView>;
 
@@ -92,6 +99,8 @@ export function ImportProfile():Promise<profile.Profile>;
 
 export function JournalSprintMoves(arg1:string,arg2:Array<string>,arg3:string):Promise<number>;
 
+export function LastRitualSync(arg1:string,arg2:number):Promise<string>;
+
 export function ListActivity(arg1:string,arg2:string,arg3:number):Promise<Array<journal.AuditEntry>>;
 
 export function ListBoardSprintDetails(arg1:string,arg2:number):Promise<Array<boardrepo.SprintDetail>>;
@@ -118,6 +127,8 @@ export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListRitualAssociations(arg1:string,arg2:number,arg3:number):Promise<Array<profile.RitualAssociation>>;
 
+export function ListRitualDocuments(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
+
 export function ListRitualDrafts(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Draft>>;
 
 export function ListSprintIssues(arg1:string,arg2:number,arg3:number):Promise<Array<backend.Issue>>;
@@ -140,7 +151,13 @@ export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>
 
 export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function ResolveRitualConflict(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string):Promise<void>;
+
+export function RitualMacroIssues(arg1:string,arg2:string):Promise<main.RitualMacroPreview>;
+
 export function SaveImportTemplate(arg1:string):Promise<string>;
+
+export function SaveRitualBody(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string):Promise<ritualrepo.Document>;
 
 export function SaveRitualDraft(arg1:string,arg2:ritualrepo.Draft):Promise<void>;
 
@@ -160,6 +177,8 @@ export function SetRitualAssociation(arg1:string,arg2:profile.RitualAssociation)
 
 export function SetTheme(arg1:string):Promise<void>;
 
+export function StandupEntry(arg1:string):Promise<string>;
+
 export function StartSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string):Promise<string>;
 
 export function SuggestSprintDates(arg1:string,arg2:number):Promise<sprints.Suggestion>;
@@ -167,6 +186,8 @@ export function SuggestSprintDates(arg1:string,arg2:number):Promise<sprints.Sugg
 export function SyncBoards(arg1:string):Promise<syncer.BoardSummary>;
 
 export function SyncIssues(arg1:string,arg2:boolean):Promise<syncer.Summary>;
+
+export function SyncRituals(arg1:string,arg2:number):Promise<ritualsync.Result>;
 
 export function TestConnection(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<string>;
 

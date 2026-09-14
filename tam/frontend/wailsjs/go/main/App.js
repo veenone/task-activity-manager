@@ -50,6 +50,10 @@ export function DeleteRitualAssociation(arg1, arg2) {
   return window['go']['main']['App']['DeleteRitualAssociation'](arg1, arg2);
 }
 
+export function DeleteRitualDocument(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['DeleteRitualDocument'](arg1, arg2, arg3, arg4);
+}
+
 export function DeleteRitualDraft(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['DeleteRitualDraft'](arg1, arg2, arg3, arg4);
 }
@@ -74,8 +78,16 @@ export function EditSprint(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['EditSprint'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
+export function EnsureSprintRituals(arg1, arg2, arg3) {
+  return window['go']['main']['App']['EnsureSprintRituals'](arg1, arg2, arg3);
+}
+
 export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
+}
+
+export function ForgetRitualPage(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ForgetRitualPage'](arg1, arg2, arg3, arg4);
 }
 
 export function GetBoard(arg1, arg2, arg3, arg4) {
@@ -154,6 +166,10 @@ export function JournalSprintMoves(arg1, arg2, arg3) {
   return window['go']['main']['App']['JournalSprintMoves'](arg1, arg2, arg3);
 }
 
+export function LastRitualSync(arg1, arg2) {
+  return window['go']['main']['App']['LastRitualSync'](arg1, arg2);
+}
+
 export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
 }
@@ -206,6 +222,10 @@ export function ListRitualAssociations(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListRitualAssociations'](arg1, arg2, arg3);
 }
 
+export function ListRitualDocuments(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ListRitualDocuments'](arg1, arg2, arg3);
+}
+
 export function ListRitualDrafts(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListRitualDrafts'](arg1, arg2, arg3);
 }
@@ -250,8 +270,20 @@ export function ResolveConflictOverride(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveConflictOverride'](arg1, arg2, arg3);
 }
 
+export function ResolveRitualConflict(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ResolveRitualConflict'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function RitualMacroIssues(arg1, arg2) {
+  return window['go']['main']['App']['RitualMacroIssues'](arg1, arg2);
+}
+
 export function SaveImportTemplate(arg1) {
   return window['go']['main']['App']['SaveImportTemplate'](arg1);
+}
+
+export function SaveRitualBody(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SaveRitualBody'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SaveRitualDraft(arg1, arg2) {
@@ -290,6 +322,10 @@ export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
 }
 
+export function StandupEntry(arg1) {
+  return window['go']['main']['App']['StandupEntry'](arg1);
+}
+
 export function StartSprint(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['StartSprint'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
@@ -304,6 +340,10 @@ export function SyncBoards(arg1) {
 
 export function SyncIssues(arg1, arg2) {
   return window['go']['main']['App']['SyncIssues'](arg1, arg2);
+}
+
+export function SyncRituals(arg1, arg2) {
+  return window['go']['main']['App']['SyncRituals'](arg1, arg2);
 }
 
 export function TestConnection(arg1, arg2, arg3, arg4) {

@@ -1341,6 +1341,40 @@ export namespace main {
 	        this.logPath = source["logPath"];
 	    }
 	}
+	export class RitualMacroPreview {
+	    supported: boolean;
+	    jql: string;
+	    issues: backend.Issue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RitualMacroPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supported = source["supported"];
+	        this.jql = source["jql"];
+	        this.issues = this.convertValues(source["issues"], backend.Issue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SprintCreated {
 	    sprint: backend.Sprint;
 	    note: string;
@@ -1573,6 +1607,44 @@ export namespace reports {
 
 export namespace ritualrepo {
 	
+	export class Document {
+	    profileId: string;
+	    boardId: number;
+	    sprintId: number;
+	    ritualType: string;
+	    title: string;
+	    body: string;
+	    baseBody: string;
+	    pageId: string;
+	    version: number;
+	    conflictBody: string;
+	    conflictVersion: number;
+	    status: string;
+	    updatedAt: string;
+	    syncedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Document(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.profileId = source["profileId"];
+	        this.boardId = source["boardId"];
+	        this.sprintId = source["sprintId"];
+	        this.ritualType = source["ritualType"];
+	        this.title = source["title"];
+	        this.body = source["body"];
+	        this.baseBody = source["baseBody"];
+	        this.pageId = source["pageId"];
+	        this.version = source["version"];
+	        this.conflictBody = source["conflictBody"];
+	        this.conflictVersion = source["conflictVersion"];
+	        this.status = source["status"];
+	        this.updatedAt = source["updatedAt"];
+	        this.syncedAt = source["syncedAt"];
+	    }
+	}
 	export class Draft {
 	    profileId: string;
 	    boardId: number;
@@ -1608,6 +1680,69 @@ export namespace ritualrepo {
 	        this.updatedAt = source["updatedAt"];
 	        this.publishedAt = source["publishedAt"];
 	    }
+	}
+
+}
+
+export namespace ritualsync {
+	
+	export class PageFailure {
+	    sprintName: string;
+	    title: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageFailure(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sprintName = source["sprintName"];
+	        this.title = source["title"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class Result {
+	    created: number;
+	    pulled: number;
+	    pushed: number;
+	    conflicts: number;
+	    gone: number;
+	    failed: PageFailure[];
+	    syncedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.created = source["created"];
+	        this.pulled = source["pulled"];
+	        this.pushed = source["pushed"];
+	        this.conflicts = source["conflicts"];
+	        this.gone = source["gone"];
+	        this.failed = this.convertValues(source["failed"], PageFailure);
+	        this.syncedAt = source["syncedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
