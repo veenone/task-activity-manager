@@ -123,7 +123,7 @@ func (r *Repository) Documents(ctx context.Context, profileID string, boardID, s
 // ProfileDocuments lists every document of a profile that has a page, which
 // is what the demo space is rebuilt from when the app restarts.
 func (r *Repository) ProfileDocuments(ctx context.Context, profileID string) ([]Document, error) {
-	return r.documents(ctx, `WHERE profile_id = ? ORDER BY board_id, sprint_id, ritual_type`, profileID)
+	return r.documents(ctx, `WHERE profile_id = ? AND confluence_page_id <> '' ORDER BY board_id, sprint_id, ritual_type`, profileID)
 }
 
 // BoardSprintIDs lists the sprints of a board that hold any document, so a

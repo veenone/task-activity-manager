@@ -222,7 +222,10 @@ func TestListingByBoardSprintAndProfile(t *testing.T) {
 	}
 	_ = r.ApplyCreated(ctx, planning, "42", "<p/>", 1, "t")
 	all, _ := r.ProfileDocuments(ctx, "p1")
-	if len(all) != 4 {
-		t.Fatalf("profile documents = %d", len(all))
+	if len(all) != 1 {
+		t.Fatalf("profile documents = %d, want 1", len(all))
+	}
+	if all[0].RitualType != "planning" || all[0].PageID != "42" {
+		t.Fatalf("document = %+v, want planning with page 42", all[0])
 	}
 }
