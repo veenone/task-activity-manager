@@ -121,3 +121,135 @@ func TestAFailedCreateIsReportedAndTheRestContinue(t *testing.T) {
 		t.Fatalf("review = %+v", d)
 	}
 }
+
+func TestAnUntouchedSyncedPageIsLeftAlone(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	res := h.run(sprint14)
+	if res.Created+res.Pulled+res.Pushed+res.Conflicts+res.Gone != 0 || len(res.Failed) != 0 {
+		t.Fatalf("second pass = %+v", res)
+	}
+}
+
+func TestALocalEditIsPushedAtTheNextVersion(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	h.save(14, "planning", "<p>plan</p>")
+	res := h.run(sprint14)
+	d := h.doc(14, "planning")
+	page, _ := h.fake.Page(d.PageID)
+	if res.Pushed != 1 || page.Body != "<p>plan</p>" || page.Version != 2 ||
+		d.Version != 2 || d.BaseBody != "<p>plan</p>" || d.Status != ritualrepo.StatusSynced {
+		t.Fatalf("result = %+v, doc = %+v, page = %+v", res, d, page)
+	}
+}
+
+func TestARemoteEditIsPulledIntoACleanPage(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	id := h.doc(14, "retro").PageID
+	h.fake.EditRemote(id, "<p>theirs</p>")
+	res := h.run(sprint14)
+	if d := h.doc(14, "retro"); res.Pulled != 1 || d.Body != "<p>theirs</p>" || d.Version != 2 || d.Status != ritualrepo.StatusSynced {
+		t.Fatalf("result = %+v, doc = %+v", res, d)
+	}
+}
+
+func TestARemoteEditAgainstLocalEditsIsAConflictAndIsNeverPushed(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	id := h.doc(14, "retro").PageID
+	h.fake.EditRemote(id, "<p>theirs</p>")
+	h.save(14, "retro", "<p>mine</p>")
+	if res := h.run(sprint14); res.Conflicts != 1 {
+		t.Fatalf("result = %+v", res)
+	}
+	h.fake.EditRemote(id, "<p>theirs again</p>")
+	res := h.run(sprint14)
+	d := h.doc(14, "retro")
+	page, _ := h.fake.Page(id)
+	if res.Conflicts != 1 || res.Pushed != 0 || d.ConflictVersion != 3 || d.ConflictBody != "<p>theirs again</p>" ||
+		d.Body != "<p>mine</p>" || page.Body != "<p>theirs again</p>" {
+		t.Fatalf("result = %+v, doc = %+v, page = %+v", res, d, page)
+	}
+	// Keep mine, and the next pass pushes over the newer version.
+	if err := h.docs.ResolveMine(h.ctx, h.key(14, "retro"), "t"); err != nil {
+		t.Fatal(err)
+	}
+	if res := h.run(sprint14); res.Pushed != 1 {
+		t.Fatalf("after keep mine = %+v", res)
+	}
+	if page, _ := h.fake.Page(id); page.Body != "<p>mine</p>" || page.Version != 4 {
+		t.Fatalf("page = %+v", page)
+	}
+}
+
+func TestAPageDeletedInConfluenceGoesGoneAndIsNotRecreated(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	h.fake.Remove(h.doc(14, "review").PageID)
+	if res := h.run(sprint14); res.Gone != 1 || h.doc(14, "review").Status != ritualrepo.StatusGone {
+		t.Fatalf("result = %+v", res)
+	}
+	if res := h.run(sprint14); res.Gone != 0 || res.Created != 0 {
+		t.Fatalf("a gone page must be skipped, not recreated: %+v", res)
+	}
+}
+
+func TestAVersionRaceOnPushBecomesAConflict(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	id := h.doc(14, "planning").PageID
+	h.save(14, "planning", "<p>mine</p>")
+	// The teammate saves after the pass read version 1 and before it pushes.
+	h.fake.After("get", id, func() { h.fake.EditRemote(id, "<p>raced</p>") })
+	res := h.run(sprint14)
+	d := h.doc(14, "planning")
+	if res.Conflicts != 1 || res.Pushed != 0 || d.Status != ritualrepo.StatusConflict || d.ConflictBody != "<p>raced</p>" {
+		t.Fatalf("result = %+v, doc = %+v", res, d)
+	}
+}
+
+func TestASaveDuringAPushStaysUnsynced(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	id := h.doc(14, "planning").PageID
+	h.save(14, "planning", "<p>pushed</p>")
+	h.fake.After("update", id, func() { h.save(14, "planning", "<p>typed during the push</p>") })
+	res := h.run(sprint14)
+	d := h.doc(14, "planning")
+	if res.Pushed != 1 || d.Body != "<p>typed during the push</p>" || d.BaseBody != "<p>pushed</p>" || d.Status != ritualrepo.StatusUnsynced {
+		t.Fatalf("result = %+v, doc = %+v", res, d)
+	}
+	if res := h.run(sprint14); res.Pushed != 1 {
+		t.Fatalf("the next pass should push what was typed: %+v", res)
+	}
+}
+
+func TestASaveDuringAPullBecomesAConflictNotAnOverwrite(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	id := h.doc(14, "retro").PageID
+	h.fake.EditRemote(id, "<p>theirs</p>")
+	h.fake.After("get", id, func() { h.save(14, "retro", "<p>typed during the pull</p>") })
+	res := h.run(sprint14)
+	d := h.doc(14, "retro")
+	if res.Conflicts != 1 || d.Body != "<p>typed during the pull</p>" || d.ConflictBody != "<p>theirs</p>" {
+		t.Fatalf("result = %+v, doc = %+v", res, d)
+	}
+}
+
+func TestOneFailingPageLeavesTheOthersSynced(t *testing.T) {
+	h := newHarness(t)
+	h.run(sprint14)
+	h.save(14, "planning", "<p>plan</p>")
+	h.save(14, "review", "<p>review</p>")
+	h.fake.FailNext("update", h.doc(14, "planning").PageID, errors.New("boom"))
+	res := h.run(sprint14)
+	if res.Pushed != 1 || len(res.Failed) != 1 || res.Failed[0].Title != "Sprint 14 · Planning" || res.Failed[0].Reason != "boom" {
+		t.Fatalf("result = %+v", res)
+	}
+	if h.doc(14, "planning").Status != ritualrepo.StatusUnsynced || h.doc(14, "review").Status != ritualrepo.StatusSynced {
+		t.Fatal("statuses after a partial pass are wrong")
+	}
+}

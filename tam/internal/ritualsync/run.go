@@ -165,9 +165,93 @@ func (p *pass) place(sp Sprint, d ritualrepo.Document, parentID string) (string,
 	return found.ID, true, nil
 }
 
-// reconcile is Task 9's half: a document that already has a page. Until then
-// it leaves the page alone, which is what an unchanged page wants anyway.
+// reconcile brings a document that already has a page into step. The table
+// in section 2 of the design is this switch, row for row.
 func (p *pass) reconcile(sp Sprint, d ritualrepo.Document) (string, bool, error) {
-	_ = errors.Is
+	k := d.Key()
+	remote, err := p.pages.GetPageStorage(p.ctx, d.PageID)
+	if errors.Is(err, confluence.ErrNotFound) {
+		if err := p.docs.MarkGone(p.ctx, k); err != nil {
+			return "", false, err
+		}
+		p.res.Gone++
+		return "", false, nil
+	}
+	if err != nil {
+		p.fail(sp, d, errtext.Line(err))
+		// The page id is still good for children even when this read failed.
+		return d.PageID, true, nil
+	}
+	switch {
+	case d.Status == ritualrepo.StatusConflict:
+		// Never pushed while in conflict; follow a remote that moved again.
+		if remote.Version > d.ConflictVersion {
+			if err := p.docs.ApplyConflict(p.ctx, k, d.PageID, remote.Body, remote.Version); err != nil {
+				return "", false, err
+			}
+		}
+		p.res.Conflicts++
+	case remote.Version > d.Version && !d.Dirty():
+		if err := p.pull(k, d, remote); err != nil {
+			return "", false, err
+		}
+	case remote.Version > d.Version:
+		if err := p.docs.ApplyConflict(p.ctx, k, d.PageID, remote.Body, remote.Version); err != nil {
+			return "", false, err
+		}
+		p.res.Conflicts++
+	case d.Dirty():
+		if err := p.push(sp, k, d); err != nil {
+			return "", false, err
+		}
+	}
 	return d.PageID, true, nil
+}
+
+// pull takes a newer remote into a clean document, and records a conflict
+// instead when a save landed after the pass read the row.
+func (p *pass) pull(k ritualrepo.Key, d ritualrepo.Document, remote confluence.StoredPage) error {
+	pulled, err := p.docs.ApplyPulled(p.ctx, k, d.PageID, d.Body, remote.Body, remote.Version, p.now())
+	if err != nil {
+		return err
+	}
+	if pulled {
+		p.res.Pulled++
+		return nil
+	}
+	if err := p.docs.ApplyConflict(p.ctx, k, d.PageID, remote.Body, remote.Version); err != nil {
+		return err
+	}
+	p.res.Conflicts++
+	return nil
+}
+
+// push sends the body the pass read at base plus one. A 409 means the page
+// moved between the read and the write, so it is read again and recorded as
+// a conflict. The base is set to what was pushed, never to what Confluence
+// answers with: Confluence normalises storage on save, and a base taken from
+// its answer would leave every pushed page dirty forever.
+func (p *pass) push(sp Sprint, k ritualrepo.Key, d ritualrepo.Document) error {
+	updated, err := p.pages.UpdatePage(p.ctx, d.PageID, d.Title, d.Body, d.Version+1)
+	if errors.Is(err, confluence.ErrVersionConflict) {
+		again, getErr := p.pages.GetPageStorage(p.ctx, d.PageID)
+		if getErr != nil {
+			p.fail(sp, d, errtext.Line(getErr))
+			return nil
+		}
+		if err := p.docs.ApplyConflict(p.ctx, k, d.PageID, again.Body, again.Version); err != nil {
+			return err
+		}
+		p.res.Conflicts++
+		return nil
+	}
+	if err != nil {
+		p.fail(sp, d, errtext.Line(err))
+		return nil
+	}
+	if err := p.docs.ApplyPushed(p.ctx, k, d.Body, updated.Version, p.now()); err != nil {
+		return err
+	}
+	p.res.Pushed++
+	return nil
 }
