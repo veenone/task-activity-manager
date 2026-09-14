@@ -1120,6 +1120,50 @@ export const SaveRitualDraft = (profileId: string, draft: RitualDraft): Promise<
   App.SaveRitualDraft(profileId, ritualrepo.Draft.createFrom(draft));
 export const DeleteRitualDraft: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.DeleteRitualDraft as any;
 export const ScaffoldSprintRituals: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDraft[]> = App.ScaffoldSprintRituals as any;
+
+// A ritual page as tam.db keeps it. body is the local page in Confluence
+// storage format; baseBody the page as of version, the last one synced;
+// conflictBody a newer remote a Sync found while local edits were pending.
+export type RitualStatus = "local" | "synced" | "unsynced" | "conflict" | "gone";
+export interface RitualDocument {
+  profileId: string;
+  boardId: number;
+  sprintId: number;
+  ritualType: string;
+  title: string;
+  body: string;
+  baseBody: string;
+  pageId: string;
+  version: number;
+  conflictBody: string;
+  conflictVersion: number;
+  status: RitualStatus;
+  updatedAt: string;
+  syncedAt: string;
+}
+export interface RitualPageFailure { sprintName: string; title: string; reason: string }
+export interface RitualSyncResult {
+  created: number;
+  pulled: number;
+  pushed: number;
+  conflicts: number;
+  gone: number;
+  failed: RitualPageFailure[];
+  syncedAt: string;
+}
+export interface RitualMacroPreview { supported: boolean; jql: string; issues: Issue[] }
+
+export const EnsureSprintRituals: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.EnsureSprintRituals as any;
+export const ListRitualDocuments: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.ListRitualDocuments as any;
+export const SaveRitualBody: (profileId: string, boardId: number, sprintId: number, ritualType: string, body: string) => Promise<RitualDocument> = App.SaveRitualBody as any;
+export const ResolveRitualConflict: (profileId: string, boardId: number, sprintId: number, ritualType: string, choice: "mine" | "theirs") => Promise<void> = App.ResolveRitualConflict;
+export const ForgetRitualPage: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.ForgetRitualPage;
+export const DeleteRitualDocument: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.DeleteRitualDocument;
+export const RitualMacroIssues: (profileId: string, jql: string) => Promise<RitualMacroPreview> = App.RitualMacroIssues as any;
+export const StandupEntry: (day: string) => Promise<string> = App.StandupEntry;
+export const LastRitualSync: (profileId: string, boardId: number) => Promise<string> = App.LastRitualSync;
+export const SyncRituals: (profileId: string, boardId: number) => Promise<RitualSyncResult> = App.SyncRituals as any;
+
 export const ListSprintIssues: (profileId: string, boardId: number, sprintId: number) => Promise<Issue[]> = App.ListSprintIssues as any;
 // LookupIssue is cast the same way ListIssues is above: the generated
 // binding types the issue type as a plain string, narrowed to IssueType here.
