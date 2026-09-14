@@ -9,7 +9,7 @@
 // class's createFrom so the binding receives the shape it declares.
 
 import * as App from "../wailsjs/go/main/App";
-import { backend, confluence, importer, issuerepo, profile } from "../wailsjs/go/models";
+import { backend, confluence, importer, issuerepo, profile, ritualrepo } from "../wailsjs/go/models";
 
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 export type { SyncProgress } from "@agile-suite/core";
@@ -43,6 +43,28 @@ export interface ConfluenceConfig { baseURL: string; spaceKey: string; rootPageI
 export type ConfluencePage = confluence.Page;
 export type ConfluenceChildPageResult = confluence.ChildPageResult;
 export interface RitualAssociation { boardID: number; sprintID: number; ritualType: string; pageID: string; pageTitle: string }
+
+export interface RitualIssue { key: string; remark: string }
+export type RitualDraft = ritualrepo.Draft;
+
+// parseRitualIssues reads the issues_json column. Stored data that cannot be
+// parsed yields no issues rather than throwing, because a draft with a damaged
+// column must still open in the wizard to be repaired.
+export function parseRitualIssues(json: string): RitualIssue[] {
+  const trimmed = (json ?? "").trim();
+  if (!trimmed) return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((i) => ({ key: String(i?.key ?? ""), remark: String(i?.remark ?? "") })).filter((i) => i.key);
+  } catch {
+    return [];
+  }
+}
+
+export function encodeRitualIssues(issues: RitualIssue[]): string {
+  return JSON.stringify(issues.map((i) => ({ key: i.key, remark: i.remark ?? "" })));
+}
 
 export interface HealthInfo {
   ok: boolean;
@@ -1092,6 +1114,13 @@ export const GetRitualPage: (profileId: string, pageId: string) => Promise<Confl
 export const ListRitualAssociations: (profileId: string, boardId: number, sprintId: number) => Promise<RitualAssociation[]> = App.ListRitualAssociations as any;
 export const SetRitualAssociation = (profileId: string, association: RitualAssociation): Promise<void> => App.SetRitualAssociation(profileId, profile.RitualAssociation.createFrom(association));
 export const DeleteRitualAssociation = (profileId: string, association: RitualAssociation): Promise<void> => App.DeleteRitualAssociation(profileId, profile.RitualAssociation.createFrom(association));
+export const ListRitualDrafts: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDraft[]> = App.ListRitualDrafts as any;
+export const GetRitualDraft: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<RitualDraft> = App.GetRitualDraft as any;
+export const SaveRitualDraft = (profileId: string, draft: RitualDraft): Promise<void> =>
+  App.SaveRitualDraft(profileId, ritualrepo.Draft.createFrom(draft));
+export const DeleteRitualDraft: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.DeleteRitualDraft as any;
+export const ScaffoldSprintRituals: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDraft[]> = App.ScaffoldSprintRituals as any;
+export const ListSprintIssues: (profileId: string, boardId: number, sprintId: number) => Promise<Issue[]> = App.ListSprintIssues as any;
 // LookupIssue is cast the same way ListIssues is above: the generated
 // binding types the issue type as a plain string, narrowed to IssueType here.
 export const LookupIssue = (profileId: string, key: string): Promise<Issue> =>
