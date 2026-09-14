@@ -1,4 +1,9 @@
 import type { BoardView, Issue } from "../api";
+import { orderFamilies } from "./issueFamilies";
+
+export function groupBoard(view: BoardView): BoardView {
+  return { ...view, lanes: view.lanes.map((lane) => ({ ...lane, cells: lane.cells.map(orderFamilies) })) };
+}
 
 // matchesCard is the board filter's one rule: a card matches when the text
 // appears in its key, its assignee, or its issue type. Those three are what
@@ -27,10 +32,13 @@ export function matchesCard(issue: Issue, needle: string): boolean {
 // board, not this view of it.
 export function filterBoard(view: BoardView, needle: string): BoardView {
   if (needle.trim() === "") return view;
+  const cards = view.lanes.flatMap((lane) => lane.cells.flat());
+  const matching = new Set(cards.filter((i) => matchesCard(i, needle)).map((i) => i.key));
+  const families = new Set(cards.filter((i) => matching.has(i.key)).map((i) => i.type === "subtask" ? i.parentKey : i.key));
   const totals = view.columns.map(() => ({ total: 0, points: 0 }));
   const lanes = view.lanes.map((lane) => {
     const cells = lane.cells.map((cell, col) => {
-      const kept = cell.filter((iss) => matchesCard(iss, needle));
+      const kept = cell.filter((iss) => matching.has(iss.key) || families.has(iss.key) || (iss.type === "subtask" && families.has(iss.parentKey)));
       totals[col].total += kept.length;
       totals[col].points += kept.reduce((sum, i) => sum + (i.storyPoints ?? 0), 0);
       return kept;

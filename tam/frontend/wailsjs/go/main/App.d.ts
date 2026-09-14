@@ -7,8 +7,11 @@ import {sprints} from '../models';
 import {profile} from '../models';
 import {main} from '../models';
 import {boardrepo} from '../models';
+import {confluence} from '../models';
 import {issuerepo} from '../models';
+import {ritualrepo} from '../models';
 import {settings} from '../models';
+import {sprintreport} from '../models';
 import {journal} from '../models';
 import {importfile} from '../models';
 import {syncer} from '../models';
@@ -18,6 +21,8 @@ export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<
 export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
 
 export function CanTransition(arg1:string,arg2:string,arg3:string):Promise<backend.TransitionCheck>;
+
+export function CancelSprintReport(arg1:string):Promise<void>;
 
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
@@ -33,6 +38,10 @@ export function CreateSprint(arg1:string,arg2:number,arg3:string,arg4:string,arg
 
 export function DeleteProfile(arg1:string):Promise<void>;
 
+export function DeleteRitualAssociation(arg1:string,arg2:profile.RitualAssociation):Promise<void>;
+
+export function DeleteRitualDraft(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
+
 export function DeleteSprint(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function DiscardAllPendingChanges(arg1:string):Promise<number>;
@@ -47,6 +56,10 @@ export function ExportProfile(arg1:string):Promise<string>;
 
 export function GetBoard(arg1:string,arg2:number,arg3:string,arg4:string):Promise<boardrepo.BoardView>;
 
+export function GetConfluenceConfig(arg1:string):Promise<profile.ConfluenceConfig>;
+
+export function GetConfluencePage(arg1:string,arg2:string):Promise<confluence.Page>;
+
 export function GetCreateFields(arg1:string,arg2:string):Promise<Array<backend.FieldSpec>>;
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
@@ -59,7 +72,13 @@ export function GetLinkTypes(arg1:string):Promise<Array<backend.LinkType>>;
 
 export function GetProfileSetting(arg1:string,arg2:string):Promise<string>;
 
+export function GetRitualDraft(arg1:string,arg2:number,arg3:number,arg4:string):Promise<ritualrepo.Draft>;
+
+export function GetRitualPage(arg1:string,arg2:string):Promise<confluence.Page>;
+
 export function GetSettings():Promise<settings.Settings>;
+
+export function GetSprintReport(arg1:string,arg2:number,arg3:number,arg4:boolean):Promise<sprintreport.Report>;
 
 export function GetSubtaskTypeName(arg1:string):Promise<string>;
 
@@ -81,6 +100,8 @@ export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrep
 
 export function ListBoards(arg1:string):Promise<Array<boardrepo.Board>>;
 
+export function ListConfluenceChildPages(arg1:string,arg2:string,arg3:number,arg4:number):Promise<confluence.ChildPageResult>;
+
 export function ListEpics(arg1:string):Promise<Array<backend.Issue>>;
 
 export function ListIssues(arg1:string,arg2:issuerepo.IssueQuery):Promise<issuerepo.IssuePage>;
@@ -94,6 +115,12 @@ export function ListPendingChanges(arg1:string):Promise<Array<journal.PendingCha
 export function ListPriorities(arg1:string):Promise<Array<string>>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;
+
+export function ListRitualAssociations(arg1:string,arg2:number,arg3:number):Promise<Array<profile.RitualAssociation>>;
+
+export function ListRitualDrafts(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Draft>>;
+
+export function ListSprintIssues(arg1:string,arg2:number,arg3:number):Promise<Array<backend.Issue>>;
 
 export function ListSprints(arg1:string):Promise<Array<issuerepo.SprintRef>>;
 
@@ -115,13 +142,21 @@ export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Pro
 
 export function SaveImportTemplate(arg1:string):Promise<string>;
 
+export function SaveRitualDraft(arg1:string,arg2:ritualrepo.Draft):Promise<void>;
+
+export function ScaffoldSprintRituals(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Draft>>;
+
 export function SearchUsers(arg1:string,arg2:string):Promise<Array<backend.User>>;
+
+export function SetConfluenceConfig(arg1:string,arg2:profile.ConfluenceConfig,arg3:string):Promise<void>;
 
 export function SetDefaultProfile(arg1:string):Promise<void>;
 
 export function SetNavRailVisible(arg1:boolean):Promise<void>;
 
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SetRitualAssociation(arg1:string,arg2:profile.RitualAssociation):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 

@@ -23,7 +23,7 @@ func TestSearchIssuesPassesPagingAndFieldsAndDecodesRawFields(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
-	page, err := c.SearchIssues(context.Background(), "project = PLAT ORDER BY key ASC", []string{"summary", "status"}, 50, 25)
+	page, err := c.SearchIssues(context.Background(), "project = PLAT ORDER BY key ASC", []string{"summary", "status"}, nil, 50, 25)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -36,6 +36,52 @@ func TestSearchIssuesPassesPagingAndFieldsAndDecodesRawFields(t *testing.T) {
 	}
 	if string(iss.Fields["summary"]) != `"One"` {
 		t.Errorf("summary raw = %s", iss.Fields["summary"])
+	}
+}
+
+func TestSearchIssuesOmitsExpandWhenNoneIsAsked(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, has := r.URL.Query()["expand"]; has {
+			t.Errorf("expand present in query with none requested: %s", r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"total":0,"issues":[]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	if _, err := c.SearchIssues(context.Background(), "project = PLAT", nil, nil, 0, 50); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+}
+
+func TestSearchIssuesAsksForTheChangelogAndDecodesIt(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("expand") != "changelog" {
+			t.Errorf("expand = %q", r.URL.Query().Get("expand"))
+		}
+		_, _ = w.Write([]byte(`{"total":1,"issues":[{"id":"1","key":"PLAT-1","fields":{},"changelog":{
+			"startAt":0,"maxResults":100,"total":2,
+			"histories":[
+				{"created":"2026-09-09T10:42:00.000+0000","items":[{"field":"Sprint","fieldId":"customfield_10020","fromString":"","toString":"Sprint 11"}]},
+				{"created":"2026-09-10T08:00:00.000+0000","items":[{"field":"status","fieldId":"status","fromString":"To Do","toString":"Done"}]}
+			]}}]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	page, err := c.SearchIssues(context.Background(), "project = PLAT", nil, []string{"changelog"}, 0, 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	cl := page.Issues[0].Changelog
+	if cl.Total != 2 || len(cl.Histories) != 2 {
+		t.Fatalf("changelog = %+v", cl)
+	}
+	if cl.Histories[0].Items[0].FieldID != "customfield_10020" || cl.Histories[0].Items[0].ToString != "Sprint 11" {
+		t.Errorf("history 0 item 0 = %+v", cl.Histories[0].Items[0])
+	}
+	if cl.Histories[1].Created != "2026-09-10T08:00:00.000+0000" {
+		t.Errorf("history 1 created = %q", cl.Histories[1].Created)
 	}
 }
 

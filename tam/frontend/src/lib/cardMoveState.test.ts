@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { CommitResult, PendingChange } from "../api";
-import { cardMoves } from "./cardMoveState";
+import { cardMoves, warningLine } from "./cardMoveState";
 
 function row(over: Partial<PendingChange>): PendingChange {
   return {
@@ -23,6 +23,23 @@ const REFUSED = {
 };
 
 const NONE = { warnings: new Map(), checking: new Set<string>() };
+
+describe("warningLine", () => {
+  it("uses the specific reason supplied by the backend", () => {
+    const reason = "PRJ-412 is blocked by a demo rule, even when its subtasks are Done.";
+    expect(warningLine("PRJ-412", { target: "Done", reachable: ["To Do"], reason })).toBe(reason);
+  });
+
+  it("explains available moves without guessing why Jira refused", () => {
+    const line = warningLine("PRJ-412", { target: "Done", reachable: ["Review"] });
+    expect(line).toContain("Available statuses: Review.");
+    expect(line).toContain("Jira has not provided a specific reason");
+  });
+
+  it("provides a next step when no status changes are available", () => {
+    expect(warningLine("PRJ-412", { target: "Done", reachable: [] })).toContain("Open the issue in Jira to check its workflow and your permissions.");
+  });
+});
 
 describe("cardMoves", () => {
   it("marks a card whose move a Commit refused", () => {

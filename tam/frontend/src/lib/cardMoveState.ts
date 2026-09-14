@@ -24,6 +24,7 @@ export interface CardMove {
 // Warning is a CanTransition answer that came back no: where the card was
 // going and what Jira offered instead.
 export interface Warning {
+  reason?: string;
   target: string;
   reachable: string[];
 }
@@ -73,9 +74,10 @@ export function cardMoves({ pending, commit, warnings, checking }: MoveInputs): 
 // said it could, since "this move will fail" with no alternative leaves
 // the user nowhere to go but the web board.
 export function warningLine(key: string, warning: Warning): string {
-  const head = `${key} cannot reach ${warning.target} from where it is now.`;
+  if (warning.reason) return warning.reason;
+  const head = `${key} cannot move to ${warning.target} yet. Jira does not offer that move from its current status.`;
   if (warning.reachable.length === 0) {
-    return `${head} Jira offers no other status from here.`;
+    return `${head} No status changes are available. Open the issue in Jira to check its workflow and your permissions.`;
   }
-  return `${head} Jira offers ${warning.reachable.join(", ")}.`;
+  return `${head} Available statuses: ${warning.reachable.join(", ")}. Jira has not provided a specific reason; open the issue in Jira to check its workflow.`;
 }

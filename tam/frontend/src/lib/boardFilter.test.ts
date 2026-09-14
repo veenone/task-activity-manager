@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterBoard, matchesCard } from "./boardFilter";
+import { filterBoard, groupBoard, matchesCard } from "./boardFilter";
 import type { BoardView, Issue } from "../api";
 
 function card(over: Partial<Issue>): Issue {
@@ -42,6 +42,18 @@ describe("matchesCard", () => {
 });
 
 describe("filterBoard", () => {
+  it("groups siblings under a parent without moving children out of their status columns", () => {
+    const v = view();
+    const child = card({ key: "PLAT-2", type: "subtask", parentKey: anand.key });
+    const doneChild = card({ key: "PLAT-3", type: "subtask", parentKey: anand.key, status: "Done" });
+    v.lanes[0].cells = [[child, ortiz, anand], [doneChild]];
+    const grouped = groupBoard(v);
+    expect(grouped.lanes[0].cells[0].map((i) => i.key)).toEqual([ortiz.key, anand.key, child.key]);
+    const filtered = groupBoard(filterBoard(v, child.key));
+    expect(filtered.lanes[0].cells[0].map((i) => i.key)).toEqual([anand.key, child.key]);
+    expect(filtered.lanes[0].cells[1]).toEqual([doneChild]);
+    expect(v.lanes[0].cells[0][0]).toBe(child);
+  });
   it("returns the view untouched when nothing is being filtered", () => {
     const v = view();
     expect(filterBoard(v, "")).toBe(v);

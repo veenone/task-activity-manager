@@ -33,6 +33,9 @@ type IssueQuery struct {
 	SprintID string   `json:"sprintId"`
 	Offset   int      `json:"offset"`
 	Limit    int      `json:"limit"`
+	// GroupSubtasks pages parent issues and includes their subtasks directly
+	// after them. Total, Limit and Offset then count parent groups.
+	GroupSubtasks bool `json:"groupSubtasks"`
 	// Sort names the column the grid is ordered by: one of the keys in
 	// sortColumns, or "" for the default rank order. Desc reverses it.
 	// Sorting happens here rather than in the frontend because the grid is

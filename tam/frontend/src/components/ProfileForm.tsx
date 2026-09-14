@@ -8,6 +8,12 @@ import {
   TestProfileConnection,
   GetProfileSetting,
   SetProfileSetting,
+  GetConfluenceConfig,
+  SetConfluenceConfig,
+  ListRitualAssociations,
+  DeleteRitualAssociation,
+  ListConfluenceChildPages,
+  SetRitualAssociation,
   isDemoUrl,
 } from "../api";
 import type { Profile } from "../api";
@@ -104,12 +110,24 @@ export function ProfileForm({
   const [allowUntrustedTLS, setAllowUntrustedTLS] = useState(
     profile?.allowUntrustedTls ?? false,
   );
+  const [confluenceURL, setConfluenceURL] = useState("");
+  const [confluenceSpace, setConfluenceSpace] = useState("");
+  const [confluenceRootPageID, setConfluenceRootPageID] = useState("");
+  const [confluenceToken, setConfluenceToken] = useState("");
+  const [confluenceLoaded, setConfluenceLoaded] = useState(false);
+  const [ritualAssociations, setRitualAssociations] = useState<{ boardID: number; sprintID: number; ritualType: string; pageID: string; pageTitle: string }[]>([]);
+  const [ritualPages, setRitualPages] = useState<{ id: string; title: string }[]>([]);
+  const [ritualPageID, setRitualPageID] = useState("");
+  const [ritualType, setRitualType] = useState("standup");
+  const [ritualBoardID, setRitualBoardID] = useState(0);
+  const [ritualSprintID, setRitualSprintID] = useState(0);
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState("");
   const [testOk, setTestOk] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const demo = isDemoUrl(jiraUrl);
 
   // The requirement type is only readable once the profile exists, so a new
   // profile starts blank and saves the field after its id comes back.
@@ -126,9 +144,33 @@ export function ProfileForm({
     };
   }, [profile]);
 
+  useEffect(() => {
+    if (profile || !demo) return;
+    setConfluenceURL((value) => value || "demo");
+    setConfluenceSpace((value) => value || "DEMO");
+    setConfluenceRootPageID((value) => value || "demo-root");
+  }, [demo, profile]);
+
+  useEffect(() => {
+    if (!profile) return;
+    let live = true;
+    Promise.resolve()
+      .then(() => GetConfluenceConfig(profile.id))
+      .then((c) => {
+        if (!live) return;
+        setConfluenceURL(c.baseURL);
+        setConfluenceSpace(c.spaceKey);
+        setConfluenceRootPageID(c.rootPageID);
+        setConfluenceLoaded(true);
+        void ListRitualAssociations(profile.id, 0, 0).then(setRitualAssociations).catch(() => setRitualAssociations([]));
+        if (c.rootPageID && c.baseURL.trim().toLowerCase() !== "demo") void ListConfluenceChildPages(profile.id, c.rootPageID, 0, 100).then((result) => setRitualPages(result.results.map((page) => ({ id: page.id, title: page.title })))).catch(() => setRitualPages([]));
+      })
+      .catch(() => { /* optional integration remains blank when unavailable */ });
+    return () => { live = false; };
+  }, [profile]);
+
   const keyError = projectKeyError(projectKey);
   const urlError = jiraUrlError(jiraUrl);
-  const demo = isDemoUrl(jiraUrl);
 
   // A demo profile needs no credential; a live one needs one on create unless
   // it is reusing another profile's. On edit a blank token keeps the stored one.
@@ -204,6 +246,17 @@ export function ProfileForm({
       // The requirement type lives in TAM's own store, keyed by profile id,
       // so it is written after the profile write hands one back.
       await SetProfileSetting(p.id, REQUIREMENT_TYPE_KEY, requirementType.trim());
+      if ((isEdit && confluenceLoaded) || ((!demo && (confluenceURL.trim() || confluenceSpace.trim() || confluenceRootPageID.trim())) || confluenceToken.trim())) {
+        await SetConfluenceConfig(p.id, {
+          baseURL: confluenceURL.trim(),
+          spaceKey: confluenceSpace.trim(),
+          rootPageID: confluenceRootPageID.trim(),
+        }, confluenceToken.trim());
+        setConfluenceURL(confluenceURL.trim().replace(/\/+$/, ""));
+        setConfluenceSpace(confluenceSpace.trim());
+        setConfluenceRootPageID(confluenceRootPageID.trim());
+        setConfluenceLoaded(true);
+      }
       onSaved(p);
     } catch (e) {
       setError(errMsg(e));
@@ -261,6 +314,29 @@ export function ProfileForm({
           pulls everything again; run a Full sync to drop rows of the old type.
         </span>
       </label>
+
+      <details className="profile-form-advanced">
+        <summary>Confluence Rituals (optional)</summary>
+        <label>
+          Confluence base URL
+          <input value={confluenceURL} onChange={(e) => setConfluenceURL(e.target.value)} placeholder="https://confluence.example.com" spellCheck={false} />
+        </label>
+        <label>
+          Space key
+          <input value={confluenceSpace} onChange={(e) => setConfluenceSpace(e.target.value)} placeholder="TEAM" spellCheck={false} />
+        </label>
+        <label>
+          Root page ID (optional)
+          <input value={confluenceRootPageID} onChange={(e) => setConfluenceRootPageID(e.target.value)} placeholder="123456" spellCheck={false} />
+        </label>
+        <label>
+          Confluence personal access token
+          <input type="password" value={confluenceToken} onChange={(e) => setConfluenceToken(e.target.value)} placeholder={isEdit ? "Leave blank to keep the current token" : "Stored in Windows Credential Manager"} autoComplete="off" />
+        </label>
+        {demo && <span className="field-hint">Demo profile sample: use <code>demo</code> as the Confluence URL. It is a local configuration example and does not contact a server.</span>}
+        {isEdit && ritualAssociations.length > 0 && <div className="ritual-association-list"><span className="field-hint">Associated ritual pages</span>{ritualAssociations.map((association) => <div className="ritual-association-row" key={`${association.ritualType}-${association.pageID}`}><span>{association.pageTitle || association.pageID} · {association.ritualType}</span><button type="button" className="btn btn-ghost" onClick={() => void DeleteRitualAssociation(profile!.id, association).then(() => setRitualAssociations((items) => items.filter((item) => item.pageID !== association.pageID || item.ritualType !== association.ritualType)))}>Remove</button></div>)}</div>}
+        {isEdit && ritualPages.length > 0 && <div className="ritual-association-form"><span className="field-hint">Associate a child page with a sprint</span><select aria-label="Ritual page" value={ritualPageID} onChange={(event) => setRitualPageID(event.target.value)}><option value="">Choose a page…</option>{ritualPages.filter((page) => !ritualAssociations.some((association) => association.pageID === page.id && association.sprintID === ritualSprintID)).map((page) => <option key={page.id} value={page.id}>{page.title}</option>)}</select><div className="ritual-association-scope"><input aria-label="Board ID" type="number" min="0" value={ritualBoardID || ""} onChange={(event) => setRitualBoardID(Number(event.target.value))} placeholder="Board ID" /><input aria-label="Sprint ID" type="number" min="0" value={ritualSprintID || ""} onChange={(event) => setRitualSprintID(Number(event.target.value))} placeholder="Sprint ID" /></div><select aria-label="Ritual type" value={ritualType} onChange={(event) => setRitualType(event.target.value)}>{["planning", "standup", "review", "retro"].map((type) => <option key={type} value={type}>{type}</option>)}</select><button type="button" className="btn btn-ghost" disabled={!ritualPageID} onClick={() => { const page = ritualPages.find((item) => item.id === ritualPageID); if (!page) return; void SetRitualAssociation(profile!.id, { boardID: ritualBoardID, sprintID: ritualSprintID, ritualType, pageID: page.id, pageTitle: page.title }).then(() => ListRitualAssociations(profile!.id, ritualBoardID, ritualSprintID)).then((items) => { setRitualAssociations(items); setRitualPageID(""); }); }}>Associate</button></div>}
+      </details>
 
       {!isEdit && others.length > 0 && (
         <label>

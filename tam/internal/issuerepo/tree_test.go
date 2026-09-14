@@ -50,6 +50,47 @@ func TestEpicTreeGroupsAndCountsAllChildren(t *testing.T) {
 	}
 }
 
+func TestEpicTreeKeepsSubtasksUnderTheirIssueAndFindsThemByText(t *testing.T) {
+	r := newRepo(t)
+	seedTree(t, r)
+	ctx := context.Background()
+	key, err := r.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeSubtask, ParentKey: "PLAT-412", Summary: "Wire validation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []issuerepo.TreeQuery{{ShowDone: true}, {Text: "validation"}, {SprintID: "12"}} {
+		tree, err := r.EpicTree(ctx, "p1", q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(tree.Epics) == 0 {
+			t.Fatalf("no epic for %+v", q)
+		}
+		node := tree.Epics[0]
+		found := false
+		for i, child := range node.Children {
+			if child.Key == key {
+				found = i > 0 && node.Children[i-1].Key == "PLAT-412"
+			}
+		}
+		if !found {
+			t.Fatalf("subtask detached: %+v", node)
+		}
+		wantTotal := 2
+		if q.SprintID != "" {
+			wantTotal = 1
+		}
+		if node.Total != wantTotal {
+			t.Fatalf("subtask inflated epic total: %+v", node)
+		}
+		for _, orphan := range tree.Orphans {
+			if orphan.Key == key {
+				t.Fatal("attached subtask appeared as orphan")
+			}
+		}
+	}
+}
+
 func TestEpicTreeFilters(t *testing.T) {
 	repo := newRepo(t)
 	seedTree(t, repo)

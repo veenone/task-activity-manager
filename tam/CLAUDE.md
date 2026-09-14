@@ -1,976 +1,1100 @@
 # CLAUDE.md
 
-Task Activity Manager (TAM) is the agile task-management app of the suite:
-Jira DC tasks, epics, stories, bugs, and requirements for scrum masters,
-product owners, and team members. It shares connection profiles and the
-Windows Credential Manager entries with Xray Test Manager through
-`core/profile` and the shared `profiles.db`. The design lives in
-`docs/superpowers/specs/2026-09-04-tam-foundation-design.md`; the Outline
-collection "Task Activity Manager" mirrors it.
+Task Activity Manager (TAM) = agile task app of suite: Jira DC tasks,
+epics, stories, bugs, requirements. For scrum masters, product owners,
+team. Share connection profiles + Windows Credential Manager entries with
+Xray Test Manager via `core/profile` + shared `profiles.db`. Design live in
+`docs/superpowers/specs/2026-09-04-tam-foundation-design.md`; Outline
+collection "Task Activity Manager" mirror it.
 
 ## Status
 
-Plan 1a (issues, read path): sync by project into `tam.db`, the Backlog
-grid, and a read-only detail panel, on the demo dataset or a live Jira DC.
-Plan 1b adds the journal, create and edit, and Commit. Plan 1c adds Excel
-import, cross-project links, and requirement creation. Phase 2 adds the
-epic and story hierarchy: the Epics view, `parentKey` as the seventh
-editable field, and epic creation. Phase 3a adds the Boards view: boards,
-columns, and sprints synced from Jira's Agile API, read only. Phase 3b
-makes the board writable: a card dragged or keyboard-moved across
-columns, within a column, or into another sprint journals the same way
-every other TAM write does, and Commit pushes it. Phase 3c
-closes Phase 3 with the sprint ceremonies: starting and completing a
-sprint from the Boards toolbar, moving several selected cards into a
-sprint at once, and the sprint field in the detail panel, plus the board
-read now taking one transaction so a reader can never observe a board
-mid-write. This branch puts a sprint choice everywhere an issue appears
-rather than only on its board: the Backlog and the Epics tree, the New
-issue dialog, and a Sprint column in the spreadsheet importer, all
-reading the same profile-wide list of open sprints the board already
-drew from. It also adds the fourth view, Sprints: a board picker, that
-board's sprints as a two-level tree with the board's unassigned work
-folded in, and a detail panel beside it. Creating, editing and deleting a
-sprint live here, and reach Jira the moment they are pressed rather than
-waiting for Commit, the same exception Phase 3c carved out for starting
-and completing one. Filling a sprint, by contrast, is an ordinary
-journaled move. Schema version 7 adds the sprint's goal, which existed on
-the wire since Phase 3a and nowhere in TAM until now.
+Plan 1a (issues, read path): sync by project into `tam.db`, Backlog grid,
+read-only detail panel, on demo dataset or live Jira DC. Plan 1b add
+journal, create, edit, Commit. Plan 1c add Excel import, cross-project
+links, requirement creation. Phase 2 add epic+story hierarchy: Epics view,
+`parentKey` as seventh editable field, epic creation. Phase 3a add Boards
+view: boards, columns, sprints from Jira Agile API, read only. Phase 3b
+make board writable: card dragged or keyboard-moved across columns, within
+column, or into another sprint journal same way every other TAM write do,
+Commit push it. Phase 3c close Phase 3 with sprint ceremonies: start +
+complete sprint from Boards toolbar, move many selected cards into sprint
+at once, sprint field in detail panel, plus board read now take one
+transaction so reader never see board mid-write. This branch put sprint
+choice everywhere issue appear, not only on its board: Backlog, Epics tree,
+New issue dialog, Sprint column in spreadsheet importer, all read same
+profile-wide list of open sprints board already draw from. Also add fourth
+view, Sprints: board picker, that board's sprints as two-level tree with
+board's unassigned work folded in, detail panel beside it. Create, edit,
+delete sprint live here, and reach Jira moment pressed, not wait for
+Commit, same exception Phase 3c carve out for start + complete. Fill
+sprint = ordinary journaled move. Schema version 7 add sprint goal, which
+exist on wire since Phase 3a and nowhere in TAM until now. Phase 4 fill
+fifth view, Reports: numbers sprint review start with, committed, added,
+removed, completed, carried over, rebuilt from Jira's own changelog not its
+internal chart endpoints, with last six closed sprints as velocity table
+beside them. Schema version 8 add `sprint_report`, where closed sprint's
+reconstruction kept so view readable offline, and `complete_date` on
+`sprint`. Charts those numbers would draw into = deliberately next plan;
+here ship figures, method printed under them, plain statement of what
+reconstruction cannot see.
+
+## Phase 4: the sprint report, the reconstruction
+
+`internal/reports` turn sprint's issues + changelogs into numbers:
+committed, added, removed, completed, carried over, and day by day line
+behind them. `Build` take one sprint, rule for what count as finished,
+issues with history, clock, location. `VelocitySprints` = which closed
+sprints velocity table cover, last `Depth` (six), oldest first; `Row` = what
+one of them say, own unit per row; `internal/sprintreport` call both,
+because half a table usually read back out of store, not rebuilt. Design =
+`docs/superpowers/specs/2026-09-09-tam-reports-design.md`, sections 3 and 7.
+
+**It run backwards before it run forwards, everything else here detail
+beside that.** Changelog = today's field values plus list of deltas, so
+status, estimate, sprint membership *at sprint start* not given: derive by
+undo every change dated after start, take each one's "from" side, then
+replay forward one local day at a time. Forward replay seeded from today's
+values draw sprint that never happen, and look entirely plausible doing it:
+issue reopened, re-estimated, moved to next sprint a week after this one
+closed would start reconstruction already finished, with estimate nobody
+agreed to. `rewound` in `series.go` = that pass, and walk never replay
+change dated after sprint end, which keep two halves consistent.
+
+Three smaller things that each look like one line simplification and are
+not:
+
+- **Every timestamp go through `internal/sprintdate`.** Jira offsets carry
+  no colon, so `time.RFC3339` reject real thing outright while fixture
+  written with `Z` pass. Fixtures in `internal/reports/*_test.go` written in
+  Jira format for that reason.
+- **Day = local day in location `Build` handed.** Day one = local date of
+  sprint start, boundaries = local midnight. Bucket in UTC give team ten
+  hours ahead a day one that start previous afternoon.
+- **Sprint field changelog values = comma separated lists.** Card sit in two
+  sprints at once during rollover, so `"12, 13"` to `"13"` mean it left 12
+  and stay in 13; membership = set test per change, never toggle. Both id
+  and name matched, because backend normaliser keep whichever half of Jira's
+  parallel id/name pair the field populated.
+
+What reconstruction cannot see = section 3 of design, not footnote: issues
+come from `sprint = N` search, which answer with whoever in sprint now, so
+card dragged out day four and left out never fetched. Committed = floor,
+Removed can only hold cards that left and came back. Every surface printing
+either number must say so.
+
+**`internal/donerule` = one definition of done, not new one.** Board's last
+column rule was unexported on `sprints.Service`, and report need same answer
+sprint completion act on. Moved to own package, `sprints.completeStatuses`
+call it, and `donerule.Done` return nil not silent false when columns cannot
+answer, since board never synced is not board where nothing finished; caller
+word that refusal, `donerule.LastColumn` = what it word it from.
+
+**Name based rule still exist and still right where it is.**
+`backend.IsDone` match on status *name* and power Backlog grid chip, Epics
+tree counts, board done points, Sprints view per-sprint numbers, with
+frontend `statusClass` mirroring that list for chip. Answer question about
+one issue with no board in hand, from name cache already carry. Frontend
+`lib/unfinished.ts` = other rule, column one, written again in TypeScript for
+views that decide what to draw. So name rule and column rule can disagree,
+on board whose last column collect status named something else, and sprint
+report = surface that make it visible: user comparing Sprints view done
+count against report completed figure look at two different questions.
+`donerule` package comment = where that written down.
+
+Jira `completeDate` now reach TAM: `core/jira.RawSprint`, `backend.Sprint`,
+`boardrepo.Sprint`, `sprint` table (schema version 8) all carry it, written
+through `writeSprints`, the one seam both `ReplaceBoard` and
+`ReplaceSprints` call, so sprint completed through either path keep field.
+`Build` own walk not read it yet: still stop at `endDate` (or at `now`, for
+sprint still running), so wiring real close date into reconstruction =
+separate later work.
+
+## Phase 4: where the report is kept, asked for, and read
+
+**What report cannot see = most important paragraph in this section.**
+Issues come from `sprint = N` search, only membership JQL Jira offer, which
+answer with whoever in sprint **now**. Card dragged out day four no longer
+carry sprint N, so never fetched, changelog never read, removal leave no
+trace. Jira own report get this right only because it keep private
+sprint-change records public API not expose. So `Removed` can only hold
+cards that left and came back, `Committed` = floor not total, and every
+surface printing either one carry qualification: `SprintSummary` under the
+sentence, `VelocityTable` under its own Committed column, which is not
+redundancy but same rule applied twice, because Phase 5 Rituals publish
+those figures out of `lib/reportText.ts` where no neighbouring paragraph to
+borrow caveat from. Query whole project to recover removed cards = recorded
+upgrade, not built.
+
+**Method printed with numbers, and that = product decision not
+documentation one.** TAM figures and Jira figures differ, in public, during
+review, because different sources: Jira from private sprint records, TAM
+from public changelog, with own done rule and blind spot above. One line
+under summary say what done mean here, that history rebuilt from public
+changelog not Jira stored sprint records, and that removals only visible for
+cards that came back. Cost one sentence, turn argument in front of team into
+footnote. Nobody read documentation during sprint review.
+
+**Where report kept.** `sprint_report` arrive at schema version 8, keyed
+`(profile_id, board_id, sprint_id)`. Board in that key for same reason
+version 6 put it in `sprint`: Jira hand one sprint to every board whose
+filter reach it, and report done rule come from own board's last column, so
+key without board would serve board B a series built for board A and neither
+board ever find out. Row carry `algo_version`, stamped on write from
+`reports.AlgoVersion` and compared on read, so first reconstruction bug not
+baked into every user database with no way out but delete file. Table in both
+purge lists, `PurgeProfile` and `RemoveBoards`.
+
+**Closed sprint series stored and served from store; live one neither
+stored nor served.** Live sprint changed an hour ago, so stored copy =
+confident wrong answer. Closed sprint numbers steady enough to keep, which
+is not same as fixed, and two things that can still move them worth knowing
+because neither obvious: membership, since series built from `sprint = N`
+and card can move into or out of closed sprint, and board own done rule,
+since column rearranged in Jira change what `donerule` answer without
+touching single issue. Status and estimate changes after close move nothing,
+which is what rewind for. `refresh` = how caller ask for series again, and
+only invalidation path short of bump `AlgoVersion`: without it, report built
+while Jira return cut-short changelogs keep its truncation marker forever.
+
+**One binding, not two.** First draft had view ask for burndown and velocity
+separately. `App.acquire` refuse not wait, and TanStack Query fire every
+`useQuery` on component mount, so two bindings would fail one of them with
+"a report is already running for this profile" every time view open.
+`GetSprintReport` return both under one lock, share one fetch, and velocity
+table reuse stored reports for sprints already built rather than refetch
+six. `CancelSprintReport` = other half: Wails hand bound method no per-call
+context, so cancel func live on `App` under same mutex `busy` do, and view
+call it on unmount and on every board or sprint switch. Without it, report
+nobody look at hold profile lock for minutes.
+
+**Cost of open view is real and is reported.** Page = 25 issues against
+sync's 50, because changelog expansion make each issue payload several times
+size of row grid sync. **That = considered default not measured one**: step
+4 of this phase wire probe, which would time 50 against 25 on real instance,
+not run, so nobody know where real knee is. Progress go on
+`tam:report-progress` with own frame type not on `tam:sync-progress`,
+because shell banner read the latter and read that is not sync must not
+announce one.
+
+**`reports.Velocity` gone, and shape it had could not survive reusing
+store.** Took map of every sprint fetched history and return whole table,
+right shape when every row rebuilt and wrong one when five of six read back
+out of `sprint_report`. Split in two = what let store in: `VelocitySprints`
+pick which closed sprints table cover and in what order, `Row` turn one
+series into one row, `internal/sprintreport` call both, so sprint built just
+now and same sprint read back from store give identical row by construction
+not by two code paths agreeing. `VelocitySprints` parse both dates not just
+end, which stop sprint it already know it cannot rebuild from costing full
+changelog fetch first; end-before-start case it cannot see caught later by
+`ErrNoDates`, and each layer comment say which fault is whose.
+
+`internal/sprintreport` = orchestration, `internal/reports` stay pure. Split
+not tidiness: `reports` take issues + clock and touch no I/O, which make its
+tests cheap, and everything that cost something (done rule, paged fetch,
+store, progress frames) live other side of it. `app_reports.go` do what every
+other `app*.go` do and no more.
+
+**Condition view must render beside report travel in result, not as Go
+error.** Wails fill in either bound method value or its error, never both,
+limit `sprints.Completion` already built around. So board never synced,
+sprint cache not hold, sprint with no readable dates, board that never closed
+a sprint come back as `Report` carrying `Unavailable` reason and nothing
+else, while refused lock, transport failure, database that will not answer
+stay Go errors. Reasons = constants because frontend word them, in
+`lib/reportText.ts`, one home for every sentence report print, tested without
+rendering anything.
+
+**Sprint id of 0 mean board's most recent closed sprint**, the call view make
+before its picker have anything in it, and what make `noClosedSprint`
+reachable at all. Negative id not that, answer `sprintNotFound`. `api.ts`
+refuse sprint id that is not non-negative whole number before call, because
+Wails marshal arguments with `JSON.stringify` and both `undefined` and `NaN`
+arrive in Go as `0`: uninitialised picker would otherwise get newest closed
+sprint report under whatever heading happened to be on screen. Heading drawn
+from `series.sprintName`, the sprint backend answered about, never from
+picker state = second line of defence for same failure.
+
+**Charts not here, are next plan.** `Series.Days` carry day by day line and
+nothing draw it. No SVG anywhere in this frontend, so axis ticks, label
+collision, empty ranges, single day sprints, colour tokens, screen reader
+access all new surface, and splitting mean numbers get trusted before
+anything drawn from them.
 
 ## Phase 3a: boards
 
-`core/jira/agile.go` is the Agile 1.0 transport: `Boards`, `BoardConfiguration`,
-`Sprints`, and `BoardIssueKeys`, each paged to exhaustion and returning
-Jira's raw shape. A Data Center with no Jira Software answers `Boards`
-with 404, mapped to `ErrNoAgile`; a kanban board's sprint call answers 400,
-mapped to `ErrNoSprints`. TAM's `internal/backend.BoardBackend` is the
-read-only capability those four calls back, kept off `IssueBackend` so
-only a backend that can speak Jira's Agile API has to answer for it; the
-demo backend implements it too, with one scrum board (three sprints, one
-closed) and one kanban board.
+`core/jira/agile.go` = Agile 1.0 transport: `Boards`, `BoardConfiguration`,
+`Sprints`, `BoardIssueKeys`, each paged to exhaustion, return Jira raw
+shape. Data Center with no Jira Software answer `Boards` with 404, mapped to
+`ErrNoAgile`; kanban board sprint call answer 400, mapped to `ErrNoSprints`.
+TAM `internal/backend.BoardBackend` = read-only capability those four calls
+back, kept off `IssueBackend` so only backend that can speak Jira Agile API
+answer for it; demo backend implement it too, with one scrum board (three
+sprints, one closed) and one kanban board.
 
-Schema version 5 adds four tables to `tam.db`, all keyed by profile:
-`board`, `board_column`, `sprint`, and `board_issue` (a board's membership
-of one scope, `sprint_id` empty for the board's own list and a sprint id
-otherwise). It also adds a `status_id` column to `issue`, which is how a
-card is matched to a column. Since `CREATE TABLE IF NOT EXISTS` cannot add
-a column to a table that already exists, this is the plan's first store
-migration (`tamstore.Schema.Migrations`): it adds the column, then clears
-every profile's sync watermark. **An incremental sync only re-reads issues
-Jira reports changed since the watermark, so a row cached before version 5
-would never get a status id filled in on its own; clearing the watermark
-is what makes the next sync for each profile re-read every issue and fill
-the column in, without purging anything first.**
+Schema version 5 add four tables to `tam.db`, all keyed by profile: `board`,
+`board_column`, `sprint`, `board_issue` (board membership of one scope,
+`sprint_id` empty for board's own list and sprint id otherwise). Also add
+`status_id` column to `issue`, how card matched to column. Since
+`CREATE TABLE IF NOT EXISTS` cannot add column to table that already exist,
+this = plan's first store migration (`tamstore.Schema.Migrations`): add
+column, then clear every profile sync watermark. **Incremental sync only
+re-read issues Jira report changed since watermark, so row cached before
+version 5 would never get status id filled in on its own; clearing watermark
+= what make next sync for each profile re-read every issue and fill column
+in, without purging anything first.**
 
-Schema version 6 re-keys `sprint` from `(profile_id, id)` to
-`(profile_id, board_id, id)`. Jira Data Center hands the same sprint to
-every board whose filter reaches it, and the sync clears and writes
-sprints one board at a time, so two scrum boards over one project used to
-collide on the second board's insert and take the whole pass down. SQLite
-cannot change a primary key in place, so the migration drops the table and
-recreates it: it is a cache the next sync refills, and nothing joins to
-its rows.
+Schema version 6 re-key `sprint` from `(profile_id, id)` to
+`(profile_id, board_id, id)`. Jira Data Center hand same sprint to every
+board whose filter reach it, and sync clear and write sprints one board at a
+time, so two scrum boards over one project used to collide on second board
+insert and take whole pass down. SQLite cannot change primary key in place,
+so migration drop table and recreate it: it is cache next sync refill, and
+nothing join to its rows.
 
-`internal/boardrepo` is the store layer over the four tables, beside
-`issuerepo` since boards are their own concern. It never imports
-`issuerepo`: what it needs from the issue cache is the three-method
-`IssueSource` interface (`IssuesByKeys`, `DraftIssues`, `PendingMoves`),
-which `app.go` satisfies with the issue repository it already holds. Every
-method takes the `dbtx.Querier` the board read is running on, so the cards
-and moves come from the same transaction as the board's own columns and
-membership rather than from a later moment on the handle. `boardrepo.Board`
-composes the view a board draws: columns in board order, cards bucketed
-into them by status id (a draft goes to the first column that collects
-any status, since Jira has never assigned it one), and the lanes the
-chosen swimlane (none, assignee, epic) asks for. A card whose status is
-in no column is counted into `Unmapped`, and its status name into
-`UnmappedStatuses`, not listed card by card. A cell caps at 200 cards and
-the whole view at 2,000; past either cap a card is only counted, in
-`Overflow` and `Capped`. `DonePoints` is summed in the same walk, over
-every mapped card rather than the ones a capped cell drew, by
-`backend.IsDone`: the definition lives in `internal/backend` because both
-`boardrepo` and `issuerepo` count by it and `boardrepo` may not import
-`issuerepo`. `NeedsStatusSync` is true when every cached card
-still carries an empty status id, which is the state right after the
-version 5 migration and before the next sync; the view tells the user to
-sync rather than drawing an empty board and blaming them for it.
+`internal/boardrepo` = store layer over the four tables, beside `issuerepo`
+since boards are own concern. Never import `issuerepo`: what it need from
+issue cache = three-method `IssueSource` interface (`IssuesByKeys`,
+`DraftIssues`, `PendingMoves`), which `app.go` satisfy with issue repository
+it already hold. Every method take the `dbtx.Querier` board read running on,
+so cards and moves come from same transaction as board's own columns and
+membership rather than from later moment on handle. `boardrepo.Board`
+compose view board draw: columns in board order, cards bucketed into them by
+status id (draft go to first column that collect any status, since Jira
+never assign it one), and lanes chosen swimlane (none, assignee, epic) ask
+for. Card whose status in no column counted into `Unmapped`, and its status
+name into `UnmappedStatuses`, not listed card by card. Cell cap at 200 cards
+and whole view at 2,000; past either cap card only counted, in `Overflow`
+and `Capped`. `DonePoints` summed in same walk, over every mapped card not
+ones capped cell drew, by `backend.IsDone`: definition live in
+`internal/backend` because both `boardrepo` and `issuerepo` count by it and
+`boardrepo` may not import `issuerepo`. `NeedsStatusSync` true when every
+cached card still carry empty status id, state right after version 5
+migration and before next sync; view tell user to sync rather than draw
+empty board and blame them for it.
 
-`internal/syncer/boards.go` is `Engine.SyncBoards`, reached through a type
-assertion on `backend.BoardBackend` so a backend without it is skipped,
-not failed. It runs after the issues pass in a regular sync, and alone
-from the Boards view's Refresh. For each board it reads columns, sprints,
-its own issue list, and the issue keys of its active and future sprints
-only, then writes all of it for that board in one transaction with
-`boardrepo.ReplaceBoard`; a board whose read fails at any point is
-recorded in the summary's `Dropped` with a one-line reason from
-`internal/errtext` (added during review: it strips HTML tags and
-collapses whitespace, since a 403 answered with an HTML login page hands
-the transport a kilobyte of markup) and is left exactly as it was. The
-four read methods are `ListBoards`, `ListBoardSprints`, `GetBoard`, and
-`SyncBoards`, all in `app_boards.go`. Phase 3a wrote nothing to Jira;
-Phase 3b, directly below, adds the writes.
+`internal/syncer/boards.go` = `Engine.SyncBoards`, reached through type
+assertion on `backend.BoardBackend` so backend without it skipped, not
+failed. Run after issues pass in regular sync, and alone from Boards view
+Refresh. For each board read columns, sprints, own issue list, and issue
+keys of its active and future sprints only, then write all of it for that
+board in one transaction with `boardrepo.ReplaceBoard`; board whose read
+fail at any point recorded in summary `Dropped` with one-line reason from
+`internal/errtext` (added during review: strip HTML tags and collapse
+whitespace, since 403 answered with HTML login page hand transport a
+kilobyte of markup) and left exactly as it was. Four read methods =
+`ListBoards`, `ListBoardSprints`, `GetBoard`, `SyncBoards`, all in
+`app_boards.go`. Phase 3a wrote nothing to Jira; Phase 3b, directly below,
+add writes.
 
-Two facts worth knowing before they cost you a debugging session:
+Two facts worth knowing before they cost you debugging session:
 
-- **An incremental sync cannot backfill `status_id`.** That is the whole
-  reason version 5's migration clears the sync watermark rather than just
-  adding the column: without the reset, every issue cached before this
-  branch would carry an empty status id forever, since nothing would ever
-  ask Jira for it again.
-- **A board's membership is whatever Jira's board endpoint returned at
-  sync time.** TAM does not compute board membership from status; it
-  caches the key list `/board/{id}/issue` and `/board/{id}/sprint/{id}/issue`
-  answered with. A card moved on the web board moves in TAM only after
-  the next sync, boards sync included.
-- **Only the active and future sprints have their cards fetched.** A
-  closed sprint stays in the sprint list, for history, but its membership
-  is never pulled, so the sprint picker offers only active and future
-  sprints and no others.
+- **Incremental sync cannot backfill `status_id`.** Whole reason version 5
+  migration clear sync watermark rather than just add column: without reset,
+  every issue cached before this branch carry empty status id forever, since
+  nothing would ever ask Jira for it again.
+- **Board membership = whatever Jira board endpoint returned at sync time.**
+  TAM not compute board membership from status; it cache key list
+  `/board/{id}/issue` and `/board/{id}/sprint/{id}/issue` answered with. Card
+  moved on web board move in TAM only after next sync, boards sync included.
+- **Only active and future sprints have cards fetched.** Closed sprint stay
+  in sprint list, for history, but membership never pulled, so sprint picker
+  offer only active and future sprints and no others.
 
 ## Phase 3b: board writes
 
-A card dropped or keyboard-moved on the board makes one of three moves,
-each its own journal entity beside `issue`, `issue_create`, and `link`:
-`issue_transition` (field `statusId`) for a drag across columns,
-`issue_sprint` (field `sprintId`) for a move to another sprint or to the
-backlog, and `issue_rank` (field `rank`) for a reorder within a column.
-The three writes, the packing, and the reverts are `internal/issuerepo`'s
-`boardwrites.go`, `movevalue.go`, and `movecolumns.go`; `rebasemoves.go`
-is what Override does to a held one. Nothing here talks to Jira directly;
-the journal is what Commit pushes, exactly as it does for a field edit.
+Card dropped or keyboard-moved on board make one of three moves, each own
+journal entity beside `issue`, `issue_create`, `link`: `issue_transition`
+(field `statusId`) for drag across columns, `issue_sprint` (field
+`sprintId`) for move to another sprint or backlog, `issue_rank` (field
+`rank`) for reorder within column. Three writes, packing, reverts =
+`internal/issuerepo` `boardwrites.go`, `movevalue.go`, `movecolumns.go`;
+`rebasemoves.go` = what Override do to held one. Nothing here talk to Jira
+directly; journal = what Commit push, exactly as for field edit.
 
-A transition is journaled by the target status id, never by a transition
-id: which transitions Jira offers depends on the issue's status at that
-exact moment, so an id read at drag time would be stale before Commit
-ever runs. `internal/backend/jira/transitions.go`'s `Transition` is where
-the target status id becomes a real transition at push time: it lists the
-issue's transitions, picks the one whose `to.id` matches the journaled
-target (the lowest transition id when two reach it, so the same drop
-resolves the same way on every run), and fills whatever that transition's
-own screen requires. Almost every Data Center workflow's way into Done
-puts a resolution on that screen; TAM reads it from the transition's own
-`fields.resolution.allowedValues` and fills it from the profile's
-`transition_resolution` setting when the transition allows that value,
-from the transition's first allowed value otherwise, and refuses (naming
-every required field by name) when the screen asks for anything else.
+Transition journaled by target status id, never by transition id: which
+transitions Jira offer depend on issue status at that exact moment, so id
+read at drag time stale before Commit run.
+`internal/backend/jira/transitions.go` `Transition` = where target status id
+become real transition at push time: list issue transitions, pick one whose
+`to.id` match journaled target (lowest transition id when two reach it, so
+same drop resolve same way every run), and fill whatever that transition's
+own screen require. Almost every Data Center workflow way into Done put
+resolution on that screen; TAM read it from transition's own
+`fields.resolution.allowedValues` and fill from profile
+`transition_resolution` setting when transition allow that value, from
+transition's first allowed value otherwise, and refuse (naming every
+required field by name) when screen ask for anything else.
 
-A rank is never journaled as a LexoRank: Jira owns that value, and a
-client-made one would be a second, wrong source of truth the next sync
-would silently overwrite. It is journaled as a neighbour, a side, and the
-board the drop was made on (`before|KEY|BOARD` or `after|KEY|BOARD`), and
-the commit pass re-derives the neighbour from that board's final local
-order at push time (`boardrepo.CellOrder`) rather than trusting the key
-that was journaled at drop time, which a busy board can easily have moved
-on from. The board rides along because one key can sit on two boards
-whose orders disagree, and nothing else says which board's order a rank
-was measured against. Every card but the one at the very top of the
-board's order anchors with `rankAfterIssue` against the card that landed
-above it; the top card has nothing above it, so it anchors with
-`rankBeforeIssue` against the card below it instead. "X before Y" and "X
-after W" place X in exactly the same spot in Jira's one global rank, so
-two cards ranked against each other can never disagree about the pair,
-and only the first card of the board's first non-empty column can ever
-take the `before` branch.
+Rank never journaled as LexoRank: Jira own that value, and client-made one
+would be second wrong source of truth next sync silently overwrite.
+Journaled as neighbour, side, and board drop made on (`before|KEY|BOARD` or
+`after|KEY|BOARD`), and commit pass re-derive neighbour from that board's
+final local order at push time (`boardrepo.CellOrder`) rather than trust key
+journaled at drop time, which busy board can easily have moved on from.
+Board ride along because one key can sit on two boards whose orders
+disagree, and nothing else say which board order rank measured against.
+Every card but one at very top of board order anchor with `rankAfterIssue`
+against card that landed above it; top card have nothing above it, so anchor
+with `rankBeforeIssue` against card below instead. "X before Y" and "X after
+W" place X in exactly same spot in Jira's one global rank, so two cards
+ranked against each other can never disagree about pair, and only first card
+of board's first non-empty column can ever take `before` branch.
 
-A board write is classified against the issue's remote status or sprint
-id at Commit, never against its `updated` stamp: a comment left on the
-issue in Jira bumps `updated` without moving the card, and reading that
-as a conflict would hold back a card nobody touched. Remote already at
-the journaled target is satisfaction, not a conflict, and the row is
-dropped as a `Moved{Satisfied: true}` rather than raised as one; remote
-at the journaled before value is pushed; anything else holds the whole
-issue back, both board rows together if both are pending, so half an
-intent is never committed against a card that is not where the user left
-it. `internal/committer/boards.go` (the sprint and transition passes),
-`ranks.go` (the rank pass, last, since it is the one write that can be
-redone harmlessly), and `boardvalues.go` (the three-way classification
-and the labels a conflict card prints) are the board pass, which runs
-after the edits and before the links, because a transition on a draft has
-to wait for the create that gives the draft a real key.
+Board write classified against issue remote status or sprint id at Commit,
+never against its `updated` stamp: comment left on issue in Jira bump
+`updated` without moving card, and read that as conflict would hold back
+card nobody touched. Remote already at journaled target = satisfaction not
+conflict, and row dropped as `Moved{Satisfied: true}` not raised as one;
+remote at journaled before value pushed; anything else hold whole issue
+back, both board rows together if both pending, so half an intent never
+committed against card that is not where user left it.
+`internal/committer/boards.go` (sprint + transition passes), `ranks.go` (rank
+pass, last, since it is one write that can be redone harmlessly), and
+`boardvalues.go` (three-way classification + labels conflict card print) =
+board pass, which run after edits and before links, because transition on
+draft must wait for create that give draft real key.
 
-`Commit`'s own loop and `regroupEdits` both name the three board entity
-types through `boardRow`; missing either spot sorts a board row into
-`commitEdit`, which sends `statusId` to Jira as an ordinary field, fails
-on it, and fails the issue's real edits along with it. Overriding a held
-board row is not the same operation as overriding a held edit: an edit is
-held on the issue's `updated` stamp, which `ResolveOverride` rebases by
-writing a new `base_version`, but a board row is held on its `before_val`
-against the remote status or sprint id, which has no base version to
-rewrite. `RebaseMoves` is the other half: it rewrites the held row's
-`before_val` to what Jira holds now and leaves `after_val`, the user's
-move, untouched. Skip it and Override on a board conflict would meet the
-identical conflict on every following Commit; a key with only edits
-pending still overrides with no network call.
+`Commit` own loop and `regroupEdits` both name three board entity types
+through `boardRow`; miss either spot sort board row into `commitEdit`, which
+send `statusId` to Jira as ordinary field, fail on it, and fail issue's real
+edits along with it. Override held board row not same operation as override
+held edit: edit held on issue `updated` stamp, which `ResolveOverride`
+rebase by writing new `base_version`, but board row held on its `before_val`
+against remote status or sprint id, which have no base version to rewrite.
+`RebaseMoves` = other half: rewrite held row `before_val` to what Jira hold
+now and leave `after_val`, user move, untouched. Skip it and Override on
+board conflict meet identical conflict on every following Commit; key with
+only edits pending still override with no network call.
 
-A journal row for a board move is deleted only while its `after_val` is
-still the value that was pushed (`MarkMoveCommitted`), because none of
-the three move bindings take TAM's busy guard the way editing a field
-does: a card dragged again while Commit is mid-push updates that row in
-place, and a delete by row id would throw away an intent Jira was never
-told about. The commit is still audited, since the push did happen; the
-newer intent stays in the journal for the next Commit to find.
+Journal row for board move deleted only while its `after_val` still the
+value that was pushed (`MarkMoveCommitted`), because none of three move
+bindings take TAM busy guard the way editing field do: card dragged again
+while Commit mid-push update that row in place, and delete by row id would
+throw away intent Jira never told about. Commit still audited, since push
+did happen; newer intent stay in journal for next Commit to find.
 
-Jira's Agile bulk endpoints (`PUT /issue/rank`, `POST /sprint/{id}/issue`,
+Jira Agile bulk endpoints (`PUT /issue/rank`, `POST /sprint/{id}/issue`,
 `POST /backlog/issue`) answer 207 Multi-Status when at least one issue in
-the request was rejected and 204 when every one landed, so
-`core/jira/bulkwrite.go` treats a 207 as a failure by its HTTP status
-alone, never by trying to recognise a body schema: there is no successful
-Multi-Status to accommodate. The body is decoded only to say why, trying
-Atlassian's documented `entries` array first, then the shapes
-`jiraErrorMessage` already knows, then a raw excerpt as a last resort.
+request rejected and 204 when every one landed, so `core/jira/bulkwrite.go`
+treat 207 as failure by HTTP status alone, never by trying to recognise body
+schema: there is no successful Multi-Status to accommodate. Body decoded
+only to say why, trying Atlassian documented `entries` array first, then
+shapes `jiraErrorMessage` already know, then raw excerpt as last resort.
 
-The keyboard path is not a convenience beside the drag; it is the
-accessible path a screen reader user and a trackpad-averse user actually
-get the feature through. Ctrl with an arrow moves the card that already
-holds focus (left and right transition a column, up and down rank within
-the cell), refusing with an announced sentence at either edge, and every
-card's "Move to" menu reaches a sprint move without a pointer at all. A
-drag draws two different cues for the same reason the two moves are
-different writes: a drop line at the cursor inside the card's own cell,
-exactly where a rank will land, and a full-cell outline for a drop on
-another column, never a line there, since a transition lands the card by
-its own rank rather than at the cursor.
+Keyboard path not convenience beside drag; it is accessible path screen
+reader user and trackpad-averse user actually get feature through. Ctrl with
+arrow move card that already hold focus (left and right transition column,
+up and down rank within cell), refusing with announced sentence at either
+edge, and every card "Move to" menu reach sprint move without pointer at
+all. Drag draw two different cues for same reason two moves are different
+writes: drop line at cursor inside card's own cell, exactly where rank will
+land, and full-cell outline for drop on another column, never line there,
+since transition land card by its own rank not at cursor.
 
 ## Phase 3c: the sprint lifecycle
 
-Starting a sprint and completing one are the only writes in TAM that reach
-Jira outside a Commit. Everything else in this app is journaled and waits
-for the user to push it; these two do not, for reasons that do not apply
-to a card move. A sprint's start is a timestamped fact a whole team reads
-the moment it happens, and Phase 4's burndown will be computed from it, so
-journaling it would mean TAM decides when the sprint started and tells
-Jira an hour later. A completion is the harder case: what happens to the
-issues that did not finish depends on the sprint's contents at the exact
-moment it closes, not at whatever moment a Commit next happens to run, and
-there is nothing to reconcile the way a held transition or rank can be, a
-sprint someone else already started cannot be started again. `internal/sprints`
-owns both ceremonies (`Service.Start`, `Service.Complete`) so the exception
-has one home and one place to test; nothing in that package touches the
-journal. The bound methods, `StartSprint` and `CompleteSprint` in
-`app_sprints.go`, take the same per-profile lock (`a.acquire(p.ID, "sprint")`)
-a sync, a commit, and a boards refresh take, and the frontend reaches them
-through `SyncContext.runSprintCeremony`, which is the same reducer path
-`runBoardsRefresh` uses. The three sprint management writes in
-`app_sprintmanage.go` take that same Go lock but reach it through
-`runQuietLock` instead, for the reason the sync section below gives. Neither button has an offline state: TAM has no
-connectivity signal to disable one from, so both stay enabled, the call is
-attempted, and a transport failure or a Jira refusal (a second active
-sprint, a missing Manage Sprints permission) is reported in the dialog,
-which stays open with what the user typed still in it.
+Start sprint and complete one = only writes in TAM that reach Jira outside
+Commit. Everything else in this app journaled and wait for user to push it;
+these two do not, for reasons that do not apply to card move. Sprint start =
+timestamped fact whole team read moment it happen, and Phase 4 burndown
+computed from it, so journaling it would mean TAM decide when sprint started
+and tell Jira an hour later. Completion = harder case: what happen to issues
+that did not finish depend on sprint contents at exact moment it close, not
+at whatever moment Commit next happen to run, and nothing to reconcile the
+way held transition or rank can be, a sprint someone else already started
+cannot be started again. `internal/sprints` own both ceremonies
+(`Service.Start`, `Service.Complete`) so exception have one home and one
+place to test; nothing in that package touch journal. Bound methods,
+`StartSprint` and `CompleteSprint` in `app_sprints.go`, take same per-profile
+lock (`a.acquire(p.ID, "sprint")`) sync, commit, boards refresh take, and
+frontend reach them through `SyncContext.runSprintCeremony`, same reducer
+path `runBoardsRefresh` use. Three sprint management writes in
+`app_sprintmanage.go` take same Go lock but reach it through `runQuietLock`
+instead, for reason sync section below give. Neither button have offline
+state: TAM have no connectivity signal to disable one from, so both stay
+enabled, call attempted, and transport failure or Jira refusal (second
+active sprint, missing Manage Sprints permission) reported in dialog, which
+stay open with what user typed still in it.
 
-A completion moves the sprint's unfinished issues before it closes the
-sprint, never after: the reverse would leave a closed sprint whose cards
-went nowhere, which nobody can undo from TAM. "Unfinished" is one
-definition used everywhere it matters: an issue whose status id is not in
-the board's last `board_column`'s `status_ids`, the same mapping the board
-itself draws with and the same one `DonePoints` counts by. The sprint's
-own membership is re-read from Jira through the issue search rather than
-from the cache or from `BoardIssueKeys`, because the cache can be minutes
-stale and a key list carries no status; the search comes back with both in
-one paged call. The push itself moves in chunks of twenty
-(`sprints.pushBatch`, matching the committer's own `sprintBatch`), because
-Jira's bulk endpoints answer a partial refusal with a 207 that names
-issues by numeric id, which cannot be mapped back to a key, so the whole
-batch fails together and a smaller batch limits how much of a completion
-one refusal can take down.
+Completion move sprint's unfinished issues before it close sprint, never
+after: reverse would leave closed sprint whose cards went nowhere, which
+nobody can undo from TAM. "Unfinished" = one definition used everywhere it
+matter: issue whose status id not in board's last `board_column`
+`status_ids`, same mapping board itself draw with and same one `DonePoints`
+count by. Sprint's own membership re-read from Jira through issue search
+rather than from cache or from `BoardIssueKeys`, because cache can be
+minutes stale and key list carry no status; search come back with both in one
+paged call. Push itself move in chunks of twenty (`sprints.pushBatch`,
+matching committer's own `sprintBatch`), because Jira bulk endpoints answer
+partial refusal with 207 that name issues by numeric id, which cannot map
+back to key, so whole batch fail together and smaller batch limit how much
+of completion one refusal can take down.
 
-A completion that reached Jira and then failed is reported inside
-`sprints.Completion` (`Moved`, `MovedTo`, `Failed`, `Note`, `Message`)
-rather than as a Go error, because Wails discards a bound method's return
-value whenever the method also returns a non-nil error: the dispatcher
-fills in either the result or the error and never both. An error would
-therefore deliver the sentence and drop the counts and keys it is about,
-which is what the dialog needs at that moment. Both failures travel that
-way, a push that stopped partway and a close Jira refused once every card
-had already moved, and for a second reason as well: the dialog renders a
-`Message` as an outcome and a Go error as a refusal, so the refused close
-used to print its accurate sentence directly above a list still headed "47
-cards are not finished and will move out of the sprint" and a footer still
-promising the move. `CompleteSprint` returns a real error only for the
-refusals that happen before anything moves, and those go through
-`internal/errtext` first, as does the `Message` a failed push or a refused
-close carries: Jira's words come straight off the wire, and a Data Center
-answering 403 with an HTML login page would otherwise put a kilobyte of
-markup inline beside the start dialog's buttons.
+Completion that reached Jira then failed reported inside `sprints.Completion`
+(`Moved`, `MovedTo`, `Failed`, `Note`, `Message`) not as Go error, because
+Wails discard bound method return value whenever method also return non-nil
+error: dispatcher fill in either result or error, never both. Error would
+therefore deliver sentence and drop counts and keys it is about, which is
+what dialog need at that moment. Both failures travel that way, push that
+stopped partway and close Jira refused once every card already moved, and
+for second reason too: dialog render `Message` as outcome and Go error as
+refusal, so refused close used to print its accurate sentence directly above
+list still headed "47 cards are not finished and will move out of the
+sprint" and footer still promising move. `CompleteSprint` return real error
+only for refusals that happen before anything moves, and those go through
+`internal/errtext` first, as do `Message` a failed push or refused close
+carry: Jira words come straight off wire, and Data Center answering 403 with
+HTML login page would otherwise put kilobyte of markup inline beside start
+dialog buttons.
 
-`Note` is the opposite case: the ceremony worked and the bookkeeping after
-it did not. `refreshSprints` answers with its own failure now rather than
-only logging it, because the cached row still says `future` for the sprint
-that is now running, so the toolbar offers Start for it and Jira answers
-that second start with a 400. Both ceremonies carry it back as one line
-telling the user to press Refresh, beside their own success; `StartSprint`
-returns it as a string, and the board's ceremony banner is where both are
-read.
+`Note` = opposite case: ceremony worked and bookkeeping after it did not.
+`refreshSprints` answer with own failure now rather than only logging it,
+because cached row still say `future` for sprint that is now running, so
+toolbar offer Start for it and Jira answer that second start with 400. Both
+ceremonies carry it back as one line telling user to press Refresh, beside
+own success; `StartSprint` return it as string, and board ceremony banner =
+where both read.
 
-A completion refuses a sprint the cache calls `future`, and only `future`.
-It moves the cards out before it asks Jira to close the sprint, so aimed at
-a sprint that never started it empties that sprint and then fails the
-close, and TAM can undo neither half. A sprint started on the web an hour
-ago still reads as future in a cache nobody has refreshed since, and
-refusing that costs a Refresh where emptying it costs the sprint, so no
-other state is refused here.
+Completion refuse sprint cache call `future`, and only `future`. It move
+cards out before it ask Jira to close sprint, so aimed at sprint that never
+started it empty that sprint then fail close, and TAM can undo neither half.
+Sprint started on web an hour ago still read as future in cache nobody
+refreshed, and refusing that cost a Refresh where emptying it cost the
+sprint, so no other state refused here.
 
-The cards that move are written back into both scopes of the board cache,
-the sprint they left and the destination they were sent to, the second of
-which used to be missed: the banner said twelve cards moved to Sprint 15
-and the picker switched to Sprint 15, which drew exactly what it drew
-before, and nothing else would have corrected it, since a ceremony writes
-no journal row for the view to fold in. An empty destination is the board's
-own list, which is a scope like any other.
+Cards that move written back into both scopes of board cache, sprint they
+left and destination they were sent to, second of which used to be missed:
+banner said twelve cards moved to Sprint 15 and picker switched to Sprint
+15, which drew exactly what it drew before, and nothing else would correct
+it, since ceremony write no journal row for view to fold in. Empty
+destination = board's own list, scope like any other.
 
-The demo backend narrows its search to `sprint = N`. That is the one scope
-it honours, and it is not decoration: the completion's own read is that
-query, and the service keeps an issue the backend reports no sprint for on
-the grounds that the query already narrowed it. Against a backend that
-ignored the scope, every card in the project walked past that guard, so
-completing a sprint on the demo profile moved the whole backlog and
-reported success.
+Demo backend narrow its search to `sprint = N`. That = one scope it honour,
+and not decoration: completion's own read is that query, and service keep
+issue backend report no sprint for on grounds query already narrowed it.
+Against backend that ignored scope, every card in project walked past that
+guard, so completing sprint on demo profile moved whole backlog and reported
+success.
 
-A board read now runs inside one deferred read transaction
-(`boardrepo.Board`, `Order.CellOrder`, both through `Repository.inReadTx`),
-and every read the issue cache does on the way, `IssuesByKeys`,
-`DraftIssues`, `PendingMoves`, takes the `dbtx.Querier` that transaction
-opened rather than the bare handle. `ReplaceBoard` writes a board's row,
-columns, sprints, and membership together in one transaction and was
-already correct; the gap was on the read side, where `Board` used to issue
-four separate statements on the handle and could land between two of
-`ReplaceBoard`'s writes, drawing cards into columns that had already been
-replaced or a membership list that had not been written yet. That is the
-flake two sessions chased before this plan named it: a reader on another
-connection sees a consistent snapshot only inside a transaction, and a
-read spread across the handle never had one. The sprint lifecycle itself
-does not write an empty sprint list back over a board it has just acted
-on: `sprints.Service.refreshSprints` refuses to persist what
-`BoardSprints` answers with when the answer is empty, because a single 400
-on the sprint endpoint is indistinguishable from "no sprints" the way
-`core/jira` maps it, and a ceremony has just proven the board has at least
-one sprint. Overwriting the cache with that empty answer would delete
-every sprint row of the board and drop the sprint length the start dialog
-suggests from, with nothing reported anywhere since the call itself did
-not fail; `boardrepo.ReplaceSprints` does the write once the caller has
-decided the list is real.
+Board read now run inside one deferred read transaction (`boardrepo.Board`,
+`Order.CellOrder`, both through `Repository.inReadTx`), and every read issue
+cache do on way, `IssuesByKeys`, `DraftIssues`, `PendingMoves`, take
+`dbtx.Querier` that transaction opened rather than bare handle.
+`ReplaceBoard` write board row, columns, sprints, membership together in one
+transaction and was already correct; gap was on read side, where `Board` used
+to issue four separate statements on handle and could land between two of
+`ReplaceBoard` writes, drawing cards into columns already replaced or
+membership list not yet written. That = flake two sessions chased before this
+plan named it: reader on another connection see consistent snapshot only
+inside transaction, and read spread across handle never had one. Sprint
+lifecycle itself not write empty sprint list back over board it just acted
+on: `sprints.Service.refreshSprints` refuse to persist what `BoardSprints`
+answer with when answer empty, because single 400 on sprint endpoint
+indistinguishable from "no sprints" the way `core/jira` map it, and ceremony
+just proved board have at least one sprint. Overwriting cache with that empty
+answer would delete every sprint row of board and drop sprint length start
+dialog suggest from, with nothing reported anywhere since call itself did not
+fail; `boardrepo.ReplaceSprints` do write once caller decided list is real.
 
-The board's multi-selection (`lib/boardSelection.ts`, `useBoardSelection`)
-is a set of issue keys, never a set of positions, because the board
-redraws on every refetch and a position-based selection would silently
-select whatever cards happen to land in those slots afterwards, the same
-class of bug 3b hit with keyboard focus. It is also a different thing from
-the detail panel's one selected card: the panel's selection stays
-`.board-card-selected` and opens on a plain click or Enter; the
-multi-selection paints `.board-card-checked`, grows with a control-click
-or a shift-click range, and more than one checked card closes the detail
-panel and replaces it with `BoardSelectionBar`, because a panel describing
-one card while three are checked would be lying about what the next
-action touches. Its one action, "Move N cards", journals through the same
-`issuerepo.MoveManyToSprint` (`moveToSprintTx` shared with the single-card
-move) that every other board write uses, so it takes no guard, has a
-conflict story already reviewed in 3b, and needs no new case in Discard,
-the pending dialog, or the commit pass.
+Board multi-selection (`lib/boardSelection.ts`, `useBoardSelection`) = set of
+issue keys, never set of positions, because board redraw on every refetch and
+position-based selection would silently select whatever cards happen to land
+in those slots afterwards, same class of bug 3b hit with keyboard focus. Also
+different thing from detail panel's one selected card: panel selection stay
+`.board-card-selected` and open on plain click or Enter; multi-selection
+paint `.board-card-checked`, grow with control-click or shift-click range,
+and more than one checked card close detail panel and replace it with
+`BoardSelectionBar`, because panel describing one card while three checked
+would lie about what next action touch. Its one action, "Move N cards",
+journal through same `issuerepo.MoveManyToSprint` (`moveToSprintTx` shared
+with single-card move) every other board write use, so take no guard, have
+conflict story already reviewed in 3b, and need no new case in Discard,
+pending dialog, or commit pass.
 
-The detail panel's Sprint field, and the start dialog's suggested end
-date, both read the cache rather than Jira: `SuggestSprintDates` combines
-`boardrepo.SprintLength` (the median whole-day length of the board's last
-three closed sprints, zero when none exist) with the board's cached
-sprint list, so the dialog can open with a plausible date before any
-network call and say plainly whether the date came from history or from a
-two-week default.
+Detail panel Sprint field and start dialog suggested end date both read cache
+not Jira: `SuggestSprintDates` combine `boardrepo.SprintLength` (median
+whole-day length of board's last three closed sprints, zero when none exist)
+with board cached sprint list, so dialog open with plausible date before any
+network call and say plainly whether date came from history or from two-week
+default.
 
 ## A sprint from anywhere an issue appears
 
-The sprint list away from a board is profile-wide. `boardrepo.OpenSprints`
-reads every active or future sprint across every board the profile has
-synced, each carrying its board's name, and the detail panel offers that
-list in the Backlog and the Epics tree. A user in the Backlog is thinking
-about an issue, not about a board, so making them pick a board first to
-reach a sprint would be the app's own model leaking into their task. Two
-boards can hold a sprint of the same name, which is why a choice carries
-its board's name when the name alone would be a guess.
+Sprint list away from board = profile-wide. `boardrepo.OpenSprints` read
+every active or future sprint across every board profile synced, each
+carrying its board name, and detail panel offer that list in Backlog and
+Epics tree. User in Backlog think about issue, not about board, so making
+them pick board first to reach sprint would be app's own model leaking into
+their task. Two boards can hold sprint of same name, which is why choice
+carry board name when name alone would be guess.
 
-A draft's sprint is pushed after its create, not sent with it. The Sprint
-field is missing from most Data Center create screens, and the create
-path already sends none of the board state for that reason.
-`journalDraftSprint` runs inside `Rekey`, in the same transaction that
-repoints the draft's other rows, and writes an `issue_sprint` row under
-the real key with an empty before value, so the board pass of the same
-Commit classifies it as a push rather than a conflict and lands it right
-after the create. The one path that loses it is
-`MarkCreatedWithoutRekey`, where Jira accepted the create and the local
-rename failed: it drops the sprint the same way it drops the rank
-repointing, and says so in its audit note.
+Draft sprint pushed after its create, not sent with it. Sprint field missing
+from most Data Center create screens, and create path already send none of
+board state for that reason. `journalDraftSprint` run inside `Rekey`, in same
+transaction that repoint draft's other rows, and write `issue_sprint` row
+under real key with empty before value, so board pass of same Commit classify
+it as push not conflict and land it right after create. One path that lose it
+= `MarkCreatedWithoutRekey`, where Jira accepted create and local rename
+failed: drop sprint same way it drop rank repointing, and say so in its audit
+note.
 
-The importer's Sprint column is matched by name against the profile's
-open sprints, case insensitively. An empty cell is the backlog; a name
-that matches nothing fails the row and lists what was available; a name
-two different sprints share is refused rather than guessed at, and for
-that reason is left out of the template's dropdown entirely. On a row
-that carries a Key the cell is ignored, and the result now says how many
-rows that happened to.
+Importer Sprint column matched by name against profile open sprints, case
+insensitively. Empty cell = backlog; name that match nothing fail row and
+list what was available; name two different sprints share refused not
+guessed, and for that reason left out of template dropdown entirely. On row
+that carry Key, cell ignored, and result now say how many rows that happened
+to.
 
-Writing a draft's sprint onto its row does not change what the board
-draws. `CreateDrafts` writes `sprint_id` and `sprint_name` onto the draft
-row, the same two columns `moveDraft` already writes when a draft is
-dragged into a sprint, but `composeBoard` appends `DraftIssues`
-unfiltered, so a draft was already drawn in every board and every sprint
-of the profile, and `applyMoves` only drops a card carrying a pending
-sprint-move journal row, which a draft never has. What those two columns
-change instead is the Backlog's sprint filter, the Backlog grid and
-detail panel, and `ListSprints`, whose `DISTINCT sprint_id` over cached
-rows can now surface a sprint id contributed only by a draft.
+Writing draft sprint onto its row not change what board draw. `CreateDrafts`
+write `sprint_id` and `sprint_name` onto draft row, same two columns
+`moveDraft` already write when draft dragged into sprint, but `composeBoard`
+append `DraftIssues` unfiltered, so draft already drawn in every board and
+every sprint of profile, and `applyMoves` only drop card carrying pending
+sprint-move journal row, which draft never have. What those two columns
+change instead = Backlog sprint filter, Backlog grid and detail panel, and
+`ListSprints`, whose `DISTINCT sprint_id` over cached rows can now surface
+sprint id contributed only by draft.
 
 ## The Sprints view
 
-Phase 3c gave TAM sprints on a board: draw one, drag cards through it,
-start it, close it. It could not make one, rename one, fix a wrong date,
-delete one created by mistake, or look at a sprint's contents without
-first choosing the board that happens to carry it. This view is what does
-those things, between Boards and Reports in the tab order, and it is
-always present: hiding it for a project with no scrum board synced would
-have needed a cross-cutting navigation mechanism for one consumer, and
-would have shown a brand new profile nothing at all on its first launch,
-since the condition that would hide it reads a cache that profile has not
-filled yet. A project with no scrum board sees an empty state that says
-so and points at the Boards view instead.
+Phase 3c gave TAM sprints on board: draw one, drag cards through it, start
+it, close it. Could not make one, rename one, fix wrong date, delete one
+created by mistake, or look at sprint contents without first choosing board
+that happen to carry it. This view do those things, between Boards and
+Reports in tab order, and it is always present: hiding it for project with no
+scrum board synced would need cross-cutting navigation mechanism for one
+consumer, and would show brand new profile nothing at all on first launch,
+since condition that would hide it read cache that profile has not filled
+yet. Project with no scrum board see empty state that say so and point at
+Boards view instead.
 
-**Create, edit and delete reach Jira immediately, and the honest reason
-is a cost, not a principle.** The tempting explanation is that a sprint
-is more of a shared Jira object than an issue is, and it is not: a new
-issue is every bit as much a thing a whole team plans around, and TAM
-journals it behind a `TAM-NEW-n` placeholder and pushes it on Commit like
-everything else. The real reason is that TAM's journal is issue
-machinery. A pending change is keyed by issue key, a conflict is decided
-by comparing an issue's `updated` stamp, and Commit walks issues. A
-sprint has none of that: no cached version to rebase an edit on, no
-conflict card, no rekey path for an id Jira has not handed out yet.
-Journaling these three writes would mean building a second journal for a
-second kind of entity, with its own placeholder ids for create, its own
-conflict story for edit, and a queue holding a destructive intent for
-delete, for three calls a user makes a handful of times per sprint. The
-full argument is written on `UpdateSprint` in `core/jira/sprintwrite.go`,
-which is where a future exception should start reading rather than
-re-deriving the point from scratch.
+**Create, edit, delete reach Jira immediately, and honest reason is cost not
+principle.** Tempting explanation = sprint is more of a shared Jira object
+than issue is, and it is not: new issue is every bit as much a thing whole
+team plan around, and TAM journal it behind `TAM-NEW-n` placeholder and push
+it on Commit like everything else. Real reason = TAM journal is issue
+machinery. Pending change keyed by issue key, conflict decided by comparing
+issue `updated` stamp, and Commit walk issues. Sprint have none of that: no
+cached version to rebase edit on, no conflict card, no rekey path for id Jira
+has not handed out yet. Journaling these three writes would mean building
+second journal for second kind of entity, with own placeholder ids for
+create, own conflict story for edit, and queue holding destructive intent for
+delete, for three calls user make handful of times per sprint. Full argument
+written on `UpdateSprint` in `core/jira/sprintwrite.go`, where future
+exception should start reading rather than re-derive point from scratch.
 
-The fence is structural rather than a sentence in a spec, because the
-previous version of this rule lived in one sentence in the boards design
-and lasted one phase. `internal/sprints/exceptions_test.go` asserts, by
-name, that `sprints.Service`'s exported method set is exactly `Complete`,
-`Create`, `Delete`, `Edit`, `Start`; growing it means editing a failing
-test whose message says what the list is for. The fence is deliberately
-the service's own methods and not the `lifecycle` interface a ceremony
-uses internally: that interface also carries `BoardSprints`, a read, and
-`MoveIssuesToSprint`, whose other caller (the multi-select move) journals
-it like every other membership change, so asserting `lifecycle` as the
-immediate-write list would have been false the day it was written.
-Membership stays journaled everywhere in this view exactly as it does on
-the board: the detail panel's Sprint field and the tree's own multi-select
-move both go through the same journaled `MoveManyToSprint` path the
-board's selection uses, with the same conflict story and the same
-Discard case, because reaching a sprint without first picking its board
-is the whole reason this view exists, not a reason to grow a second write
-path.
+Fence structural rather than sentence in spec, because previous version of
+this rule lived in one sentence in boards design and lasted one phase.
+`internal/sprints/exceptions_test.go` assert, by name, that `sprints.Service`
+exported method set is exactly `Complete`, `Create`, `Delete`, `Edit`,
+`Start`; growing it mean editing failing test whose message say what list is
+for. Fence deliberately service's own methods and not `lifecycle` interface
+ceremony use internally: that interface also carry `BoardSprints`, a read,
+and `MoveIssuesToSprint`, whose other caller (multi-select move) journal it
+like every other membership change, so asserting `lifecycle` as
+immediate-write list would have been false day it was written. Membership
+stay journaled everywhere in this view exactly as on board: detail panel
+Sprint field and tree's own multi-select move both go through same journaled
+`MoveManyToSprint` path board selection use, with same conflict story and
+same Discard case, because reaching sprint without first picking its board is
+whole reason this view exist, not reason to grow second write path.
 
-A closed sprint carries no cached membership, by design and not by
-accident: the boards sync never fetches a closed sprint's issue keys, on
-the reasoning that a chart Phase 4 draws from it should not depend on a
-mostly-idle poll of history nobody asked for. `SprintDetail.Issues` is
-therefore empty for a closed sprint for the same reason it would be
-empty right after a version 5 migration and before the next sync, and the
-view shows a closed sprint's contents as unavailable, with the reason,
-rather than as an empty sprint, which would be a lie the row cannot tell
-apart from the truth.
+Closed sprint carry no cached membership, by design not accident: boards sync
+never fetch closed sprint issue keys, on reasoning that chart Phase 4 draw
+from it should not depend on mostly-idle poll of history nobody asked for.
+`SprintDetail.Issues` therefore empty for closed sprint for same reason it
+would be empty right after version 5 migration and before next sync, and view
+show closed sprint contents as unavailable, with reason, not as empty sprint,
+which would be lie row cannot tell apart from truth.
 
-**Delete spans two repositories in two transactions, board rows first.**
-`sprints.Service.Delete` calls Jira, then `boardrepo.DeleteSprintEverywhere`
-to remove the sprint's row and its membership from every board of the
-profile that holds a copy (Jira hands the same sprint to every board
-whose filter reaches it, so a delete scoped to one board would leave a
-second board's copy in `OpenSprints`, still offering a sprint Jira has
-already destroyed to the New issue dialog, the detail panel, and the
-importer's Sprint column), then `issuerepo.ClearSprint` to blank the
-sprint's name off the issues that carried it. The two are separate
-transactions in separate repositories on purpose: `dbtx.In` opens its own
-transaction from the handle, so nesting one repository's helper inside
-the other's takes a second pooled connection, blocks on the first's write
-lock, and dies on the driver's busy timeout, the same failure
-`MoveManyToSprint` already documents. A shared transaction helper
-spanning both is real work and is recorded as deferred. `boardrepo`'s own
-comment on `DeleteSprintEverywhere` carries the rest of the argument and
-what a crash between the two transactions leaves: board rows first means
-a crash leaves issues whose `sprint_id` and `sprint_name` still name a
-sprint that is gone, stale text on cards that already held it; the other
-order would leave the sprint alive in `OpenSprints`, offering it as a
-pickable destination everywhere an issue's Sprint field appears. Narrow
-stale text beats a dead sprint that can still be chosen, and only a full
-issue sync repairs either.
+**Delete span two repositories in two transactions, board rows first.**
+`sprints.Service.Delete` call Jira, then `boardrepo.DeleteSprintEverywhere`
+to remove sprint row and its membership from every board of profile that hold
+copy (Jira hand same sprint to every board whose filter reach it, so delete
+scoped to one board would leave second board copy in `OpenSprints`, still
+offering sprint Jira already destroyed to New issue dialog, detail panel, and
+importer Sprint column), then `issuerepo.ClearSprint` to blank sprint name
+off issues that carried it. Two are separate transactions in separate
+repositories on purpose: `dbtx.In` open its own transaction from handle, so
+nesting one repository helper inside other's take second pooled connection,
+block on first's write lock, and die on driver busy timeout, same failure
+`MoveManyToSprint` already document. Shared transaction helper spanning both
+= real work, recorded as deferred. `boardrepo` own comment on
+`DeleteSprintEverywhere` carry rest of argument and what crash between two
+transactions leave: board rows first mean crash leave issues whose
+`sprint_id` and `sprint_name` still name sprint that is gone, stale text on
+cards that already held it; other order would leave sprint alive in
+`OpenSprints`, offering it as pickable destination everywhere issue Sprint
+field appear. Narrow stale text beat dead sprint that can still be chosen,
+and only full issue sync repair either.
 
-**Scope `""` in `board_issue` is the board's own list, not a backlog.**
-It is every issue on the board, sprint issues included, which is what
-TAM's own code calls the board's own list; rendering it as-is would list
-every sprint's issues a second time and offer the fill bar work that is
-already in a sprint. So the tree's unassigned node, `UnassignedSprintName`
-("Board backlog", deliberately not "Unassigned": that word already names
-an assignee group two rows up in the same tree), is computed rather than
-read: `boardrepo.sprintDetails` builds it as the board's own list minus
-every key a sprint's journal-replayed scope holds, once the journal has
-been replayed over every sprint ahead of it in the same pass.
+**Scope `""` in `board_issue` = board's own list, not backlog.** It is every
+issue on board, sprint issues included, which is what TAM's own code call
+board's own list; rendering it as-is would list every sprint issues second
+time and offer fill bar work already in sprint. So tree unassigned node,
+`UnassignedSprintName` ("Board backlog", deliberately not "Unassigned": that
+word already name assignee group two rows up in same tree), computed not
+read: `boardrepo.sprintDetails` build it as board's own list minus every key
+a sprint's journal-replayed scope hold, once journal replayed over every
+sprint ahead of it in same pass.
 
-**The delete confirmation's issue count says "at least" for three
-different reasons, never for one.** `notSynced` counts keys the sprint
-holds that the issue cache does not, so the true count is short by
-exactly them. `truncated` means the shared per-view card budget stopped
-this sprint's own list short, so the count cannot be checked against what
-is on screen. And the third is this view's own doing: a pending sprint
-move is replayed over the scope before the total is counted, so a card
-journaled out of the sprint but not yet committed has already left the
-count while Jira still holds it, and the reverse holds too, a card
-journaled in counts here before Commit has pushed it. Any one of the
-three turns the sentence into "at least N issues" with a line naming
-which; quoting an exact count that turns out to be low costs a sprint
-nobody can get back.
+**Delete confirmation issue count say "at least" for three different reasons,
+never for one.** `notSynced` count keys sprint hold that issue cache do not,
+so true count short by exactly them. `truncated` mean shared per-view card
+budget stopped this sprint's own list short, so count cannot be checked
+against what is on screen. Third = this view's own doing: pending sprint move
+replayed over scope before total counted, so card journaled out of sprint but
+not yet committed already left count while Jira still hold it, and reverse
+hold too, card journaled in count here before Commit pushed it. Any one of
+three turn sentence into "at least N issues" with line naming which; quoting
+exact count that turn out low cost a sprint nobody can get back.
 
-Schema version 7 adds `goal` to the `sprint` table, `RawSprint`,
-`backend.Sprint`, and `boardrepo.Sprint`. It does not back-fill: unlike
-version 5's `status_id`, nothing here clears a sync watermark, because a
-sprint is not read by an issue sync and its only refresh is the Boards
-view's own Refresh button. A sprint cached before version 7 keeps an
-empty goal until the next boards refresh rewrites it. Clearing a goal is
-sent as an explicit empty string on edit and never on create, because the
-partial-update rule that stops an empty box from wiping a real goal on
-`UpdateSprint` is also what makes a goal impossible to clear otherwise;
-`clearGoal` is how `sprints.Service.Edit` tells the two apart.
+Schema version 7 add `goal` to `sprint` table, `RawSprint`, `backend.Sprint`,
+`boardrepo.Sprint`. Not back-fill: unlike version 5 `status_id`, nothing here
+clear sync watermark, because sprint not read by issue sync and its only
+refresh = Boards view's own Refresh button. Sprint cached before version 7
+keep empty goal until next boards refresh rewrite it. Clearing goal sent as
+explicit empty string on edit and never on create, because partial-update
+rule that stop empty box from wiping real goal on `UpdateSprint` is also what
+make goal impossible to clear otherwise; `clearGoal` = how
+`sprints.Service.Edit` tell the two apart.
 
-The three management writes reach their lock the same way the two
-ceremonies do, `a.acquire(p.ID, "sprint")` in Go, but the frontend reaches
-them through `SyncContext.runQuietLock` rather than `runSprintCeremony`:
-that is the exception the "One lock, both ends" section already
-documents, and what it costs is written there, not repeated here.
+Three management writes reach their lock same way two ceremonies do,
+`a.acquire(p.ID, "sprint")` in Go, but frontend reach them through
+`SyncContext.runQuietLock` not `runSprintCeremony`: that = exception the "One
+lock, both ends" section already document, and what it cost written there,
+not repeated here.
 
 ## The write path (plan 1b)
 
-Edits and creates go through the journal in `tam.db` (`pending_change` and
+Edits and creates go through journal in `tam.db` (`pending_change` and
 `audit_log`, shared DDL and helpers in `core/journal`). `issuerepo.EditField`
-writes the row and journals the change with the row's `updated` as the base
-version; `CreateDraft` inserts a `TAM-NEW-n` row with status `Draft` and a
-create row holding the draft as JSON. Sync never deletes a draft and never
-overwrites a column with a pending edit. `internal/committer` pushes the
-journal: drafts first (POST, then rekey), then per-issue version checks and
-PUTs; an issue whose remote `updated` moved is held back with base, mine,
-and remote per field, and the user picks Override (rebase, push next time)
-or Keep remote (drop the edits, take Jira's row). Commit and sync exclude
-each other through `App.busy` and the shared reducer's `committing` state.
+write row and journal change with row `updated` as base version;
+`CreateDraft` insert `TAM-NEW-n` row with status `Draft` and create row
+holding draft as JSON. Sync never delete draft and never overwrite column
+with pending edit. `internal/committer` push journal: drafts first (POST,
+then rekey), then per-issue version checks and PUTs; issue whose remote
+`updated` moved held back with base, mine, remote per field, and user pick
+Override (rebase, push next time) or Keep remote (drop edits, take Jira row).
+Commit and sync exclude each other through `App.busy` and shared reducer
+`committing` state.
 
-The demo backend keeps writes in memory, hands out keys from 500, and
-stages one conflict: the first Commit of an edit to the curated story
-(`<project>-412`) is held back. Editable fields are summary, description,
-priority, labels, story points, and assignee; drafts can be tasks, stories,
-bugs, and requirements. Excel import and cross-project links are plan 1c.
+Demo backend keep writes in memory, hand out keys from 500, and stage one
+conflict: first Commit of edit to curated story (`<project>-412`) held back.
+Editable fields = summary, description, priority, labels, story points,
+assignee; drafts can be tasks, stories, bugs, requirements. Excel import and
+cross-project links = plan 1c.
 
 ## The write features (plan 1c)
 
-Import: the Backlog's Import button takes a CSV or XLSX (parsed by
-`core/importfile`, XTM's parser lifted out), maps columns to the nine draft
-fields (`internal/importer`), validates rows with file row numbers, and
-creates the valid rows as drafts in one transaction (`CreateDrafts`, audited
-"imported from <file>").
+Import: Backlog Import button take CSV or XLSX (parsed by `core/importfile`,
+XTM parser lifted out), map columns to nine draft fields
+(`internal/importer`), validate rows with file row numbers, and create valid
+rows as drafts in one transaction (`CreateDrafts`, audited "imported from
+<file>").
 
-A tenth column, Key, decides what a row does. Empty, the row creates a
-draft. Filled with an issue key or a `.../browse/KEY` URL, it journals edits
-to that cached issue instead (`EditFields`, one transaction, all or
-nothing), so a sheet exported from Jira round-trips rather than duplicating
-every row. On such a row the Type and Sprint cells are ignored (an issue's
-type is not editable, and a sprint is a board write EditFields cannot
-carry) and an empty cell means "leave this field alone", never "clear it";
-a value that already matches is not journaled, so re-importing an unchanged
-file leaves nothing pending. Summary is required only when no Key column is
-mapped. `SaveImportTemplate` writes a real workbook
-(`internal/importer/template.go`, excelize): an Issues sheet with the ten
-columns, a Type dropdown carrying the profile's own requirement type name,
-a Sprint dropdown carrying the profile's open sprints, five examples, and a
-"How to use" sheet; naming the file `.csv` in the save dialog writes the
-same columns as CSV. Assignee is the Jira username, not the display name.
+Tenth column, Key, decide what row do. Empty, row create draft. Filled with
+issue key or `.../browse/KEY` URL, it journal edits to that cached issue
+instead (`EditFields`, one transaction, all or nothing), so sheet exported
+from Jira round-trip rather than duplicate every row. On such row Type and
+Sprint cells ignored (issue type not editable, and sprint is board write
+EditFields cannot carry) and empty cell mean "leave this field alone", never
+"clear it"; value that already match not journaled, so re-import unchanged
+file leave nothing pending. Summary required only when no Key column mapped.
+`SaveImportTemplate` write real workbook (`internal/importer/template.go`,
+excelize): Issues sheet with ten columns, Type dropdown carrying profile's
+own requirement type name, Sprint dropdown carrying profile open sprints,
+five examples, and "How to use" sheet; naming file `.csv` in save dialog
+write same columns as CSV. Assignee = Jira username, not display name.
 
-Links: the Links tab's Add link form journals a
-link (entity type `link`, field `<type>|<direction>|<target>`); the
-repository merges pending links into the cached detail; the committer pushes
-link rows after edits with `POST /rest/api/2/issueLink` and drops the
-source's detail cache. Requirements are creatable; the demo asks for a
-Source field on them and answers lookups for the `XT-` keys its curated
-details reference. Link removal, links in the bulk sync, epics, and
-subtask parents are not in scope.
+Links: Links tab Add link form journal link (entity type `link`, field
+`<type>|<direction>|<target>`); repository merge pending links into cached
+detail; committer push link rows after edits with
+`POST /rest/api/2/issueLink` and drop source detail cache. Requirements
+creatable; demo ask for Source field on them and answer lookups for `XT-`
+keys its curated details reference. Link removal, links in bulk sync, epics,
+subtask parents not in scope.
 
 ## Phase 2: epics
 
-The Epics view groups the cache by parent: `issuerepo.EpicTree` reads a
-profile's epics and their children from `tam.db` in one call, in rank
-order, with per-epic progress counts (done count, points, done points),
-truncating past a 5,000-row cap. `parentKey` (label "Epic") is the seventh
-editable field, riding the same edit, journal, conflict, and commit
-machinery as the other six; the Jira backend maps it to the discovered
-Epic Link field. Creating an epic defaults its Epic Name to the summary
-when the draft leaves the field blank, so the user never has to know Epic
-Name exists. The two bound methods are `GetEpicTree` and `ListEpics`, both
-in `app_writes.go`. The tree's own styling is XTM's folder tree, reused
-class for class (`folder-tree`, `folder-item`, `folder-caret`, and the
-rest) out of `frontend/core/styles/primitives.css` rather than a second
-tree style.
+Epics view group cache by parent: `issuerepo.EpicTree` read profile epics and
+their children from `tam.db` in one call, in rank order, with per-epic
+progress counts (done count, points, done points), truncating past 5,000-row
+cap. `parentKey` (label "Epic") = seventh editable field, riding same edit,
+journal, conflict, commit machinery as other six; Jira backend map it to
+discovered Epic Link field. Creating epic default its Epic Name to summary
+when draft leave field blank, so user never have to know Epic Name exist. Two
+bound methods = `GetEpicTree` and `ListEpics`, both in `app_writes.go`. Tree's
+own styling = XTM folder tree, reused class for class (`folder-tree`,
+`folder-item`, `folder-caret`, rest) out of
+`frontend/core/styles/primitives.css` rather than second tree style.
 
-An incremental sync does not remove an epic that was deleted in Jira, so a
-stale epic keeps showing its children in the tree until a full sync clears
-it.
+Incremental sync not remove epic deleted in Jira, so stale epic keep showing
+its children in tree until full sync clear it.
 
-A CSV import's epic rows must come before the rows of any child that
-names them: a child's row is checked against the epics the file has
-defined so far, in the order the rows appear, not against the whole file
-or the cache.
+CSV import epic rows must come before rows of any child that name them:
+child row checked against epics file defined so far, in order rows appear,
+not against whole file or cache.
 
 ## Navigation and the menu bar
 
-The view tabs under the topbar are the visible navigation, mirrored from
-XTM's (`references/xtm-main-layout.png`). The View menu and the optional rail
-reach the same places.
+View tabs under topbar = visible navigation, mirrored from XTM
+(`references/xtm-main-layout.png`). View menu and optional rail reach same
+places.
 
-No view renders a title bar, the way none of XTM's do: the active tab already
-names the view and the topbar's profile select already names the project, so a
-heading repeating both only cost the content height. Each view names its own
-landmark (`aria-label` on its section) rather than borrowing an id from a
-heading that no longer exists, so the views are still distinguishable to a
-screen reader and to a test.
+No view render title bar, way none of XTM's do: active tab already name view
+and topbar profile select already name project, so heading repeating both
+only cost content height. Each view name its own landmark (`aria-label` on
+its section) rather than borrow id from heading that no longer exist, so
+views still distinguishable to screen reader and to test.
 
-The native menu bar carries the same list, the way XTM's View menu does:
-`menuViews` in `main.go` lists the views and each item emits `menu:view` with
-the view id, which `App.tsx` routes on. That list has to stay in step with
-`VIEWS` in `frontend/src/nav.ts` by hand; a native menu cannot read the
-frontend's.
+Native menu bar carry same list, way XTM View menu do: `menuViews` in
+`main.go` list views and each item emit `menu:view` with view id, which
+`App.tsx` route on. That list must stay in step with `VIEWS` in
+`frontend/src/nav.ts` by hand; native menu cannot read frontend's.
 
-The left nav rail is a second, optional way to reach the same places, off by
-default and toggled from View → Navigation Rail (Ctrl+B) or from its own close
-button. The preference is `show_nav_rail` in the shared settings, whose zero
-value is the hidden default. Wails renders a checkbox's tick from the value the
-item was built with, so `App.refreshMenu` rebuilds the whole menu rather than
-mutating it, and `startup` rebuilds once more because `main()` builds the first
-menu before the store exists.
+Left nav rail = second, optional way to reach same places, off by default and
+toggled from View → Navigation Rail (Ctrl+B) or from own close button.
+Preference = `show_nav_rail` in shared settings, whose zero value is hidden
+default. Wails render checkbox tick from value item was built with, so
+`App.refreshMenu` rebuild whole menu rather than mutate it, and `startup`
+rebuild once more because `main()` build first menu before store exist.
 
-The window icon and the executable's icon come from `build/windows/icon.ico`,
-not from `build/appicon.png`: Wails only generates the `.ico` when it is
-missing. After changing `appicon.png`, regenerate the `.ico` over the same six
-sizes Wails uses (256, 128, 64, 48, 32, 16) and copy the PNG to
-`frontend/src/assets/images/appicon.png`, which is what the About dialog shows.
+Window icon and executable icon come from `build/windows/icon.ico`, not from
+`build/appicon.png`: Wails only generate the `.ico` when missing. After
+changing `appicon.png`, regenerate the `.ico` over same six sizes Wails use
+(256, 128, 64, 48, 32, 16) and copy PNG to
+`frontend/src/assets/images/appicon.png`, which is what About dialog show.
 
 ## Issue types and sub-tasks
 
-The six logical types are task, epic, story, bug, requirement, and sub-task.
-Epic, story, and bug map to fixed Jira names; the requirement's is the
-per-profile setting `requirement_issue_type`; **the task and sub-task levels
-are discovered from the project**, because the instance names them.
-`jira.Backend.resolveTypes` reads the project's issue types once, caches them,
-and takes the first with `subtask: true` as the sub-task level and the first
-matching `taskAliases` ("task", "todo", "to do") as the task level. Jira's
-defaults are "Sub-task" and "Task"; an instance in the field calls them
-"Technical task" and "Todo", and asking that instance for "Task" found
-nothing. A level the project does not define is dropped from the sync scope
-rather than quoted into it: Jira rejects an entire query that names an
-issuetype the instance lacks, so asking would fail the sync instead of
-returning nothing.
+Six logical types = task, epic, story, bug, requirement, sub-task. Epic,
+story, bug map to fixed Jira names; requirement's = per-profile setting
+`requirement_issue_type`; **task and sub-task levels discovered from
+project**, because instance name them. `jira.Backend.resolveTypes` read
+project issue types once, cache them, and take first with `subtask: true` as
+sub-task level and first matching `taskAliases` ("task", "todo", "to do") as
+task level. Jira defaults = "Sub-task" and "Task"; instance in field call
+them "Technical task" and "Todo", and asking that instance for "Task" found
+nothing. Level project not define dropped from sync scope rather than quoted
+into it: Jira reject entire query that name issuetype instance lack, so
+asking would fail sync instead of return nothing.
 
-The sub-task chip shows the instance's own word, passed down as
-`TypeChip`'s `subtaskLabel` by whoever holds the profile rather than looked up
-in the chip, so the chip stays a pure render. A reader who sees "Technical
-task" in Jira should not see "Sub" here.
+Sub-task chip show instance's own word, passed down as `TypeChip`
+`subtaskLabel` by whoever hold profile rather than looked up in chip, so chip
+stay pure render. Reader who see "Technical task" in Jira should not see
+"Sub" here.
 
-`parentKey` means two different things by level. For a sub-task it is Jira's
-own `parent` field and an ordinary issue, never an epic or another sub-task,
-and it cannot be blank. For everything else it is the Epic Link and must be an
-epic. `validateParent` and the Jira create both branch on that.
+`parentKey` mean two different things by level. For sub-task it is Jira's own
+`parent` field and ordinary issue, never epic or another sub-task, and cannot
+be blank. For everything else it is Epic Link and must be epic.
+`validateParent` and Jira create both branch on that.
 
-A sub-task is not in `CREATABLE`: it cannot exist without a parent, so it is
-only drafted from the issue it belongs to, through the detail panel's
-"+ <sub-task type>" button, which opens the create dialog with the type locked
-and the parent stated rather than chosen.
+Sub-task not in `CREATABLE`: cannot exist without parent, so only drafted
+from issue it belong to, through detail panel "+ <sub-task type>" button,
+which open create dialog with type locked and parent stated rather than
+chosen.
 
 ## The detail sidebar
 
-The panel is XTM's (`references/xtm-detail-sidebar.png`): a dark instrument
-bar carrying the key and its status chip over a padded scrolling body, then
-the read-only facts in an 84px label grid, then collapsible sections under
-uppercase headings. It used to hide Links, Tests, and Activity behind tabs;
-XTM stacks them so a reader scrolls one column instead of hunting three.
-Fields is the only section open on mount, so the panel still starts short.
+Panel = XTM's (`references/xtm-detail-sidebar.png`): dark instrument bar
+carrying key and its status chip over padded scrolling body, then read-only
+facts in 84px label grid, then collapsible sections under uppercase
+headings. Used to hide Links, Tests, Activity behind tabs; XTM stack them so
+reader scroll one column instead of hunting three. Fields = only section open
+on mount, so panel still start short.
 
 ## The create dialog
 
-A draft's parent comes from context. `parentKey` is fixed and stated (a
-sub-task's parent, from the issue it was drafted from); `initialEpic` is a
-default the picker may change, seeded from the epic on screen: the selected
-row when it is an epic, else the epic it hangs off. Starting at "(none)" made
-every draft begun with an epic open an orphan that had to be reparented
-afterwards. A fixed parent wins over a seeded epic.
+Draft parent come from context. `parentKey` fixed and stated (sub-task
+parent, from issue it was drafted from); `initialEpic` = default picker may
+change, seeded from epic on screen: selected row when it is epic, else epic
+it hang off. Starting at "(none)" made every draft begun with epic open an
+orphan that had to be reparented afterwards. Fixed parent win over seeded
+epic.
 
+`NewIssueModal` draft one issue and say so: titled after type it is about to
+create, and subtitle carry offline-first sentence at full strength, in slot
+no error message can take (used to share footer with error, so explanation
+vanished exactly when confused user needed it). Success call `announce()`
+naming `TAM-NEW-n` key, since created row may be hidden by active filters.
 
-`NewIssueModal` drafts one issue and says so: it is titled after the type it
-is about to create, and its subtitle carries the offline-first sentence at
-full strength, in a slot no error message can take (it used to share the
-footer with the error, so the explanation vanished exactly when a confused
-user needed it). Success calls `announce()` naming the `TAM-NEW-n` key, since
-the created row may be hidden by the active filters.
+Submit wait for `GetCreateFields`. Drafting before required-field list land
+skipped every one of them and deferred failure to Jira 400 at Commit;
+*failed* read is different and still let user draft, which is intended
+degrade. List cached for ten minutes, so type toggle no longer re-flicker it.
 
-Submit waits for `GetCreateFields`. Drafting before the required-field list
-lands skipped every one of them and deferred the failure to a Jira 400 at
-Commit; a *failed* read is different and still lets the user draft, which is
-the intended degrade. The list is cached for ten minutes, so a type toggle no
-longer re-flickers it.
+`parentKey` = seventh draft field here as well as in detail panel, so story
+can be born under its epic rather than reparented afterwards. Epic never
+carry one, and switching type to epic drop it.
 
-`parentKey` is the seventh draft field here as well as in the detail panel,
-so a story can be born under its epic rather than reparented afterwards. An
-epic never carries one, and switching the type to epic drops it.
+Epics view open dialog with `lockType`, which fix draft to `initialType` and
+drop type select: "+ New epic" = statement not opening question, and dialog's
+own title state type. Backlog "+ New" leave select in place, so everything
+else drafted there.
 
-The Epics view opens the dialog with `lockType`, which fixes the draft to
-`initialType` and drops the type select: "+ New epic" is a statement, not an
-opening question, and the dialog's own title states the type. The Backlog's
-"+ New" leaves the select in place, so everything else is drafted there.
-
-A create-meta value's JSON shape comes from its own create-meta, in
-`shapeExtra`: an option id when Jira listed allowed values, the typed text as
-`{"value": …}` when it did not, and a comma list split into the array Jira
-wants. That is why an array field renders as a multi-select: a Jira array
-takes more than one value, and the form joins the chosen ids with a comma.
+Create-meta value JSON shape come from its own create-meta, in `shapeExtra`:
+option id when Jira listed allowed values, typed text as `{"value": …}` when
+it did not, and comma list split into array Jira want. That is why array
+field render as multi-select: Jira array take more than one value, and form
+join chosen ids with comma.
 
 ## The grids' columns
 
-Every track in both grids is a fixed width, including SUMMARY. A `1fr` summary
-made the whole table reflow the moment a row was selected, because the detail
-panel took 352px out of the pane: the one time the reader is looking closely
-at it is the one time it moved. The rows are `width: max-content;
-min-width: 100%`, so they size to their tracks, still fill a wider pane, and
-leave the slack at the right instead of redistributing it. When the pane is
-narrower than the tracks, the scroller takes over; in the Backlog that is
-`.issue-body`, which holds the header too, so a sideways scroll carries the
-column labels with the rows.
+Every track in both grids = fixed width, including SUMMARY. A `1fr` summary
+made whole table reflow moment row selected, because detail panel took 352px
+out of pane: one time reader look closely at it = one time it moved. Rows are
+`width: max-content;
+min-width: 100%`, so they size to their tracks, still
+fill wider pane, and leave slack at right instead of redistributing it. When
+pane narrower than tracks, scroller take over; in Backlog that is
+`.issue-body`, which hold header too, so sideways scroll carry column labels
+with rows.
 
-The table and the detail panel meet on a single 1px border with no gutter and
-no rounded seam, the way XTM's do, and the panel is dragged to width from a
-grip on its left edge (bounded 300-900px, remembered in the WebView's own
-localStorage since it is a per-machine reading preference, not a shared
-setting).
+Table and detail panel meet on single 1px border with no gutter and no
+rounded seam, way XTM's do, and panel dragged to width from grip on its left
+edge (bounded 300-900px, remembered in WebView's own localStorage since it is
+per-machine reading preference, not shared setting).
 
-The detail panel's title is the one issue key that links out to the instance
-(`IssueKeyLink`, opened in the user's own browser). The grids' key cells are
-plain text on purpose: a row selects on click, so a link inside one would put
-two actions on the same pixels.
+Detail panel title = one issue key that link out to instance
+(`IssueKeyLink`, opened in user's own browser). Grid key cells = plain text
+on purpose: row select on click, so link inside one would put two actions on
+same pixels.
 
 ## People and priorities
 
-The assignee field is a picker, not a text box, because the two halves of a
-user never matched: sync writes the *display name* into the issue row, and the
-write path sends `{"assignee": {"name": …}}`, so free text could only produce
-a value Jira accepts when the two happened to be identical. `AssigneePicker`
-stores the username and shows the display name.
+Assignee field = picker not text box, because two halves of user never
+matched: sync write *display name* into issue row, and write path send
+`{"assignee": {"name": …}}`, so free text could only produce value Jira
+accept when the two happened identical. `AssigneePicker` store username and
+show display name.
 
-`App.SearchUsers` asks Jira's *assignable* endpoint (the plain user search
-answers with people who hold no permission on the project, and picking one of
-those fails at Commit), caches the answer in `jira_user` in `tam.db`, and
-falls back to that cache when Jira cannot be reached. A blank query goes out
-as the wildcard Jira DC's assignable search wants, and is what seeds the
-cache. `CacheUsers` is additive: a narrow search must not empty the picker for
-the next one, so rows go when the profile is purged, not when a search misses
-them.
+`App.SearchUsers` ask Jira *assignable* endpoint (plain user search answer
+with people who hold no permission on project, and picking one of those fail
+at Commit), cache answer in `jira_user` in `tam.db`, and fall back to that
+cache when Jira cannot be reached. Blank query go out as wildcard Jira DC
+assignable search want, and is what seed cache. `CacheUsers` additive: narrow
+search must not empty picker for next one, so rows go when profile purged,
+not when search miss them.
 
-Priority is the instance's own list through `App.ListPriorities`. Both
-pickers degrade to the text input they replaced when their lookup fails, the
-same shape the create dialog uses for a failed create-meta read: a lookup that
-cannot reach its list must not be the reason an issue cannot be assigned.
+Priority = instance's own list through `App.ListPriorities`. Both pickers
+degrade to text input they replaced when lookup fail, same shape create
+dialog use for failed create-meta read: lookup that cannot reach its list
+must not be reason issue cannot be assigned.
 
 ## One lock, both ends
 
-Go holds a single per-profile lock (`App.acquire`) for a sync, a commit, an
-import, and a boards refresh alike, so whichever starts second is refused.
-The frontend models the same invariant in the shared sync reducer, and the two
-have to agree: the Boards view's Refresh used to be a plain mutation outside
-the reducer, so the shell stayed `idle`, kept offering Sync, and Go refused it
-with "a sync is already running for this profile" on a profile whose status
-still read "not synced yet". It runs through `SyncContext.runBoardsRefresh`
-now, which takes the same lock the sync does. **Anything new that calls a
-bound method taking `acquire` has to take the frontend's lock too.**
+Go hold single per-profile lock (`App.acquire`) for sync, commit, import,
+boards refresh, sprint operation and sprint report alike, so whichever start
+second refused. Frontend model same invariant in shared sync reducer, and the
+two must agree: Boards view Refresh used to be plain mutation outside
+reducer, so shell stayed `idle`, kept offering Sync, and Go refused it with
+"a sync is already running for this profile" on profile whose status still
+read "not synced yet". Run through `SyncContext.runBoardsRefresh` now, which
+take same lock sync do. **Anything new that call bound method taking
+`acquire` must take frontend lock too.**
 
-There is one deliberate exception, and it is narrower than it looks.
-`SyncContext.runQuietLock` takes the same `statusRef` guard every other `run*`
-takes, so a sync, a commit, a boards refresh and a ceremony all still refuse
-against it, but it dispatches no progress actions, so the reducer stays
-`idle`. Creating, editing and deleting a sprint go through it: those are one
-short call each, and flashing the whole app's sync banner for a rename would
-say something untrue about what is happening.
+One deliberate exception, narrower than it look. `SyncContext.runQuietLock`
+take same `statusRef` guard every other `run*` take, so sync, commit, boards
+refresh and ceremony all still refuse against it, but it dispatch no progress
+actions, so reducer stay `idle`. Create, edit, delete sprint go through it:
+those are one short call each, and flashing whole app sync banner for rename
+would say something untrue about what is happening.
 
-What that costs is worth knowing, because it is the same shape as the bug the
-rule above was written about. For the length of the call the shell's Sync and
-Commit buttons stay enabled and do nothing when pressed, and the profile
-picker stays enabled, because all three read `state.status` rather than the
-ref. What keeps a user away from them is the dialog holding focus, which is
-why those dialogs refuse Escape while their write is in flight rather than
-merely disabling their own buttons. A fourth quiet write would have to earn
-the same treatment.
+What that cost worth knowing, because it is same shape as bug rule above was
+written about. For length of call, shell Sync and Commit buttons stay enabled
+and do nothing when pressed, and profile picker stay enabled, because all
+three read `state.status` rather than ref. What keep user away from them =
+dialog holding focus, which is why those dialogs refuse Escape while their
+write in flight rather than merely disabling own buttons. Fourth quiet write
+would have to earn same treatment.
 
-`SyncBoards` acquires under its own name, so a refusal says which operation is
-actually running. The boards pass is also given the progress sink now: it
-walks every board's columns, sprints, and each sprint's issue keys, which
-takes minutes on a real project, and a standalone Refresh used to pass `nil`
-and report nothing anywhere.
+**Sprint report not quiet write and not go through `runQuietLock`.**
+`SyncContext.runReport` dispatch `SYNC_START` and `SYNC_END` way
+`runBoardsRefresh` do, so shell genuinely enter running state and Sync,
+Commit, profile picker all disabled. Three sprint management writes get away
+with staying quiet only because each is one short call behind modal dialog
+holding focus; report is minutes long, have no modal, and user look straight
+at window, so leaving Sync enabled and inert would have been exact bug rule
+above was written about. What status bar say while report run come from
+report's own frames through `reportText.progressStage`, so it read "Reading
+Sprint 10 for the velocity table" rather than borrow sync sentence. Reducer
+internal field still called `syncing`; nothing render that word.
 
-`SyncIssues` and `SyncBoards` log on the way in as well as out. A run that
-never returns used to leave no trace at all, so the log could not say whether
-a call had even reached Go.
+**`SyncContext` carry `running` value beside `statusRef`, and the two not
+redundant.** `statusRef` is ref because it is synchronous guard: state update
+would be render too late and two operations could both pass it. But it only
+ever hold `idle`, `syncing` or `committing`, and every one of `runSync`,
+`runBoardsRefresh`, `runSprintCeremony`, `runQuietLock` and `runReport` set
+`syncing`, so frontend could not say what was actually holding its own lock.
+Told user sync was running when holder was their own previous report, and
+Reports view rendered whichever progress frame was in context as if it were
+its own, so sync's issue counter appeared under report's copy. `running` hold
+`acquire` names spelled Go's way, though only five this client can take:
+`import` is Go's sixth and import dialog not run through this context, so
+putting it in type would claim state that can never be set. Set and cleared
+in same two places ref move, and is state rather than ref because view
+re-render on it: refusal word itself from it, and Reports view show progress
+frame only while `running` is `"report"`.
+
+`SyncBoards` acquire under its own name, so refusal say which operation
+actually running. Boards pass also given progress sink now: it walk every
+board columns, sprints, and each sprint issue keys, which take minutes on
+real project, and standalone Refresh used to pass `nil` and report nothing
+anywhere.
+
+`SyncIssues` and `SyncBoards` log on way in as well as out. Run that never
+return used to leave no trace at all, so log could not say whether call had
+even reached Go.
 
 ## The boards pass and the board's shape
 
-The pass is one request per board's column config, per page of its sprint
-list, and per page of the issue keys of every scope it holds: the board's own
-list plus each active or future sprint. Two things keep that from dominating
-the sync, and both were measured against a real instance where one board took
-66 seconds on its own:
+Pass = one request per board column config, per page of its sprint list, and
+per page of issue keys of every scope it hold: board's own list plus each
+active or future sprint. Two things keep that from dominating sync, both
+measured against real instance where one board took 66 seconds on its own:
 
-- **The Agile page size** (`pageAgileIssues`, 500). At 50 a page a board's own
-  issue list, which is every issue on the board, cost one round trip per 50
-  keys. Both paging loops advance by what actually came back, so an instance
-  that clamps `maxResults` lower is handled by the same arithmetic.
-- **The project narrowing.** A board's filter is not bounded by a project: the
-  board above held 8,485 cards while the project being synced had 38. Every
-  scope is read with `jql=project = "KEY"`, which the Agile endpoints AND with
-  the board's own filter. Only that project's issues are ever in the cache, so
-  a key outside it could not be drawn anyway.
+- **Agile page size** (`pageAgileIssues`, 500). At 50 a page, board's own
+  issue list, which is every issue on board, cost one round trip per 50 keys.
+  Both paging loops advance by what actually came back, so instance that
+  clamp `maxResults` lower handled by same arithmetic.
+- **Project narrowing.** Board filter not bounded by project: board above
+  held 8,485 cards while project being synced had 38. Every scope read with
+  `jql=project = "KEY"`, which Agile endpoints AND with board's own filter.
+  Only that project issues ever in cache, so key outside it could not be
+  drawn anyway.
 
-A board that still takes over five seconds names itself in the log with its
-sprint and card counts.
+Board that still take over five seconds name itself in log with its sprint
+and card counts.
 
-The third saving is **whose boards get synced at all**. Jira's board list
-answers with every board whose *filter* mentions the project, which includes
-boards another team owns: the 8,485-card board above belongs to a different
-project entirely. `ownBoards` keeps only the boards whose own
-`location.projectKey` is this project, counts the rest in the summary's
-`Foreign`, and names them in the log. A board whose home the instance did not
-report is kept, so an instance that sends no location does not lose every
-board. The per-profile setting `boards_all_projects` keeps them all, for a
-profile that genuinely works across a programme board.
+Third saving = **whose boards get synced at all**. Jira board list answer
+with every board whose *filter* mention project, which include boards another
+team own: 8,485-card board above belong to different project entirely.
+`ownBoards` keep only boards whose own `location.projectKey` is this project,
+count rest in summary `Foreign`, and name them in log. Board whose home
+instance did not report is kept, so instance that send no location not lose
+every board. Per-profile setting `boards_all_projects` keep them all, for
+profile that genuinely work across programme board.
 
-The columns are Jira's own: `BoardColumns` reads the board's configuration and
-keeps each column's status ids, and `placeCard` puts a card in the column
-whose ids contain the card's `status_id` (schema 5 added that column; matching
-on the status *name* would break on any instance that renames one). A status
-no column collects is counted as `Unmapped` rather than drawn, which is what
-the board's unmapped line reports. Re-syncing a board therefore picks up a
-column added or renamed in Jira with no further work.
+Columns = Jira's own: `BoardColumns` read board configuration and keep each
+column status ids, and `placeCard` put card in column whose ids contain
+card's `status_id` (schema 5 added that column; matching on status *name*
+would break on any instance that rename one). Status no column collect
+counted as `Unmapped` rather than drawn, which is what board unmapped line
+report. Re-syncing board therefore pick up column added or renamed in Jira
+with no further work.
 
 ## A drop asks for a column, not a status
 
-A Jira board column collects several statuses: a Done column commonly holds
-Resolved and Closed, and an instance that has migrated a workflow holds the
-old status beside the new one. Only one of them is usually reachable from
-where a card is now.
+Jira board column collect several statuses: Done column commonly hold
+Resolved and Closed, and instance that migrated workflow hold old status
+beside new one. Only one of them usually reachable from where card is now.
 
-So the push is given the whole column, not the one id the drop journaled.
-`BoardOrder.ColumnStatuses` returns every status sharing the dropped-on
-status's column, that one first, and `Transition` walks them in order and
-fires the first the issue's workflow offers. Keeping the journaled status
-first means a reachable target is still preferred over its siblings, and a
-refusal still names the status the user actually dropped on.
+So push given whole column, not one id drop journaled.
+`BoardOrder.ColumnStatuses` return every status sharing dropped-on status
+column, that one first, and `Transition` walk them in order and fire first
+the issue workflow offer. Keeping journaled status first mean reachable
+target still preferred over its siblings, and refusal still name status user
+actually dropped on.
 
-The journal format is untouched: it still holds one `id|Name`, and the
-resolution happens at commit time, which is the only moment the workflow is
-knowable. `App.CanTransition` builds the same candidate set, so the drop's
-optimistic check and the push agree about what the drop meant.
+Journal format untouched: still hold one `id|Name`, and resolution happen at
+commit time, only moment workflow is knowable. `App.CanTransition` build same
+candidate set, so drop optimistic check and push agree about what drop meant.
 
 ## The board grid
 
-The header row anchors as a **row** (`.board-columns-head`, sticky with its
-own background), not as individual sticky cells: sticking the cells alone left
-the 12px gaps between them transparent and cards scrolled through the header.
+Header row anchor as **row** (`.board-columns-head`, sticky with own
+background), not as individual sticky cells: sticking cells alone left 12px
+gaps between them transparent and cards scrolled through header.
 
-The toolbar's filter is a reading aid over the drawn board, not a query
-(`lib/boardFilter.ts`): it matches a card's key, assignee, or issue type, and
-never refetches, so clearing it costs nothing. It keeps every column and lane
-so a filter never reads as a lost column, recomputes the column counts from
-what survives, and zeroes overflow rather than guessing at cards a cap left
-out. The board's own totals (unmapped, notSynced, donePoints) describe the
-board and are left alone. `BoardBody` takes the filtered view beside the query
-result: the query still says whether the board loaded, failed, or is empty.
+Toolbar filter = reading aid over drawn board, not query
+(`lib/boardFilter.ts`): match card key, assignee, or issue type, and never
+refetch, so clearing it cost nothing. Keep every column and lane so filter
+never read as lost column, recompute column counts from what survive, and
+zero overflow rather than guess at cards a cap left out. Board's own totals
+(unmapped, notSynced, donePoints) describe board and left alone. `BoardBody`
+take filtered view beside query result: query still say whether board loaded,
+failed, or is empty.
 
-
-The column header row and each lane's row are separate elements, so they only
-line up because both are laid out on **one grid template**:
-`repeat(var(--board-cols), minmax(--board-col-w, 1fr))`, with the column count
-set on `.board-scroll` from the view. A flex row cannot do this, since each
-row sizes its own items and a lane holding a long card grew wider than the
-header above it. The cells carry `min-width: 0` so a wide card cannot push its
-track open. `minmax` is also what makes the columns share the pane's width and
-stop at a floor, past which `.board-scroll` scrolls sideways.
+Column header row and each lane row = separate elements, so they only line up
+because both laid out on **one grid template**:
+`repeat(var(--board-cols), minmax(--board-col-w, 1fr))`, with column count
+set on `.board-scroll` from view. Flex row cannot do this, since each row
+size its own items and lane holding long card grew wider than header above
+it. Cells carry `min-width: 0` so wide card cannot push its track open.
+`minmax` also what make columns share pane width and stop at floor, past
+which `.board-scroll` scroll sideways.
 
 ## Layout and scrolling
 
-The window never scrolls as a whole. `.app` is one flex chain down to the
-panes, and only three boxes scroll: the Epics tree, the Backlog's table body,
-and the detail panel, each inside its own bounded card. `.main` is
-`overflow: hidden`, so every level between it and a scroller carries
-`min-height: 0` (a flex child defaults to `min-height: auto` and will not
-shrink below its content, so one missing declaration lets the table push the
-pager off the bottom of the window). Nothing sizes itself off
-`calc(100vh - <a guess>)` any more; that was only ever right at one window
-height. `references/xtm-main-layout.png` is the reference for this
-arrangement, and the nav rail stays TAM's own in place of XTM's view tabs.
+Window never scroll as whole. `.app` = one flex chain down to panes, and only
+three boxes scroll: Epics tree, Backlog table body, detail panel, each inside
+own bounded card. `.main` is `overflow: hidden`, so every level between it
+and scroller carry `min-height: 0` (flex child default to
+`min-height: auto` and will not shrink below its content, so one missing
+declaration let table push pager off bottom of window). Nothing size itself
+off `calc(100vh - <a guess>)` any more; that was only ever right at one
+window height. `references/xtm-main-layout.png` = reference for this
+arrangement, and nav rail stay TAM's own in place of XTM view tabs.
 
-Anything rendered directly in `.main` has to say how it behaves in a bounded
-box, which is why the placeholder and the startup error carry their own
+Anything rendered directly in `.main` must say how it behave in bounded box,
+which is why placeholder and startup error carry own
 `min-height: 0; overflow: auto`.
 
-The Backlog's pager is pinned to the floor of the table card: rows per page,
-first / previous / a typed page number / next / last, and the range on the
-right. The page box holds a draft string separate from the page itself, with
-`null` meaning "not editing", because binding it straight to `page + 1` made
-clearing it snap back to "1" and typing "23" over it produce "123".
+Backlog pager pinned to floor of table card: rows per page, first / previous
+/ typed page number / next / last, and range on right. Page box hold draft
+string separate from page itself, with `null` meaning "not editing", because
+binding it straight to `page + 1` made clearing it snap back to "1" and
+typing "23" over it produce "123".
 
 ## The tables
 
-Both grids size their key column from the keys on screen rather than from a
-fixed pixel track (`frontend/src/lib/keyColumn.ts`, handed to the table as
-`--issue-key-w` / `--epic-key-w`). A fixed track held about eleven characters
-and Jira DC allows a ten-character project key, so a legal key overflowed: in
-the Backlog it wrapped inside a 34px row and the type chip painted over it, in
-the Epics tree it ran straight over the summary. One width per table, not per
-row: each row is its own grid container, so a `max-content` track would size
-every row to its own key and the columns would stop lining up. Every cell in
-both grids now clips with an ellipsis and carries a `title`, so a shortened
-value never reads as a complete one.
+Both grids size key column from keys on screen rather than from fixed pixel
+track (`frontend/src/lib/keyColumn.ts`, handed to table as `--issue-key-w` /
+`--epic-key-w`). Fixed track held about eleven characters and Jira DC allow
+ten-character project key, so legal key overflowed: in Backlog it wrapped
+inside 34px row and type chip painted over it, in Epics tree it ran straight
+over summary. One width per table, not per row: each row is own grid
+container, so `max-content` track would size every row to its own key and
+columns would stop lining up. Every cell in both grids now clip with ellipsis
+and carry `title`, so shortened value never read as complete one.
 
-The Backlog is sortable. `IssueQuery` carries `sort` and `desc`, and
-`issuerepo.sortColumns` maps a sort key to its SQL; a name outside that
-whitelist falls back to rank order, so nothing from the frontend reaches the
-query. Sorting is server-side because the grid is paged: the frontend holds 25
-rows out of a project's thousands. A header click goes ascending, descending,
-then back to rank; drafts stay pinned to the top under every sort, and blanks
-sort last in both directions. The grid states its order in a line above the
-rows, since rank order is the point of a backlog and was otherwise invisible.
+Backlog sortable. `IssueQuery` carry `sort` and `desc`, and
+`issuerepo.sortColumns` map sort key to its SQL; name outside that whitelist
+fall back to rank order, so nothing from frontend reach query. Sorting
+server-side because grid paged: frontend hold 25 rows out of project
+thousands. Header click go ascending, descending, then back to rank; drafts
+stay pinned to top under every sort, and blanks sort last in both directions.
+Grid state its order in line above rows, since rank order is point of backlog
+and was otherwise invisible.
 
-The Epics tree's row kinds all emit the same seven cells now. An epic header
-used to fold key and summary into one spanning cell while a child split them,
-and with the status and points tracks sized `auto` in each row's own grid,
-column 5 started up to 110px apart between the two; those tracks are fixed for
-that reason, since a grid cannot see its siblings without `subgrid`.
+Epics tree row kinds all emit same seven cells now. Epic header used to fold
+key and summary into one spanning cell while child split them, and with
+status and points tracks sized `auto` in each row's own grid, column 5
+started up to 110px apart between the two; those tracks fixed for that
+reason, since grid cannot see its siblings without `subgrid`.
 
 ## Profiles
 
-Manage Profiles is XTM's dialog, feature for feature: the profile list on the
-left with the launch-default star, the selected profile's `ProfileForm` on the
-right, Create and Import above the list, Export and Delete in the open
-profile's footer, and the start state that opens on nothing so the active
-connection is never edited by accident. The markup and the styles are the
-shared ones in `frontend/core/styles/primitives.css`, not a second copy.
+Manage Profiles = XTM dialog, feature for feature: profile list on left with
+launch-default star, selected profile `ProfileForm` on right, Create and
+Import above list, Export and Delete in open profile footer, and start state
+that open on nothing so active connection never edited by accident. Markup
+and styles = shared ones in `frontend/core/styles/primitives.css`, not second
+copy.
 
-The form drops the fields that only mean something to Xray: the Kiwi/Xray
-backend selector, the bug issue type, the bug project, and the cross-project
-sources. `App.UpdateProfile` reads those off the saved row and writes them
-back unchanged, so editing a profile in TAM never resets what XTM configured
-on it. In their place the form carries TAM's own requirement issue type,
-which lives in `tam.db` as the per-profile setting `requirement_issue_type`
-and so is loaded and saved around the profile write, not with it.
+Form drop fields that only mean something to Xray: Kiwi/Xray backend
+selector, bug issue type, bug project, cross-project sources.
+`App.UpdateProfile` read those off saved row and write them back unchanged,
+so editing profile in TAM never reset what XTM configured on it. In their
+place form carry TAM's own requirement issue type, which live in `tam.db` as
+per-profile setting `requirement_issue_type` and so is loaded and saved
+around profile write, not with it.
 
-Export writes the same credential-free JSON shape XTM's exporter does, so a
-file from either app imports into the other; an imported profile has no token
-until one is entered. A Kiwi profile file is refused.
+Export write same credential-free JSON shape XTM exporter do, so file from
+either app import into other; imported profile have no token until one
+entered. Kiwi profile file refused.
 
 ## Layout
 
@@ -987,10 +1111,14 @@ until one is entered. A Kiwi profile file is refused.
     app_sprints.go       the two sprint ceremonies, SuggestSprintDates, and PendingInSprint
     app_sprintmanage.go  Create, Edit and Delete sprint, and ListBoardSprintDetails for the
                           Sprints view's tree, all under the "sprint" lock name the ceremonies use
-    internal/tamstore/   TAM's own SQLite file (schema version 7: issue (with status_id), issue_link,
+    app_reports.go       GetSprintReport, the one binding the Reports view calls, and
+                          CancelSprintReport, which is how a view that has been left cancels a read
+                          still holding the profile lock; both under the "report" lock name
+    internal/tamstore/   TAM's own SQLite file (schema version 8: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
-                          sprint (with goal, added at version 7), plus the shared journal tables
-                          pending_change and audit_log)
+                          sprint (with goal, added at version 7, and complete_date, added at
+                          version 8), sprint_report (a sprint's saved report, added at version 8),
+                          plus the shared journal tables pending_change and audit_log)
     internal/backend/    IssueBackend and BoardBackend seams and DTOs; backend/jira on core/jira,
                           backend/demo on internal/demo
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile
@@ -1017,7 +1145,21 @@ until one is entered. A Kiwi profile file is refused.
                           Create, Edit and Delete themselves, and suggest.go the start and create
                           dialogs' suggested name and dates
     internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
-                          datetime format, shared by the ceremonies and the suggestion
+                          datetime format, shared by the ceremonies, the suggestion, and every
+                          timestamp the sprint report reads off a changelog
+    internal/donerule/   the board's own definition of finished, a status its last column
+                          collects, shared by the sprint completion and the sprint report;
+                          backend.IsDone, the status-name rule, is a different question and
+                          stays where it is
+    internal/reports/    the sprint report's reconstruction: reports.go is Build and the unit
+                          it counts in, series.go the rewind and the day by day walk, velocity.go
+                          which six closed sprints a velocity table covers and what one row of
+                          it says
+    internal/sprintreport/  the orchestration around internal/reports, kept out of it so that
+                          package stays pure: build.go is the one exported entry point, series.go
+                          the store-or-fetch rule a closed sprint is served by, fetch.go the paged
+                          changelog search with its progress frames, velocity.go the table
+                          assembled from stored series plus whatever has to be read
     internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
                           InRead for a deferred read-only transaction, and the Querier interface a
                           read helper takes so it can run on the handle or inside either kind
@@ -1038,7 +1180,13 @@ until one is entered. A Kiwi profile file is refused.
       src/contexts/      SyncContext on the shared sync reducer; runSprintCeremony is the reducer
                           path StartSprint and CompleteSprint run through, beside runBoardsRefresh;
                           runQuietLock takes the same lock without the banner, for the three
-                          sprint management writes
+                          sprint management writes; runReport is the sprint report's path, which
+                          does show the banner, and `running` is what lets a refusal name the
+                          operation actually holding the lock
+      src/lib/reportText.ts  every sentence the sprint report prints: the summary, the floor and
+                          removal qualifications, the method line, the four unavailable reasons,
+                          the unit and its reason, and the progress wording, all testable without
+                          rendering anything and all reused by Phase 5's Rituals
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands
@@ -1061,7 +1209,10 @@ until one is entered. A Kiwi profile file is refused.
                           goal, shown only while a sprint is expanded), SprintFillBar,
                           CreateSprintModal, EditSprintModal, SprintDraftForm (the four fields the
                           create and edit dialogs share), useSprintSelection (the tree's own
-                          multi-select, the board's under a different name)
+                          multi-select, the board's under a different name), ReportsView (the two
+                          pickers, the eight states a report can be in, and the rebuild),
+                          SprintSummary (the sentence, its qualification, and the method line),
+                          VelocityTable (the last six closed sprints, each row with its own unit)
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands
@@ -1072,20 +1223,20 @@ until one is entered. A Kiwi profile file is refused.
     cd frontend; npx vitest run    # frontend tests
     cd frontend; npm run build     # tsc + vite build
 
-`npm install` runs at the repo root (npm workspaces). `frontend:install` in
-wails.json does that for you.
+`npm install` run at repo root (npm workspaces). `frontend:install` in
+wails.json do that for you.
 
 ## Conventions
 
-Same as XTM's: logic in `internal/`, `app.go` only adapts it to Wails; Jira
-is the system of record; credentials go to the OS credential manager only;
-`TODO(tam): desc` marks planned work. TAM creates Jira profiles, which core
-stores with backend `xray`; Kiwi profiles from XTM are hidden. UI text uses
-no em dashes.
+Same as XTM's: logic in `internal/`, `app.go` only adapt it to Wails; Jira =
+system of record; credentials go to OS credential manager only;
+`TODO(tam): desc` mark planned work. TAM create Jira profiles, which core
+store with backend `xray`; Kiwi profiles from XTM hidden. UI text use no em
+dashes.
 
-Sync scope is `project = KEY AND issuetype in (Task, Epic, Story, Bug, <requirement
-type>)` plus the profile's scope JQL; incremental syncs add `updated >=` the last
-sync minus an hour. The requirement type name is the per-profile setting
-`requirement_issue_type`. The Sprint and Epic Link field shapes are marked
-`NOTE(tam)` in `internal/backend/jira/fields.go` until verified on a real
+Sync scope = `project = KEY AND issuetype in (Task, Epic, Story, Bug, <requirement
+type>)` plus profile scope JQL; incremental syncs add `updated >=` last sync
+minus an hour. Requirement type name = per-profile setting
+`requirement_issue_type`. Sprint and Epic Link field shapes marked
+`NOTE(tam)` in `internal/backend/jira/fields.go` until verified on real
 instance.

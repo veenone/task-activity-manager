@@ -3,12 +3,22 @@
 // shared profiles.db. Version 1 carries no app tables. Version 2 adds the
 // issue tables, version 3 the shared journal tables, version 4 the
 // cached Jira user list, version 5 the board tables and the issue's status
-// id, version 6 re-keys the sprint table by board, and version 7 adds the
-// sprint's goal.
+// id, version 6 re-keys the sprint table by board, version 7 adds the
+// sprint's goal, version 8 adds the sprint_report table and the sprint's
+// complete_date, and version 9 adds local ritual documents. Version 10 adds
+// ritual_document's issues_json column and converts version 9's bare key
+// arrays into it as {"key","remark"} objects, so a draft written before
+// per-issue remarks existed keeps its issues and their order. Version 11
+// repeats that same column add and conversion, guarded to be a no-op on a
+// healthy version 10 database: some development builds recorded the version
+// 10 stamp before the issues_json migration actually ran, and this repairs
+// those files without re-running the conversion where it already happened.
 package tamstore
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -26,9 +36,14 @@ import (
 // migration for the same reason: CREATE TABLE IF NOT EXISTS leaves a table
 // that already exists exactly as it is, primary key included. Version 7
 // adds the sprint's goal, the same shape as version 5's column add.
+// Version 8 adds two things: sprint_report, a plain CREATE TABLE IF NOT
+// EXISTS that needs no migration entry at all, and the sprint's
+// complete_date, a column add in version 7's own shape.
+// Version 9 adds ritual_document through the same idempotent base DDL path
+// as sprint_report.
 var Schema = store.Schema{
-	Version: 7,
-	Base:    baseDDL + sprintDDL + journal.DDL,
+	Version: 11,
+	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -95,8 +110,128 @@ var Schema = store.Schema{
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "sprint", "goal TEXT NOT NULL DEFAULT ''")
 		},
+	}, {
+		Version: 8,
+		// sprint_report is a brand new table, so it needs nothing here:
+		// sprintReportDDL is already part of Base, and CREATE TABLE IF NOT
+		// EXISTS picks it up on an older database's next open the same way
+		// the journal tables and the user cache did at versions 3 and 4.
+		// complete_date is the one piece of this version that does need a
+		// migration entry, for the same reason goal did at version 7: a
+		// table that already exists is not touched by CREATE TABLE IF NOT
+		// EXISTS, primary key or columns alike. On a database still behind
+		// version 6, migration 6 runs first and rebuilds sprint from
+		// sprintDDL, which by then already carries this column, so this add
+		// lands as the duplicate-column no-op AddColumnIfMissing treats as
+		// success.
+		//
+		// Nothing here backfills a sprint cached before this version, the
+		// same as goal before it: a sprint is not read by an issue sync, so
+		// complete_date stays empty until the Boards view's own Refresh
+		// rewrites it.
+		Apply: func(db *sql.DB) error {
+			return store.AddColumnIfMissing(db, "sprint", "complete_date TEXT NOT NULL DEFAULT ''")
+		},
+	}, {
+		Version: 10,
+		// ritual_document arrived whole at version 9, so Base created it and
+		// no migration was needed. issues_json is a column on a table that now
+		// exists, which CREATE TABLE IF NOT EXISTS will not touch, so it needs
+		// the same treatment goal and complete_date got at versions 7 and 8.
+		//
+		// The old issue_keys_json is left in place and unread rather than
+		// dropped: SQLite makes column removal a table rebuild, and a rebuild
+		// here would risk a user's unpublished drafts to reclaim nothing.
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "ritual_document", "issues_json TEXT NOT NULL DEFAULT '[]'"); err != nil {
+				return err
+			}
+			return convertRitualIssueKeys(db)
+		},
+	}, {
+		Version: 11,
+		// Some development builds recorded v10 before adding issues_json.
+		// Repair those files without restoring deliberately cleared selections
+		// in healthy v10 databases, where the legacy keys may still be present.
+		Apply: func(db *sql.DB) error {
+			var exists int
+			if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('ritual_document') WHERE name = 'issues_json'`).Scan(&exists); err != nil {
+				return fmt.Errorf("check ritual issue column: %w", err)
+			}
+			if exists != 0 {
+				return nil
+			}
+			if err := store.AddColumnIfMissing(db, "ritual_document", "issues_json TEXT NOT NULL DEFAULT '[]'"); err != nil {
+				return err
+			}
+			return convertRitualIssueKeys(db)
+		},
 	}},
 	Indexes: indexDDL,
+}
+
+// convertRitualIssueKeys rewrites version 9's bare key array into version 10's
+// objects, so a draft written before per-issue remarks existed keeps its issues
+// and their order. Only rows that have not already been converted are touched.
+func convertRitualIssueKeys(db *sql.DB) error {
+	rows, err := db.Query(`SELECT profile_id, board_id, sprint_id, ritual_type, issue_keys_json
+		FROM ritual_document WHERE issues_json = '[]' AND issue_keys_json <> '[]'`)
+	if err != nil {
+		return fmt.Errorf("read ritual issue keys: %w", err)
+	}
+	type target struct {
+		profileID  string
+		boardID    int
+		sprintID   int
+		ritualType string
+		issuesJSON string
+	}
+	var targets []target
+	for rows.Next() {
+		var t target
+		var keysJSON string
+		if err := rows.Scan(&t.profileID, &t.boardID, &t.sprintID, &t.ritualType, &keysJSON); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan ritual issue keys: %w", err)
+		}
+		var keys []string
+		if err := json.Unmarshal([]byte(keysJSON), &keys); err != nil {
+			// A row nobody can parse is left exactly as it is rather than
+			// emptied: the draft is the user's unpublished work.
+			continue
+		}
+		converted := make([]struct {
+			Key    string `json:"key"`
+			Remark string `json:"remark"`
+		}, 0, len(keys))
+		for _, k := range keys {
+			converted = append(converted, struct {
+				Key    string `json:"key"`
+				Remark string `json:"remark"`
+			}{Key: k})
+		}
+		encoded, err := json.Marshal(converted)
+		if err != nil {
+			rows.Close()
+			return fmt.Errorf("encode ritual issues: %w", err)
+		}
+		t.issuesJSON = string(encoded)
+		targets = append(targets, t)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("iterate ritual issue keys: %w", err)
+	}
+	rows.Close()
+
+	for _, t := range targets {
+		if _, err := db.Exec(`UPDATE ritual_document SET issues_json = ?
+			WHERE profile_id = ? AND board_id = ? AND sprint_id = ? AND ritual_type = ?`,
+			t.issuesJSON, t.profileID, t.boardID, t.sprintID, t.ritualType); err != nil {
+			return fmt.Errorf("write ritual issues for %s: %w", t.ritualType, err)
+		}
+	}
+	return nil
 }
 
 const baseDDL = `
@@ -189,22 +324,66 @@ CREATE TABLE IF NOT EXISTS board_issue (
 // board whose filter reaches it, and each board caches its own copy.
 const sprintDDL = `
 CREATE TABLE IF NOT EXISTS sprint (
-	profile_id TEXT NOT NULL,
-	id         INTEGER NOT NULL,
-	board_id   INTEGER NOT NULL,
-	name       TEXT NOT NULL DEFAULT '',
-	state      TEXT NOT NULL DEFAULT '',
-	start_date TEXT NOT NULL DEFAULT '',
-	end_date   TEXT NOT NULL DEFAULT '',
-	goal       TEXT NOT NULL DEFAULT '',
+	profile_id    TEXT NOT NULL,
+	id            INTEGER NOT NULL,
+	board_id      INTEGER NOT NULL,
+	name          TEXT NOT NULL DEFAULT '',
+	state         TEXT NOT NULL DEFAULT '',
+	start_date    TEXT NOT NULL DEFAULT '',
+	end_date      TEXT NOT NULL DEFAULT '',
+	goal          TEXT NOT NULL DEFAULT '',
+	complete_date TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, board_id, id)
+);`
+
+// sprintReportDDL is a sprint's reconstructed report, one row per board's
+// copy of a sprint for the same reason sprintDDL's key carries board_id:
+// Jira hands one sprint to every board whose filter reaches it, and a
+// report's own done rule comes from its board's last column, so a key
+// without the board would let one board's report answer for another's.
+// algo_version is compared against internal/reports.AlgoVersion on read,
+// so a row a lower version wrote is rebuilt rather than served.
+const sprintReportDDL = `
+CREATE TABLE IF NOT EXISTS sprint_report (
+	profile_id   TEXT NOT NULL,
+	board_id     INTEGER NOT NULL,
+	sprint_id    INTEGER NOT NULL,
+	unit         TEXT NOT NULL DEFAULT '',
+	algo_version INTEGER NOT NULL DEFAULT 0,
+	built_at     TEXT NOT NULL DEFAULT '',
+	series_json  TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, sprint_id)
+);`
+
+// ritualDocumentDDL holds one locally editable document for each ritual in
+// one board's copy of a sprint. The four-part key keeps profiles, boards,
+// sprints, and ritual types from overwriting one another. Publish metadata
+// stays with the draft so an explicit publish can update its existing page.
+const ritualDocumentDDL = `
+CREATE TABLE IF NOT EXISTS ritual_document (
+	profile_id        TEXT NOT NULL,
+	board_id          INTEGER NOT NULL,
+	sprint_id         INTEGER NOT NULL,
+	ritual_type       TEXT NOT NULL,
+	title             TEXT NOT NULL DEFAULT '',
+	remark            TEXT NOT NULL DEFAULT '',
+	body              TEXT NOT NULL DEFAULT '',
+	issue_keys_json   TEXT NOT NULL DEFAULT '[]',
+	issues_json       TEXT NOT NULL DEFAULT '[]',
+	confluence_page_id TEXT NOT NULL DEFAULT '',
+	confluence_version INTEGER NOT NULL DEFAULT 0,
+	status            TEXT NOT NULL DEFAULT '',
+	updated_at        TEXT NOT NULL DEFAULT '',
+	published_at      TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, board_id, sprint_id, ritual_type)
 );`
 
 const indexDDL = `
 CREATE INDEX IF NOT EXISTS issue_profile_type   ON issue (profile_id, type);
 CREATE INDEX IF NOT EXISTS issue_profile_sprint ON issue (profile_id, sprint_id);
 CREATE INDEX IF NOT EXISTS jira_user_profile_display ON jira_user (profile_id, display_name);
-CREATE INDEX IF NOT EXISTS board_issue_lookup    ON board_issue (profile_id, board_id, sprint_id);`
+CREATE INDEX IF NOT EXISTS board_issue_lookup    ON board_issue (profile_id, board_id, sprint_id);
+CREATE INDEX IF NOT EXISTS ritual_document_profile ON ritual_document (profile_id);`
 
 // Open opens (or creates) TAM's database at path.
 func Open(path string) (*store.DB, error) { return store.Open(path, Schema) }

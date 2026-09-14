@@ -39,7 +39,7 @@ export const VIEWS: ViewInfo[] = [
     id: "reports",
     label: "Reports",
     phase: "Phase 4",
-    blurb: "Burndown, velocity, and sprint analytics.",
+    blurb: "What a sprint committed, completed and carried over, with the board's velocity beside it.",
   },
   {
     id: "rituals",

@@ -33,6 +33,7 @@ export function SprintsView() {
   const [boardId, setBoardId] = useState(0);
   const [showClosed, setShowClosed] = useState(false);
   const [selectedKey, setSelectedKey] = useState("");
+  const [collapsedIssues, setCollapsedIssues] = useState(new Set<string>());
   // The sentence the last sprint write left behind. A write here reaches
   // Jira at once and the dialog that made it closes on success, so the
   // banner is where the outcome, and any note riding with it, is read.
@@ -60,6 +61,7 @@ export function SprintsView() {
   const [madeFor, setMadeFor] = useState(activeId);
   if (madeFor !== activeId) {
     setMadeFor(activeId);
+    setCollapsedIssues(new Set());
     setBoardId(0);
     setShowClosed(false);
     setSelectedKey("");
@@ -100,7 +102,7 @@ export function SprintsView() {
 
   // One list of issue keys per sprint, which is what a shift gesture is
   // measured inside and what the fill sends.
-  const order = useMemo(() => issueOrder(visible), [visible]);
+  const order = useMemo(() => issueOrder(visible, collapsedIssues), [visible, collapsedIssues]);
   const selection = useSprintSelection(order, activeId);
   const fill = useJournalSprintMoves(activeId);
   // The profile's journal, read here for one sentence: the delete
@@ -124,6 +126,7 @@ export function SprintsView() {
     .find((i) => i.key === selectedKey);
 
   function switchBoard(id: number) {
+    setCollapsedIssues(new Set());
     setBoardId(id);
     setSelectedKey("");
     setLine("");
@@ -279,6 +282,9 @@ export function SprintsView() {
     }
     return (
       <SprintList
+        key={`${activeId}:${board?.id ?? 0}`}
+        collapsedIssues={collapsedIssues}
+        onCollapsedIssuesChange={setCollapsedIssues}
         details={visible}
         selectedKey={selectedKey}
         onSelect={setSelectedKey}
@@ -315,7 +321,7 @@ export function SprintsView() {
           board && <h2 className="board-head-name">{board.name}</h2>
         )}
 
-        <label className="check-row" htmlFor="sprints-show-closed">
+        <label className="check-row sprints-show-closed" htmlFor="sprints-show-closed">
           <input
             id="sprints-show-closed"
             type="checkbox"

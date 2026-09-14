@@ -97,6 +97,12 @@ export function useBoardsUnavailable(profileId: string) {
 // openSprints is invalidated here too: a board's sprints can change on this
 // pass alone, without a full issue sync, and the profile-wide list is drawn
 // from the same per-board sprint rows.
+//
+// So is the sprint report, for a reason of its own. A report's done rule is
+// the board's last column, and this pass is what rewrites the columns, so a
+// refresh that moves a status into or out of that column changes what
+// completed means for every sprint. The report's staleTime is infinite and
+// nothing else would ever ask for it again.
 export function useSyncBoards(profileId: string, run: () => Promise<BoardSummary>) {
   const qc = useQueryClient();
   return useMutation({
@@ -111,6 +117,7 @@ export function useSyncBoards(profileId: string, run: () => Promise<BoardSummary
         keys.syncState(profileId),
         keys.openSprints(profileId),
         [profileId, "boardSprintDetails"] as const,
+        [profileId, "sprintReport"] as const,
       ]) {
         qc.invalidateQueries({ queryKey });
       }

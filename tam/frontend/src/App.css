@@ -136,6 +136,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The Manage Profiles dialog is entirely the shared master-detail one in
    @agile-suite/core's primitives.css now, so TAM adds nothing to it. */
 .check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.sprints-show-closed { margin: 0; }
 .topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .topbar-btn-primary:hover { background: var(--accent-hover); }
 /* Sync progress bar, mirrored from XTM's App.css. The track's dark fill is
@@ -229,6 +230,15 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-row-selected, .issue-row-selected:hover { background: var(--accent-soft); }
 .issue-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .issue-key { font-weight: 600; font-variant-numeric: tabular-nums; }
+.issue-row-subtask .issue-summary { padding-inline-start: 18px; }
+.issue-child-branch { display: inline-block; margin-inline-end: 8px; color: var(--text-muted); }
+.nested-subtask .epic-cell-summary { padding-inline-start: 18px; }
+.subtask-assignee { margin-inline-start: 10px; color: var(--text-muted); }
+.subtask-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 24px; margin-inline-end: 6px; padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; vertical-align: middle; }
+.subtask-toggle:hover { background: var(--surface-2); color: var(--text); }
+.subtask-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.board-card-subtask { margin-inline-start: 16px; border-inline-start: 2px solid var(--border); }
+.board-card-parent { color: var(--text-muted); font-size: 11px; margin-top: 6px; }
 /* The detail panel's title is the one key that links out to the instance:
    in a grid the row already owns the click. */
 .issue-key-link {
@@ -414,12 +424,17 @@ input, button, select { font-family: inherit; font-size: inherit; }
    under the last row. */
 .edit-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .edit-form .edit-row > .detail-input, .edit-form .edit-row > .edit-cell > .detail-input { margin-bottom: 0; }
+.edit-sprint-modal { width: min(600px, 92vw); }
+.edit-sprint-title { min-width: 0; }
+.edit-sprint-title p { margin: 2px 0 0; color: var(--text-muted); font-size: 11px; }
 .edit-row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: start; }
 /* A row whose hint sits beside the control uses a real <label> for the name
    rather than a wrapping one, so the hint does not become part of the field's
    label text. It has to line up with the wrapping rows either way. */
 .edit-row > label.muted { padding-top: 6px; }
 .edit-row .detail-input { width: 100%; box-sizing: border-box; }
+.edit-date-changed { padding: 6px; border: 1px solid var(--accent); border-radius: 5px; background: var(--accent-soft); }
+.edit-date-note { display: block; margin-top: 5px; color: var(--accent); font-size: 11px; line-height: 1.4; }
 .edit-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .activity-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .activity-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; }
@@ -473,7 +488,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .epics-tree-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .epics-body:has(.detail-panel) .epics-tree-pane { border-right: none; border-radius: 6px 0 0 6px; }
 .epics-tree-pane .folder-tree { flex: 1; min-height: 0; width: 100%; border-right: none; border: none; border-radius: 0; overflow: auto; }
-.epics-tree-pane > .muted, .epics-tree-pane > .error-text { padding: 16px; }
+.epics-tree-pane > .muted, .epics-tree-pane > .error-text { flex: 1; display: grid; place-content: center; padding: 32px; text-align: center; }
 .epics-summary { flex: none; margin-bottom: 4px; }
 .epics-note { flex: none; }
 /* Refetch state rides on the summary line the view already shows, so it
@@ -554,7 +569,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-row, .sprint-issue-row { width: 100%; gap: 8px; align-items: center; }
 .sprint-row {
   display: grid;
-  grid-template-columns: 12px minmax(120px, 1fr) 72px 150px 190px 40px;
+  grid-template-columns: 12px minmax(120px, 1fr) 72px 150px 190px 76px;
 }
 .sprint-issue-row {
   display: grid;
@@ -565,7 +580,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-cell-name { font-weight: 600; }
 .sprint-cell-dates, .sprint-cell-progress { color: var(--text-muted); font-size: 11px; }
 .sprint-cell-progress { font-variant-numeric: tabular-nums; margin-left: 0; }
-.sprint-cell-actions { display: flex; justify-content: flex-end; }
+.sprint-cell-actions { display: flex; justify-content: flex-end; overflow: visible; }
 .sprint-check { margin: 0; cursor: pointer; }
 /* The goal is a sentence, so it gets a line of its own under the sprint
    rather than a cell that would clip it. */
@@ -634,3 +649,89 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .assignee-option-active { background: var(--accent-soft); }
 .detail-activity-head { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+
+/* Phase 4: the sprint report. The frame fills the available workspace while
+   its body owns scrolling; readable text remains constrained inside it. */
+.report-frame { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.report-body { flex: 1; min-width: 0; min-height: 0; width: 100%; overflow: auto; padding-right: 4px; }
+.report-summary { max-width: 78ch; }
+.report-heading { margin: 18px 0 6px; font-size: 15px; font-weight: 600; }
+.report-summary .report-heading { margin-top: 0; }
+/* The one line a review is read off, so it carries the weight the muted
+   qualifications under it deliberately do not. */
+.report-sentence { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
+.report-mode { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.report-mode-live { color: var(--accent); }
+.report-mode-closed { color: var(--text-muted); }
+.report-outcome { margin: 0 0 10px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); font-weight: 600; }
+.report-outcome-label { display: block; margin-bottom: 3px; color: var(--text-muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.report-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 14px 0 12px; }
+.report-metric { min-width: 0; border-top: 2px solid var(--border); padding-top: 6px; }
+.report-metric dt { color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+.report-metric dd span { color: var(--text-muted); font-size: 11px; }
+.report-summary p.muted, .report-summary p.warn-text { margin: 0 0 6px; line-height: 1.45; }
+.report-details { margin: 8px 0 0; max-width: 70ch; }
+.report-details summary { color: var(--text-muted); cursor: pointer; font-size: 12px; }
+.report-details p:first-of-type { margin-top: 8px; }
+.report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; max-width: 70ch; }
+.report-unavailable, .report-loading { max-width: 70ch; line-height: 1.45; }
+.report-loading p { margin: 0 0 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+/* The velocity rows, on the same rules .conflict-table draws with: a table
+   in this app is a header rule and padded cells, not a box. */
+.report-table-wrap { max-width: 100%; overflow-x: auto; }
+.report-table { border-collapse: collapse; margin-top: 8px; font-size: 13px; min-width: 420px; }
+.report-table th { text-align: left; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 16px 4px 0; }
+.report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
+.report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
+.report-row-note { display: block; font-weight: 400; }
+.rituals-layout { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 16px; min-height: 0; flex: 1; }
+.rituals-layout nav, .rituals-layout article { min-width: 0; overflow: auto; }
+.ritual-link { display: flex; flex-direction: column; align-items: flex-start; width: 100%; gap: 3px; padding: 8px; border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.ritual-link span { color: var(--text-muted); font-size: 11px; }
+.ritual-link-selected { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
+.ritual-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2); color: var(--accent); font-size: 16px !important; }
+.ritual-icon-svg { width: 16px; height: 16px; }
+.ritual-planning .ritual-icon { color: #8b5cf6; background: color-mix(in srgb, #8b5cf6 14%, transparent); }
+.ritual-standup .ritual-icon { color: #0d9488; background: color-mix(in srgb, #0d9488 14%, transparent); }
+.ritual-review .ritual-icon { color: #2563eb; background: color-mix(in srgb, #2563eb 14%, transparent); }
+.ritual-retro .ritual-icon { color: #d97706; background: color-mix(in srgb, #d97706 14%, transparent); }
+.ritual-link-copy { display: flex; flex-direction: column; gap: 2px; }
+.ritual-link-copy small, .ritual-page-meta { color: var(--text-muted); font-size: 11px; }
+.ritual-page-body { line-height: 1.6; max-width: 78ch; }
+.ritual-page-body img { max-width: 100%; height: auto; }
+.ritual-template { max-width: 78ch; margin-top: 20px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+.ritual-template-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ritual-template-head h4 { margin: 0; font-size: 13px; }
+.ritual-template-context { margin: 8px 0; color: var(--text-muted); font-size: 12px; }
+.ritual-template ul { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; }
+.ritual-template li { display: flex; gap: 8px; align-items: baseline; }
+.ritual-association-list { display: grid; gap: 6px; margin-top: 10px; }
+.ritual-association-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.ritual-missing-page { max-width: 480px; padding: 36px 0; }
+.ritual-missing-code { color: var(--accent); font-size: 48px; font-weight: 700; letter-spacing: -0.06em; }
+.ritual-report-context { padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--accent-soft); }
+.ritual-association-form { display: grid; gap: 6px; margin-bottom: 12px; }
+.ritual-association-form select { width: 100%; min-width: 0; }
+.ritual-association-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ritual-association-scope input { width: 100%; min-width: 0; box-sizing: border-box; }
+.ritual-slots-frame { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.ritual-slots { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.ritual-slot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.ritual-slot:last-child { border-bottom: none; }
+.ritual-slot .status { font-size: 11px; color: var(--text-muted); text-transform: capitalize; }
+.ritual-slot-open { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; padding: 2px 0; }
+.ritual-slot-info { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.ritual-slot-empty .ritual-icon { opacity: 0.6; }
+.ritual-slot-empty .ritual-link-copy small { font-style: italic; }
+.ritual-wizard { margin-top: 12px; }
+.ritual-wizard .ritual-issues { list-style: none; padding: 0; display: grid; gap: 6px; margin: 8px 0 0; }
+.ritual-wizard .ritual-issues li { padding: 6px 0; border-bottom: 1px solid var(--border); }
+@media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-frame .board-picker { width: 100%; }
+  .report-frame .board-picker select { min-width: 0; width: 100%; }
+  .report-actions .btn { min-height: 44px; }
+}

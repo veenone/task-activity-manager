@@ -383,7 +383,7 @@ func (s *Service) pageWidth() int {
 // card of it walks past the guard and out of the backlog. Both the demo
 // backend and this package's fake narrow "sprint = N" for exactly that
 // reason.
-func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete map[string]bool) ([]string, error) {
+func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete func(string) bool) ([]string, error) {
 	incomplete := []string{}
 	startAt, total := 0, -1
 	for total < 0 || startAt < total {
@@ -396,7 +396,7 @@ func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete ma
 			if iss.SprintID != "" && iss.SprintID != sprintID {
 				continue
 			}
-			if !complete[iss.StatusID] {
+			if !complete(iss.StatusID) {
 				incomplete = append(incomplete, iss.Key)
 			}
 		}

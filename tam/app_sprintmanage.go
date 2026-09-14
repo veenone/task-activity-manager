@@ -19,9 +19,12 @@ import (
 // reports the name that is HELD, so sharing it means a refusal says a sprint
 // operation is running rather than which one, and that is the trade: what a
 // user needs to know is that this profile is busy with a sprint and not with
-// a sync, a commit or a boards refresh, which are the other names in play. Nothing here is journaled, for the reasons
-// internal/sprints' package doc gives: a sprint id has to be real before
-// anything can point at it, and there is nothing to defer.
+// a sync, a commit, an import, a boards refresh or a report, which are the
+// other names in play.
+//
+// Nothing here is journaled, for the reasons internal/sprints' package doc
+// gives: a sprint id has to be real before anything can point at it, and
+// there is nothing to defer.
 //
 // None of the three carries a partial result the way CompleteSprint's does.
 // A guard refuses before Jira is ever asked anything, and once Create, Edit

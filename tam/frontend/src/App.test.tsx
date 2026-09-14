@@ -61,6 +61,8 @@ vi.mock("./api", async () => {
     ListBoardSprints: vi.fn(),
     ListBoardSprintDetails: vi.fn(),
     GetBoard: vi.fn(),
+    GetSprintReport: vi.fn(),
+    CancelSprintReport: vi.fn(),
     SyncBoards: vi.fn(),
     SetProfileSetting: vi.fn(),
     EventsOn: vi.fn(menuBus.on),
@@ -73,6 +75,10 @@ vi.mock("./api", async () => {
     AutoMapImport: vi.fn(),
     ImportIssues: vi.fn(),
     SaveImportTemplate: vi.fn(),
+    GetConfluenceConfig: vi.fn(),
+    ListConfluenceChildPages: vi.fn(),
+    GetRitualPage: vi.fn(),
+    ListRitualAssociations: vi.fn(),
   };
 });
 
@@ -110,9 +116,15 @@ beforeEach(() => {
   vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
+  vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "", spaceKey: "", rootPageID: "" });
+  vi.mocked(api.ListRitualAssociations).mockResolvedValue([]);
   vi.mocked(api.ListBoards).mockResolvedValue([]);
   vi.mocked(api.ListBoardSprints).mockResolvedValue([]);
   vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([]);
+  // The Reports view cancels whatever report it left running when it goes
+  // away, whether or not it ever started one, so the shell's own test needs
+  // the binding stood in for even though no board here has a sprint.
+  vi.mocked(api.CancelSprintReport).mockResolvedValue();
   vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
 });
 
@@ -199,15 +211,28 @@ describe("App shell", () => {
       .toHaveAttribute("aria-current", "page");
   });
 
-  it("switches views from the nav rail and names the phase", async () => {
+  it("switches views from the nav rail, and Reports is the real view now", async () => {
     vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
     renderApp();
     const rail = await screen.findByRole("navigation", { name: "Navigation rail" });
     await userEvent.click(within(rail).getByRole("button", { name: "Reports" }));
     expect(screen.getByRole("region", { name: /Reports/ })).toBeInTheDocument();
-    expect(screen.getByText(/arrives in Phase 4/)).toBeInTheDocument();
+    // No board is synced in this fixture, which is ReportsView's own empty
+    // state rather than the placeholder that used to stand here.
+    expect(await screen.findByText(/No scrum board has been synced for this project/)).toBeInTheDocument();
+    expect(screen.queryByText(/arrives in Phase/)).not.toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Reports" }))
       .toHaveAttribute("aria-current", "page");
+  });
+
+  // Rituals was the last placeholder; Phase 5 replaced it, so the rail now
+  // opens the real view and the view speaks for an unconfigured profile.
+  it("opens Rituals and says when Confluence is not configured", async () => {
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+    renderApp();
+    const rail = await screen.findByRole("navigation", { name: "Navigation rail" });
+    await userEvent.click(within(rail).getByRole("button", { name: "Rituals" }));
+    expect(await screen.findByText(/Confluence is not configured for this profile/)).toBeInTheDocument();
   });
 
   it("renders the epic tree when the View menu opens Epics", async () => {

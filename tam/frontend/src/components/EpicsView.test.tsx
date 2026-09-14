@@ -96,6 +96,28 @@ beforeEach(() => {
 });
 
 describe("EpicsView", () => {
+  it("shows a third-level subtask and navigates back to its parent issue", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [epicNode({ issue: issue({ key: "P-EPIC", type: "epic" }), children: [issue({ key: "P-1", type: "story", summary: "Parent" }), issue({ key: "P-2", type: "subtask", parentKey: "P-1", summary: "Child" })] })], orphans: [], truncated: false });
+    renderView();
+    const child = (await screen.findByText("Child")).closest('[role="treeitem"]') as HTMLElement;
+    const parent = screen.getByText("Parent").closest('[role="treeitem"]');
+    expect(parent?.nextElementSibling).toBe(child);
+    expect(child).toHaveAttribute("aria-level", "3");
+    await user.click(child);
+    await user.keyboard("{ArrowLeft}");
+    expect(parent).toHaveFocus();
+    expect(screen.queryByText("No epic")).not.toBeInTheDocument();
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.queryByText("Child")).not.toBeInTheDocument();
+    expect(parent).toHaveAttribute("aria-expanded", "false");
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByText("Child")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collapse subtasks of P-1" }));
+    expect(screen.queryByText("Child")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Expand subtasks of P-1" }));
+    expect(screen.getByText("Child")).toBeInTheDocument();
+  });
   it("renders epics with their progress and children", async () => {
     vi.mocked(api.GetEpicTree).mockResolvedValue({
       epics: [

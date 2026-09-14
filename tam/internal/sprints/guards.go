@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/donerule"
 	"agile-suite/tam/internal/sprintdate"
 )
 
@@ -101,28 +102,28 @@ func (s *Service) refusePending(ctx context.Context, profileID string, sprintID 
 	return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before completing it, or Jira will be asked which cards finished before it has been told", n)
 }
 
-// completeStatuses is the set of status ids that count as finished: the ones
-// the board's last column collects. A board whose columns are not cached, or
-// whose last column collects nothing, cannot answer the question this action
-// turns on, and guessing is not an option for a move nobody can undo from
-// TAM.
-func (s *Service) completeStatuses(ctx context.Context, profileID string, boardID int) (map[string]bool, error) {
+// completeStatuses is what counts as finished for this completion: the rule
+// donerule builds from the board's last column, which the sprint report
+// reconstructs its burndown with too. A board whose columns are not cached,
+// or whose last column collects nothing, cannot answer the question this
+// action turns on, and guessing is not an option for a move nobody can undo
+// from TAM. donerule says only that it cannot answer; naming which of the
+// two happened is this function's job, because refreshing the boards fixes
+// one of them and nothing a user can do here fixes the other.
+func (s *Service) completeStatuses(ctx context.Context, profileID string, boardID int) (func(string) bool, error) {
 	cols, err := s.store.Columns(ctx, profileID, boardID)
 	if err != nil {
 		return nil, err
 	}
-	if len(cols) == 0 {
+	last, ok := donerule.LastColumn(cols)
+	if !ok {
 		return nil, fmt.Errorf("board %d has no cached columns, so TAM cannot tell which issues finished; refresh the boards first", boardID)
 	}
-	last := cols[len(cols)-1]
-	if len(last.StatusIDs) == 0 {
+	done := donerule.Done(cols)
+	if done == nil {
 		return nil, fmt.Errorf("the last column of board %d (%q) collects no statuses, so TAM cannot tell which issues finished", boardID, last.Name)
 	}
-	set := make(map[string]bool, len(last.StatusIDs))
-	for _, id := range last.StatusIDs {
-		set[id] = true
-	}
-	return set, nil
+	return done, nil
 }
 
 // dates turns the two the dialog collected into the pair Jira is sent,

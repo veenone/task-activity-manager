@@ -32,6 +32,15 @@ export const keys = {
   // the board's own history suggests.
   sprintSuggestion: (profileId: string, boardId: number) =>
     [profileId, "sprintSuggestion", boardId] as const,
+  // One sprint's report and its board's velocity table, which arrive
+  // together from one call. The board is in the key because a report's done
+  // rule comes from its board's last column, so the same sprint reported on
+  // from two boards is two different answers. Nothing else belongs here:
+  // a rebuild asks the same question as the read beside it, so putting the
+  // refresh flag in the key would file the rebuilt report as a second entry
+  // and let the view fall back to the stored one.
+  sprintReport: (profileId: string, boardId: number, sprintId: number) =>
+    [profileId, "sprintReport", boardId, sprintId] as const,
   // The one profile setting the Boards view reads: whether this Jira
   // answered the boards call with no Agile API at all.
   boardsUnavailable: (profileId: string) => [profileId, "boardsUnavailable"] as const,

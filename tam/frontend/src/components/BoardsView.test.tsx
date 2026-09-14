@@ -288,6 +288,21 @@ describe("BoardsView toolbar", () => {
 });
 
 describe("BoardsView board", () => {
+  it("groups a child card beneath its parent and keeps its status actions", async () => {
+    const user = userEvent.setup();
+    const child = issue({ key: "PLAT-500", type: "subtask", parentKey: KEYS.key, summary: "Wire input" });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[child, KEYS], [PROMO], []]));
+    renderView();
+    const parent = await screen.findByRole("gridcell", { name: new RegExp(`${KEYS.key} ${KEYS.summary}`) });
+    const subtask = screen.getByRole("gridcell", { name: /PLAT-500 Wire input/ });
+    expect(parent.parentElement?.nextElementSibling).toBe(subtask.parentElement);
+    expect(subtask).toHaveClass("board-card-subtask");
+    expect(within(subtask).getByText(`↳ Subtask of ${KEYS.key}`)).toBeInTheDocument();
+    await user.click(within(subtask).getByRole("button", { name: `Actions on ${child.key}` }));
+    expect(await screen.findByRole("menuitem", { name: "Move to In Progress" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Move to Sprint 13" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Move to the backlog" })).not.toBeInTheDocument();
+  });
   it("renders the columns with their card counts and point sums", async () => {
     renderView();
     expect(await screen.findByText("To Do")).toBeInTheDocument();
@@ -861,14 +876,25 @@ describe("BoardsView moves", () => {
 
     await dragTo(/PLAT-409/, 1, 100);
     const banner = await screen.findByText(
-      "PLAT-409 cannot reach In Progress from where it is now. Jira offers Review, Done.",
+      "PLAT-409 cannot move to In Progress yet. Jira does not offer that move from its current status. Available statuses: Review, Done. Jira has not provided a specific reason; open the issue in Jira to check its workflow.",
     );
     expect(banner.closest(".pending-banner-warn")).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: /PLAT-409/ })).toHaveClass("board-card-warn");
 
     await user.click(screen.getByRole("button", { name: "Put it back" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 7));
-    await waitFor(() => expect(screen.queryByText(/cannot reach In Progress/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/cannot move to In Progress/)).not.toBeInTheDocument());
+  });
+
+  it("shows the specific demo restriction when Done is blocked", async () => {
+    const reason = "PLAT-412 cannot move to Done because of a demo restriction. This applies even when all its subtasks are Done. Use another story to try this move.";
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([TRANSITION_ROW]);
+    vi.mocked(api.CanTransition).mockResolvedValue({ reachable: ["To Do", "In Progress"], allowed: false, reason });
+    renderView();
+    await screen.findByRole("gridcell", { name: /PLAT-412/ });
+    await dragTo(/PLAT-412/, 2, 100);
+    expect((await screen.findByText(reason)).closest(".pending-banner-warn")).toBeInTheDocument();
+    expect(screen.getByRole("gridcell", { name: /PLAT-412/ })).toHaveAccessibleName(expect.stringContaining(reason));
   });
 
   it("marks a card whose move failed at the last Commit, with the reason in its label", async () => {
@@ -982,7 +1008,7 @@ describe("BoardsView moves", () => {
     await screen.findByRole("gridcell", { name: /PLAT-409/ });
 
     await dragTo(/PLAT-409/, 1, 100);
-    await screen.findByText(/PLAT-409 cannot reach In Progress/);
+    await screen.findByText(/PLAT-409 cannot move to In Progress/);
 
     // The Pending changes dialog, Discard all, and a Commit that pushed
     // the row all end the same way: the row is gone on the next read.
@@ -991,7 +1017,7 @@ describe("BoardsView moves", () => {
     await user.keyboard("{Control>}{ArrowUp}{/Control}");
     await waitFor(() => expect(api.RankIssue).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.queryByText(/PLAT-409 cannot reach In Progress/)).not.toBeInTheDocument(),
+      expect(screen.queryByText(/PLAT-409 cannot move to In Progress/)).not.toBeInTheDocument(),
     );
   });
 });

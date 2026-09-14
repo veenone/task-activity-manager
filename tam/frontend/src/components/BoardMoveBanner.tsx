@@ -21,7 +21,7 @@ export function BoardMoveBanner({ line, canPutBack, busy, onPutBack }: Props) {
           <button type="button" className="btn" disabled={busy} onClick={onPutBack}>Put it back</button>
         )}
       </p>
-      <p className="muted small">Commit would refuse this move, so it is worth undoing now rather than at the end of the standup.</p>
+      <p className="muted small">This move is saved locally. It has not been applied in Jira. Undo it or resolve the restriction before committing.</p>
     </div>
   );
 }

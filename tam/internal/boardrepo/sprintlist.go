@@ -20,7 +20,7 @@ import (
 // once by giving each direction its own column instead of trying to flip the
 // sign of a text column.
 const detailSprintsSQL = `
-	SELECT id, board_id, name, state, start_date, end_date, goal FROM sprint
+	SELECT id, board_id, name, state, start_date, end_date, goal, complete_date FROM sprint
 	WHERE profile_id = ? AND board_id = ?
 	ORDER BY CASE state WHEN 'active' THEN 0 WHEN 'future' THEN 1 WHEN 'closed' THEN 2 ELSE 3 END,
 	         CASE WHEN state = 'closed' THEN NULL ELSE start_date END ASC,
@@ -47,14 +47,8 @@ const UnassignedSprintName = "Board backlog"
 // same order composeBoard uses them in, and the four numbers a fill bar
 // reads from. It does not replay pending rank the way composeBoard does, so
 // cards come back in board_issue.position order with any pending reorder
-// ignored, and it draws no drafts: composeBoard draws every draft on every
-// board and every sprint regardless of the draft's own sprint id, since a
-// draft is project level there and DraftIssues answers unfiltered by scope.
-// Copying that same everywhere-placement into a per-sprint read would be no
-// better an answer, since it is not sprint-true either, so this read leaves
-// the exclusion explicit instead. A draft created into a sprint therefore
-// shows in neither its sprint nor the unassigned node, and this view's
-// counts can disagree with the Boards view's for the same sprint.
+// ignored. Subtask drafts are included only with their parent; standalone
+// drafts still have no board membership and are excluded from this read.
 type SprintDetail struct {
 	Sprint
 	// Issues is this scope's cards, capped by MaxCardsPerView, the same
@@ -140,6 +134,10 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 	}
 
 	rendered := 0
+	drafts, err := issues.DraftIssues(ctx, q, profileID)
+	if err != nil {
+		return nil, err
+	}
 	// claimed is every key a sprint's journal-replayed scope holds, across
 	// every sprint. The unassigned scope is the board's own list minus this
 	// set: board_issue's own list already carries every sprint's issues
@@ -170,6 +168,7 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 		// with what this scope failed to sync.
 		notSynced := countNotSynced(scopeKeys, cards)
 		cards = applyMoves(cards, moves, sprintID)
+		cards = withSubtaskDrafts(cards, drafts)
 		// claimed is built from cards after applyMoves has run, so a card
 		// the journal has just moved out of this sprint is not claimed by
 		// it: applyMoves already dropped it here, and the unassigned scope
@@ -204,6 +203,7 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 	// own drop branch only fires when sprintID != "", so an empty scope has
 	// no sprint to leave.
 	unassignedCards = applyMoves(unassignedCards, moves, "")
+	unassignedCards = withSubtaskDrafts(unassignedCards, drafts)
 	// Built through the same constructor as every sprint node, rather than
 	// a separate literal, so Issues starts as an empty slice on every path
 	// and fillDetail's nil guard has only one meaning to carry.
@@ -267,7 +267,7 @@ func sprintsForDetail(ctx context.Context, q dbtx.Querier, profileID string, boa
 	out := []Sprint{}
 	for rows.Next() {
 		var s Sprint
-		if err := rows.Scan(&s.ID, &s.BoardID, &s.Name, &s.State, &s.StartDate, &s.EndDate, &s.Goal); err != nil {
+		if err := rows.Scan(&s.ID, &s.BoardID, &s.Name, &s.State, &s.StartDate, &s.EndDate, &s.Goal, &s.CompleteDate); err != nil {
 			return nil, err
 		}
 		out = append(out, s)

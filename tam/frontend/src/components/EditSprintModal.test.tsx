@@ -88,15 +88,15 @@ describe("EditSprintModal", () => {
     ));
   });
 
-  it("nudges about a name another sprint already has without refusing it", async () => {
+  it("asks before using a name another sprint already has", async () => {
     const user = userEvent.setup();
     renderModal({}, ["Sprint 13"]);
     await user.clear(screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Sprint 13");
     expect(screen.getByText("Another sprint on this board is already called that.")).toBeInTheDocument();
-    // A duplicate name is legal in Jira and often deliberate, so it is said
-    // and not enforced.
     await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const ask = await screen.findByRole("alertdialog", { name: "Use a duplicate sprint name?" });
+    await user.click(within(ask).getByRole("button", { name: "Use this name" }));
     await waitFor(() => expect(api.EditSprint).toHaveBeenCalled());
   });
 

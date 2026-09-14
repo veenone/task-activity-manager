@@ -13,8 +13,9 @@ import {
   errMsg,
 } from "@agile-suite/core";
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
-import { CommitPendingChanges, EventsOn, SyncBoards, SyncIssues } from "../api";
-import type { BoardSummary, CommitResult, Profile, Settings } from "../api";
+import { CommitPendingChanges, EventsOn, REPORT_PROGRESS_EVENT, SyncBoards, SyncIssues } from "../api";
+import type { BoardSummary, CommitResult, Profile, ReportProgress, Settings } from "../api";
+import { progressStage } from "../lib/reportText";
 import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
 // SyncProvider owns the one reducer that keeps sync and commit from
@@ -24,10 +25,24 @@ import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
 const PROGRESS_EVENT = "tam:sync-progress";
 
+// LockedOperation is what this client can be holding the per-profile lock
+// for. The names are the ones Go's App.acquire is called with, so a refusal
+// made here and a refusal made there are the same sentence about the same
+// operation. The three sprint management writes acquire under "sprint" in
+// Go, the same name the two ceremonies use, so they share it here too.
+export type LockedOperation = "sync" | "commit" | "boards refresh" | "sprint" | "report";
+
 interface SyncApi {
   status: SyncStatus;
   progress: SyncProgress | null;
   syncError: string;
+  // running names the operation holding this client's half of the
+  // per-profile lock, or null when nothing holds it. status cannot answer
+  // that question: every run* but the commit puts the reducer in "syncing",
+  // so a sync, a boards refresh, a ceremony and a report are one word there.
+  // The Reports view needs the name to know whether the progress frame on
+  // screen is its own report's or another operation's.
+  running: LockedOperation | null;
   canSync: boolean;
   canCommit: boolean;
   canSwitchProfile: boolean;
@@ -44,6 +59,16 @@ interface SyncApi {
   // shell that still offered Sync. It rejects rather than swallowing: the
   // dialog is what reports a ceremony's failure, word for word.
   runSprintCeremony: <T>(action: () => Promise<T>) => Promise<T>;
+  // runReport is how the Reports view takes Go's per-profile lock. It is
+  // not runQuietLock: a report runs for minutes with no dialog over it and
+  // the user looking straight at the window, so leaving the reducer idle
+  // would leave Sync and Commit offered and inert for the whole of it,
+  // which is the bug tam/CLAUDE.md's "One lock, both ends" section records.
+  // It puts the shell in its running state the way runBoardsRefresh does,
+  // and the frames arriving on the report's own event give the status bar a
+  // stage that says a report is what is running. It rejects rather than
+  // swallowing, so the view can tell a refusal from a failed read.
+  runReport: <T>(action: () => Promise<T>) => Promise<T>;
   // runQuietLock is what a fast management write (creating, renaming, or
   // destroying a sprint) takes Go's per-profile lock through without reading
   // as a ceremony. It guards against overlapping a sync, a commit, a boards
@@ -96,6 +121,17 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // and the cost of the divergence is written down beside the rule it bends
   // in tam/CLAUDE.md.
   const statusRef = useRef<SyncStatus>("idle");
+  // running is that same lock in the one form a component can render: the
+  // name of the operation holding it. Both exist and neither is redundant.
+  // The ref is the guard, because it is read and written synchronously and a
+  // state update would land a render too late to stop a double click. The
+  // state is what the Reports view re-renders on, since a ref re-renders
+  // nothing, and it carries the name the ref cannot: the ref reads
+  // "syncing" for a sync, a boards refresh, a ceremony and a report alike.
+  // take and release below set the two together, on adjacent lines, so the
+  // only moment they can disagree is the tick between a lock being taken
+  // and the render that shows its name.
+  const [running, setRunning] = useState<LockedOperation | null>(null);
   const [lastCommit, setLastCommit] = useState<CommitResult | null>(null);
   const [boards, setBoards] = useState<{ summary: BoardSummary | null; at: number }>({ summary: null, at: 0 });
 
@@ -107,15 +143,67 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  // A report's frames arrive on their own event, and they are turned into
+  // the same progress the status bar already draws, with a stage of their
+  // own so the bar names a report rather than a sync.
+  //
+  // done is dropped on purpose. sprintreport.Progress marks the last frame
+  // of *one sprint's* fetch, and a report covering six sprints sends six of
+  // them; the reducer reads done as "the pull is over" and clears the bar,
+  // so forwarding it would blank the status bar after the first sprint and
+  // leave the rest of a minutes-long read silent. runReport's own finally
+  // is what ends the run.
+  useEffect(
+    () =>
+      EventsOn(REPORT_PROGRESS_EVENT, (p: ReportProgress) =>
+        dispatch({
+          type: "SYNC_PROGRESS",
+          progress: {
+            phase: p.phase,
+            fetched: p.fetched,
+            total: p.total,
+            done: false,
+            stage: progressStage(p),
+          },
+        }),
+      ),
+    [],
+  );
+
   useEffect(() => {
     setLastCommit(null);
     setBoards({ summary: null, at: 0 });
   }, [activeId]);
 
+  // take and release are the only two places the lock moves, so the ref and
+  // the state cannot drift apart.
+  const take = useCallback((op: LockedOperation) => {
+    statusRef.current = op === "commit" ? "committing" : "syncing";
+    setRunning(op);
+  }, []);
+
+  const release = useCallback(() => {
+    statusRef.current = "idle";
+    setRunning(null);
+  }, []);
+
+  // busyRefusal is what a run* throws when the lock is already taken, worded
+  // the way Go's acquire words its own so the two read alike and
+  // reportText.isBusyRefusal recognises either.
+  //
+  // It names no operation in the one tick where running has not caught up
+  // with the ref yet. Guessing a name there would be the bug this whole
+  // change is about: "a sync is already running" was printed over a report,
+  // a ceremony and a boards refresh as well.
+  const busyRefusal = useCallback(
+    () => new Error(`${running ? `a ${running}` : "another operation"} is already running for this profile`),
+    [running],
+  );
+
   const runSync = useCallback(
     async (full: boolean) => {
       if (!activeId || statusRef.current !== "idle") return;
-      statusRef.current = "syncing";
+      take("sync");
       dispatch({
         type: "SYNC_START",
         clearError: true,
@@ -129,20 +217,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SYNC_ERROR", message });
         void notice({ title: "Sync failed", message, tone: "error" });
       } finally {
-        statusRef.current = "idle";
+        release();
         dispatch({ type: "SYNC_END" });
         invalidateProfileData(qc, activeId);
       }
     },
-    [activeId, qc, notice],
+    [activeId, qc, notice, take, release],
   );
 
   const runBoardsRefresh = useCallback(async (): Promise<BoardSummary> => {
     if (!activeId) throw new Error("no profile selected");
-    if (statusRef.current !== "idle") {
-      throw new Error("a sync is already running for this profile");
-    }
-    statusRef.current = "syncing";
+    if (statusRef.current !== "idle") throw busyRefusal();
+    take("boards refresh");
     dispatch({
       type: "SYNC_START",
       clearError: true,
@@ -153,10 +239,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       setBoards({ summary: sum, at: Date.now() });
       return sum;
     } finally {
-      statusRef.current = "idle";
+      release();
       dispatch({ type: "SYNC_END" });
     }
-  }, [activeId]);
+  }, [activeId, busyRefusal, take, release]);
 
   // A ceremony is short, one Jira call or a handful, so it reports a stage
   // rather than a count: there is nothing to page through and no total to
@@ -164,10 +250,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // refresh does not.
   const runSprintCeremony = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
     if (!activeId) throw new Error("no profile selected");
-    if (statusRef.current !== "idle") {
-      throw new Error("a sync is already running for this profile");
-    }
-    statusRef.current = "syncing";
+    if (statusRef.current !== "idle") throw busyRefusal();
+    take("sprint");
     dispatch({
       type: "SYNC_START",
       clearError: true,
@@ -176,10 +260,31 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     try {
       return await action();
     } finally {
-      statusRef.current = "idle";
+      release();
       dispatch({ type: "SYNC_END" });
     }
-  }, [activeId]);
+  }, [activeId, busyRefusal, take, release]);
+
+  // A report is the heaviest read this app makes, so it starts the bar with
+  // a stage that is true before the first frame lands: nothing has been
+  // fetched yet and no total is known, and a bar with no count draws no
+  // track and trails off, which is what the boards refresh does too.
+  const runReport = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
+    if (!activeId) throw new Error("no profile selected");
+    if (statusRef.current !== "idle") throw busyRefusal();
+    take("report");
+    dispatch({
+      type: "SYNC_START",
+      clearError: true,
+      initialProgress: { phase: "report", fetched: 0, total: 0, done: false, stage: "Building the sprint report" },
+    });
+    try {
+      return await action();
+    } finally {
+      release();
+      dispatch({ type: "SYNC_END" });
+    }
+  }, [activeId, busyRefusal, take, release]);
 
   // A quiet lock is the same statusRef guard every other run function
   // checks, so it still refuses while any of them is in flight, but it never
@@ -189,20 +294,21 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // its own dialog.
   const runQuietLock = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
     if (!activeId) throw new Error("no profile selected");
-    if (statusRef.current !== "idle") {
-      throw new Error("a sync is already running for this profile");
-    }
-    statusRef.current = "syncing";
+    if (statusRef.current !== "idle") throw busyRefusal();
+    // A create, a rename and a delete are what Go acquires under the sprint
+    // name, so that is what this holds the lock under here as well, even
+    // though this path deliberately raises no banner to print it on.
+    take("sprint");
     try {
       return await action();
     } finally {
-      statusRef.current = "idle";
+      release();
     }
-  }, [activeId]);
+  }, [activeId, busyRefusal, take, release]);
 
   const runCommit = useCallback(async (): Promise<CommitResult | null> => {
     if (!activeId || statusRef.current !== "idle") return null;
-    statusRef.current = "committing";
+    take("commit");
     dispatch({ type: "COMMIT_START" });
     try {
       const res = await call(() => CommitPendingChanges(activeId));
@@ -226,12 +332,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       void notice({ title: "Commit failed", message: errMsg(e), tone: "error" });
       return null;
     } finally {
-      statusRef.current = "idle";
+      release();
       dispatch({ type: "COMMIT_END" });
       invalidateWrites(qc, activeId);
       invalidateProfileData(qc, activeId);
     }
-  }, [activeId, qc, notice]);
+  }, [activeId, qc, notice, take, release]);
 
   const dismissConflict = useCallback((key: string) => {
     setLastCommit((cur) => (cur ? { ...cur, conflicts: cur.conflicts.filter((c) => c.key !== key) } : cur));
@@ -242,12 +348,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       status: state.status,
       progress: state.progress,
       syncError: state.syncError,
+      running,
       canSync: canSyncSel(state) && !!activeId,
       canCommit: canCommitSel(state) && !!activeId,
       canSwitchProfile: canSwitchProfileSel(state),
       runSync,
       runBoardsRefresh,
       runSprintCeremony,
+      runReport,
       runQuietLock,
       runCommit,
       lastCommit,
@@ -255,7 +363,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, activeId, runSync, runBoardsRefresh, runSprintCeremony, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
+    [state, running, activeId, runSync, runBoardsRefresh, runSprintCeremony, runReport, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

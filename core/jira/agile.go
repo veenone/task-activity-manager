@@ -48,6 +48,11 @@ type RawSprint struct {
 	// Goal has been on every sprint Jira answers with since the boards work
 	// landed in Phase 3a; this struct dropped it on the floor until now.
 	Goal string `json:"goal"`
+	// CompleteDate is the moment the sprint actually closed, which routinely
+	// differs from EndDate by days in either direction. Jira sends it null
+	// for a sprint that has never been closed, which decodes as the empty
+	// string here rather than an error.
+	CompleteDate string `json:"completeDate"`
 }
 
 // RawBoardConfig is /board/{id}/configuration. Jira nests the columns under

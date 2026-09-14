@@ -57,6 +57,30 @@ function renderList(details: SprintDetail[] = [ACTIVE, FUTURE, BACKLOG], over: R
 }
 
 describe("SprintList", () => {
+  it("nests a subtask under its parent across assignees and navigates back to the parent", async () => {
+    const user = userEvent.setup();
+    const child = issue({ key: "TAM-NEW-1", type: "subtask", parentKey: PROMO.key, summary: "Wire input", assignee: "Other owner", draft: true });
+    const on = renderList([detail({ issues: [child, KEYS, PROMO] })]);
+    const parent = await screen.findByRole("treeitem", { name: `${PROMO.key} ${PROMO.summary}` });
+    const subtask = screen.getByRole("treeitem", { name: "TAM-NEW-1 Wire input" });
+    expect(parent.nextElementSibling).toBe(subtask);
+    expect(subtask).toHaveAttribute("aria-level", "3");
+    expect(within(subtask).getByText("Other owner")).toBeInTheDocument();
+    await user.click(subtask);
+    expect(on.onSelect).toHaveBeenCalledWith(child.key);
+    await user.keyboard("{ArrowLeft}");
+    expect(parent).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.queryByRole("treeitem", { name: "TAM-NEW-1 Wire input" })).not.toBeInTheDocument();
+    expect(parent).toHaveAttribute("aria-expanded", "false");
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("treeitem", { name: `${KEYS.key} ${KEYS.summary}` })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: `Expand subtasks of ${PROMO.key}` }));
+    expect(screen.getByRole("treeitem", { name: "TAM-NEW-1 Wire input" })).toBeInTheDocument();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("treeitem", { name: "TAM-NEW-1 Wire input" })).toHaveFocus();
+    expect(issueOrder([detail({ issues: [child, KEYS, PROMO] })], new Set([PROMO.key])).get(rowIdOf(ACTIVE))).not.toContain(child.key);
+  });
   it("opens the active sprint and leaves every other one closed", async () => {
     renderList();
     // A board carries every sprint it has ever run, so opening what has not

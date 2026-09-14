@@ -8,6 +8,8 @@ import { keyColumnWidth } from "../lib/keyColumn";
 import { statusClass } from "../lib/statusClass";
 import { MOVED_FLASH_MS } from "../lib/flash";
 import { TypeChip } from "./TypeChip";
+import { SubtaskToggle } from "./SubtaskToggle";
+import { subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
 import { SprintRow } from "./SprintRow";
 import { CARD_MENU_CLASS } from "./CardMoveMenu";
 
@@ -31,6 +33,7 @@ interface TreeRow {
   // scope is the sprint row the row belongs to, and its own id for a sprint
   // row. A shift gesture is measured inside one scope and nowhere else.
   scope: string;
+  parentKey?: string;
 }
 
 // visibleRows flattens the list into the order it is drawn in, which is the
@@ -38,14 +41,14 @@ interface TreeRow {
 // separators are not rows here because they are not tree items: they are
 // labels drawn between cards, so the tree stays two levels deep and nothing
 // lands focus on a band heading that does nothing when activated.
-function visibleRows(details: SprintDetail[], expanded: ReadonlySet<string>): TreeRow[] {
+function visibleRows(details: SprintDetail[], expanded: ReadonlySet<string>, collapsed: ReadonlySet<string>): TreeRow[] {
   const rows: TreeRow[] = [];
   for (const detail of details) {
     const id = rowIdOf(detail);
     rows.push({ id, kind: "sprint", scope: id });
     if (!expanded.has(id)) continue;
     for (const group of groupByAssignee(detail.issues)) {
-      for (const issue of group.issues) rows.push({ id: issue.key, kind: "issue", scope: id });
+      for (const issue of visibleFamilyIssues(group.issues, collapsed)) rows.push({ id: issue.key, kind: "issue", scope: id, parentKey: issue.type === "subtask" && group.issues.some((p) => p.key === issue.parentKey) ? issue.parentKey : undefined });
     }
   }
   return rows;
@@ -57,15 +60,17 @@ function visibleRows(details: SprintDetail[], expanded: ReadonlySet<string>): Tr
 // bottom of Sprint 14 from checking three sprints' work at once. It cannot
 // happen on a board, which draws one sprint at a time, and it is one drag
 // away here.
-export function issueOrder(details: SprintDetail[]): Map<string, string[]> {
+export function issueOrder(details: SprintDetail[], collapsed: ReadonlySet<string> = new Set()): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const detail of details) {
-    out.set(rowIdOf(detail), groupByAssignee(detail.issues).flatMap((g) => g.issues.map((i) => i.key)));
+    out.set(rowIdOf(detail), groupByAssignee(detail.issues).flatMap((g) => visibleFamilyIssues(g.issues, collapsed).map((i) => i.key)));
   }
   return out;
 }
 
 interface Props {
+  collapsedIssues?: Set<string>;
+  onCollapsedIssuesChange?: (updater: (prev: Set<string>) => Set<string>) => void;
   details: SprintDetail[];
   selectedKey: string;
   onSelect: (key: string) => void;
@@ -99,12 +104,28 @@ interface Props {
 export function SprintList({
   details, selectedKey, onSelect, checked, onCheck, onExtend, onClearTo,
   movedRowId, busyRowId, onStart, onComplete, onEdit, onDelete,
+  collapsedIssues, onCollapsedIssuesChange,
 }: Props) {
   const rootRef = useRef<HTMLElement>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [flashId, setFlashId] = useState("");
   const [focusId, setFocusId] = useState("");
+  const [localCollapsed, setLocalCollapsed] = useState(new Set<string>());
+  const collapsed = collapsedIssues ?? localCollapsed;
+  const setCollapsed = onCollapsedIssuesChange ?? setLocalCollapsed;
+  const allIssues = details.flatMap((d) => d.issues);
+  const counts = subtaskCounts(allIssues);
+  function toggleChildren(key: string) {
+    if (!collapsed.has(key)) {
+      for (const child of allIssues.filter((i) => i.type === "subtask" && i.parentKey === key)) {
+        if (child.key === selectedKey) onSelect(key);
+        if (checked.has(child.key)) onCheck(child.key);
+      }
+    }
+    setCollapsed((prev) => { const next = new Set(prev); if (!next.delete(key)) next.add(key); return next; });
+    setFocusId(key);
+  }
 
   // Only the active sprint opens by itself. A board carries every sprint it
   // has ever run, so opening what has not been seen before, the way the
@@ -147,7 +168,7 @@ export function SprintList({
       ?.scrollIntoView({ block: "nearest" });
   }, [movedRowId, details]);
 
-  const rows = visibleRows(details, expanded);
+  const rows = visibleRows(details, expanded, collapsed);
   const indexOf = new Map(rows.map((r, i) => [r.id, i] as const));
   // One key width for the whole tree, for the reason lib/keyColumn gives:
   // every row is its own grid container, so a per-row track would size each
@@ -163,7 +184,7 @@ export function SprintList({
       if (indexOf.has(selectedKey)) return selectedKey;
       return rows[0]?.id ?? "";
     });
-  }, [details, expanded, selectedKey]);
+  }, [details, expanded, collapsed, selectedKey]);
 
   function toggle(id: string, focus?: boolean) {
     setExpanded((prev) => {
@@ -205,6 +226,7 @@ export function SprintList({
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       if (row.kind === "sprint") setExpanded((prev) => new Set(prev).add(row.id));
+      else if (counts.has(row.id) && collapsed.has(row.id)) toggleChildren(row.id);
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
       if (row.kind === "sprint") {
@@ -214,7 +236,8 @@ export function SprintList({
           return next;
         });
       } else {
-        moveFocus(indexOf.get(row.scope) ?? index, false);
+        if (counts.has(row.id) && !collapsed.has(row.id)) toggleChildren(row.id);
+        else moveFocus(indexOf.get(row.parentKey ?? row.scope) ?? index, false);
       }
     } else if (e.key === "Enter") {
       e.preventDefault();
@@ -257,8 +280,8 @@ export function SprintList({
     setFocusId(row.id);
   }
 
-  function issueRow(issue: Issue, scope: string) {
-    const row: TreeRow = { id: issue.key, kind: "issue", scope };
+  function issueRow(issue: Issue, scope: string, nested: boolean) {
+    const row: TreeRow = { id: issue.key, kind: "issue", scope, parentKey: nested ? issue.parentKey : undefined };
     const isChecked = checked.has(issue.key);
     return (
       <div
@@ -266,10 +289,12 @@ export function SprintList({
         role="treeitem"
         aria-selected={issue.key === selectedKey}
         aria-label={`${issue.key} ${issue.summary}`}
+        aria-level={nested ? 3 : 2}
+        aria-expanded={counts.has(issue.key) ? !collapsed.has(issue.key) : undefined}
         tabIndex={focusId === issue.key ? 0 : -1}
         data-tree-index={indexOf.get(issue.key)}
         data-tree-key={issue.key}
-        className={`folder-item sprint-issue-row${issue.key === selectedKey ? " folder-selected" : ""}`}
+        className={`folder-item sprint-issue-row${nested ? " nested-subtask" : ""}${issue.key === selectedKey ? " folder-selected" : ""}`}
         onClick={(e) => clickIssue(e, row)}
         onKeyDown={(e) => onKeyDown(e, row)}
       >
@@ -287,7 +312,11 @@ export function SprintList({
         />
         <TypeChip type={issue.type} />
         <span className="sprint-cell epic-cell-key accent-text" title={issue.key}>{issue.key}</span>
-        <span className="sprint-cell epic-cell-summary" title={issue.summary}>{issue.summary}</span>
+        <span className="sprint-cell epic-cell-summary" title={issue.summary}>
+          <SubtaskToggle issueKey={issue.key} count={counts.get(issue.key) ?? 0} expanded={!collapsed.has(issue.key)} onToggle={() => toggleChildren(issue.key)} />
+          {nested && <span aria-hidden="true">↳ </span>}{issue.summary}
+          {nested && <small className="subtask-assignee">{issue.assignee || "Unassigned"}</small>}
+        </span>
         <span className="sprint-cell">
           <span className={`chip chip-status chip-status-${statusClass(issue.status)}`} title={issue.status}>
             {issue.status}
@@ -326,7 +355,7 @@ export function SprintList({
                 {group.points > 0 ? `, ${points(group.points)} pts` : ""}
               </span>
             </div>
-            {group.issues.map((issue) => issueRow(issue, id))}
+            {visibleFamilyIssues(group.issues, collapsed).map((issue) => issueRow(issue, id, issue.type === "subtask" && group.issues.some((p) => p.key === issue.parentKey)))}
           </div>
         ))}
         {detail.total === 0 && (

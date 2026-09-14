@@ -1,4 +1,5 @@
 import type { Issue } from "../api";
+import { issueFamilies } from "./issueFamilies";
 
 // UNASSIGNED_LABEL is what the separator over the cards nobody owns prints.
 // It is the same word the Boards view's assignee swimlane uses for the same
@@ -33,14 +34,14 @@ export interface AssigneeGroup {
 // order is total rather than merely mostly decided.
 export function groupByAssignee(issues: Issue[]): AssigneeGroup[] {
   const byAssignee = new Map<string, AssigneeGroup>();
-  for (const issue of issues) {
+  for (const { parent: issue, children } of issueFamilies(issues)) {
     let group = byAssignee.get(issue.assignee);
     if (!group) {
       group = { id: issue.assignee, label: issue.assignee || UNASSIGNED_LABEL, issues: [], points: 0 };
       byAssignee.set(issue.assignee, group);
     }
-    group.issues.push(issue);
-    group.points += issue.storyPoints ?? 0;
+    group.issues.push(issue, ...children);
+    group.points += [issue, ...children].reduce((sum, i) => sum + (i.storyPoints ?? 0), 0);
   }
   return [...byAssignee.values()].sort(compare);
 }

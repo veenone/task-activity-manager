@@ -184,7 +184,7 @@ describe("NewIssueModal", () => {
     renderModal(vi.fn(), vi.fn(), "story");
     const dialog = await screen.findByRole("dialog", { name: "New story" });
     const sprint = await within(dialog).findByLabelText("Sprint");
-    await waitFor(() => expect(sprint).not.toBeDisabled());
+    await within(sprint).findByRole("option", { name: /Sprint 12/ });
     await user.selectOptions(sprint, "12");
     await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
     expect(within(dialog).queryByLabelText("Sprint")).not.toBeInTheDocument();
@@ -207,7 +207,7 @@ describe("NewIssueModal", () => {
     renderModal(vi.fn(), vi.fn(), "story");
     const dialog = await screen.findByRole("dialog", { name: "New story" });
     const sprint = await within(dialog).findByLabelText("Sprint");
-    await waitFor(() => expect(sprint).not.toBeDisabled());
+    await within(sprint).findByRole("option", { name: /Sprint 12/ });
     await user.selectOptions(sprint, "12");
     await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
     await user.selectOptions(within(dialog).getByLabelText("Type"), "story");
@@ -224,7 +224,7 @@ describe("NewIssueModal", () => {
     const user = userEvent.setup();
     renderModal(vi.fn(), vi.fn(), "story");
     const dialog = await screen.findByRole("dialog", { name: "New story" });
-    await waitFor(() => expect(within(dialog).getByLabelText("Epic")).toBeEnabled());
+    await within(dialog).findByRole("option", { name: /PLAT-360/ });
     await user.selectOptions(within(dialog).getByLabelText("Epic"), "PLAT-360");
     await user.selectOptions(within(dialog).getByLabelText("Type"), "epic");
     expect(within(dialog).queryByLabelText("Epic")).not.toBeInTheDocument();

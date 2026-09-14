@@ -36,6 +36,12 @@ export function useBoardSprintDetails(profileId: string, boardId: number) {
 // sprint to it, a completion closes one out of it, and an edit renames one
 // inside it: the Backlog's Sprint field offers that list and has no other
 // way to hear about any of the three.
+//
+// The sprint report is here because completing a sprint changes which
+// sprint is the newest closed one, and the Reports view holds that answer
+// under a sprint id of 0 with an infinite staleTime. Without this, closing
+// a sprint and opening Reports shows the sprint before it, under its own
+// name, for the rest of the session.
 export function invalidateSprintWrites(qc: QueryClient, profileId: string) {
   if (!profileId) return;
   for (const queryKey of [
@@ -45,6 +51,7 @@ export function invalidateSprintWrites(qc: QueryClient, profileId: string) {
     [profileId, "board"] as const,
     [profileId, "sprintSuggestion"] as const,
     keys.openSprints(profileId),
+    [profileId, "sprintReport"] as const,
   ]) {
     qc.invalidateQueries({ queryKey });
   }

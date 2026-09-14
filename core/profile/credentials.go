@@ -14,3 +14,6 @@ type CredentialStore interface {
 	// Delete removes the secret for a profile.
 	Delete(profileID string) error
 }
+
+// ConfluenceCredentialID namespaces the Confluence secret from a profile's Jira secret.
+func ConfluenceCredentialID(profileID string) string { return profileID + ":confluence" }

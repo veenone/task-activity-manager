@@ -34,7 +34,7 @@ func Visible(ps []profile.Profile) []profile.Profile {
 // purpose, since the mock fixtures belong to XTM's test data.
 func IsDemoURL(url string) bool {
 	u := strings.ToLower(strings.TrimSpace(url))
-	return u == "demo" || strings.HasPrefix(u, "demo:") || strings.HasPrefix(u, "demo-")
+	return u == "demo" || u == "demo_pkcs" || strings.HasPrefix(u, "demo:") || strings.HasPrefix(u, "demo-")
 }
 
 // ValidateFields checks the three fields every profile needs, whether it is

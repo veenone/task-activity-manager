@@ -125,7 +125,11 @@ func (b *Backend) SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, si
 	pt := b.typesOrEmpty(ctx, projectKey)
 	jql := buildJQL(projectKey, scopeJQL, since, jiraTypeNames(types, b.requirementType, pt))
 	fields := append(append([]string{}, baseFields...), ids.list()...)
-	page, err := b.c.SearchIssues(ctx, jql, fields, startAt, maxResults)
+	// No expand: this is the sync path. expand=changelog costs no second
+	// request; it makes this same response carry every row's full history,
+	// which Jira has to assemble at real cost and which a sync never reads,
+	// so asking for it here would only make every page slower for nothing.
+	page, err := b.c.SearchIssues(ctx, jql, fields, nil, startAt, maxResults)
 	if err != nil {
 		return nil, 0, err
 	}

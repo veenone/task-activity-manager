@@ -159,13 +159,14 @@ interface FieldsProps {
   // and the caption under them would otherwise sit there saying it was
   // reading a sprint length nobody had asked for.
   suggesting?: boolean;
+  dateChanged?: boolean;
 }
 
 // SprintDraftFields renders the four fields and the caption under the dates.
 // It takes the suggestion's error separately from the suggestion itself,
 // because a dialog whose dates could not be suggested is still usable and has
 // to say so rather than silently offering two empty boxes.
-export function SprintDraftFields({ draft, suggestion, suggestionError, nameNote, suggesting = true }: FieldsProps) {
+export function SprintDraftFields({ draft, suggestion, suggestionError, nameNote, suggesting = true, dateChanged = false }: FieldsProps) {
   const { values, set, invalidField, idPrefix } = draft;
   const days = suggestion ? plural(suggestion.length, "day", "days") : "";
 
@@ -199,7 +200,7 @@ export function SprintDraftFields({ draft, suggestion, suggestionError, nameNote
       <div className="edit-row">
         <span className="muted small">Dates</span>
         <span className="edit-cell">
-          <span className="date-field">
+          <span className={`date-field${dateChanged ? " edit-date-changed" : ""}`}>
             <label className="muted small" htmlFor={`${idPrefix}-from`}>Start</label>
             <input
               id={`${idPrefix}-from`}
@@ -220,6 +221,7 @@ export function SprintDraftFields({ draft, suggestion, suggestionError, nameNote
               onChange={(e) => set.to(e.target.value)}
             />
           </span>
+          {dateChanged && <span className="edit-date-note">Dates changed — saving moves the sprint schedule in Jira.</span>}
           {/* Where the length came from, every time. Jira does not expose a
               board's cadence, so the only honest sources are this board's own
               closed sprints or a flat default, and a team that changed cadence

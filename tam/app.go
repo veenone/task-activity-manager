@@ -19,6 +19,8 @@ import (
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/ritualrepo"
+	"agile-suite/tam/internal/suiteprofiles"
 	"agile-suite/tam/internal/tamstore"
 )
 
@@ -40,11 +42,19 @@ type App struct {
 	settings  *settings.Manager
 	repo      *issuerepo.Repository
 	boards    *boardrepo.Repository
+	rituals   *ritualrepo.Repository
 	backendMu sync.Mutex
 	backends  map[string]backend.IssueBackend
-	// busy names the operation running for a profile ("sync", "commit", or
-	// "import"), so none of them overlap; the frontend reducer mirrors this.
-	busy       map[string]string
+	// busy names the operation running for a profile, one of "sync",
+	// "commit", "import", "sprint", "boards refresh" and "report", so none
+	// of them overlap; the frontend reducer mirrors this.
+	busy map[string]string
+	// reportCancels holds the cancel func of the sprint report running for
+	// a profile, so the view can stop one it has walked away from. It is
+	// guarded by backendMu, the same mutex busy is, and app_reports.go is
+	// the only file that touches it.
+	reportCancels map[string]context.CancelFunc
+
 	dbPath     string
 	sharedPath string
 	logPath    string
@@ -107,6 +117,7 @@ func (a *App) initStore() error {
 	a.dbPath = dbPath
 	a.repo = issuerepo.New(local.DB())
 	a.boards = boardrepo.New(local.DB())
+	a.rituals = ritualrepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
 
@@ -124,6 +135,24 @@ func (a *App) initStore() error {
 	a.profiles = profile.NewManager(shared.DB())
 	a.creds = profile.NewCredentialStore()
 	a.settings = settings.NewManager(shared.DB())
+	// Keep the offline preview useful for demo profiles created by an older
+	// build as well as profiles created today. SeedDemo is idempotent and never
+	// replaces a locally edited document. Neither a listing failure nor a
+	// seeding failure should keep the app from opening: this is a nice-to-have
+	// preview refresh, not something the rest of startup depends on, so it is
+	// logged and skipped the same way shutdown logs a close failure rather
+	// than treating it as fatal.
+	if demoProfiles, listErr := a.profiles.List(); listErr != nil {
+		log.Printf("tam: list profiles for demo ritual seed: %v", listErr)
+	} else {
+		for _, p := range demoProfiles {
+			if suiteprofiles.IsDemoURL(p.JiraURL) {
+				if seedErr := a.rituals.SeedDemo(context.Background(), p.ID, p.ProjectKey); seedErr != nil {
+					log.Printf("tam: seed demo rituals for %s: %v", p.ID, seedErr)
+				}
+			}
+		}
+	}
 	log.Printf("tam: local store ready at %s; shared profiles at %s", dbPath, sharedPath)
 	return nil
 }

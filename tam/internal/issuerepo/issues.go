@@ -153,6 +153,16 @@ func (r *Repository) UpsertPage(ctx context.Context, profileID string, page []ba
 // sort column.
 func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQuery) (IssuePage, error) {
 	where, args := issueFilter(profileID, q)
+	if q.GroupSubtasks {
+		// Match either a parent or one of its children, then page the parent
+		// keys. A subtask whose parent has not been synced stays visible alone.
+		where = `profile_id = ? AND key IN (
+			SELECT CASE WHEN type = 'subtask' AND EXISTS (
+				SELECT 1 FROM issue parent WHERE parent.profile_id = issue.profile_id
+				AND parent.key = issue.parent_key AND parent.type NOT IN ('subtask', 'epic')
+			) THEN parent_key ELSE key END FROM issue WHERE ` + where + `)`
+		args = append([]any{profileID}, args...)
+	}
 	var total int
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM issue WHERE `+where, args...).Scan(&total); err != nil {
 		return IssuePage{}, fmt.Errorf("count issues: %w", err)
@@ -186,7 +196,57 @@ func (r *Repository) ListIssues(ctx context.Context, profileID string, q IssueQu
 	if err := rows.Err(); err != nil {
 		return IssuePage{}, err
 	}
+	// Release the connection before the child read (the store may use a
+	// single connection). Children do not consume additional page slots.
+	if err := rows.Close(); err != nil {
+		return IssuePage{}, err
+	}
+	if q.GroupSubtasks && len(issues) > 0 {
+		issues, err = r.withSubtasks(ctx, profileID, issues, q)
+		if err != nil {
+			return IssuePage{}, err
+		}
+	}
 	return IssuePage{Issues: issues, Total: total}, nil
+}
+
+// withSubtasks expands only the selected page's parents, preserving the sort
+// within each family. Filters select families, so siblings remain available
+// alongside a matching child, including when the parent itself did not match.
+func (r *Repository) withSubtasks(ctx context.Context, profileID string, parents []backend.Issue, q IssueQuery) ([]backend.Issue, error) {
+	args := []any{profileID}
+	for _, parent := range parents {
+		if parent.Type != backend.TypeSubtask && parent.Type != backend.TypeEpic {
+			args = append(args, parent.Key)
+		}
+	}
+	if len(args) == 1 {
+		return parents, nil
+	}
+	marks := strings.TrimSuffix(strings.Repeat("?,", len(args)-1), ",")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+issueColumns+` FROM issue
+		WHERE profile_id = ? AND type = 'subtask' AND parent_key IN (`+marks+`)`+orderFor(q), args...)
+	if err != nil {
+		return nil, fmt.Errorf("list backlog subtasks: %w", err)
+	}
+	defer rows.Close()
+	children := make(map[string][]backend.Issue)
+	for rows.Next() {
+		iss, err := scanIssue(rows)
+		if err != nil {
+			return nil, err
+		}
+		children[iss.ParentKey] = append(children[iss.ParentKey], iss)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	result := make([]backend.Issue, 0, len(parents))
+	for _, parent := range parents {
+		result = append(result, parent)
+		result = append(result, children[parent.Key]...)
+	}
+	return result, nil
 }
 
 // GetIssue returns one cached row or ErrNotFound.
