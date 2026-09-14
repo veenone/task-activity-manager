@@ -52,8 +52,8 @@ func TestDemoSeedAfterRepairingVersionTenWithoutIssuesColumn(t *testing.T) {
 		if draft.IssuesJSON != `[{"key":"DEMO-412","remark":""},{"key":"DEMO-409","remark":""}]` {
 			t.Errorf("lost issue selections: %s", draft.IssuesJSON)
 		}
-		if version, err := store.ReadSchemaVersion(db.DB()); err != nil || version != 11 {
-			t.Errorf("schema = %d, error = %v", version, err)
+		if version, err := store.ReadSchemaVersion(db.DB()); err != nil || version != tamstore.Schema.Version {
+			t.Errorf("schema = %d, error = %v, want %d", version, err, tamstore.Schema.Version)
 		}
 		if err := db.Close(); err != nil {
 			t.Fatal(err)
