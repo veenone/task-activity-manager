@@ -140,3 +140,75 @@ func TestDemoPagesSurviveARestart(t *testing.T) {
 		t.Fatalf("after restart = %+v, %v", res, err)
 	}
 }
+
+// TestAGonePageStaysGoneAfterARestart guards against demoSpace resurrecting a
+// page a real Sync already marked gone: ProfileDocuments filters only on
+// confluence_page_id being non-empty, and MarkGone never clears that column,
+// so a naive rebuild restores the gone page under its old id and title the
+// moment the app restarts, before anyone has forgotten it. ForgetRitualPage
+// then clears the local page id, and the next Sync's place() does
+// FindPageByTitle before creating: against the resurrected page still
+// sitting in the rebuilt space, it adopts (or conflicts with) it instead of
+// creating a genuinely new one. The rebuild has to run once while the row is
+// still gone-with-a-page-id (the sync right after the restart) for the
+// resurrection to land in the space at all; a Sync run only after
+// ForgetRitualPage has already cleared the page id would never ask
+// ProfileDocuments for this row in the first place, fix or no fix.
+func TestAGonePageStaysGoneAfterARestart(t *testing.T) {
+	a, p := newRitualSyncApp(t)
+	if _, err := a.SyncRituals(p.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := a.ListRitualDocuments(p.ID, 1, 14)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var oldPageID string
+	for _, d := range docs {
+		if d.RitualType == "planning" {
+			oldPageID = d.PageID
+		}
+	}
+	if oldPageID == "" {
+		t.Fatal("planning page was not created")
+	}
+
+	a.demoConfluence[p.ID].Remove(oldPageID)
+	if _, err := a.SyncRituals(p.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	docs, err = a.ListRitualDocuments(p.ID, 1, 14)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range docs {
+		if d.RitualType == "planning" && d.Status != ritualrepo.StatusGone {
+			t.Fatalf("planning status = %q, want gone", d.Status)
+		}
+	}
+
+	// Restart: the in-memory space is gone, but the gone row (page id still
+	// set) is not. The very next Sync is what rebuilds the space, and it has
+	// to run before the row is forgotten for a naive rebuild to resurrect it.
+	a.demoConfluence = nil
+	if _, err := a.SyncRituals(p.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := a.ForgetRitualPage(p.ID, 1, 14, "planning"); err != nil {
+		t.Fatal(err)
+	}
+	res, err := a.SyncRituals(p.ID, 1)
+	if err != nil || res.Created != 1 {
+		t.Fatalf("result = %+v, %v", res, err)
+	}
+	docs, err = a.ListRitualDocuments(p.ID, 1, 14)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range docs {
+		if d.RitualType == "planning" && d.PageID == oldPageID {
+			t.Fatalf("planning page id = %q, want a new id, not the resurrected old one", d.PageID)
+		}
+	}
+}

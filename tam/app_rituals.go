@@ -323,14 +323,25 @@ func (a *App) demoSpace(profileID string, c profile.ConfluenceConfig) *demo.Conf
 	if docs, err := a.rituals.ProfileDocuments(a.ctx, profileID); err != nil {
 		log.Printf("tam: rebuild demo ritual pages for %s: %v", profileID, err)
 	} else {
+		// A row can carry a page id and still be gone: MarkGone only flips
+		// status, so ProfileDocuments' confluence_page_id <> '' filter alone
+		// cannot tell the two apart. Restoring a gone page here would put it
+		// back in the space under its old title, and a later ForgetRitualPage
+		// would then have Sync's place() find and adopt that resurrected page
+		// by title instead of creating a genuinely new one. A gone overview
+		// is skipped from the parent map too, so a gone ritual page never
+		// gets rebuilt under it either.
 		overviews := map[[2]int]string{}
 		for _, d := range docs {
-			if d.RitualType == ritualtemplate.Sprint {
+			if d.RitualType == ritualtemplate.Sprint && d.Status != ritualrepo.StatusGone {
 				overviews[[2]int{d.BoardID, d.SprintID}] = d.PageID
 				space.Restore(d.PageID, c.RootPageID, d.Title, d.BaseBody, d.Version)
 			}
 		}
 		for _, d := range docs {
+			if d.Status == ritualrepo.StatusGone {
+				continue
+			}
 			if parent, ok := overviews[[2]int{d.BoardID, d.SprintID}]; ok && d.RitualType != ritualtemplate.Sprint {
 				space.Restore(d.PageID, parent, d.Title, d.BaseBody, d.Version)
 			}
