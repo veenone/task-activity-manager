@@ -735,3 +735,29 @@ input, button, select { font-family: inherit; font-size: inherit; }
   .report-frame .board-picker select { min-width: 0; width: 100%; }
   .report-actions .btn { min-height: 44px; }
 }
+
+/* The ritual editor: a toolbar, one scroller, and a status line. */
+.ritual-page { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.ritual-page-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.ritual-page-head h3 { margin: 0; font-size: 15px; }
+.ritual-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.ritual-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.ritual-toolbar .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.ritual-toolbar .ritual-add-entry { margin-left: auto; }
+.ritual-link-input { display: inline-flex; gap: 4px; align-items: center; }
+.ritual-link-input input { width: 220px; }
+.ritual-editor-content { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
+.ritual-editor-content .ProseMirror { outline: none; min-height: 100%; }
+.ritual-editor-content table { border-collapse: collapse; margin: 8px 0; }
+.ritual-editor-content th, .ritual-editor-content td { border: 1px solid var(--border); padding: 4px 8px; min-width: 64px; vertical-align: top; }
+.ritual-editor-content th { background: var(--surface-2); }
+.ritual-editor-content ul[data-type="taskList"] { list-style: none; padding-left: 2px; }
+.ritual-editor-content ul[data-type="taskList"] li { display: flex; gap: 6px; align-items: flex-start; }
+.ritual-editor-content ul[data-type="taskList"] li > div { flex: 1; }
+.ritual-opaque { display: block; border: 1px dashed var(--border-strong); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--surface-sunken); }
+.ritual-opaque.is-selected { outline: 2px solid var(--accent); }
+.ritual-opaque-label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 4px; color: var(--text-strong); }
+.ritual-opaque-inline { border: 1px dashed var(--border-strong); border-radius: 4px; padding: 0 4px; font-size: 12px; background: var(--surface-sunken); }
+.ritual-status-line { margin: 0; padding: 4px 16px; border-top: 1px solid var(--border-subtle); }
+.ritual-notice { margin: 0; padding: 4px 16px; }
+.ritual-readonly { padding: 12px 16px; overflow: auto; min-height: 0; }
