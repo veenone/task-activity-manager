@@ -384,6 +384,7 @@ var ErrNoTransition = errors.New("no workflow transition reaches that status")
 // while naming the reachable ones by name, and it is shown verbatim in the
 // commit banner.
 type NoTransition struct {
+	Reason         string
 	Key            string
 	TargetStatusID string
 	TargetStatus   string
@@ -391,6 +392,9 @@ type NoTransition struct {
 }
 
 func (e *NoTransition) Error() string {
+	if e.Reason != "" {
+		return e.Reason
+	}
 	target := e.TargetStatus
 	if target == "" {
 		target = "status " + e.TargetStatusID
@@ -415,6 +419,7 @@ var ErrTransitionFields = errors.New("the transition needs fields TAM cannot fil
 // the statuses that are. It is best effort, so a failed check means "we
 // could not ask", never "the move is illegal".
 type TransitionCheck struct {
+	Reason    string   `json:"reason,omitempty"`
 	Reachable []string `json:"reachable"`
 	Allowed   bool     `json:"allowed"`
 }

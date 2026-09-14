@@ -643,6 +643,9 @@ func TestVersionTenAddsIssuesJSONAndConvertsOldKeys(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 	// The recorded version lives as a row in meta, not in a table of its own.
+	if _, err := db.DB().Exec(`ALTER TABLE ritual_document DROP COLUMN issues_json`); err != nil {
+		t.Fatalf("restore version 9 table: %v", err)
+	}
 	// Every existing migration test rewinds this way; see
 	// openAtSprintKeyVersion in this file.
 	if _, err := db.DB().Exec(`UPDATE meta SET value = '9' WHERE key = 'schema_version'`); err != nil {

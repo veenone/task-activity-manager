@@ -81,8 +81,10 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 	where := []string{"profile_id = ?", "type <> ?"}
 	args := []any{profileID, backend.TypeEpic}
 	if q.SprintID != "" {
-		where = append(where, "sprint_id = ?")
-		args = append(args, q.SprintID)
+		where = append(where, `(sprint_id = ? OR
+			(type = 'subtask' AND parent_key IN (SELECT key FROM issue WHERE profile_id = ? AND sprint_id = ?)) OR
+			key IN (SELECT parent_key FROM issue WHERE profile_id = ? AND type = 'subtask' AND sprint_id = ?))`)
+		args = append(args, q.SprintID, profileID, q.SprintID, profileID, q.SprintID)
 	}
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+issueColumns+` FROM issue WHERE `+strings.Join(where, " AND ")+issueOrder+` LIMIT ?`,
@@ -112,6 +114,29 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		return Tree{}, err
 	}
 	text := strings.TrimSpace(q.Text)
+	parents := map[string]bool{}
+	for _, c := range others {
+		if c.Type != backend.TypeSubtask {
+			parents[c.Key] = true
+		}
+	}
+	// Keep the parent as context when a subtask matches, even when the
+	// parent is done. Only direct epic children contribute to epic totals.
+	family := func(c backend.Issue, epicMatches bool) []backend.Issue {
+		parentMatches := epicMatches || matches(c, text)
+		children := []backend.Issue{}
+		if c.Type != backend.TypeSubtask {
+			for _, sub := range byParent[c.Key] {
+				if sub.Type == backend.TypeSubtask && (q.ShowDone || !backend.IsDone(sub.Status)) && (parentMatches || matches(sub, text)) {
+					children = append(children, sub)
+				}
+			}
+		}
+		if len(children) == 0 && ((!q.ShowDone && backend.IsDone(c.Status)) || !parentMatches) {
+			return nil
+		}
+		return append([]backend.Issue{c}, children...)
+	}
 	isEpic := map[string]bool{}
 	tree := Tree{Epics: []EpicNode{}, Orphans: []backend.Issue{}, Truncated: truncated}
 	for _, e := range epics {
@@ -119,6 +144,9 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		node := EpicNode{Issue: e, Children: []backend.Issue{}}
 		all := byParent[e.Key]
 		for _, c := range all {
+			if c.Type == backend.TypeSubtask {
+				continue
+			}
 			node.Total++
 			if c.StoryPoints != nil {
 				node.Points += *c.StoryPoints
@@ -133,14 +161,12 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		epicMatches := matches(e, text)
 		anyChild := false
 		for _, c := range all {
-			if !q.ShowDone && backend.IsDone(c.Status) {
+			if c.Type == backend.TypeSubtask {
 				continue
 			}
-			if !epicMatches && !matches(c, text) {
-				continue
-			}
-			node.Children = append(node.Children, c)
-			anyChild = true
+			visible := family(c, epicMatches)
+			node.Children = append(node.Children, visible...)
+			anyChild = anyChild || len(visible) > 0
 		}
 		if text != "" && !epicMatches && !anyChild {
 			continue
@@ -154,16 +180,13 @@ func (r *Repository) EpicTree(ctx context.Context, profileID string, q TreeQuery
 		tree.Epics = append(tree.Epics, node)
 	}
 	for _, c := range others {
-		if c.ParentKey != "" && isEpic[c.ParentKey] {
+		if c.Type == backend.TypeSubtask && parents[c.ParentKey] {
 			continue
 		}
-		if !q.ShowDone && backend.IsDone(c.Status) {
+		if c.Type != backend.TypeSubtask && isEpic[c.ParentKey] {
 			continue
 		}
-		if !matches(c, text) {
-			continue
-		}
-		tree.Orphans = append(tree.Orphans, c)
+		tree.Orphans = append(tree.Orphans, family(c, false)...)
 	}
 	return tree, nil
 }

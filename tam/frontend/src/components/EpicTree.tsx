@@ -6,6 +6,7 @@ import type { Row } from "../lib/epicTreeItems";
 import { EpicChildRow, EpicRow } from "./EpicRow";
 import { keyColumnWidth } from "../lib/keyColumn";
 import { MOVED_FLASH_MS } from "../lib/flash";
+import { subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
 
 interface Props {
   tree: EpicTreeData;
@@ -22,6 +23,14 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
   const seenRef = useRef<Set<string>>(new Set());
   const [flashKey, setFlashKey] = useState("");
   const [focusKey, setFocusKey] = useState(selectedKey);
+  const [collapsed, setCollapsed] = useState(new Set<string>());
+  const allIssues = [...tree.epics.flatMap((n) => n.children), ...tree.orphans];
+  const counts = subtaskCounts(allIssues);
+  function toggleChildren(key: string) {
+    if (!collapsed.has(key) && allIssues.some((i) => i.key === selectedKey && i.type === "subtask" && i.parentKey === key)) onSelect(key);
+    setCollapsed((prev) => { const next = new Set(prev); if (!next.delete(key)) next.add(key); return next; });
+    setFocusKey(key);
+  }
 
   // A newly seen epic (or the orphans group) opens by default, and so does
   // the branch holding the selected key, so nothing loads, or gets
@@ -61,7 +70,7 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
     return () => clearTimeout(t);
   }, [movedKey]);
 
-  const rows = visibleRows(tree, expanded);
+  const rows = visibleRows(tree, expanded, collapsed);
   // One width for every row: each .epic-row is its own grid container, so a
   // per-row max-content track would size each row to its own key and the
   // columns would stop lining up. "All epics" is in the list because it sits
@@ -82,7 +91,7 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
       if (indexOf.has(selectedKey)) return selectedKey;
       return rows[0]?.id ?? "";
     });
-  }, [tree, expanded, selectedKey]);
+  }, [tree, expanded, collapsed, selectedKey]);
 
   function moveFocus(index: number) {
     const target = rows[index];
@@ -117,6 +126,7 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       if (row.kind === "epic" || row.kind === "noepic") onExpandedChange((prev) => new Set(prev).add(row.id));
+      else if (counts.has(row.id) && collapsed.has(row.id)) toggleChildren(row.id);
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
       if (row.kind === "epic" || row.kind === "noepic") {
@@ -126,7 +136,8 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
           return next;
         });
       } else if (row.kind === "child") {
-        moveFocus(indexOf.get(row.ownerKey) ?? index);
+        if (counts.has(row.id) && !collapsed.has(row.id)) toggleChildren(row.id);
+        else moveFocus(indexOf.get(row.ownerKey) ?? index);
       }
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -137,12 +148,16 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
   }
 
   function renderChildren(children: Issue[], ownerKey: string) {
-    return children.map((child) => (
+    return visibleFamilyIssues(children, collapsed).map((child) => (
       <EpicChildRow
         key={child.key}
         child={child}
+        subtaskCount={counts.get(child.key) ?? 0}
+        subtasksExpanded={!collapsed.has(child.key)}
+        onToggleSubtasks={() => toggleChildren(child.key)}
         subtaskLabel={subtaskLabel}
-        ownerKey={ownerKey}
+        nested={child.type === "subtask" && children.some((p) => p.key === child.parentKey)}
+        ownerKey={child.type === "subtask" && children.some((p) => p.key === child.parentKey) ? child.parentKey : ownerKey}
         index={indexOf.get(child.key)}
         selected={child.key === selectedKey}
         focused={child.key === focusKey}

@@ -81,7 +81,10 @@ func TestVersionTenAddsIssuesJSONAndConvertsOldKeys(t *testing.T) {
 		VALUES ('p1', 1, 12, 'review', '["PLAT-14","PLAT-22"]', '[]')`); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	if _, err := db.DB().Exec(`UPDATE schema_version SET version = 9`); err != nil {
+	// The recorded version lives as a row in meta, not in a table of its own.
+	// Every existing migration test rewinds this way; see
+	// openAtSprintKeyVersion in this file.
+	if _, err := db.DB().Exec(`UPDATE meta SET value = '9' WHERE key = 'schema_version'`); err != nil {
 		t.Fatalf("rewind: %v", err)
 	}
 	if err := db.Close(); err != nil {

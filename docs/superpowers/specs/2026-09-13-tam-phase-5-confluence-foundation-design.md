@@ -2,10 +2,9 @@
 
 ## Goal
 
-Add the configuration and read-only API foundation needed by the Phase 5
-Rituals view. This slice does not render pages or add caching; it establishes
-the profile settings, credential boundary, normalized page model, and tested
-HTTP client that later UI work will consume.
+Add the configuration and read-only API foundation used by the Phase 5 Rituals
+view. The shipped slice also renders linked pages and caches page payloads for
+offline-friendly revisits; editing remains out of scope.
 
 ## Profile and credential boundary
 
@@ -51,11 +50,12 @@ is included in this slice.
 
 ## Verification
 
-- Profile tests cover round-tripping optional Confluence fields and ensuring
-  exported profile configuration excludes the token.
+- Profile tests cover round-tripping optional Confluence fields, profile-delete
+  cleanup, and ensuring exported profile configuration excludes the token.
 - Client tests use an `httptest` server to verify auth headers, URL joining,
   page decoding, child-page pagination, and status/error mapping.
 - App tests cover missing configuration, missing credentials, and successful
-  page reads.
+  page reads. The Rituals view covers cache reads and writes around those app
+  calls.
 - Existing core and TAM test suites, frontend typecheck, and build remain
   green.

@@ -349,6 +349,14 @@ func (b *Backend) CanTransition(_ context.Context, key string, targetStatusIDs [
 	}
 	_, allowed := b.firstAllowed(key, targetStatusIDs)
 	check := backend.TransitionCheck{Reachable: reachableFrom(key, b.ConflictKey()), Allowed: allowed}
+	if !allowed {
+		for _, id := range targetStatusIDs {
+			if err := b.refuseTransition(key, id); err != nil {
+				check.Reason = err.Error()
+				break
+			}
+		}
+	}
 	return check, nil
 }
 
@@ -381,7 +389,11 @@ func (b *Backend) refuseTransition(key, targetStatusID string) error {
 	if key != b.ConflictKey() || targetStatusID != StatusID("Done") {
 		return nil
 	}
-	return &backend.NoTransition{Key: key, TargetStatusID: targetStatusID, Reachable: reachableFrom(key, b.ConflictKey())}
+	return &backend.NoTransition{Key: key, TargetStatusID: targetStatusID, Reachable: reachableFrom(key, b.ConflictKey()), Reason: demoDoneRefusal(key)}
+}
+
+func demoDoneRefusal(key string) string {
+	return fmt.Sprintf("%s cannot move to Done because of a demo restriction. This applies even when all its subtasks are Done. Use another story to try this move.", key)
 }
 
 // reachableFrom is the demo's list of statuses a card can move to: the

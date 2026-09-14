@@ -4,7 +4,7 @@ import { errMsg, useProfile } from "@agile-suite/core";
 import type { Issue, Profile, Settings, Swimlane } from "../api";
 import { useBoard, useBoardSprints, useBoards, useBoardsUnavailable, useSyncBoards } from "../queries/boards";
 import { useSyncState } from "../queries/issues";
-import { filterBoard } from "../lib/boardFilter";
+import { filterBoard, groupBoard } from "../lib/boardFilter";
 import { useSync } from "../contexts/SyncContext";
 import { cardAtPos, cardKeys, findCard, posId } from "../lib/boardCells";
 import { BoardBody } from "./BoardBody";
@@ -98,7 +98,7 @@ export function BoardsView() {
 
   // Filtered before anything reads it, so the cells, the counts, the
   // keyboard walk, and the drop targets all agree about which cards exist.
-  const data = useMemo(() => (view.data ? filterBoard(view.data, filter) : view.data), [view.data, filter]);
+  const data = useMemo(() => (view.data ? groupBoard(filterBoard(view.data, filter)) : view.data), [view.data, filter]);
   // The board in reading order, which is what a shift gesture measures a run
   // against and the order a bulk move sends its keys in. It is the drawn
   // board, filter and all, so the selection can only ever hold cards the

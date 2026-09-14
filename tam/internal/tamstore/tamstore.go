@@ -35,7 +35,7 @@ import (
 // Version 9 adds ritual_document through the same idempotent base DDL path
 // as sprint_report.
 var Schema = store.Schema{
-	Version: 10,
+	Version: 11,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -136,6 +136,24 @@ var Schema = store.Schema{
 		// dropped: SQLite makes column removal a table rebuild, and a rebuild
 		// here would risk a user's unpublished drafts to reclaim nothing.
 		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "ritual_document", "issues_json TEXT NOT NULL DEFAULT '[]'"); err != nil {
+				return err
+			}
+			return convertRitualIssueKeys(db)
+		},
+	}, {
+		Version: 11,
+		// Some development builds recorded v10 before adding issues_json.
+		// Repair those files without restoring deliberately cleared selections
+		// in healthy v10 databases, where the legacy keys may still be present.
+		Apply: func(db *sql.DB) error {
+			var exists int
+			if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('ritual_document') WHERE name = 'issues_json'`).Scan(&exists); err != nil {
+				return fmt.Errorf("check ritual issue column: %w", err)
+			}
+			if exists != 0 {
+				return nil
+			}
 			if err := store.AddColumnIfMissing(db, "ritual_document", "issues_json TEXT NOT NULL DEFAULT '[]'"); err != nil {
 				return err
 			}

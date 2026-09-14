@@ -11,6 +11,48 @@ import (
 	demobackend "agile-suite/tam/internal/backend/demo"
 )
 
+func TestDemoDoneRefusalExplainsRestrictionAfterSubtasksAreDone(t *testing.T) {
+	b := demobackend.New("PRJ")
+	ctx := context.Background()
+	done := demobackend.StatusID("Done")
+	issues, _, err := b.SearchIssuesPage(ctx, "PRJ", "", "", backend.AllTypes, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	children := 0
+	for _, issue := range issues {
+		if issue.Type != backend.TypeSubtask || issue.ParentKey != "PRJ-412" {
+			continue
+		}
+		children++
+		if err := b.Transition(ctx, issue.Key, []string{done}); err != nil {
+			t.Fatal(err)
+		}
+		updated, err := b.GetIssue(ctx, issue.Key)
+		if err != nil || updated.Status != "Done" {
+			t.Fatalf("subtask = %+v, %v", updated, err)
+		}
+	}
+	if children == 0 {
+		t.Fatal("fixture has no subtasks for PRJ-412")
+	}
+	check, err := b.CanTransition(ctx, "PRJ-412", []string{done})
+	if err != nil || check.Allowed {
+		t.Fatalf("check = %+v, %v", check, err)
+	}
+	if !strings.Contains(check.Reason, "demo restriction") || !strings.Contains(check.Reason, "subtasks") {
+		t.Fatalf("missing explanation: %q", check.Reason)
+	}
+	err = b.Transition(ctx, "PRJ-412", []string{done})
+	if !errors.Is(err, backend.ErrNoTransition) || err.Error() != check.Reason {
+		t.Fatalf("commit refusal = %v, want %q", err, check.Reason)
+	}
+	check, err = b.CanTransition(ctx, "PRJ-409", []string{done})
+	if err != nil || !check.Allowed || check.Reason != "" {
+		t.Fatalf("ordinary issue = %+v, %v", check, err)
+	}
+}
+
 func TestDemoBackendPagesTheWholeDataset(t *testing.T) {
 	b := demobackend.New("PLAT")
 	ctx := context.Background()

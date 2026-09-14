@@ -122,7 +122,7 @@ export function useBoardMoves({ profileId, view, boardId, commit, committing }: 
       {
         onSuccess: (answer) => {
           if (asked.current.get(key) !== n || answer.allowed) return;
-          setWarnings((prev) => new Map(prev).set(key, { target: columnName, reachable: answer.reachable ?? [] }));
+          setWarnings((prev) => new Map(prev).set(key, { target: columnName, reachable: answer.reachable ?? [], reason: answer.reason }));
         },
         onSettled: () => {
           if (asked.current.get(key) !== n) return;

@@ -93,7 +93,13 @@ func (m *Manager) CachedConfluencePage(profileID, pageID string) (payload, fetch
 }
 
 func (m *Manager) ListRitualAssociations(profileID string, boardID, sprintID int) ([]RitualAssociation, error) {
-	rows, err := m.db.Query(`SELECT board_id, sprint_id, ritual_type, page_id, page_title FROM confluence_association WHERE profile_id = ? AND board_id = ? AND sprint_id = ? ORDER BY ritual_type, page_title`, profileID, boardID, sprintID)
+	query := `SELECT board_id, sprint_id, ritual_type, page_id, page_title FROM confluence_association WHERE profile_id = ? ORDER BY board_id, sprint_id, ritual_type, page_title`
+	args := []any{profileID}
+	if boardID != 0 || sprintID != 0 {
+		query = `SELECT board_id, sprint_id, ritual_type, page_id, page_title FROM confluence_association WHERE profile_id = ? AND board_id = ? AND sprint_id = ? ORDER BY ritual_type, page_title`
+		args = append(args, boardID, sprintID)
+	}
+	rows, err := m.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list ritual associations: %w", err)
 	}
@@ -344,12 +350,25 @@ func (m *Manager) UpdateCrossProjectSources(id, sources string) error {
 // created before the connection table existed on a database that has not
 // yet reopened to run the v43 backfill) is tolerated, not an error.
 func (m *Manager) Delete(id string) error {
-	res, err := m.db.Exec(`DELETE FROM profiles WHERE id = ?`, id)
+	tx, err := m.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin delete profile: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, table := range []string{"confluence_page_cache", "confluence_association", "confluence_profile"} {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE profile_id = ?`, id); err != nil {
+			return fmt.Errorf("delete %s for profile: %w", table, err)
+		}
+	}
+	res, err := tx.Exec(`DELETE FROM profiles WHERE id = ?`, id)
 	if err != nil {
 		return fmt.Errorf("delete profile: %w", err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit delete profile: %w", err)
 	}
 	if err := m.conns.Delete(id); err != nil && !errors.Is(err, connection.ErrNotFound) {
 		return fmt.Errorf("delete connection for profile: %w", err)

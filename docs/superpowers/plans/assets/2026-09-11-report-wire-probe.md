@@ -1,5 +1,13 @@
 # Probing the changelog read
 
+## Validation attempt: 2026-09-12
+
+The probes were not run against Jira Data Center. This checkout had no Jira base URL,
+project/sprint identifiers, or PAT available in the session environment, and no live Jira
+instance was supplied. The four answers therefore remain **Assumed** below; the local demo
+fixtures and Reports tests validate decoding and reconstruction behavior only, not Jira's wire
+format or production response cost.
+
 Four requests against your own Data Center, before the sprint report is built on assumptions about
 them. Three of the reviews' findings resolve to "we guessed" without this, and one of the four
 could make the phase better rather than worse.

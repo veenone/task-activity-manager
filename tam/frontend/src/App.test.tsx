@@ -75,6 +75,10 @@ vi.mock("./api", async () => {
     AutoMapImport: vi.fn(),
     ImportIssues: vi.fn(),
     SaveImportTemplate: vi.fn(),
+    GetConfluenceConfig: vi.fn(),
+    ListConfluenceChildPages: vi.fn(),
+    GetRitualPage: vi.fn(),
+    ListRitualAssociations: vi.fn(),
   };
 });
 
@@ -112,6 +116,8 @@ beforeEach(() => {
   vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
+  vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "", spaceKey: "", rootPageID: "" });
+  vi.mocked(api.ListRitualAssociations).mockResolvedValue([]);
   vi.mocked(api.ListBoards).mockResolvedValue([]);
   vi.mocked(api.ListBoardSprints).mockResolvedValue([]);
   vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([]);
@@ -219,12 +225,14 @@ describe("App shell", () => {
       .toHaveAttribute("aria-current", "page");
   });
 
-  it("names the phase of a view a later plan delivers", async () => {
+  // Rituals was the last placeholder; Phase 5 replaced it, so the rail now
+  // opens the real view and the view speaks for an unconfigured profile.
+  it("opens Rituals and says when Confluence is not configured", async () => {
     vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
     renderApp();
     const rail = await screen.findByRole("navigation", { name: "Navigation rail" });
     await userEvent.click(within(rail).getByRole("button", { name: "Rituals" }));
-    expect(screen.getByText(/arrives in Phase 5/)).toBeInTheDocument();
+    expect(await screen.findByText(/Confluence is not configured for this profile/)).toBeInTheDocument();
   });
 
   it("renders the epic tree when the View menu opens Epics", async () => {

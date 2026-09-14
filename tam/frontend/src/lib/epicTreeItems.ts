@@ -1,4 +1,5 @@
 import type { EpicTreeData } from "../api";
+import { visibleFamilyIssues } from "./issueFamilies";
 
 // NO_EPIC_KEY stands in for the orphans group in the expanded set and the
 // flat visible-item list: it is not a real issue key, so it can never
@@ -19,20 +20,20 @@ export interface Row {
 // orphans group with its children (capped) when expanded. It backs both the
 // keyboard model (which item is next/previous, and a child's parent) and the
 // data-tree-index each rendered row carries.
-export function visibleRows(tree: EpicTreeData, expanded: Set<string>): Row[] {
+export function visibleRows(tree: EpicTreeData, expanded: Set<string>, collapsed: ReadonlySet<string> = new Set()): Row[] {
   const rows: Row[] = [{ id: "", kind: "all", ownerKey: "" }];
   for (const node of tree.epics) {
     const key = node.issue.key;
     rows.push({ id: key, kind: "epic", ownerKey: key });
     if (expanded.has(key)) {
-      for (const child of node.children) rows.push({ id: child.key, kind: "child", ownerKey: key });
+      for (const child of visibleFamilyIssues(node.children, collapsed)) rows.push({ id: child.key, kind: "child", ownerKey: child.type === "subtask" && node.children.some((p) => p.key === child.parentKey) ? child.parentKey : key });
     }
   }
   if (tree.orphans.length > 0) {
     rows.push({ id: NO_EPIC_KEY, kind: "noepic", ownerKey: NO_EPIC_KEY });
     if (expanded.has(NO_EPIC_KEY)) {
-      for (const child of tree.orphans.slice(0, MAX_ORPHAN_ROWS)) {
-        rows.push({ id: child.key, kind: "child", ownerKey: NO_EPIC_KEY });
+      for (const child of visibleFamilyIssues(tree.orphans.slice(0, MAX_ORPHAN_ROWS), collapsed)) {
+        rows.push({ id: child.key, kind: "child", ownerKey: child.type === "subtask" && tree.orphans.some((p) => p.key === child.parentKey) ? child.parentKey : NO_EPIC_KEY });
       }
     }
   }

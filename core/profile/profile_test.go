@@ -38,6 +38,78 @@ func TestCreateProfileStoresScopeJQL(t *testing.T) {
 	}
 }
 
+func TestDeleteProfilePurgesConfluenceRowsOnlyForProfile(t *testing.T) {
+	st, err := shareddb.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	m := profile.NewManager(st.DB())
+	one, err := m.Create("One", "https://jira.one", "ONE", "", "", "", "", "", false, "")
+	if err != nil {
+		t.Fatalf("create one: %v", err)
+	}
+	two, err := m.Create("Two", "https://jira.two", "TWO", "", "", "", "", "", false, "")
+	if err != nil {
+		t.Fatalf("create two: %v", err)
+	}
+	if _, err := st.DB().Exec(`INSERT INTO confluence_profile(profile_id, base_url) VALUES(?, ?)`, one.ID, "https://confluence.one"); err != nil {
+		t.Fatalf("seed profile config: %v", err)
+	}
+	if _, err := st.DB().Exec(`INSERT INTO confluence_profile(profile_id, base_url) VALUES(?, ?)`, two.ID, "https://confluence.two"); err != nil {
+		t.Fatalf("seed other config: %v", err)
+	}
+	if _, err := st.DB().Exec(`INSERT INTO confluence_association(profile_id, ritual_type, page_id) VALUES(?, ?, ?)`, one.ID, "standup", "p1"); err != nil {
+		t.Fatalf("seed association: %v", err)
+	}
+	if _, err := st.DB().Exec(`INSERT INTO confluence_association(profile_id, ritual_type, page_id) VALUES(?, ?, ?)`, two.ID, "retro", "p2"); err != nil {
+		t.Fatalf("seed other association: %v", err)
+	}
+	if _, err := st.DB().Exec(`INSERT INTO confluence_page_cache(profile_id, page_id, fetched_at, payload) VALUES(?, ?, ?, ?)`, one.ID, "p1", "now", "one"); err != nil {
+		t.Fatalf("seed cache: %v", err)
+	}
+	if _, err := st.DB().Exec(`INSERT INTO confluence_page_cache(profile_id, page_id, fetched_at, payload) VALUES(?, ?, ?, ?)`, two.ID, "p2", "now", "two"); err != nil {
+		t.Fatalf("seed other cache: %v", err)
+	}
+	if err := m.Delete(one.ID); err != nil {
+		t.Fatalf("delete one: %v", err)
+	}
+	for _, table := range []string{"confluence_profile", "confluence_association", "confluence_page_cache"} {
+		var n int
+		if err := st.DB().QueryRow("SELECT COUNT(*) FROM "+table+" WHERE profile_id = ?", one.ID).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		if n != 0 {
+			t.Errorf("%s rows for deleted profile = %d, want 0", table, n)
+		}
+		if err := st.DB().QueryRow("SELECT COUNT(*) FROM "+table+" WHERE profile_id = ?", two.ID).Scan(&n); err != nil {
+			t.Fatalf("count other %s: %v", table, err)
+		}
+		if n != 1 {
+			t.Errorf("%s rows for other profile = %d, want 1", table, n)
+		}
+	}
+}
+
+func TestConfluenceConfigRoundTripsWithoutCredential(t *testing.T) {
+	m := newManager(t)
+	p, err := m.Create("QA", "https://jira.example.com", "QA", "", "", "", "", "", false, "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	want := profile.ConfluenceConfig{BaseURL: "https://confluence.example.com/", SpaceKey: "ENG", RootPageID: "42"}
+	if err := m.SetConfluenceConfig(p.ID, want); err != nil {
+		t.Fatalf("set Confluence config: %v", err)
+	}
+	got, err := m.ConfluenceConfig(p.ID)
+	if err != nil {
+		t.Fatalf("get Confluence config: %v", err)
+	}
+	if got.BaseURL != "https://confluence.example.com" || got.SpaceKey != want.SpaceKey || got.RootPageID != want.RootPageID {
+		t.Fatalf("config = %+v", got)
+	}
+}
+
 func TestBugIssueTypeDefaultsAndPersists(t *testing.T) {
 	m := newManager(t)
 

@@ -140,6 +140,15 @@ describe("BacklogView", () => {
     await user.keyboard("{Enter}");
     expect(childRow).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("button", { name: "+ Technical task" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collapse subtasks of PLAT-412" }));
+    expect(screen.queryByRole("row", { name: /TAM-NEW-1.*subtask of PLAT-412/ })).not.toBeInTheDocument();
+    expect(parentRow).toHaveAttribute("aria-selected", "true");
+    parentRow.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("row", { name: /PLAT-409 Rotate/ })).toHaveFocus();
+    parentRow.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("row", { name: /TAM-NEW-1.*subtask of PLAT-412/ })).toBeInTheDocument();
   });
 
   it("renders the page with the seven columns and the count", async () => {

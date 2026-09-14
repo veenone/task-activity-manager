@@ -750,6 +750,7 @@ export interface CommitResult {
 // TransitionCheck is what CanTransition answers with. It is best effort: an
 // error means the check could not be made, never that the move is illegal.
 export interface TransitionCheck {
+  reason?: string;
   reachable: string[];
   allowed: boolean;
 }

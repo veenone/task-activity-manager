@@ -183,14 +183,25 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 	}
 	all := make([]backend.Issue, 0, len(cards)+len(drafts))
 	all = append(all, cards...)
-	all = append(all, drafts...)
+	for _, d := range drafts {
+		if d.Type != backend.TypeSubtask {
+			all = append(all, d)
+		}
+	}
 
 	byStatus, draftColumn := columnIndex(cols)
 	all = applyMoves(all, moves, sprintID)
+	all = withSubtaskDrafts(all, drafts)
 	all = rankCards(all, moves, byStatus, draftColumn, lane)
 	lanes := newLaneSet(lane, len(cols))
 	unmapped := map[string]bool{}
 	rendered := 0
+	parents := map[string]backend.Issue{}
+	for _, card := range all {
+		if card.Type != backend.TypeSubtask && card.Type != backend.TypeEpic {
+			parents[card.Key] = card
+		}
+	}
 
 	for _, card := range all {
 		col, ok := placeCard(card, byStatus, draftColumn)
@@ -208,7 +219,15 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 				view.DonePoints += *card.StoryPoints
 			}
 		}
-		l := lanes.get(card, lane)
+		laneCard := card
+		if card.Type == backend.TypeSubtask {
+			if parent, ok := parents[card.ParentKey]; ok {
+				// Group by the parent's epic/assignee, retaining the child's
+				// own fields on its card and its own status column.
+				laneCard = parent
+			}
+		}
+		l := lanes.get(laneCard, lane)
 		l.Count++
 		switch {
 		case len(l.Cells[col]) >= MaxCardsPerCell:

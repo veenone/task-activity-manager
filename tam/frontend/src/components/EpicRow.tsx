@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import type { EpicNode, Issue } from "../api";
 import { TypeChip } from "./TypeChip";
+import { SubtaskToggle } from "./SubtaskToggle";
 import { statusClass } from "../lib/statusClass";
 import type { Row } from "../lib/epicTreeItems";
 import { progressText } from "../lib/format";
@@ -62,9 +63,13 @@ export function EpicRow({
 }
 
 interface EpicChildRowProps {
+  subtaskCount?: number;
+  subtasksExpanded?: boolean;
+  onToggleSubtasks?: () => void;
   child: Issue;
   subtaskLabel?: string;
   ownerKey: string;
+  nested?: boolean;
   index: number | undefined;
   selected: boolean;
   focused: boolean;
@@ -75,23 +80,28 @@ interface EpicChildRowProps {
 
 // EpicChildRow renders one leaf row, whether it hangs off an epic or off
 // the orphans group; ownerKey tells the keyboard model which it is.
-export function EpicChildRow({ child, subtaskLabel, ownerKey, index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
+export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true, onToggleSubtasks, subtaskLabel, ownerKey, nested, index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
   const row: Row = { id: child.key, kind: "child", ownerKey };
   return (
     <div
       role="treeitem"
+      aria-level={nested ? 3 : 2}
+      aria-expanded={subtaskCount > 0 ? subtasksExpanded : undefined}
       aria-selected={selected}
       tabIndex={focused ? 0 : -1}
       data-tree-index={index}
       data-tree-key={child.key}
-      className={`folder-item epic-row${selected ? " folder-selected" : ""}${flashed ? " epic-row-moved" : ""}`}
+      className={`folder-item epic-row${nested ? " nested-subtask" : ""}${selected ? " folder-selected" : ""}${flashed ? " epic-row-moved" : ""}`}
       onClick={() => onActivate(child.key)}
       onKeyDown={(e) => onKeyDown(e, row)}
     >
-      <span className="folder-caret" />
+      <span className="folder-caret" aria-hidden="true">{nested ? "↳" : ""}</span>
       <TypeChip type={child.type} subtaskLabel={subtaskLabel} />
       <span className="epic-cell epic-cell-key" title={child.key}>{child.key}</span>
-      <span className="epic-cell epic-cell-summary" title={child.summary}>{child.summary}</span>
+      <span className="epic-cell epic-cell-summary" title={child.summary}>
+        {onToggleSubtasks && <SubtaskToggle issueKey={child.key} count={subtaskCount} expanded={subtasksExpanded} onToggle={onToggleSubtasks} />}
+        {child.summary}
+      </span>
       <span className="epic-cell epic-cell-status">
         <span className={`chip chip-status chip-status-${statusClass(child.status)}`} title={child.status}>{child.status}</span>
       </span>

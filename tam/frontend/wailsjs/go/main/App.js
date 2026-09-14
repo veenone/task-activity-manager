@@ -50,6 +50,10 @@ export function DeleteRitualAssociation(arg1, arg2) {
   return window['go']['main']['App']['DeleteRitualAssociation'](arg1, arg2);
 }
 
+export function DeleteRitualDraft(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['DeleteRitualDraft'](arg1, arg2, arg3, arg4);
+}
+
 export function DeleteSprint(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeleteSprint'](arg1, arg2, arg3);
 }
@@ -108,6 +112,10 @@ export function GetLinkTypes(arg1) {
 
 export function GetProfileSetting(arg1, arg2) {
   return window['go']['main']['App']['GetProfileSetting'](arg1, arg2);
+}
+
+export function GetRitualDraft(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetRitualDraft'](arg1, arg2, arg3, arg4);
 }
 
 export function GetRitualPage(arg1, arg2) {
@@ -198,6 +206,14 @@ export function ListRitualAssociations(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListRitualAssociations'](arg1, arg2, arg3);
 }
 
+export function ListRitualDrafts(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ListRitualDrafts'](arg1, arg2, arg3);
+}
+
+export function ListSprintIssues(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ListSprintIssues'](arg1, arg2, arg3);
+}
+
 export function ListSprints(arg1) {
   return window['go']['main']['App']['ListSprints'](arg1);
 }
@@ -236,6 +252,14 @@ export function ResolveConflictOverride(arg1, arg2, arg3) {
 
 export function SaveImportTemplate(arg1) {
   return window['go']['main']['App']['SaveImportTemplate'](arg1);
+}
+
+export function SaveRitualDraft(arg1, arg2) {
+  return window['go']['main']['App']['SaveRitualDraft'](arg1, arg2);
+}
+
+export function ScaffoldSprintRituals(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ScaffoldSprintRituals'](arg1, arg2, arg3);
 }
 
 export function SearchUsers(arg1, arg2) {

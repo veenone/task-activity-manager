@@ -124,6 +124,7 @@ export function BoardGrid({
                         {line === index && <div className="board-drop-line" />}
                         <BoardCard
                           issue={issue}
+                          nested={issue.type === "subtask" && (lane.cells[col] ?? []).some((p) => p.key === issue.parentKey)}
                           selected={issue.key === selectedKey}
                           checked={checked.has(issue.key)}
                           focused={id === focusId}
@@ -139,8 +140,8 @@ export function BoardGrid({
                               issueKey={issue.key}
                               columns={view.columns}
                               col={col}
-                              sprints={sprints}
-                              sprintId={sprintId}
+                              sprints={issue.type === "subtask" ? [] : sprints}
+                              sprintId={issue.type === "subtask" ? "" : sprintId}
                               disabled={committing}
                               onColumn={(to) => moves.moveToColumn(issue.key, to)}
                               onSprint={(sprint) => moves.moveToSprint(issue.key, sprint)}

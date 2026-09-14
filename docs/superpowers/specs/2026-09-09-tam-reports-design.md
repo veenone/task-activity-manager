@@ -84,11 +84,11 @@ footnote. Nobody reads documentation during a sprint review.
 | Which issues | `sprint = N`, accepting the blind spot | Section 3 |
 | When it is fetched | When a report is opened, not on every sync | A changelog expansion is the heaviest read this app makes, and a sync already takes minutes; a report nobody asked for should not cost that |
 | Where it is kept | A `sprint_report` table holding the reconstructed series per sprint, keyed by board as well as sprint | A closed sprint's history cannot change, so it is fetched once and belongs to the user offline. Keyed by board because Jira hands one sprint to every board whose filter reaches it, and the done rule comes from the board's own last column, so two boards over one project would otherwise share one wrong answer forever |
-| When a cached report is wrong | A stored `algo_version`, compared against a constant on read, rebuilding on mismatch | The first reconstruction bug would otherwise be baked into every user's database with no way out but deleting the file |
-| A live sprint | Recomputed on demand, never cached | It changes hourly, and a stale report is worse than a slow one |
+| When a cached report is wrong | Compare stored `algo_version` on read; invalidate affected stored reports transactionally when refreshed board rules or sprint calculation dates change | Algorithm changes and refreshed calculation inputs must both replace stale totals; an unchanged refresh preserves offline reports |
+| A live sprint | Recomputed on demand and when reopened, never persisted; labeled in progress with remaining work instead of carry-over | It changes hourly. The velocity table still contains only closed sprints |
 | What is measured | Story points, falling back to issue count when the sprint has no points at all, and the report says which and why | A board that does not estimate is common. "Why" matters: no Story Points field on this instance is a different problem from nothing estimated, and only one of them is the user's to fix |
 | What "done" means | A status id in the board's last column, from one shared package | There are three definitions of done in this codebase today and the one this phase wants is unexported. Section 7 |
-| When a sprint ended | Jira's `completeDate`, not its `endDate` | A sprint closed three days late measured at its end date mis-reports every number in the review, and TAM does not currently carry the field at all |
+| When a sprint ended | Use `completeDate` for closed sprints; fall back to `endDate` only when completion is absent. Reject an invalid supplied completion date. Active sprints run through now, including overdue work; their ideal line remains anchored to the planned end and stops at zero | A sprint closed late or early must be measured at its actual close. Older cached sprints can lack the completion field; refreshing that field invalidates their reports |
 | Velocity | Committed and completed per closed sprint, for the last six, from the same reconstruction, each row carrying its own unit | A board that changed from points to cards mid-year would otherwise average two different things |
 | Where it lives | The Reports view, which already exists as a placeholder with its own tab and accelerator | Nothing is added to the navigation; what it renders is replaced |
 
@@ -153,6 +153,11 @@ kind of thing this phase makes visible.
 The Reports view, which exists today as a placeholder, gains a board picker and a sprint picker
 following the Sprints view's rather than the Boards view's, which means hiding the board picker
 when the profile has one scrum board and naming the board in the heading instead.
+
+The sprint picker includes closed and active sprints, marking active ones as in progress. It
+defaults to the latest closed sprint, or an active sprint if none has closed. Future sprints are
+excluded. Refresh rereads the selected sprint and velocity history; a busy retry retains the
+original rebuild request rather than silently returning stored figures.
 
 Then the summary: committed, added, removed, completed, carried over, in the sentence a review
 starts with, with the method line from section 4 beneath it, and the velocity figures for the last

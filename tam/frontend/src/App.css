@@ -232,6 +232,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-key { font-weight: 600; font-variant-numeric: tabular-nums; }
 .issue-row-subtask .issue-summary { padding-inline-start: 18px; }
 .issue-child-branch { display: inline-block; margin-inline-end: 8px; color: var(--text-muted); }
+.nested-subtask .epic-cell-summary { padding-inline-start: 18px; }
+.subtask-assignee { margin-inline-start: 10px; color: var(--text-muted); }
+.subtask-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 24px; margin-inline-end: 6px; padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; vertical-align: middle; }
+.subtask-toggle:hover { background: var(--surface-2); color: var(--text); }
+.subtask-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.board-card-subtask { margin-inline-start: 16px; border-inline-start: 2px solid var(--border); }
+.board-card-parent { color: var(--text-muted); font-size: 11px; margin-top: 6px; }
 /* The detail panel's title is the one key that links out to the instance:
    in a grid the row already owns the click. */
 .issue-key-link {
@@ -694,6 +701,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-link-copy small, .ritual-page-meta { color: var(--text-muted); font-size: 11px; }
 .ritual-page-body { line-height: 1.6; max-width: 78ch; }
 .ritual-page-body img { max-width: 100%; height: auto; }
+.ritual-template { max-width: 78ch; margin-top: 20px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+.ritual-template-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ritual-template-head h4 { margin: 0; font-size: 13px; }
+.ritual-template-context { margin: 8px 0; color: var(--text-muted); font-size: 12px; }
+.ritual-template ul { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; }
+.ritual-template li { display: flex; gap: 8px; align-items: baseline; }
 .ritual-association-list { display: grid; gap: 6px; margin-top: 10px; }
 .ritual-association-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
 .ritual-missing-page { max-width: 480px; padding: 36px 0; }
@@ -701,6 +714,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-report-context { padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--accent-soft); }
 .ritual-association-form { display: grid; gap: 6px; margin-bottom: 12px; }
 .ritual-association-form select { width: 100%; min-width: 0; }
+.ritual-association-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ritual-association-scope input { width: 100%; min-width: 0; box-sizing: border-box; }
 @media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } }
 @media (max-width: 720px) {
   .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }

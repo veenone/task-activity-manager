@@ -5,6 +5,7 @@ import { TypeChip } from "./TypeChip";
 
 interface Props {
   issue: Issue;
+  nested?: boolean;
   // selected is the one card the detail panel is about; checked is one card
   // of the multi-selection a bulk action will touch. They are two models on
   // one surface, so they paint differently, the way XTM's row-selected and
@@ -58,7 +59,7 @@ const MOVE_CLASS: Record<string, string> = {
 // grid's own semantics rather than a button's. It is the surface the user
 // made a move on, so it is the surface that reports what became of it.
 export function BoardCard({
-  issue, selected, checked, focused, columnName, colIndex, posId, move, flashed, dragging, draggable, menu,
+  issue, nested, selected, checked, focused, columnName, colIndex, posId, move, flashed, dragging, draggable, menu,
   onSelect, onFocus, onKeyDown, onDragStart, onDragEnd,
 }: Props) {
   const points = issue.storyPoints ?? null;
@@ -70,6 +71,7 @@ export function BoardCard({
   const label = [`${issue.key} ${issue.summary} ${columnName}`, move.reason].filter(Boolean).join(". ");
   const className = [
     "board-card",
+    nested ? "board-card-subtask" : "",
     selected ? "board-card-selected" : "",
     checked ? "board-card-checked" : "",
     MOVE_CLASS[move.state] ?? "",
@@ -110,6 +112,7 @@ export function BoardCard({
         {menu}
       </div>
       <div>{issue.summary}</div>
+      {issue.type === "subtask" && issue.parentKey && <div className="board-card-parent">↳ Subtask of {issue.parentKey}</div>}
       <div className="board-card-foot">
         <span>{assignee}</span>
         {points !== null && <span>{`${points} pts`}</span>}

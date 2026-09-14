@@ -15,6 +15,18 @@ function RitualIcon({ name }: { name: "calendar" | "pulse" | "check" | "refresh"
   return <svg className="ritual-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
+function RitualTemplate({ type, report }: { type: string; report: SprintReport | null }) {
+  const items = type === "planning" ? ["Confirm the sprint goal", "Review capacity and priorities", "Call out risks before work starts"]
+    : type === "standup" ? ["What moved yesterday?", "What moves today?", "What is blocked and needs help?"]
+      : type === "review" ? ["Demo completed work", "Capture stakeholder feedback", "Record follow-up work"]
+        : ["What should we keep?", "What should we improve?", "What will we try next sprint?"];
+  return <section className="ritual-template" aria-label="Ritual template">
+    <div className="ritual-template-head"><h4>{RITUAL_META[type]?.label ?? "Ritual"} template</h4><span className="muted small">Jira snapshot</span></div>
+    {report && !report.unavailable && <p className="ritual-template-context">{report.series.sprintName}: {report.series.completed} completed of {report.series.committed} committed {report.series.unit}.</p>}
+    <ul>{items.map((item) => <li key={item}><span aria-hidden="true">□</span>{item}</li>)}</ul>
+  </section>;
+}
+
 export function RitualsView() {
   const { activeId } = useProfile<Profile, Settings>();
   const [config, setConfig] = useState<ConfluenceConfig | null>(null);
@@ -66,7 +78,7 @@ export function RitualsView() {
       <nav aria-label="Ritual documents"><h3>Documents <span className="muted">({associations.length})</span></h3>
         {associations.length === 0 ? <p className="muted">No ritual pages are associated yet. Add them in Profile settings.</p> : associations.map((a) => { const meta = RITUAL_META[a.ritualType] ?? { label: a.ritualType, icon: "calendar" as const }; return <button className={`ritual-link ritual-${a.ritualType}${selectedID === a.pageID ? " ritual-link-selected" : ""}`} aria-current={selectedID === a.pageID ? "page" : undefined} key={a.pageID} onClick={() => openAssociation(a)} disabled={loadingPage && selectedID === a.pageID}><span className="ritual-icon" aria-hidden="true"><RitualIcon name={meta.icon} /></span><span className="ritual-link-copy"><strong>{a.pageTitle || a.pageID}</strong><small>{meta.label}</small></span></button>; })}
       </nav>
-      <article aria-label="Selected ritual page" aria-busy={loadingPage}>{page ? <><h3 ref={headingRef} tabIndex={-1}>{page.title}</h3><p className="ritual-page-meta">{RITUAL_META[associations.find((a) => a.pageID === selectedID)?.ritualType ?? ""]?.label ?? "Ritual document"}</p>{report && !report.unavailable && <p className="ritual-report-context">{summarySentence(report.series, false)}</p>}<div className="ritual-page-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body.view.value || page.body.storage.value) }} /></> : <p className="muted">{loadingPage ? "Loading ritual page…" : "Select an associated ritual page."}</p>}</article>
+    <article aria-label="Selected ritual page" aria-busy={loadingPage}>{page ? <><h3 ref={headingRef} tabIndex={-1}>{page.title}</h3><p className="ritual-page-meta">{RITUAL_META[associations.find((a) => a.pageID === selectedID)?.ritualType ?? ""]?.label ?? "Ritual document"}</p>{report && !report.unavailable && <p className="ritual-report-context">{summarySentence(report.series, false)}</p>}<div className="ritual-page-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body.view.value || page.body.storage.value) }} /><RitualTemplate type={associations.find((a) => a.pageID === selectedID)?.ritualType ?? "standup"} report={report} /></> : <p className="muted">{loadingPage ? "Loading ritual page…" : "Select an associated ritual page."}</p>}</article>
     </div>
   </section>;
 }

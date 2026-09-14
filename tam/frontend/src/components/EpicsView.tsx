@@ -156,6 +156,7 @@ export function EpicsView() {
             <>
               {tree.data && (
                 <EpicTree
+                  key={activeId}
                   tree={tree.data}
                   subtaskLabel={subtaskType.data}
                   selectedKey={selectedKey}

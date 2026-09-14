@@ -230,10 +230,10 @@ export default function App() {
             ))}
             <div className="nav-divider" />
             <div className="nav-section">Suite</div>
-            <button className="nav-item" disabled title="The launcher arrives in Phase 6">
+            <button className="nav-item" disabled title="The suite launcher is unavailable in this build">
               Tests (XTM)
             </button>
-            <div className="nav-hint">opens Xray Test Manager</div>
+            <div className="nav-hint">suite launcher unavailable in this build</div>
           </nav>
         )}
 

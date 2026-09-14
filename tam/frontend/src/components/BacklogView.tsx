@@ -175,7 +175,7 @@ export function BacklogView() {
                 : "No issues cached yet. Use Sync in the topbar to pull this project's issues."}
             </p>
           ) : (
-            <IssueTable issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={setSelectedKey} sort={sort} desc={desc} onSort={toggleSort} />
+            <IssueTable key={activeId} issues={rows} subtaskLabel={subtaskType.data} selectedKey={selectedKey} onSelect={setSelectedKey} sort={sort} desc={desc} onSort={toggleSort} />
           )}
           <div className="pager">
             <label className="sr-only" htmlFor="pager-size">Issue groups per page</label>

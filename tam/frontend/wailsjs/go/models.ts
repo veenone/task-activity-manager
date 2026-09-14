@@ -260,6 +260,7 @@ export namespace backend {
 	    }
 	}
 	export class TransitionCheck {
+	    reason?: string;
 	    reachable: string[];
 	    allowed: boolean;
 	
@@ -269,6 +270,7 @@ export namespace backend {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.reason = source["reason"];
 	        this.reachable = source["reachable"];
 	        this.allowed = source["allowed"];
 	    }
@@ -1564,6 +1566,47 @@ export namespace reports {
 	        this.committed = source["committed"];
 	        this.completed = source["completed"];
 	        this.truncated = source["truncated"];
+	    }
+	}
+
+}
+
+export namespace ritualrepo {
+	
+	export class Draft {
+	    profileId: string;
+	    boardId: number;
+	    sprintId: number;
+	    ritualType: string;
+	    title: string;
+	    remark: string;
+	    body: string;
+	    issuesJson: string;
+	    confluencePageId: string;
+	    confluenceVersion: number;
+	    status: string;
+	    updatedAt: string;
+	    publishedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Draft(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.profileId = source["profileId"];
+	        this.boardId = source["boardId"];
+	        this.sprintId = source["sprintId"];
+	        this.ritualType = source["ritualType"];
+	        this.title = source["title"];
+	        this.remark = source["remark"];
+	        this.body = source["body"];
+	        this.issuesJson = source["issuesJson"];
+	        this.confluencePageId = source["confluencePageId"];
+	        this.confluenceVersion = source["confluenceVersion"];
+	        this.status = source["status"];
+	        this.updatedAt = source["updatedAt"];
+	        this.publishedAt = source["publishedAt"];
 	    }
 	}
 

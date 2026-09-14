@@ -9,6 +9,7 @@ import {main} from '../models';
 import {boardrepo} from '../models';
 import {confluence} from '../models';
 import {issuerepo} from '../models';
+import {ritualrepo} from '../models';
 import {settings} from '../models';
 import {sprintreport} from '../models';
 import {journal} from '../models';
@@ -39,6 +40,8 @@ export function DeleteProfile(arg1:string):Promise<void>;
 
 export function DeleteRitualAssociation(arg1:string,arg2:profile.RitualAssociation):Promise<void>;
 
+export function DeleteRitualDraft(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
+
 export function DeleteSprint(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function DiscardAllPendingChanges(arg1:string):Promise<number>;
@@ -68,6 +71,8 @@ export function GetIssueDetail(arg1:string,arg2:string):Promise<backend.IssueDet
 export function GetLinkTypes(arg1:string):Promise<Array<backend.LinkType>>;
 
 export function GetProfileSetting(arg1:string,arg2:string):Promise<string>;
+
+export function GetRitualDraft(arg1:string,arg2:number,arg3:number,arg4:string):Promise<ritualrepo.Draft>;
 
 export function GetRitualPage(arg1:string,arg2:string):Promise<confluence.Page>;
 
@@ -113,6 +118,10 @@ export function ListProfiles():Promise<Array<profile.Profile>>;
 
 export function ListRitualAssociations(arg1:string,arg2:number,arg3:number):Promise<Array<profile.RitualAssociation>>;
 
+export function ListRitualDrafts(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Draft>>;
+
+export function ListSprintIssues(arg1:string,arg2:number,arg3:number):Promise<Array<backend.Issue>>;
+
 export function ListSprints(arg1:string):Promise<Array<issuerepo.SprintRef>>;
 
 export function LookupIssue(arg1:string,arg2:string):Promise<backend.Issue>;
@@ -132,6 +141,10 @@ export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>
 export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SaveImportTemplate(arg1:string):Promise<string>;
+
+export function SaveRitualDraft(arg1:string,arg2:ritualrepo.Draft):Promise<void>;
+
+export function ScaffoldSprintRituals(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Draft>>;
 
 export function SearchUsers(arg1:string,arg2:string):Promise<Array<backend.User>>;
 

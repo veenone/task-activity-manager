@@ -1,10 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { GRID_COLUMNS } from "../api";
 import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
 import { statusClass } from "../lib/statusClass";
 import { keyColumnWidth } from "../lib/keyColumn";
+import { subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
+import { SubtaskToggle } from "./SubtaskToggle";
 
 // The pending dot shares the key cell, so the key column has to be wide
 // enough for the longest key plus the dot and its margin.
@@ -48,6 +50,13 @@ interface Props {
 // header outside the scroller in the first place.
 export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, desc, onSort }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [collapsed, setCollapsed] = useState(new Set<string>());
+  const counts = subtaskCounts(issues);
+  const rows = visibleFamilyIssues(issues, collapsed);
+  function toggleChildren(key: string) {
+    if (!collapsed.has(key) && issues.some((i) => i.key === selectedKey && i.type === "subtask" && i.parentKey === key)) onSelect(key);
+    setCollapsed((prev) => { const next = new Set(prev); if (!next.delete(key)) next.add(key); return next; });
+  }
 
   // moveFocus walks the roving tabindex to a neighbouring row.
   function moveFocus(from: number, delta: number) {
@@ -64,7 +73,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
       role="grid"
       aria-label="Issues"
       aria-multiselectable="false"
-      aria-rowcount={issues.length + 1}
+      aria-rowcount={rows.length + 1}
       style={{ "--issue-key-w": keyWidth } as CSSProperties}
     >
       {/* The order was otherwise invisible, and rank order is the whole point
@@ -107,7 +116,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
             );
           })}
         </div>
-        {issues.map((iss, index) => {
+        {rows.map((iss, index) => {
           const selected = iss.key === selectedKey;
           const nested = iss.type === "subtask" && parentKeys.has(iss.parentKey);
           return (
@@ -121,7 +130,14 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               className={`issue-row${nested ? " issue-row-subtask" : ""}${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
               onClick={() => onSelect(iss.key)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
+                if (e.key === "ArrowRight" && counts.has(iss.key)) {
+                  e.preventDefault();
+                  if (collapsed.has(iss.key)) toggleChildren(iss.key);
+                } else if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  if (counts.has(iss.key) && !collapsed.has(iss.key)) toggleChildren(iss.key);
+                  else if (nested) bodyRef.current?.querySelector<HTMLElement>(`[data-row-index="${rows.findIndex((p) => p.key === iss.parentKey)}"]`)?.focus();
+                } else if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   onSelect(iss.key);
                 } else if (e.key === "ArrowDown") {
@@ -140,6 +156,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               </span>
               <span role="gridcell"><TypeChip type={iss.type} subtaskLabel={subtaskLabel} /></span>
               <span role="gridcell" className="issue-summary" title={iss.summary}>
+                <SubtaskToggle issueKey={iss.key} count={counts.get(iss.key) ?? 0} expanded={!collapsed.has(iss.key)} onToggle={() => toggleChildren(iss.key)} />
                 {nested && <span className="issue-child-branch" aria-hidden="true">↳</span>}
                 {iss.summary}
               </span>
