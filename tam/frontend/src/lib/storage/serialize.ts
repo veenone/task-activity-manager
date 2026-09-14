@@ -53,10 +53,13 @@ function block(n: JSONContent): string {
     }
     case "taskList": return `<ac:task-list${attrs(a.extra)}>${blocks(kids)}</ac:task-list>`;
     case "taskItem": {
-      // taskId undefined means parsing never saw a task-id element at all;
-      // "" means it saw one that was genuinely empty (<ac:task-id/>) and
-      // must write one back rather than silently dropping it.
-      const id = a.taskId !== undefined ? `<ac:task-id>${escapeText(String(a.taskId))}</ac:task-id>` : "";
+      // taskId null or undefined means parsing never saw a task-id element
+      // at all (the editor's schema fills the gap with null, its declared
+      // default, once a page has been through it); "" means it saw one that
+      // was genuinely empty (<ac:task-id/>) and must write one back rather
+      // than silently dropping it. Testing the type, not just !== undefined,
+      // is what keeps the schema's own default from being written back out.
+      const id = typeof a.taskId === "string" ? `<ac:task-id>${escapeText(a.taskId)}</ac:task-id>` : "";
       return `<ac:task>${id}${a.extraXml ?? ""}<ac:task-status>${a.checked ? "complete" : "incomplete"}</ac:task-status><ac:task-body>${blocks(kids)}</ac:task-body></ac:task>`;
     }
     case "opaqueBlock": return String(a.xml ?? "");

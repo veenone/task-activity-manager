@@ -21,7 +21,12 @@ const StorageAttributes = Extension.create({
       { types: ["paragraph"], attributes: { bare: hidden(null) } },
       { types: ["paragraph", "heading", "bulletList", "orderedList", "listItem", "blockquote", "tableRow", "tableCell", "tableHeader", "taskList"], attributes: { extra: hidden(null) } },
       { types: ["table"], attributes: { extra: hidden(null), colgroup: hidden(""), tbody: hidden(true) } },
-      { types: ["taskItem"], attributes: { taskId: hidden(""), extraXml: hidden("") } },
+      // taskId defaults to null, not "": a task with no <ac:task-id> at all
+      // parses with taskId left undefined, and the schema must fill that gap
+      // with a value serialize.ts also reads as "no id", or the very first
+      // schema round trip (opening the page in this editor) would write an
+      // empty <ac:task-id/> onto every task that never had one.
+      { types: ["taskItem"], attributes: { taskId: hidden(null), extraXml: hidden("") } },
       { types: ["bold", "italic", "strike"], attributes: { tag: hidden(null) } },
       { types: ["link"], attributes: { extra: hidden(null) } },
     ];

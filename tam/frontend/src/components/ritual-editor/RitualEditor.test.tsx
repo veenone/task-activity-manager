@@ -1,9 +1,9 @@
-import { createRef } from "react";
+import { createRef, useState } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as api from "../../api";
-import { READ_ONLY_SENTENCE, ENTRY_EXISTS } from "../../lib/ritualText";
+import { READ_ONLY_SENTENCE, ENTRY_EXISTS, ENTRY_UNREADABLE } from "../../lib/ritualText";
 import { RitualEditor } from "./RitualEditor";
 import type { RitualEditorHandle } from "./RitualEditor";
 
@@ -46,9 +46,8 @@ describe("RitualEditor", () => {
   it("saves once after an edit pauses, and hands the saved row back", async () => {
     const ref = createRef<RitualEditorHandle>();
     const onSaved = vi.fn();
-    const { container } = render(<RitualEditor ref={ref} profileId="p1" doc={doc()} onSaved={onSaved} saveDelayMs={10} />);
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} onSaved={onSaved} saveDelayMs={10} />);
     await screen.findByText("ship it");
-    fireEvent.keyDown(container.querySelector(".ProseMirror")!, { key: "a" });
     act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>hello</p>"); });
     await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
     expect(vi.mocked(api.SaveRitualBody).mock.calls[0]).toEqual(["p1", 1, 14, "planning", "<h2>Decisions</h2><ul><li>ship it</li></ul><p>hello</p>"]);
@@ -57,12 +56,37 @@ describe("RitualEditor", () => {
 
   it("flushes a pending edit immediately when asked", async () => {
     const ref = createRef<RitualEditorHandle>();
-    const { container } = render(<RitualEditor ref={ref} profileId="p1" doc={doc()} saveDelayMs={60_000} />);
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} saveDelayMs={60_000} />);
     await screen.findByText("ship it");
-    fireEvent.keyDown(container.querySelector(".ProseMirror")!, { key: "a" });
     act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>now</p>"); });
     await act(() => ref.current!.flush());
     expect(api.SaveRitualBody).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves a mouse-only task checkbox tick", async () => {
+    render(<RitualEditor profileId="p1" saveDelayMs={10}
+      doc={doc({ body: "<ac:task-list><ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body><p>x</p></ac:task-body></ac:task></ac:task-list>" })} />);
+    await screen.findByText("x");
+    const checkbox = document.querySelector('ul[data-type="taskList"] li input[type="checkbox"]') as HTMLInputElement;
+    expect(checkbox).toBeTruthy();
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalled());
+    const body = vi.mocked(api.SaveRitualBody).mock.calls[0][4];
+    expect(body).toContain("<ac:task-status>complete</ac:task-status>");
+  });
+
+  it("survives its own save: the editor instance is not rebuilt when the saved row comes back", async () => {
+    function Harness({ handleRef }: { handleRef: React.RefObject<RitualEditorHandle | null> }) {
+      const [d, setD] = useState<api.RitualDocument>(doc());
+      return <RitualEditor ref={handleRef} profileId="p1" doc={d} onSaved={setD} saveDelayMs={10} />;
+    }
+    const ref = createRef<RitualEditorHandle>();
+    render(<Harness handleRef={ref} />);
+    await screen.findByText("ship it");
+    const before = ref.current!.editor;
+    act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>more</p>"); });
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(ref.current!.editor).toBe(before));
   });
 
   it("opens a page it cannot read as read only, with the page link", async () => {
@@ -89,6 +113,24 @@ describe("RitualEditor", () => {
     await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalled());
     await userEvent.click(screen.getByRole("button", { name: "Add today's entry" }));
     expect(await screen.findByText(ENTRY_EXISTS)).toBeInTheDocument();
+  });
+
+  it("shows a notice and does not crash when the standup entry fails to read", async () => {
+    vi.mocked(api.StandupEntry).mockRejectedValue(new Error("network down"));
+    render(<RitualEditor profileId="p1" saveDelayMs={10}
+      doc={doc({ ritualType: "standup", body: "<h2>Daily log</h2><h3>Mon 14 Sep 2026</h3><p>y</p>" })} />);
+    await screen.findByText("Mon 14 Sep 2026");
+    await userEvent.click(screen.getByRole("button", { name: "Add today's entry" }));
+    expect(await screen.findByText("network down")).toBeInTheDocument();
+  });
+
+  it("shows a notice when the standup entry fragment cannot be parsed", async () => {
+    vi.mocked(api.StandupEntry).mockResolvedValue("<p>&bogus;</p>");
+    render(<RitualEditor profileId="p1" saveDelayMs={10}
+      doc={doc({ ritualType: "standup", body: "<h2>Daily log</h2><h3>Mon 14 Sep 2026</h3><p>y</p>" })} />);
+    await screen.findByText("Mon 14 Sep 2026");
+    await userEvent.click(screen.getByRole("button", { name: "Add today's entry" }));
+    expect(await screen.findByText(ENTRY_UNREADABLE)).toBeInTheDocument();
   });
 
   it("offers Add today's entry only on the standup", async () => {

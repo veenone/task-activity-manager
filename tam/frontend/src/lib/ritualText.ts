@@ -21,6 +21,7 @@ export const CLOSED_EMPTY_SENTENCE = "This sprint closed before it had ritual pa
 export const NO_SCRUM_BOARD_SENTENCE = "No scrum board has been synced for this project, so there are no sprints to hold rituals.";
 export const ENTRY_EXISTS = "Today's entry is already in the log.";
 export const DAILY_LOG_MISSING = "The Daily log heading is gone, so there is nowhere to add today's entry.";
+export const ENTRY_UNREADABLE = "Today's entry could not be read.";
 
 export function clock(iso: string): string {
   const d = new Date(iso);

@@ -9,7 +9,7 @@ import { parseStorage } from "../../lib/storage/parse";
 import { serializeStorage } from "../../lib/storage/serialize";
 import { sanitizeHtml } from "../../lib/sanitizeHtml";
 import { findTodaysEntry, localDay } from "../../lib/standupLog";
-import { DAILY_LOG_MISSING, ENTRY_EXISTS, READ_ONLY_SENTENCE, editorStatusLine } from "../../lib/ritualText";
+import { DAILY_LOG_MISSING, ENTRY_EXISTS, ENTRY_UNREADABLE, READ_ONLY_SENTENCE, editorStatusLine } from "../../lib/ritualText";
 import { RitualEditorContext } from "./context";
 import { ritualExtensions } from "./extensions";
 
@@ -22,6 +22,15 @@ export interface RitualEditorHandle {
 
 interface Props {
   profileId: string;
+  // The editor rebuilds itself (a fresh TipTap instance, cursor and undo
+  // history reset) only when `editable` changes, never when `doc`/`body`
+  // do: a local save hands the saved row back through onSaved, and if that
+  // alone tore the editor down, every save would cost the caret, the undo
+  // stack, and any keystroke typed while the save was still in flight. That
+  // makes identity the caller's job: whoever renders RitualEditor must give
+  // it a React `key` that changes whenever the page does (board, sprint,
+  // ritual type, version, page id), so a real page change unmounts and
+  // remounts rather than quietly reusing the old page's editor.
   doc: RitualDocument;
   // body defaults to doc.body; the conflict view passes conflictBody with readOnly.
   body?: string;
@@ -34,40 +43,56 @@ interface Props {
 
 type Run = (chain: ChainedCommands) => ChainedCommands;
 
-// RitualEditor edits one ritual page. It saves locally, 800 ms after the last
-// edit, on Ctrl+S, on flush, and on unmount; it never talks to Confluence.
-// Only an edit a person made counts: loading content, and anything a plugin
-// does on load, never saves, so opening a page never makes it unsynced.
+// RitualEditor edits one ritual page. It saves locally, 800 ms after an edit
+// that actually changes the page's serialized text, on Ctrl+S, on flush, and
+// on unmount; it never talks to Confluence. Whether something counts as an
+// edit is decided by comparing serialized text to what was last saved, never
+// by which DOM event carried it: a mouse click on a task checkbox, a
+// context-menu Cut, or a spellcheck correction change the document exactly
+// as a keystroke does, and none of them reliably raise one. Loading content,
+// and anything a plugin does on load, serialize back to the same text the
+// page already had, so opening a page never makes it unsynced.
 export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false, pageUrl, onSaved, saveDelayMs = SAVE_DELAY_MS, ref }: Props) {
   const parsed = useMemo(() => parseStorage(body), [body]);
   const editable = !readOnly && parsed.ok;
   const extensions = useMemo(() => ritualExtensions(), []);
-  const touched = useRef(false);
   const pending = useRef<string | null>(null);
+  const lastSaved = useRef<string>("");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Saves run one at a time, in the order they were asked for: a call
+  // chains onto whatever is already in flight rather than firing beside it,
+  // so Ctrl+S landing between two keystrokes can never let an older body or
+  // an older onSaved arrive after a newer one.
+  const inFlight = useRef<Promise<void>>(Promise.resolve());
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState("");
   const [saveError, setSaveError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const save = useCallback(async () => {
+  const save = useCallback((): Promise<void> => {
     clearTimeout(timer.current);
-    const next = pending.current;
-    if (next === null) return;
-    pending.current = null;
-    setSaving(true);
-    setSaveError("");
-    try {
-      const saved = await SaveRitualBody(profileId, doc.boardId, doc.sprintId, doc.ritualType, next);
-      setSavedAt(new Date().toISOString());
-      onSaved?.(saved);
-    } catch (e) {
-      // Keep the text for the next try, unless a newer edit already replaced it.
-      if (pending.current === null) pending.current = next;
-      setSaveError(errMsg(e));
-    } finally {
-      setSaving(false);
-    }
+    const runOne = async () => {
+      const next = pending.current;
+      if (next === null) return;
+      pending.current = null;
+      setSaving(true);
+      setSaveError("");
+      try {
+        const saved = await SaveRitualBody(profileId, doc.boardId, doc.sprintId, doc.ritualType, next);
+        lastSaved.current = next;
+        setSavedAt(new Date().toISOString());
+        onSaved?.(saved);
+      } catch (e) {
+        // Keep the text for the next try, unless a newer edit already replaced it.
+        if (pending.current === null) pending.current = next;
+        setSaveError(errMsg(e));
+      } finally {
+        setSaving(false);
+      }
+    };
+    const chained = inFlight.current.then(runOne);
+    inFlight.current = chained;
+    return chained;
   }, [profileId, doc.boardId, doc.sprintId, doc.ritualType, onSaved]);
 
   const saveRef = useRef(save);
@@ -77,13 +102,26 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
     extensions,
     content: parsed.ok ? parsed.doc : "",
     editable,
+    onCreate: ({ editor: created }) => {
+      lastSaved.current = serializeStorage(created.getJSON());
+    },
     onUpdate: ({ editor: current }) => {
-      if (!editable || !touched.current) return;
-      pending.current = serializeStorage(current.getJSON());
+      const next = serializeStorage(current.getJSON());
+      if (next === lastSaved.current) {
+        pending.current = null;
+        clearTimeout(timer.current);
+        return;
+      }
+      pending.current = next;
       clearTimeout(timer.current);
       timer.current = setTimeout(() => void saveRef.current(), saveDelayMs);
     },
-  }, [body, editable]);
+    // Not `[body, editable]`: see the comment on Props.doc about who owns
+    // this editor's identity.
+  }, [editable]);
+
+  const editorRef = useRef<Editor | null>(null);
+  useEffect(() => { editorRef.current = editor; }, [editor]);
 
   useImperativeHandle(ref, () => ({ flush: () => saveRef.current(), editor }), [editor]);
 
@@ -94,7 +132,6 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
 
   const act = (run: Run) => {
     if (!editor) return;
-    touched.current = true;
     run(editor.chain().focus()).run();
   };
 
@@ -102,26 +139,38 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       void save();
-      return;
     }
-    touched.current = true;
   };
 
   async function addTodaysEntry() {
-    if (!editor) return;
+    if (!editorRef.current) return;
     setNotice("");
-    const fragment = parseStorage(await StandupEntry(localDay(new Date())));
-    if (!fragment.ok || !fragment.doc.content?.length) return;
-    const heading = editor.schema.nodeFromJSON(fragment.doc.content[0]).textContent.trim();
-    const place = findTodaysEntry(editor.state.doc, heading);
-    if (place.kind !== "insert") {
-      const sentence = place.kind === "exists" ? ENTRY_EXISTS : DAILY_LOG_MISSING;
-      setNotice(sentence);
-      announce(sentence);
-      return;
+    try {
+      const raw = await StandupEntry(localDay(new Date()));
+      // The editor this started with may have been unmounted, or torn down
+      // and rebuilt because `editable` changed, while that call was in
+      // flight; re-read it rather than trust the closure.
+      const current = editorRef.current;
+      if (!current || current.isDestroyed) return;
+      const fragment = parseStorage(raw);
+      if (!fragment.ok || !fragment.doc.content?.length) {
+        setNotice(ENTRY_UNREADABLE);
+        announce(ENTRY_UNREADABLE);
+        return;
+      }
+      const heading = current.schema.nodeFromJSON(fragment.doc.content[0]).textContent.trim();
+      const place = findTodaysEntry(current.state.doc, heading);
+      if (place.kind !== "insert") {
+        const sentence = place.kind === "exists" ? ENTRY_EXISTS : DAILY_LOG_MISSING;
+        setNotice(sentence);
+        announce(sentence);
+        return;
+      }
+      current.chain().insertContentAt(place.pos, fragment.doc.content).run();
+    } catch (e) {
+      const current = editorRef.current;
+      if (current && !current.isDestroyed) setNotice(errMsg(e));
     }
-    touched.current = true;
-    editor.chain().insertContentAt(place.pos, fragment.doc.content).run();
   }
 
   if (!parsed.ok) {
@@ -139,8 +188,6 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
       <div
         className={`ritual-editor${readOnly ? " ritual-editor-readonly" : ""}`}
         onKeyDownCapture={onKeyDown}
-        onPasteCapture={() => { touched.current = true; }}
-        onDropCapture={() => { touched.current = true; }}
       >
         {editable && editor && <Toolbar editor={editor} act={act} standup={doc.ritualType === "standup"} onAddEntry={() => void addTodaysEntry()} />}
         {notice && <p className="muted small ritual-notice" role="status">{notice}</p>}
