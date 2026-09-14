@@ -716,6 +716,15 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-association-form select { width: 100%; min-width: 0; }
 .ritual-association-scope { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ritual-association-scope input { width: 100%; min-width: 0; box-sizing: border-box; }
+.ritual-slots-frame { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+.ritual-slots { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.ritual-slot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.ritual-slot:last-child { border-bottom: none; }
+.ritual-slot .status { font-size: 11px; color: var(--text-muted); text-transform: capitalize; }
+.ritual-slot-open { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; padding: 2px 0; }
+.ritual-wizard { margin-top: 12px; }
+.ritual-wizard .ritual-issues { list-style: none; padding: 0; display: grid; gap: 6px; margin: 8px 0 0; }
+.ritual-wizard .ritual-issues li { padding: 6px 0; border-bottom: 1px solid var(--border); }
 @media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } }
 @media (max-width: 720px) {
   .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
