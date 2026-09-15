@@ -91,7 +91,13 @@ func (r *Repository) MarkSprintCreatedWithoutRekey(ctx context.Context, profileI
 			return fmt.Errorf("drop draft sprint %s: %w", from, err)
 		}
 		note := fmt.Sprintf("created in Jira as sprint %d but the local rename failed; refresh the board to see it, and move its cards again", realID)
-		return journal.Audit(tx, profileID, EntitySprintCreate, from, "created", "", from, strconv.Itoa(realID), note)
+		to := strconv.Itoa(realID)
+		if realID == 0 {
+			// Jira answered the create with no id, so there is none to name.
+			note = "created in Jira, which answered with no id; refresh the board to see it, and move its cards again"
+			to = ""
+		}
+		return journal.Audit(tx, profileID, EntitySprintCreate, from, "created", "", from, to, note)
 	})
 }
 

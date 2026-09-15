@@ -213,4 +213,16 @@ func TestMarkSprintCreatedWithoutRekeyLeavesNothingToCreateTwice(t *testing.T) {
 	if len(act) == 0 || !strings.Contains(act[0].Note, "88") {
 		t.Errorf("the trail says where the sprint went: %+v", act)
 	}
+
+	noID, err := repo.CreateDraftSprint(ctx, "p1", sprint15())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.MarkSprintCreatedWithoutRekey(ctx, "p1", noID.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	act, _ = repo.ListActivity(ctx, "p1", strconv.Itoa(noID.ID), 0)
+	if len(act) == 0 || strings.Contains(act[0].Note, "sprint 0") || !strings.Contains(act[0].Note, "no id") {
+		t.Errorf("a create answered with no id names no sprint 0: %+v", act)
+	}
 }
