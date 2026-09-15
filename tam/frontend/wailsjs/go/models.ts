@@ -429,6 +429,7 @@ export namespace boardrepo {
 	    endDate: string;
 	    goal: string;
 	    completeDate: string;
+	    draft: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Sprint(source);
@@ -444,6 +445,7 @@ export namespace boardrepo {
 	        this.endDate = source["endDate"];
 	        this.goal = source["goal"];
 	        this.completeDate = source["completeDate"];
+	        this.draft = source["draft"];
 	    }
 	}
 	export class SprintChoice {
@@ -451,6 +453,7 @@ export namespace boardrepo {
 	    name: string;
 	    boardName: string;
 	    state: string;
+	    draft: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SprintChoice(source);
@@ -462,6 +465,7 @@ export namespace boardrepo {
 	        this.name = source["name"];
 	        this.boardName = source["boardName"];
 	        this.state = source["state"];
+	        this.draft = source["draft"];
 	    }
 	}
 	export class SprintDetail {
@@ -473,6 +477,7 @@ export namespace boardrepo {
 	    endDate: string;
 	    goal: string;
 	    completeDate: string;
+	    draft: boolean;
 	    issues: backend.Issue[];
 	    total: number;
 	    done: number;
@@ -496,6 +501,7 @@ export namespace boardrepo {
 	        this.endDate = source["endDate"];
 	        this.goal = source["goal"];
 	        this.completeDate = source["completeDate"];
+	        this.draft = source["draft"];
 	        this.issues = this.convertValues(source["issues"], backend.Issue);
 	        this.total = source["total"];
 	        this.done = source["done"];

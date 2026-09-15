@@ -48,6 +48,10 @@ type Sprint struct {
 	EndDate      string `json:"endDate"`
 	Goal         string `json:"goal"`
 	CompleteDate string `json:"completeDate"`
+	// Draft marks a sprint drafted in TAM and not yet created in Jira. Its
+	// id is negative and its state is future; Start and Complete refuse it
+	// and Commit creates it before anything moves into it.
+	Draft bool `json:"draft"`
 }
 
 // IssueSource is what the view needs from the issue cache. Keeping it an
