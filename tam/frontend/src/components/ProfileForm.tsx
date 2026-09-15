@@ -13,6 +13,7 @@ import {
   isDemoUrl,
 } from "../api";
 import type { Profile } from "../api";
+import { ROOT_FIX_BEFORE_SAVE, readRootPageInput } from "../lib/confluenceRoot";
 
 // REQUIREMENT_TYPE_KEY is the per-profile setting holding the Jira issue type
 // name TAM syncs as a requirement. It lives in tam.db, not on the shared
@@ -160,6 +161,10 @@ export function ProfileForm({
   const keyError = projectKeyError(projectKey);
   const urlError = jiraUrlError(jiraUrl);
 
+  // A Sync against a root page id that is not one answers 404 and offers to
+  // create a root nobody needed, so the id is checked where it is typed.
+  const rootInput = readRootPageInput(confluenceRootPageID, confluenceURL);
+
   // A demo profile needs no credential; a live one needs one on create unless
   // it is reusing another profile's. On edit a blank token keeps the stored one.
   const tokenSatisfied = isEdit || demo || reuseFrom !== "" || token.trim() !== "";
@@ -173,7 +178,8 @@ export function ProfileForm({
     urlError === "" &&
     projectKey.trim() !== "" &&
     keyError === "" &&
-    tokenSatisfied;
+    tokenSatisfied &&
+    rootInput.error === "";
 
   // Warn when an edit changes the project key or URL: App.UpdateProfile purges
   // the rows cached for the old project, so the next sync starts from nothing.
@@ -238,11 +244,11 @@ export function ProfileForm({
         await SetConfluenceConfig(p.id, {
           baseURL: confluenceURL.trim(),
           spaceKey: confluenceSpace.trim(),
-          rootPageID: confluenceRootPageID.trim(),
+          rootPageID: rootInput.id,
         }, confluenceToken.trim());
         setConfluenceURL(confluenceURL.trim().replace(/\/+$/, ""));
         setConfluenceSpace(confluenceSpace.trim());
-        setConfluenceRootPageID(confluenceRootPageID.trim());
+        setConfluenceRootPageID(rootInput.id);
         setConfluenceLoaded(true);
       }
       onSaved(p);
@@ -315,7 +321,17 @@ export function ProfileForm({
         </label>
         <label>
           Root page ID (optional)
-          <input value={confluenceRootPageID} onChange={(e) => setConfluenceRootPageID(e.target.value)} placeholder="123456" spellCheck={false} />
+          <input
+            value={confluenceRootPageID}
+            onChange={(e) => setConfluenceRootPageID(e.target.value)}
+            onBlur={() => {
+              if (rootInput.id && !rootInput.error) setConfluenceRootPageID(rootInput.id);
+            }}
+            placeholder="123456, or paste the page's address"
+            spellCheck={false}
+            aria-invalid={rootInput.error ? true : undefined}
+          />
+          {rootInput.error && <span className="field-error">{rootInput.error}</span>}
         </label>
         <label>
           Confluence personal access token
@@ -415,6 +431,8 @@ export function ProfileForm({
           <span className={testOk ? "ok-text" : "error-text"}>{testResult}</span>
         )}
       </div>
+
+      {rootInput.error && <div className="field-error">{ROOT_FIX_BEFORE_SAVE}</div>}
 
       {error && (
         <div className="error-text" role="alert">
