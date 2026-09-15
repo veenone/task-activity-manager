@@ -130,6 +130,63 @@ func TestCreateIssueShapesExtraFromCreateMeta(t *testing.T) {
 	}
 }
 
+// Item 3 of the ticket, second half: customfield_10253 came from a classic
+// createmeta answer that listed a field the Story create screen does not
+// carry, and Jira answered "Field cannot be set. It is not on the
+// appropriate screen". A draft carries the ids its dialog offered, so the
+// field stays out of the payload with no network call; and when the live
+// per-type answer does not list a field either, it stays out too.
+func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.createKey = "TKT-10"
+	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+		Type: backend.TypeStory, Summary: "Promo input",
+		Extra:        map[string]string{"customfield_10253": "Platform", "customfield_10050": "3"},
+		ScreenFields: []string{"customfield_10050"},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	post := f.writes[len(f.writes)-1]
+	if strings.Contains(post, "customfield_10253") {
+		t.Errorf("a field off the drafted screen must not be sent: %s", post)
+	}
+	if !strings.Contains(post, `"customfield_10050":{"id":"3"}`) {
+		t.Errorf("the screen's own field is shaped and sent: %s", post)
+	}
+
+	// A draft from before the set existed: the live per-type answer decides.
+	f.createKey = "TKT-11"
+	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+		Type: backend.TypeStory, Summary: "Legacy draft",
+		Extra: map[string]string{"customfield_10253": "Platform"},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	if post := f.writes[len(f.writes)-1]; strings.Contains(post, "customfield_10253") {
+		t.Errorf("the per-type answer does not list the field, so it is not sent: %s", post)
+	}
+}
+
+func TestCreateIssueNeverLetsAnExtraOverwriteABaseField(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.createKey = "TKT-12"
+	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+		Type: backend.TypeStory, Summary: "Real summary", ParentKey: "TKT-2",
+		Extra: map[string]string{"summary": "Fake summary", "customfield_10014": "TKT-99", "customfield_10016": "40"},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	post := f.writes[len(f.writes)-1]
+	for _, bad := range []string{"Fake summary", "TKT-99", `"customfield_10016":40`} {
+		if strings.Contains(post, bad) {
+			t.Errorf("an extra overwrote a base field (%s): %s", bad, post)
+		}
+	}
+	if !strings.Contains(post, `"summary":"Real summary"`) || !strings.Contains(post, `"customfield_10014":"TKT-2"`) {
+		t.Errorf("the form's own values stand: %s", post)
+	}
+}
+
 func TestUpdateIssuePushesTheEpicLink(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	if err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"parentKey": "PLAT-320"}); err != nil {
@@ -164,6 +221,8 @@ func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 	if !strings.Contains(post, `"customfield_10011":"New epic"`) {
 		t.Errorf("Epic Name defaults to the summary: %s", post)
 	}
+	// Epic Name is one of TAM's own fields: an extra naming it is ignored
+	// and the summary is what Jira gets, the same as with no extra at all.
 	f.createKey = "PLAT-601"
 	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeEpic, Summary: "Another epic", Extra: map[string]string{"customfield_10011": "Custom name"},
@@ -171,8 +230,8 @@ func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	post = f.writes[len(f.writes)-1]
-	if !strings.Contains(post, `"customfield_10011":"Custom name"`) {
-		t.Errorf("Extra's Epic Name wins: %s", post)
+	if !strings.Contains(post, `"customfield_10011":"Another epic"`) || strings.Contains(post, "Custom name") {
+		t.Errorf("Epic Name is the summary, whatever Extra says: %s", post)
 	}
 }
 
