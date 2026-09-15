@@ -198,4 +198,80 @@ describe("RitualsView", () => {
     );
     expect(screen.getByTestId("editor")).not.toHaveTextContent("stale");
   });
+
+  // Critical finding: sync() had no staleness guard. Setting sync.running
+  // before render (rather than mid-flight, whose reflection in the DOM
+  // depends on a React re-render this plain mock object cannot trigger on
+  // its own) is the direct way to prove the pickers are disabled whenever
+  // the shared lock actually says a rituals sync is running.
+  it("disables the board and sprint pickers while a rituals sync is running", async () => {
+    vi.mocked(api.ListBoards).mockResolvedValue([
+      { id: 1, name: "PLAT board", type: "scrum" }, { id: 2, name: "Second board", type: "scrum" },
+    ] as api.Board[]);
+    sync.running = "rituals";
+    renderView();
+    await screen.findByTestId("editor");
+    expect(screen.getByRole("combobox", { name: "Ritual board" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Ritual sprint" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Syncing rituals" })).toBeInTheDocument();
+  });
+
+  // Critical finding: sync() closed over boardId/sprintId from the render at
+  // click time, so a switch made while the request was still in flight had
+  // the resolved answer overwrite whatever sprint was now on screen: the
+  // result banner, the last-synced line, and the reloaded documents all
+  // landed on the sprint the user had already left. This does not set
+  // sync.running (a separate, simpler test above covers the pickers'
+  // disabled state), so the switch below goes through the picker exactly as
+  // a user would drive it once the lock that disables it has released.
+  it("answers only for the sprint a Sync was started on, not one switched to while it was in flight", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockImplementation(async (_p, _b, sprintId) =>
+      sprintId === 13
+        ? ["_sprint", "planning", "standup", "review", "retro"].map((t) => docFor(t, { sprintId: 13, title: `Sprint 13 · ${t}` }))
+        : five(),
+    );
+    let resolveSync!: (v: api.RitualSyncResult) => void;
+    sync.runRitualsSync.mockImplementation(() => new Promise<api.RitualSyncResult>((resolve) => { resolveSync = resolve; }));
+
+    renderView();
+    await screen.findByTestId("editor");
+
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    expect(sync.runRitualsSync).toHaveBeenCalledWith(1);
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Ritual sprint" }), "13");
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-type", "planning"));
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveTextContent(
+      docFor("planning", { sprintId: 13, title: "Sprint 13 · planning" }).body.replace(/<[^>]+>/g, ""),
+    ));
+
+    resolveSync({ created: 5, pulled: 0, pushed: 0, conflicts: 0, gone: 0, failed: [], syncedAt: "2026-09-14T10:00:00Z" });
+
+    // The stale answer must not paint a summary banner over sprint 13, and
+    // sprint 13's documents (already shown above) must not be clobbered by
+    // a reload keyed to sprint 14.
+    await waitFor(() => expect(sync.runRitualsSync).toHaveResolved());
+    expect(screen.queryByText(/Sync finished/)).not.toBeInTheDocument();
+    expect(screen.getByTestId("editor")).toHaveTextContent(
+      docFor("planning", { sprintId: 13, title: "Sprint 13 · planning" }).body.replace(/<[^>]+>/g, ""),
+    );
+  });
+
+  // Important finding: selected never reset and had no fallback when the
+  // current sprint's list lacked that type, which a closed sprint's Ensure
+  // (no backfill) makes routine: nav showed no aria-current item and the
+  // article pane rendered nothing, with no explanation.
+  it("opens the first available document when the selected type is missing from a closed sprint", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockImplementation(async (_p, _b, sprintId) =>
+      sprintId === 13 ? [docFor("_sprint", { sprintId: 13 }), docFor("standup", { sprintId: 13 })] : five(),
+    );
+    renderView();
+    await screen.findByTestId("editor");
+    expect(screen.getByTestId("editor")).toHaveAttribute("data-type", "planning");
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Ritual sprint" }), "13");
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-type", "_sprint"));
+    const nav = screen.getByRole("navigation", { name: "Ritual documents" });
+    expect(within(nav).getByRole("button", { name: /Overview/ })).toHaveAttribute("aria-current", "page");
+  });
 });

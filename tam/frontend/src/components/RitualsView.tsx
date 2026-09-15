@@ -32,6 +32,15 @@ export function RitualsView() {
   const [error, setError] = useState("");
   const [viewTheirs, setViewTheirs] = useState(false);
   const editorRef = useRef<RitualEditorHandle>(null);
+  // sync() captures the board and sprint it was started on, and checks these
+  // refs (kept in step with the pickers on every render) before applying
+  // anything it read back. Without that, a user free to switch board or
+  // sprint mid-sync would have the old sprint's result banner, last-synced
+  // line, and reloaded documents silently overwrite whatever is on screen
+  // once the request resolves.
+  const boardIdRef = useRef(boardId);
+  const sprintIdRef = useRef(sprintId);
+  useEffect(() => { boardIdRef.current = boardId; sprintIdRef.current = sprintId; }, [boardId, sprintId]);
 
   useEffect(() => {
     let live = true;
@@ -95,14 +104,25 @@ export function RitualsView() {
   }, []);
 
   async function sync() {
+    // Captured at call time, not read again below: the board and sprint
+    // pickers stay live while this runs, and every write below is gated on
+    // still matching what boardIdRef/sprintIdRef hold at the moment it
+    // would apply, not on what this closure started with.
+    const startBoardId = boardId;
+    const startSprintId = sprintId;
+    const stillCurrent = () => boardIdRef.current === startBoardId && sprintIdRef.current === startSprintId;
     setError(""); setResult(null);
     try {
       await editorRef.current?.flush();
-      const res = await runRitualsSync(boardId);
-      setResult(res);
-      setLastSync(res.syncedAt);
+      const res = await runRitualsSync(startBoardId);
+      if (stillCurrent()) {
+        setResult(res);
+        setLastSync(res.syncedAt);
+      }
       announce(syncSummary(res));
-      await loadDocs();
+      if (stillCurrent()) {
+        setDocs(await EnsureSprintRituals(activeId, startBoardId, startSprintId));
+      }
     } catch (e) {
       setError(errMsg(e));
     }
@@ -176,7 +196,17 @@ export function RitualsView() {
   const configured = !!config && !!config.baseURL.trim() && !!config.spaceKey.trim() && !!config.rootPageID.trim();
   const demoSpace = config?.baseURL.trim().toLowerCase() === "demo";
   const sprint = sprints.find((s) => s.id === sprintId);
-  const doc = docs?.find((d) => d.ritualType === selected) ?? null;
+  // selected can point at a type the current sprint's list no longer has: it
+  // never resets on a board/sprint switch, and a closed sprint's Ensure does
+  // not backfill a type removeLocal just deleted. effectiveSelected falls
+  // back to the first RITUAL_ORDER type the list actually has, so the nav
+  // and the article pane agree on something real rather than both going
+  // blank with no explanation.
+  const docList = docs ?? [];
+  const effectiveSelected = docList.some((d) => d.ritualType === selected)
+    ? selected
+    : (RITUAL_ORDER.find((t) => docList.some((d) => d.ritualType === t)) ?? selected);
+  const doc = docList.find((d) => d.ritualType === effectiveSelected) ?? null;
   const pageUrl = doc?.pageId && configured && !demoSpace
     ? `${config!.baseURL.trim().replace(/\/+$/, "")}/pages/viewpage.action?pageId=${encodeURIComponent(doc.pageId)}`
     : "";
@@ -188,7 +218,7 @@ export function RitualsView() {
         {boards.length > 1 ? (
           <label className="board-picker">
             <span>Board</span>
-            <select aria-label="Ritual board" value={boardId} onChange={(e) => setBoardId(Number(e.target.value))}>
+            <select aria-label="Ritual board" value={boardId} onChange={(e) => setBoardId(Number(e.target.value))} disabled={syncing}>
               {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </label>
@@ -196,7 +226,7 @@ export function RitualsView() {
         {sprints.length > 0 && (
           <label className="board-picker">
             <span>Sprint</span>
-            <select aria-label="Ritual sprint" value={sprintId} onChange={(e) => setSprintId(Number(e.target.value))}>
+            <select aria-label="Ritual sprint" value={sprintId} onChange={(e) => setSprintId(Number(e.target.value))} disabled={syncing}>
               {sprints.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
@@ -231,8 +261,8 @@ export function RitualsView() {
                 return (
                   <li key={type}>
                     <button
-                      className={`folder-item ritual-doc${selected === type ? " folder-selected" : ""}`}
-                      aria-current={selected === type ? "page" : undefined}
+                      className={`folder-item ritual-doc${effectiveSelected === type ? " folder-selected" : ""}`}
+                      aria-current={effectiveSelected === type ? "page" : undefined}
                       onClick={() => { setSelected(type); setViewTheirs(false); }}
                     >
                       <span className="ritual-doc-label">{RITUAL_LABEL[type]}</span>
