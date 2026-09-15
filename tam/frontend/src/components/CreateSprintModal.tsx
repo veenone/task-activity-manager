@@ -34,20 +34,16 @@ export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Pr
     create.mutate(
       { boardId, name: values.name, goal: values.goal, start: values.from, end: values.to },
       {
-        // The note is the write's own postscript, empty almost always: Jira
-        // made the sprint and the board's sprint list could not be re-read
-        // afterwards, so the picker does not offer it yet. It rides with the
-        // sentence into the board's banner, since this dialog closes on
-        // success.
+        // The create is a local draft now, so the Go side always answers
+        // with an empty note and the draft's negative id. The note still
+        // rides into the board's banner when present, since this dialog
+        // closes on success, and the id is what the picker switches to.
         onSuccess: (created) => {
           const made = `${created.sprint.name || values.name} was drafted, ${values.from} to ${values.to}. Commit creates it in Jira.`;
           const line = created.note ? `${made} ${created.note}` : made;
           announce(line);
-          // A zero id is a documented answer rather than a failure: core/jira
-          // treats an empty create response, or one with no id, as "made, go
-          // and refresh", because the sprint exists in Jira either way. So
-          // there is no id to select and the board keeps the sprint it had,
-          // rather than switching the picker to a sprint numbered zero.
+          // A zero id cannot come from a draft; the guard only keeps the
+          // picker off a sprint numbered zero if one ever did.
           onCreated(created.sprint.id ? String(created.sprint.id) : "", line);
           onClose();
         },

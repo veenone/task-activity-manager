@@ -10,12 +10,13 @@ import (
 )
 
 // Rekey moves a draft to the key Jira assigned, across the row, its links,
-// its journal rows, and its audit trail, and repoints any issue or pending
-// edit that named the temporary key, the parent of an edit and the
-// neighbour of a rank alike, and repoints every other draft whose own JSON
-// names the temporary key as its parent, and every link whose target it is,
-// journals the sprint the draft was created with
-// as a move under the real key, and audits the creation.
+// its journal rows, and its audit trail, and journals the sprint the draft
+// was created with as a move under the real key and audits the creation.
+//
+// It also repoints everything else that named the temporary key: any issue
+// or pending edit (the parent of an edit and the neighbour of a rank alike),
+// every other draft whose own JSON names it as its parent, and every link
+// whose target it is.
 func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

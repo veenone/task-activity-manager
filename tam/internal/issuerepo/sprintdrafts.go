@@ -24,10 +24,11 @@ import (
 //
 // This package writes those sprint rows although the sprint table is
 // boardrepo's. It writes only draft = 1 rows and RekeySprint's two
-// statements that turn one real, both on the draft's own board, because the row has to land and go in the same
-// transaction as its journal row, and a discard has to revert the moves into
-// it in that transaction too; two repositories would mean two transactions
-// and a crash window leaving a sprint nobody can discard.
+// statements that turn one real, both on the draft's own board, because the
+// row has to land and go in the same transaction as its journal row, and a
+// discard has to revert the moves into it in that transaction too; two
+// repositories would mean two transactions and a crash window leaving a
+// sprint nobody can discard.
 //
 // Only the creation moves into the journal. Starting, completing, editing
 // and deleting a sprint Jira already holds stay immediate writes in
