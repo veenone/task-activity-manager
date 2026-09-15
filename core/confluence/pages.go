@@ -115,15 +115,20 @@ func (c *Client) FindPageByTitle(ctx context.Context, spaceKey, title string) (S
 	return r.Results[0].stored(), true, nil
 }
 
-// CreatePage creates a page under parentID. A response that leaves the body
-// out answers with the body that was sent, since that is what now exists.
+// CreatePage creates a page under parentID, or at the top of the space when
+// parentID is empty: Confluence places a page sent with no ancestors there,
+// and an ancestors entry with an empty id is not that. A response that leaves
+// the body out answers with the body that was sent, since that is what now
+// exists.
 func (c *Client) CreatePage(ctx context.Context, spaceKey, parentID, title, body string) (StoredPage, error) {
 	payload := map[string]any{
-		"type":      "page",
-		"title":     title,
-		"space":     map[string]string{"key": spaceKey},
-		"ancestors": []map[string]string{{"id": parentID}},
-		"body":      storageBody(body),
+		"type":  "page",
+		"title": title,
+		"space": map[string]string{"key": spaceKey},
+		"body":  storageBody(body),
+	}
+	if parentID != "" {
+		payload["ancestors"] = []map[string]string{{"id": parentID}}
 	}
 	var r rawStoredPage
 	if err := c.send(ctx, http.MethodPost, "/rest/api/content?expand="+storedExpand, payload).Decode(&r); err != nil {

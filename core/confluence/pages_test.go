@@ -135,6 +135,29 @@ func TestUpdatePageSendsTheVersionItIsGiven(t *testing.T) {
 	}
 }
 
+func TestCreatePageWithNoParentSendsNoAncestors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		var got map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &got); err != nil {
+			t.Fatalf("payload %s: %v", raw, err)
+		}
+		if _, ok := got["ancestors"]; ok {
+			t.Errorf("a top-level create sent ancestors: %s", raw)
+		}
+		if string(got["title"]) != `"PLAT Rituals"` || string(got["type"]) != `"page"` {
+			t.Errorf("payload = %s", raw)
+		}
+		_, _ = w.Write([]byte(`{"id":"500","title":"PLAT Rituals","version":{"number":1},"ancestors":[]}`))
+	}))
+	defer srv.Close()
+
+	p, err := NewClient(srv.URL, "secret", "", false).CreatePage(context.Background(), "PLAT", "", "PLAT Rituals", "<p>root</p>")
+	if err != nil || p.ID != "500" || len(p.AncestorIDs) != 0 || p.Body != "<p>root</p>" {
+		t.Fatalf("created = %+v, %v", p, err)
+	}
+}
+
 func TestConflictAndNotFoundAreMatchable(t *testing.T) {
 	for _, tc := range []struct {
 		code      int
