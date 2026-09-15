@@ -41,7 +41,10 @@ each a decision taken during brainstorming on 2026-09-14:
 
 ## 1. Storage
 
-### Schema version 11
+### Schema version 12
+
+Version 11 was already taken by a repair migration when this was built, so
+these columns arrive at 12.
 
 `ritual_document` stays the one table. Its columns are redefined or added:
 

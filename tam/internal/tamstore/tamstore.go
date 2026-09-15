@@ -13,6 +13,9 @@
 // healthy version 10 database: some development builds recorded the version
 // 10 stamp before the issues_json migration actually ran, and this repairs
 // those files without re-running the conversion where it already happened.
+// Version 12 adds ritual_document's base_body, conflict_body and
+// conflict_version, the three facts the ritual sync compares and resolves
+// with.
 package tamstore
 
 import (
@@ -40,8 +43,7 @@ import (
 // EXISTS that needs no migration entry at all, and the sprint's
 // complete_date, a column add in version 7's own shape.
 // Version 9 adds ritual_document through the same idempotent base DDL path
-// as sprint_report. Version 12 adds ritual_document's base_body, conflict_body
-// and conflict_version, the three facts the ritual sync compares and resolves with.
+// as sprint_report.
 var Schema = store.Schema{
 	Version: 12,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
