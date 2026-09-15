@@ -1,0 +1,107 @@
+name: gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The instruction gate itself runs inside `npm test --workspaces`, which the
+  # existing `frontend` job in build.yml already runs. This job holds the gates
+  # that job does not: the ratchet, go vet, and gofmt.
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the instruction gate resolves cited commit hashes
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: lint report
+        # eslint exits non-zero while the backlog exists; the ratchet is the gate.
+        run: npm run lint
+      - name: ratchet
+        run: sh scripts/ratchet.sh
+      - name: go vet
+        run: |
+          cd core && go vet ./... && cd ..
+          cd tam && go vet ./... && cd ..
+          cd xtm && go vet ./...
+      - name: gofmt
+        # Linux checkout is LF, so this is meaningful here and not on a
+        # Windows clone where core.autocrlf makes gofmt flag every file.
+        run: |
+          unformatted=$(gofmt -l core tam xtm)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt would change these files:"
+            echo "$unformatted"
+            exit 1
+          fi
+          echo "gofmt clean"
+
+  # Generated bindings contract: the tree must match what the generator emits.
+  bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tam/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: install wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
+      - name: regenerate and compare
+        run: |
+          cd tam && wails generate module && cd ..
+          cd xtm && wails generate module && cd ..
+          if ! git diff --exit-code -- '*/frontend/wailsjs'; then
+            echo "Generated bindings are stale. Run 'wails generate module' and commit the result."
+            exit 1
+          fi
+
+  pr-acceptance:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: check PR body
+        env:
+          # Never interpolated into the run script: a PR title is attacker-controlled.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: sh scripts/pr-body-check.sh
+
+  proven-red:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tam/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: tests must fail against the pre-change code
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: sh scripts/proven-red.sh
