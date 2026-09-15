@@ -655,6 +655,10 @@ export interface IssueDraft {
   sprintId?: string;
   sprintName?: string;
   extra: Record<string, string>;
+  // The extra field ids the dialog offered for this type, read off the
+  // create screen. The create sends no extra outside them. Absent on a draft
+  // written before the set existed and on the importer's drafts.
+  screenFields?: string[];
 }
 
 // JiraUser is one person the assignee picker can offer. name is the username

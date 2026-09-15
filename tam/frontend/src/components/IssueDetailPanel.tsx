@@ -152,9 +152,9 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
     window.addEventListener("mouseup", onUp);
   }
   // Jira allows a sub-task under any standard issue, and under neither an
-  // epic nor another sub-task; a draft has no key to hang one off yet.
+  // epic nor another sub-task. A draft parent is fine: Commit creates it
+  // first and the sub-task after it has a real key.
   const canHoldSubtasks =
-    !issue.draft &&
     issue.type !== "epic" &&
     issue.type !== "subtask" &&
     (subtaskType.data ?? "") !== "";

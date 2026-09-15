@@ -455,6 +455,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
    not there is an error to show. */
 .new-issue-status { flex: 1; min-width: 0; }
 .meta-fields { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+.meta-more { display: flex; flex-direction: column; gap: 10px; }
+.meta-more-toggle { align-self: flex-start; padding-left: 0; }
+.meta-fields-optional { display: flex; flex-direction: column; gap: 10px; }
 /* A cell that stacks its control over a hint, for the fields whose value is a
    list and would otherwise say so only in a placeholder that vanishes on the
    first keystroke. */

@@ -3,7 +3,8 @@ import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Modal, announce, call, errMsg, useConfirm, useProfile } from "@agile-suite/core";
 import { CreateIssue, ISSUE_TYPES } from "../api";
-import type { FieldSpec, IssueDraft, IssueType, Profile, Settings } from "../api";
+import type { IssueDraft, IssueType, Profile, Settings } from "../api";
+import { MetaField, splitMetaFields } from "./MetaField";
 import { useCreateFields } from "../queries/pending";
 import { useEpics } from "../queries/tree";
 import { useOpenSprints } from "../queries/boards";
@@ -81,85 +82,6 @@ function hasPoints(type: IssueType): boolean {
   return type !== "requirement" && type !== "epic";
 }
 
-// MetaField renders one create-meta field by its schema type. A field whose
-// create-meta listed allowed values gets a select, and an array field gets a
-// multi-select, because a Jira array (components, fix versions, a
-// multi-select) takes more than one value; the chosen ids are joined with a
-// comma, which is what the Go side splits. Anything else is a text input,
-// with a hint saying so where the value is really a list.
-function MetaField({
-  spec,
-  value,
-  invalid,
-  onChange,
-}: {
-  spec: FieldSpec;
-  value: string;
-  invalid: boolean;
-  onChange: (v: string) => void;
-}) {
-  const id = `meta-${spec.id}`;
-  const isList = spec.type === "array";
-  const shared = {
-    id,
-    className: "detail-input",
-    "aria-required": spec.required || undefined,
-    "aria-invalid": invalid || undefined,
-  };
-  const label = (
-    <label className="muted small" htmlFor={id}>
-      {spec.name}
-      {spec.required && <span className="field-required" aria-hidden="true"> *</span>}
-    </label>
-  );
-
-  if (spec.allowedValues.length > 0) {
-    const selected = value === "" ? [] : value.split(",");
-    return (
-      <div className="edit-row">
-        {label}
-        <span className="edit-cell">
-          <select
-            {...shared}
-            multiple={isList}
-            size={isList ? Math.min(spec.allowedValues.length, 4) : undefined}
-            value={isList ? selected : value}
-            onChange={(e) =>
-              onChange(
-                isList
-                  ? Array.from(e.target.selectedOptions, (o) => o.value).join(",")
-                  : e.target.value,
-              )
-            }
-          >
-            {!isList && <option value="">Select a {spec.name.toLowerCase()}</option>}
-            {spec.allowedValues.map((o) => (
-              <option key={o.id} value={o.id}>{o.value}</option>
-            ))}
-          </select>
-          {isList && <span className="muted small">Pick one or more.</span>}
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="edit-row">
-      {label}
-      <span className="edit-cell">
-        <input
-          {...shared}
-          type={spec.type === "date" ? "date" : "text"}
-          inputMode={spec.type === "number" ? "decimal" : undefined}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        {isList && <span className="muted small">A comma list.</span>}
-      </span>
-    </div>
-  );
-}
-
 // NewIssueModal drafts one issue. Nothing it creates exists in Jira: it
 // writes a TAM-NEW-n row into the journal, and Commit is what pushes it. The
 // dialog says so in its subtitle rather than only in a footnote, because that
@@ -198,7 +120,11 @@ export function NewIssueModal({
   const epics = useEpics(activeId);
   const openSprints = useOpenSprints(activeId);
   const subtaskType = useSubtaskType(activeId);
-  const specs = meta.data ?? [];
+  const { required: requiredSpecs, optional: optionalSpecs } = splitMetaFields(meta.data ?? []);
+  const specs = [...requiredSpecs, ...optionalSpecs];
+  // More fields opens only on request, or on a validation failure inside it,
+  // so the dialog stays as short as the fields Jira insists on.
+  const [moreOpen, setMoreOpen] = useState(false);
   const summaryRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -208,6 +134,16 @@ export function NewIssueModal({
   useEffect(() => {
     summaryRef.current?.focus();
   }, []);
+
+  // A failure inside the collapsed More fields section opens it first
+  // (invalidField and moreOpen land in the same render), so the field this
+  // effect looks for is already mounted by the time it runs: focusing here,
+  // after commit, is what keeps it from reaching for a node that render
+  // has not drawn yet (F12).
+  useEffect(() => {
+    if (!invalidField) return;
+    formRef.current?.querySelector<HTMLElement>(`#${invalidField}`)?.focus();
+  }, [invalidField, moreOpen]);
 
   const dirty =
     summary !== "" ||
@@ -242,6 +178,7 @@ export function NewIssueModal({
     setExtra({});
     setError("");
     setInvalidField("");
+    setMoreOpen(false);
     if (!hasPoints(next)) setPoints("");
     if (next === "epic") {
       setParentKey("");
@@ -249,10 +186,12 @@ export function NewIssueModal({
     }
   }
 
+  // Focus itself is not done here: the field this names may still be behind
+  // a collapsed More fields section, not yet mounted. The effect above does
+  // the focusing, once render has caught up with invalidField and moreOpen.
   function fail(message: string, field: string) {
     setError(message);
     setInvalidField(field);
-    formRef.current?.querySelector<HTMLElement>(`#${field}`)?.focus();
   }
 
   async function onSubmit(e: FormEvent) {
@@ -277,6 +216,7 @@ export function NewIssueModal({
       // Jira's own number fields get the same check the built-in story points
       // field gets; inputMode is a keyboard hint, not validation.
       if (v !== "" && s.type === "number" && Number.isNaN(Number(v))) {
+        if (!s.required) setMoreOpen(true);
         fail(`${s.name} must be a number.`, `meta-${s.id}`);
         return;
       }
@@ -297,6 +237,10 @@ export function NewIssueModal({
       sprintId: type === "epic" ? "" : sprintId,
       sprintName: type === "epic" ? "" : chosenSprintName,
       extra: Object.fromEntries(Object.entries(extra).filter(([, v]) => v.trim() !== "")),
+      // The ids this dialog offered, so Commit can leave out any extra the
+      // create screen did not carry without asking Jira again. A failed read
+      // offered nothing, which is what an empty list says.
+      screenFields: meta.isSuccess ? specs.map((s) => s.id) : [],
     };
     setError("");
     setInvalidField("");
@@ -488,16 +432,46 @@ export function NewIssueModal({
               <p className="muted small" role="status">Checking which fields Jira requires.</p>
             ) : (
               <>
-                <p className="muted small">Jira requires these for a {typeLabel(type).toLowerCase()}:</p>
-                {specs.map((s) => (
-                  <MetaField
-                    key={s.id}
-                    spec={s}
-                    value={extra[s.id] ?? ""}
-                    invalid={invalidField === `meta-${s.id}`}
-                    onChange={(v) => setExtra((cur) => ({ ...cur, [s.id]: v }))}
-                  />
-                ))}
+                {requiredSpecs.length > 0 && (
+                  <>
+                    <p className="muted small">Jira requires these for a {typeLabel(type).toLowerCase()}:</p>
+                    {requiredSpecs.map((s) => (
+                      <MetaField
+                        key={s.id}
+                        spec={s}
+                        value={extra[s.id] ?? ""}
+                        invalid={invalidField === `meta-${s.id}`}
+                        onChange={(v) => setExtra((cur) => ({ ...cur, [s.id]: v }))}
+                      />
+                    ))}
+                  </>
+                )}
+                {optionalSpecs.length > 0 && (
+                  <div className="meta-more">
+                    <button
+                      type="button"
+                      className="btn btn-ghost meta-more-toggle"
+                      aria-expanded={moreOpen}
+                      aria-controls="new-issue-more-fields"
+                      onClick={() => setMoreOpen((open) => !open)}
+                    >
+                      <span aria-hidden="true">{moreOpen ? "▾" : "▸"}</span> More fields ({optionalSpecs.length})
+                    </button>
+                    {moreOpen && (
+                      <div id="new-issue-more-fields" className="meta-fields-optional">
+                        {optionalSpecs.map((s) => (
+                          <MetaField
+                            key={s.id}
+                            spec={s}
+                            value={extra[s.id] ?? ""}
+                            invalid={invalidField === `meta-${s.id}`}
+                            onChange={(v) => setExtra((cur) => ({ ...cur, [s.id]: v }))}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>

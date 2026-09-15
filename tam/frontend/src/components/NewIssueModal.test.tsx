@@ -79,6 +79,7 @@ const epic = (key: string, summary: string): api.Issue => ({
 const baseDraft = {
   type: "task", summary: "", description: "", priority: "", labels: [] as string[],
   assignee: "", storyPoints: null as number | null, parentKey: "", sprintId: "", sprintName: "", extra: {},
+  screenFields: [] as string[],
 };
 
 beforeEach(() => {
@@ -279,6 +280,71 @@ describe("NewIssueModal", () => {
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
     expect(vi.mocked(api.CreateIssue).mock.calls[0][1].extra).toEqual({ customfield_10050: "3" });
     expect(vi.mocked(api.CreateIssue).mock.calls[0][1].type).toBe("bug");
+    expect(vi.mocked(api.CreateIssue).mock.calls[0][1].screenFields).toEqual(["customfield_10050"]);
+  });
+
+  // Item 2 of the ticket: a technical task drafted from a story was asked
+  // for its parent a second time, under the parent it already stated.
+  it("never renders the parent or the form's own fields from create-meta", async () => {
+    vi.mocked(api.GetCreateFields).mockResolvedValue([
+      { id: "parent", name: "Parent", type: "string", required: true, allowedValues: [] },
+      { id: "summary", name: "Summary", type: "string", required: true, allowedValues: [] },
+      { id: "customfield_10300", name: "Acceptance criteria", type: "textarea", required: false, allowedValues: [] },
+    ]);
+    renderModal(vi.fn(), vi.fn(), "subtask", true, "PLAT-412");
+    const dialog = await screen.findByRole("dialog", { name: "New technical task" });
+    await submitButton(dialog);
+    expect(within(dialog).queryByLabelText(/^Parent/)).not.toBeInTheDocument();
+    expect(within(dialog).getAllByLabelText("Summary *")).toHaveLength(1);
+    expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "More fields (1)" })).toBeInTheDocument();
+  });
+
+  it("keeps optional fields behind More fields and sends what was filled there", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetCreateFields).mockResolvedValue([
+      { id: "customfield_10050", name: "Severity", type: "option", required: true, allowedValues: [{ id: "3", value: "Critical" }] },
+      { id: "customfield_10300", name: "Acceptance criteria", type: "textarea", required: false, allowedValues: [] },
+      { id: "duedate", name: "Due date", type: "date", required: false, allowedValues: [] },
+    ]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    const more = await within(dialog).findByRole("button", { name: "More fields (2)" });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    expect(within(dialog).queryByLabelText("Acceptance criteria")).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Severity *")).toBeInTheDocument();
+    await user.click(more);
+    expect(more).toHaveAttribute("aria-expanded", "true");
+    await user.type(within(dialog).getByLabelText("Acceptance criteria"), "Given a promo code");
+    await user.selectOptions(within(dialog).getByLabelText("Severity *"), "3");
+    await user.type(within(dialog).getByLabelText("Summary *"), "Promo input");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    const draft = vi.mocked(api.CreateIssue).mock.calls[0][1];
+    expect(draft.extra).toEqual({ customfield_10050: "3", customfield_10300: "Given a promo code" });
+    expect(draft.screenFields).toEqual(["customfield_10050", "customfield_10300", "duedate"]);
+  });
+
+  // Controller ruling F12: a submit failure on an optional field hidden
+  // inside the collapsed More fields section must not try to focus it
+  // before the section has mounted. Reopening and focusing land in the
+  // same act(), so this proves both the reopen and the actual focus.
+  it("opens More fields when an optional number there is not a number, and focuses it once it renders", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetCreateFields).mockResolvedValue([
+      { id: "customfield_10099", name: "Effort", type: "number", required: false, allowedValues: [] },
+    ]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    await user.click(await within(dialog).findByRole("button", { name: "More fields (1)" }));
+    await user.type(within(dialog).getByLabelText("Effort"), "soon");
+    await user.click(within(dialog).getByRole("button", { name: "More fields (1)" }));
+    await user.type(within(dialog).getByLabelText("Summary *"), "Rework");
+    await user.click(await submitButton(dialog));
+    expect(await within(dialog).findByText("Effort must be a number.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "More fields (1)" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(dialog).getByLabelText("Effort")).toHaveFocus();
+    expect(api.CreateIssue).not.toHaveBeenCalled();
   });
 
   it("takes more than one value for an array field", async () => {

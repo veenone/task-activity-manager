@@ -124,6 +124,13 @@ describe("IssueDetailPanel", () => {
     expect(within(dialog).queryByLabelText("Type")).not.toBeInTheDocument();
   });
 
+  // A story still drafted as TAM-NEW-2 can hold a technical task: Commit
+  // creates the story first and the sub-task after it has a real key.
+  it("drafts a sub-task under a draft", async () => {
+    renderPanel(vi.fn(), undefined, { ...story, key: "TAM-NEW-2", status: "Draft", draft: true, pending: true });
+    expect(await screen.findByRole("button", { name: "+ Technical task" })).toBeInTheDocument();
+  });
+
   it("is resizeable, and remembers the width", async () => {
     renderPanel();
     const panel = await screen.findByRole("complementary");
