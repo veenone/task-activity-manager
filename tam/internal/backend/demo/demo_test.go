@@ -225,7 +225,8 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 	}
 
 	specs, err := b.CreateFields(ctx, "ACME", backend.TypeBug)
-	if err != nil || len(specs) != 1 || specs[0].Type != "option" || len(specs[0].AllowedValues) != 3 {
+	if err != nil || len(specs) != 2 || specs[0].Type != "option" || !specs[0].Required || len(specs[0].AllowedValues) != 3 ||
+		specs[1].ID != "environment" || specs[1].Required || specs[1].Type != "textarea" {
 		t.Errorf("bug create fields: %+v %v", specs, err)
 	}
 	if specs, _ := b.CreateFields(ctx, "ACME", backend.TypeTask); len(specs) != 0 {
@@ -849,5 +850,27 @@ func TestDeleteSprintRemovesItAndReturnsItsIssuesToTheBoard(t *testing.T) {
 
 	if err := b.DeleteSprint(ctx, 13); err == nil {
 		t.Error("deleting an already-deleted sprint is refused")
+	}
+}
+
+func TestDemoRefusesAMarkedEpicOnceAndAPlaceholderParentAlways(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+	if _, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeEpic, Summary: "Plain epic"}); err != nil {
+		t.Fatalf("an ordinary epic is created: %v", err)
+	}
+	marked := backend.IssueDraft{Type: backend.TypeEpic, Summary: "Refused promotions epic"}
+	if _, err := b.CreateIssue(ctx, "ACME", marked); err == nil || !strings.Contains(err.Error(), "Commit again") {
+		t.Fatalf("the marked epic is refused the first time: %v", err)
+	}
+	if key, err := b.CreateIssue(ctx, "ACME", marked); err != nil || key == "" {
+		t.Fatalf("and created the second time: %q %v", key, err)
+	}
+	if _, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeStory, Summary: "Leaky", ParentKey: "TAM-NEW-2"}); err == nil {
+		t.Error("a placeholder parent is refused the way Jira refuses it")
+	}
+	story, _ := b.CreateFields(ctx, "ACME", backend.TypeStory)
+	if len(story) != 2 || story[0].Required || story[1].Required {
+		t.Errorf("story offers two optional fields: %+v", story)
 	}
 }
