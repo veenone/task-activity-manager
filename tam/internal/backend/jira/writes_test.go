@@ -2,6 +2,7 @@ package jira_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -186,7 +187,9 @@ func TestCreateFieldsHidesEpicName(t *testing.T) {
 	}
 }
 
-func TestCreateFieldsKeepsOnlyRequiredUnknownFields(t *testing.T) {
+// The classic answer this fake gives for a Bug carries one optional field,
+// Environment, which the dialog now offers under More fields.
+func TestCreateFieldsOffersRequiredAndOptionalFieldsBeyondTheForm(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeBug)
 	if err != nil {
@@ -194,22 +197,19 @@ func TestCreateFieldsKeepsOnlyRequiredUnknownFields(t *testing.T) {
 	}
 	var seen []string
 	for _, s := range specs {
-		seen = append(seen, s.ID+":"+s.Type)
+		seen = append(seen, fmt.Sprintf("%s:%s:%v", s.ID, s.Type, s.Required))
 	}
-	// Sorted by name: Component/s, Keywords, Release Note, Severity.
-	if strings.Join(seen, ",") != "components:array,customfield_10071:array,customfield_10070:option,customfield_10050:option" {
+	// Sorted by name: Component/s, Environment, Keywords, Release Note,
+	// Severity. Story Points and Summary are the form's own.
+	want := "components:array:true,environment:string:false,customfield_10071:array:true,customfield_10070:option:true,customfield_10050:option:true"
+	if strings.Join(seen, ",") != want {
 		t.Errorf("specs = %v", seen)
 	}
-	if specs[3].Name != "Severity" || len(specs[3].AllowedValues) != 2 || specs[3].AllowedValues[1].Value != "Critical" {
-		t.Errorf("severity = %+v", specs[3])
+	if specs[4].Name != "Severity" || len(specs[4].AllowedValues) != 2 || specs[4].AllowedValues[1].Value != "Critical" {
+		t.Errorf("severity = %+v", specs[4])
 	}
 	if specs[0].AllowedValues[0].Value != "Checkout" {
 		t.Errorf("array options take name when value is empty: %+v", specs[0])
-	}
-	// A field whose create-meta lists no allowed values is what tells the form
-	// to offer free text and the create to send a name rather than an id.
-	if len(specs[1].AllowedValues) != 0 || len(specs[2].AllowedValues) != 0 {
-		t.Errorf("fields without options must report none: %+v %+v", specs[1], specs[2])
 	}
 	found := false
 	for _, s := range f.searches {
@@ -218,7 +218,44 @@ func TestCreateFieldsKeepsOnlyRequiredUnknownFields(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("createmeta query: %v", f.searches)
+		t.Errorf("a type with no id in the project list is read through the classic call by name: %v", f.searches)
+	}
+}
+
+// A Story on TKT is read through the per-type endpoint, which does not list
+// customfield_10253, so the dialog never offers it. Epic Link and Sprint are
+// the form's own, found by id or by their greenhopper type, and an optional
+// attachment is nothing a text form can fill.
+func TestCreateFieldsReadsTheScreenAndLeavesOutBaseAndUnfillableFields(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	specs, err := b.CreateFields(context.Background(), "TKT", backend.TypeStory)
+	if err != nil {
+		t.Fatalf("CreateFields: %v", err)
+	}
+	var seen []string
+	for _, s := range specs {
+		seen = append(seen, fmt.Sprintf("%s:%s:%v", s.ID, s.Type, s.Required))
+	}
+	if strings.Join(seen, ",") != "customfield_10300:textarea:false,customfield_10050:option:true" {
+		t.Errorf("specs = %v", seen)
+	}
+	for _, s := range f.searches {
+		if strings.HasPrefix(s, "createmeta ") {
+			t.Errorf("the per-type endpoint answered, so the classic call is never made: %v", f.searches)
+		}
+	}
+}
+
+// Item 2 of the ticket: a technical task drafted from a story was asked for
+// its parent a second time, because createmeta lists parent as required.
+func TestCreateFieldsNeverOffersTheParentOfASubtask(t *testing.T) {
+	b, _ := newBackend(t, threeFields)
+	specs, err := b.CreateFields(context.Background(), "TKT", backend.TypeSubtask)
+	if err != nil {
+		t.Fatalf("CreateFields: %v", err)
+	}
+	if len(specs) != 1 || specs[0].ID != "customfield_10300" {
+		t.Errorf("specs = %+v, want only Acceptance criteria", specs)
 	}
 }
 

@@ -95,6 +95,14 @@ type IssueDraft struct {
 	SprintID   string `json:"sprintId"`
 	SprintName string `json:"sprintName"`
 
+	// ScreenFields are the extra field ids the create dialog offered for
+	// this draft's type, read off the create screen when it was drafted.
+	// The create sends no extra outside this set, which is what keeps a
+	// field createmeta listed but the screen does not carry out of the
+	// payload without a network call at Commit. Nil is a draft made before
+	// the set existed or by the importer, whose extras are empty anyway.
+	ScreenFields []string `json:"screenFields"`
+
 	Extra map[string]string `json:"extra"`
 }
 
@@ -459,8 +467,11 @@ type IssueBackend interface {
 	CanTransition(ctx context.Context, key string, targetStatusIDs []string) (TransitionCheck, error)
 	// CreateIssue creates the draft and returns the key Jira assigned.
 	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, error)
-	// CreateFields lists the required create-meta fields of a logical type
-	// that the New issue form does not already carry.
+	// CreateFields lists the create-screen fields of a logical type that
+	// the New issue form does not already carry, required and optional,
+	// with FieldSpec.Required saying which. The form's own fields (summary,
+	// description, priority, labels, assignee, story points, Epic Link,
+	// Epic Name, parent, sprint) never come back, whatever createmeta says.
 	CreateFields(ctx context.Context, projectKey, logicalType string) ([]FieldSpec, error)
 	// LinkTypes lists the issue link types the instance defines.
 	LinkTypes(ctx context.Context) ([]LinkType, error)

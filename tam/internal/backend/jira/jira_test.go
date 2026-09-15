@@ -66,8 +66,42 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
+		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/createmeta/"):
+			f.searches = append(f.searches, "createmeta-type "+r.URL.Path)
+			switch r.URL.Path {
+			case "/rest/api/2/issue/createmeta/TKT/issuetypes/10001":
+				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":7,"isLast":true,"values":[
+					{"fieldId":"summary","name":"Summary","required":true,"schema":{"type":"string","system":"summary"}},
+					{"fieldId":"issuetype","name":"Issue Type","required":true,"schema":{"type":"issuetype","system":"issuetype"}},
+					{"fieldId":"customfield_10014","name":"Epic Link","required":false,"schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}},
+					{"fieldId":"customfield_10020","name":"Sprint","required":false,"schema":{"type":"array","items":"string","custom":"com.pyxis.greenhopper.jira:gh-sprint"}},
+					{"fieldId":"customfield_10050","name":"Severity","required":true,"schema":{"type":"option"},"allowedValues":[{"id":"1","value":"Minor"},{"id":"3","value":"Critical"}]},
+					{"fieldId":"customfield_10300","name":"Acceptance criteria","required":false,"schema":{"type":"string","custom":"com.atlassian.jira.plugin.system.customfieldtypes:textarea"}},
+					{"fieldId":"attachment","name":"Attachment","required":false,"schema":{"type":"array","items":"attachment","system":"attachment"}}
+				]}`))
+			case "/rest/api/2/issue/createmeta/TKT/issuetypes/10003":
+				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":3,"isLast":true,"values":[
+					{"fieldId":"parent","name":"Parent","required":true,"schema":{"type":"issuelink","system":"parent"}},
+					{"fieldId":"summary","name":"Summary","required":true,"schema":{"type":"string","system":"summary"}},
+					{"fieldId":"customfield_10300","name":"Acceptance criteria","required":false,"schema":{"type":"string","custom":"com.atlassian.jira.plugin.system.customfieldtypes:textarea"}}
+				]}`))
+			default:
+				// An instance before 8.4, or a type id this fake does not know:
+				// the backend falls back to the classic call.
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"errorMessages":["not found"]}`))
+			}
+		case r.URL.Path == "/rest/api/2/project/TKT":
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10001","name":"Story"},{"id":"10003","name":"Technical task","subtask":true}]}`))
 		case r.URL.Path == "/rest/api/2/issue/createmeta":
 			f.searches = append(f.searches, "createmeta "+r.URL.RawQuery)
+			if r.URL.Query().Get("projectKeys") == "TKT" {
+				_, _ = w.Write([]byte(`{"projects":[{"key":"TKT","issuetypes":[{"id":"10001","name":"Story","fields":{
+					"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},
+					"customfield_10253":{"required":false,"name":"Team","schema":{"type":"string"}}
+				}}]}]}`))
+				return
+			}
 			if r.URL.Query().Get("issuetypeNames") == "Epic" {
 				_, _ = w.Write([]byte(`{"projects":[{"key":"PLAT","issuetypes":[{"name":"Epic","fields":{
 					"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},

@@ -174,6 +174,7 @@ export namespace backend {
 	    statusId: string;
 	    sprintId: string;
 	    sprintName: string;
+	    screenFields: string[];
 	    extra: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
@@ -193,6 +194,7 @@ export namespace backend {
 	        this.statusId = source["statusId"];
 	        this.sprintId = source["sprintId"];
 	        this.sprintName = source["sprintName"];
+	        this.screenFields = source["screenFields"];
 	        this.extra = source["extra"];
 	    }
 	}
