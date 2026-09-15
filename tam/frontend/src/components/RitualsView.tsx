@@ -13,6 +13,17 @@ import {
 import { RitualEditor } from "./ritual-editor/RitualEditor";
 import type { RitualEditorHandle } from "./ritual-editor/RitualEditor";
 
+// isWebURL is whether a configured base URL may become a link: the page link
+// goes to BrowserOpenURL, and a base with any other scheme is not Confluence.
+function isWebURL(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 // RitualsView reads nothing but tam.db. Opening it, picking a sprint, and
 // editing a page make no Confluence call; Sync rituals is the one press that
 // does, through the profile lock.
@@ -31,6 +42,11 @@ export function RitualsView() {
   const [result, setResult] = useState<RitualSyncResult | null>(null);
   const [error, setError] = useState("");
   const [viewTheirs, setViewTheirs] = useState(false);
+  // True from the Sync press until its reload lands. The shared lock alone
+  // releases before the reload remounts the editor on what the pass brought
+  // back, and a keystroke in that gap would be saved against the version the
+  // Sync just replaced, and refused.
+  const [syncPressed, setSyncPressed] = useState(false);
   const editorRef = useRef<RitualEditorHandle>(null);
   // sync() captures the board and sprint it was started on, and checks these
   // refs (kept in step with the pickers on every render) before applying
@@ -68,10 +84,26 @@ export function RitualsView() {
     return () => { live = false; };
   }, [activeId, boardId]);
 
-  const loadDocs = useCallback(async () => {
-    if (!boardId || !sprintId) return;
-    setDocs(await EnsureSprintRituals(activeId, boardId, sprintId));
-  }, [activeId, boardId, sprintId]);
+  // capture remembers the board and sprint an action started on, and answers
+  // whether they are still the ones on screen. Every action below that
+  // applies something once an await resolves checks it first, so a switch
+  // made meanwhile is never painted over with the old sprint's answer.
+  const capture = () => {
+    const startBoardId = boardId;
+    const startSprintId = sprintId;
+    return {
+      boardId: startBoardId,
+      sprintId: startSprintId,
+      current: () => boardIdRef.current === startBoardId && sprintIdRef.current === startSprintId,
+    };
+  };
+  type Captured = ReturnType<typeof capture>;
+
+  const reloadDocs = async (at: Captured) => {
+    if (!at.boardId || !at.sprintId) return;
+    const list = await EnsureSprintRituals(activeId, at.boardId, at.sprintId);
+    if (at.current()) setDocs(list);
+  };
 
   useEffect(() => {
     let live = true;
@@ -104,31 +136,30 @@ export function RitualsView() {
   }, []);
 
   async function sync() {
-    // Captured at call time, not read again below: the board and sprint
-    // pickers stay live while this runs, and every write below is gated on
-    // still matching what boardIdRef/sprintIdRef hold at the moment it
-    // would apply, not on what this closure started with.
-    const startBoardId = boardId;
-    const startSprintId = sprintId;
-    const stillCurrent = () => boardIdRef.current === startBoardId && sprintIdRef.current === startSprintId;
+    // Captured at call time, not read again below: every write below is
+    // gated on still matching what boardIdRef/sprintIdRef hold at the moment
+    // it would apply, not on what this closure started with.
+    const at = capture();
     setError(""); setResult(null);
+    setSyncPressed(true);
     try {
       await editorRef.current?.flush();
-      const res = await runRitualsSync(startBoardId);
-      if (stillCurrent()) {
+      const res = await runRitualsSync(at.boardId);
+      if (at.current()) {
         setResult(res);
         setLastSync(res.syncedAt);
       }
       announce(syncSummary(res));
-      if (stillCurrent()) {
-        setDocs(await EnsureSprintRituals(activeId, startBoardId, startSprintId));
-      }
+      await reloadDocs(at);
     } catch (e) {
-      setError(errMsg(e));
+      if (at.current()) setError(errMsg(e));
+    } finally {
+      setSyncPressed(false);
     }
   }
 
   async function resolve(doc: RitualDocument, choice: "mine" | "theirs") {
+    const at = capture();
     if (choice === "theirs") {
       const ok = await confirm({
         title: "Take the Confluence version?",
@@ -145,24 +176,26 @@ export function RitualsView() {
       await ResolveRitualConflict(activeId, doc.boardId, doc.sprintId, doc.ritualType, choice);
       announce(choice === "mine" ? "Kept your version. The next Sync pushes it." : "Took the Confluence version.");
       setViewTheirs(false);
-      await loadDocs();
+      await reloadDocs(at);
     } catch (e) {
       setError(errMsg(e));
     }
   }
 
   async function forget(doc: RitualDocument) {
+    const at = capture();
     setError("");
     try {
       await ForgetRitualPage(activeId, doc.boardId, doc.sprintId, doc.ritualType);
       announce("The page will be created again on the next Sync.");
-      await loadDocs();
+      await reloadDocs(at);
     } catch (e) {
       setError(errMsg(e));
     }
   }
 
   async function removeLocal(doc: RitualDocument) {
+    const at = capture();
     const ok = await confirm({
       title: `Remove the local ${RITUAL_LABEL[doc.ritualType] ?? doc.ritualType}?`,
       message: "This deletes TAM's copy of the page. A fresh page from the template takes its place. It cannot be undone.",
@@ -175,7 +208,7 @@ export function RitualsView() {
     try {
       await DeleteRitualDocument(activeId, doc.boardId, doc.sprintId, doc.ritualType);
       announce("Removed the local copy.");
-      await loadDocs();
+      await reloadDocs(at);
     } catch (e) {
       setError(errMsg(e));
     }
@@ -207,8 +240,9 @@ export function RitualsView() {
     ? selected
     : (RITUAL_ORDER.find((t) => docList.some((d) => d.ritualType === t)) ?? selected);
   const doc = docList.find((d) => d.ritualType === effectiveSelected) ?? null;
-  const pageUrl = doc?.pageId && configured && !demoSpace
-    ? `${config!.baseURL.trim().replace(/\/+$/, "")}/pages/viewpage.action?pageId=${encodeURIComponent(doc.pageId)}`
+  const base = config?.baseURL.trim().replace(/\/+$/, "") ?? "";
+  const pageUrl = doc?.pageId && configured && !demoSpace && isWebURL(base)
+    ? `${base}/pages/viewpage.action?pageId=${encodeURIComponent(doc.pageId)}`
     : "";
   const syncing = running === "rituals";
 
@@ -308,8 +342,11 @@ export function RitualsView() {
                   // Keyed by version and page id, so a Sync that pulls, pushes or
                   // creates remounts the editor on the new body, and a local save,
                   // which changes neither, does not.
+                  // Locked while a Sync runs and until its reload lands, so no
+                  // keystroke is typed over a page the pass is replacing.
                   <RitualEditor key={`${doc.boardId}:${doc.sprintId}:${doc.ritualType}:${doc.version}:${doc.pageId}`}
-                    ref={editorRef} profileId={activeId} doc={doc} pageUrl={pageUrl} onSaved={onSaved} />
+                    ref={editorRef} profileId={activeId} doc={doc} pageUrl={pageUrl} onSaved={onSaved}
+                    locked={syncing || syncPressed} />
                 )}
               </>
             )}

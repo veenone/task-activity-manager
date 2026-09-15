@@ -29,11 +29,11 @@ vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
 // from can resolve after the switch, and the controller-level fix in
 // RitualsView for that race (matching boardId, sprintId AND ritualType, not
 // ritualType alone) needs a way to fire that late onSaved by hand.
-const editorMock = vi.hoisted(() => ({ latest: null as null | { doc: api.RitualDocument; body?: string; readOnly?: boolean; onSaved?: (d: api.RitualDocument) => void } }));
+const editorMock = vi.hoisted(() => ({ latest: null as null | { doc: api.RitualDocument; body?: string; readOnly?: boolean; locked?: boolean; onSaved?: (d: api.RitualDocument) => void } }));
 vi.mock("./ritual-editor/RitualEditor", () => ({
-  RitualEditor: (p: { doc: api.RitualDocument; body?: string; readOnly?: boolean; onSaved?: (d: api.RitualDocument) => void }) => {
+  RitualEditor: (p: { doc: api.RitualDocument; body?: string; readOnly?: boolean; locked?: boolean; onSaved?: (d: api.RitualDocument) => void }) => {
     editorMock.latest = p;
-    return <div data-testid="editor" data-type={p.doc.ritualType} data-readonly={String(!!p.readOnly)}>{p.body ?? p.doc.body}</div>;
+    return <div data-testid="editor" data-type={p.doc.ritualType} data-readonly={String(!!p.readOnly)} data-locked={String(!!p.locked)}>{p.body ?? p.doc.body}</div>;
   },
 }));
 
@@ -214,6 +214,76 @@ describe("RitualsView", () => {
     expect(screen.getByRole("combobox", { name: "Ritual board" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Ritual sprint" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Syncing rituals" })).toBeInTheDocument();
+    // The editor is locked too: a keystroke typed while the pass runs would
+    // otherwise be saved over whatever the pass pulled.
+    expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "true");
+  });
+
+  it("leaves the editor unlocked when no rituals sync is running", async () => {
+    renderView();
+    expect(await screen.findByTestId("editor")).toHaveAttribute("data-locked", "false");
+  });
+
+  // The pass is over before the reload remounts the editor on what it
+  // brought back, so the lock holds until that reload lands: a keystroke in
+  // between would be saved against the version the Sync just replaced.
+  it("keeps the editor locked from the press until the documents reload", async () => {
+    let resolveSync!: (v: api.RitualSyncResult) => void;
+    sync.runRitualsSync.mockImplementation(() => new Promise<api.RitualSyncResult>((resolve) => { resolveSync = resolve; }));
+    let resolveReload!: (v: api.RitualDocument[]) => void;
+    renderView();
+    await screen.findByTestId("editor");
+    vi.mocked(api.EnsureSprintRituals).mockImplementationOnce(() => new Promise((resolve) => { resolveReload = resolve; }));
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "true"));
+    resolveSync({ created: 0, pulled: 1, pushed: 0, conflicts: 0, gone: 0, failed: [], syncedAt: "2026-09-14T10:00:00Z" });
+    await waitFor(() => expect(api.EnsureSprintRituals).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "true");
+    resolveReload(five({ planning: { version: 2, pageId: "42", status: "synced" } }));
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "false"));
+  });
+
+  it("does not show a failed Sync's error over a sprint switched to while it ran", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockImplementation(async (_p, _b, sprintId) =>
+      sprintId === 13 ? five({ planning: { sprintId: 13 } }) : five(),
+    );
+    let rejectSync!: (e: unknown) => void;
+    sync.runRitualsSync.mockImplementation(() => new Promise((_resolve, reject) => { rejectSync = reject; }));
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Ritual sprint" }), "13");
+    await waitFor(() => expect(api.EnsureSprintRituals).toHaveBeenCalledWith("p1", 1, 13));
+    rejectSync(new Error("Confluence said no"));
+    await waitFor(() => expect(sync.runRitualsSync).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("Confluence said no")).not.toBeInTheDocument();
+  });
+
+  it("does not reload a sprint switched away from after Recreate on next Sync", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockImplementation(async (_p, _b, sprintId) =>
+      sprintId === 13
+        ? ["_sprint", "planning", "standup", "review", "retro"].map((t) => docFor(t, { sprintId: 13, body: `<p>sprint 13 ${t}</p>` }))
+        : five({ planning: { status: "gone", pageId: "42" } }),
+    );
+    let resolveForget!: () => void;
+    vi.mocked(api.ForgetRitualPage).mockImplementation(() => new Promise<void>((resolve) => { resolveForget = resolve; }));
+    renderView();
+    const banner = await screen.findByRole("alert");
+    await userEvent.click(within(banner).getByRole("button", { name: "Recreate on next Sync" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Ritual sprint" }), "13");
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveTextContent("sprint 13 planning"));
+    resolveForget();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByTestId("editor")).toHaveTextContent("sprint 13 planning");
+  });
+
+  it("does not link to a Confluence base URL that is not http or https", async () => {
+    vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "javascript:alert(1)//", spaceKey: "PLAT", rootPageID: "100" });
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({ planning: { status: "synced", pageId: "42" } }));
+    renderView();
+    await screen.findByTestId("editor");
+    expect(screen.queryByRole("button", { name: "Open in Confluence" })).toBeNull();
   });
 
   // Critical finding: sync() closed over boardId/sprintId from the render at
