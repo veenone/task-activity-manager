@@ -112,4 +112,20 @@ describe("SprintRow", () => {
     await user.click(screen.getByText("▸"));
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
+
+  it("marks a draft sprint and holds back Start and Complete until Commit", async () => {
+    const user = userEvent.setup();
+    renderRow({ id: -1, name: "Sprint 15", state: "future", draft: true, total: 0, done: 0, points: 0, donePoints: 0 });
+    expect(screen.getByRole("treeitem", { name: "Sprint 15, Draft" })).toBeInTheDocument();
+    expect(screen.getByText("Draft")).toHaveClass("chip-draft");
+    await user.click(screen.getByRole("button", { name: "Actions on Sprint 15" }));
+    const menu = await screen.findByRole("menu");
+    for (const name of ["Start sprint…", "Complete sprint…"]) {
+      const item = within(menu).getByRole("menuitem", { name });
+      expect(item).toBeDisabled();
+      expect(item).toHaveAttribute("title", "Commit this sprint first");
+    }
+    expect(within(menu).getByRole("menuitem", { name: "Edit sprint…" })).toBeEnabled();
+    expect(within(menu).getByRole("menuitem", { name: "Delete sprint…" })).toBeEnabled();
+  });
 });

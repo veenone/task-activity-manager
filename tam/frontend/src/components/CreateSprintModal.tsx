@@ -2,7 +2,6 @@ import type { FormEvent } from "react";
 import { Modal, announce, errMsg } from "@agile-suite/core";
 import { useCreateSprint, useSprintSuggestion } from "../queries/boards";
 import { useSync } from "../contexts/SyncContext";
-import { ImmediateWriteChip } from "./ImmediateWriteChip";
 import { SprintDraftFields, useSprintDraft } from "./SprintDraftForm";
 
 interface Props {
@@ -15,15 +14,11 @@ interface Props {
   onCreated: (sprintId: string, line: string) => void;
 }
 
-// CreateSprintModal makes a new sprint on Jira. Like the two ceremonies it
-// does not wait for Commit, because a sprint's id has to be real before
-// anything, including a later Start on it, can point at it; unlike them it
-// takes the app's lock quietly, through runQuietLock rather than
-// runSprintCeremony, since a create is not a ceremony every other view needs
-// to announce.
-//
-// It is the dialog's first home: Task 8's Sprints view reopens this same
-// component rather than building its own.
+// CreateSprintModal drafts a new sprint. Like a new issue it waits for
+// Commit: the sprint is journaled under a negative id, every picker offers
+// it at once, and Commit creates it in Jira before any card moved into it is
+// sent. It still takes the app's lock quietly, through runQuietLock, because
+// the Go binding serialises a draft against a Commit rewriting the same rows.
 export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Props) {
   const { runQuietLock } = useSync();
   const suggestion = useSprintSuggestion(profileId, boardId, true);
@@ -45,7 +40,7 @@ export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Pr
         // sentence into the board's banner, since this dialog closes on
         // success.
         onSuccess: (created) => {
-          const made = `${created.sprint.name || values.name} was created, ${values.from} to ${values.to}.`;
+          const made = `${created.sprint.name || values.name} was drafted, ${values.from} to ${values.to}. Commit creates it in Jira.`;
           const line = created.note ? `${made} ${created.note}` : made;
           announce(line);
           // A zero id is a documented answer rather than a failure: core/jira
@@ -82,14 +77,7 @@ export function CreateSprintModal({ profileId, boardId, onClose, onCreated }: Pr
     >
       <div className="pending-head">
         <h2 id="create-sprint-title">New sprint</h2>
-        <span className="immediate-write">
-          <ImmediateWriteChip />
-          {/* The chip is the marker, and this is the word it cannot fit: a
-              user who has learned that nothing in TAM reaches Jira until
-              Commit is owed the sentence that names Commit, and it is the
-              sentence this chip replaced. */}
-          <span className="muted small">This does not wait for Commit.</span>
-        </span>
+        <p className="muted small">Drafted locally. Commit creates it in Jira.</p>
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

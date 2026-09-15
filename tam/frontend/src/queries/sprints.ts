@@ -42,6 +42,9 @@ export function useBoardSprintDetails(profileId: string, boardId: number) {
 // under a sprint id of 0 with an infinite staleTime. Without this, closing
 // a sprint and opening Reports shows the sprint before it, under its own
 // name, for the rest of the session.
+//
+// The pending list is here because creating, editing or deleting a draft
+// sprint is a journal write.
 export function invalidateSprintWrites(qc: QueryClient, profileId: string) {
   if (!profileId) return;
   for (const queryKey of [
@@ -52,6 +55,7 @@ export function invalidateSprintWrites(qc: QueryClient, profileId: string) {
     [profileId, "sprintSuggestion"] as const,
     keys.openSprints(profileId),
     [profileId, "sprintReport"] as const,
+    keys.pending(profileId),
   ]) {
     qc.invalidateQueries({ queryKey });
   }

@@ -1561,7 +1561,7 @@ describe("BoardsView sprint create", () => {
     // region, so an unscoped query matches twice as soon as the region's own
     // timer fires.
     const banner = await screen.findByRole("status", { name: "Sprint outcome" });
-    expect(within(banner).getByText("Sprint 14 was created, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
+    expect(within(banner).getByText("Sprint 14 was drafted, 2026-09-14 to 2026-09-28. Commit creates it in Jira.")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("14"));
   });
 

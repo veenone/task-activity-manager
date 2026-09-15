@@ -1,5 +1,6 @@
 import type { Board, Sprint, Swimlane } from "../api";
 import { SWIMLANES } from "../api";
+import { DRAFT_SPRINT_HINT } from "../lib/sprintOptions";
 
 interface Props {
   boards: Board[];
@@ -32,9 +33,11 @@ interface Props {
   onFilter: (v: string) => void;
 }
 
-// sprintOption labels a sprint "Name (State)". Jira sends the state
-// lowercase, so it is capitalised here for display only.
-function sprintOption(s: Sprint): string {
+// sprintOption labels a sprint "Name (State)", or "Name (draft)" for one
+// Commit has not created yet. Jira sends the state lowercase, so it is
+// capitalised here for display only.
+export function sprintOption(s: Sprint): string {
+  if (s.draft) return `${s.name} (draft)`;
   return `${s.name} (${s.state.charAt(0).toUpperCase()}${s.state.slice(1)})`;
 }
 
@@ -114,7 +117,15 @@ export function BoardsToolbar({
           <button type="button" className="btn" onClick={onCreate}>New sprint</button>
         )}
         {canStart && (
-          <button type="button" className="btn" onClick={onStart}>Start sprint</button>
+          <button
+            type="button"
+            className="btn"
+            onClick={onStart}
+            disabled={!!sprint?.draft}
+            title={sprint?.draft ? DRAFT_SPRINT_HINT : undefined}
+          >
+            Start sprint
+          </button>
         )}
         {canComplete && (
           <button type="button" className="btn" onClick={onComplete}>Complete sprint</button>

@@ -152,4 +152,10 @@ describe("EditSprintModal", () => {
       "Sprint 12 was updated. The board's sprints could not be re-read. Press Refresh.",
     ));
   });
+
+  it("edits a draft sprint locally and says so instead of the Jira chip", () => {
+    renderModal({ id: -1, name: "Sprint 15", draft: true, goal: "" });
+    expect(screen.getByText("A draft sprint. Changes stay local until Commit.")).toBeInTheDocument();
+    expect(screen.queryByText("Sends to Jira now")).not.toBeInTheDocument();
+  });
 });

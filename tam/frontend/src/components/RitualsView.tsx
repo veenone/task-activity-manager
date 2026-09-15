@@ -77,8 +77,10 @@ export function RitualsView() {
     if (!boardId) return;
     ListBoardSprints(activeId, boardId).then((list) => {
       if (!live) return;
-      setSprints(list);
-      setSprintId(list.find((s) => s.state === "active")?.id ?? list[0]?.id ?? 0);
+      // A draft sprint gets no ritual pages until Commit creates it.
+      const held = list.filter((s) => !s.draft);
+      setSprints(held);
+      setSprintId(held.find((s) => s.state === "active")?.id ?? held[0]?.id ?? 0);
     }).catch((e) => { if (live) setError(errMsg(e)); });
     LastRitualSync(activeId, boardId).then((at) => { if (live) setLastSync(at); }).catch(() => {});
     return () => { live = false; };

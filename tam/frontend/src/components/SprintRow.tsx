@@ -4,6 +4,7 @@ import type { MenuItem } from "@agile-suite/core";
 import type { SprintDetail } from "../api";
 import { UNASSIGNED_SPRINT_STATE } from "../api";
 import { progressText, sprintDates } from "../lib/format";
+import { DRAFT_SPRINT_HINT } from "../lib/sprintOptions";
 import { CARD_MENU_CLASS } from "./CardMoveMenu";
 
 // The four things a sprint row can open, each of them a dialog. The row
@@ -73,21 +74,28 @@ export function SprintRow({
     : "";
 
   const items: MenuItem[] = [];
-  if (detail.state === "future") {
+  if (detail.draft) {
+    // A draft is not in Jira, so neither ceremony can act on it; both are
+    // shown and held back, so the menu says what Commit unlocks.
+    items.push({ key: "start", label: "Start sprint…", disabled: true, title: DRAFT_SPRINT_HINT });
+    items.push({ key: "complete", label: "Complete sprint…", disabled: true, title: DRAFT_SPRINT_HINT });
+  } else if (detail.state === "future") {
     items.push({ key: "start", label: "Start sprint…", disabled: busy, onClick: actions.onStart });
-  }
-  if (detail.state === "active") {
+  } else if (detail.state === "active") {
     items.push({ key: "complete", label: "Complete sprint…", disabled: busy, onClick: actions.onComplete });
   }
   if (items.length > 0) items.push({ key: "manage", divider: true });
   items.push({ key: "edit", label: "Edit sprint…", disabled: busy, onClick: actions.onEdit });
   items.push({ key: "delete", label: "Delete sprint…", danger: true, disabled: busy, onClick: actions.onDelete });
+  // A draft reads "Draft" in the chip and the tree's own label, painted in
+  // the amber every other thing waiting for Commit wears.
+  const label = detail.draft ? "Draft" : stateLabel(detail.state);
 
   return (
     <div
       role="treeitem"
       aria-expanded={open}
-      aria-label={isSprint ? `${detail.name}, ${stateLabel(detail.state)}` : detail.name}
+      aria-label={isSprint ? `${detail.name}, ${label}` : detail.name}
       tabIndex={focused ? 0 : -1}
       data-tree-index={index}
       data-tree-key={rowId}
@@ -104,8 +112,8 @@ export function SprintRow({
       <span className="sprint-cell sprint-cell-name" title={detail.name}>{detail.name}</span>
       <span className="sprint-cell sprint-cell-state">
         {isSprint && (
-          <span className={`chip chip-status chip-status-${stateClass(detail.state)}`}>
-            {stateLabel(detail.state)}
+          <span className={detail.draft ? "chip chip-draft" : `chip chip-status chip-status-${stateClass(detail.state)}`}>
+            {label}
           </span>
         )}
       </span>

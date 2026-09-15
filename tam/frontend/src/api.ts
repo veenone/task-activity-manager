@@ -247,6 +247,10 @@ export interface Sprint {
   // refresh, which is why a reader cannot tell an absent goal from one Jira
   // has none set on.
   goal: string;
+  // A sprint drafted in TAM and not yet created in Jira: its id is negative,
+  // its state is future, and Commit creates it before any card moved into it
+  // is sent. Absent on fixtures written before drafts existed.
+  draft?: boolean;
 }
 
 // SprintChoice mirrors boardrepo.SprintChoice field for field: every open
@@ -258,6 +262,8 @@ export interface SprintChoice {
   name: string;
   boardName: string;
   state: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 // SprintOption is the smallest shape the Sprint field actually reads. Sprint
@@ -269,6 +275,8 @@ export interface SprintOption {
   // The board this sprint belongs to, given only by the profile-wide list
   // (SprintChoice); a board's own list needs no such disambiguation.
   boardName?: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 // SprintChoice mirrors boardrepo.SprintChoice field for field: every open
@@ -280,6 +288,8 @@ export interface SprintChoice {
   name: string;
   boardName: string;
   state: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 // SprintOption is the smallest shape the Sprint field actually reads. Sprint
@@ -291,6 +301,8 @@ export interface SprintOption {
   // The board this sprint belongs to, given only by the profile-wide list
   // (SprintChoice); a board's own list needs no such disambiguation.
   boardName?: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 export interface ColumnView {
