@@ -1,295 +1,291 @@
-import { useEffect, useRef, useState } from "react";
-import { errMsg, useConfirm, useProfile } from "@agile-suite/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { announce, errMsg, useConfirm, useProfile } from "@agile-suite/core";
 import {
-  DeleteRitualDraft, GetConfluenceConfig, GetRitualPage, GetSprintReport, ListBoards, ListBoardSprints,
-  ListConfluenceChildPages, ListRitualAssociations, ListRitualDrafts, ListSprintIssues, ScaffoldSprintRituals,
+  BrowserOpenURL, DeleteRitualDocument, EnsureSprintRituals, ForgetRitualPage, GetConfluenceConfig,
+  LastRitualSync, ListBoards, ListBoardSprints, ResolveRitualConflict,
 } from "../api";
-import type {
-  Board, ConfluenceConfig, ConfluencePage, Issue, Profile, RitualAssociation, RitualDraft, Settings, Sprint, SprintReport,
-} from "../api";
-import { summarySentence } from "../lib/reportText";
-import { sanitizeHtml } from "../lib/sanitizeHtml";
-import { RitualWizard } from "./RitualWizard";
+import type { Board, ConfluenceConfig, Profile, RitualDocument, RitualSyncResult, Settings, Sprint } from "../api";
+import { useSync } from "../contexts/SyncContext";
+import {
+  CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, RITUAL_LABEL, RITUAL_ORDER, STATUS_LABEL,
+  UNCONFIGURED_SENTENCE, conflictSentence, pendingLine, syncSummary,
+} from "../lib/ritualText";
+import { RitualEditor } from "./ritual-editor/RitualEditor";
+import type { RitualEditorHandle } from "./ritual-editor/RitualEditor";
 
-const RITUAL_META: Record<string, { label: string; icon: "calendar" | "pulse" | "check" | "refresh" }> = {
-  planning: { label: "Planning", icon: "calendar" }, standup: { label: "Standup", icon: "pulse" },
-  review: { label: "Review", icon: "check" }, retro: { label: "Retrospective", icon: "refresh" },
-};
-
-function RitualIcon({ name }: { name: "calendar" | "pulse" | "check" | "refresh" }) {
-  const paths = { calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></>, pulse: <path d="M3 12h4l2-6 4 12 2-6h6" />, check: <path d="m5 12 4 4L19 6" />, refresh: <path d="M20 11a8 8 0 0 0-14.7-3L3 11m0 0V5m0 6h6M4 13a8 8 0 0 0 14.7 3L21 13m0 0v6m0-6h-6" /> };
-  return <svg className="ritual-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
-}
-
-function RitualTemplate({ type, report }: { type: string; report: SprintReport | null }) {
-  const items = type === "planning" ? ["Confirm the sprint goal", "Review capacity and priorities", "Call out risks before work starts"]
-    : type === "standup" ? ["What moved yesterday?", "What moves today?", "What is blocked and needs help?"]
-      : type === "review" ? ["Demo completed work", "Capture stakeholder feedback", "Record follow-up work"]
-        : ["What should we keep?", "What should we improve?", "What will we try next sprint?"];
-  return <section className="ritual-template" aria-label="Ritual template">
-    <div className="ritual-template-head"><h4>{RITUAL_META[type]?.label ?? "Ritual"} template</h4><span className="muted small">Jira snapshot</span></div>
-    {report && !report.unavailable && <p className="ritual-template-context">{report.series.sprintName}: {report.series.completed} completed of {report.series.committed} committed {report.series.unit}.</p>}
-    <ul>{items.map((item) => <li key={item}><span aria-hidden="true">□</span>{item}</li>)}</ul>
-  </section>;
-}
-
-// RITUAL_ORDER is the sprint slots' fixed display order: planning opens the
-// sprint, standup runs through it, review and retro close it. Fixed rather
-// than however ListRitualDrafts happens to order its rows (alphabetically,
-// on the ritual_type column), so the slots read the same way every sprint.
-const RITUAL_ORDER = ["planning", "standup", "review", "retro"];
-
+// RitualsView reads nothing but tam.db. Opening it, picking a sprint, and
+// editing a page make no Confluence call; Sync rituals is the one press that
+// does, through the profile lock.
 export function RitualsView() {
   const { activeId } = useProfile<Profile, Settings>();
   const { confirm } = useConfirm();
+  const { runRitualsSync, running } = useSync();
   const [config, setConfig] = useState<ConfluenceConfig | null>(null);
-  const [associations, setAssociations] = useState<RitualAssociation[]>([]);
-  const [page, setPage] = useState<ConfluencePage | null>(null);
-  const [report, setReport] = useState<SprintReport | null>(null);
+  const [boards, setBoards] = useState<Board[] | null>(null);
+  const [boardId, setBoardId] = useState(0);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [sprintId, setSprintId] = useState(0);
+  const [docs, setDocs] = useState<RitualDocument[] | null>(null);
+  const [selected, setSelected] = useState<string>("planning");
+  const [lastSync, setLastSync] = useState("");
+  const [result, setResult] = useState<RitualSyncResult | null>(null);
   const [error, setError] = useState("");
-  const [loadingPage, setLoadingPage] = useState(false);
-  const [selectedID, setSelectedID] = useState("");
-  const headingRef = useRef<HTMLHeadingElement>(null);
-
-  // The sprint the authoring slots belong to: a scrum board and one of its
-  // sprints, the issues that sprint holds (what the wizard offers), the
-  // drafts already stored for it, and which ritual type the wizard is open
-  // on, if any. This is a separate concern from the association nav above:
-  // linking a page somebody already wrote is a different job from authoring
-  // one, and both live on this view side by side.
-  const [ritualBoards, setRitualBoards] = useState<Board[]>([]);
-  const [ritualBoardId, setRitualBoardId] = useState(0);
-  const [ritualSprints, setRitualSprints] = useState<Sprint[]>([]);
-  const [ritualSprintId, setRitualSprintId] = useState(0);
-  const [ritualIssues, setRitualIssues] = useState<Issue[]>([]);
-  const [ritualDrafts, setRitualDrafts] = useState<RitualDraft[] | null>(null);
-  const [ritualError, setRitualError] = useState("");
-  const [scaffolding, setScaffolding] = useState(false);
-  const [wizardType, setWizardType] = useState<string | null>(null);
-
-  async function loadAssociations() {
-    const next = await ListRitualAssociations(activeId, 0, 0);
-    setAssociations(next);
-    return next;
-  }
+  const [viewTheirs, setViewTheirs] = useState(false);
+  const editorRef = useRef<RitualEditorHandle>(null);
 
   useEffect(() => {
     let live = true;
-    setConfig(null); setPage(null); setReport(null); setSelectedID(""); setError("");
-    void GetConfluenceConfig(activeId).then((c) => {
+    setConfig(null); setBoards(null); setBoardId(0); setError(""); setResult(null);
+    GetConfluenceConfig(activeId).then((c) => { if (live) setConfig(c); }).catch((e) => { if (live) setError(errMsg(e)); });
+    ListBoards(activeId).then((all) => {
       if (!live) return;
-      setConfig(c);
-      if (!c.rootPageID) return;
-      if (c.baseURL.trim().toLowerCase() === "demo") { void loadAssociations().then((items) => { const standup = items.find((item) => item.ritualType === "standup"); if (standup && live) openAssociation(standup); }).catch((e) => live && setError(String(e))); return; }
-      void Promise.all([loadAssociations(), ListConfluenceChildPages(activeId, c.rootPageID, 0, 100)]).then(([items]) => { const standup = items.find((item) => item.ritualType === "standup"); if (standup && live) openAssociation(standup); }).catch((e) => live && setError(String(e)));
-    }).catch((e) => live && setError(String(e)));
+      const scrum = all.filter((b) => b.type === "scrum");
+      setBoards(scrum);
+      setBoardId(scrum[0]?.id ?? 0);
+    }).catch((e) => { if (live) { setBoards([]); setError(errMsg(e)); } });
     return () => { live = false; };
   }, [activeId]);
 
-  // Which scrum board the slots draw from. Keyed off the Confluence config
-  // rather than off nothing, so a profile whose Confluence is unconfigured
-  // never spends a call on boards it cannot author rituals for anyway (the
-  // early return below leaves this view before it draws slots at all).
   useEffect(() => {
     let live = true;
-    setRitualBoards([]); setRitualBoardId(0); setRitualSprints([]); setRitualSprintId(0);
-    setRitualDrafts(null); setRitualIssues([]); setRitualError("");
-    if (!config?.baseURL) return;
-    void ListBoards(activeId).then((boards) => {
+    setSprints([]); setSprintId(0); setLastSync("");
+    if (!boardId) return;
+    ListBoardSprints(activeId, boardId).then((list) => {
       if (!live) return;
-      const scrum = boards.filter((b) => b.type === "scrum");
-      setRitualBoards(scrum);
-      setRitualBoardId(scrum[0]?.id ?? 0);
-    }).catch((e) => live && setRitualError(String(e)));
+      setSprints(list);
+      setSprintId(list.find((s) => s.state === "active")?.id ?? list[0]?.id ?? 0);
+    }).catch((e) => { if (live) setError(errMsg(e)); });
+    LastRitualSync(activeId, boardId).then((at) => { if (live) setLastSync(at); }).catch(() => {});
     return () => { live = false; };
-  }, [activeId, config?.baseURL]);
+  }, [activeId, boardId]);
 
-  // Which of that board's sprints the slots belong to. An active sprint is
-  // the one a team is authoring rituals for most of the time; the picker
-  // below lets a planning session ahead of it, or a review just after
-  // close, choose a different one.
+  const loadDocs = useCallback(async () => {
+    if (!boardId || !sprintId) return;
+    setDocs(await EnsureSprintRituals(activeId, boardId, sprintId));
+  }, [activeId, boardId, sprintId]);
+
   useEffect(() => {
     let live = true;
-    setRitualSprints([]); setRitualSprintId(0);
-    if (!ritualBoardId) return;
-    void ListBoardSprints(activeId, ritualBoardId).then((sprints) => {
-      if (!live) return;
-      setRitualSprints(sprints);
-      const active = sprints.find((s) => s.state === "active");
-      setRitualSprintId(active?.id ?? sprints[0]?.id ?? 0);
-    }).catch((e) => live && setRitualError(String(e)));
+    setDocs(null); setViewTheirs(false);
+    if (!boardId || !sprintId) return;
+    EnsureSprintRituals(activeId, boardId, sprintId)
+      .then((list) => { if (live) setDocs(list); })
+      .catch((e) => { if (live) setError(errMsg(e)); });
     return () => { live = false; };
-  }, [activeId, ritualBoardId]);
+  }, [activeId, boardId, sprintId]);
 
-  function loadRitualSlots() {
-    setRitualDrafts(null); setRitualError("");
-    return Promise.all([
-      ListRitualDrafts(activeId, ritualBoardId, ritualSprintId),
-      ListSprintIssues(activeId, ritualBoardId, ritualSprintId),
-    ]).then(([drafts, issues]) => { setRitualDrafts(drafts); setRitualIssues(issues); })
-      .catch((e) => setRitualError(String(e)));
+  // Controller ruling: the editor saves on unmount, so a save started for
+  // the page the user just switched away from (a different sprint, or a
+  // different board) can still resolve after the switch. Matching by
+  // ritualType alone would let that stale save overwrite the same ritual in
+  // whatever sprint's list is on screen now, so this matches boardId,
+  // sprintId AND ritualType, and drops a saved document that matches
+  // nothing in the current list rather than grafting it in.
+  const onSaved = useCallback((saved: RitualDocument) => {
+    setDocs((list) => {
+      if (!list) return list;
+      const idx = list.findIndex(
+        (d) => d.boardId === saved.boardId && d.sprintId === saved.sprintId && d.ritualType === saved.ritualType,
+      );
+      if (idx === -1) return list;
+      const next = list.slice();
+      next[idx] = saved;
+      return next;
+    });
+  }, []);
+
+  async function sync() {
+    setError(""); setResult(null);
+    try {
+      await editorRef.current?.flush();
+      const res = await runRitualsSync(boardId);
+      setResult(res);
+      setLastSync(res.syncedAt);
+      announce(syncSummary(res));
+      await loadDocs();
+    } catch (e) {
+      setError(errMsg(e));
+    }
   }
 
-  useEffect(() => {
-    if (!ritualBoardId || !ritualSprintId) return;
-    void loadRitualSlots();
-    // loadRitualSlots reads ritualBoardId and ritualSprintId directly; it is
-    // not itself a dependency, and adding it would refire this effect every
-    // render since it is redefined each time.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, ritualBoardId, ritualSprintId]);
-
-  function scaffoldSprint() {
-    setScaffolding(true); setRitualError("");
-    void ScaffoldSprintRituals(activeId, ritualBoardId, ritualSprintId)
-      .then((drafts) => setRitualDrafts(drafts))
-      .catch((e) => setRitualError(String(e)))
-      .finally(() => setScaffolding(false));
+  async function resolve(doc: RitualDocument, choice: "mine" | "theirs") {
+    if (choice === "theirs") {
+      const ok = await confirm({
+        title: "Take the Confluence version?",
+        message: "Your local edits to this page will be replaced by the version in Confluence. This cannot be undone.",
+        confirmLabel: "Take theirs",
+        cancelLabel: "Keep editing",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    setError("");
+    try {
+      await editorRef.current?.flush();
+      await ResolveRitualConflict(activeId, doc.boardId, doc.sprintId, doc.ritualType, choice);
+      announce(choice === "mine" ? "Kept your version. The next Sync pushes it." : "Took the Confluence version.");
+      setViewTheirs(false);
+      await loadDocs();
+    } catch (e) {
+      setError(errMsg(e));
+    }
   }
 
-  // deleteRitual removes only the local document. It is offered on a slot
-  // that has one, never on a "Not started" slot, which has nothing to
-  // delete; the confirmation says so plainly since there is no undo.
-  async function deleteRitual(type: string) {
-    const meta = RITUAL_META[type] ?? { label: type, icon: "calendar" as const };
+  async function forget(doc: RitualDocument) {
+    setError("");
+    try {
+      await ForgetRitualPage(activeId, doc.boardId, doc.sprintId, doc.ritualType);
+      announce("The page will be created again on the next Sync.");
+      await loadDocs();
+    } catch (e) {
+      setError(errMsg(e));
+    }
+  }
+
+  async function removeLocal(doc: RitualDocument) {
     const ok = await confirm({
-      title: `Delete ${meta.label}?`,
-      message: "This removes the local document. It cannot be undone.",
-      confirmLabel: "Delete",
+      title: `Remove the local ${RITUAL_LABEL[doc.ritualType] ?? doc.ritualType}?`,
+      message: "This deletes TAM's copy of the page. A fresh page from the template takes its place. It cannot be undone.",
+      confirmLabel: "Remove",
       cancelLabel: "Keep it",
       danger: true,
     });
     if (!ok) return;
-    setRitualError("");
+    setError("");
     try {
-      await DeleteRitualDraft(activeId, ritualBoardId, ritualSprintId, type);
-      void loadRitualSlots();
+      await DeleteRitualDocument(activeId, doc.boardId, doc.sprintId, doc.ritualType);
+      announce("Removed the local copy.");
+      await loadDocs();
     } catch (e) {
-      setRitualError(errMsg(e));
+      setError(errMsg(e));
     }
   }
 
-  function openAssociation(association: RitualAssociation) {
-    setSelectedID(association.pageID); setError(""); setLoadingPage(true); setReport(null);
-    void Promise.all([GetRitualPage(activeId, association.pageID), association.sprintID ? GetSprintReport(activeId, association.boardID, association.sprintID, false) : Promise.resolve(null)])
-      .then(([nextPage, nextReport]) => { setPage(nextPage); setReport(nextReport); requestAnimationFrame(() => headingRef.current?.focus()); })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoadingPage(false));
+  if (boards === null) {
+    return <section className="backlog rituals-view" aria-label="Rituals"><p className="muted" role="status">Loading rituals</p></section>;
+  }
+  if (boards.length === 0) {
+    return (
+      <section className="backlog rituals-view" aria-label="Rituals">
+        {error && <p className="error-text" role="alert">{error}</p>}
+        <p className="muted">{NO_SCRUM_BOARD_SENTENCE}</p>
+      </section>
+    );
   }
 
-  const missingPage = /not found|404/i.test(error);
+  const configured = !!config && !!config.baseURL.trim() && !!config.spaceKey.trim() && !!config.rootPageID.trim();
+  const demoSpace = config?.baseURL.trim().toLowerCase() === "demo";
+  const sprint = sprints.find((s) => s.id === sprintId);
+  const doc = docs?.find((d) => d.ritualType === selected) ?? null;
+  const pageUrl = doc?.pageId && configured && !demoSpace
+    ? `${config!.baseURL.trim().replace(/\/+$/, "")}/pages/viewpage.action?pageId=${encodeURIComponent(doc.pageId)}`
+    : "";
+  const syncing = running === "rituals";
 
-  if (error && !page) return <section className="backlog" aria-label="Rituals"><h2>Rituals</h2>{missingPage ? <div className="ritual-missing-page" role="alert"><div className="ritual-missing-code">404</div><h3>Ritual page unavailable</h3><p>This document may have been deleted, moved, or is no longer accessible.</p><button className="btn" onClick={() => setError("")}>Back to documents</button></div> : <><p className="error-text" role="alert">Could not load Rituals: {error}</p><button className="btn" onClick={() => window.location.reload()}>Retry</button></>}</section>;
-  if (!config) return <section className="backlog" aria-label="Rituals"><h2>Rituals</h2><p className="muted" role="status">Loading Confluence settings</p></section>;
-  if (!config.baseURL) return <section className="backlog" aria-label="Rituals"><h2>Rituals</h2><p className="muted">Confluence is not configured for this profile. Add it in Profile settings.</p></section>;
+  return (
+    <section className="backlog rituals-view" aria-label="Rituals">
+      <div className="board-head rituals-toolbar">
+        {boards.length > 1 ? (
+          <label className="board-picker">
+            <span>Board</span>
+            <select aria-label="Ritual board" value={boardId} onChange={(e) => setBoardId(Number(e.target.value))}>
+              {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </label>
+        ) : <h3 className="board-head-name">{boards[0].name}</h3>}
+        {sprints.length > 0 && (
+          <label className="board-picker">
+            <span>Sprint</span>
+            <select aria-label="Ritual sprint" value={sprintId} onChange={(e) => setSprintId(Number(e.target.value))}>
+              {sprints.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+        )}
+        <button className="btn" onClick={() => void sync()} disabled={!configured || !boardId || syncing}>
+          {syncing ? "Syncing rituals" : "Sync rituals"}
+        </button>
+        <span className="muted small">{configured ? pendingLine(docs ?? [], lastSync) : UNCONFIGURED_SENTENCE}</span>
+      </div>
 
-  const ritualBoard = ritualBoards.find((b) => b.id === ritualBoardId);
-  const ritualSprint = ritualSprints.find((s) => s.id === ritualSprintId);
-
-  return <section className="backlog rituals-view" aria-label="Rituals">
-    <h2>Rituals</h2>
-    {error && <p className="error-text" role="alert">{error} <button className="btn btn-ghost" onClick={() => { const selected = associations.find((a) => a.pageID === selectedID); if (selected) openAssociation(selected); else setError(""); }}>Retry</button></p>}
-
-    {ritualBoards.length > 0 && (
-      <section aria-label="Sprint rituals" className="ritual-slots-frame">
-        <div className="board-head">
-          {ritualBoards.length > 1 ? (
-            <label className="board-picker">
-              <span>Board</span>
-              <select aria-label="Ritual board" value={ritualBoardId} onChange={(e) => setRitualBoardId(Number(e.target.value))}>
-                {ritualBoards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </label>
-          ) : ritualBoard && <h3 className="board-head-name">{ritualBoard.name}</h3>}
-          {ritualSprints.length > 0 && (
-            <label className="board-picker">
-              <span>Sprint</span>
-              <select aria-label="Ritual sprint" value={ritualSprintId} onChange={(e) => setRitualSprintId(Number(e.target.value))}>
-                {ritualSprints.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </label>
+      {error && <p className="error-text" role="alert">{error}</p>}
+      {result && (
+        <div className="ritual-sync-result" role="status">
+          <p>{syncSummary(result)}</p>
+          {result.failed.length > 0 && (
+            <ul>{result.failed.map((f) => <li key={`${f.sprintName}|${f.title}`}><strong>{f.title}</strong>: {f.reason}</li>)}</ul>
           )}
         </div>
+      )}
 
-        {ritualError && <p className="error-text" role="alert">{ritualError}</p>}
-
-        {ritualBoardId > 0 && ritualSprintId > 0 && (
-          ritualDrafts === null ? <p className="muted" role="status">Loading this sprint's rituals</p>
-            : (
+      {docs === null ? (
+        sprintId ? <p className="muted" role="status">Loading this sprint's rituals</p> : null
+      ) : docs.length === 0 ? (
+        <p className="muted">{sprint?.state === "closed" ? CLOSED_EMPTY_SENTENCE : "This sprint has no ritual pages yet."}</p>
+      ) : (
+        <div className="rituals-layout">
+          <nav aria-label="Ritual documents" className="ritual-docs">
+            <ul>
+              {RITUAL_ORDER.map((type) => {
+                const d = docs.find((x) => x.ritualType === type);
+                if (!d) return null;
+                return (
+                  <li key={type}>
+                    <button
+                      className={`folder-item ritual-doc${selected === type ? " folder-selected" : ""}`}
+                      aria-current={selected === type ? "page" : undefined}
+                      onClick={() => { setSelected(type); setViewTheirs(false); }}
+                    >
+                      <span className="ritual-doc-label">{RITUAL_LABEL[type]}</span>
+                      <span className={`ritual-chip ritual-chip-${d.status}`}>{STATUS_LABEL[d.status]}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          <article aria-label="Ritual page" className="ritual-page">
+            {doc && (
               <>
-                {/* Scaffolding is deliberately not transactional, so a run
-                    that stops partway can leave some slots filled and some
-                    not; every slot in RITUAL_ORDER renders regardless, and
-                    ScaffoldSprintRituals is idempotent, so this button (and
-                    each empty slot's own) always offers a way to finish it. */}
-                {ritualDrafts.length === 0 && (
-                  <button className="btn" disabled={scaffolding} onClick={scaffoldSprint}>
-                    {scaffolding ? "Setting up rituals" : `Set up ${ritualSprint?.name ?? "this sprint"}'s rituals`}
-                  </button>
+                <div className="ritual-page-head">
+                  <h3>{doc.title}</h3>
+                  {pageUrl && <button className="btn btn-ghost" onClick={() => BrowserOpenURL(pageUrl)}>Open in Confluence</button>}
+                </div>
+                {doc.status === "conflict" && (
+                  <div className="ritual-banner" role="alert">
+                    <p>{conflictSentence(doc.conflictVersion)}</p>
+                    <div className="row">
+                      <button className="btn btn-ghost" aria-pressed={viewTheirs} onClick={() => setViewTheirs((v) => !v)}>
+                        {viewTheirs ? "View mine" : "View theirs"}
+                      </button>
+                      <button className="btn" onClick={() => void resolve(doc, "mine")}>Keep mine</button>
+                      <button className="btn btn-ghost" onClick={() => void resolve(doc, "theirs")}>Take theirs</button>
+                    </div>
+                  </div>
                 )}
-                <ul className="ritual-slots">
-                  {RITUAL_ORDER.map((type) => {
-                    const draft = ritualDrafts.find((d) => d.ritualType === type);
-                    const meta = RITUAL_META[type] ?? { label: type, icon: "calendar" as const };
-                    if (!draft) {
-                      return (
-                        <li key={type} className="ritual-slot ritual-slot-empty">
-                          <span className="ritual-slot-info">
-                            <span className="ritual-icon" aria-hidden="true"><RitualIcon name={meta.icon} /></span>
-                            <span className="ritual-link-copy"><strong>{meta.label}</strong><small>Not started</small></span>
-                          </span>
-                          <button
-                            className="btn btn-ghost"
-                            aria-label={`Set up ${meta.label}`}
-                            disabled={scaffolding}
-                            onClick={scaffoldSprint}
-                          >
-                            {scaffolding ? "Setting up" : "Set up"}
-                          </button>
-                        </li>
-                      );
-                    }
-                    return (
-                      <li key={type} className="ritual-slot">
-                        <button className="ritual-slot-open" onClick={() => setWizardType(type)}>
-                          <span className="ritual-icon" aria-hidden="true"><RitualIcon name={meta.icon} /></span>
-                          <span className="ritual-link-copy"><strong>{draft.title || meta.label}</strong><small>{meta.label}</small></span>
-                        </button>
-                        <span className="status">{draft.status}</span>
-                        <button
-                          className="btn btn-ghost ritual-slot-delete"
-                          aria-label={`Delete ${meta.label}`}
-                          onClick={() => void deleteRitual(type)}
-                        >
-                          Delete
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                {doc.status === "gone" && (
+                  <div className="ritual-banner" role="alert">
+                    <p>{GONE_SENTENCE}</p>
+                    <div className="row">
+                      <button className="btn" onClick={() => void forget(doc)}>Recreate on next Sync</button>
+                      <button className="btn btn-ghost" onClick={() => void removeLocal(doc)}>Remove local copy</button>
+                    </div>
+                  </div>
+                )}
+                {viewTheirs && doc.status === "conflict" ? (
+                  <RitualEditor key={`theirs:${doc.ritualType}:${doc.conflictVersion}`} profileId={activeId} doc={doc}
+                    body={doc.conflictBody} readOnly pageUrl={pageUrl} />
+                ) : (
+                  // Keyed by version and page id, so a Sync that pulls, pushes or
+                  // creates remounts the editor on the new body, and a local save,
+                  // which changes neither, does not.
+                  <RitualEditor key={`${doc.boardId}:${doc.sprintId}:${doc.ritualType}:${doc.version}:${doc.pageId}`}
+                    ref={editorRef} profileId={activeId} doc={doc} pageUrl={pageUrl} onSaved={onSaved} />
+                )}
               </>
-            )
-        )}
-
-        {wizardType && (
-          <RitualWizard
-            profileId={activeId}
-            boardId={ritualBoardId}
-            sprintId={ritualSprintId}
-            ritualType={wizardType}
-            sprintIssues={ritualIssues}
-            onSaved={() => { setWizardType(null); void loadRitualSlots(); }}
-            onCancel={() => setWizardType(null)}
-          />
-        )}
-      </section>
-    )}
-
-    <div className="rituals-layout">
-      <nav aria-label="Ritual documents"><h3>Documents <span className="muted">({associations.length})</span></h3>
-        {associations.length === 0 ? <p className="muted">No ritual pages are associated yet. Add them in Profile settings.</p> : associations.map((a) => { const meta = RITUAL_META[a.ritualType] ?? { label: a.ritualType, icon: "calendar" as const }; return <button className={`ritual-link ritual-${a.ritualType}${selectedID === a.pageID ? " ritual-link-selected" : ""}`} aria-current={selectedID === a.pageID ? "page" : undefined} key={a.pageID} onClick={() => openAssociation(a)} disabled={loadingPage && selectedID === a.pageID}><span className="ritual-icon" aria-hidden="true"><RitualIcon name={meta.icon} /></span><span className="ritual-link-copy"><strong>{a.pageTitle || a.pageID}</strong><small>{meta.label}</small></span></button>; })}
-      </nav>
-    <article aria-label="Selected ritual page" aria-busy={loadingPage}>{page ? <><h3 ref={headingRef} tabIndex={-1}>{page.title}</h3><p className="ritual-page-meta">{RITUAL_META[associations.find((a) => a.pageID === selectedID)?.ritualType ?? ""]?.label ?? "Ritual document"}</p>{report && !report.unavailable && <p className="ritual-report-context">{summarySentence(report.series, false)}</p>}<div className="ritual-page-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body.view.value || page.body.storage.value) }} /><RitualTemplate type={associations.find((a) => a.pageID === selectedID)?.ritualType ?? "standup"} report={report} /></> : <p className="muted">{loadingPage ? "Loading ritual page…" : "Select an associated ritual page."}</p>}</article>
-    </div>
-  </section>;
+            )}
+          </article>
+        </div>
+      )}
+    </section>
+  );
 }

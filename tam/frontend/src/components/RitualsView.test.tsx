@@ -1,32 +1,41 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import * as api from "../api";
 import { profileBackend } from "../profileBackend";
+import { CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, UNCONFIGURED_SENTENCE } from "../lib/ritualText";
 import { RitualsView } from "./RitualsView";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
   return {
     ...actual,
-    ListProfiles: vi.fn(),
-    GetSettings: vi.fn(),
-    GetConfluenceConfig: vi.fn(),
-    ListConfluenceChildPages: vi.fn(),
-    ListRitualAssociations: vi.fn(),
-    GetRitualPage: vi.fn(),
-    GetSprintReport: vi.fn(),
-    ListBoards: vi.fn(),
-    ListBoardSprints: vi.fn(),
-    ListRitualDrafts: vi.fn(),
-    ListSprintIssues: vi.fn(),
-    ScaffoldSprintRituals: vi.fn(),
-    DeleteRitualDraft: vi.fn(),
+    ListProfiles: vi.fn(), GetSettings: vi.fn(), GetConfluenceConfig: vi.fn(), ListBoards: vi.fn(), ListBoardSprints: vi.fn(),
+    EnsureSprintRituals: vi.fn(), LastRitualSync: vi.fn(), ResolveRitualConflict: vi.fn(), ForgetRitualPage: vi.fn(),
+    DeleteRitualDocument: vi.fn(), BrowserOpenURL: vi.fn(),
   };
 });
+
+const sync = vi.hoisted(() => ({ running: null as string | null, runRitualsSync: vi.fn() }));
+vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
+
+// The editor has its own tests; here it only has to show which body and mode
+// it was handed. latestEditorProps records the most recent props the mock
+// was rendered with so a test can reach into onSaved directly: RitualEditor
+// saves on unmount, so a save for the sprint the user just navigated away
+// from can resolve after the switch, and the controller-level fix in
+// RitualsView for that race (matching boardId, sprintId AND ritualType, not
+// ritualType alone) needs a way to fire that late onSaved by hand.
+const editorMock = vi.hoisted(() => ({ latest: null as null | { doc: api.RitualDocument; body?: string; readOnly?: boolean; onSaved?: (d: api.RitualDocument) => void } }));
+vi.mock("./ritual-editor/RitualEditor", () => ({
+  RitualEditor: (p: { doc: api.RitualDocument; body?: string; readOnly?: boolean; onSaved?: (d: api.RitualDocument) => void }) => {
+    editorMock.latest = p;
+    return <div data-testid="editor" data-type={p.doc.ritualType} data-readonly={String(!!p.readOnly)}>{p.body ?? p.doc.body}</div>;
+  },
+}));
 
 function Loader() {
   const { reload } = useProfile<api.Profile, api.Settings>();
@@ -47,92 +56,146 @@ function renderView() {
   );
 }
 
+function docFor(ritualType: string, over: Partial<api.RitualDocument> = {}): api.RitualDocument {
+  return {
+    profileId: "p1", boardId: 1, sprintId: 14, ritualType, title: `Sprint 14 · ${ritualType}`, body: `<p>${ritualType} body</p>`,
+    baseBody: "", pageId: "", version: 0, conflictBody: "", conflictVersion: 0, status: "local",
+    updatedAt: "2026-09-14T09:00:00Z", syncedAt: "", ...over,
+  };
+}
+const five = (over: Record<string, Partial<api.RitualDocument>> = {}) =>
+  ["_sprint", "planning", "standup", "review", "retro"].map((t) => docFor(t, over[t]));
+
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(api.ListProfiles).mockResolvedValue([
-    { id: "p1", name: "Acme Platform", jiraUrl: "https://jira.example.com", projectKey: "PLAT", backend: "jira", createdAt: "" },
-  ]);
+  editorMock.latest = null;
+  sync.running = null;
+  vi.mocked(api.ListProfiles).mockResolvedValue([{ id: "p1", name: "Acme", jiraUrl: "https://jira.example.com", projectKey: "PLAT", backend: "jira", createdAt: "" }]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
-  vi.mocked(api.GetConfluenceConfig).mockResolvedValue({
-    baseURL: "https://confluence.example.com", spaceKey: "PLAT", rootPageID: "100",
-  });
-  vi.mocked(api.ListConfluenceChildPages).mockResolvedValue({ results: [], start: 0, limit: 100, size: 0 } as never);
-  vi.mocked(api.ListRitualAssociations).mockResolvedValue([]);
-  vi.mocked(api.ListBoards).mockResolvedValue([{ id: 1, name: "Acme Platform Scrum", type: "scrum" }]);
+  vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "https://confluence.example.com", spaceKey: "PLAT", rootPageID: "100" });
+  vi.mocked(api.ListBoards).mockResolvedValue([{ id: 1, name: "PLAT board", type: "scrum" }] as api.Board[]);
   vi.mocked(api.ListBoardSprints).mockResolvedValue([
-    { id: 12, boardId: 1, name: "Sprint 12", state: "active", startDate: "", endDate: "", goal: "" },
-  ]);
-  vi.mocked(api.ListSprintIssues).mockResolvedValue([]);
+    { id: 13, boardId: 1, name: "Sprint 13", state: "closed", startDate: "", endDate: "", goal: "", completeDate: "" },
+    { id: 14, boardId: 1, name: "Sprint 14", state: "active", startDate: "", endDate: "", goal: "", completeDate: "" },
+  ] as api.Sprint[]);
+  vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five());
+  vi.mocked(api.LastRitualSync).mockResolvedValue("");
 });
 
 describe("RitualsView", () => {
-  it("offers to draw up the sprint's rituals when none exist", async () => {
-    vi.mocked(api.ListRitualDrafts).mockResolvedValue([]);
+  it("lists the active sprint's five pages with their statuses and opens Planning", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({ review: { status: "conflict" }, retro: { status: "synced" } }));
     renderView();
-    expect(await screen.findByRole("button", { name: /Set up .* rituals/ })).toBeInTheDocument();
+    const nav = await screen.findByRole("navigation", { name: "Ritual documents" });
+    for (const label of ["Overview", "Planning", "Standup", "Review", "Retrospective"]) {
+      expect(within(nav).getByRole("button", { name: new RegExp(label) })).toBeInTheDocument();
+    }
+    expect(within(nav).getByRole("button", { name: /Review/ })).toHaveTextContent("Conflict");
+    expect(api.EnsureSprintRituals).toHaveBeenCalledWith("p1", 1, 14);
+    expect(screen.getByTestId("editor")).toHaveAttribute("data-type", "planning");
+    expect(screen.getByText("Not synced yet · 3 unsynced · 1 conflict")).toBeInTheDocument();
   });
 
-  it("shows a slot per stored ritual with its status", async () => {
-    vi.mocked(api.ListRitualDrafts).mockResolvedValue([
-      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
-      { ritualType: "review", title: "Sprint 12 Review", status: "draft" },
-    ] as never);
+  it("keeps editing available without Confluence and says how to sync", async () => {
+    vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "", spaceKey: "", rootPageID: "" });
     renderView();
-    expect(await screen.findByText("Sprint 12 Planning")).toBeInTheDocument();
-    expect(screen.getAllByText("draft")).toHaveLength(2);
+    expect(await screen.findByTestId("editor")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sync rituals" })).toBeDisabled();
+    expect(screen.getByText(UNCONFIGURED_SENTENCE)).toBeInTheDocument();
   });
 
-  it("shows the other two slots as not started, each offering to fill the gap", async () => {
-    vi.mocked(api.ListRitualDrafts).mockResolvedValue([
-      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
-      { ritualType: "review", title: "Sprint 12 Review", status: "draft" },
-    ] as never);
-    vi.mocked(api.ScaffoldSprintRituals).mockResolvedValue([
-      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
-      { ritualType: "standup", title: "Sprint 12 Standup", status: "draft" },
-      { ritualType: "review", title: "Sprint 12 Review", status: "draft" },
-      { ritualType: "retro", title: "Sprint 12 Retrospective", status: "draft" },
-    ] as never);
-    const user = userEvent.setup();
+  it("syncs through the lock, reports what happened, and reloads", async () => {
+    sync.runRitualsSync.mockResolvedValue({ created: 5, pulled: 0, pushed: 0, conflicts: 0, gone: 0,
+      failed: [{ sprintName: "Sprint 14", title: "Sprint 14 · Review", reason: "403 Forbidden" }], syncedAt: "2026-09-14T10:00:00Z" });
     renderView();
-    await screen.findByText("Sprint 12 Planning");
-    // A scaffold that only ran partway leaves standup and retro with nothing
-    // stored; both slots still render, distinct from the two that did land.
-    expect(screen.getAllByText("Not started")).toHaveLength(2);
-
-    await user.click(screen.getByRole("button", { name: "Set up Standup" }));
-    await waitFor(() => expect(api.ScaffoldSprintRituals).toHaveBeenCalledWith("p1", 1, 12));
-    expect(await screen.findByText("Sprint 12 Standup")).toBeInTheDocument();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    expect(sync.runRitualsSync).toHaveBeenCalledWith(1);
+    expect(await screen.findByText("Sync finished: 5 created, 1 failed.")).toBeInTheDocument();
+    expect(screen.getByText("403 Forbidden", { exact: false })).toBeInTheDocument();
+    await waitFor(() => expect(api.EnsureSprintRituals).toHaveBeenCalledTimes(2));
   });
 
-  it("deletes a stored ritual once the confirmation is answered", async () => {
-    vi.mocked(api.ListRitualDrafts).mockResolvedValue([
-      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
-    ] as never);
-    vi.mocked(api.DeleteRitualDraft).mockResolvedValue();
-    const user = userEvent.setup();
+  it("shows theirs read only, keeps mine, and confirms before taking theirs", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({
+      planning: { status: "conflict", pageId: "42", version: 1, conflictVersion: 3, conflictBody: "<p>their planning</p>" },
+    }));
     renderView();
-    await screen.findByText("Sprint 12 Planning");
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("Confluence has a newer version (v3). Your local edits are kept until you choose.");
 
-    await user.click(screen.getByRole("button", { name: "Delete Planning" }));
-    const ask = await screen.findByRole("alertdialog", { name: "Delete Planning?" });
-    await user.click(within(ask).getByRole("button", { name: "Delete" }));
+    await userEvent.click(within(banner).getByRole("button", { name: "View theirs" }));
+    expect(screen.getByTestId("editor")).toHaveTextContent("their planning");
+    expect(screen.getByTestId("editor")).toHaveAttribute("data-readonly", "true");
 
-    await waitFor(() => expect(api.DeleteRitualDraft).toHaveBeenCalledWith("p1", 1, 12, "planning"));
+    await userEvent.click(within(banner).getByRole("button", { name: "Keep mine" }));
+    await waitFor(() => expect(api.ResolveRitualConflict).toHaveBeenCalledWith("p1", 1, 14, "planning", "mine"));
+
+    await userEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Take theirs" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Take theirs" }));
+    await waitFor(() => expect(api.ResolveRitualConflict).toHaveBeenCalledWith("p1", 1, 14, "planning", "theirs"));
   });
 
-  it("keeps a stored ritual when the delete confirmation is declined", async () => {
-    vi.mocked(api.ListRitualDrafts).mockResolvedValue([
-      { ritualType: "planning", title: "Sprint 12 Planning", status: "draft" },
-    ] as never);
-    const user = userEvent.setup();
+  it("offers to recreate a page gone from Confluence or remove the local copy", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({ planning: { status: "gone", pageId: "42" } }));
     renderView();
-    await screen.findByText("Sprint 12 Planning");
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent(GONE_SENTENCE);
+    await userEvent.click(within(banner).getByRole("button", { name: "Recreate on next Sync" }));
+    await waitFor(() => expect(api.ForgetRitualPage).toHaveBeenCalledWith("p1", 1, 14, "planning"));
+    await userEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Remove local copy" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(api.DeleteRitualDocument).toHaveBeenCalledWith("p1", 1, 14, "planning"));
+  });
 
-    await user.click(screen.getByRole("button", { name: "Delete Planning" }));
-    const ask = await screen.findByRole("alertdialog", { name: "Delete Planning?" });
-    await user.click(within(ask).getByRole("button", { name: "Keep it" }));
+  it("links a synced page to Confluence", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue(five({ planning: { status: "synced", pageId: "42" } }));
+    renderView();
+    await userEvent.click(await screen.findByRole("button", { name: "Open in Confluence" }));
+    expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://confluence.example.com/pages/viewpage.action?pageId=42");
+  });
 
-    expect(api.DeleteRitualDraft).not.toHaveBeenCalled();
+  it("says a closed sprint without pages has none", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockImplementation(async (_p, _b, sprintId) => (sprintId === 13 ? [] : five()));
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Ritual sprint" }), "13");
+    expect(await screen.findByText(CLOSED_EMPTY_SENTENCE)).toBeInTheDocument();
+  });
+
+  it("says when there is no scrum board", async () => {
+    vi.mocked(api.ListBoards).mockResolvedValue([{ id: 2, name: "Kanban", type: "kanban" }] as api.Board[]);
+    renderView();
+    expect(await screen.findByText(NO_SCRUM_BOARD_SENTENCE)).toBeInTheDocument();
+  });
+
+  // Controller ruling: onSaved must match boardId, sprintId AND ritualType,
+  // not ritualType alone. RitualEditor saves on unmount, so a save begun for
+  // sprint 14's Planning page can still be in flight when the user switches
+  // to sprint 13; if the resolved save only matched on ritualType it would
+  // overwrite sprint 13's Planning document with sprint 14's stale body.
+  it("ignores a stale onSaved from a page the sprint switch already left", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockImplementation(async (_p, boardId, sprintId) =>
+      sprintId === 13
+        ? ["_sprint", "planning", "standup", "review", "retro"].map((t) => docFor(t, { sprintId: 13, title: `Sprint 13 · ${t}` }))
+        : five(),
+    );
+    renderView();
+    await screen.findByTestId("editor");
+    const savedOnSprint14 = editorMock.latest?.onSaved;
+    expect(savedOnSprint14).toBeInstanceOf(Function);
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Ritual sprint" }), "13");
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-type", "planning"));
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveTextContent(docFor("planning", { sprintId: 13, title: "Sprint 13 · planning" }).body.replace(/<[^>]+>/g, "")));
+
+    // Fire the sprint-14 save's onSaved now, after the switch to sprint 13.
+    savedOnSprint14!(docFor("planning", { sprintId: 14, body: "stale" }));
+
+    expect(screen.getByTestId("editor")).toHaveTextContent(
+      docFor("planning", { sprintId: 13, title: "Sprint 13 · planning" }).body.replace(/<[^>]+>/g, ""),
+    );
+    expect(screen.getByTestId("editor")).not.toHaveTextContent("stale");
   });
 });
