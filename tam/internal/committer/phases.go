@@ -47,7 +47,7 @@ func phases() []phase {
 		{name: "sub-tasks", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelSubtask) }},
 		{name: "edits", run: func(ctx context.Context, r *commitRun) { r.pushEdits(ctx) }},
 		{name: "board moves", run: func(ctx context.Context, r *commitRun) { r.e.commitBoardMoves(ctx, r.profileID, r.res, r.deps) }},
-		{name: "links", run: func(ctx context.Context, r *commitRun) { r.e.commitLinks(ctx, r.profileID, r.res) }},
+		{name: "links", run: func(ctx context.Context, r *commitRun) { r.e.commitLinks(ctx, r.profileID, r.res, r.deps) }},
 	}
 }
 
@@ -158,8 +158,13 @@ func (r *commitRun) createSprints(ctx context.Context) {
 			continue
 		}
 		if !canCreate {
-			r.res.Failures = append(r.res.Failures, sprintFailure(p, d.Name, errNoBoardWrites.Error(), false))
+			r.res.Failures = append(r.res.Failures, sprintFailure(p, d.Name, "this connection cannot create sprints", false))
 			r.deps.block(p.EntityKey, label, "which this connection cannot create")
+			continue
+		}
+		if err := assertNoPlaceholders(map[string]any{"boardId": d.BoardID, "draft": d.SprintDraft()}); err != nil {
+			r.res.Failures = append(r.res.Failures, sprintFailure(p, d.Name, err.Error(), false))
+			r.deps.block(p.EntityKey, label, "which could not be sent")
 			continue
 		}
 		made, err := w.CreateSprint(ctx, d.BoardID, d.SprintDraft())
@@ -272,6 +277,11 @@ func (r *commitRun) createDrafts(ctx context.Context, level draftLevel) {
 			r.deps.block(key, key, "which could not be sent")
 			continue
 		}
+		if err := assertNoPlaceholders(t.draft); err != nil {
+			r.res.Failures = append(r.res.Failures, failure(key, issuerepo.EntityIssueCreate, err.Error(), false))
+			r.deps.block(key, key, "which could not be sent")
+			continue
+		}
 		r.e.commitCreate(ctx, r, t.row, t.draft)
 	}
 }
@@ -291,6 +301,18 @@ func (r *commitRun) pushEdits(ctx context.Context) {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		r.e.commitEdit(ctx, r.profileID, key, byKey[key], r.res)
+		rows := byKey[key]
+		values := make([]string, 0, len(rows))
+		for _, p := range rows {
+			values = append(values, p.AfterVal)
+		}
+		// Every edit of the issue waits together, the way a conflict holds
+		// every edit of an issue together: half an issue's edits pushed is
+		// an intent Jira never saw whole.
+		if waits, held := r.deps.blockedBy(values...); held {
+			r.deps.hold(r.res, key, issuerepo.EntityIssue, 0, waits)
+			continue
+		}
+		r.e.commitEdit(ctx, r.profileID, key, rows, r.res)
 	}
 }

@@ -2,6 +2,7 @@ package committer_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -310,5 +311,167 @@ func TestALinkToADraftIsSentWithTheKeyItsCreateGot(t *testing.T) {
 	}
 	if len(h.jira.links) != 1 || h.jira.links[0] != "PLAT-1 outward Relates PLAT-501" {
 		t.Errorf("links = %v, want the draft's real key", h.jira.links)
+	}
+}
+
+// sprintMovedInto drafts Sprint 15 and journals PLAT-1 into it, the smallest
+// plan with something waiting on a draft sprint, and answers its draft id.
+func sprintMovedInto(t *testing.T, h harness) int {
+	t.Helper()
+	ctx := context.Background()
+	s, err := h.repo.CreateDraftSprint(ctx, "p1", draftSprint15())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.repo.MoveToSprint(ctx, "p1", "PLAT-1", strconv.Itoa(s.ID), "Sprint 15"); err != nil {
+		t.Fatal(err)
+	}
+	return s.ID
+}
+
+func heldReasons(res committer.Result) map[string]string {
+	out := map[string]string{}
+	for _, held := range res.Held {
+		out[held.Key] = held.Reason
+	}
+	return out
+}
+
+// A sprint_create row that will not decode has no name, so what waits on it
+// names the draft id.
+func TestAMoveIntoADraftSprintThatCannotBeReadIsHeldByItsID(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	id := sprintMovedInto(t, h)
+	if _, err := h.db.Exec(`UPDATE pending_change SET after_val = '{not json' WHERE profile_id = 'p1' AND entity_type = ?`, issuerepo.EntitySprintCreate); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	label := fmt.Sprintf("draft sprint %d", id)
+	if len(res.Failures) != 1 || res.Failures[0].Key != label || res.Failures[0].Retryable {
+		t.Errorf("failures = %+v", res.Failures)
+	}
+	if got := heldReasons(res)["PLAT-1"]; got != "waits for "+label+", which could not be read" {
+		t.Errorf("held = %+v", res.Held)
+	}
+	if len(h.jira.sprintsMade) != 0 || len(h.jira.pushed) != 0 {
+		t.Errorf("nothing reached Jira: sprints %v, pushed %v", h.jira.sprintsMade, h.jira.pushed)
+	}
+}
+
+// idlessSprints is a Jira that creates a sprint and answers with no id.
+type idlessSprints struct {
+	*fake
+	calls *int
+}
+
+func (j idlessSprints) CreateSprint(context.Context, int, backend.SprintDraft) (backend.Sprint, error) {
+	*j.calls++
+	return backend.Sprint{}, nil
+}
+
+// A sprint Jira created that TAM could not rename clears its draft, so the
+// next Commit does not create it a second time.
+func TestASprintCreatedWithNoIDIsNotCreatedAgainNextCommit(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	sprintMovedInto(t, h)
+	calls := 0
+	eng := committer.New(idlessSprints{fake: h.jira, calls: &calls}, h.repo, h.order)
+
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Failures) != 1 || !strings.Contains(res.Failures[0].Error, "answered with no id") || res.Failures[0].Retryable {
+		t.Errorf("failures = %+v", res.Failures)
+	}
+	want := `waits for sprint "Sprint 15", which Jira created but TAM could not rename; refresh the board, then move its cards again`
+	if got := heldReasons(res)["PLAT-1"]; got != want {
+		t.Errorf("held = %+v", res.Held)
+	}
+
+	if _, err := eng.Commit(ctx, "p1", "PLAT"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Errorf("CreateSprint called %d times, want once across both Commits", calls)
+	}
+}
+
+// noSprintCreate is a backend that answers nothing beyond IssueBackend.
+type noSprintCreate struct{ backend.IssueBackend }
+
+func TestADraftSprintOnAConnectionThatCannotCreateOneIsHeld(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	sprintMovedInto(t, h)
+	eng := committer.New(noSprintCreate{h.jira}, h.repo, h.order)
+
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Failures) != 1 || res.Failures[0].Error != "this connection cannot create sprints" || res.Failures[0].Retryable {
+		t.Errorf("failures = %+v", res.Failures)
+	}
+	if got := heldReasons(res)["PLAT-1"]; got != `waits for sprint "Sprint 15", which this connection cannot create` {
+		t.Errorf("held = %+v", res.Held)
+	}
+	if len(h.jira.sprintsMade) != 0 {
+		t.Errorf("sprints made = %v", h.jira.sprintsMade)
+	}
+}
+
+// journalLostOnLink is a Jira whose link lands and whose journal then cannot
+// be read: the moment after the last phase that used to turn a Commit that
+// had written to Jira into a Go error, beside which Wails drops the Result.
+type journalLostOnLink struct {
+	*fake
+	db *sql.DB
+}
+
+func (j journalLostOnLink) CreateLink(ctx context.Context, fromKey string, d backend.LinkDraft) error {
+	if err := j.fake.CreateLink(ctx, fromKey, d); err != nil {
+		return err
+	}
+	_, err := j.db.Exec(`ALTER TABLE pending_change RENAME TO pending_change_gone`)
+	return err
+}
+
+func TestAJournalLostAfterTheLastPhaseStillReturnsTheResult(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	if _, err := h.repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeTask, Summary: "Made"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.repo.AddLink(ctx, "p1", "PLAT-1", backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "XT-9"}); err != nil {
+		t.Fatal(err)
+	}
+	eng := committer.New(journalLostOnLink{fake: h.jira, db: h.db}, h.repo, h.order)
+
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatalf("a Commit that wrote to Jira returned an error: %v", err)
+	}
+	if len(res.Created) != 1 || len(h.jira.links) != 1 {
+		t.Errorf("created %+v, links %v", res.Created, h.jira.links)
+	}
+	lost := false
+	for _, f := range res.Failures {
+		if strings.Contains(f.Error, "did not run") {
+			t.Errorf("no phase follows the last one: %+v", f)
+		}
+		lost = lost || strings.Contains(f.Error, "linked in Jira but the journal could not be cleared")
+	}
+	if !lost {
+		t.Errorf("the journal was not lost, so this proves nothing: %+v", res.Failures)
+	}
+	if res.Remaining != 1 {
+		t.Errorf("remaining = %d, want the link row the last successful read counted", res.Remaining)
 	}
 }

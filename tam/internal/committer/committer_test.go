@@ -389,18 +389,11 @@ func TestAnEditNamingAnUncreatedDraftWaits(t *testing.T) {
 			t.Errorf("the story must not be pushed while its epic is still a draft: %v", f.updates)
 		}
 	}
-	if len(res.Failures) != 2 {
-		t.Fatalf("two failures, the create's and the story's: %+v", res.Failures)
+	if len(res.Failures) != 1 || !strings.Contains(res.Failures[0].Error, "Severity") || res.Failures[0].Key != temp {
+		t.Fatalf("one failure, the create's: %+v", res.Failures)
 	}
-	keys := map[string]string{}
-	for _, fl := range res.Failures {
-		keys[fl.Key] = fl.Error
-	}
-	if !strings.Contains(keys[temp], "Severity") {
-		t.Errorf("the create's failure: %v", keys)
-	}
-	if !strings.Contains(keys["PLAT-2"], temp) {
-		t.Errorf("the story's failure names the temp key: %v", keys)
+	if len(res.Held) != 1 || res.Held[0].Key != "PLAT-2" || res.Held[0].Reason != "waits for "+temp+", which Jira refused" {
+		t.Errorf("the story's edit is held with the reason: %+v", res.Held)
 	}
 	pend, err := repo.PendingForKey(ctx, "p1", "PLAT-2")
 	if err != nil || len(pend) != 1 {

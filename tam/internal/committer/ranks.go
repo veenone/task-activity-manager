@@ -77,6 +77,10 @@ func (e *Engine) pushBoardRanks(ctx context.Context, profileID string, w boardWr
 			res.Failures = append(res.Failures, boardFailure(p, err, false))
 			continue
 		}
+		if err := assertNoPlaceholders(map[string]any{"issue": key, "neighbour": anchor}); err != nil {
+			res.Failures = append(res.Failures, boardFailure(p, err, false))
+			continue
+		}
 		if err := w.RankIssue(ctx, key, anchor, before); err != nil {
 			res.Failures = append(res.Failures, boardFailure(p, err, true))
 			continue

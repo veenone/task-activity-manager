@@ -277,6 +277,12 @@ func (e *Engine) pushSprints(ctx context.Context, profileID string, w boardWrite
 			for _, p := range batch {
 				keys = append(keys, p.EntityKey)
 			}
+			if err := assertNoPlaceholders(map[string]any{"sprintId": target, "issues": keys}); err != nil {
+				for _, p := range batch {
+					res.Failures = append(res.Failures, boardFailure(p, err, false))
+				}
+				continue
+			}
 			if err := w.MoveIssuesToSprint(ctx, target, keys); err != nil {
 				for _, p := range batch {
 					res.Failures = append(res.Failures, boardFailure(p, err, true))
@@ -314,6 +320,10 @@ func (e *Engine) pushTransitions(ctx context.Context, profileID string, plan mov
 			// The board's columns are a local read; failing it should not
 			// cost the move, it should only cost the siblings.
 			targets = []string{target}
+		}
+		if err := assertNoPlaceholders(map[string]any{"issue": key}); err != nil {
+			res.Failures = append(res.Failures, boardFailure(p, err, false))
+			continue
 		}
 		if err := e.b.Transition(ctx, key, targets); err != nil {
 			res.Failures = append(res.Failures, boardFailure(p, namedTarget(err, issuerepo.MoveRawName(p.AfterVal)), true))
