@@ -13,55 +13,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strconv"
 	"strings"
 	"time"
 )
-
-type Page struct {
-	ID      string      `json:"id"`
-	Title   string      `json:"title"`
-	Space   PageSpace   `json:"space"`
-	Version PageVersion `json:"version"`
-	Links   PageLinks   `json:"_links"`
-	Body    PageBody    `json:"body"`
-}
-type PageSpace struct {
-	Key string `json:"key"`
-}
-type PageVersion struct {
-	Number int    `json:"number"`
-	When   string `json:"when"`
-}
-type PageLinks struct {
-	WebUI string `json:"webui"`
-}
-type PageBody struct {
-	Storage PageStorage `json:"storage"`
-	View    PageView    `json:"view"`
-}
-type PageStorage struct {
-	Value          string `json:"value"`
-	Representation string `json:"representation"`
-}
-type PageView struct {
-	Value string `json:"value"`
-}
-
-type ChildPage struct {
-	ID     string    `json:"id"`
-	Title  string    `json:"title"`
-	Type   string    `json:"type"`
-	Status string    `json:"status"`
-	Links  PageLinks `json:"_links"`
-}
-type ChildPageResult struct {
-	Results []ChildPage `json:"results"`
-	Start   int         `json:"start"`
-	Limit   int         `json:"limit"`
-	Size    int         `json:"size"`
-}
 
 type HTTPError struct {
 	Code    int
@@ -94,21 +48,6 @@ func NewClient(baseURL, token string, caCert string, insecure bool) *Client {
 		transport.TLSClientConfig = &tls.Config{RootCAs: pool, InsecureSkipVerify: insecure}
 	}
 	return &Client{baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"), token: token, http: &http.Client{Timeout: 30 * time.Second, Transport: transport}}
-}
-
-func (c *Client) GetPage(ctx context.Context, id string) (Page, error) {
-	var p Page
-	err := c.get(ctx, "/rest/api/content/"+url.PathEscape(id)+"?expand=body.storage,body.view,version,space,_links").Decode(&p)
-	return p, err
-}
-func (c *Client) ListChildPages(ctx context.Context, parentID string, start, limit int) (ChildPageResult, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	path := "/rest/api/content/" + url.PathEscape(parentID) + "/child/page?start=" + strconv.Itoa(start) + "&limit=" + strconv.Itoa(limit) + "&expand=version,_links"
-	var r ChildPageResult
-	err := c.get(ctx, path).Decode(&r)
-	return r, err
 }
 
 type responseDecoder struct {

@@ -76,9 +76,8 @@ vi.mock("./api", async () => {
     ImportIssues: vi.fn(),
     SaveImportTemplate: vi.fn(),
     GetConfluenceConfig: vi.fn(),
-    ListConfluenceChildPages: vi.fn(),
-    GetRitualPage: vi.fn(),
-    ListRitualAssociations: vi.fn(),
+    EnsureSprintRituals: vi.fn(),
+    LastRitualSync: vi.fn(),
   };
 });
 
@@ -117,7 +116,6 @@ beforeEach(() => {
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
   vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "", spaceKey: "", rootPageID: "" });
-  vi.mocked(api.ListRitualAssociations).mockResolvedValue([]);
   vi.mocked(api.ListBoards).mockResolvedValue([]);
   vi.mocked(api.ListBoardSprints).mockResolvedValue([]);
   vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([]);
@@ -225,14 +223,13 @@ describe("App shell", () => {
       .toHaveAttribute("aria-current", "page");
   });
 
-  // Rituals was the last placeholder; Phase 5 replaced it, so the rail now
-  // opens the real view and the view speaks for an unconfigured profile.
-  it("opens Rituals and says when Confluence is not configured", async () => {
-    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+  // ListBoards answers no boards in this suite, so the Rituals view has no
+  // scrum board to hold rituals and says so instead of drawing an editor.
+  it("opens Rituals and says when there is no scrum board", async () => {
     renderApp();
-    const rail = await screen.findByRole("navigation", { name: "Navigation rail" });
+    const rail = await screen.findByRole("navigation", { name: "Views" });
     await userEvent.click(within(rail).getByRole("button", { name: "Rituals" }));
-    expect(await screen.findByText(/Confluence is not configured for this profile/)).toBeInTheDocument();
+    expect(await screen.findByText(/No scrum board has been synced for this project/)).toBeInTheDocument();
   });
 
   it("renders the epic tree when the View menu opens Epics", async () => {

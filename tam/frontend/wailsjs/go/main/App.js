@@ -46,16 +46,8 @@ export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
-export function DeleteRitualAssociation(arg1, arg2) {
-  return window['go']['main']['App']['DeleteRitualAssociation'](arg1, arg2);
-}
-
 export function DeleteRitualDocument(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['DeleteRitualDocument'](arg1, arg2, arg3, arg4);
-}
-
-export function DeleteRitualDraft(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['DeleteRitualDraft'](arg1, arg2, arg3, arg4);
 }
 
 export function DeleteSprint(arg1, arg2, arg3) {
@@ -98,10 +90,6 @@ export function GetConfluenceConfig(arg1) {
   return window['go']['main']['App']['GetConfluenceConfig'](arg1);
 }
 
-export function GetConfluencePage(arg1, arg2) {
-  return window['go']['main']['App']['GetConfluencePage'](arg1, arg2);
-}
-
 export function GetCreateFields(arg1, arg2) {
   return window['go']['main']['App']['GetCreateFields'](arg1, arg2);
 }
@@ -124,14 +112,6 @@ export function GetLinkTypes(arg1) {
 
 export function GetProfileSetting(arg1, arg2) {
   return window['go']['main']['App']['GetProfileSetting'](arg1, arg2);
-}
-
-export function GetRitualDraft(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['GetRitualDraft'](arg1, arg2, arg3, arg4);
-}
-
-export function GetRitualPage(arg1, arg2) {
-  return window['go']['main']['App']['GetRitualPage'](arg1, arg2);
 }
 
 export function GetSettings() {
@@ -186,10 +166,6 @@ export function ListBoards(arg1) {
   return window['go']['main']['App']['ListBoards'](arg1);
 }
 
-export function ListConfluenceChildPages(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['ListConfluenceChildPages'](arg1, arg2, arg3, arg4);
-}
-
 export function ListEpics(arg1) {
   return window['go']['main']['App']['ListEpics'](arg1);
 }
@@ -218,20 +194,8 @@ export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
 }
 
-export function ListRitualAssociations(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListRitualAssociations'](arg1, arg2, arg3);
-}
-
 export function ListRitualDocuments(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListRitualDocuments'](arg1, arg2, arg3);
-}
-
-export function ListRitualDrafts(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListRitualDrafts'](arg1, arg2, arg3);
-}
-
-export function ListSprintIssues(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListSprintIssues'](arg1, arg2, arg3);
 }
 
 export function ListSprints(arg1) {
@@ -286,14 +250,6 @@ export function SaveRitualBody(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SaveRitualBody'](arg1, arg2, arg3, arg4, arg5);
 }
 
-export function SaveRitualDraft(arg1, arg2) {
-  return window['go']['main']['App']['SaveRitualDraft'](arg1, arg2);
-}
-
-export function ScaffoldSprintRituals(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ScaffoldSprintRituals'](arg1, arg2, arg3);
-}
-
 export function SearchUsers(arg1, arg2) {
   return window['go']['main']['App']['SearchUsers'](arg1, arg2);
 }
@@ -312,10 +268,6 @@ export function SetNavRailVisible(arg1) {
 
 export function SetProfileSetting(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetProfileSetting'](arg1, arg2, arg3);
-}
-
-export function SetRitualAssociation(arg1, arg2) {
-  return window['go']['main']['App']['SetRitualAssociation'](arg1, arg2);
 }
 
 export function SetTheme(arg1) {
