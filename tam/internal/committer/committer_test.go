@@ -36,6 +36,15 @@ type fake struct {
 	// onTransition runs inside a transition push, which is where a test
 	// drags the same card again while the pass is mid-push.
 	onTransition func()
+
+	// createErrFor refuses the create of a draft by summary, so one draft
+	// of a plan can fail while the rest go through.
+	createErrFor map[string]error
+	// sprintsMade records "board name" for every sprint created, and
+	// sprintCreateErr refuses them all. Sprint ids count up from 100.
+	sprintsMade     []string
+	sprintCreateErr error
+	nextSprint      int
 }
 
 func newFake() *fake {
@@ -43,6 +52,7 @@ func newFake() *fake {
 		rows: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 501,
 		updateErr: map[string]error{}, getErr: map[string]error{},
 		transitionErr: map[string]error{}, rankErr: map[string]error{},
+		createErrFor: map[string]error{},
 	}
 }
 
@@ -107,6 +117,9 @@ func (f *fake) UpdateIssue(_ context.Context, key string, fields map[string]stri
 func (f *fake) CreateIssue(_ context.Context, projectKey string, d backend.IssueDraft) (string, error) {
 	if f.createErr != nil {
 		return "", f.createErr
+	}
+	if err := f.createErrFor[d.Summary]; err != nil {
+		return "", err
 	}
 	f.creates = append(f.creates, d)
 	key := fmt.Sprintf("%s-%d", projectKey, f.nextKey)

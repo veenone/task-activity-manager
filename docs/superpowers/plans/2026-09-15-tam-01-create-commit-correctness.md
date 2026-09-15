@@ -31,7 +31,7 @@
   - `npm run typecheck --workspaces --if-present` (repo root)
 - After any change to an exported Go struct or bound method that crosses Wails, run `cd tam && wails generate module` and commit `tam/frontend/wailsjs/**` with the task. Never hand-edit `wailsjs`.
 - Sentences, verbatim:
-  - Held reason: `waits for <label>, <why>` where `<label>` is `TAM-NEW-n` or `sprint "<name>"` and `<why>` is one of `which Jira refused`, `which is waiting for <label>`, `which could not be read`, `which could not be sent`, `which this connection cannot create`, `which Jira created as <key> but TAM could not rename; sync, then set it again`, `which Jira created but TAM could not rename; refresh the board, then move its cards again`.
+  - Held reason: `waits for <label>, <why>` where `<label>` is `TAM-NEW-n`, `sprint "<name>"`, or `draft sprint <id>` (a sprint_create row that cannot be decoded, so no name exists) and `<why>` is one of `which Jira refused`, `which is waiting for <label>`, `which could not be read`, `which could not be sent`, `which this connection cannot create`, `which Jira created as <key> but TAM could not rename; sync, then set it again`, `which Jira created but TAM could not rename; refresh the board, then move its cards again`.
   - Draft sprint refusal (Go): `this sprint is a draft in TAM; Commit creates it in Jira first`
   - Draft sprint tooltip: `Commit this sprint first`
   - Create sprint dialog subtitle: `Drafted locally. Commit creates it in Jira.`

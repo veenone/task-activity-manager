@@ -603,6 +603,22 @@ export namespace committer {
 	        this.key = source["key"];
 	    }
 	}
+	export class CreatedSprint {
+	    draftId: number;
+	    id: number;
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreatedSprint(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.draftId = source["draftId"];
+	        this.id = source["id"];
+	        this.name = source["name"];
+	    }
+	}
 	export class Failure {
 	    key: string;
 	    entityType: string;
@@ -626,6 +642,26 @@ export namespace committer {
 	    }
 	}
 	
+	export class Held {
+	    key: string;
+	    entityType: string;
+	    rowId: number;
+	    waitsFor: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Held(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.entityType = source["entityType"];
+	        this.rowId = source["rowId"];
+	        this.waitsFor = source["waitsFor"];
+	        this.reason = source["reason"];
+	    }
+	}
 	export class Linked {
 	    key: string;
 	    toKey: string;
@@ -665,10 +701,12 @@ export namespace committer {
 	export class Result {
 	    committed: string[];
 	    created: Created[];
+	    createdSprints: CreatedSprint[];
 	    linked: Linked[];
 	    moved: Moved[];
 	    conflicts: Conflict[];
 	    failures: Failure[];
+	    held: Held[];
 	    remaining: number;
 	
 	    static createFrom(source: any = {}) {
@@ -679,10 +717,12 @@ export namespace committer {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.committed = source["committed"];
 	        this.created = this.convertValues(source["created"], Created);
+	        this.createdSprints = this.convertValues(source["createdSprints"], CreatedSprint);
 	        this.linked = this.convertValues(source["linked"], Linked);
 	        this.moved = this.convertValues(source["moved"], Moved);
 	        this.conflicts = this.convertValues(source["conflicts"], Conflict);
 	        this.failures = this.convertValues(source["failures"], Failure);
+	        this.held = this.convertValues(source["held"], Held);
 	        this.remaining = source["remaining"];
 	    }
 	
