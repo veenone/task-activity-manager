@@ -287,10 +287,52 @@ document only when board, sprint and ritual type all match what the current
 list holds, and drop one that matches nothing rather than graft it in. Same
 captured-id check guard Sync error and reload after Keep mine, Take theirs,
 Recreate, Remove. Editor `locked` from Sync press until its reload land
-(`setEditable` on same instance, toolbar hidden, never a rebuild): lock alone
-release before reload remount editor, and keystroke in that gap would be
-saved against replaced version and refused. Open in Confluence built only
-from http or https base URL.
+(`setEditable` on same instance, toolbar disabled not hidden, never a
+rebuild): lock alone release before reload remount editor, and keystroke in
+that gap would be saved against replaced version and refused. Open in
+Confluence built only from http or https base URL.
+
+**Editor toolbar = shared `EditorToolbar` in `@agile-suite/core`, and it know
+nothing about TipTap.** Items = plain data (toggle, action, link: label, icon,
+shortcut, active, disabled, what to run); `useRitualToolbar` in
+`ritual-editor/` map TipTap state onto them through `useEditorState`, so
+toolbar re-render on transaction and offer only what schema carry (Underline
+shown because StarterKit 3 bring it and `lib/storage` write `<u>`). Keyboard =
+WAI-ARIA toolbar: one tab stop, Left/Right with wrap, Home/End, tab stop kept
+by item id not position. Item that cannot run here = `aria-disabled`, still
+focusable; whole toolbar locked = native `disabled` on every button. **Locked
+for Sync = disabled, not hidden**, so page not jump when Sync start; editor
+itself still `setEditable(false)` on same instance. Read-only page still show
+no toolbar. Link popover: Enter apply, Escape close and hand focus back to
+link button, refusal (`LINK_REFUSED`, from `isAllowedLink` in
+`lib/sanitizeHtml.ts`: absolute http, https, mailto only, scheme read after
+dropping control characters) shown under box, never silent close. Button
+mouse press `preventDefault`, or selection gone before command run.
+
+**Root page gone = offer, not dead end.** `ritualsync.Run` read root first; 404
+come back as `Result.RootMissing` (page id, space, `CanCreate`,
+`SuggestedTitle` = `<project key> Rituals`), nil error, nothing written, no
+sync time recorded. Any other root failure still Go error. `CanCreate` =
+`confluence.SpaceProbe` answer (content listing then space `operations`),
+unknown and transport with no probe both read as yes, create own 403 the
+fallback. Rituals view open `RitualRootDialog`: placement stated first (top of
+space, id saved to profile), Create page and sync, or forbidden sentence plus
+Open Profile settings when probe say no. `App.CreateRitualRoot(profile, board,
+title, adopt)` run under `"rituals"` lock, reached only through
+`SyncContext.runRitualRoot`: `ritualsync.CreateRoot` call `CreatePage` with
+empty parent (now omit `ancestors`), 403 = `forbidden`, 400 or 409 = look title
+up, `titleTaken` with `TopLevel`, never read Confluence message; adopt (second
+confirmation) take only page with no ancestors. On `created`/`adopted`
+binding write new id onto stored Confluence config (`saveRitualRoot`, stored
+row not stand-in demo config) then run same pass (`syncRitualsLocked`) and
+return it in `RitualRootResult`; pass refusal = `SyncError`, not Go error,
+since root already saved. Pages under vanished old root go Gone as before;
+Recreate on next Sync put them under new root. Demo space asked for root id
+`1` (`demo.StagedMissingRootID`) start without it, `DenyCreate` stage token
+that cannot create. Profile form refuse non-numeric root id (except Confluence
+URL `demo`) and read `pageId` out of pasted address (`lib/confluenceRoot.ts`).
+Real-instance answers = `docs/superpowers/plans/assets/2026-09-15-confluence-root-page-probe.md`,
+non-blocking.
 
 Frontend `lib/storage` convert storage XHTML to TipTap JSON and back.
 Everything not modelled = opaque node carrying raw XML, written back byte for
@@ -1122,7 +1164,9 @@ even reached Go.
 
 **Rituals Sync not quiet either.** `SyncContext.runRitualsSync` drive banner
 like `runBoardsRefresh`, `running` = `"rituals"`: several requests, no modal
-holding focus. Editor save, resolve, forget, delete take no lock at all.
+holding focus. `runRitualRoot` share same private `runRituals` path, name and
+banner, because `CreateRitualRoot` acquire `"rituals"` and end in full Sync.
+Editor save, resolve, forget, delete take no lock at all.
 
 ## The boards pass and the board's shape
 
@@ -1292,8 +1336,8 @@ entered. Kiwi profile file refused.
                           CancelSprintReport, which is how a view that has been left cancels a read
                           still holding the profile lock; both under the "report" lock name
     app_rituals.go       the ritual bindings: ensure, list, save, resolve, forget, delete, macro
-                          preview, standup entry, last sync, Sync, all but Sync under no lock,
-                          Sync under the "rituals" lock name
+                          preview, standup entry, last sync, Sync, CreateRitualRoot; all but Sync and
+                          CreateRitualRoot under no lock, those two under the "rituals" lock name
     internal/tamstore/   TAM's own SQLite file (schema version 13: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
                           sprint (with goal, added at version 7, and complete_date, added at
@@ -1307,7 +1351,8 @@ entered. Kiwi profile file refused.
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile;
                           confluence.go is the in-memory Confluence space rituals sync against
                           on a demo profile, rebuilt from stored pages after a restart and
-                          staging one conflict on the first Standup it creates
+                          staging one conflict on the first Standup it creates, a missing root
+                          for root id 1, and with DenyCreate a token that cannot create pages
     internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile
                           settings, the pending-change journal, and drafts; tree.go groups the
                           cache into the Epics view's tree; boardwrites.go, movevalue.go,
@@ -1363,17 +1408,20 @@ entered. Kiwi profile file refused.
                           is the boards pass, reached through backend.BoardBackend
     internal/errtext/    reduces an error to one readable line (strips HTML tags, collapses
                           whitespace) for sync summaries and dropped-board reasons
-    internal/ritualtemplate/  renders a sprint's five ritual pages (pure, no clock, no I/O) and
-                          reads a Jira Issues macro's JQL back (JQL, ParseJQL), the three
-                          written forms and nothing else
+    internal/ritualtemplate/  renders a sprint's five ritual pages (pure, no clock, no I/O), the
+                          body of a root page TAM creates (RootBody), and reads a Jira Issues
+                          macro's JQL back (JQL, ParseJQL), the three written forms and nothing
+                          else
     internal/ritualrepo/ the store layer over ritual_document; documents.go is the CRUD, the
                           dirty and status computation, and Apply{Created,Pulled,Pushed,Conflict},
                           MarkGone, the writes a Sync pass makes
-    internal/ritualsync/ Ensure (write missing pages from templates, local, no lock) and Run
+    internal/ritualsync/ Ensure (write missing pages from templates, local, no lock), Run
                           (the Sync pass under the "rituals" lock: title match, adopt, create,
-                          pull, push, conflict, gone)
+                          pull, push, conflict, gone, and a 404 root reported as RootMissing), and
+                          root.go: CreateRoot, the top-level root page create or adoption
     internal/suiteprofiles/  which shared profiles TAM shows, demo detection, validation
-    frontend/            React app on @agile-suite/core (see ../frontend/core)
+    frontend/            React app on @agile-suite/core (see ../frontend/core); EditorToolbar
+                          lives there
       src/api.ts         typed access to the bindings; plain shapes for fixtures
       src/lib/keyColumn.ts  the issue-key column width both tables share
       src/lib/boardSelection.ts  the board's multi-selection: a set of keys and the three
@@ -1404,6 +1452,8 @@ entered. Kiwi profile file refused.
       src/lib/ritualText.ts  every sentence the Rituals view prints: chip and status labels, the
                           conflict and gone banners, the sync summary and pending line, the
                           unconfigured and no-scrum-board sentences
+      src/lib/confluenceRoot.ts  the Profile settings root page id field: a number, or the pageId
+                          read out of a pasted page address
       src/lib/standupLog.ts  finds where today's dated Yesterday/Today/Blockers section belongs
                           in a Standup page's Daily log, and whether it is already there
       src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
@@ -1430,8 +1480,11 @@ entered. Kiwi profile file refused.
                           RitualsView (the board and sprint pickers, the five-page nav, Sync
                           rituals and its result banner, the conflict and gone banners),
                           ritual-editor/RitualEditor (the TipTap editor over one page's storage
-                          XHTML, its own save state), MacroPreview (a Jira Issues macro rendered
-                          from cache), OpaqueViews (read-only rendering of an opaque node)
+                          XHTML, its own save state), ritual-editor/useRitualToolbar (TipTap state
+                          mapped onto @agile-suite/core's EditorToolbar), RitualRootDialog (the
+                          missing root page: create, adopt, or Profile settings), MacroPreview (a
+                          Jira Issues macro rendered from cache), OpaqueViews (read-only rendering
+                          of an opaque node)
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands
