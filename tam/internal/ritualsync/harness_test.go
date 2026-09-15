@@ -67,7 +67,9 @@ func (h *harness) ensure(s Sprint) {
 
 func (h *harness) save(sprintID int, ritualType, body string) {
 	h.t.Helper()
-	if _, err := h.docs.SaveBody(h.ctx, h.key(sprintID, ritualType), body, "t"); err != nil {
+	// An editor opened on the row as it is now, so the save's guard holds.
+	d := h.doc(sprintID, ritualType)
+	if _, err := h.docs.SaveBody(h.ctx, h.key(sprintID, ritualType), body, d.Version, d.PageID, "t"); err != nil {
 		h.t.Fatal(err)
 	}
 }

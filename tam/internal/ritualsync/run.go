@@ -79,22 +79,20 @@ func Run(ctx context.Context, pages confluence.Pages, docs *ritualrepo.Repositor
 		for _, d := range list {
 			byType[d.RitualType] = d
 		}
-		overview, ok := byType[ritualtemplate.Sprint]
-		if !ok {
-			// A closed sprint whose overview was removed locally has nothing
-			// its rituals could be created under.
-			continue
-		}
-		parentID, ok, err := p.page(sp, overview, cfg.RootID)
-		if err != nil {
-			return res, err
-		}
-		if !ok {
-			continue
+		// A sprint page that is missing, gone, or refused has nothing new to
+		// create rituals under, but a ritual that already has its own page
+		// is still reconciled: skipping it would leave its edits unpushed
+		// and say nothing about why.
+		parentID, placeable := "", false
+		if overview, ok := byType[ritualtemplate.Sprint]; ok {
+			parentID, placeable, err = p.page(sp, overview, cfg.RootID)
+			if err != nil {
+				return res, err
+			}
 		}
 		for _, t := range ritualtemplate.Types[1:] {
 			d, ok := byType[t]
-			if !ok {
+			if !ok || (!placeable && d.PageID == "") {
 				continue
 			}
 			if _, _, err := p.page(sp, d, parentID); err != nil {
@@ -226,23 +224,34 @@ func (p *pass) pull(k ritualrepo.Key, d ritualrepo.Document, remote confluence.S
 	return nil
 }
 
-// push sends the body the pass read at base plus one. A 409 means the page
-// moved between the read and the write, so it is read again and recorded as
-// a conflict. The base is set to what was pushed, never to what Confluence
-// answers with: Confluence normalises storage on save, and a base taken from
-// its answer would leave every pushed page dirty forever.
+// push sends the body the pass read at base plus one. A 409 usually means the
+// page moved between the read and the write, so it is read again, and only a
+// version newer than the base is recorded as a conflict: a 409 for anything
+// else (a title clash) is this push failing, and a conflict at the base
+// version would claim a newer page that is not newer. The base is set to what
+// was pushed, never to what Confluence answers with: Confluence normalises
+// storage on save, and a base taken from its answer would leave every pushed
+// page dirty forever.
 func (p *pass) push(sp Sprint, k ritualrepo.Key, d ritualrepo.Document) error {
 	updated, err := p.pages.UpdatePage(p.ctx, d.PageID, d.Title, d.Body, d.Version+1)
 	if errors.Is(err, confluence.ErrVersionConflict) {
 		again, getErr := p.pages.GetPageStorage(p.ctx, d.PageID)
-		if getErr != nil {
+		switch {
+		case errors.Is(getErr, confluence.ErrNotFound):
+			if err := p.docs.MarkGone(p.ctx, k); err != nil {
+				return err
+			}
+			p.res.Gone++
+		case getErr != nil:
 			p.fail(sp, d, errtext.Line(getErr))
-			return nil
+		case again.Version > d.Version:
+			if err := p.docs.ApplyConflict(p.ctx, k, d.PageID, again.Body, again.Version); err != nil {
+				return err
+			}
+			p.res.Conflicts++
+		default:
+			p.fail(sp, d, errtext.Line(err))
 		}
-		if err := p.docs.ApplyConflict(p.ctx, k, d.PageID, again.Body, again.Version); err != nil {
-			return err
-		}
-		p.res.Conflicts++
 		return nil
 	}
 	if err != nil {

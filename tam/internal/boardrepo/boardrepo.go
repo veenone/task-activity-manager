@@ -78,8 +78,9 @@ type IssueSource interface {
 // issue cache is issuerepo's to purge: two purges naming the same tables is
 // the drift that used to leave one behind when a fifth table arrived, and
 // sprint_report was that fifth table, added alongside RemoveBoards's own
-// list in boards.go. The list now holds six: ritual_document joined it the
-// same way, and needs the same care against the same drift.
+// list in boards.go. This list holds six: ritual_document is the one table
+// here that RemoveBoards deliberately leaves alone, since it holds text
+// people wrote and only a purge of the whole profile may remove that.
 func (r *Repository) PurgeProfile(ctx context.Context, profileID string) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
 		for _, table := range []string{"board", "board_column", "board_issue", "sprint", "sprint_report", "ritual_document"} {

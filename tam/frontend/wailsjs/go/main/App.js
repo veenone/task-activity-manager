@@ -246,8 +246,8 @@ export function SaveImportTemplate(arg1) {
   return window['go']['main']['App']['SaveImportTemplate'](arg1);
 }
 
-export function SaveRitualBody(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['SaveRitualBody'](arg1, arg2, arg3, arg4, arg5);
+export function SaveRitualBody(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['SaveRitualBody'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
 export function SearchUsers(arg1, arg2) {

@@ -138,7 +138,7 @@ export function RitualMacroIssues(arg1:string,arg2:string):Promise<main.RitualMa
 
 export function SaveImportTemplate(arg1:string):Promise<string>;
 
-export function SaveRitualBody(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string):Promise<ritualrepo.Document>;
+export function SaveRitualBody(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:number,arg7:string):Promise<ritualrepo.Document>;
 
 export function SearchUsers(arg1:string,arg2:string):Promise<Array<backend.User>>;
 

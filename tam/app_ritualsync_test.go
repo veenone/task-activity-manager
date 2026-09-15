@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -79,11 +80,11 @@ func TestSaveAndResolveThroughTheBindings(t *testing.T) {
 	if _, err := a.EnsureSprintRituals(p.ID, 1, 14); err != nil {
 		t.Fatal(err)
 	}
-	d, err := a.SaveRitualBody(p.ID, 1, 14, "planning", "<p>mine</p>")
+	d, err := a.SaveRitualBody(p.ID, 1, 14, "planning", "<p>mine</p>", 0, "")
 	if err != nil || d.Body != "<p>mine</p>" || d.Status != ritualrepo.StatusLocal {
 		t.Fatalf("saved = %+v, %v", d, err)
 	}
-	if _, err := a.SaveRitualBody(p.ID, 1, 14, "party", "<p/>"); err == nil {
+	if _, err := a.SaveRitualBody(p.ID, 1, 14, "party", "<p/>", 0, ""); err == nil {
 		t.Fatal("an unknown ritual type should be refused")
 	}
 	if err := a.ResolveRitualConflict(p.ID, 1, 14, "planning", "both"); err == nil {
@@ -91,6 +92,40 @@ func TestSaveAndResolveThroughTheBindings(t *testing.T) {
 	}
 	if err := a.ResolveRitualConflict(p.ID, 1, 14, "planning", "mine"); err == nil {
 		t.Fatal("a row with no conflict should be refused")
+	}
+}
+
+func ritualDoc(t *testing.T, a *App, profileID, ritualType string) ritualrepo.Document {
+	t.Helper()
+	docs, err := a.ListRitualDocuments(profileID, 1, 14)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range docs {
+		if d.RitualType == ritualType {
+			return d
+		}
+	}
+	t.Fatalf("no %s document", ritualType)
+	return ritualrepo.Document{}
+}
+
+// An editor opened before a Sync created the page still holds version 0 and
+// no page id; its save must be refused, not written over the synced page.
+func TestSaveRitualBodyRefusesAnEditorOpenedBeforeASync(t *testing.T) {
+	a, p := newRitualSyncApp(t)
+	if _, err := a.SyncRituals(p.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	before := ritualDoc(t, a, p.ID, "planning")
+	if _, err := a.SaveRitualBody(p.ID, 1, 14, "planning", "<p>stale</p>", 0, ""); !errors.Is(err, ritualrepo.ErrChangedUnderEditor) {
+		t.Fatalf("err = %v", err)
+	}
+	if after := ritualDoc(t, a, p.ID, "planning"); after.Body != before.Body || after.Status != ritualrepo.StatusSynced {
+		t.Fatalf("a refused save changed the row: %+v", after)
+	}
+	if d, err := a.SaveRitualBody(p.ID, 1, 14, "planning", "<p>current</p>", before.Version, before.PageID); err != nil || d.Status != ritualrepo.StatusUnsynced {
+		t.Fatalf("current save = %+v, %v", d, err)
 	}
 }
 
@@ -132,12 +167,46 @@ func TestDemoPagesSurviveARestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	a.demoConfluence = nil
-	if _, err := a.SaveRitualBody(p.ID, 1, 14, "planning", "<p>after restart</p>"); err != nil {
+	planning := ritualDoc(t, a, p.ID, "planning")
+	if _, err := a.SaveRitualBody(p.ID, 1, 14, "planning", "<p>after restart</p>", planning.Version, planning.PageID); err != nil {
 		t.Fatal(err)
 	}
 	res, err := a.SyncRituals(p.ID, 1)
 	if err != nil || res.Gone != 0 || res.Pushed != 1 {
 		t.Fatalf("after restart = %+v, %v", res, err)
+	}
+}
+
+// A row in conflict knows the remote as its conflict body and version, not
+// its base: an adopted page never had a base, so rebuilding from base_body
+// put it back at version 0 with an empty body, and Keep mine then pushed
+// against a version Confluence never had.
+func TestADemoConflictIsRebuiltFromTheRemoteItKnows(t *testing.T) {
+	a, p := newRitualSyncApp(t)
+	if _, err := a.EnsureSprintRituals(p.ID, 1, 14); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.SaveRitualBody(p.ID, 1, 14, "_sprint", "<p>mine</p>", 0, ""); err != nil {
+		t.Fatal(err)
+	}
+	space := a.demoSpace(p.ID, profile.ConfluenceConfig{SpaceKey: "DEMO", RootPageID: "demo-root"})
+	id := space.Seed("demo-root", "Sprint 14", "<p>theirs</p>")
+	if res, err := a.SyncRituals(p.ID, 1); err != nil || res.Conflicts != 1 {
+		t.Fatalf("adopt = %+v, %v", res, err)
+	}
+
+	a.demoConfluence = nil
+	if _, err := a.SyncRituals(p.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if page, ok := a.demoConfluence[p.ID].Page(id); !ok || page.Body != "<p>theirs</p>" || page.Version != 1 {
+		t.Fatalf("rebuilt page = %+v, %v", page, ok)
+	}
+	if err := a.ResolveRitualConflict(p.ID, 1, 14, "_sprint", "mine"); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := a.SyncRituals(p.ID, 1); err != nil || res.Pushed != 1 || len(res.Failed) != 0 {
+		t.Fatalf("after keep mine = %+v, %v", res, err)
 	}
 }
 

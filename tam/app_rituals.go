@@ -84,11 +84,21 @@ func (a *App) demoSpace(profileID string, c profile.ConfluenceConfig) *demo.Conf
 		// by title instead of creating a genuinely new one. A gone overview
 		// is skipped from the parent map too, so a gone ritual page never
 		// gets rebuilt under it either.
+		// A row in conflict knows the remote as its conflict body and
+		// version, not its base: an adopted page never had a base, and
+		// rebuilding it from one put it back at version 0 with no body.
+		remote := func(d ritualrepo.Document) (string, int) {
+			if d.Status == ritualrepo.StatusConflict {
+				return d.ConflictBody, d.ConflictVersion
+			}
+			return d.BaseBody, d.Version
+		}
 		overviews := map[[2]int]string{}
 		for _, d := range docs {
 			if d.RitualType == ritualtemplate.Sprint && d.Status != ritualrepo.StatusGone {
 				overviews[[2]int{d.BoardID, d.SprintID}] = d.PageID
-				space.Restore(d.PageID, c.RootPageID, d.Title, d.BaseBody, d.Version)
+				body, version := remote(d)
+				space.Restore(d.PageID, c.RootPageID, d.Title, body, version)
 			}
 		}
 		for _, d := range docs {
@@ -96,7 +106,8 @@ func (a *App) demoSpace(profileID string, c profile.ConfluenceConfig) *demo.Conf
 				continue
 			}
 			if parent, ok := overviews[[2]int{d.BoardID, d.SprintID}]; ok && d.RitualType != ritualtemplate.Sprint {
-				space.Restore(d.PageID, parent, d.Title, d.BaseBody, d.Version)
+				body, version := remote(d)
+				space.Restore(d.PageID, parent, d.Title, body, version)
 			}
 		}
 	}
@@ -172,7 +183,9 @@ func (a *App) ListRitualDocuments(profileID string, boardID, sprintID int) ([]ri
 
 // SaveRitualBody is the editor's local save. It takes no lock, the way a
 // board move takes none; the sync's compare-and-set is what makes that safe.
-func (a *App) SaveRitualBody(profileID string, boardID, sprintID int, ritualType, body string) (ritualrepo.Document, error) {
+// version and pageID are what the editor was opened on, and the save is
+// refused once a Sync has moved the row past either.
+func (a *App) SaveRitualBody(profileID string, boardID, sprintID int, ritualType, body string, version int, pageID string) (ritualrepo.Document, error) {
 	if _, err := a.requireProfile(profileID); err != nil {
 		return ritualrepo.Document{}, err
 	}
@@ -183,7 +196,7 @@ func (a *App) SaveRitualBody(profileID string, boardID, sprintID int, ritualType
 	if err != nil {
 		return ritualrepo.Document{}, err
 	}
-	return a.rituals.SaveBody(a.ctx, k, body, nowStamp())
+	return a.rituals.SaveBody(a.ctx, k, body, version, pageID, nowStamp())
 }
 
 // ResolveRitualConflict keeps the local body ("mine", pushed on the next

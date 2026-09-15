@@ -3,6 +3,7 @@ package ritualrepo_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -47,7 +48,7 @@ func TestWriteTemplateCreatesALocalRowAndLeavesAWrittenOneAlone(t *testing.T) {
 	if d.Status != ritualrepo.StatusLocal || d.Body != "<p>template</p>" || d.BaseBody != "" || !d.Dirty() {
 		t.Fatalf("fresh = %+v", d)
 	}
-	if _, err := r.SaveBody(ctx, planning, "<p>mine</p>", "t2"); err != nil {
+	if _, err := r.SaveBody(ctx, planning, "<p>mine</p>", 0, "", "t2"); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.WriteTemplate(ctx, planning, "Sprint 14 · Planning", "<p>template again</p>", "t3"); err != nil {
@@ -96,7 +97,7 @@ func TestNeedsTemplateFindsMissingAndEmptyRowsWithTheirLegacyText(t *testing.T) 
 func TestSaveBodyStatusFollowsThePageAndTheBase(t *testing.T) {
 	r, ctx := newDocs(t)
 	_ = r.WriteTemplate(ctx, planning, "T", "<p>a</p>", "t1")
-	if d, _ := r.SaveBody(ctx, planning, "<p>b</p>", "t2"); d.Status != ritualrepo.StatusLocal {
+	if d, _ := r.SaveBody(ctx, planning, "<p>b</p>", 0, "", "t2"); d.Status != ritualrepo.StatusLocal {
 		t.Fatalf("no page yet = %s", d.Status)
 	}
 	if err := r.ApplyCreated(ctx, planning, "42", "<p>b</p>", 1, "t3"); err != nil {
@@ -105,21 +106,61 @@ func TestSaveBodyStatusFollowsThePageAndTheBase(t *testing.T) {
 	if d := mustDoc(t, r, ctx, planning); d.Status != ritualrepo.StatusSynced || d.Dirty() || d.PageID != "42" {
 		t.Fatalf("after create = %+v", d)
 	}
-	if d, _ := r.SaveBody(ctx, planning, "<p>c</p>", "t4"); d.Status != ritualrepo.StatusUnsynced || !d.Dirty() {
+	if d, _ := r.SaveBody(ctx, planning, "<p>c</p>", 1, "42", "t4"); d.Status != ritualrepo.StatusUnsynced || !d.Dirty() {
 		t.Fatalf("edited = %+v", d)
 	}
-	if d, _ := r.SaveBody(ctx, planning, "<p>b</p>", "t5"); d.Status != ritualrepo.StatusSynced {
+	if d, _ := r.SaveBody(ctx, planning, "<p>b</p>", 1, "42", "t5"); d.Status != ritualrepo.StatusSynced {
 		t.Fatalf("undone back to base = %s", d.Status)
 	}
-	if _, err := r.SaveBody(ctx, ritualrepo.Key{ProfileID: "p1", BoardID: 1, SprintID: 99, RitualType: "planning"}, "x", "t6"); err == nil {
+	if _, err := r.SaveBody(ctx, ritualrepo.Key{ProfileID: "p1", BoardID: 1, SprintID: 99, RitualType: "planning"}, "x", 0, "", "t6"); err == nil {
 		t.Fatal("saving a row that does not exist should fail")
+	}
+}
+
+// The editor saves the text it was opened on. Once a Sync has moved the row
+// to another version or page, that text was typed over a page the store no
+// longer holds, and writing it would push stale text over the newer remote
+// on the next Sync with no conflict.
+func TestSaveBodyIsRefusedOnceASyncMovedTheVersion(t *testing.T) {
+	r, ctx := newDocs(t)
+	_ = r.WriteTemplate(ctx, planning, "T", "<p>v1</p>", "t1")
+	_ = r.ApplyCreated(ctx, planning, "42", "<p>v1</p>", 1, "t2")
+	if _, err := r.ApplyPulled(ctx, planning, "42", "<p>v1</p>", "<p>teammate</p>", 2, "t3"); err != nil {
+		t.Fatal(err)
+	}
+	_, err := r.SaveBody(ctx, planning, "<p>stale plus keystrokes</p>", 1, "42", "t4")
+	if !errors.Is(err, ritualrepo.ErrChangedUnderEditor) ||
+		err.Error() != "This page changed while you were editing (a Sync brought in a newer version). Copy your text, reopen the page, and apply it again." {
+		t.Fatalf("err = %v", err)
+	}
+	if d := mustDoc(t, r, ctx, planning); d.Body != "<p>teammate</p>" || d.Status != ritualrepo.StatusSynced {
+		t.Fatalf("a stale save changed the row: %+v", d)
+	}
+}
+
+func TestSaveBodyIsRefusedOnceASyncMovedThePageID(t *testing.T) {
+	r, ctx := newDocs(t)
+	_ = r.WriteTemplate(ctx, planning, "T", "<p>v1</p>", "t1")
+	// Created meanwhile: the editor was opened on a page with no id.
+	_ = r.ApplyCreated(ctx, planning, "42", "<p>v1</p>", 1, "t2")
+	if _, err := r.SaveBody(ctx, planning, "<p>stale</p>", 1, "", "t3"); !errors.Is(err, ritualrepo.ErrChangedUnderEditor) {
+		t.Fatalf("created meanwhile: err = %v", err)
+	}
+	// Forgotten meanwhile: the editor was opened on page 42 at version 1.
+	_ = r.MarkGone(ctx, planning)
+	_ = r.ForgetPage(ctx, planning, "t4")
+	if _, err := r.SaveBody(ctx, planning, "<p>stale</p>", 1, "42", "t5"); !errors.Is(err, ritualrepo.ErrChangedUnderEditor) {
+		t.Fatalf("forgotten meanwhile: err = %v", err)
+	}
+	if d := mustDoc(t, r, ctx, planning); d.Body != "<p>v1</p>" {
+		t.Fatalf("a stale save changed the body: %q", d.Body)
 	}
 }
 
 func TestApplyPulledRefusesABodyThatChangedSinceItWasRead(t *testing.T) {
 	r, ctx := newDocs(t)
 	_ = r.WriteTemplate(ctx, planning, "T", "<p>read</p>", "t1")
-	_, _ = r.SaveBody(ctx, planning, "<p>typed after the read</p>", "t2")
+	_, _ = r.SaveBody(ctx, planning, "<p>typed after the read</p>", 0, "", "t2")
 	pulled, err := r.ApplyPulled(ctx, planning, "42", "<p>read</p>", "<p>remote</p>", 2, "t3")
 	if err != nil || pulled {
 		t.Fatalf("pulled = %v, %v", pulled, err)
@@ -137,8 +178,8 @@ func TestApplyPushedLeavesAKeystrokeSavedMidPushUnsynced(t *testing.T) {
 	r, ctx := newDocs(t)
 	_ = r.WriteTemplate(ctx, planning, "T", "<p>v1</p>", "t1")
 	_ = r.ApplyCreated(ctx, planning, "42", "<p>v1</p>", 1, "t2")
-	_, _ = r.SaveBody(ctx, planning, "<p>pushed</p>", "t3")
-	_, _ = r.SaveBody(ctx, planning, "<p>typed during the push</p>", "t4")
+	_, _ = r.SaveBody(ctx, planning, "<p>pushed</p>", 1, "42", "t3")
+	_, _ = r.SaveBody(ctx, planning, "<p>typed during the push</p>", 1, "42", "t4")
 	if err := r.ApplyPushed(ctx, planning, "<p>pushed</p>", 2, "t5"); err != nil {
 		t.Fatal(err)
 	}
@@ -154,14 +195,14 @@ func TestResolveMineRebasesAndTheirsTakesTheRemote(t *testing.T) {
 		_ = r.DeleteDocument(ctx, planning)
 		_ = r.WriteTemplate(ctx, planning, "T", "<p>v1</p>", "t1")
 		_ = r.ApplyCreated(ctx, planning, "42", "<p>v1</p>", 1, "t2")
-		_, _ = r.SaveBody(ctx, planning, "<p>mine</p>", "t3")
+		_, _ = r.SaveBody(ctx, planning, "<p>mine</p>", 1, "42", "t3")
 		_ = r.ApplyConflict(ctx, planning, "42", "<p>theirs</p>", 3)
 	}
 	setup()
 	if d := mustDoc(t, r, ctx, planning); d.Status != ritualrepo.StatusConflict || d.ConflictVersion != 3 {
 		t.Fatalf("conflict = %+v", d)
 	}
-	if _, err := r.SaveBody(ctx, planning, "<p>mine, more</p>", "t4"); err != nil {
+	if _, err := r.SaveBody(ctx, planning, "<p>mine, more</p>", 1, "42", "t4"); err != nil {
 		t.Fatal(err)
 	}
 	if d := mustDoc(t, r, ctx, planning); d.Status != ritualrepo.StatusConflict {

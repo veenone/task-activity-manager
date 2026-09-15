@@ -202,20 +202,36 @@ func (r *Repository) update(ctx context.Context, what string, k Key, set string,
 	return res.RowsAffected()
 }
 
+// ErrChangedUnderEditor is a save refused because a Sync moved the row to
+// another version or page after the editor opened it. The sentence is the one
+// the editor shows.
+var ErrChangedUnderEditor = errors.New("This page changed while you were editing (a Sync brought in a newer version). Copy your text, reopen the page, and apply it again.")
+
 // SaveBody is the editor's local save. It takes no lock: the sync's
-// compare-and-set writes are what make a save during a pass safe. A row in
-// conflict or gone keeps that status, since a save resolves neither.
-func (r *Repository) SaveBody(ctx context.Context, k Key, body, now string) (Document, error) {
+// compare-and-set writes are what make a save during a pass safe. The other
+// direction needs its own guard, so the save names the version and page id
+// the editor was opened on and lands only while the row still holds both:
+// text typed over a page a Sync has since pulled or created would otherwise
+// overwrite it locally and be pushed over the newer remote next Sync, with no
+// conflict. A row in conflict or gone keeps that status, since a save
+// resolves neither.
+func (r *Repository) SaveBody(ctx context.Context, k Key, body string, version int, pageID, now string) (Document, error) {
 	n, err := r.update(ctx, "save", k, `body = ?, updated_at = ?,
 		status = CASE
 			WHEN status IN ('conflict', 'gone') THEN status
 			WHEN confluence_page_id = '' THEN 'local'
 			WHEN base_body = ? THEN 'synced'
-			ELSE 'unsynced' END`, []any{body, now, body}, "")
+			ELSE 'unsynced' END`, []any{body, now, body},
+		` AND confluence_version = ? AND confluence_page_id = ?`, version, pageID)
 	if err != nil {
 		return Document{}, err
 	}
 	if n == 0 {
+		if _, ok, err := r.Document(ctx, k); err != nil {
+			return Document{}, err
+		} else if ok {
+			return Document{}, ErrChangedUnderEditor
+		}
 		return Document{}, fmt.Errorf("no %s ritual is stored for sprint %d", k.RitualType, k.SprintID)
 	}
 	d, _, err := r.Document(ctx, k)
