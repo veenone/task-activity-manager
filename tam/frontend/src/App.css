@@ -761,3 +761,5 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-status-line { margin: 0; padding: 4px 16px; border-top: 1px solid var(--border-subtle); }
 .ritual-notice { margin: 0; padding: 4px 16px; }
 .ritual-readonly { padding: 12px 16px; overflow: auto; min-height: 0; }
+.ritual-macro-table { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+.ritual-macro-table th, .ritual-macro-table td { border: 1px solid var(--border-subtle); padding: 2px 6px; text-align: left; }

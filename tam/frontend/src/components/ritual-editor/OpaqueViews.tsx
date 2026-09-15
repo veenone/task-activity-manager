@@ -4,6 +4,7 @@ import { NodeViewWrapper } from "@tiptap/react";
 // ref type this component does not need), so it is imported from its home
 // package directly rather than through @tiptap/react.
 import type { NodeViewProps } from "@tiptap/core";
+import { MacroPreview } from "./MacroPreview";
 
 export function opaqueTitle(label: string): string {
   return label === "jira" ? "Jira issues" : `Confluence: ${label || "content"}`;
@@ -14,7 +15,9 @@ export function OpaqueBlockView({ node, selected }: NodeViewProps) {
   return (
     <NodeViewWrapper className={`ritual-opaque${selected ? " is-selected" : ""}`} contentEditable={false} data-drag-handle>
       <span className="ritual-opaque-label">{opaqueTitle(label)}</span>
-      <span className="muted small">Edit this in Confluence. TAM keeps it exactly as it is.</span>
+      {label === "jira"
+        ? <MacroPreview xml={String(node.attrs.xml ?? "")} />
+        : <span className="muted small">Edit this in Confluence. TAM keeps it exactly as it is.</span>}
     </NodeViewWrapper>
   );
 }
