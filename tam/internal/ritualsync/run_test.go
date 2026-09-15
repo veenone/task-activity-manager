@@ -341,3 +341,58 @@ func TestOneFailingPageLeavesTheOthersSynced(t *testing.T) {
 		t.Fatal("statuses after a partial pass are wrong")
 	}
 }
+
+// pagesOnly hides the demo space's permission probe, the way a transport
+// that cannot answer it would.
+type pagesOnly struct{ confluence.Pages }
+
+func TestAMissingRootIsReportedInTheResultNotAsAnError(t *testing.T) {
+	h := newHarness(t)
+	h.cfg.ProjectKey = "PLAT"
+	h.fake.Remove("root")
+	res, err := Run(h.ctx, h.fake, h.docs, h.cfg, testProfile, testBoard, []Sprint{sprint14})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	want := RootMissing{PageID: "root", SpaceKey: "PLAT", CanCreate: true, SuggestedTitle: "PLAT Rituals"}
+	if res.RootMissing == nil || *res.RootMissing != want {
+		t.Fatalf("root missing = %+v", res.RootMissing)
+	}
+	if res.Created != 0 || res.SyncedAt != "" || len(res.Failed) != 0 {
+		t.Fatalf("a pass with no root must do nothing: %+v", res)
+	}
+	if docs, _ := h.docs.Documents(h.ctx, testProfile, testBoard, 14); len(docs) != 0 {
+		t.Fatal("a pass with no root should not have written pages locally")
+	}
+}
+
+func TestAMissingRootSaysWhenTheTokenCannotCreatePages(t *testing.T) {
+	h := newHarness(t)
+	h.fake.Remove("root")
+	h.fake.DenyCreate()
+	res, err := Run(h.ctx, h.fake, h.docs, h.cfg, testProfile, testBoard, []Sprint{sprint14})
+	if err != nil || res.RootMissing == nil || res.RootMissing.CanCreate {
+		t.Fatalf("result = %+v, %v", res.RootMissing, err)
+	}
+	if res.RootMissing.SuggestedTitle != "Rituals" {
+		t.Fatalf("suggested title with no project key = %q", res.RootMissing.SuggestedTitle)
+	}
+}
+
+func TestAMissingRootOnATransportWithNoProbeIsWorthTrying(t *testing.T) {
+	h := newHarness(t)
+	h.fake.Remove("root")
+	h.fake.DenyCreate()
+	res, err := Run(h.ctx, pagesOnly{h.fake}, h.docs, h.cfg, testProfile, testBoard, []Sprint{sprint14})
+	if err != nil || res.RootMissing == nil || !res.RootMissing.CanCreate {
+		t.Fatalf("result = %+v, %v", res.RootMissing, err)
+	}
+}
+
+func TestSuggestedRootTitleNamesTheProject(t *testing.T) {
+	for key, want := range map[string]string{"PLAT": "PLAT Rituals", " PLAT ": "PLAT Rituals", "": "Rituals", "  ": "Rituals"} {
+		if got := SuggestedRootTitle(key); got != want {
+			t.Errorf("SuggestedRootTitle(%q) = %q, want %q", key, got, want)
+		}
+	}
+}

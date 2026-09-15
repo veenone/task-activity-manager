@@ -14,13 +14,15 @@ import (
 	"agile-suite/tam/internal/ritualtemplate"
 )
 
-// Config is what a pass needs besides its sprints: where the pages live, and
-// the clock and zone the templates and timestamps read.
+// Config is what a pass needs besides its sprints: where the pages live, the
+// project a missing root's suggested title names, and the clock and zone the
+// templates and timestamps read.
 type Config struct {
-	SpaceKey string
-	RootID   string
-	Location *time.Location
-	Now      func() time.Time
+	SpaceKey   string
+	RootID     string
+	ProjectKey string
+	Location   *time.Location
+	Now        func() time.Time
 }
 
 // Sprint is one sprint a pass covers.
