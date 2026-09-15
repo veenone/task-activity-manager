@@ -379,6 +379,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* Plan 1b: pending changes */
 .chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
+.chip-held { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
+.pending-held { margin: 4px 0 0; color: var(--warn-fg, #92400e); }
 .chip-conflict { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); text-transform: uppercase; font-size: 10px; }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }

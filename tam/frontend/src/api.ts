@@ -627,6 +627,20 @@ export interface PendingChange {
   createdAt: string;
 }
 
+// ENTITY_SPRINT_CREATE is the journal entity of a sprint drafted in TAM. Its
+// entityKey is the draft's negative id and its afterVal a DraftSprint.
+export const ENTITY_SPRINT_CREATE = "sprint_create";
+
+// DraftSprint mirrors issuerepo.DraftSprint: what a sprint_create row carries.
+export interface DraftSprint {
+  boardId: number;
+  boardName: string;
+  name: string;
+  goal: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface AuditEntry {
   id: number;
   occurredAt: string;
@@ -749,14 +763,29 @@ export interface CommitMove {
   satisfied: boolean;
 }
 
+// CommitHeld mirrors committer.Held: a row the Commit did not send because
+// something it names was not created in Jira. It stays pending; reason is
+// the sentence that says what it waits for.
+export interface CommitHeld {
+  key: string;
+  entityType: string;
+  rowId: number;
+  waitsFor: string;
+  reason: string;
+}
+
 export interface CommitResult {
   committed: string[];
   created: { tempKey: string; key: string }[];
+  // createdSprints and held are optional for the same reason CommitFailure's
+  // fields are: fixtures written before phased Commit do not spell them out.
+  createdSprints?: { draftId: number; id: number; name: string }[];
   linked: { key: string; toKey: string; type: string }[];
   // moved is optional for the same reason CommitFailure's fields are.
   moved?: CommitMove[];
   conflicts: Conflict[];
   failures: CommitFailure[];
+  held?: CommitHeld[];
   remaining: number;
 }
 
