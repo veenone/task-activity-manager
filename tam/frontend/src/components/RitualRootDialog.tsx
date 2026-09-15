@@ -106,7 +106,7 @@ export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onCl
       {error && <p className="error-text" role="alert">{error}</p>}
       <div className="form-actions form-actions-end">
         {step.kind === "taken" && <button className="btn" onClick={() => setStep({ kind: "confirm" })}>Back</button>}
-        {(step.kind === "taken" || step.kind === "forbidden") && <button className="btn" onClick={openProfiles}>Open Profile settings</button>}
+        {step.kind !== "working" && <button className="btn" onClick={openProfiles}>Open Profile settings</button>}
         <button className="btn" onClick={onClose} disabled={working}>Cancel</button>
         {editing && (
           <button className="btn btn-primary" onClick={() => void run(title, false)} disabled={working}>

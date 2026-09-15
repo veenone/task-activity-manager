@@ -45,6 +45,13 @@ describe("RitualRootDialog", () => {
     await waitFor(() => expect(props.onDone).toHaveBeenCalledTimes(1));
   });
 
+  it("offers Profile settings beside Cancel and Create on the confirm step too", async () => {
+    const props = renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: "Open Profile settings" }));
+    expect(props.onClose).toHaveBeenCalled();
+    expect(props.onOpenProfiles).toHaveBeenCalled();
+  });
+
   it("sends an edited title trimmed, and refuses an empty one", async () => {
     const props = renderDialog();
     const box = screen.getByRole("textbox", { name: "Page title" });

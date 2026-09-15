@@ -4,14 +4,18 @@ import {
   BrowserOpenURL, DeleteRitualDocument, EnsureSprintRituals, ForgetRitualPage, GetConfluenceConfig,
   LastRitualSync, ListBoards, ListBoardSprints, ResolveRitualConflict,
 } from "../api";
-import type { Board, ConfluenceConfig, Profile, RitualDocument, RitualSyncResult, Settings, Sprint } from "../api";
+import type {
+  Board, ConfluenceConfig, Profile, RitualDocument, RitualRootMissing, RitualRootResult, RitualSyncResult, Settings, Sprint,
+} from "../api";
 import { useSync } from "../contexts/SyncContext";
 import {
   CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, RITUAL_LABEL, RITUAL_ORDER, STATUS_LABEL,
-  UNCONFIGURED_SENTENCE, conflictSentence, pendingLine, syncSummary,
+  UNCONFIGURED_SENTENCE, conflictSentence, pendingLine, rootDoneSentence, rootMissingSentence, syncSummary,
 } from "../lib/ritualText";
+import { useModal } from "../modals";
 import { RitualEditor } from "./ritual-editor/RitualEditor";
 import type { RitualEditorHandle } from "./ritual-editor/RitualEditor";
+import { RitualRootDialog } from "./RitualRootDialog";
 
 // isWebURL is whether a configured base URL may become a link: the page link
 // goes to BrowserOpenURL, and a base with any other scheme is not Confluence.
@@ -30,7 +34,8 @@ function isWebURL(value: string): boolean {
 export function RitualsView() {
   const { activeId } = useProfile<Profile, Settings>();
   const { confirm } = useConfirm();
-  const { runRitualsSync, running } = useSync();
+  const { runRitualsSync, runRitualRoot, running } = useSync();
+  const { openModal } = useModal();
   const [config, setConfig] = useState<ConfluenceConfig | null>(null);
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [boardId, setBoardId] = useState(0);
@@ -48,6 +53,12 @@ export function RitualsView() {
   // Sync just replaced, and refused.
   const [syncPressed, setSyncPressed] = useState(false);
   const editorRef = useRef<RitualEditorHandle>(null);
+  // rootMissing is set when a Sync found the configured root page gone, and
+  // opens the dialog. rootAt is the board and sprint that Sync was started
+  // on, so the create and the Sync after it answer for those, not for
+  // whatever the pickers moved to while the dialog was open.
+  const [rootMissing, setRootMissing] = useState<RitualRootMissing | null>(null);
+  const rootAt = useRef<Captured | null>(null);
   // sync() captures the board and sprint it was started on, and checks these
   // refs (kept in step with the pickers on every render) before applying
   // anything it read back. Without that, a user free to switch board or
@@ -60,7 +71,7 @@ export function RitualsView() {
 
   useEffect(() => {
     let live = true;
-    setConfig(null); setBoards(null); setBoardId(0); setError(""); setResult(null);
+    setConfig(null); setBoards(null); setBoardId(0); setError(""); setResult(null); setRootMissing(null);
     GetConfluenceConfig(activeId).then((c) => { if (live) setConfig(c); }).catch((e) => { if (live) setError(errMsg(e)); });
     ListBoards(activeId).then((all) => {
       if (!live) return;
@@ -147,6 +158,16 @@ export function RitualsView() {
     try {
       await editorRef.current?.flush();
       const res = await runRitualsSync(at.boardId);
+      if (res.rootMissing) {
+        // Nothing was synced, so there is no summary, no sync time, and
+        // nothing to reload; the dialog is what happens next.
+        if (at.current()) {
+          rootAt.current = at;
+          setRootMissing(res.rootMissing);
+        }
+        announce(rootMissingSentence(res.rootMissing.pageId));
+        return;
+      }
       if (at.current()) {
         setResult(res);
         setLastSync(res.syncedAt);
@@ -159,6 +180,45 @@ export function RitualsView() {
       setSyncPressed(false);
     }
   }
+
+  // createRoot is the dialog's create (or adoption), through the rituals lock,
+  // and applies the Sync Go ran on the new root the way sync() applies its
+  // own. The editor stays locked from the press until the reload lands, for
+  // the reason syncPressed exists. A failed reload is shown on the view, not
+  // handed back to the dialog: the root is already set by then, and a dialog
+  // offering Create again would only meet its own page as a taken title.
+  async function createRoot(title: string, adopt: boolean): Promise<RitualRootResult> {
+    const at = rootAt.current ?? capture();
+    setSyncPressed(true);
+    try {
+      await editorRef.current?.flush();
+      const out = await runRitualRoot(at.boardId, title, adopt);
+      if (out.root.outcome === "created" || out.root.outcome === "adopted") {
+        setConfig((c) => (c ? { ...c, rootPageID: out.root.pageId } : c));
+        announce(rootDoneSentence(out.root));
+        if (at.current()) {
+          if (out.sync) {
+            setResult(out.sync);
+            setLastSync(out.sync.syncedAt);
+          }
+          setError(out.syncError);
+        }
+        try {
+          await reloadDocs(at);
+        } catch (e) {
+          if (at.current()) setError(errMsg(e));
+        }
+      }
+      return out;
+    } finally {
+      setSyncPressed(false);
+    }
+  }
+
+  const closeRootDialog = () => {
+    setRootMissing(null);
+    rootAt.current = null;
+  };
 
   async function resolve(doc: RitualDocument, choice: "mine" | "theirs") {
     const at = capture();
@@ -354,6 +414,15 @@ export function RitualsView() {
             )}
           </article>
         </div>
+      )}
+      {rootMissing && (
+        <RitualRootDialog
+          missing={rootMissing}
+          create={createRoot}
+          onDone={closeRootDialog}
+          onClose={closeRootDialog}
+          onOpenProfiles={() => openModal("profiles")}
+        />
       )}
     </section>
   );

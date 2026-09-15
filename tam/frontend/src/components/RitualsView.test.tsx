@@ -1,12 +1,14 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import * as api from "../api";
 import { profileBackend } from "../profileBackend";
-import { CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, UNCONFIGURED_SENTENCE } from "../lib/ritualText";
+import {
+  CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, UNCONFIGURED_SENTENCE, rootForbiddenSentence,
+} from "../lib/ritualText";
 import { RitualsView } from "./RitualsView";
 
 vi.mock("../api", async () => {
@@ -19,8 +21,11 @@ vi.mock("../api", async () => {
   };
 });
 
-const sync = vi.hoisted(() => ({ running: null as string | null, runRitualsSync: vi.fn() }));
+const sync = vi.hoisted(() => ({ running: null as string | null, runRitualsSync: vi.fn(), runRitualRoot: vi.fn() }));
 vi.mock("../contexts/SyncContext", () => ({ useSync: () => sync }));
+
+const modal = vi.hoisted(() => ({ openModal: vi.fn() }));
+vi.mock("../modals", () => ({ useModal: () => modal }));
 
 // The editor has its own tests; here it only has to show which body and mode
 // it was handed. latestEditorProps records the most recent props the mock
@@ -343,5 +348,66 @@ describe("RitualsView", () => {
     await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-type", "_sprint"));
     const nav = screen.getByRole("navigation", { name: "Ritual documents" });
     expect(within(nav).getByRole("button", { name: /Overview/ })).toHaveAttribute("aria-current", "page");
+  });
+
+  const rootMissingResult = (canCreate: boolean): api.RitualSyncResult => ({
+    created: 0, pulled: 0, pushed: 0, conflicts: 0, gone: 0, failed: [], syncedAt: "",
+    rootMissing: { pageId: "653264152", spaceKey: "TEAM", canCreate, suggestedTitle: "PLAT Rituals" },
+  });
+
+  it("opens the root dialog when Sync finds the root missing, then creates it and syncs through the lock", async () => {
+    sync.runRitualsSync.mockResolvedValue(rootMissingResult(true));
+    sync.runRitualRoot.mockResolvedValue({
+      root: { outcome: "created", pageId: "9001", title: "PLAT Rituals", spaceKey: "TEAM", topLevel: true },
+      sync: { created: 5, pulled: 0, pushed: 0, conflicts: 0, gone: 0, failed: [], syncedAt: "2026-09-15T10:00:00Z", rootMissing: null },
+      syncError: "",
+    } satisfies api.RitualRootResult);
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    const dialog = await screen.findByRole("dialog", { name: "Rituals root page not found" });
+    expect(screen.queryByText(/Sync finished/)).toBeNull();
+    expect(api.EnsureSprintRituals).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create page and sync" }));
+    expect(sync.runRitualRoot).toHaveBeenCalledWith(1, "PLAT Rituals", false);
+    expect(await screen.findByText("Sync finished: 5 created.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(api.EnsureSprintRituals).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends a token that cannot create pages to Profile settings", async () => {
+    sync.runRitualsSync.mockResolvedValue(rootMissingResult(false));
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    const dialog = await screen.findByRole("dialog", { name: "Rituals root page not found" });
+    expect(within(dialog).getByText(rootForbiddenSentence("TEAM"))).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Create page and sync" })).toBeNull();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Open Profile settings" }));
+    expect(modal.openModal).toHaveBeenCalledWith("profiles");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(sync.runRitualRoot).not.toHaveBeenCalled();
+  });
+
+  it("keeps the editor locked while the root is created and until the reload lands", async () => {
+    sync.runRitualsSync.mockResolvedValue(rootMissingResult(true));
+    let finish: (r: api.RitualRootResult) => void = () => {};
+    sync.runRitualRoot.mockImplementation(() => new Promise<api.RitualRootResult>((resolve) => { finish = resolve; }));
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    const dialog = await screen.findByRole("dialog", { name: "Rituals root page not found" });
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "false"));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create page and sync" }));
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "true"));
+    await act(async () => {
+      finish({
+        root: { outcome: "created", pageId: "9001", title: "PLAT Rituals", spaceKey: "TEAM", topLevel: true },
+        sync: { created: 5, pulled: 0, pushed: 0, conflicts: 0, gone: 0, failed: [], syncedAt: "2026-09-15T10:00:00Z", rootMissing: null },
+        syncError: "",
+      });
+    });
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-locked", "false"));
   });
 });
