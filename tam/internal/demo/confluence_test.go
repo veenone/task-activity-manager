@@ -3,6 +3,7 @@ package demo
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	"agile-suite/core/confluence"
@@ -99,5 +100,62 @@ func TestRestoreRebuildsAPageAndKeepsIdsUnique(t *testing.T) {
 	next, _ := c.CreatePage(ctx, "DEMO", "root", "Sprint 15", "<p/>")
 	if next.ID == "1500" {
 		t.Fatal("a new page reused a restored id")
+	}
+}
+
+func TestTheDemoSpaceCreatesAtTheTopAndCanStageAMissingRoot(t *testing.T) {
+	ctx := context.Background()
+	c := NewConfluence("DEMO", StagedMissingRootID, false)
+	if _, err := c.GetPageStorage(ctx, StagedMissingRootID); !errors.Is(err, confluence.ErrNotFound) {
+		t.Fatalf("staged root = %v", err)
+	}
+	if got := c.CanCreatePages(ctx, "DEMO"); got != confluence.PermissionYes {
+		t.Fatalf("probe = %s", got)
+	}
+	if got := c.CanCreatePages(ctx, "OTHER"); got != confluence.PermissionNo {
+		t.Fatalf("probe for another space = %s", got)
+	}
+	root, err := c.CreatePage(ctx, "DEMO", "", "PLAT Rituals", "<p>root</p>")
+	if err != nil || len(root.AncestorIDs) != 0 {
+		t.Fatalf("top-level create = %+v, %v", root, err)
+	}
+	if _, err := c.CreatePage(ctx, "DEMO", "", "PLAT Rituals", "<p>again</p>"); err == nil {
+		t.Fatal("a duplicate top-level title should be refused")
+	}
+}
+
+func TestADeniedDemoTokenCannotCreate(t *testing.T) {
+	ctx := context.Background()
+	c := NewConfluence("DEMO", "root", false)
+	c.DenyCreate()
+	if got := c.CanCreatePages(ctx, "DEMO"); got != confluence.PermissionNo {
+		t.Fatalf("probe = %s", got)
+	}
+	_, err := c.CreatePage(ctx, "DEMO", "", "PLAT Rituals", "<p/>")
+	var h *confluence.HTTPError
+	if !errors.As(err, &h) || h.Code != http.StatusForbidden {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := c.GetPageStorage(ctx, "root"); err != nil {
+		t.Fatalf("a root other than the staged id is still seeded: %v", err)
+	}
+}
+
+func TestANumericRootAdvancesTheIDCounterPastRestoredPages(t *testing.T) {
+	ctx := context.Background()
+	c := NewConfluence("DEMO", "1005", false)
+	c.Restore("1000", "1005", "Sprint 14", "<p/>", 1)
+	c.Restore("1001", "1005", "Sprint 14 · Planning", "<p/>", 1)
+	c.Restore("1002", "1005", "Sprint 14 · Standup", "<p/>", 1)
+	c.Restore("1003", "1005", "Sprint 14 · Review", "<p/>", 1)
+	c.Restore("1004", "1005", "Sprint 14 · Retro", "<p/>", 1)
+	next, err := c.CreatePage(ctx, "DEMO", "1005", "Sprint 15", "<p/>")
+	if err != nil {
+		t.Fatalf("create = %v", err)
+	}
+	for _, used := range []string{"1000", "1001", "1002", "1003", "1004", "1005"} {
+		if next.ID == used {
+			t.Fatalf("a new page reused id %s", used)
+		}
 	}
 }
