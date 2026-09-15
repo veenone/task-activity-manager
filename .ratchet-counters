@@ -1,7 +1,10 @@
 # name<TAB>command printing one number. C7: these fall or hold, never grow.
 # Raising one by hand needs a reason in the commit message.
 files_over_400	git ls-files "*.go" "*.ts" "*.tsx" | grep -v wailsjs | while read f; do n=$(wc -l < "$f"); [ "$n" -gt 400 ] && echo x; done | wc -l
-console_calls	git ls-files "*/frontend/src/*.ts" "*/frontend/src/*.tsx" "frontend/core/src/*.ts" "frontend/core/src/*.tsx" | grep -v ".test." | xargs grep -h "console\." 2>/dev/null | wc -l
 ui_em_dashes	git ls-files "*/frontend/src/*.tsx" "*/frontend/src/*.ts" | grep -v ".test." | xargs grep -h -- "—" 2>/dev/null | grep -vE "^\s*(//|\*|/\*)" | wc -l
 unscoped_todos	git ls-files "*.go" | xargs grep -h "TODO" 2>/dev/null | grep -vE "TODO\((tam|xtm)\)" | wc -l
 bespoke_modals	git ls-files "*/frontend/src/*.tsx" | xargs grep -lE "className=\"[^\"]*(modal|overlay|backdrop)" 2>/dev/null | while read f; do grep -q "@agile-suite/core" "$f" || echo x; done | wc -l
+eslint_a11y	node scripts/lint-count.js jsx-a11y/
+eslint_max_lines	node scripts/lint-count.js max-lines
+eslint_no_console	node scripts/lint-count.js no-console
+eslint_problems	node scripts/lint-count.js

@@ -21,6 +21,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: core/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: lint report
+        # eslint exits non-zero while the backlog exists; the ratchet is the gate.
+        run: npm run lint
       - name: ratchet
         run: sh scripts/ratchet.sh
       - name: go vet

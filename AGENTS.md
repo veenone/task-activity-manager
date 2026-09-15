@@ -22,7 +22,7 @@ tier; docs reference IDs, never copied text.
 - I2. Destructive operations need error handling and a recovery path. Lost
   user data cannot be patched later.
 - I3. Security and accessibility are never traded for simplicity or speed.
-  Gate: n/a, no linter in this repo.
+  Gate: accessibility and correctness lints, held by the lint ratchet.
 
 ## Process
 

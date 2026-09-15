@@ -1,7 +1,7 @@
 # Gate commands. AGENTS.project.md cites `make gates` for rule P3.
-.PHONY: gates test typecheck vet instruction ratchet
+.PHONY: gates test typecheck vet instruction lint ratchet
 
-gates: vet test typecheck ratchet
+gates: vet test typecheck lint ratchet
 	@echo "all gates passed"
 
 vet:
@@ -21,6 +21,9 @@ typecheck:
 # The instruction gate runs inside `npm test --workspaces` (frontend/core).
 instruction:
 	cd frontend/core && npx vitest run src/instruction-gate.test.ts
+
+lint:
+	sh scripts/lint-report.sh
 
 ratchet:
 	sh scripts/ratchet.sh

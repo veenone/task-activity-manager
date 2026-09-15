@@ -36,7 +36,7 @@ Gate: `frontend/core/src/instruction-gate.test.ts` (zero cross-module internal i
 Owns: diagnostics reaching a developer from the frontends.
 Path: surface failures through component state and the error text the view already renders; the Go side logs through `log`.
 Never: `console` calls in a workspace `src` tree.
-Gate: the ratchet holds console_calls; `tam/frontend` is already zero.
+Gate: the ratchet holds eslint_no_console.
 
 ### UI copy
 Owns: user-visible strings in both frontends.
@@ -70,7 +70,8 @@ make gates                                  # tests, typecheck, vet, instruction
 go test ./... -count=1                      # from core, tam, or xtm
 npm test --workspaces --if-present          # from the repo root
 npm run typecheck --workspaces --if-present
-go vet ./...                                # from each module; CI runs none today
+npm run lint                                # writes eslint-report.json for the ratchet
+go vet ./...                                # from each module
 ```
 
 Per commit, run what the change touches; the full set before push or PR.
