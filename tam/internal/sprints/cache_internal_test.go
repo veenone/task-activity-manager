@@ -91,13 +91,14 @@ func TestARefreshAfterADeleteWritesAnEmptyAnswerBecauseItIsTrue(t *testing.T) {
 }
 
 // preLifecycleBackend answers the four methods a ceremony backend answered
-// before this package grew EditSprint and DeleteSprint (Create never joined
-// the lifecycle interface at all: creating a sprint is journaled now, and
-// issuerepo does the writing). It is what Service.board() must refuse: a
-// backend that can start and complete a sprint but cannot edit or delete one
-// is not the lifecycle interface asks for, and the refusal has to say so in
-// words that cover every write in the interface, not just the two this
-// double still answers.
+// before this package grew EditSprint and DeleteSprint. CreateSprint was
+// part of the lifecycle interface too, until creating a sprint moved into
+// the journal and left it; this double never carried that method, so its
+// absence here says nothing about that change. It is what Service.board()
+// must refuse: a backend that can start and complete a sprint but cannot
+// edit or delete one is not the lifecycle interface asks for, and the
+// refusal has to say so in words that cover every write in the interface,
+// not just the two this double still answers.
 type preLifecycleBackend struct{}
 
 func (preLifecycleBackend) SearchIssuesPage(context.Context, string, string, string, []string, int, int) ([]backend.Issue, int, error) {

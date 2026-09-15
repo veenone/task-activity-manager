@@ -21,7 +21,7 @@ type auditCall struct {
 }
 
 // fakeIssues is the issue cache seam: the cached sprint columns a delete
-// blanks, and the audit rows all three management writes leave behind. Its
+// blanks, and the audit rows both management writes leave behind. Its
 // calls land in the store's own ordered log, because the thing worth
 // asserting is the order the two repositories are touched in, which neither
 // of them can enforce from inside its own transaction.
@@ -57,7 +57,7 @@ func (i *fakeIssues) AuditSprint(_ context.Context, _ string, sprintID int, acti
 	return i.auditErr
 }
 
-// manageService is the service the three management writes are exercised
+// manageService is the service the two management writes are exercised
 // through: the same one the ceremonies use, with the issue cache wired the
 // way app.go wires it.
 func manageService(b *fakeBackend, store *fakeStore, issues *fakeIssues) *sprints.Service {
@@ -127,6 +127,28 @@ func TestEditRefusesAClosedSprintJiraReportsWhileTheCacheStillCallsItFuture(t *t
 	}
 	if len(b.edited) != 0 {
 		t.Errorf("edits = %+v, want none: nothing may reach Jira after that refusal", b.edited)
+	}
+}
+
+// TestAnEditWithNoIssueCacheWiredStillLandsInJira is the shape of the seam
+// for Edit: its audit row is bookkeeping after the fact, so a service
+// without the issue cache still writes the edit to Jira and logs what it
+// could not record, rather than refusing the write. Delete is not this
+// shape, and TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked
+// below is why.
+func TestAnEditWithNoIssueCacheWiredStillLandsInJira(t *testing.T) {
+	b := &fakeBackend{sprints: []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active"}}}
+	store := newStore()
+
+	note, err := newService(b, store).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13 renamed", ""), false)
+	if err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	if note != "" {
+		t.Errorf("note = %q, want none", note)
+	}
+	if len(b.edited) != 1 || b.edited[0].sprintID != 13 {
+		t.Errorf("edits = %+v after %d calls, want sprint 13 edited in Jira anyway", b.edited, len(b.edited))
 	}
 }
 
@@ -350,8 +372,9 @@ func TestADeleteWhoseCacheWorkFailsIsStillADeleteWithANote(t *testing.T) {
 }
 
 // TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked pins the other
-// side of that seam. A delete's Issues calls are not a footnote the way
-// Edit's is: they are what keeps Jira's board tables and the
+// side of the seam TestAnEditWithNoIssueCacheWiredStillLandsInJira pins
+// above. A delete's Issues calls are not a footnote the way Edit's is: they
+// are what keeps Jira's board tables and the
 // cached issues from naming a sprint forever that Jira no longer has, and
 // the one audit row that will be the only trace of the sprint left anywhere
 // once Jira has destroyed it. Both are lost for good if the delete is let

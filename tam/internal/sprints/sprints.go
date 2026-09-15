@@ -12,11 +12,13 @@
 // it is sent. DraftSprint is the check a draft gets; issuerepo holds the
 // rest.
 //
-// The other four follow the first. A sprint is a container a whole team
-// plans into, so one that exists on a single laptop is one nobody else can
-// move an issue into, and there is nothing to reconcile later either: a card
-// move can be rebased onto a status that shifted underneath it, while a
-// sprint somebody else has already deleted cannot be renamed.
+// The other four follow for a reason that only starts once a sprint is real.
+// A sprint Jira holds is a container a whole team plans into, so editing,
+// deleting, starting or completing it on a single laptop while everyone else
+// still sees the old one would put that laptop out of step with the team,
+// and there is nothing to reconcile later either: a card move can be
+// rebased onto a status that shifted underneath it, while a sprint somebody
+// else has already deleted cannot be renamed.
 //
 // The exception has one home here, one place to test, and a fence:
 // exceptions_test.go names the Service's own exported methods, so a fifth
@@ -24,9 +26,9 @@
 //
 // This package writes no journal rows. It reads their count, to refuse a
 // completion or a delete while changes are queued against the sprint, and it
-// leaves an audit row behind each of the three management writes. Moving an
-// issue into or out of a sprint stays an ordinary journal write and lives in
-// issuerepo, where every other one does.
+// leaves an audit row behind each of the two management writes, Edit and
+// Delete. Moving an issue into or out of a sprint stays an ordinary journal
+// write and lives in issuerepo, where every other one does.
 package sprints
 
 import (
@@ -105,7 +107,7 @@ type Store interface {
 
 // Issues is the issue cache's side of a sprint write, which is a different
 // repository from the board cache Store is: the cached sprint columns a
-// delete has to blank, and the audit row each of the three management writes
+// delete has to blank, and the audit row each of the two management writes
 // leaves behind. issuerepo.Repository satisfies it.
 //
 // It is its own seam rather than two more methods on Store because the two
