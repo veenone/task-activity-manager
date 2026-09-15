@@ -957,7 +957,9 @@ check), drop extra per-type metadata no longer list, log each drop. That =
 fix for `parent: data was not an object` (duplicate Parent input) and
 `customfield_10253 ... not on the appropriate screen` (classic answer
 listing off-screen field). Sub-task drafted from draft parent allowed:
-Commit create parent first.
+Commit create parent first. XTM stays on its own reader for now
+(`xtm/internal/jira.GetBugCreateFields`); moving it onto
+`core/jira/createmeta.go` is a separate change.
 
 ## Draft sprints
 
