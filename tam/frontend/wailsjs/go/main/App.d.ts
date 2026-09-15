@@ -34,6 +34,8 @@ export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function CreateProfileReusingToken(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
 
+export function CreateRitualRoot(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<main.RitualRootResult>;
+
 export function CreateSprint(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string):Promise<main.SprintCreated>;
 
 export function DeleteProfile(arg1:string):Promise<void>;

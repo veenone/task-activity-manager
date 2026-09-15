@@ -7,7 +7,9 @@ import (
 
 	"agile-suite/core/profile"
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/demo"
 	"agile-suite/tam/internal/ritualrepo"
+	"agile-suite/tam/internal/ritualsync"
 )
 
 // newRitualSyncApp is a non-demo Jira profile whose Confluence URL is "demo",
@@ -279,5 +281,112 @@ func TestAGonePageStaysGoneAfterARestart(t *testing.T) {
 		if d.RitualType == "planning" && d.PageID == oldPageID {
 			t.Fatalf("planning page id = %q, want a new id, not the resurrected old one", d.PageID)
 		}
+	}
+}
+
+// newMissingRootApp is newRitualSyncApp pointed at the demo space's staged
+// missing root, the configuration a stale root page id leaves behind.
+func newMissingRootApp(t *testing.T) (*App, profile.Profile) {
+	t.Helper()
+	a, p := newRitualSyncApp(t)
+	if err := a.profiles.SetConfluenceConfig(p.ID, profile.ConfluenceConfig{BaseURL: "demo", SpaceKey: "DEMO", RootPageID: demo.StagedMissingRootID}); err != nil {
+		t.Fatal(err)
+	}
+	return a, p
+}
+
+func storedRoot(t *testing.T, a *App, profileID string) profile.ConfluenceConfig {
+	t.Helper()
+	c, err := a.profiles.ConfluenceConfig(profileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func TestSyncRitualsReportsAMissingRootWithoutRecordingASync(t *testing.T) {
+	a, p := newMissingRootApp(t)
+	res, err := a.SyncRituals(p.ID, 1)
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	want := ritualsync.RootMissing{PageID: demo.StagedMissingRootID, SpaceKey: "DEMO", CanCreate: true, SuggestedTitle: "PLAT Rituals"}
+	if res.RootMissing == nil || *res.RootMissing != want {
+		t.Fatalf("root missing = %+v", res.RootMissing)
+	}
+	if last, _ := a.LastRitualSync(p.ID, 1); last != "" {
+		t.Fatalf("a pass that found no root recorded a sync at %q", last)
+	}
+	if _, ok := a.busy[p.ID]; ok {
+		t.Fatal("the lock was not released")
+	}
+}
+
+func TestCreateRitualRootSavesTheNewRootAndSyncsUnderIt(t *testing.T) {
+	a, p := newMissingRootApp(t)
+	out, err := a.CreateRitualRoot(p.ID, 1, "PLAT Rituals", false)
+	if err != nil || out.Root.Outcome != ritualsync.RootCreated || out.Sync == nil || out.Sync.Created != 5 || out.SyncError != "" {
+		t.Fatalf("out = %+v, %v", out, err)
+	}
+	stored := storedRoot(t, a, p.ID)
+	if stored.RootPageID != out.Root.PageID || stored.BaseURL != "demo" || stored.SpaceKey != "DEMO" {
+		t.Fatalf("stored = %+v", stored)
+	}
+	overview := ritualDoc(t, a, p.ID, "_sprint")
+	page, ok := a.demoSpace(p.ID, stored).Page(overview.PageID)
+	if !ok || len(page.AncestorIDs) != 1 || page.AncestorIDs[0] != out.Root.PageID {
+		t.Fatalf("overview page = %+v", page)
+	}
+	if last, _ := a.LastRitualSync(p.ID, 1); last == "" {
+		t.Fatal("the Sync after the create should record its time")
+	}
+	again, err := a.SyncRituals(p.ID, 1)
+	if err != nil || again.RootMissing != nil || again.Created != 0 {
+		t.Fatalf("second sync = %+v, %v", again, err)
+	}
+	if _, ok := a.busy[p.ID]; ok {
+		t.Fatal("the lock was not released")
+	}
+}
+
+func TestCreateRitualRootLeavesTheProfileAloneWhenTheTokenMayNotCreate(t *testing.T) {
+	a, p := newMissingRootApp(t)
+	a.demoSpace(p.ID, storedRoot(t, a, p.ID)).DenyCreate()
+	out, err := a.CreateRitualRoot(p.ID, 1, "PLAT Rituals", false)
+	if err != nil || out.Root.Outcome != ritualsync.RootForbidden || out.Sync != nil {
+		t.Fatalf("out = %+v, %v", out, err)
+	}
+	if got := storedRoot(t, a, p.ID).RootPageID; got != demo.StagedMissingRootID {
+		t.Fatalf("root page id = %q", got)
+	}
+}
+
+func TestCreateRitualRootAdoptsATopLevelPageOnlyWhenAsked(t *testing.T) {
+	a, p := newMissingRootApp(t)
+	existing := a.demoSpace(p.ID, storedRoot(t, a, p.ID)).Seed("", "PLAT Rituals", "<p>by hand</p>")
+	out, err := a.CreateRitualRoot(p.ID, 1, "PLAT Rituals", false)
+	if err != nil || out.Root.Outcome != ritualsync.RootTitleTaken || out.Root.PageID != existing || !out.Root.TopLevel || out.Sync != nil {
+		t.Fatalf("taken = %+v, %v", out, err)
+	}
+	if got := storedRoot(t, a, p.ID).RootPageID; got != demo.StagedMissingRootID {
+		t.Fatalf("a taken title saved root %q", got)
+	}
+	out, err = a.CreateRitualRoot(p.ID, 1, "PLAT Rituals", true)
+	if err != nil || out.Root.Outcome != ritualsync.RootAdopted || out.Sync == nil || out.Sync.Created != 5 {
+		t.Fatalf("adopted = %+v, %v", out, err)
+	}
+	if got := storedRoot(t, a, p.ID).RootPageID; got != existing {
+		t.Fatalf("root page id = %q, want %q", got, existing)
+	}
+}
+
+func TestCreateRitualRootIsRefusedWhileAnotherOperationHoldsTheLock(t *testing.T) {
+	a, p := newMissingRootApp(t)
+	a.busy[p.ID] = "sync"
+	if _, err := a.CreateRitualRoot(p.ID, 1, "PLAT Rituals", false); err == nil || err.Error() != "a sync is already running for this profile" {
+		t.Fatalf("err = %v", err)
+	}
+	if got := storedRoot(t, a, p.ID).RootPageID; got != demo.StagedMissingRootID {
+		t.Fatalf("a refused call saved root %q", got)
 	}
 }

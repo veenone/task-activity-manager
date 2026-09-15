@@ -1203,6 +1203,40 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class RitualRootResult {
+	    root: ritualsync.Root;
+	    sync?: ritualsync.Result;
+	    syncError: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RitualRootResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.root = this.convertValues(source["root"], ritualsync.Root);
+	        this.sync = this.convertValues(source["sync"], ritualsync.Result);
+	        this.syncError = source["syncError"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SprintCreated {
 	    sprint: backend.Sprint;
 	    note: string;
@@ -1474,6 +1508,24 @@ export namespace ritualsync {
 	        this.reason = source["reason"];
 	    }
 	}
+	export class RootMissing {
+	    pageId: string;
+	    spaceKey: string;
+	    canCreate: boolean;
+	    suggestedTitle: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RootMissing(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pageId = source["pageId"];
+	        this.spaceKey = source["spaceKey"];
+	        this.canCreate = source["canCreate"];
+	        this.suggestedTitle = source["suggestedTitle"];
+	    }
+	}
 	export class Result {
 	    created: number;
 	    pulled: number;
@@ -1482,6 +1534,7 @@ export namespace ritualsync {
 	    gone: number;
 	    failed: PageFailure[];
 	    syncedAt: string;
+	    rootMissing?: RootMissing;
 	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
@@ -1496,6 +1549,7 @@ export namespace ritualsync {
 	        this.gone = source["gone"];
 	        this.failed = this.convertValues(source["failed"], PageFailure);
 	        this.syncedAt = source["syncedAt"];
+	        this.rootMissing = this.convertValues(source["rootMissing"], RootMissing);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1515,6 +1569,26 @@ export namespace ritualsync {
 		    }
 		    return a;
 		}
+	}
+	export class Root {
+	    outcome: string;
+	    pageId: string;
+	    title: string;
+	    spaceKey: string;
+	    topLevel: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Root(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.outcome = source["outcome"];
+	        this.pageId = source["pageId"];
+	        this.title = source["title"];
+	        this.spaceKey = source["spaceKey"];
+	        this.topLevel = source["topLevel"];
+	    }
 	}
 
 }

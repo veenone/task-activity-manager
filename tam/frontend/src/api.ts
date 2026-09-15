@@ -1149,7 +1149,14 @@ export interface RitualDocument {
   syncedAt: string;
 }
 export interface RitualPageFailure { sprintName: string; title: string; reason: string }
+// RitualRootMissing is a Sync that stopped because the configured root page
+// answered 404. canCreate is the permission probe's answer, unknown read as yes.
+export interface RitualRootMissing { pageId: string; spaceKey: string; canCreate: boolean; suggestedTitle: string }
 export interface RitualSyncResult {
+  // Set, and nothing else is, when the root page is gone. Optional only so
+  // fixtures written before it stay valid; Go always sends it, null when the
+  // root was read.
+  rootMissing?: RitualRootMissing | null;
   created: number;
   pulled: number;
   pushed: number;
@@ -1172,6 +1179,15 @@ export const RitualMacroIssues: (profileId: string, jql: string) => Promise<Ritu
 export const StandupEntry: (day: string) => Promise<string> = App.StandupEntry;
 export const LastRitualSync: (profileId: string, boardId: number) => Promise<string> = App.LastRitualSync;
 export const SyncRituals: (profileId: string, boardId: number) => Promise<RitualSyncResult> = App.SyncRituals as any;
+
+export type RitualRootOutcome = "created" | "adopted" | "forbidden" | "titleTaken";
+export interface RitualRoot { outcome: RitualRootOutcome; pageId: string; title: string; spaceKey: string; topLevel: boolean }
+// sync is the pass Go ran on the new root, null when no root was set; syncError
+// is that pass's refusal, with the new root saved either way.
+export interface RitualRootResult { root: RitualRoot; sync: RitualSyncResult | null; syncError: string }
+// CreateRitualRoot takes Go's "rituals" lock. Call it only through
+// SyncContext.runRitualRoot, never directly.
+export const CreateRitualRoot: (profileId: string, boardId: number, title: string, adopt: boolean) => Promise<RitualRootResult> = App.CreateRitualRoot as any;
 
 // LookupIssue is cast the same way ListIssues is above: the generated
 // binding types the issue type as a plain string, narrowed to IssueType here.
