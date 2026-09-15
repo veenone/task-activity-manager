@@ -735,6 +735,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-chip-conflict, .ritual-chip-gone { color: var(--warn-text); border-color: var(--warn-border); background: var(--warn-soft); }
 .ritual-banner { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--warn-border); background: var(--warn-soft); color: var(--warn-text); }
 .ritual-banner p { margin: 0 0 6px; }
+
+/* The missing-root dialog: a title box, where the page goes, what Sync does next. */
+.ritual-root-modal { max-width: 480px; }
+.ritual-root-modal .ritual-root-title { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.ritual-root-modal p { line-height: 1.45; }
 .ritual-sync-result { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
 .ritual-sync-result p, .ritual-sync-result ul { margin: 0; }
 @media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } .ritual-docs { border-right: 0; border-bottom: 1px solid var(--border); } }
