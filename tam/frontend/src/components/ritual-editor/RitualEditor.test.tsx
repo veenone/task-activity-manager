@@ -112,7 +112,7 @@ describe("RitualEditor", () => {
     expect(vi.mocked(api.SaveRitualBody).mock.calls[1][4]).toBe(originalBody);
   });
 
-  it("does not resend the undone text if the in-flight save fails", async () => {
+  it("a failed save whose undo already matches what is stored does not resend it", async () => {
     const ref = createRef<RitualEditorHandle>();
     let rejectSave: ((e: unknown) => void) | null = null;
     vi.mocked(api.SaveRitualBody).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSave = reject; }));
@@ -120,20 +120,47 @@ describe("RitualEditor", () => {
     await screen.findByText("ship it");
     act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>hello</p>"); });
     await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
+    // Undo back to exactly what is stored: the failed save never persisted
+    // anything, so the store still holds the original text, and the editor
+    // now reads back to that same text too.
     act(() => { ref.current!.editor!.commands.undo(); });
     await act(async () => { rejectSave!(new Error("network down")); });
-    // The undo already differs from the stored text (still the original,
-    // since the failed save never persisted anything), so it retries with
-    // the original body; confirm that retry actually happens, not just that
-    // it carries the right text, or this test would pass just as well if
-    // nothing were sent at all.
+    // Nothing left to save: a pending equal to what is already stored must
+    // not queue a save that would change no content, so no second call ever
+    // happens, and the one call that did happen (the failed attempt itself)
+    // never gets resent. Give a stray timer a real chance to fire before
+    // concluding nothing else was queued.
+    await pause(50);
+    expect(api.SaveRitualBody).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(api.SaveRitualBody).mock.calls[0][4]).toContain("hello");
+  });
+
+  it("a save that keeps failing waits for the next edit instead of retrying itself", async () => {
+    vi.mocked(api.SaveRitualBody).mockRejectedValue(new Error("no planning ritual is stored for sprint 14"));
+    const ref = createRef<RitualEditorHandle>();
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} saveDelayMs={10} />);
+    await screen.findByText("ship it");
+    act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>hello</p>"); });
+    // Well past the debounce: a save that retried itself on failure would
+    // have called SaveRitualBody many times over by now (measured at 20
+    // calls in 300 ms against a mock rejecting after 5 ms in the review
+    // that found this).
+    await pause(150);
+    expect(api.SaveRitualBody).toHaveBeenCalledTimes(1);
+    // A further edit is one of the real triggers a failed save waits for.
+    act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>world</p>"); });
     await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(2));
-    // The first call is the failed attempt itself, and legitimately carries
-    // "hello": what must never happen is a later call resending it after
-    // the user undid it back out.
-    for (const call of vi.mocked(api.SaveRitualBody).mock.calls.slice(1)) {
-      expect(call[4]).not.toContain("hello");
-    }
+  });
+
+  it("a flush after a failed save retries once", async () => {
+    vi.mocked(api.SaveRitualBody).mockRejectedValue(new Error("no planning ritual is stored for sprint 14"));
+    const ref = createRef<RitualEditorHandle>();
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} saveDelayMs={10} />);
+    await screen.findByText("ship it");
+    act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>hello</p>"); });
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
+    await act(() => ref.current!.flush());
+    expect(api.SaveRitualBody).toHaveBeenCalledTimes(2);
   });
 
   it("opens a page it cannot read as read only, with the page link", async () => {

@@ -84,15 +84,14 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
 
   const save = useCallback((): Promise<void> => {
     clearTimeout(timer.current);
-    // Runs after a save settles, success or failure. The store (`lastSaved`)
-    // and the screen can disagree at this point even when `onUpdate`'s own
-    // in-flight comparison already caught most cases (see the comment on
-    // `inFlightText`); this is the backstop, not the primary mechanism, so
-    // it only acts when nothing is already queued to fix the drift and it
-    // always saves what the editor currently holds, never the text that was
-    // just attempted, which is exactly what "restore the current text, not
-    // the attempted one" means for a failed save whose text was undone
-    // before it settled.
+    // Runs after a successful save, before `inFlightText` is cleared. The
+    // store (`lastSaved`) and the screen can disagree even here, when
+    // `onUpdate`'s own in-flight comparison already caught most such drift
+    // (see the comment on `inFlightText`); this is the backstop, not the
+    // primary mechanism, so it only acts when nothing is already queued and
+    // it always saves what the editor currently holds, never the text that
+    // was just attempted. Success only: a failed save gets different
+    // handling in `runOne`'s `catch`, not this.
     const reconcile = () => {
       const current = editorRef.current;
       if (!current || current.isDestroyed || pending.current !== null) return;
@@ -114,11 +113,30 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
         lastSaved.current = next;
         setSavedAt(new Date().toISOString());
         onSaved?.(saved);
-      } catch (e) {
-        setSaveError(errMsg(e));
-      } finally {
         inFlightText.current = null;
         reconcile();
+      } catch (e) {
+        inFlightText.current = null;
+        setSaveError(errMsg(e));
+        // A failed save never retries itself. Calling save() again here,
+        // even once, means a save that keeps failing (a purged page, a
+        // permanently rejected write) spins as fast as promises resolve:
+        // measured at 20 calls in 300 ms against a mock failing after 5 ms,
+        // and never returning at all against one that rejects immediately,
+        // since the retry loop starves the event loop's timers. Instead
+        // this only makes sure the *next* real trigger — the debounce timer
+        // from another edit, Ctrl+S, flush, or unmount — has the right text
+        // queued: the editor's current text, if it still differs from what
+        // is actually stored (`lastSaved`, unchanged by a failed save), or
+        // nothing at all if the editor already reads back to the stored
+        // text, so a page the user undid back to what was already saved
+        // does not queue a save that would change nothing.
+        const current = editorRef.current;
+        if (current && !current.isDestroyed) {
+          const now = serializeStorage(current.getJSON());
+          pending.current = now !== lastSaved.current ? now : null;
+        }
+      } finally {
         setSaving(false);
       }
     };
