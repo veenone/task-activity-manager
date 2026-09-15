@@ -30,6 +30,38 @@
 | `marked` version | `18.0.13` (latest on 2026-09-16), exact, in `frontend/core/package.json` `dependencies`. | Bump the pin. |
 | User Guide | No TAM user guide exists in the repo; the docs task updates `tam/CLAUDE.md` and gives Outline text to paste. | Same ruling as bundle 02. |
 
+## Review decisions (plan-eng-review, 2026-09-16)
+
+- **D1 scope:** full scope stands, Task 7 included.
+- **D2 offline detail (P1, Task 5):** `tam/app_issues.go` `GetIssueDetail` currently drops the cached detail when the backend read fails (`d, err := b.GetIssueDetail(...)`, line ~255), so after `detailFreshFor` (10 minutes) an offline panel shows an error instead of the description, links and comments it already had. Add: when the fetch fails and `ok` (a cached detail exists), log one line and return the cached detail with a nil error. Go test: cached detail written, backend fails, the call answers the cached detail.
+- **D3 parse cost (P1, Tasks 1-3):** the parsers scan character by character; no regex with nested quantifiers ever runs over user text. Tests: 200,000 characters of alternating `*_+-` marks, 5,000 stacked list markers, and an unclosed `{code` each parse in under ~200 ms (`performance.now()` bounds, generous so CI stays stable).
+- **D4 render cost (P2, Tasks 2, 6, 7):** `toPlainText` returns its input unchanged when it holds none of ``*_+-{}[]|#~^!` `` and caches results in a bounded `Map` (cap ~2,000, clear oldest on overflow); the panel and `RichTextField` wrap `parseRich` in `useMemo` on `(text, format)`. Test: 2,000 distinct summaries through `toPlainText` in under ~50 ms.
+- **TODO 1 (Task 5 + 6):** the detail answer carries `fetchedAt` (already read by `ReadDetail`) and the panel prints the mockup's `cached HH:MM` beside the Comments heading, so a stale offline detail says so.
+- **TODO 2:** rendering XTM's test descriptions with core `RichText` is recorded in `TODOS.md`, not built here.
+- **D5 summary (Tasks 6, 7):** the summary renders **inline code and links only**, never marks. Jira DC does not wiki-render the summary field, so `2*3*4 items` and `cost - benefit` must read exactly as typed in the heading and in every grid, card, tree row and dialog. `toPlainText` keeps a `scope: "summary" | "full"` argument (or a second export `summaryText`) that unwraps `{{code}}` and `[text|url]` only. The mockup's `/payment` code chip in the heading still renders.
+- **D6 refresh and offline (new Task 10, before Docs):** one **Refresh** for the whole view, not a control per section, plus configurable detail freshness:
+  - Per-profile setting `detail_cache_minutes` (default 10; `0` = never expires, so a selected issue is always served from cache and TAM needs no Jira connection at all). `app_issues.go` reads it in place of the `detailFreshFor` constant. Profile settings gets the field, with a line saying 0 keeps everything offline until a Refresh.
+  - A shell **Refresh** button beside Sync, enabled for the active profile, which clears the cached details of that profile (`issuerepo.ClearDetails(profileID)`, new, one statement) and invalidates the active view's queries, so the next read of whatever is on screen fetches fresh. It takes the frontend `SyncContext` lock like every other binding that takes `acquire`, and no new Go lock name if it runs under the existing `sync` name.
+  - Tests: Go, `detail_cache_minutes = 0` serves a day-old cached detail without calling the backend; `ClearDetails` drops every detail of one profile and no other's; frontend, Refresh invalidates and is refused while a sync runs.
+
+## Outside-voice fixes folded in (2026-09-16)
+
+An independent reviewer read the plan against the spec, bundles 01-02 and Jira DC behaviour. Accepted, and binding:
+
+1. **Comments are read newest first.** Do not take comments from `fields=comment` (DC returns the whole list inline, unbounded). Read `GET /rest/api/2/issue/{key}/comment?orderBy=-created&maxResults=100`, page to at most 500, and keep the newest. "Showing 500 of 812" then means the newest 500, which is what the panel shows.
+2. **Task 5 owns `app_issues.go`.** The Constraints line "`app*.go` untouched" no longer holds: D2's stale fallback, TODO 1's `fetchedAt` and D6's setting all live there. Task 5's file list includes `tam/app_issues.go` and its test.
+3. **Escapes are part of the wiki grammar.** `\*not bold\*`, `\|`, `\{`, `\[` and `\\` at line end: Task 1 handles them and tests them; an escaped character renders as itself with no backslash and fires no mark.
+4. **Table cells carrying links and code are tested.** `|[Figma|https://f]|` (a `|` inside a link) and a `{code}` block holding `|` are Task 1 cases; the cell split must not break either.
+5. **marked's token text is unescaped once.** `marked`'s lexer returns `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;` already escaped in `text` and `codespan` tokens; `markdown.ts` decodes exactly those five before building `text` nodes, so React does not show entities. Tested with `` `a<b &amp;` ``.
+6. **The Markdown warning sentence is corrected** (it was factually wrong: DC does not show Markdown as plain text, it wiki-renders it, so `# Steps` becomes a list item): `Jira Data Center renders this field as wiki markup, so Markdown will not look the same there. TAM renders it here; the text is sent to Jira unchanged.`
+7. **Preview keeps the label working.** The textarea stays in the DOM and visually hidden (not `hidden`, not `display:none`), so `<label htmlFor>` from `EditableFields`, `NewIssueModal` and `MetaField` still focuses it; clicking the label while Preview is shown switches back to Write. Tested.
+8. **Conflict and pending surfaces stay raw.** `ConflictCard` and `PendingChangesModal` are removed from Task 7: they show the exact value being pushed or compared, and stripping markup would make `*bold*` and `bold` look identical.
+9. **Comment authors and visibility.** `author` can be null (anonymous or deleted user): render `Unknown user`. A comment carrying a `visibility` restriction is marked with a `Restricted` chip and its role or group name, so a restricted comment is never shown as ordinary.
+10. **Task 1 splits.** Task 1a: blocks (headings, lists, tables, code, noformat, quote, panel, rule) with its own gate and commit. Task 1b: inline (marks with boundary rules, `{{mono}}`, links, escapes, colour, images, unknown macros). Task 3 onward depends on 1b.
+11. **Verification gains a real-instance pass** (manual, for the user): open an issue whose description has headings, a table, `{code}` and a link on the real Jira, compare TAM's rendering with Jira's own view, and record anything the parser gets wrong.
+
+Dismissed: the `marked@18.0.13` pin was checked against the registry and exists (MIT, no dependencies); `toPlainText` stripping ordinary punctuation is handled by the boundary rules Task 1b already specifies (`mid-session`, `cost - benefit` stay intact), and D5 narrows summary handling further.
+
 ## Constraints (every task)
 
 - Worktree `C:\tool-projects\task-activity-manager\.claude\worktrees\tam-planning-bundles`, branch `feat/tam-bundles-01-06`. Commit only the files a task names; **never stage `tam/go.mod`** (line endings only).
@@ -277,3 +309,18 @@ Add a section "Rich text" in its own voice: the renderer lives in `@agile-suite/
 - Loading images and attachments inline.
 - Converting between wiki markup and Markdown.
 - A WYSIWYG editor for Jira fields.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 4 issues (1 scope, 1 architecture P1, 1 test P1, 1 performance P2), 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+**OUTSIDE VOICE:** Codex was killed by the OS (low memory); an independent Claude reviewer ran instead and returned 16 findings. 11 accepted and folded in above, 2 raised to the user as decisions (D5 summary scope, D6 refresh and offline), 3 dismissed with reasons.
+**CROSS-MODEL:** tension on rendering the summary field. The review followed the approved spec; the outside voice said Jira never renders summaries. The user chose inline code and links only.
+**UNRESOLVED:** none.
+**VERDICT:** ENG CLEARED — ready to implement.
