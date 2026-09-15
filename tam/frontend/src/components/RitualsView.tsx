@@ -195,7 +195,8 @@ export function RitualsView() {
       const out = await runRitualRoot(at.boardId, title, adopt);
       if (out.root.outcome === "created" || out.root.outcome === "adopted") {
         setConfig((c) => (c ? { ...c, rootPageID: out.root.pageId } : c));
-        announce(rootDoneSentence(out.root));
+        // One announce: a second call would replace the first before it is read.
+        announce(out.sync ? `${rootDoneSentence(out.root)} ${syncSummary(out.sync)}` : rootDoneSentence(out.root));
         if (at.current()) {
           if (out.sync) {
             setResult(out.sync);

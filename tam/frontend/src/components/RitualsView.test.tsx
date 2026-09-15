@@ -7,9 +7,15 @@ import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "
 import * as api from "../api";
 import { profileBackend } from "../profileBackend";
 import {
-  CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, UNCONFIGURED_SENTENCE, rootForbiddenSentence,
+  CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, UNCONFIGURED_SENTENCE, rootDoneSentence, rootForbiddenSentence,
 } from "../lib/ritualText";
 import { RitualsView } from "./RitualsView";
+
+const announced = vi.hoisted(() => vi.fn());
+vi.mock("@agile-suite/core", async () => ({
+  ...(await vi.importActual<typeof import("@agile-suite/core")>("@agile-suite/core")),
+  announce: announced,
+}));
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
@@ -374,6 +380,9 @@ describe("RitualsView", () => {
     expect(await screen.findByText("Sync finished: 5 created.")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(api.EnsureSprintRituals).toHaveBeenCalledTimes(2);
+    // One announcement: a second announce() replaces the first before it is read.
+    const root = { outcome: "created", pageId: "9001", title: "PLAT Rituals", spaceKey: "TEAM", topLevel: true } as const;
+    expect(announced).toHaveBeenLastCalledWith(`${rootDoneSentence(root)} Sync finished: 5 created.`);
   });
 
   it("sends a token that cannot create pages to Profile settings", async () => {

@@ -46,7 +46,7 @@ describe("root page text", () => {
   it("words the missing root, where the new one goes, and what Sync does next", () => {
     expect(rootMissingSentence("653264152")).toBe("The Confluence root page 653264152 could not be found. It may have been deleted, moved out of reach, or mistyped.");
     expect(rootPlacementSentence("TEAM")).toBe("The new page goes at the top of the TEAM space, and its id is saved to this profile as the rituals root.");
-    expect(ROOT_AFTER_SENTENCE).toBe("Sync runs again straight after. This sprint's ritual pages are created under the new root; a page that was under the old root and is gone shows as Gone, and Recreate on next Sync puts it under the new root.");
+    expect(ROOT_AFTER_SENTENCE).toBe("Sync runs again straight after. Pages this sprint does not have yet are created under the new root; a page that was under the old root and is gone shows as Gone, and Recreate on next Sync puts it under the new root.");
   });
 
   it("words the refusals", () => {

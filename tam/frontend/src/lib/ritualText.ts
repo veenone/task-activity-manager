@@ -68,7 +68,7 @@ export function editorStatusLine(input: { doc: RitualDocument; saving: boolean; 
 // the forbidden sentence is the same whether the probe said so up front or
 // the create was refused.
 export const ROOT_TITLE_EMPTY = "The root page needs a title.";
-export const ROOT_AFTER_SENTENCE = "Sync runs again straight after. This sprint's ritual pages are created under the new root; a page that was under the old root and is gone shows as Gone, and Recreate on next Sync puts it under the new root.";
+export const ROOT_AFTER_SENTENCE = "Sync runs again straight after. Pages this sprint does not have yet are created under the new root; a page that was under the old root and is gone shows as Gone, and Recreate on next Sync puts it under the new root.";
 
 export function rootMissingSentence(pageId: string): string {
   return `The Confluence root page ${pageId} could not be found. It may have been deleted, moved out of reach, or mistyped.`;
