@@ -244,6 +244,18 @@ func StandupEntry(day time.Time) string {
 		"<p><strong>Blockers</strong></p>" + taskList
 }
 
+// RootBody is the body of a rituals root page TAM creates when the configured
+// one is missing: one paragraph saying what lives beneath it. Like Render it
+// reads no clock, so the same project always gets the same page.
+func RootBody(projectKey string) string {
+	key := strings.TrimSpace(projectKey)
+	subject := "Sprint ritual pages"
+	if key != "" {
+		subject += " for " + key
+	}
+	return "<p>" + esc(subject+", kept by Task Activity Manager. Each sprint has a page here, with its Planning, Standup, Review and Retrospective pages beneath it.") + "</p>"
+}
+
 // Note is one remark the retired wizard stored against an issue.
 type Note struct {
 	Key    string
