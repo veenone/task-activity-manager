@@ -16,7 +16,6 @@ import (
 	"agile-suite/tam/internal/backend"
 	demobackend "agile-suite/tam/internal/backend/demo"
 	jirabackend "agile-suite/tam/internal/backend/jira"
-	"agile-suite/tam/internal/ritualrepo"
 	"agile-suite/tam/internal/suiteprofiles"
 )
 
@@ -70,11 +69,6 @@ func (a *App) CreateProfile(name, jiraURL, projectKey, scopeJQL, token, caCert s
 	if suiteprofiles.IsDemoURL(jiraURL) {
 		if err := a.profiles.SetConfluenceConfig(p.ID, profile.ConfluenceConfig{BaseURL: "demo", SpaceKey: "DEMO", RootPageID: "demo-root"}); err != nil {
 			return profile.Profile{}, fmt.Errorf("save demo Confluence configuration: %w", err)
-		}
-		if a.local != nil {
-			if err := ritualrepo.New(a.local.DB()).SeedDemo(a.ctx, p.ID, p.ProjectKey); err != nil {
-				return profile.Profile{}, fmt.Errorf("seed demo rituals: %w", err)
-			}
 		}
 	}
 	return p, nil

@@ -699,226 +699,6 @@ export namespace committer {
 
 }
 
-export namespace confluence {
-	
-	export class PageLinks {
-	    webui: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PageLinks(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.webui = source["webui"];
-	    }
-	}
-	export class ChildPage {
-	    id: string;
-	    title: string;
-	    type: string;
-	    status: string;
-	    _links: PageLinks;
-	
-	    static createFrom(source: any = {}) {
-	        return new ChildPage(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.title = source["title"];
-	        this.type = source["type"];
-	        this.status = source["status"];
-	        this._links = this.convertValues(source["_links"], PageLinks);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ChildPageResult {
-	    results: ChildPage[];
-	    start: number;
-	    limit: number;
-	    size: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new ChildPageResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.results = this.convertValues(source["results"], ChildPage);
-	        this.start = source["start"];
-	        this.limit = source["limit"];
-	        this.size = source["size"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PageView {
-	    value: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PageView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.value = source["value"];
-	    }
-	}
-	export class PageStorage {
-	    value: string;
-	    representation: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PageStorage(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.value = source["value"];
-	        this.representation = source["representation"];
-	    }
-	}
-	export class PageBody {
-	    storage: PageStorage;
-	    view: PageView;
-	
-	    static createFrom(source: any = {}) {
-	        return new PageBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.storage = this.convertValues(source["storage"], PageStorage);
-	        this.view = this.convertValues(source["view"], PageView);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PageVersion {
-	    number: number;
-	    when: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PageVersion(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.number = source["number"];
-	        this.when = source["when"];
-	    }
-	}
-	export class PageSpace {
-	    key: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PageSpace(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.key = source["key"];
-	    }
-	}
-	export class Page {
-	    id: string;
-	    title: string;
-	    space: PageSpace;
-	    version: PageVersion;
-	    _links: PageLinks;
-	    body: PageBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new Page(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.title = source["title"];
-	        this.space = this.convertValues(source["space"], PageSpace);
-	        this.version = this.convertValues(source["version"], PageVersion);
-	        this._links = this.convertValues(source["_links"], PageLinks);
-	        this.body = this.convertValues(source["body"], PageBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	
-	
-	
-	
-
-}
-
 export namespace importer {
 	
 	export class Mapping {
@@ -1341,6 +1121,40 @@ export namespace main {
 	        this.logPath = source["logPath"];
 	    }
 	}
+	export class RitualMacroPreview {
+	    supported: boolean;
+	    jql: string;
+	    issues: backend.Issue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RitualMacroPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supported = source["supported"];
+	        this.jql = source["jql"];
+	        this.issues = this.convertValues(source["issues"], backend.Issue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SprintCreated {
 	    sprint: backend.Sprint;
 	    note: string;
@@ -1449,26 +1263,6 @@ export namespace profile {
 		    return a;
 		}
 	}
-	export class RitualAssociation {
-	    boardID: number;
-	    sprintID: number;
-	    ritualType: string;
-	    pageID: string;
-	    pageTitle: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new RitualAssociation(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.boardID = source["boardID"];
-	        this.sprintID = source["sprintID"];
-	        this.ritualType = source["ritualType"];
-	        this.pageID = source["pageID"];
-	        this.pageTitle = source["pageTitle"];
-	    }
-	}
 
 }
 
@@ -1573,23 +1367,24 @@ export namespace reports {
 
 export namespace ritualrepo {
 	
-	export class Draft {
+	export class Document {
 	    profileId: string;
 	    boardId: number;
 	    sprintId: number;
 	    ritualType: string;
 	    title: string;
-	    remark: string;
 	    body: string;
-	    issuesJson: string;
-	    confluencePageId: string;
-	    confluenceVersion: number;
+	    baseBody: string;
+	    pageId: string;
+	    version: number;
+	    conflictBody: string;
+	    conflictVersion: number;
 	    status: string;
 	    updatedAt: string;
-	    publishedAt: string;
+	    syncedAt: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new Draft(source);
+	        return new Document(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -1599,15 +1394,79 @@ export namespace ritualrepo {
 	        this.sprintId = source["sprintId"];
 	        this.ritualType = source["ritualType"];
 	        this.title = source["title"];
-	        this.remark = source["remark"];
 	        this.body = source["body"];
-	        this.issuesJson = source["issuesJson"];
-	        this.confluencePageId = source["confluencePageId"];
-	        this.confluenceVersion = source["confluenceVersion"];
+	        this.baseBody = source["baseBody"];
+	        this.pageId = source["pageId"];
+	        this.version = source["version"];
+	        this.conflictBody = source["conflictBody"];
+	        this.conflictVersion = source["conflictVersion"];
 	        this.status = source["status"];
 	        this.updatedAt = source["updatedAt"];
-	        this.publishedAt = source["publishedAt"];
+	        this.syncedAt = source["syncedAt"];
 	    }
+	}
+
+}
+
+export namespace ritualsync {
+	
+	export class PageFailure {
+	    sprintName: string;
+	    title: string;
+	    reason: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PageFailure(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sprintName = source["sprintName"];
+	        this.title = source["title"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class Result {
+	    created: number;
+	    pulled: number;
+	    pushed: number;
+	    conflicts: number;
+	    gone: number;
+	    failed: PageFailure[];
+	    syncedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.created = source["created"];
+	        this.pulled = source["pulled"];
+	        this.pushed = source["pushed"];
+	        this.conflicts = source["conflicts"];
+	        this.gone = source["gone"];
+	        this.failed = this.convertValues(source["failed"], PageFailure);
+	        this.syncedAt = source["syncedAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

@@ -221,6 +221,111 @@ collision, empty ranges, single day sprints, colour tokens, screen reader
 access all new surface, and splitting mean numbers get trusted before
 anything drawn from them.
 
+## Rituals, local first
+
+Ritual page live in `tam.db` (`ritual_document`), edited in TAM, reach
+Confluence only on Rituals view **Sync rituals**. View make no Confluence
+call on open, sprint pick, or edit. Design =
+`docs/superpowers/specs/2026-09-14-tam-rituals-local-first-design.md`.
+
+TAM own whole page. No markers, no splice: `body` = local page in storage
+XHTML, `base_body` = page as of `confluence_version`, `conflict_body` +
+`conflict_version` = newer remote Sync found while local edits pending
+(schema version 12). Dirty computed (`page id empty or body != base_body`),
+never stored; `status` only what view draw.
+
+`internal/ritualtemplate` render five pages per sprint (`_sprint` overview,
+planning, standup, review, retro), pure, no clock. **Deterministic on
+purpose**: adoption compare stored body against fresh render to tell
+untouched template from page somebody wrote in. Golden files in `testdata/`
+are also frontend round-trip corpus, and `.gitattributes` keep them LF.
+Jira issues = Jira Issues macro carrying one of three written JQL forms
+(`JQL` write them, `ParseJQL` read them back): sprint's whole list, done
+only, not done only. Only those three preview from cache; a bare
+`sprint = N` is not one of them and opens unpreviewed.
+
+`ritualsync.Ensure` write missing pages from templates, local, no lock, so
+planning page writable offline; closed sprint get none. `ritualsync.Run` =
+Sync pass under `a.acquire(p.ID, "rituals")`: title match space wide (titles
+unique per space), adopt under root, refuse elsewhere by name, create, pull,
+push base+1, remote-newer-and-dirty = conflict, 404 = gone and never
+silently recreated. 409 on push re-read: newer version = conflict, 404 =
+gone, same version = push failed (title clash, say) and row left as is,
+since conflict at base version claim newer page that is not newer and Keep
+mine loop on it. Sprint page gone or refused still let rituals that already
+have page reconcile; only placing new ones wait. **Every row write blind to body or compare-and-set on body
+read at pass start**, so save landing mid-push stay unsynced and mid-pull
+become conflict, never overwrite. Base after push = body pushed, never
+Confluence answer: Confluence normalise storage on save, and base from its
+answer leave page dirty forever. Per-page trouble travel in `Result.Failed`,
+not Go error (Wails either/or).
+
+Local writes take no lock (`SaveRitualBody`, resolve, forget, delete, ensure),
+same as board moves; compare-and-set make that safe. Other direction need own
+guard: `SaveBody` take version and page id editor was opened on and update
+only while row still hold both, else `ErrChangedUnderEditor` ("This page
+changed while you were editing..."), shown on editor status line with text
+left pending. Without it, text typed over page Sync pulled or created
+overwrite it locally and next Sync push it over newer remote, no conflict.
+`RemoveBoards` leave `ritual_document` alone: text people wrote, maybe never
+pushed, and board leave Jira list for reasons that say nothing about it
+(setting off, location change, lost permission). Only `PurgeProfile` remove
+it. Demo rebuild restore conflict row from `conflict_body`/`conflict_version`,
+since adopted page never had base. Demo Confluence URL
+"demo" = `internal/demo.Confluence`, in memory, rebuilt from stored pages on
+first use after restart (a page whose status is gone skipped, so it never
+comes back under its old title and a later adopt sees a genuinely new page,
+not a resurrected one), and stage one conflict on first Standup it create.
+
+Rituals view Sync capture the board and sprint it started on and check both
+still current before applying anything the pass read back, so switching
+board or sprint mid-sync cannot overwrite what is on screen with another
+sprint's result; both pickers disable for the run (`running === "rituals"`).
+`onSaved`, the editor's own save landing after such a switch, replace a
+document only when board, sprint and ritual type all match what the current
+list holds, and drop one that matches nothing rather than graft it in. Same
+captured-id check guard Sync error and reload after Keep mine, Take theirs,
+Recreate, Remove. Editor `locked` from Sync press until its reload land
+(`setEditable` on same instance, toolbar hidden, never a rebuild): lock alone
+release before reload remount editor, and keystroke in that gap would be
+saved against replaced version and refused. Open in Confluence built only
+from http or https base URL.
+
+Frontend `lib/storage` convert storage XHTML to TipTap JSON and back.
+Everything not modelled = opaque node carrying raw XML, written back byte for
+byte; fallback is rule, not list, and it also reaches shapes TAM recognises
+but cannot hold exactly: a task list carrying an attribute anywhere in it, an
+empty task id (the one field allowed to be empty), a task status that is not
+exactly "complete" or "incomplete", a colspan/rowspan that is not a plain
+integer greater than one, an empty `<strong>` or `<a>` with no text to carry
+the mark. Namespace declarations strip only inside start tags, never out of
+text or CDATA, so a code sample quoting one is left alone. Page that will not
+parse open read only. Link click never navigate WebView (that take whole app
+away from TAM): absolute http or https open in browser from read-only surface
+or on Ctrl/Cmd click while editing, anything else go nowhere. `sanitizeHtml`
+allow only http, https, mailto, relative in `href`, `src`, `xlink:href`,
+`action`, scheme read after dropping control characters and whitespace
+(`java&#9;script:` is javascript to browser), and drop style with `url(` or
+`expression(`. Whole storage corpus (`lib/storage/corpus.ts`, test only) go
+through editor real schema in `schemaRoundTrip.test.ts`, not just templates.
+
+Editor saves when the serialized document differs from what was last saved
+(the baseline serialized the moment it is created), never on a `touched`
+flag: a checkbox click, a context-menu Cut, a spellcheck fix change the
+document exactly as a keystroke does and none reliably raise one. Its
+`useEditor` dependencies are `[editable]` only and its identity comes from
+the parent's React `key`, so a local save never tears it down; 800 ms
+debounce, Ctrl+S, flush on Sync and unmount trigger a save. Saves run one at
+a time: after a success it re-serializes and queues another save if the
+screen has moved on since, and after a failure it leaves the text pending and
+waits for the next edit, flush, Ctrl+S or unmount rather than retry itself.
+Editor keyed by board, sprint, ritual type, version and page id, so Sync
+remount it and a local save do not. `lib/ritualText.ts` = every sentence.
+
+Retired: wizard, `ritualdefaults`, page associations, `GetRitualPage` live
+read. `confluence_association` and `confluence_page_cache` tables left in
+`profiles.db`, unwritten, still purged with profile.
+
 ## Phase 3a: boards
 
 `core/jira/agile.go` = Agile 1.0 transport: `Boards`, `BoardConfiguration`,
@@ -948,6 +1053,10 @@ anywhere.
 return used to leave no trace at all, so log could not say whether call had
 even reached Go.
 
+**Rituals Sync not quiet either.** `SyncContext.runRitualsSync` drive banner
+like `runBoardsRefresh`, `running` = `"rituals"`: several requests, no modal
+holding focus. Editor save, resolve, forget, delete take no lock at all.
+
 ## The boards pass and the board's shape
 
 Pass = one request per board column config, per page of its sprint list, and
@@ -1114,14 +1223,22 @@ entered. Kiwi profile file refused.
     app_reports.go       GetSprintReport, the one binding the Reports view calls, and
                           CancelSprintReport, which is how a view that has been left cancels a read
                           still holding the profile lock; both under the "report" lock name
-    internal/tamstore/   TAM's own SQLite file (schema version 8: issue (with status_id), issue_link,
+    app_rituals.go       the ritual bindings: ensure, list, save, resolve, forget, delete, macro
+                          preview, standup entry, last sync, Sync, all but Sync under no lock,
+                          Sync under the "rituals" lock name
+    internal/tamstore/   TAM's own SQLite file (schema version 12: issue (with status_id), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
                           sprint (with goal, added at version 7, and complete_date, added at
                           version 8), sprint_report (a sprint's saved report, added at version 8),
-                          plus the shared journal tables pending_change and audit_log)
+                          ritual_document (added at version 9, with base_body, conflict_body and
+                          conflict_version added at version 12), plus the shared journal tables
+                          pending_change and audit_log)
     internal/backend/    IssueBackend and BoardBackend seams and DTOs; backend/jira on core/jira,
                           backend/demo on internal/demo
-    internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile
+    internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile;
+                          confluence.go is the in-memory Confluence space rituals sync against
+                          on a demo profile, rebuilt from stored pages after a restart and
+                          staging one conflict on the first Standup it creates
     internal/issuerepo/  the store layer: issue cache, detail cache, links, sync state, profile
                           settings, the pending-change journal, and drafts; tree.go groups the
                           cache into the Epics view's tree; boardwrites.go, movevalue.go,
@@ -1170,6 +1287,15 @@ entered. Kiwi profile file refused.
                           is the boards pass, reached through backend.BoardBackend
     internal/errtext/    reduces an error to one readable line (strips HTML tags, collapses
                           whitespace) for sync summaries and dropped-board reasons
+    internal/ritualtemplate/  renders a sprint's five ritual pages (pure, no clock, no I/O) and
+                          reads a Jira Issues macro's JQL back (JQL, ParseJQL), the three
+                          written forms and nothing else
+    internal/ritualrepo/ the store layer over ritual_document; documents.go is the CRUD, the
+                          dirty and status computation, and Apply{Created,Pulled,Pushed,Conflict},
+                          MarkGone, the writes a Sync pass makes
+    internal/ritualsync/ Ensure (write missing pages from templates, local, no lock) and Run
+                          (the Sync pass under the "rituals" lock: title match, adopt, create,
+                          pull, push, conflict, gone)
     internal/suiteprofiles/  which shared profiles TAM shows, demo detection, validation
     frontend/            React app on @agile-suite/core (see ../frontend/core)
       src/api.ts         typed access to the bindings; plain shapes for fixtures
@@ -1194,6 +1320,16 @@ entered. Kiwi profile file refused.
                           anything; cardMoveState.ts folds a card's pending row, warnings, and
                           commit failures into one state; moveValue.ts reads a journaled board
                           value back for the Pending changes dialog and the Activity tab
+      src/lib/storage/   converts a ritual page between storage XHTML and TipTap JSON and back;
+                          parse.ts is the read side (BLOCK/INLINE element sets, the opaque-node
+                          fallback for anything not modelled), serialize.ts the write side,
+                          xml.ts the XML parse and the start-tag-only namespace stripping,
+                          normalize.ts the byte-for-byte round-trip check
+      src/lib/ritualText.ts  every sentence the Rituals view prints: chip and status labels, the
+                          conflict and gone banners, the sync summary and pending line, the
+                          unconfigured and no-scrum-board sentences
+      src/lib/standupLog.ts  finds where today's dated Yesterday/Today/Blockers section belongs
+                          in a Standup page's Daily log, and whether it is already there
       src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
                           AssigneePicker, PriorityPicker,
                           PendingChangesModal, ConflictCard, NewIssueModal, ProfilesModal,
@@ -1212,7 +1348,12 @@ entered. Kiwi profile file refused.
                           multi-select, the board's under a different name), ReportsView (the two
                           pickers, the eight states a report can be in, and the rebuild),
                           SprintSummary (the sentence, its qualification, and the method line),
-                          VelocityTable (the last six closed sprints, each row with its own unit)
+                          VelocityTable (the last six closed sprints, each row with its own unit),
+                          RitualsView (the board and sprint pickers, the five-page nav, Sync
+                          rituals and its result banner, the conflict and gone banners),
+                          ritual-editor/RitualEditor (the TipTap editor over one page's storage
+                          XHTML, its own save state), MacroPreview (a Jira Issues macro rendered
+                          from cache), OpaqueViews (read-only rendering of an opaque node)
       wailsjs/           GENERATED bindings, do not hand-edit
 
 ## Commands

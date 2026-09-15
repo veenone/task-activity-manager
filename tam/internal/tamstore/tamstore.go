@@ -13,6 +13,9 @@
 // healthy version 10 database: some development builds recorded the version
 // 10 stamp before the issues_json migration actually ran, and this repairs
 // those files without re-running the conversion where it already happened.
+// Version 12 adds ritual_document's base_body, conflict_body and
+// conflict_version, the three facts the ritual sync compares and resolves
+// with.
 package tamstore
 
 import (
@@ -42,7 +45,7 @@ import (
 // Version 9 adds ritual_document through the same idempotent base DDL path
 // as sprint_report.
 var Schema = store.Schema{
-	Version: 11,
+	Version: 12,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -165,6 +168,27 @@ var Schema = store.Schema{
 				return err
 			}
 			return convertRitualIssueKeys(db)
+		},
+	}, {
+		Version: 12,
+		// The ritual sync keeps three more facts per page: the body as of the
+		// last synced version, and a newer remote body a Sync found while local
+		// edits were pending, with its version. Column adds in version 7's
+		// shape; a fresh database has them from ritualDocumentDDL already, which
+		// AddColumnIfMissing treats as success. No row is rewritten: this
+		// migration knows no sprint names to render a template from, so rows
+		// written before it are upgraded by ritualsync.Ensure instead.
+		Apply: func(db *sql.DB) error {
+			for _, column := range []string{
+				"base_body TEXT NOT NULL DEFAULT ''",
+				"conflict_body TEXT NOT NULL DEFAULT ''",
+				"conflict_version INTEGER NOT NULL DEFAULT 0",
+			} {
+				if err := store.AddColumnIfMissing(db, "ritual_document", column); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	}},
 	Indexes: indexDDL,
@@ -372,6 +396,9 @@ CREATE TABLE IF NOT EXISTS ritual_document (
 	issues_json       TEXT NOT NULL DEFAULT '[]',
 	confluence_page_id TEXT NOT NULL DEFAULT '',
 	confluence_version INTEGER NOT NULL DEFAULT 0,
+	base_body         TEXT NOT NULL DEFAULT '',
+	conflict_body     TEXT NOT NULL DEFAULT '',
+	conflict_version  INTEGER NOT NULL DEFAULT 0,
 	status            TEXT NOT NULL DEFAULT '',
 	updated_at        TEXT NOT NULL DEFAULT '',
 	published_at      TEXT NOT NULL DEFAULT '',

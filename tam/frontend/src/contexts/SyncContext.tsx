@@ -13,8 +13,8 @@ import {
   errMsg,
 } from "@agile-suite/core";
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
-import { CommitPendingChanges, EventsOn, REPORT_PROGRESS_EVENT, SyncBoards, SyncIssues } from "../api";
-import type { BoardSummary, CommitResult, Profile, ReportProgress, Settings } from "../api";
+import { CommitPendingChanges, EventsOn, REPORT_PROGRESS_EVENT, SyncBoards, SyncIssues, SyncRituals } from "../api";
+import type { BoardSummary, CommitResult, Profile, ReportProgress, RitualSyncResult, Settings } from "../api";
 import { progressStage } from "../lib/reportText";
 import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
@@ -30,7 +30,7 @@ const PROGRESS_EVENT = "tam:sync-progress";
 // made here and a refusal made there are the same sentence about the same
 // operation. The three sprint management writes acquire under "sprint" in
 // Go, the same name the two ceremonies use, so they share it here too.
-export type LockedOperation = "sync" | "commit" | "boards refresh" | "sprint" | "report";
+export type LockedOperation = "sync" | "commit" | "boards refresh" | "sprint" | "report" | "rituals";
 
 interface SyncApi {
   status: SyncStatus;
@@ -69,6 +69,11 @@ interface SyncApi {
   // stage that says a report is what is running. It rejects rather than
   // swallowing, so the view can tell a refusal from a failed read.
   runReport: <T>(action: () => Promise<T>) => Promise<T>;
+  // runRitualsSync is the Rituals view's Sync. It is several requests with no
+  // modal holding focus, so it drives the banner the way a boards refresh
+  // does rather than staying quiet: a Sync button left enabled and inert
+  // beside it is the bug "One lock, both ends" was written about.
+  runRitualsSync: (boardId: number) => Promise<RitualSyncResult>;
   // runQuietLock is what a fast management write (creating, renaming, or
   // destroying a sprint) takes Go's per-profile lock through without reading
   // as a ceremony. It guards against overlapping a sync, a commit, a boards
@@ -286,6 +291,23 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [activeId, busyRefusal, take, release]);
 
+  const runRitualsSync = useCallback(async (boardId: number): Promise<RitualSyncResult> => {
+    if (!activeId) throw new Error("no profile selected");
+    if (statusRef.current !== "idle") throw busyRefusal();
+    take("rituals");
+    dispatch({
+      type: "SYNC_START",
+      clearError: true,
+      initialProgress: { phase: "rituals", fetched: 0, total: 0, done: false, stage: "Syncing rituals with Confluence" },
+    });
+    try {
+      return await call(() => SyncRituals(activeId, boardId));
+    } finally {
+      release();
+      dispatch({ type: "SYNC_END" });
+    }
+  }, [activeId, busyRefusal, take, release]);
+
   // A quiet lock is the same statusRef guard every other run function
   // checks, so it still refuses while any of them is in flight, but it never
   // touches the reducer: no SYNC_START, no SYNC_END, no progress frame. The
@@ -356,6 +378,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       runBoardsRefresh,
       runSprintCeremony,
       runReport,
+      runRitualsSync,
       runQuietLock,
       runCommit,
       lastCommit,
@@ -363,7 +386,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, running, activeId, runSync, runBoardsRefresh, runSprintCeremony, runReport, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
+    [state, running, activeId, runSync, runBoardsRefresh, runSprintCeremony, runReport, runRitualsSync, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

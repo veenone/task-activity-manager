@@ -48,39 +48,19 @@ func testConfluenceApp(t *testing.T, handler http.Handler) (*App, profile.Profil
 	return app, p
 }
 
-func TestConfluenceClientReportsMissingCredential(t *testing.T) {
+func TestConfluencePagesReportsMissingCredential(t *testing.T) {
 	app, p := testConfluenceApp(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("request should not be made") }))
-	_, err := app.GetConfluencePage(p.ID, "42")
-	if err == nil || err.Error() != "Confluence credentials are not configured for this profile" {
+	if err := app.profiles.SetConfluenceConfig(p.ID, profile.ConfluenceConfig{BaseURL: "https://confluence.example.com", SpaceKey: "QA", RootPageID: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := app.confluencePages(p); err == nil || err.Error() != "Confluence credentials are not configured for this profile" {
 		t.Fatalf("error = %v", err)
 	}
 }
 
-func TestConfluenceClientReportsMissingConfiguration(t *testing.T) {
+func TestConfluencePagesNeedsASpaceAndARoot(t *testing.T) {
 	app, p := testConfluenceApp(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("request should not be made") }))
-	if err := app.profiles.SetConfluenceConfig(p.ID, profile.ConfluenceConfig{}); err != nil {
-		t.Fatal(err)
-	}
-	_, err := app.GetConfluencePage(p.ID, "42")
-	if err == nil || err.Error() != "Confluence is not configured for this profile" {
+	if _, _, err := app.confluencePages(p); err == nil || err.Error() != "Confluence needs a space key and a root page id before rituals can sync" {
 		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestConfluenceClientReadsPage(t *testing.T) {
-	app, p := testConfluenceApp(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/rest/api/content/42" {
-			t.Errorf("path = %q", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"42","title":"Standup","body":{"storage":{"value":"<p>Done</p>"}}}`))
-	}))
-	app.creds.(testCredentialStore)[profile.ConfluenceCredentialID(p.ID)] = "secret"
-	page, err := app.GetConfluencePage(p.ID, "42")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if page.ID != "42" || page.Title != "Standup" || page.Body.Storage.Value != "<p>Done</p>" {
-		t.Fatalf("page = %+v", page)
 	}
 }

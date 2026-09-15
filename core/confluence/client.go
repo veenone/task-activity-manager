@@ -1,8 +1,11 @@
-// Package confluence provides the read-only Confluence Data Center transport
-// used by TAM's Rituals view.
+// Package confluence is the Confluence Data Center transport behind TAM's
+// Rituals view: reading a page's storage body, finding a page by title, and
+// creating and updating pages. TAM's ritualsync decides when each is called;
+// nothing here keeps state between calls.
 package confluence
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -10,55 +13,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strconv"
 	"strings"
 	"time"
 )
-
-type Page struct {
-	ID      string      `json:"id"`
-	Title   string      `json:"title"`
-	Space   PageSpace   `json:"space"`
-	Version PageVersion `json:"version"`
-	Links   PageLinks   `json:"_links"`
-	Body    PageBody    `json:"body"`
-}
-type PageSpace struct {
-	Key string `json:"key"`
-}
-type PageVersion struct {
-	Number int    `json:"number"`
-	When   string `json:"when"`
-}
-type PageLinks struct {
-	WebUI string `json:"webui"`
-}
-type PageBody struct {
-	Storage PageStorage `json:"storage"`
-	View    PageView    `json:"view"`
-}
-type PageStorage struct {
-	Value          string `json:"value"`
-	Representation string `json:"representation"`
-}
-type PageView struct {
-	Value string `json:"value"`
-}
-
-type ChildPage struct {
-	ID     string    `json:"id"`
-	Title  string    `json:"title"`
-	Type   string    `json:"type"`
-	Status string    `json:"status"`
-	Links  PageLinks `json:"_links"`
-}
-type ChildPageResult struct {
-	Results []ChildPage `json:"results"`
-	Start   int         `json:"start"`
-	Limit   int         `json:"limit"`
-	Size    int         `json:"size"`
-}
 
 type HTTPError struct {
 	Code    int
@@ -93,21 +50,6 @@ func NewClient(baseURL, token string, caCert string, insecure bool) *Client {
 	return &Client{baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"), token: token, http: &http.Client{Timeout: 30 * time.Second, Transport: transport}}
 }
 
-func (c *Client) GetPage(ctx context.Context, id string) (Page, error) {
-	var p Page
-	err := c.get(ctx, "/rest/api/content/"+url.PathEscape(id)+"?expand=body.storage,body.view,version,space,_links").Decode(&p)
-	return p, err
-}
-func (c *Client) ListChildPages(ctx context.Context, parentID string, start, limit int) (ChildPageResult, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	path := "/rest/api/content/" + url.PathEscape(parentID) + "/child/page?start=" + strconv.Itoa(start) + "&limit=" + strconv.Itoa(limit) + "&expand=version,_links"
-	var r ChildPageResult
-	err := c.get(ctx, path).Decode(&r)
-	return r, err
-}
-
 type responseDecoder struct {
 	body io.ReadCloser
 	err  error
@@ -120,13 +62,33 @@ func (r responseDecoder) Decode(out any) error {
 	defer r.body.Close()
 	return json.NewDecoder(r.body).Decode(out)
 }
+
 func (c *Client) get(ctx context.Context, path string) responseDecoder {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	return c.send(ctx, http.MethodGet, path, nil)
+}
+
+// send is every request this client makes. A nil payload sends no body; any
+// other payload is JSON. A non-2xx answer becomes *HTTPError carrying
+// Confluence's own message, which is what errors.Is matches ErrNotFound and
+// ErrVersionConflict against.
+func (c *Client) send(ctx context.Context, method, path string, payload any) responseDecoder {
+	var body io.Reader
+	if payload != nil {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return responseDecoder{err: err}
+		}
+		body = bytes.NewReader(encoded)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return responseDecoder{err: err}
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return responseDecoder{err: err}

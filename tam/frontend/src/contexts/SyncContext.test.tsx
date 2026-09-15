@@ -20,6 +20,7 @@ vi.mock("../api", async () => {
     SetDefaultProfile: vi.fn(),
     SyncIssues: vi.fn(),
     SyncBoards: vi.fn(),
+    SyncRituals: vi.fn(),
     GetSyncState: vi.fn(),
     EventsOn: vi.fn(() => () => {}),
   };
@@ -58,7 +59,7 @@ beforeEach(() => {
 });
 
 function Probe() {
-  const { status, progress, syncError, canSync, runSync, runBoardsRefresh, runReport, runQuietLock, lastBoards } = useSync();
+  const { status, progress, syncError, canSync, running, runSync, runBoardsRefresh, runReport, runRitualsSync, runQuietLock, lastBoards } = useSync();
   const state = useSyncState("p1");
   const [quiet, setQuiet] = React.useState("idle");
   // The report's own outcome, so a refusal can be read as the sentence
@@ -74,7 +75,9 @@ function Probe() {
       <span data-testid="quiet">{quiet}</span>
       <span data-testid="stage">{progress?.stage ?? "none"}</span>
       <span data-testid="report">{reported}</span>
+      <span data-testid="running">{running ?? "none"}</span>
       <button onClick={() => void runSync(false)} disabled={!canSync}>Sync</button>
+      <button onClick={() => void runRitualsSync(1).catch(() => {})}>Sync rituals</button>
       <button onClick={() => void runSync(true)}>Full sync</button>
       <button onClick={() => void runBoardsRefresh().catch(() => {})}>Refresh boards</button>
       <button
@@ -362,5 +365,27 @@ describe("SyncProvider", () => {
 
     await act(async () => { finishReport(); });
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+  });
+
+  it("holds the lock under rituals while a rituals sync runs", async () => {
+    let finish: (v: api.RitualSyncResult) => void = () => {};
+    vi.mocked(api.SyncRituals).mockImplementation(
+      () => new Promise<api.RitualSyncResult>((resolve) => { finish = resolve; }),
+    );
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Sync rituals" }));
+    await waitFor(() => expect(screen.getByTestId("running")).toHaveTextContent("rituals"));
+    expect(screen.getByTestId("status")).toHaveTextContent("syncing");
+    expect(screen.getByTestId("stage")).toHaveTextContent("Syncing rituals with Confluence");
+    expect(screen.getByRole("button", { name: "Sync" })).toBeDisabled();
+    expect(api.SyncRituals).toHaveBeenCalledWith("p1", 1);
+
+    await act(async () => {
+      finish({ created: 5, pulled: 0, pushed: 0, conflicts: 0, gone: 0, failed: [], syncedAt: "2026-09-14T10:00:00Z" });
+    });
+    await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
+    expect(screen.getByTestId("running")).toHaveTextContent("none");
   });
 });

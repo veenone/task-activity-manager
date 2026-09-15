@@ -1,16 +1,14 @@
 package ritualrepo_test
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
 	"agile-suite/core/store"
-	"agile-suite/tam/internal/ritualrepo"
 	"agile-suite/tam/internal/tamstore"
 )
 
-func TestDemoSeedAfterRepairingVersionTenWithoutIssuesColumn(t *testing.T) {
+func TestRepairingVersionTenWithoutIssuesColumnKeepsTheRow(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tam.db")
 	db, err := tamstore.Open(path)
 	if err != nil {
@@ -30,29 +28,27 @@ func TestDemoSeedAfterRepairingVersionTenWithoutIssuesColumn(t *testing.T) {
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// Repeat startup: repairs and demo seeding must both be idempotent.
+	// Repeat startup: the repair must be idempotent.
 	for pass := 0; pass < 2; pass++ {
 		db, err := tamstore.Open(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		r := ritualrepo.New(db.DB())
-		if err := r.SeedDemo(context.Background(), "demo", "DEMO"); err != nil {
+		var title, remark, body, pageID, issues string
+		var version int
+		if err := db.DB().QueryRow(`SELECT title, remark, body, confluence_page_id, confluence_version, issues_json
+			FROM ritual_document WHERE profile_id = 'demo' AND sprint_id = 12 AND ritual_type = 'planning'`).
+			Scan(&title, &remark, &body, &pageID, &version, &issues); err != nil {
 			_ = db.Close()
 			t.Fatal(err)
 		}
-		draft, err := r.Get(context.Background(), "demo", 1, 12, "planning")
-		if err != nil {
-			_ = db.Close()
-			t.Fatal(err)
+		if title != "My plan" || remark != "Keep this remark" || body != "<p>My notes</p>" || pageID != "1234" || version != 3 {
+			t.Errorf("repair changed the saved row: %s %s %s %s %d", title, remark, body, pageID, version)
 		}
-		if draft.Title != "My plan" || draft.Remark != "Keep this remark" || draft.Body != "<p>My notes</p>" || draft.ConfluencePageID != "1234" || draft.ConfluenceVersion != 3 || draft.Status != "published" {
-			t.Errorf("repair or seed changed the saved draft: %+v", draft)
+		if issues != `[{"key":"DEMO-412","remark":""},{"key":"DEMO-409","remark":""}]` {
+			t.Errorf("lost issue selections: %s", issues)
 		}
-		if draft.IssuesJSON != `[{"key":"DEMO-412","remark":""},{"key":"DEMO-409","remark":""}]` {
-			t.Errorf("lost issue selections: %s", draft.IssuesJSON)
-		}
-		if version, err := store.ReadSchemaVersion(db.DB()); err != nil || version != 11 {
+		if version, err := store.ReadSchemaVersion(db.DB()); err != nil || version != tamstore.Schema.Version {
 			t.Errorf("schema = %d, error = %v", version, err)
 		}
 		if err := db.Close(); err != nil {
@@ -87,9 +83,11 @@ func TestRepairPreservesHealthyVersionTenIssueSelections(t *testing.T) {
 	}
 	defer db.Close()
 	for typ, want := range map[string]string{"planning": "[]", "review": `[{"key":"NEW-2","remark":"Team decision"}]`} {
-		draft, err := ritualrepo.New(db.DB()).Get(context.Background(), "p1", 1, 12, typ)
-		if err != nil || draft.IssuesJSON != want {
-			t.Errorf("%s selection = %s, error = %v; want %s", typ, draft.IssuesJSON, err, want)
+		var issues string
+		if err := db.DB().QueryRow(`SELECT issues_json FROM ritual_document
+			WHERE profile_id = 'p1' AND board_id = 1 AND sprint_id = 12 AND ritual_type = ?`, typ).
+			Scan(&issues); err != nil || issues != want {
+			t.Errorf("%s selection = %s, error = %v; want %s", typ, issues, err, want)
 		}
 	}
 }

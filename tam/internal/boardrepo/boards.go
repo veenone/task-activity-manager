@@ -52,14 +52,18 @@ const boardSprintSQL = `
 
 // RemoveBoards drops the boards and everything hanging off them: their
 // columns, their issue keys, their sprints, and any report built for one of
-// those sprints on this board, in one transaction.
+// those sprints on this board, in one transaction. ritual_document is not in
+// the list: it holds text people wrote, possibly never pushed, and a board
+// leaves Jira's list for reasons that say nothing about that text (a setting
+// switched off, a location change, a lost permission). PurgeProfile removes
+// it.
 func (r *Repository) RemoveBoards(ctx context.Context, profileID string, boardIDs []int) error {
 	if len(boardIDs) == 0 {
 		return nil
 	}
 	return r.inTx(ctx, func(tx *sql.Tx) error {
 		for _, id := range boardIDs {
-			for _, table := range []string{"board_column", "board_issue", "sprint", "sprint_report", "ritual_document", "board"} {
+			for _, table := range []string{"board_column", "board_issue", "sprint", "sprint_report", "board"} {
 				column := "board_id"
 				if table == "board" {
 					column = "id"
