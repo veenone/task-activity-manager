@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -343,6 +344,30 @@ func TestCreateRitualRootSavesTheNewRootAndSyncsUnderIt(t *testing.T) {
 	again, err := a.SyncRituals(p.ID, 1)
 	if err != nil || again.RootMissing != nil || again.Created != 0 {
 		t.Fatalf("second sync = %+v, %v", again, err)
+	}
+	if _, ok := a.busy[p.ID]; ok {
+		t.Fatal("the lock was not released")
+	}
+}
+
+// A Sync that fails after the root was created must not hide the create: the
+// root is saved by then, so the failure travels as SyncError beside it.
+func TestCreateRitualRootReportsAFailedSyncBesideTheSavedRoot(t *testing.T) {
+	a, p := newMissingRootApp(t)
+	space := a.demoSpace(p.ID, storedRoot(t, a, p.ID))
+	space.After("create", "PLAT Rituals", func() {
+		created, _, _ := space.FindPageByTitle(context.Background(), "DEMO", "PLAT Rituals")
+		space.FailNext("get", created.ID, errors.New("503 Service Unavailable\n<html><body>down</body></html>"))
+	})
+	out, err := a.CreateRitualRoot(p.ID, 1, "PLAT Rituals", false)
+	if err != nil || out.Root.Outcome != ritualsync.RootCreated || out.Sync != nil {
+		t.Fatalf("out = %+v, %v", out, err)
+	}
+	if out.SyncError == "" || strings.Contains(out.SyncError, "\n") {
+		t.Fatalf("sync error = %q, want one line", out.SyncError)
+	}
+	if got := storedRoot(t, a, p.ID).RootPageID; got != out.Root.PageID {
+		t.Fatalf("root page id = %q, want %q", got, out.Root.PageID)
 	}
 	if _, ok := a.busy[p.ID]; ok {
 		t.Fatal("the lock was not released")
