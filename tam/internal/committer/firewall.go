@@ -17,8 +17,11 @@ import (
 // TAM-NEW key or a draft sprint's negative id through, it ends here as an
 // internal error on that one write, and never as a 400 from Jira.
 //
-// A label that happens to read TAM-NEW-9 trips it too. That is the price of
-// a check that does not need to know which fields carry keys.
+// It checks only the reference values each call site hands it (parentKey,
+// sprintId, the issue key, a link's from and to keys, a rank neighbour),
+// never free text such as a summary or a label, which may legitimately read
+// TAM-NEW-9. A new phase must pass its references the same way, not its
+// whole payload.
 func assertNoPlaceholders(payload any) error {
 	encoded, err := json.Marshal(payload)
 	if err != nil {

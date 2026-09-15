@@ -1002,10 +1002,11 @@ row (key or move target), link (source or target) naming blocked placeholder
 held (`Result.Held`, reason `waits for TAM-NEW-2, which Jira refused`, chain
 `which is waiting for ...`), stay in journal, retried next Commit; held draft
 block own key. Held != failure: nothing sent. `assertNoPlaceholders`
-(`firewall.go`) walk every payload right before backend call: `TAM-NEW-`
-string anywhere, or negative whole number under key naming sprint, fail that
-one write with internal error, never 400 from Jira (label reading
-`TAM-NEW-9` trip it too, accepted). Pending changes dialog show draft sprint
+(`firewall.go`) check, right before backend call, only reference values each
+call site hand it (parentKey, sprintId, issue key, link from/to key, rank
+neighbour), never free text: `TAM-NEW-` string, or negative whole number under
+key naming sprint, fail that one write with internal error, never 400 from
+Jira. New phase must pass references only, not whole payload. Pending changes dialog show draft sprint
 as own card first, held rows with Waiting chip + reason; banner count
 "n waiting". Later bundle add commit step = one entry in `phases()`.
 Demo: epic whose summary contain "refused" refused once per run; demo refuse
