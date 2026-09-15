@@ -162,11 +162,8 @@ func (r *commitRun) createSprints(ctx context.Context) {
 			r.deps.block(p.EntityKey, label, "which this connection cannot create")
 			continue
 		}
-		if err := assertNoPlaceholders(map[string]any{"boardId": d.BoardID, "draft": d.SprintDraft()}); err != nil {
-			r.res.Failures = append(r.res.Failures, sprintFailure(p, d.Name, err.Error(), false))
-			r.deps.block(p.EntityKey, label, "which could not be sent")
-			continue
-		}
+		// No firewall here: a sprint create carries a board id, a name, a
+		// goal and two dates, and none of them can reference a placeholder.
 		made, err := w.CreateSprint(ctx, d.BoardID, d.SprintDraft())
 		if err != nil {
 			r.res.Failures = append(r.res.Failures, sprintFailure(p, d.Name, err.Error(), !errors.Is(err, corejira.ErrNoAgile)))
@@ -277,7 +274,7 @@ func (r *commitRun) createDrafts(ctx context.Context, level draftLevel) {
 			r.deps.block(key, key, "which could not be sent")
 			continue
 		}
-		if err := assertNoPlaceholders(t.draft); err != nil {
+		if err := assertNoPlaceholders(map[string]any{"parentKey": t.draft.ParentKey, "sprintId": t.draft.SprintID}); err != nil {
 			r.res.Failures = append(r.res.Failures, failure(key, issuerepo.EntityIssueCreate, err.Error(), false))
 			r.deps.block(key, key, "which could not be sent")
 			continue
@@ -302,15 +299,23 @@ func (r *commitRun) pushEdits(ctx context.Context) {
 	sort.Strings(keys)
 	for _, key := range keys {
 		rows := byKey[key]
-		values := make([]string, 0, len(rows))
+		// parentKey is the one edited field that references another issue;
+		// every other value is free text a placeholder check must not read.
+		parent := ""
 		for _, p := range rows {
-			values = append(values, p.AfterVal)
+			if p.Field == "parentKey" {
+				parent = p.AfterVal
+			}
 		}
 		// Every edit of the issue waits together, the way a conflict holds
 		// every edit of an issue together: half an issue's edits pushed is
 		// an intent Jira never saw whole.
-		if waits, held := r.deps.blockedBy(values...); held {
+		if waits, held := r.deps.blockedBy(parent); held {
 			r.deps.hold(r.res, key, issuerepo.EntityIssue, 0, waits)
+			continue
+		}
+		if isDraftKey(parent) {
+			r.res.Failures = append(r.res.Failures, failure(key, issuerepo.EntityIssue, fmt.Sprintf("its parent %s is not a draft this Commit could create; set the parent again", parent), false))
 			continue
 		}
 		r.e.commitEdit(ctx, r.profileID, key, rows, r.res)

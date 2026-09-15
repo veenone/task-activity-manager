@@ -240,9 +240,14 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 	for _, p := range rows {
 		fields[p.Field] = p.AfterVal
 	}
-	// pushEdits has already held an edit naming a draft this Commit could
-	// not create; one still naming a placeholder here is a rewriting bug.
-	if err := assertNoPlaceholders(map[string]any{"issue": key, "fields": fields}); err != nil {
+	// pushEdits has already held or failed an edit naming a draft; a
+	// reference still naming a placeholder here is a rewriting bug. Only the
+	// references are checked, since a summary may read TAM-NEW-12.
+	refs := map[string]any{"issue": key}
+	if parent, edited := fields["parentKey"]; edited {
+		refs["parentKey"] = parent
+	}
+	if err := assertNoPlaceholders(refs); err != nil {
 		res.Failures = append(res.Failures, failure(key, issuerepo.EntityIssue, err.Error(), false))
 		return
 	}
@@ -260,9 +265,10 @@ func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []j
 
 // commitLinks pushes every link row, read fresh so a link added from or to
 // a draft carries the key the create pass gave it. A row whose source or
-// target is a draft this Commit could not create is held; any other row
-// whose source is still a draft is left for next time, neither pushed nor
-// reported. Each push is its own journal delete, and the source's detail
+// target is a draft this Commit could not create is held; one whose target
+// is a draft nothing in this Commit knows fails, since no retry creates it;
+// any other row whose source is still a draft is left for next time,
+// neither pushed nor reported. Each push is its own journal delete, and the source's detail
 // cache is dropped so the panel refetches the links Jira now holds.
 func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result, deps *dependencies) {
 	all, err := e.repo.ListPendingChanges(ctx, profileID)
@@ -292,7 +298,11 @@ func (e *Engine) commitLinks(ctx context.Context, profileID string, res *Result,
 			deps.hold(res, p.EntityKey, issuerepo.EntityLink, p.ID, waits)
 			continue
 		}
-		if err := assertNoPlaceholders(map[string]any{"from": p.EntityKey, "link": d}); err != nil {
+		if isDraftKey(d.ToKey) {
+			res.Failures = append(res.Failures, linkFailure(p, fmt.Sprintf("its target %s is not a draft this Commit could create; add the link again", d.ToKey), false))
+			continue
+		}
+		if err := assertNoPlaceholders(map[string]any{"from": p.EntityKey, "toKey": d.ToKey}); err != nil {
 			res.Failures = append(res.Failures, linkFailure(p, err.Error(), false))
 			continue
 		}
