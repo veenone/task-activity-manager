@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { errMsg } from "@agile-suite/core";
 import {
   CreateProfile,
@@ -160,6 +160,11 @@ export function ProfileForm({
 
   const keyError = projectKeyError(projectKey);
   const urlError = jiraUrlError(jiraUrl);
+  // Each field error is the description of its input, so a screen reader
+  // reads it with the field rather than only where it sits on the page.
+  const urlErrorId = useId();
+  const keyErrorId = useId();
+  const rootErrorId = useId();
 
   // A Sync against a root page id that is not one answers 404 and offers to
   // create a root nobody needed, so the id is checked where it is typed.
@@ -273,8 +278,10 @@ export function ProfileForm({
           onBlur={() => setJiraUrl(normalizeJiraUrl(jiraUrl))}
           placeholder="https://jira.example.com (or 'demo')"
           spellCheck={false}
+          aria-invalid={urlError ? true : undefined}
+          aria-describedby={urlError ? urlErrorId : undefined}
         />
-        {urlError && <span className="field-error">{urlError}</span>}
+        {urlError && <span id={urlErrorId} className="field-error">{urlError}</span>}
       </label>
       <label>
         Project key
@@ -283,8 +290,10 @@ export function ProfileForm({
           onChange={(e) => setProjectKey(e.target.value.toUpperCase())}
           placeholder="PLAT"
           spellCheck={false}
+          aria-invalid={keyError ? true : undefined}
+          aria-describedby={keyError ? keyErrorId : undefined}
         />
-        {keyError && <span className="field-error">{keyError}</span>}
+        {keyError && <span id={keyErrorId} className="field-error">{keyError}</span>}
       </label>
       <label>
         Scope JQL (optional)
@@ -330,8 +339,9 @@ export function ProfileForm({
             placeholder="123456, or paste the page's address"
             spellCheck={false}
             aria-invalid={rootInput.error ? true : undefined}
+            aria-describedby={rootInput.error ? rootErrorId : undefined}
           />
-          {rootInput.error && <span className="field-error">{rootInput.error}</span>}
+          {rootInput.error && <span id={rootErrorId} className="field-error">{rootInput.error}</span>}
         </label>
         <label>
           Confluence personal access token

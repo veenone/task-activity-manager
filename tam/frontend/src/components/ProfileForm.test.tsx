@@ -65,6 +65,24 @@ describe("ProfileForm's Confluence root page id", () => {
     expect(screen.getByText(ROOT_ID_NOT_A_NUMBER)).toBeInTheDocument();
     expect(screen.getByText(ROOT_FIX_BEFORE_SAVE)).toBeInTheDocument();
     expect(root).toHaveAttribute("aria-invalid", "true");
+    expect(root).toHaveAccessibleDescription(ROOT_ID_NOT_A_NUMBER);
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+});
+
+describe("ProfileForm's field errors", () => {
+  it("ties the Jira URL and project key errors to their inputs", async () => {
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    const url = await screen.findByDisplayValue("https://jira.acme.example");
+    await userEvent.clear(url);
+    await userEvent.type(url, "jira acme");
+    expect(url).toHaveAttribute("aria-invalid", "true");
+    expect(url).toHaveAccessibleDescription("The URL must not contain spaces.");
+
+    const key = screen.getByDisplayValue("PLAT");
+    expect(key).not.toHaveAttribute("aria-describedby");
+    await userEvent.type(key, "/X");
+    expect(key).toHaveAttribute("aria-invalid", "true");
+    expect(key).toHaveAccessibleDescription(/^Project key must start with a letter/);
   });
 });
