@@ -261,23 +261,20 @@ func isBaseField(f corejira.MetaField, ids fieldIDs) bool {
 
 // createMeta reads the create fields of one logical type in the project. The
 // type's id comes from the project's own type list, so the per-type
-// endpoint can be asked; a type the list does not name is asked for by name
-// through the classic call.
+// endpoint can be asked; a type the list was read and does not name is asked
+// for by name through the classic call. A list that cannot be read is an
+// error, not a reason to fall back: the classic call lists fields that are
+// not on the screen.
 func (b *Backend) createMeta(ctx context.Context, projectKey, logicalType string) (corejira.CreateMeta, error) {
-	names := jiraTypeNames([]string{logicalType}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
+	pt, err := b.resolveTypes(ctx, projectKey)
+	if err != nil {
+		return corejira.CreateMeta{}, fmt.Errorf("read the issue types of %s: %w", projectKey, err)
+	}
+	names := jiraTypeNames([]string{logicalType}, b.requirementType, pt)
 	if len(names) == 0 {
 		return corejira.CreateMeta{}, fmt.Errorf("unknown issue type %q", logicalType)
 	}
-	typeID := ""
-	if types, err := b.c.IssueTypes(ctx, projectKey); err == nil {
-		for _, t := range types {
-			if strings.EqualFold(t.Name, names[0]) {
-				typeID = t.ID
-				break
-			}
-		}
-	}
-	return b.c.CreateMeta(ctx, projectKey, typeID, names[0])
+	return b.c.CreateMeta(ctx, projectKey, pt.ids[strings.ToLower(names[0])], names[0])
 }
 
 // CreateFields returns the create-screen fields of the type beyond the

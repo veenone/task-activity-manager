@@ -305,6 +305,22 @@ func TestCreateFieldsReadsTheScreenAndLeavesOutBaseAndUnfillableFields(t *testin
 	}
 }
 
+// Spec A1 allows the classic call only when the per-type endpoint answers
+// 404. A type list that cannot be read leaves no type id to ask that endpoint
+// with, and the classic call would list fields that are not on the screen,
+// so the read fails instead.
+func TestCreateFieldsFailsWhenTheTypeListCannotBeRead(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	if _, err := b.CreateFields(context.Background(), "DOWN", backend.TypeStory); err == nil {
+		t.Fatal("CreateFields succeeded without the project's type list")
+	}
+	for _, s := range f.searches {
+		if strings.HasPrefix(s, "createmeta") {
+			t.Errorf("no create-meta call is made without a type id: %v", f.searches)
+		}
+	}
+}
+
 // Item 2 of the ticket: a technical task drafted from a story was asked for
 // its parent a second time, because createmeta lists parent as required.
 func TestCreateFieldsNeverOffersTheParentOfASubtask(t *testing.T) {

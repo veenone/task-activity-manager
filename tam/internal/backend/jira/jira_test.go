@@ -91,6 +91,10 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write([]byte(`{"errorMessages":["not found"]}`))
 			}
+		case r.URL.Path == "/rest/api/2/project/DOWN":
+			// A project whose type list cannot be read.
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"errorMessages":["down"]}`))
 		case r.URL.Path == "/rest/api/2/project/TKT":
 			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10001","name":"Story"},{"id":"10003","name":"Technical task","subtask":true}]}`))
 		case r.URL.Path == "/rest/api/2/issue/createmeta":

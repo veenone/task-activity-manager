@@ -43,10 +43,13 @@ type Backend struct {
 }
 
 // projectTypes are the Jira names one project gives the two levels TAM cannot
-// assume. Either is "" when the project defines no such type.
+// assume. Either is "" when the project defines no such type. ids maps each
+// type's lowercased name to its id, which the per-type create-meta endpoint
+// is asked with.
 type projectTypes struct {
 	task    string
 	subtask string
+	ids     map[string]string
 }
 
 // taskAliases are the names an instance gives the plain task level, in the
@@ -179,9 +182,12 @@ func (b *Backend) resolveTypes(ctx context.Context, projectKey string) (projectT
 	if err != nil {
 		return projectTypes{}, err
 	}
-	var pt projectTypes
+	pt := projectTypes{ids: map[string]string{}}
 	bestTask := len(taskAliases) // lower is a better match
 	for _, t := range types {
+		if _, seen := pt.ids[strings.ToLower(t.Name)]; !seen {
+			pt.ids[strings.ToLower(t.Name)] = t.ID
+		}
 		if t.Subtask {
 			if pt.subtask == "" {
 				pt.subtask = t.Name
