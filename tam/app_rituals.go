@@ -135,6 +135,9 @@ func (a *App) ritualSprint(profileID string, boardID, sprintID int) (ritualsync.
 	}
 	for _, s := range cached {
 		if s.ID == sprintID {
+			if s.Draft {
+				return ritualsync.Sprint{}, fmt.Errorf("%s is a draft sprint; Commit creates it in Jira before it gets ritual pages", s.Name)
+			}
 			return ritualsync.Sprint{Info: ritualsync.Info(s, a.boardName(profileID, boardID)), State: s.State}, nil
 		}
 	}

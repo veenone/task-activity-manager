@@ -91,11 +91,13 @@ func TestARefreshAfterADeleteWritesAnEmptyAnswerBecauseItIsTrue(t *testing.T) {
 }
 
 // preLifecycleBackend answers the four methods a ceremony backend answered
-// before this package grew CreateSprint, EditSprint, and DeleteSprint. It
-// is what Service.board() must refuse: a backend that can start and
-// complete a sprint but cannot create, edit, or delete one is not the
-// lifecycle interface asks for, and the refusal has to say so in words that
-// cover all six writes, not just the two this double still answers.
+// before this package grew EditSprint and DeleteSprint (Create never joined
+// the lifecycle interface at all: creating a sprint is journaled now, and
+// issuerepo does the writing). It is what Service.board() must refuse: a
+// backend that can start and complete a sprint but cannot edit or delete one
+// is not the lifecycle interface asks for, and the refusal has to say so in
+// words that cover every write in the interface, not just the two this
+// double still answers.
 type preLifecycleBackend struct{}
 
 func (preLifecycleBackend) SearchIssuesPage(context.Context, string, string, string, []string, int, int) ([]backend.Issue, int, error) {
@@ -110,18 +112,18 @@ func (preLifecycleBackend) StartSprint(context.Context, int, backend.SprintDraft
 }
 func (preLifecycleBackend) CompleteSprint(context.Context, int) error { return nil }
 
-// TestBoardRefusesABackendThatCannotCreateEditOrDeleteSprints pins down both
+// TestBoardRefusesABackendThatCannotEditOrDeleteSprints pins down both
 // the refusal and its wording: a backend answering only the four methods
-// that existed before create, edit, and delete were added must still be
+// that existed before edit and delete were added must still be
 // refused by Service.board(), with the one sentence a ceremony returns for
-// every kind of unsupported backend, wide enough now to cover all six
-// writes rather than only Start and Complete.
-func TestBoardRefusesABackendThatCannotCreateEditOrDeleteSprints(t *testing.T) {
+// every kind of unsupported backend, wide enough now to cover every write in
+// the lifecycle interface rather than only Start and Complete.
+func TestBoardRefusesABackendThatCannotEditOrDeleteSprints(t *testing.T) {
 	s := &Service{b: preLifecycleBackend{}}
 
 	_, err := s.board()
 	if err == nil {
-		t.Fatal("board() = nil error, want a refusal: this backend cannot create, edit, or delete a sprint")
+		t.Fatal("board() = nil error, want a refusal: this backend cannot edit or delete a sprint")
 	}
 	want := "this connection cannot manage sprints"
 	if err.Error() != want {

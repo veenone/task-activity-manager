@@ -45,6 +45,11 @@ func Sprints(cached []boardrepo.Sprint, boardName string, withRows []int) []Spri
 	}
 	out := []Sprint{}
 	for _, s := range cached {
+		// A draft sprint is not in Jira and may never be, so it gets no
+		// pages until Commit creates it.
+		if s.Draft {
+			continue
+		}
 		if s.State == "closed" && !has[s.ID] {
 			continue
 		}

@@ -32,6 +32,9 @@ func destinationID(moveTo string, sprintID int) (string, error) {
 		return "", nil
 	}
 	n, err := strconv.Atoi(moveTo)
+	if err == nil && n < 0 {
+		return "", errors.New("a completion cannot move cards into a draft sprint; Commit the draft sprint first")
+	}
 	if err != nil || n <= 0 || strconv.Itoa(n) != moveTo {
 		return "", fmt.Errorf("sprint id %q is not a sprint id", moveTo)
 	}
