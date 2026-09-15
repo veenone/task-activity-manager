@@ -118,6 +118,27 @@ describe("EditorToolbar", () => {
     expect(screen.getByRole("tooltip")).toHaveTextContent("Add today's entry");
   });
 
+  it("dismisses a tooltip on Escape, whether the button is focused or only hovered", async () => {
+    const user = userEvent.setup();
+    render(<EditorToolbar label="Formatting" groups={groups()} />);
+    const bold = screen.getByRole("button", { name: "Bold" });
+
+    await user.tab();
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Bold (Ctrl+B)");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    expect(bold).toHaveFocus();
+
+    bold.blur();
+    await user.hover(bold);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Bold (Ctrl+B)");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    await user.unhover(bold);
+    await user.hover(bold);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Bold (Ctrl+B)");
+  });
+
   it("renders every button disabled while the toolbar is disabled, and hides none", async () => {
     const onBold = vi.fn();
     render(<EditorToolbar label="Formatting" groups={groups({ onBold })} disabled />);
@@ -189,6 +210,30 @@ describe("the link popover", () => {
     expect(screen.queryByRole("textbox", { name: "Link address" })).toBeNull();
     expect(onApply).not.toHaveBeenCalled();
     expect(button).toHaveFocus();
+  });
+
+  it("closes without applying when the pointer goes down outside it", async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn((_href: string): string | null => null);
+    render(
+      <>
+        <button type="button">Outside</button>
+        <EditorToolbar label="Formatting" groups={linkGroups({ onApply })} />
+      </>,
+    );
+    const button = screen.getByRole("button", { name: "Link" });
+    await user.click(button);
+    await user.type(screen.getByRole("textbox", { name: "Link address" }), "https://stale.test");
+    await user.click(screen.getByRole("textbox", { name: "Link address" }));
+    expect(screen.getByRole("textbox", { name: "Link address" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Outside" }));
+    expect(screen.queryByRole("textbox", { name: "Link address" })).toBeNull();
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(onApply).not.toHaveBeenCalled();
+    await user.click(button);
+    expect(screen.getByRole("textbox", { name: "Link address" })).toHaveValue("");
+    await user.click(button);
+    expect(screen.queryByRole("textbox", { name: "Link address" })).toBeNull();
   });
 
   it("keeps arrow keys inside the address box", async () => {

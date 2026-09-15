@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ReactNode, Ref } from "react";
 
 interface Props {
@@ -26,15 +26,35 @@ export function tooltipText(label: string, shortcut?: string): string {
 
 // ToolbarButton is one toolbar button and its tooltip. The tooltip shows on
 // hover and on keyboard focus alike, and describes the button whether or not
-// it is showing.
+// it is showing. Escape hides it until the next hover or focus (WCAG 1.4.13),
+// heard on the document so a tooltip shown by hover alone dismisses too.
 export function ToolbarButton({
   label, shortcut, pressed, active, expanded, disabled, unavailable, tabIndex, buttonRef, onFocus, onPress, children,
 }: Props) {
   const tipId = useId();
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const showing = (hovered || focused) && !dismissed;
+
+  useEffect(() => {
+    if (!showing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDismissed(true);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showing]);
+
   return (
-    <span className="editor-toolbar-slot" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+    <span
+      className="editor-toolbar-slot"
+      onMouseEnter={() => {
+        setHovered(true);
+        setDismissed(false);
+      }}
+      onMouseLeave={() => setHovered(false)}
+    >
       <button
         ref={buttonRef}
         type="button"
@@ -54,6 +74,7 @@ export function ToolbarButton({
         onMouseDown={(e) => e.preventDefault()}
         onFocus={() => {
           setFocused(true);
+          setDismissed(false);
           onFocus();
         }}
         onBlur={() => setFocused(false)}
@@ -64,7 +85,7 @@ export function ToolbarButton({
       >
         {children}
       </button>
-      <span role="tooltip" id={tipId} className="editor-toolbar-tooltip" hidden={!(hovered || focused)}>
+      <span role="tooltip" id={tipId} className="editor-toolbar-tooltip" hidden={!showing}>
         {tooltipText(label, shortcut)}
       </span>
     </span>

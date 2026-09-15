@@ -26,6 +26,7 @@ export function EditorToolbar({ label, groups, disabled = false }: Props) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [openLink, setOpenLink] = useState<string | null>(null);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
+  const openWrap = useRef<HTMLSpanElement>(null);
   const current = (focusId !== null && positions.get(focusId)) || 0;
 
   // Controller ruling F2: a toolbar disabled while the link popover is open
@@ -34,6 +35,18 @@ export function EditorToolbar({ label, groups, disabled = false }: Props) {
   useEffect(() => {
     if (disabled) setOpenLink(null);
   }, [disabled]);
+
+  // A pointer going down anywhere outside the open popover and its button
+  // closes it unapplied, so an address typed and abandoned does not linger.
+  // Focus stays where the pointer put it.
+  useEffect(() => {
+    if (openLink === null) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target instanceof Node) || !openWrap.current?.contains(e.target)) setOpenLink(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [openLink]);
 
   const moveTo = (index: number) => {
     if (items.length === 0) return;
@@ -82,7 +95,7 @@ export function EditorToolbar({ label, groups, disabled = false }: Props) {
       case "link": {
         const open = openLink === item.id && !disabled;
         return (
-          <span key={item.id} className="editor-toolbar-link">
+          <span key={item.id} className="editor-toolbar-link" ref={open ? openWrap : undefined}>
             <ToolbarButton {...common} active={item.href !== null} expanded={open} onPress={() => setOpenLink(open ? null : item.id)}>
               <ToolbarIcon name="link" />
             </ToolbarButton>
