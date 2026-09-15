@@ -703,11 +703,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-page-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .ritual-page-head h3 { margin: 0; font-size: 15px; }
 .ritual-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.ritual-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
-.ritual-toolbar .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-.ritual-toolbar .ritual-add-entry { margin-left: auto; }
-.ritual-link-input { display: inline-flex; gap: 4px; align-items: center; }
-.ritual-link-input input { width: 220px; }
+.ritual-editor .editor-toolbar-group[data-group="ritual"] { margin-left: auto; border-right: 0; }
 .ritual-editor-content { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
 .ritual-editor-content .ProseMirror { outline: none; min-height: 100%; }
 .ritual-editor-content table { border-collapse: collapse; margin: 8px 0; }

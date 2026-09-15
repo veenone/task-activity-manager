@@ -22,6 +22,7 @@ export const NO_SCRUM_BOARD_SENTENCE = "No scrum board has been synced for this 
 export const ENTRY_EXISTS = "Today's entry is already in the log.";
 export const DAILY_LOG_MISSING = "The Daily log heading is gone, so there is nowhere to add today's entry.";
 export const ENTRY_UNREADABLE = "Today's entry could not be read.";
+export const LINK_REFUSED = "Links must start with http://, https:// or mailto:.";
 
 export function clock(iso: string): string {
   const d = new Date(iso);

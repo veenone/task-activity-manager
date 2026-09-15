@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeHtml } from "./sanitizeHtml";
+import { isAllowedLink, sanitizeHtml } from "./sanitizeHtml";
 
 function hrefOf(html: string, selector = "a"): string | null {
   const host = document.createElement("div");
@@ -43,5 +43,19 @@ describe("sanitizeHtml", () => {
     expect(a.hasAttribute("style")).toBe(false);
     expect(b.hasAttribute("style")).toBe(false);
     expect(c.getAttribute("style")).toBe("color: red");
+  });
+});
+
+describe("isAllowedLink", () => {
+  it("allows http, https and mailto addresses, in any case", () => {
+    for (const href of ["https://example.com", "http://example.com/a?b=1", "MAILTO:team@example.com", "HTTPS://EXAMPLE.COM"]) {
+      expect(isAllowedLink(href)).toBe(true);
+    }
+  });
+
+  it("refuses other schemes, disguised ones, and relative addresses", () => {
+    for (const href of ["javascript:alert(1)", "java\tscript:alert(1)", " javascript:alert(1)", "data:text/html,x", "ftp://example.com", "example.com", "/wiki/x", ""]) {
+      expect(isAllowedLink(href)).toBe(false);
+    }
   });
 });

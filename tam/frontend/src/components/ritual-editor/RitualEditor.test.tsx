@@ -1,9 +1,9 @@
 import { createRef, useState } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import * as api from "../../api";
-import { READ_ONLY_SENTENCE, ENTRY_EXISTS, ENTRY_UNREADABLE } from "../../lib/ritualText";
+import { READ_ONLY_SENTENCE, ENTRY_EXISTS, ENTRY_UNREADABLE, LINK_REFUSED } from "../../lib/ritualText";
 import { RitualEditor } from "./RitualEditor";
 import type { RitualEditorHandle } from "./RitualEditor";
 
@@ -74,18 +74,20 @@ describe("RitualEditor", () => {
 
   // A Sync must not meet keystrokes typed after its flush, and must not cost
   // the caret or undo history either, so the lock is setEditable on the same
-  // instance rather than a rebuild.
-  it("is not editable while locked and editable again once unlocked, on the same editor", async () => {
+  // instance rather than a rebuild. The toolbar stays drawn, disabled, so the
+  // page does not jump when a Sync starts.
+  it("is not editable while locked, with its toolbar disabled not hidden, and editable again on the same editor", async () => {
     const ref = createRef<RitualEditorHandle>();
     const { rerender } = render(<RitualEditor ref={ref} profileId="p1" doc={doc()} locked />);
     await screen.findByText("ship it");
     const before = ref.current!.editor!;
     await waitFor(() => expect(before.isEditable).toBe(false));
-    expect(screen.queryByRole("toolbar", { name: "Formatting" })).toBeNull();
+    const locked = screen.getByRole("toolbar", { name: "Formatting" });
+    for (const button of within(locked).getAllByRole("button")) expect(button).toBeDisabled();
     rerender(<RitualEditor ref={ref} profileId="p1" doc={doc()} locked={false} />);
     await waitFor(() => expect(ref.current!.editor!.isEditable).toBe(true));
     expect(ref.current!.editor).toBe(before);
-    expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeInTheDocument();
+    expect(within(screen.getByRole("toolbar", { name: "Formatting" })).getByRole("button", { name: "Bold" })).toBeEnabled();
   });
 
   it("flushes a pending edit immediately when asked", async () => {
@@ -284,5 +286,58 @@ describe("RitualEditor", () => {
     render(<RitualEditor profileId="p1" doc={doc()} />);
     await screen.findByText("ship it");
     expect(screen.queryByRole("button", { name: "Add today's entry" })).toBeNull();
+  });
+
+  it("offers the formatting groups this editor supports", async () => {
+    render(<RitualEditor profileId="p1" doc={doc()} />);
+    await screen.findByText("ship it");
+    const bar = screen.getByRole("toolbar", { name: "Formatting" });
+    expect(within(bar).getAllByRole("group").map((g) => g.getAttribute("aria-label"))).toEqual(["Text", "Headings", "Lists", "Insert", "History"]);
+    for (const name of ["Bold", "Italic", "Underline", "Strikethrough", "Heading 2", "Heading 3", "Bullet list", "Numbered list", "Task list", "Insert table", "Link", "Undo", "Redo"]) {
+      expect(within(bar).getByRole("button", { name })).toBeInTheDocument();
+    }
+    // A page just opened has nothing to undo.
+    expect(within(bar).getByRole("button", { name: "Undo" })).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("puts Add today's entry in its own Standup group", async () => {
+    render(<RitualEditor profileId="p1" doc={doc({ ritualType: "standup", body: "<h2>Daily log</h2><h3>Mon 14 Sep 2026</h3><p>y</p>" })} />);
+    await screen.findByText("Mon 14 Sep 2026");
+    const group = screen.getByRole("group", { name: "Standup" });
+    expect(within(group).getByRole("button", { name: "Add today's entry" })).toHaveTextContent("+ Add today's entry");
+  });
+
+  it("draws no toolbar on a read-only page", async () => {
+    render(<RitualEditor profileId="p1" readOnly doc={doc()} />);
+    await screen.findByText("ship it");
+    expect(screen.queryByRole("toolbar", { name: "Formatting" })).toBeNull();
+  });
+
+  it("bolds the selection from the toolbar, shows it pressed, and saves it", async () => {
+    const ref = createRef<RitualEditorHandle>();
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} saveDelayMs={10} />);
+    await screen.findByText("ship it");
+    act(() => { ref.current!.editor!.commands.selectAll(); });
+    const bold = screen.getByRole("button", { name: "Bold" });
+    await userEvent.click(bold);
+    await waitFor(() => expect(bold).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalled());
+    expect(vi.mocked(api.SaveRitualBody).mock.calls.at(-1)![4]).toContain("<strong>");
+  });
+
+  it("refuses a link scheme it does not allow and says why, then links an https address", async () => {
+    const ref = createRef<RitualEditorHandle>();
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc()} />);
+    await screen.findByText("ship it");
+    act(() => { ref.current!.editor!.commands.selectAll(); });
+    await userEvent.click(screen.getByRole("button", { name: "Link" }));
+    const input = screen.getByRole("textbox", { name: "Link address" });
+    await userEvent.type(input, "javascript:alert(1){Enter}");
+    expect(await screen.findByText(LINK_REFUSED)).toBeInTheDocument();
+    expect(ref.current!.editor!.getHTML()).not.toContain("javascript");
+    await userEvent.clear(input);
+    await userEvent.type(input, "https://example.com/notes{Enter}");
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Link address" })).toBeNull());
+    expect(ref.current!.editor!.getHTML()).toContain('href="https://example.com/notes"');
   });
 });

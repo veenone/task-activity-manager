@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent, Ref } from "react";
-import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import type { ChainedCommands, Editor } from "@tiptap/core";
-import { announce, errMsg } from "@agile-suite/core";
+import { EditorContent, useEditor } from "@tiptap/react";
+import type { Editor } from "@tiptap/core";
+import { EditorToolbar, announce, errMsg } from "@agile-suite/core";
 import { BrowserOpenURL, SaveRitualBody, StandupEntry } from "../../api";
 import type { RitualDocument } from "../../api";
 import { parseStorage } from "../../lib/storage/parse";
@@ -12,6 +12,7 @@ import { findTodaysEntry, localDay } from "../../lib/standupLog";
 import { DAILY_LOG_MISSING, ENTRY_EXISTS, ENTRY_UNREADABLE, READ_ONLY_SENTENCE, editorStatusLine } from "../../lib/ritualText";
 import { RitualEditorContext } from "./context";
 import { ritualExtensions } from "./extensions";
+import { useRitualToolbar } from "./useRitualToolbar";
 
 export const SAVE_DELAY_MS = 800;
 
@@ -43,8 +44,6 @@ interface Props {
   saveDelayMs?: number;
   ref?: Ref<RitualEditorHandle>;
 }
-
-type Run = (chain: ChainedCommands) => ChainedCommands;
 
 // RitualEditor edits one ritual page. It saves locally, 800 ms after an edit
 // that actually changes the page's serialized text, on Ctrl+S, on flush, and
@@ -214,11 +213,6 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
     if (pending.current !== null) void saveRef.current();
   }, []);
 
-  const act = (run: Run) => {
-    if (!editor) return;
-    run(editor.chain().focus()).run();
-  };
-
   const onKeyDown = (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
@@ -257,6 +251,8 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
     }
   }
 
+  const toolbar = useRitualToolbar(editor, { standup: doc.ritualType === "standup", onAddEntry: () => void addTodaysEntry() });
+
   if (!parsed.ok) {
     return (
       <div className="ritual-readonly" onClickCapture={(e) => openLinkOutside(e, true)}>
@@ -274,72 +270,12 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
         onKeyDownCapture={onKeyDown}
         onClickCapture={(e) => openLinkOutside(e, !editable || locked || e.ctrlKey || e.metaKey)}
       >
-        {editable && !locked && editor && <Toolbar editor={editor} act={act} standup={doc.ritualType === "standup"} onAddEntry={() => void addTodaysEntry()} />}
+        {/* Disabled, not hidden, while a Sync holds the page: the layout stays put. */}
+        {editable && editor && <EditorToolbar label="Formatting" groups={toolbar} disabled={locked} />}
         {notice && <p className="muted small ritual-notice" role="status">{notice}</p>}
         <EditorContent editor={editor} className="ritual-editor-content" />
         {editable && <p className="ritual-status-line muted small">{editorStatusLine({ doc, saving, saveError, savedAt })}</p>}
       </div>
     </RitualEditorContext.Provider>
-  );
-}
-
-function Toolbar({ editor, act, standup, onAddEntry }: { editor: Editor; act: (run: Run) => void; standup: boolean; onAddEntry: () => void }) {
-  const active = useEditorState({
-    editor,
-    selector: ({ editor: e }) => ({
-      bold: e.isActive("bold"),
-      italic: e.isActive("italic"),
-      h2: e.isActive("heading", { level: 2 }),
-      h3: e.isActive("heading", { level: 3 }),
-      bullet: e.isActive("bulletList"),
-      ordered: e.isActive("orderedList"),
-      tasks: e.isActive("taskList"),
-      link: e.isActive("link"),
-    }),
-  });
-  const [href, setHref] = useState<string | null>(null);
-
-  const buttons: { label: string; text: string; run: Run; pressed?: boolean }[] = [
-    { label: "Bold", text: "B", run: (c) => c.toggleBold(), pressed: active.bold },
-    { label: "Italic", text: "I", run: (c) => c.toggleItalic(), pressed: active.italic },
-    { label: "Heading 2", text: "H2", run: (c) => c.toggleHeading({ level: 2 }), pressed: active.h2 },
-    { label: "Heading 3", text: "H3", run: (c) => c.toggleHeading({ level: 3 }), pressed: active.h3 },
-    { label: "Bullet list", text: "• List", run: (c) => c.toggleBulletList(), pressed: active.bullet },
-    { label: "Numbered list", text: "1. List", run: (c) => c.toggleOrderedList(), pressed: active.ordered },
-    { label: "Task list", text: "☐ Tasks", run: (c) => c.toggleTaskList(), pressed: active.tasks },
-    { label: "Insert table", text: "Table", run: (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
-    { label: "Undo", text: "Undo", run: (c) => c.undo() },
-    { label: "Redo", text: "Redo", run: (c) => c.redo() },
-  ];
-
-  function applyLink() {
-    const value = (href ?? "").trim();
-    act((c) => (value ? c.extendMarkRange("link").setLink({ href: value }) : c.extendMarkRange("link").unsetLink()));
-    setHref(null);
-  }
-
-  return (
-    <div className="ritual-toolbar" role="toolbar" aria-label="Formatting">
-      {buttons.map((b) => (
-        <button key={b.label} type="button" className="btn btn-ghost" aria-label={b.label}
-          aria-pressed={b.pressed === undefined ? undefined : b.pressed}
-          onMouseDown={(e) => e.preventDefault()} onClick={() => act(b.run)}>
-          {b.text}
-        </button>
-      ))}
-      <button type="button" className="btn btn-ghost" aria-label="Link" aria-pressed={active.link}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setHref(href === null ? String(editor.getAttributes("link").href ?? "") : null)}>
-        Link
-      </button>
-      {href !== null && (
-        <span className="ritual-link-input">
-          <input aria-label="Link address" value={href} placeholder="https://" onChange={(e) => setHref(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyLink(); } if (e.key === "Escape") setHref(null); }} />
-          <button type="button" className="btn btn-ghost" onClick={applyLink}>Apply</button>
-        </span>
-      )}
-      {standup && <button type="button" className="btn btn-ghost ritual-add-entry" onClick={onAddEntry}>Add today's entry</button>}
-    </div>
   );
 }

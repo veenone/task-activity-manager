@@ -20,6 +20,15 @@ function safeUrl(value: string): boolean {
   return !scheme || SAFE_SCHEMES.has(scheme[1].toLowerCase());
 }
 
+// isAllowedLink is what the editor's link box accepts: an address whose
+// scheme, read after compact the way safeUrl reads it, is http, https or
+// mailto. Unlike safeUrl it refuses a relative address, which on a page that
+// lives in Confluence and in TAM at once points nowhere useful.
+export function isAllowedLink(value: string): boolean {
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compact(value));
+  return !!scheme && SAFE_SCHEMES.has(scheme[1].toLowerCase());
+}
+
 // A style can load a URL or, in old engines, run script. A backslash is
 // refused with them, since a CSS escape can spell either word.
 function unsafeStyle(value: string): boolean {
