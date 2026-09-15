@@ -23,8 +23,8 @@ import (
 // RekeySprint rewrites the id everywhere before any move naming it is sent.
 //
 // This package writes those sprint rows although the sprint table is
-// boardrepo's. It writes only draft = 1 rows and the one statement that
-// turns one real, because the row has to land and go in the same
+// boardrepo's. It writes only draft = 1 rows and RekeySprint's two
+// statements that turn one real, both on the draft's own board, because the row has to land and go in the same
 // transaction as its journal row, and a discard has to revert the moves into
 // it in that transaction too; two repositories would mean two transactions
 // and a crash window leaving a sprint nobody can discard.
@@ -150,7 +150,7 @@ func (r *Repository) EditDraftSprint(ctx context.Context, profileID string, draf
 	key := strconv.Itoa(draftID)
 	var made backend.Sprint
 	err := r.inTx(ctx, func(tx *sql.Tx) error {
-		was, err := readDraftSprint(ctx, tx, profileID, key)
+		was, _, err := readDraftSprint(ctx, tx, profileID, key)
 		if err != nil {
 			return err
 		}
@@ -202,23 +202,24 @@ func (r *Repository) DiscardDraftSprint(ctx context.Context, profileID string, d
 	})
 }
 
-// readDraftSprint decodes the draft a sprint_create row carries.
-func readDraftSprint(ctx context.Context, tx *sql.Tx, profileID, key string) (DraftSprint, error) {
+// readDraftSprint decodes the draft a sprint_create row carries, and answers
+// with the stored text beside it for the audit entry that retires the row.
+func readDraftSprint(ctx context.Context, tx *sql.Tx, profileID, key string) (DraftSprint, string, error) {
 	var raw string
 	err := tx.QueryRowContext(ctx,
 		`SELECT after_val FROM pending_change WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
 		profileID, EntitySprintCreate, key).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
-		return DraftSprint{}, ErrDraftSprintGone
+		return DraftSprint{}, "", ErrDraftSprintGone
 	}
 	if err != nil {
-		return DraftSprint{}, fmt.Errorf("read draft sprint %s: %w", key, err)
+		return DraftSprint{}, "", fmt.Errorf("read draft sprint %s: %w", key, err)
 	}
 	var d DraftSprint
 	if err := json.Unmarshal([]byte(raw), &d); err != nil {
-		return DraftSprint{}, fmt.Errorf("decode draft sprint %s: %w", key, err)
+		return DraftSprint{}, "", fmt.Errorf("decode draft sprint %s: %w", key, err)
 	}
-	return d, nil
+	return d, raw, nil
 }
 
 // discardDraftSprint is what discarding a sprint_create row takes with it:

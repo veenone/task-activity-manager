@@ -12,7 +12,9 @@ import (
 // Rekey moves a draft to the key Jira assigned, across the row, its links,
 // its journal rows, and its audit trail, and repoints any issue or pending
 // edit that named the temporary key, the parent of an edit and the
-// neighbour of a rank alike, journals the sprint the draft was created with
+// neighbour of a rank alike, and repoints every other draft whose own JSON
+// names the temporary key as its parent, and every link whose target it is,
+// journals the sprint the draft was created with
 // as a move under the real key, and audits the creation.
 func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -31,6 +33,16 @@ func (r *Repository) Rekey(ctx context.Context, profileID, tempKey, realKey stri
 		if _, err := tx.ExecContext(ctx, stmt, realKey, profileID, tempKey); err != nil {
 			return fmt.Errorf("rekey %s to %s: %w", tempKey, realKey, err)
 		}
+	}
+	// A draft's parent is in its create JSON, which none of the UPDATEs
+	// above reach, and the next phase of the same Commit posts that JSON.
+	if err := rewriteParentKey(ctx, tx, profileID, tempKey, realKey); err != nil {
+		return err
+	}
+	// A link to the draft is journaled under its source, with the target
+	// packed into the field and the JSON, so neither UPDATE above reaches it.
+	if err := rewriteLinkTarget(ctx, tx, profileID, tempKey, realKey); err != nil {
+		return err
 	}
 	// A rank's neighbour is packed into after_val beside the side it was
 	// dropped on, so no UPDATE over the whole column can repoint it.
