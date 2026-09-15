@@ -23,7 +23,11 @@ func (r *Repository) DiscardPendingChange(ctx context.Context, profileID string,
 }
 
 // DiscardAllPendingChanges reverts every journal row of the profile and
-// returns how many it reverted.
+// returns how many it reverted. That count is not len(all): discarding a
+// draft sprint's sprint_create row cascades and removes the moves into it
+// along with it (discardDraftSprint), so a row read into all at the start
+// can already be gone by the time its own turn in the loop comes up. n only
+// grows for a row still found at that moment.
 func (r *Repository) DiscardAllPendingChanges(ctx context.Context, profileID string) (int, error) {
 	n := 0
 	err := r.inTx(ctx, func(tx *sql.Tx) error {
@@ -32,11 +36,18 @@ func (r *Repository) DiscardAllPendingChanges(ctx context.Context, profileID str
 			return err
 		}
 		for _, p := range all {
+			// Discarding a draft sprint takes the moves into it along with
+			// it, so a row read at the start may already be gone.
+			if _, err := journal.Get(tx, profileID, p.ID); errors.Is(err, journal.ErrNotFound) {
+				continue
+			} else if err != nil {
+				return err
+			}
 			if err := discardOne(ctx, tx, profileID, p); err != nil {
 				return err
 			}
+			n++
 		}
-		n = len(all)
 		return nil
 	})
 	if err != nil {
@@ -76,6 +87,10 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM issue WHERE profile_id = ? AND key = ?`, profileID, p.EntityKey); err != nil {
 			return fmt.Errorf("drop draft %s: %w", p.EntityKey, err)
+		}
+	case p.EntityType == EntitySprintCreate:
+		if err := discardDraftSprint(ctx, tx, profileID, p.EntityKey); err != nil {
+			return err
 		}
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
