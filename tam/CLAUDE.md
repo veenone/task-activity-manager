@@ -248,8 +248,12 @@ only, not done only. Only those three preview from cache; a bare
 planning page writable offline; closed sprint get none. `ritualsync.Run` =
 Sync pass under `a.acquire(p.ID, "rituals")`: title match space wide (titles
 unique per space), adopt under root, refuse elsewhere by name, create, pull,
-push base+1, 409 or remote-newer-and-dirty = conflict, 404 = gone and never
-silently recreated. **Every row write blind to body or compare-and-set on body
+push base+1, remote-newer-and-dirty = conflict, 404 = gone and never
+silently recreated. 409 on push re-read: newer version = conflict, 404 =
+gone, same version = push failed (title clash, say) and row left as is,
+since conflict at base version claim newer page that is not newer and Keep
+mine loop on it. Sprint page gone or refused still let rituals that already
+have page reconcile; only placing new ones wait. **Every row write blind to body or compare-and-set on body
 read at pass start**, so save landing mid-push stay unsynced and mid-pull
 become conflict, never overwrite. Base after push = body pushed, never
 Confluence answer: Confluence normalise storage on save, and base from its
@@ -257,7 +261,17 @@ answer leave page dirty forever. Per-page trouble travel in `Result.Failed`,
 not Go error (Wails either/or).
 
 Local writes take no lock (`SaveRitualBody`, resolve, forget, delete, ensure),
-same as board moves; compare-and-set make that safe. Demo Confluence URL
+same as board moves; compare-and-set make that safe. Other direction need own
+guard: `SaveBody` take version and page id editor was opened on and update
+only while row still hold both, else `ErrChangedUnderEditor` ("This page
+changed while you were editing..."), shown on editor status line with text
+left pending. Without it, text typed over page Sync pulled or created
+overwrite it locally and next Sync push it over newer remote, no conflict.
+`RemoveBoards` leave `ritual_document` alone: text people wrote, maybe never
+pushed, and board leave Jira list for reasons that say nothing about it
+(setting off, location change, lost permission). Only `PurgeProfile` remove
+it. Demo rebuild restore conflict row from `conflict_body`/`conflict_version`,
+since adopted page never had base. Demo Confluence URL
 "demo" = `internal/demo.Confluence`, in memory, rebuilt from stored pages on
 first use after restart (a page whose status is gone skipped, so it never
 comes back under its old title and a later adopt sees a genuinely new page,
@@ -269,7 +283,13 @@ board or sprint mid-sync cannot overwrite what is on screen with another
 sprint's result; both pickers disable for the run (`running === "rituals"`).
 `onSaved`, the editor's own save landing after such a switch, replace a
 document only when board, sprint and ritual type all match what the current
-list holds, and drop one that matches nothing rather than graft it in.
+list holds, and drop one that matches nothing rather than graft it in. Same
+captured-id check guard Sync error and reload after Keep mine, Take theirs,
+Recreate, Remove. Editor `locked` from Sync press until its reload land
+(`setEditable` on same instance, toolbar hidden, never a rebuild): lock alone
+release before reload remount editor, and keystroke in that gap would be
+saved against replaced version and refused. Open in Confluence built only
+from http or https base URL.
 
 Frontend `lib/storage` convert storage XHTML to TipTap JSON and back.
 Everything not modelled = opaque node carrying raw XML, written back byte for
@@ -280,7 +300,14 @@ exactly "complete" or "incomplete", a colspan/rowspan that is not a plain
 integer greater than one, an empty `<strong>` or `<a>` with no text to carry
 the mark. Namespace declarations strip only inside start tags, never out of
 text or CDATA, so a code sample quoting one is left alone. Page that will not
-parse open read only.
+parse open read only. Link click never navigate WebView (that take whole app
+away from TAM): absolute http or https open in browser from read-only surface
+or on Ctrl/Cmd click while editing, anything else go nowhere. `sanitizeHtml`
+allow only http, https, mailto, relative in `href`, `src`, `xlink:href`,
+`action`, scheme read after dropping control characters and whitespace
+(`java&#9;script:` is javascript to browser), and drop style with `url(` or
+`expression(`. Whole storage corpus (`lib/storage/corpus.ts`, test only) go
+through editor real schema in `schemaRoundTrip.test.ts`, not just templates.
 
 Editor saves when the serialized document differs from what was last saved
 (the baseline serialized the moment it is created), never on a `touched`
