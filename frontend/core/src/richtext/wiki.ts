@@ -46,27 +46,31 @@ function matchBq(line: string): string | null {
   return null;
 }
 
-function matchCodeOpen(line: string): { lang: string } | null {
-  if (!line.startsWith("{code")) return null;
-  const rest = line.slice(5);
-  if (rest === "}") return { lang: "" };
+// matchBraceTag recognises "{name}" or "{name:attrs}" as an opening tag,
+// but only when the closing "}" is the line's last character; it returns
+// the attrs segment ("" for the bare "{name}" form) or null otherwise.
+// Shared by matchCodeOpen and matchPanelOpen, the two tags that carry
+// attributes on their opening line.
+function matchBraceTag(line: string, name: string): string | null {
+  if (!line.startsWith(name)) return null;
+  const rest = line.slice(name.length);
+  if (rest === "}") return "";
   if (rest[0] !== ":") return null;
   const closeIdx = rest.indexOf("}");
   if (closeIdx === -1 || closeIdx !== rest.length - 1) return null;
-  let lang = rest.slice(1, closeIdx);
-  const pipeIdx = lang.indexOf("|");
-  if (pipeIdx !== -1) lang = lang.slice(0, pipeIdx);
-  return { lang };
+  return rest.slice(1, closeIdx);
+}
+
+function matchCodeOpen(line: string): { lang: string } | null {
+  const attrs = matchBraceTag(line, "{code");
+  if (attrs === null) return null;
+  const pipeIdx = attrs.indexOf("|");
+  return { lang: pipeIdx === -1 ? attrs : attrs.slice(0, pipeIdx) };
 }
 
 function matchPanelOpen(line: string): { title: string } | null {
-  if (!line.startsWith("{panel")) return null;
-  const rest = line.slice(6);
-  if (rest === "}") return { title: "" };
-  if (rest[0] !== ":") return null;
-  const closeIdx = rest.indexOf("}");
-  if (closeIdx === -1 || closeIdx !== rest.length - 1) return null;
-  const attrs = rest.slice(1, closeIdx);
+  const attrs = matchBraceTag(line, "{panel");
+  if (attrs === null) return null;
   let title = "";
   for (const part of attrs.split("|")) {
     if (part.startsWith("title=")) title = part.slice(6);
@@ -101,14 +105,20 @@ function isBlockStart(line: string): boolean {
 
 type ListBlock = Extract<Block, { t: "list" }>;
 
-// buildList turns a run of consecutive list-marker lines into one nested
-// list tree. Depth is the marker run's length; the marker character at that
+// buildList turns a run of consecutive list-marker lines into a nested list
+// tree, and can return more than one root: a top-level marker whose type
+// (bullet/ordered) differs from the list currently open at that depth pops
+// the stack to empty, same as any other depth/type mismatch, and an empty
+// stack starts a new sibling root rather than reusing the old one. That is
+// what makes "* a\n# b" (or a nested list followed by a top-level type
+// switch) two lists in order instead of the second silently replacing the
+// first. Depth is the marker run's length; the marker character at that
 // depth (the last one in the run, e.g. the "*" in "#*") decides that level's
 // own ordered/unordered type, so "#*" is a bullet item nested inside an
 // ordered item.
-function buildList(entries: { markers: string; content: string }[]): Block {
+function buildList(entries: { markers: string; content: string }[]): Block[] {
   const stack: { depth: number; ordered: boolean; block: ListBlock }[] = [];
-  let root: ListBlock | undefined;
+  const roots: ListBlock[] = [];
 
   for (const entry of entries) {
     const depth = entry.markers.length;
@@ -125,7 +135,7 @@ function buildList(entries: { markers: string; content: string }[]): Block {
     if (stack.length === 0 || stack[stack.length - 1].depth < depth) {
       const block: ListBlock = { t: "list", ordered, items: [] };
       if (stack.length === 0) {
-        root = block;
+        roots.push(block);
       } else {
         const parent = stack[stack.length - 1];
         const parentItem = parent.block.items[parent.block.items.length - 1];
@@ -138,8 +148,7 @@ function buildList(entries: { markers: string; content: string }[]): Block {
     top.block.items.push({ children: [{ t: "p", children: lineToInline(entry.content) }] });
   }
 
-  // entries is never empty when buildList is called, so root is always set.
-  return root!;
+  return roots;
 }
 
 // parseTableRow splits one "|"-prefixed line into cells. A cell opens with
@@ -262,7 +271,7 @@ function parseBlockLines(lines: string[], start: number, end: number): Block[] {
         entries.push(marker);
         j++;
       }
-      blocks.push(buildList(entries));
+      blocks.push(...buildList(entries));
       i = j;
       continue;
     }

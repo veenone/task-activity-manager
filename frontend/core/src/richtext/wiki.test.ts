@@ -124,6 +124,58 @@ describe("parseWiki lists", () => {
     ]);
   });
 
+  it("starts a new sibling list when the top-level marker type switches", () => {
+    expect(parseWiki("* a\n# b")).toEqual([
+      { t: "list", ordered: false, items: [{ children: [{ t: "p", children: text("a") }] }] },
+      { t: "list", ordered: true, items: [{ children: [{ t: "p", children: text("b") }] }] },
+    ]);
+  });
+
+  it("keeps every item across two type switches, dropping nothing", () => {
+    expect(parseWiki("* a\n** b\n* c\n# d")).toEqual([
+      {
+        t: "list",
+        ordered: false,
+        items: [
+          {
+            children: [
+              { t: "p", children: text("a") },
+              {
+                t: "list",
+                ordered: false,
+                items: [{ children: [{ t: "p", children: text("b") }] }],
+              },
+            ],
+          },
+          { children: [{ t: "p", children: text("c") }] },
+        ],
+      },
+      { t: "list", ordered: true, items: [{ children: [{ t: "p", children: text("d") }] }] },
+    ]);
+  });
+
+  it("closes a nested list and starts a new sibling on a top-level type switch", () => {
+    expect(parseWiki("* a\n** b\n# c")).toEqual([
+      {
+        t: "list",
+        ordered: false,
+        items: [
+          {
+            children: [
+              { t: "p", children: text("a") },
+              {
+                t: "list",
+                ordered: false,
+                items: [{ children: [{ t: "p", children: text("b") }] }],
+              },
+            ],
+          },
+        ],
+      },
+      { t: "list", ordered: true, items: [{ children: [{ t: "p", children: text("c") }] }] },
+    ]);
+  });
+
   it("ends a list at a blank line", () => {
     expect(parseWiki("* a\n* b\n\nNext paragraph")).toEqual([
       {
