@@ -23,6 +23,27 @@ commit hash behind it; the instruction gate checks the hash exists.
   needs no migration entry, only a version bump; a new column on an existing
   table does need one, in the `AddColumnIfMissing` shape.
 
+## Opening the local database
+
+- Migrations run before indexes, or an old database fails to upgrade: an index
+  built against a column a pending migration has not added yet aborts the open
+  (0021930).
+- The store opens in WAL mode with no single-connection cap, and retries a
+  transient lock on startup rather than failing the launch (9633cdd, 4888574).
+
+## Jira issue links
+
+- Issue links are directional and the direction carries the meaning. Coverage
+  reads as "tested by" from one side and something else from the other, so a
+  link is resolved by direction, never by type name alone (6ef4b6d, 0218fca).
+
+## Modals
+
+- Modal layering and backgrounds have cost four separate fixes: the grid header
+  painted over every modal (db86b4f), modal cards had no background (425e65f),
+  and two more reworked modal layout (a36b1dd, 8b46d9c). The dialog primitives
+  in frontend/core exist because of this; the Modals contract is the rule.
+
 ## Demo mode
 
 - Demo data must never fabricate state that only a real operation produces.

@@ -44,6 +44,12 @@ Path: plain text in the component that renders it.
 Never: an em dash in a user-visible string.
 Gate: the ratchet holds ui_em_dashes; comments and docs are exempt.
 
+### Modals
+Owns: dialogs, overlays, and their stacking against the app chrome.
+Path: the primitives in `frontend/core/src/components/Modal.tsx` and the `useConfirm`, `usePrompt`, `useNotice` hooks beside it.
+Never: bespoke modal, overlay, or backdrop markup in an app workspace.
+Gate: the ratchet holds bespoke_modals; four fixes have been spent on modal layering and backgrounds.
+
 ## Project rules
 
 - Run Go commands from the module directory (`core`, `tam`, `xtm`); run npm commands from the repo root. Run `git config core.hooksPath .githooks` once per clone so the pre-commit gates exist.

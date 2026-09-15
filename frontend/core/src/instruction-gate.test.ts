@@ -54,6 +54,15 @@ const GREP_GATES: { name: string; dirs: string[]; ext: RegExp; pattern: RegExp; 
     // A module may import its own internal tree.
     exempt: (rel) => rel.startsWith('tam/') || rel.startsWith('xtm/'),
   },
+  {
+    // The Credentials contract named this gate before it existed (M1).
+    // Clean today, so it is zero-tolerance rather than a ratchet.
+    name: 'Credentials: no token reaching a log or SQL call',
+    dirs: GO_DIRS,
+    ext: GO_EXT,
+    pattern: /(log\.(?:Print|Fatal)\w*|ExecContext|QueryContext|\bExec|\bQuery)\s*\([^)]*\b(?:token|Token|PAT|secret|Secret)\b/,
+    exempt: (rel) => rel.endsWith('_test.go'),
+  },
 ];
 // ---- end config -----------------------------------------------------------
 

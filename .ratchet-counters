@@ -4,3 +4,4 @@ files_over_400	git ls-files "*.go" "*.ts" "*.tsx" | grep -v wailsjs | while read
 console_calls	git ls-files "*/frontend/src/*.ts" "*/frontend/src/*.tsx" "frontend/core/src/*.ts" "frontend/core/src/*.tsx" | grep -v ".test." | xargs grep -h "console\." 2>/dev/null | wc -l
 ui_em_dashes	git ls-files "*/frontend/src/*.tsx" "*/frontend/src/*.ts" | grep -v ".test." | xargs grep -h -- "—" 2>/dev/null | grep -vE "^\s*(//|\*|/\*)" | wc -l
 unscoped_todos	git ls-files "*.go" | xargs grep -h "TODO" 2>/dev/null | grep -vE "TODO\((tam|xtm)\)" | wc -l
+bespoke_modals	git ls-files "*/frontend/src/*.tsx" | xargs grep -lE "className=\"[^\"]*(modal|overlay|backdrop)" 2>/dev/null | while read f; do grep -q "@agile-suite/core" "$f" || echo x; done | wc -l
