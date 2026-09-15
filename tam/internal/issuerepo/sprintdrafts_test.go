@@ -2,6 +2,7 @@ package issuerepo_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"sort"
@@ -192,13 +193,20 @@ func TestDiscardingADraftSprintPutsEveryCardItHeldBack(t *testing.T) {
 	}
 }
 
-// journal.List is newest first by created_at and then by id. A card moved to
-// Sprint 13 first and into the draft afterwards keeps its older row id with
-// the same-second created_at, so the sprint_create row, newer by id, comes
-// first; its discard takes that move with it, and Discard all must not trip
-// over the row it already removed.
+// journal.List orders newest first, by created_at then by id. journal.Put
+// (movevalue.go's recordMove, which every board move including the second
+// MoveToSprint below goes through) resets created_at to "now" on every
+// update, not just on insert, so the issue_sprint row here does not keep the
+// earlier timestamp its first Put wrote: after the second move it is exactly
+// as new as the sprint_create row that was journaled between the two calls,
+// and which of the two sorts first is a real second-boundary race, not a
+// guarantee. pinCreatedAt below pins the issue_sprint row's created_at to a
+// fixed past instant, so the sprint_create row - newer regardless of when
+// this test happens to run - sorts first deterministically; its discard
+// takes that move with it, and Discard all must not trip over the row it
+// already removed.
 func TestDiscardAllWithADraftSprintRevertsEachChangeOnce(t *testing.T) {
-	repo := newRepo(t)
+	repo, db := newRepoWithDB(t)
 	ctx := context.Background()
 	if err := repo.UpsertPage(ctx, "p1", sample(), time.Now(), false); err != nil {
 		t.Fatal(err)
@@ -210,9 +218,14 @@ func TestDiscardAllWithADraftSprintRevertsEachChangeOnce(t *testing.T) {
 	if err := repo.MoveToSprint(ctx, "p1", "PLAT-409", strconv.Itoa(s.ID), "Sprint 15"); err != nil {
 		t.Fatal(err)
 	}
+	pinCreatedAt(t, db, "p1", issuerepo.EntitySprintMove, "PLAT-409", "2000-01-01T00:00:00Z")
 
-	if _, err := repo.DiscardAllPendingChanges(ctx, "p1"); err != nil {
+	n, err := repo.DiscardAllPendingChanges(ctx, "p1")
+	if err != nil {
 		t.Fatalf("discard all: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("discarded = %d, want 1: the sprint_create row sorts first (pinned older), and its own discard cascades the move away before the loop reaches it", n)
 	}
 	if iss, _ := repo.GetIssue(ctx, "p1", "PLAT-409"); iss.SprintID != "12" {
 		t.Errorf("the card is back where it started: %+v", iss)
@@ -232,16 +245,19 @@ func TestDiscardAllWithADraftSprintRevertsEachChangeOnce(t *testing.T) {
 	}
 }
 
-// TestDiscardAllReturnsTheCountActuallyDiscarded exercises D9: journal.List
-// hands DiscardAllPendingChanges two rows here (the sprint_create row and the
-// one issue_sprint row PLAT-409 ended up with, the second MoveToSprint
-// having updated the first move's row rather than adding a second one), but
-// discarding the sprint_create row cascades and removes that issue_sprint
-// row with it. By the time the loop reaches that row's own turn it is
-// already gone, so the count returned must be 1, the number of rows the loop
-// actually discarded, not len(all)'s 2.
-func TestDiscardAllReturnsTheCountActuallyDiscarded(t *testing.T) {
-	repo := newRepo(t)
+// TestDiscardAllCountsTheMoveAndTheDraftSprintSeparatelyWhenTheMoveSortsFirst
+// is the ordering TestDiscardAllWithADraftSprintRevertsEachChangeOnce pins
+// away: here the issue_sprint row is pinned newer than the sprint_create
+// row, so it sorts first in journal.List and is discarded (an ordinary
+// revert, no cascade) before the loop ever reaches the sprint_create row.
+// The sprint_create row is then still there for its own turn, and
+// discardDraftSprint's walk over the journal finds no issue_sprint row left
+// naming it, so it deletes only the sprint row itself. Both are found and
+// discarded on their own turn, so the count is 2, not 1: which row sorts
+// first changes what the cascade catches, never how many rows the profile
+// ends up with reverted.
+func TestDiscardAllCountsTheMoveAndTheDraftSprintSeparatelyWhenTheMoveSortsFirst(t *testing.T) {
+	repo, db := newRepoWithDB(t)
 	ctx := context.Background()
 	if err := repo.UpsertPage(ctx, "p1", sample(), time.Now(), false); err != nil {
 		t.Fatal(err)
@@ -253,20 +269,40 @@ func TestDiscardAllReturnsTheCountActuallyDiscarded(t *testing.T) {
 	if err := repo.MoveToSprint(ctx, "p1", "PLAT-409", strconv.Itoa(s.ID), "Sprint 15"); err != nil {
 		t.Fatal(err)
 	}
-
-	all, err := repo.ListPendingChanges(ctx, "p1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(all) != 2 {
-		t.Fatalf("pending rows before discard = %d, want 2 (the sprint_create row and the one issue_sprint row on PLAT-409)", len(all))
-	}
+	pinCreatedAt(t, db, "p1", issuerepo.EntitySprintMove, "PLAT-409", "2099-01-01T00:00:00Z")
 
 	n, err := repo.DiscardAllPendingChanges(ctx, "p1")
 	if err != nil {
 		t.Fatalf("discard all: %v", err)
 	}
-	if n != 1 {
-		t.Errorf("discarded count = %d, want 1: the sprint_create row's own discard cascaded the issue_sprint row away before the loop reached it", n)
+	if n != 2 {
+		t.Errorf("discarded = %d, want 2: the move sorts first (pinned newer) and is discarded on its own turn, leaving the sprint_create row to be found and discarded on its own turn right after", n)
+	}
+	if iss, _ := repo.GetIssue(ctx, "p1", "PLAT-409"); iss.SprintID != "12" {
+		t.Errorf("the card is back where it started: %+v", iss)
+	}
+	if rows, _ := repo.ListPendingChanges(ctx, "p1"); len(rows) != 0 {
+		t.Errorf("nothing pending: %+v", rows)
+	}
+	var gone int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sprint WHERE profile_id = 'p1' AND id = ?`, s.ID).Scan(&gone); err != nil || gone != 0 {
+		t.Errorf("the draft sprint row is gone: %d, %v", gone, err)
+	}
+}
+
+// pinCreatedAt overwrites one pending_change row's created_at directly, so a
+// test can force journal.List's newest-first order (created_at DESC, id
+// DESC) without depending on which side of a wall-clock second two journal
+// writes happen to land on.
+func pinCreatedAt(t *testing.T, db *sql.DB, profileID, entityType, entityKey, createdAt string) {
+	t.Helper()
+	res, err := db.Exec(
+		`UPDATE pending_change SET created_at = ? WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
+		createdAt, profileID, entityType, entityKey)
+	if err != nil {
+		t.Fatalf("pin created_at: %v", err)
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		t.Fatalf("pin created_at: affected %d rows, want 1", n)
 	}
 }

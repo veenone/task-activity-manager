@@ -37,13 +37,18 @@ func (r *Repository) DiscardAllPendingChanges(ctx context.Context, profileID str
 		}
 		for _, p := range all {
 			// Discarding a draft sprint takes the moves into it along with
-			// it, so a row read at the start may already be gone.
-			if _, err := journal.Get(tx, profileID, p.ID); errors.Is(err, journal.ErrNotFound) {
+			// it, so a row read at the start may already be gone by the
+			// time its own turn comes up, or, for a row a cascade rewrote
+			// rather than removed (editDraft on a draft's JSON, a move's
+			// before_val repointed by rewriteSprintID), stale. Re-read it
+			// fresh and discard that, not the snapshot all was built from.
+			fresh, err := journal.Get(tx, profileID, p.ID)
+			if errors.Is(err, journal.ErrNotFound) {
 				continue
 			} else if err != nil {
 				return err
 			}
-			if err := discardOne(ctx, tx, profileID, p); err != nil {
+			if err := discardOne(ctx, tx, profileID, fresh); err != nil {
 				return err
 			}
 			n++
