@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent, Ref } from "react";
+import type { KeyboardEvent, MouseEvent, Ref } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import type { ChainedCommands, Editor } from "@tiptap/core";
 import { announce, errMsg } from "@agile-suite/core";
@@ -35,6 +35,9 @@ interface Props {
   // body defaults to doc.body; the conflict view passes conflictBody with readOnly.
   body?: string;
   readOnly?: boolean;
+  // locked makes the editor read only for a while (a Sync is running)
+  // without rebuilding it, so neither the caret nor the undo history is lost.
+  locked?: boolean;
   pageUrl?: string;
   onSaved?: (doc: RitualDocument) => void;
   saveDelayMs?: number;
@@ -52,7 +55,30 @@ type Run = (chain: ChainedCommands) => ChainedCommands;
 // as a keystroke does, and none of them reliably raise one. Loading content,
 // and anything a plugin does on load, serialize back to the same text the
 // page already had, so opening a page never makes it unsynced.
-export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false, pageUrl, onSaved, saveDelayMs = SAVE_DELAY_MS, ref }: Props) {
+// A link followed inside the WebView would navigate the whole app away from
+// TAM, so a click on one never does its default: an absolute http or https
+// link opens in the user's browser, and anything else (a relative link, a
+// mailto, a scheme the sanitizer or the Link mark should already have
+// refused) goes nowhere. follow is false for a plain click in an editable
+// editor, which is someone putting the caret in the link text; Ctrl or Cmd
+// click still opens it there.
+const LINK_BASE = "https://invalid.local";
+
+function openLinkOutside(e: MouseEvent<HTMLElement>, follow: boolean) {
+  const anchor = (e.target as Element | null)?.closest?.("a[href]");
+  if (!anchor) return;
+  e.preventDefault();
+  if (!follow) return;
+  let url: URL;
+  try {
+    url = new URL(anchor.getAttribute("href") ?? "", LINK_BASE);
+  } catch {
+    return;
+  }
+  if ((url.protocol === "http:" || url.protocol === "https:") && url.origin !== LINK_BASE) BrowserOpenURL(url.href);
+}
+
+export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false, locked = false, pageUrl, onSaved, saveDelayMs = SAVE_DELAY_MS, ref }: Props) {
   const parsed = useMemo(() => parseStorage(body), [body]);
   const editable = !readOnly && parsed.ok;
   const extensions = useMemo(() => ritualExtensions(), []);
@@ -109,7 +135,9 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
       setSaving(true);
       setSaveError("");
       try {
-        const saved = await SaveRitualBody(profileId, doc.boardId, doc.sprintId, doc.ritualType, next);
+        // The version and page id this editor was opened on: once a Sync has
+        // moved the row past either, the store refuses the save.
+        const saved = await SaveRitualBody(profileId, doc.boardId, doc.sprintId, doc.ritualType, next, doc.version, doc.pageId);
         lastSaved.current = next;
         setSavedAt(new Date().toISOString());
         onSaved?.(saved);
@@ -143,7 +171,7 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
     const chained = inFlight.current.then(runOne);
     inFlight.current = chained;
     return chained;
-  }, [profileId, doc.boardId, doc.sprintId, doc.ritualType, onSaved]);
+  }, [profileId, doc.boardId, doc.sprintId, doc.ritualType, doc.version, doc.pageId, onSaved]);
 
   const saveRef = useRef(save);
   useEffect(() => { saveRef.current = save; }, [save]);
@@ -172,6 +200,12 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
   }, [editable]);
 
   useEffect(() => { editorRef.current = editor; }, [editor]);
+
+  // Not a useEditor dependency: locking for a Sync must keep this instance.
+  // No update event, since nothing about the document changed.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.setEditable(editable && !locked, false);
+  }, [editor, editable, locked]);
 
   useImperativeHandle(ref, () => ({ flush: () => saveRef.current(), editor }), [editor]);
 
@@ -225,7 +259,7 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
 
   if (!parsed.ok) {
     return (
-      <div className="ritual-readonly">
+      <div className="ritual-readonly" onClickCapture={(e) => openLinkOutside(e, true)}>
         <p className="warn-text">{READ_ONLY_SENTENCE}</p>
         {pageUrl && <button className="btn btn-ghost" onClick={() => BrowserOpenURL(pageUrl)}>Open in Confluence</button>}
         <div className="ritual-page-body" dangerouslySetInnerHTML={{ __html: sanitizeHtml(body) }} />
@@ -238,8 +272,9 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
       <div
         className={`ritual-editor${readOnly ? " ritual-editor-readonly" : ""}`}
         onKeyDownCapture={onKeyDown}
+        onClickCapture={(e) => openLinkOutside(e, !editable || locked || e.ctrlKey || e.metaKey)}
       >
-        {editable && editor && <Toolbar editor={editor} act={act} standup={doc.ritualType === "standup"} onAddEntry={() => void addTodaysEntry()} />}
+        {editable && !locked && editor && <Toolbar editor={editor} act={act} standup={doc.ritualType === "standup"} onAddEntry={() => void addTodaysEntry()} />}
         {notice && <p className="muted small ritual-notice" role="status">{notice}</p>}
         <EditorContent editor={editor} className="ritual-editor-content" />
         {editable && <p className="ritual-status-line muted small">{editorStatusLine({ doc, saving, saveError, savedAt })}</p>}

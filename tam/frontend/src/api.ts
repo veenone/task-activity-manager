@@ -1117,7 +1117,9 @@ export interface RitualMacroPreview { supported: boolean; jql: string; issues: I
 
 export const EnsureSprintRituals: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.EnsureSprintRituals as any;
 export const ListRitualDocuments: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.ListRitualDocuments as any;
-export const SaveRitualBody: (profileId: string, boardId: number, sprintId: number, ritualType: string, body: string) => Promise<RitualDocument> = App.SaveRitualBody as any;
+// version and pageId are what the editor was opened on; the save is refused
+// once a Sync has moved the row past either.
+export const SaveRitualBody: (profileId: string, boardId: number, sprintId: number, ritualType: string, body: string, version: number, pageId: string) => Promise<RitualDocument> = App.SaveRitualBody as any;
 export const ResolveRitualConflict: (profileId: string, boardId: number, sprintId: number, ritualType: string, choice: "mine" | "theirs") => Promise<void> = App.ResolveRitualConflict;
 export const ForgetRitualPage: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.ForgetRitualPage;
 export const DeleteRitualDocument: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.DeleteRitualDocument;

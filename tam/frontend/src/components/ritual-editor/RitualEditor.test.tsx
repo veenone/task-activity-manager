@@ -50,8 +50,42 @@ describe("RitualEditor", () => {
     await screen.findByText("ship it");
     act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>hello</p>"); });
     await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(api.SaveRitualBody).mock.calls[0]).toEqual(["p1", 1, 14, "planning", "<h2>Decisions</h2><ul><li>ship it</li></ul><p>hello</p>"]);
+    expect(vi.mocked(api.SaveRitualBody).mock.calls[0]).toEqual(["p1", 1, 14, "planning", "<h2>Decisions</h2><ul><li>ship it</li></ul><p>hello</p>", 0, ""]);
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+
+  // The save names the version and page id the editor was opened on, so the
+  // store can refuse text typed over a page a Sync has since replaced.
+  it("saves against the version and page id it was opened on, and shows a refusal", async () => {
+    const refused = "This page changed while you were editing (a Sync brought in a newer version). Copy your text, reopen the page, and apply it again.";
+    vi.mocked(api.SaveRitualBody).mockRejectedValue(new Error(refused));
+    const ref = createRef<RitualEditorHandle>();
+    render(<RitualEditor ref={ref} profileId="p1" doc={doc({ pageId: "42", version: 3, status: "synced" })} saveDelayMs={10} />);
+    await screen.findByText("ship it");
+    act(() => { ref.current!.editor!.commands.insertContentAt(ref.current!.editor!.state.doc.content.size, "<p>late</p>"); });
+    await waitFor(() => expect(api.SaveRitualBody).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.SaveRitualBody).mock.calls[0].slice(5)).toEqual([3, "42"]);
+    expect(await screen.findByText(`Not saved: ${refused}`)).toBeInTheDocument();
+    // The text stays pending: the next trigger sends it again.
+    await act(() => ref.current!.flush());
+    expect(api.SaveRitualBody).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(api.SaveRitualBody).mock.calls[1][4]).toContain("late");
+  });
+
+  // A Sync must not meet keystrokes typed after its flush, and must not cost
+  // the caret or undo history either, so the lock is setEditable on the same
+  // instance rather than a rebuild.
+  it("is not editable while locked and editable again once unlocked, on the same editor", async () => {
+    const ref = createRef<RitualEditorHandle>();
+    const { rerender } = render(<RitualEditor ref={ref} profileId="p1" doc={doc()} locked />);
+    await screen.findByText("ship it");
+    const before = ref.current!.editor!;
+    await waitFor(() => expect(before.isEditable).toBe(false));
+    expect(screen.queryByRole("toolbar", { name: "Formatting" })).toBeNull();
+    rerender(<RitualEditor ref={ref} profileId="p1" doc={doc()} locked={false} />);
+    await waitFor(() => expect(ref.current!.editor!.isEditable).toBe(true));
+    expect(ref.current!.editor).toBe(before);
+    expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeInTheDocument();
   });
 
   it("flushes a pending edit immediately when asked", async () => {
@@ -169,6 +203,45 @@ describe("RitualEditor", () => {
     await userEvent.click(screen.getByRole("button", { name: "Open in Confluence" }));
     expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://c.example.com/pages/viewpage.action?pageId=42");
     expect(document.querySelector(".ProseMirror")).toBeNull();
+  });
+
+  // A link followed inside the WebView navigates the whole app away from TAM.
+  it("opens an http link from a read-only page in the browser, never in the window", async () => {
+    render(<RitualEditor profileId="p1" doc={doc({ body: `<p>&bogus;</p><p><a href="https://example.com/notes">notes</a></p>` })} />);
+    const link = screen.getByRole("link", { name: "notes" });
+    expect(fireEvent.click(link)).toBe(false);
+    expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://example.com/notes");
+  });
+
+  it("follows a javascript: link nowhere", async () => {
+    // Read-only fallback: the sanitizer has already taken the href away.
+    const { unmount } = render(<RitualEditor profileId="p1" doc={doc({ body: `<p>&bogus;</p><p><a href="javascript:alert(1)">bad</a></p>` })} />);
+    fireEvent.click(screen.getByText("bad"));
+    unmount();
+    // Editor: the click handler itself refuses anything but http and https.
+    render(<RitualEditor profileId="p1" readOnly doc={doc({ body: `<p><a href="javascript:alert(1)">worse</a> <a href="mailto:a@example.com">mail</a></p>` })} />);
+    for (const text of ["worse", "mail"]) {
+      const anchor = (await screen.findByText(text)).closest("a")!;
+      anchor.setAttribute("href", text === "worse" ? "java\tscript:alert(1)" : "mailto:a@example.com");
+      expect(fireEvent.click(anchor)).toBe(false);
+    }
+    expect(api.BrowserOpenURL).not.toHaveBeenCalled();
+  });
+
+  it("opens a link in the read-only editor (View theirs) in the browser", async () => {
+    render(<RitualEditor profileId="p1" readOnly doc={doc({ body: `<p><a href="https://example.com/theirs">theirs</a></p>` })} />);
+    const link = await screen.findByRole("link", { name: "theirs" });
+    expect(fireEvent.click(link)).toBe(false);
+    expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://example.com/theirs");
+  });
+
+  it("keeps a plain click on a link in the editable editor in place, and opens it on Ctrl+click", async () => {
+    render(<RitualEditor profileId="p1" doc={doc({ body: `<p><a href="https://example.com/mine">mine</a></p>` })} />);
+    const link = await screen.findByRole("link", { name: "mine" });
+    expect(fireEvent.click(link)).toBe(false);
+    expect(api.BrowserOpenURL).not.toHaveBeenCalled();
+    expect(fireEvent.click(link, { ctrlKey: true })).toBe(false);
+    expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://example.com/mine");
   });
 
   it("draws content it does not model as a locked block", async () => {
