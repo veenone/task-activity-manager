@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Modal, errMsg } from "@agile-suite/core";
 import type { RitualRootMissing, RitualRootResult } from "../api";
 import {
@@ -30,6 +30,12 @@ interface Props {
 // overlay while its call is in flight, the way the sprint dialogs do: the call
 // holds the profile lock, and closing under it would leave its outcome with
 // nowhere to land.
+//
+// Focus never leaves the dialog: the pressed button stays focusable
+// (aria-disabled) while the call runs, and every step change moves focus to
+// that step's primary control, the title box when the call failed on a
+// create. Without that a disabled or removed button dropped focus to the
+// page body, outside the Modal's focus trap.
 export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onClose }: Props) {
   const titleId = useId();
   const [title, setTitle] = useState(missing.suggestedTitle);
@@ -37,8 +43,21 @@ export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onCl
   const [error, setError] = useState("");
   const working = step.kind === "working";
   const editing = step.kind === "confirm" || step.kind === "working";
+  const titleRef = useRef<HTMLInputElement>(null);
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  const firstStep = useRef(true);
+
+  useEffect(() => {
+    // The Modal places focus when the dialog opens; only a step change moves it.
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    (step.kind === "confirm" ? titleRef.current : primaryRef.current)?.focus();
+  }, [step]);
 
   async function run(value: string, adopt: boolean) {
+    if (working) return;
     const trimmed = value.trim();
     if (!trimmed) {
       setError(ROOT_TITLE_EMPTY);
@@ -62,7 +81,8 @@ export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onCl
       }
     } catch (e) {
       setError(errMsg(e));
-      setStep({ kind: "confirm" });
+      // A failed adoption goes back to the adopt offer, so a retry adopts again.
+      setStep(adopt ? { kind: "taken", title: trimmed, topLevel: true } : { kind: "confirm" });
     }
   }
 
@@ -80,6 +100,7 @@ export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onCl
           <label className="ritual-root-title">
             Page title
             <input
+              ref={titleRef}
               className="detail-input"
               value={title}
               disabled={working}
@@ -97,24 +118,28 @@ export function RitualRootDialog({ missing, create, onDone, onOpenProfiles, onCl
           <p className="muted small">{ROOT_AFTER_SENTENCE}</p>
         </>
       )}
-      {step.kind === "forbidden" && <p className="warn-text">{rootForbiddenSentence(missing.spaceKey)}</p>}
+      {step.kind === "forbidden" && <p className="warn-text" role="status">{rootForbiddenSentence(missing.spaceKey)}</p>}
       {step.kind === "taken" && (
-        <p className="warn-text">
+        <p className="warn-text" role="status">
           {step.topLevel ? rootTakenTopSentence(step.title, missing.spaceKey) : rootTakenNestedSentence(step.title, missing.spaceKey)}
         </p>
       )}
       {error && <p className="error-text" role="alert">{error}</p>}
       <div className="form-actions form-actions-end">
-        {step.kind === "taken" && <button className="btn" onClick={() => setStep({ kind: "confirm" })}>Back</button>}
-        {step.kind !== "working" && <button className="btn" onClick={openProfiles}>Open Profile settings</button>}
+        {step.kind === "taken" && (
+          <button className="btn" ref={step.topLevel ? undefined : primaryRef} onClick={() => setStep({ kind: "confirm" })}>Back</button>
+        )}
+        {step.kind !== "working" && (
+          <button className="btn" ref={step.kind === "forbidden" ? primaryRef : undefined} onClick={openProfiles}>Open Profile settings</button>
+        )}
         <button className="btn" onClick={onClose} disabled={working}>Cancel</button>
         {editing && (
-          <button className="btn btn-primary" onClick={() => void run(title, false)} disabled={working}>
+          <button className="btn btn-primary" ref={primaryRef} onClick={() => void run(title, false)} aria-disabled={working || undefined}>
             {step.kind === "working" ? (step.adopt ? "Using page…" : "Creating page…") : "Create page and sync"}
           </button>
         )}
         {step.kind === "taken" && step.topLevel && (
-          <button className="btn btn-primary" onClick={() => void run(step.title, true)}>Use this page and sync</button>
+          <button className="btn btn-primary" ref={primaryRef} onClick={() => void run(step.title, true)}>Use this page and sync</button>
         )}
       </div>
     </Modal>

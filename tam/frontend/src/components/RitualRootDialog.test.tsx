@@ -103,12 +103,52 @@ describe("RitualRootDialog", () => {
     let fail: (e: Error) => void = () => {};
     const props = renderDialog({ create: vi.fn(() => new Promise<RitualRootResult>((_resolve, reject) => { fail = reject; })) });
     await userEvent.click(screen.getByRole("button", { name: "Create page and sync" }));
-    expect(screen.getByRole("button", { name: "Creating page…" })).toBeDisabled();
+    const pressed = screen.getByRole("button", { name: "Creating page…" });
+    expect(pressed).toHaveAttribute("aria-disabled", "true");
     await userEvent.keyboard("{Escape}");
     expect(props.onClose).not.toHaveBeenCalled();
+    await userEvent.click(pressed);
+    expect(props.create).toHaveBeenCalledTimes(1);
     await act(async () => { fail(new Error("network down")); });
     expect(await screen.findByRole("alert")).toHaveTextContent("network down");
-    expect(screen.getByRole("textbox", { name: "Page title" })).toHaveValue("PLAT Rituals");
-    expect(screen.getByRole("button", { name: "Create page and sync" })).toBeEnabled();
+    const box = screen.getByRole("textbox", { name: "Page title" });
+    expect(box).toHaveValue("PLAT Rituals");
+    expect(box).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Create page and sync" })).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("keeps focus inside the dialog on the pressed button while the call runs", async () => {
+    renderDialog({ create: vi.fn(() => new Promise<RitualRootResult>(() => {})) });
+    await userEvent.type(screen.getByRole("textbox", { name: "Page title" }), "{Enter}");
+    expect(screen.getByRole("button", { name: "Creating page…" })).toHaveFocus();
+  });
+
+  it("states a refused create as a status and moves focus to Open Profile settings", async () => {
+    renderDialog({ create: vi.fn(async () => outcome({ outcome: "forbidden", pageId: "" })) });
+    await userEvent.click(screen.getByRole("button", { name: "Create page and sync" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(rootForbiddenSentence("TEAM"));
+    expect(screen.getByRole("button", { name: "Open Profile settings" })).toHaveFocus();
+  });
+
+  it("states a taken title as a status and moves focus to Use this page and sync", async () => {
+    renderDialog({ create: vi.fn(async () => outcome({ outcome: "titleTaken", pageId: "77" })) });
+    await userEvent.click(screen.getByRole("button", { name: "Create page and sync" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(rootTakenTopSentence("PLAT Rituals", "TEAM"));
+    expect(screen.getByRole("button", { name: "Use this page and sync" })).toHaveFocus();
+  });
+
+  it("keeps the adopt option when the adopt call throws, so a retry resumes adoption", async () => {
+    const create = vi.fn(async (_title: string, adopt: boolean) => {
+      if (adopt) throw new Error("network down");
+      return outcome({ outcome: "titleTaken", pageId: "77" });
+    });
+    renderDialog({ create });
+    await userEvent.click(screen.getByRole("button", { name: "Create page and sync" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Use this page and sync" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("network down");
+    const adopt = screen.getByRole("button", { name: "Use this page and sync" });
+    expect(adopt).toHaveFocus();
+    await userEvent.click(adopt);
+    expect(create).toHaveBeenLastCalledWith("PLAT Rituals", true);
   });
 });
