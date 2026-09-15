@@ -33,3 +33,6 @@ export type {
   SyncMachineState,
   SyncAction,
 } from "./contexts/syncMachine";
+export { EditorToolbar } from "./components/EditorToolbar/EditorToolbar";
+export type { ToolbarGroup, ToolbarItem, ToolbarToggle, ToolbarAction, ToolbarLink } from "./components/EditorToolbar/types";
+export type { IconName } from "./components/EditorToolbar/icons";

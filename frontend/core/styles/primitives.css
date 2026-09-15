@@ -1366,3 +1366,22 @@
 .board-unmapped { margin-top: 12px; }
 .board-overflow { font-size: 11px; color: var(--text-muted); padding: 2px 4px; }
 .boards-body { display: flex; gap: 0; align-items: stretch; min-height: 0; flex: 1; }
+
+/* Editor toolbar: grouped icon buttons, a tooltip on each, and the link
+   popover. Disabled buttons stay drawn so a locked toolbar keeps its place. */
+.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.editor-toolbar-group { display: inline-flex; align-items: center; gap: 2px; padding-right: 4px; border-right: 1px solid var(--border-subtle); }
+.editor-toolbar-group:last-child { border-right: 0; }
+.editor-toolbar-slot, .editor-toolbar-link { position: relative; display: inline-flex; }
+.editor-toolbar-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.editor-toolbar-button:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--ghost-hover); }
+.editor-toolbar-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.editor-toolbar-button[aria-pressed="true"], .editor-toolbar-button[data-active="true"] { background: var(--accent-soft); color: var(--accent); }
+.editor-toolbar-button:disabled, .editor-toolbar-button[aria-disabled="true"] { opacity: 0.45; cursor: default; }
+.editor-toolbar-tooltip { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); z-index: 20; padding: 2px 6px; border-radius: 4px; background: var(--text-strong); color: var(--surface); font-size: 11px; white-space: nowrap; pointer-events: none; }
+.editor-link-popover { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 280px; padding: 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); box-shadow: var(--modal-shadow); }
+.editor-link-popover input { flex: 1; min-width: 180px; }
+.editor-link-error { flex-basis: 100%; margin: 0; font-size: 12px; }
+@media (forced-colors: active) {
+  .editor-toolbar-button[aria-pressed="true"], .editor-toolbar-button[data-active="true"] { outline: 2px solid CanvasText; }
+}
