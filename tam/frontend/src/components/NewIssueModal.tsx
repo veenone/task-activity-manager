@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Modal, announce, call, errMsg, useConfirm, useProfile } from "@agile-suite/core";
 import { CreateIssue, ISSUE_TYPES } from "../api";
-import type { IssueDraft, IssueType, Profile, Settings } from "../api";
+import type { FieldSpec, IssueDraft, IssueType, Profile, Settings } from "../api";
 import { MetaField, splitMetaFields } from "./MetaField";
 import { useCreateFields } from "../queries/pending";
 import { useEpics } from "../queries/tree";
@@ -135,14 +135,25 @@ export function NewIssueModal({
     summaryRef.current?.focus();
   }, []);
 
+  // pendingFocusRef is the one-shot half of F12's fix. invalidField stays
+  // set for as long as a field is showing an error, so an effect keyed only
+  // on [invalidField, moreOpen] would refire on every later moreOpen change
+  // and steal focus back from whatever the user just clicked, including the
+  // More fields toggle itself. Setting this ref is what a failure asks for;
+  // clearing it the moment the effect below acts on it is what stops that
+  // request from being replayed by an unrelated toggle.
+  const pendingFocusRef = useRef<string | null>(null);
+
   // A failure inside the collapsed More fields section opens it first
   // (invalidField and moreOpen land in the same render), so the field this
   // effect looks for is already mounted by the time it runs: focusing here,
   // after commit, is what keeps it from reaching for a node that render
   // has not drawn yet (F12).
   useEffect(() => {
-    if (!invalidField) return;
-    formRef.current?.querySelector<HTMLElement>(`#${invalidField}`)?.focus();
+    const field = pendingFocusRef.current;
+    if (!field) return;
+    pendingFocusRef.current = null;
+    formRef.current?.querySelector<HTMLElement>(`#${field}`)?.focus();
   }, [invalidField, moreOpen]);
 
   const dirty =
@@ -188,10 +199,13 @@ export function NewIssueModal({
 
   // Focus itself is not done here: the field this names may still be behind
   // a collapsed More fields section, not yet mounted. The effect above does
-  // the focusing, once render has caught up with invalidField and moreOpen.
+  // the focusing, once render has caught up with invalidField and moreOpen;
+  // pendingFocusRef is what tells it this call, specifically, is still owed
+  // one, so a later unrelated moreOpen toggle does not refocus the field.
   function fail(message: string, field: string) {
     setError(message);
     setInvalidField(field);
+    pendingFocusRef.current = field;
   }
 
   async function onSubmit(e: FormEvent) {
@@ -270,6 +284,21 @@ export function NewIssueModal({
   // genuinely different sprints now that OpenSprints folds one sprint id to
   // one row.
   const sprintDupIds = duplicateNameIds(sprintChoices);
+
+  // Both the required and the More fields lists draw the same control, wired
+  // the same way, so one place owns that wiring instead of two identical
+  // MetaField calls drifting apart under a later edit.
+  function renderMetaField(s: FieldSpec) {
+    return (
+      <MetaField
+        key={s.id}
+        spec={s}
+        value={extra[s.id] ?? ""}
+        invalid={invalidField === `meta-${s.id}`}
+        onChange={(v) => setExtra((cur) => ({ ...cur, [s.id]: v }))}
+      />
+    );
+  }
 
   return (
     <Modal
@@ -435,15 +464,7 @@ export function NewIssueModal({
                 {requiredSpecs.length > 0 && (
                   <>
                     <p className="muted small">Jira requires these for a {typeLabel(type).toLowerCase()}:</p>
-                    {requiredSpecs.map((s) => (
-                      <MetaField
-                        key={s.id}
-                        spec={s}
-                        value={extra[s.id] ?? ""}
-                        invalid={invalidField === `meta-${s.id}`}
-                        onChange={(v) => setExtra((cur) => ({ ...cur, [s.id]: v }))}
-                      />
-                    ))}
+                    {requiredSpecs.map(renderMetaField)}
                   </>
                 )}
                 {optionalSpecs.length > 0 && (
@@ -459,15 +480,7 @@ export function NewIssueModal({
                     </button>
                     {moreOpen && (
                       <div id="new-issue-more-fields" className="meta-fields-optional">
-                        {optionalSpecs.map((s) => (
-                          <MetaField
-                            key={s.id}
-                            spec={s}
-                            value={extra[s.id] ?? ""}
-                            invalid={invalidField === `meta-${s.id}`}
-                            onChange={(v) => setExtra((cur) => ({ ...cur, [s.id]: v }))}
-                          />
-                        ))}
+                        {optionalSpecs.map(renderMetaField)}
                       </div>
                     )}
                   </div>

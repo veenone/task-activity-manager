@@ -347,6 +347,30 @@ describe("NewIssueModal", () => {
     expect(api.CreateIssue).not.toHaveBeenCalled();
   });
 
+  // Review fix round 1: the focus effect used to be keyed only on
+  // [invalidField, moreOpen], so it refired on any later moreOpen change,
+  // even one that had nothing to do with the failure. A required field left
+  // empty, then a later, unrelated More fields toggle, used to steal focus
+  // right back from the button the user had just clicked.
+  it("does not refocus a field when More fields is toggled after an unrelated required-field error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetCreateFields).mockResolvedValue([
+      { id: "customfield_10050", name: "Severity", type: "option", required: true, allowedValues: [{ id: "3", value: "Critical" }] },
+      { id: "customfield_10300", name: "Acceptance criteria", type: "textarea", required: false, allowedValues: [] },
+    ]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    const severity = await within(dialog).findByLabelText("Severity *");
+    await user.type(within(dialog).getByLabelText("Summary *"), "Promo field accepts spaces");
+    await user.click(await submitButton(dialog));
+    expect(await within(dialog).findByText("Severity is required.")).toBeInTheDocument();
+    expect(severity).toHaveFocus();
+    const more = within(dialog).getByRole("button", { name: "More fields (1)" });
+    await user.click(more);
+    expect(more).toHaveAttribute("aria-expanded", "true");
+    expect(more).toHaveFocus();
+  });
+
   it("takes more than one value for an array field", async () => {
     const user = userEvent.setup();
     vi.mocked(api.GetCreateFields).mockResolvedValue([
