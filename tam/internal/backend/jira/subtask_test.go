@@ -85,3 +85,26 @@ func TestScopeUsesTheProjectsOwnTaskName(t *testing.T) {
 		t.Errorf("scope = %v", f.searches)
 	}
 }
+
+// Item 3 of the ticket, first half: the duplicate Parent input put a plain
+// string into Extra["parent"], which overwrote the {"key": ...} object and
+// Jira answered "parent: data was not an object".
+func TestCreateSubtaskKeepsTheParentObjectWhateverExtraSays(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.createKey = "TKT-9"
+	_, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+		Type: backend.TypeSubtask, Summary: "Wire the input", ParentKey: "TKT-7",
+		Extra:        map[string]string{"parent": "TKT-7", "customfield_10300": "Given a promo"},
+		ScreenFields: []string{"customfield_10300"},
+	})
+	if err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	post := f.writes[len(f.writes)-1]
+	if !strings.Contains(post, `"parent":{"key":"TKT-7"}`) || strings.Contains(post, `"parent":"TKT-7"`) {
+		t.Errorf("parent must stay the object the create set: %s", post)
+	}
+	if !strings.Contains(post, `"customfield_10300":"Given a promo"`) {
+		t.Errorf("an extra on the screen is still sent: %s", post)
+	}
+}

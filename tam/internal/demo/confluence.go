@@ -21,14 +21,15 @@ import (
 // Standup and syncs again meets a conflict. It is the demo Commit's staged
 // conflict on <project>-412, for pages.
 type Confluence struct {
-	mu       sync.Mutex
-	space    string
-	pages    map[string]*fakePage
-	next     int
-	failures map[string]error
-	after    map[string]func()
-	stage    bool
-	staged   bool
+	mu         sync.Mutex
+	space      string
+	pages      map[string]*fakePage
+	next       int
+	failures   map[string]error
+	after      map[string]func()
+	stage      bool
+	staged     bool
+	denyCreate bool
 }
 
 type fakePage struct {
@@ -37,15 +38,28 @@ type fakePage struct {
 }
 
 var _ confluence.Pages = (*Confluence)(nil)
+var _ confluence.SpaceProbe = (*Confluence)(nil)
+
+// StagedMissingRootID is the root page id a demo space starts without. A demo
+// profile whose Confluence root page id is set to it meets the missing root
+// on its first Sync, which is how the create-a-root dialog is walked through
+// with no real Confluence.
+const StagedMissingRootID = "1"
 
 // DemoRootTitle is the demo root page's title.
 const DemoRootTitle = "Team rituals"
 
-// NewConfluence answers a space holding only its root page.
+// NewConfluence answers a space holding only its root page, unless rootID is
+// StagedMissingRootID, in which case it starts without one.
 func NewConfluence(space, rootID string, stageConflict bool) *Confluence {
 	c := &Confluence{space: space, pages: map[string]*fakePage{}, next: 1000,
 		failures: map[string]error{}, after: map[string]func(){}, stage: stageConflict}
-	c.pages[rootID] = &fakePage{id: rootID, title: DemoRootTitle, body: "<p>Ritual pages for this team.</p>", version: 1}
+	if rootID != StagedMissingRootID {
+		c.pages[rootID] = &fakePage{id: rootID, title: DemoRootTitle, body: "<p>Ritual pages for this team.</p>", version: 1}
+	}
+	if n, err := strconv.Atoi(rootID); err == nil && n >= c.next {
+		c.next = n + 1
+	}
 	return c
 }
 
@@ -54,6 +68,26 @@ func (c *Confluence) FailNext(op, target string, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.failures[op+"|"+target] = err
+}
+
+// DenyCreate makes the space refuse every page create with 403 from now on,
+// and answer the permission probe with no: a token that can read the space
+// and write nothing in it.
+func (c *Confluence) DenyCreate() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.denyCreate = true
+}
+
+// CanCreatePages answers the permission probe: no for another space or a
+// denied token, yes otherwise.
+func (c *Confluence) CanCreatePages(_ context.Context, spaceKey string) confluence.Permission {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if spaceKey != c.space || c.denyCreate {
+		return confluence.PermissionNo
+	}
+	return confluence.PermissionYes
 }
 
 // After runs fn once, after the next op on target has computed its answer and
@@ -163,7 +197,8 @@ func (c *Confluence) titleTaken(title string) bool {
 	return false
 }
 
-// CreatePage creates a page under parentID.
+// CreatePage creates a page under parentID, or at the top of the space when
+// parentID is empty.
 func (c *Confluence) CreatePage(_ context.Context, spaceKey, parentID, title, body string) (confluence.StoredPage, error) {
 	c.mu.Lock()
 	if err := c.failure("create", title); err != nil {
@@ -174,14 +209,20 @@ func (c *Confluence) CreatePage(_ context.Context, spaceKey, parentID, title, bo
 		c.mu.Unlock()
 		return confluence.StoredPage{}, notFound()
 	}
+	if c.denyCreate {
+		c.mu.Unlock()
+		return confluence.StoredPage{}, &confluence.HTTPError{Code: http.StatusForbidden, Status: "403 Forbidden", Message: "Could not create content with type page"}
+	}
 	if c.titleTaken(title) {
 		c.mu.Unlock()
 		return confluence.StoredPage{}, &confluence.HTTPError{Code: http.StatusBadRequest, Status: "400 Bad Request",
 			Message: "A page with this title already exists: A page already exists with the title " + title + " in the space with key " + spaceKey}
 	}
-	if _, ok := c.pages[parentID]; !ok {
-		c.mu.Unlock()
-		return confluence.StoredPage{}, notFound()
+	if parentID != "" {
+		if _, ok := c.pages[parentID]; !ok {
+			c.mu.Unlock()
+			return confluence.StoredPage{}, notFound()
+		}
 	}
 	p := &fakePage{id: strconv.Itoa(c.next), parent: parentID, title: title, body: body, version: 1}
 	c.next++

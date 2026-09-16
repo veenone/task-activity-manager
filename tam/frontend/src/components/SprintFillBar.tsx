@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Sprint } from "../api";
 import { plural } from "../lib/format";
+import { sprintOptionLabel } from "../lib/sprintOptions";
 
 // BACKLOG is the picker's value for the board's own backlog, which is a
 // destination and not an absence. It cannot collide with a sprint id, which
@@ -54,7 +55,7 @@ export function SprintFillBar({ count, sprints, busy, onFill, onClear }: Props) 
           <option value="">Choose a destination</option>
           <option value={BACKLOG}>The backlog</option>
           {sprints.map((s) => (
-            <option key={s.id} value={String(s.id)}>{s.name}</option>
+            <option key={s.id} value={String(s.id)}>{sprintOptionLabel(s, new Set())}</option>
           ))}
         </select>
       </label>

@@ -135,6 +135,9 @@ func (a *App) ritualSprint(profileID string, boardID, sprintID int) (ritualsync.
 	}
 	for _, s := range cached {
 		if s.ID == sprintID {
+			if s.Draft {
+				return ritualsync.Sprint{}, fmt.Errorf("%s is a draft sprint; Commit creates it in Jira before it gets ritual pages", s.Name)
+			}
 			return ritualsync.Sprint{Info: ritualsync.Info(s, a.boardName(profileID, boardID)), State: s.State}, nil
 		}
 	}
@@ -329,8 +332,16 @@ func (a *App) SyncRituals(profileID string, boardID int) (ritualsync.Result, err
 		return ritualsync.Result{}, err
 	}
 	defer a.release(p.ID)
-	log.Printf("tam: rituals sync for %s board %d starting", p.ID, boardID)
 
+	return a.syncRitualsLocked(p, boardID, cfg, pages)
+}
+
+// syncRitualsLocked is the Sync pass itself, for a caller already holding the
+// profile's "rituals" lock: SyncRituals, and CreateRitualRoot once it has
+// saved a new root. A pass that found the root missing records no sync time,
+// since nothing was synced.
+func (a *App) syncRitualsLocked(p profile.Profile, boardID int, cfg profile.ConfluenceConfig, pages confluence.Pages) (ritualsync.Result, error) {
+	log.Printf("tam: rituals sync for %s board %d starting", p.ID, boardID)
 	cached, err := a.boards.ListSprints(a.ctx, p.ID, boardID)
 	if err != nil {
 		return ritualsync.Result{}, err
@@ -340,11 +351,16 @@ func (a *App) SyncRituals(profileID string, boardID int) (ritualsync.Result, err
 		return ritualsync.Result{}, err
 	}
 	res, err := ritualsync.Run(a.ctx, pages, a.rituals, ritualsync.Config{
-		SpaceKey: cfg.SpaceKey, RootID: cfg.RootPageID, Location: time.Local, Now: time.Now,
+		SpaceKey: cfg.SpaceKey, RootID: cfg.RootPageID, ProjectKey: p.ProjectKey, Location: time.Local, Now: time.Now,
 	}, p.ID, boardID, ritualsync.Sprints(cached, a.boardName(p.ID, boardID), withRows))
 	if err != nil {
 		log.Printf("tam: rituals sync for %s board %d refused: %v", p.ID, boardID, err)
 		return ritualsync.Result{}, errors.New(errtext.Line(err))
+	}
+	if res.RootMissing != nil {
+		log.Printf("tam: rituals sync for %s board %d stopped: root page %s not found in %s (can create: %v)",
+			p.ID, boardID, res.RootMissing.PageID, res.RootMissing.SpaceKey, res.RootMissing.CanCreate)
+		return res, nil
 	}
 	if err := a.repo.SetProfileSetting(a.ctx, p.ID, lastRitualSyncKey(boardID), res.SyncedAt); err != nil {
 		log.Printf("tam: record rituals sync time for %s: %v", p.ID, err)
@@ -352,4 +368,76 @@ func (a *App) SyncRituals(profileID string, boardID int) (ritualsync.Result, err
 	log.Printf("tam: rituals sync for %s board %d done: %d created, %d pulled, %d pushed, %d conflicts, %d gone, %d failed",
 		p.ID, boardID, res.Created, res.Pulled, res.Pushed, res.Conflicts, res.Gone, len(res.Failed))
 	return res, nil
+}
+
+// RitualRootResult is what CreateRitualRoot came to: the root attempt and,
+// when a root was set, the Sync pass run on it straight after. SyncError is
+// that pass's refusal in one line. It is not a Go error because by then the
+// new root is saved, and a Go error would drop the fact that it was.
+type RitualRootResult struct {
+	Root      ritualsync.Root    `json:"root"`
+	Sync      *ritualsync.Result `json:"sync"`
+	SyncError string             `json:"syncError"`
+}
+
+// CreateRitualRoot is the missing-root dialog's Create page and sync (adopt
+// false) and its Use this page and sync (adopt true). Under the "rituals"
+// lock it creates or adopts a top-level page, saves its id as the profile's
+// Confluence root page id, and runs the board's Sync on it. Forbidden and a
+// taken title come back as the result's outcome, with nothing saved.
+// Configuration and credentials are refused before the lock is taken, the way
+// SyncRituals refuses them.
+func (a *App) CreateRitualRoot(profileID string, boardID int, title string, adopt bool) (RitualRootResult, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return RitualRootResult{}, err
+	}
+	if err := a.requireRituals(); err != nil {
+		return RitualRootResult{}, err
+	}
+	cfg, pages, err := a.confluencePages(p)
+	if err != nil {
+		return RitualRootResult{}, err
+	}
+	if err := a.acquire(p.ID, "rituals"); err != nil {
+		return RitualRootResult{}, err
+	}
+	defer a.release(p.ID)
+
+	root, err := ritualsync.CreateRoot(a.ctx, pages, cfg.SpaceKey, p.ProjectKey, title, adopt)
+	if err != nil {
+		log.Printf("tam: rituals root for %s refused: %v", p.ID, err)
+		return RitualRootResult{}, errors.New(errtext.Line(err))
+	}
+	out := RitualRootResult{Root: root}
+	if root.Outcome != ritualsync.RootCreated && root.Outcome != ritualsync.RootAdopted {
+		log.Printf("tam: rituals root for %s in %s: %s", p.ID, cfg.SpaceKey, root.Outcome)
+		return out, nil
+	}
+	if err := a.saveRitualRoot(p.ID, root.PageID); err != nil {
+		return RitualRootResult{}, fmt.Errorf("The page %q (%s) is in %s now, but its id could not be saved to the profile: %s. Set it as the root page id in Profile settings.",
+			root.Title, root.PageID, cfg.SpaceKey, errtext.Line(err))
+	}
+	log.Printf("tam: rituals root for %s is now page %s (%s)", p.ID, root.PageID, root.Outcome)
+	cfg.RootPageID = root.PageID
+	res, err := a.syncRitualsLocked(p, boardID, cfg, pages)
+	if err != nil {
+		out.SyncError = err.Error()
+		return out, nil
+	}
+	out.Sync = &res
+	return out, nil
+}
+
+// saveRitualRoot writes a new root page id onto the profile's stored
+// Confluence settings, leaving the URL and space key as they are. It reads
+// the stored row rather than the configuration the pass ran with, which for a
+// demo profile with no Confluence URL is a stand-in never meant to be saved.
+func (a *App) saveRitualRoot(profileID, pageID string) error {
+	stored, err := a.profiles.ConfluenceConfig(profileID)
+	if err != nil {
+		return err
+	}
+	stored.RootPageID = pageID
+	return a.profiles.SetConfluenceConfig(profileID, stored)
 }

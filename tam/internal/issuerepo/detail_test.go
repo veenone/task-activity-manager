@@ -47,6 +47,77 @@ func TestDetailIsCachedWithItsFetchTime(t *testing.T) {
 	}
 }
 
+func TestDetailKeepsItsCommentsAndReadsBackAnOlderRowSafely(t *testing.T) {
+	r, db := newRepoWithDB(t)
+	ctx := context.Background()
+	if err := r.UpsertPage(ctx, "p1", sample(), time.Now(), false); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	at := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	d := backend.IssueDetail{
+		Description:  "As a shopper",
+		Comments:     []backend.Comment{{ID: "1", Author: "ranand", AuthorName: "R. Anand", Created: "2026-09-13T10:14:00Z", Body: "Blocked on the gateway sandbox."}},
+		CommentTotal: 812, CommentsTruncated: true,
+	}
+	if err := r.WriteDetail(ctx, "p1", "PLAT-412", d, at); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, _, _, err := r.ReadDetail(ctx, "p1", "PLAT-412")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if len(got.Comments) != 1 || got.Comments[0].Body != "Blocked on the gateway sandbox." {
+		t.Errorf("comments = %+v", got.Comments)
+	}
+	if got.CommentTotal != 812 || !got.CommentsTruncated {
+		t.Errorf("total = %d truncated = %v", got.CommentTotal, got.CommentsTruncated)
+	}
+	if got.FetchedAt != "2026-09-05T10:00:00Z" {
+		t.Errorf("fetchedAt = %q, want the cache's own stamp", got.FetchedAt)
+	}
+
+	// A detail cached before this bundle has no comments key at all, and the
+	// panel must not have to tell a nil list from an empty one.
+	if _, err := db.ExecContext(ctx,
+		`UPDATE issue SET detail_json = ? WHERE profile_id = ? AND key = ?`,
+		`{"key":"PLAT-412","description":"old","fields":{}}`, "p1", "PLAT-412"); err != nil {
+		t.Fatalf("write an older row: %v", err)
+	}
+	old, _, ok, err := r.ReadDetail(ctx, "p1", "PLAT-412")
+	if err != nil || !ok {
+		t.Fatalf("read the older row: ok=%v err=%v", ok, err)
+	}
+	if old.Comments == nil || len(old.Comments) != 0 {
+		t.Errorf("comments = %#v, want an empty slice", old.Comments)
+	}
+}
+
+func TestClearDetailsDropsOneProfilesDetailsOnly(t *testing.T) {
+	r := newRepo(t)
+	ctx := context.Background()
+	for _, p := range []string{"p1", "p2"} {
+		if err := r.UpsertPage(ctx, p, sample(), time.Now(), false); err != nil {
+			t.Fatalf("seed %s: %v", p, err)
+		}
+		for _, key := range []string{"PLAT-412", "PLAT-409"} {
+			if err := r.WriteDetail(ctx, p, key, backend.IssueDetail{Description: "cached"}, time.Now()); err != nil {
+				t.Fatalf("write %s %s: %v", p, key, err)
+			}
+		}
+	}
+	if err := r.ClearDetails(ctx, "p1"); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	for _, key := range []string{"PLAT-412", "PLAT-409"} {
+		if _, _, ok, err := r.ReadDetail(ctx, "p1", key); ok || err != nil {
+			t.Errorf("p1 %s: ok=%v err=%v, want the detail gone", key, ok, err)
+		}
+		if _, _, ok, err := r.ReadDetail(ctx, "p2", key); !ok || err != nil {
+			t.Errorf("p2 %s: ok=%v err=%v, want it untouched", key, ok, err)
+		}
+	}
+}
+
 func TestWriteDetailReplacesLinks(t *testing.T) {
 	r := newRepo(t)
 	ctx := context.Background()

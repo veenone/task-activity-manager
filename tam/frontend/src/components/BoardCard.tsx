@@ -1,4 +1,5 @@
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
+import { toPlainText } from "@agile-suite/core";
 import type { Issue } from "../api";
 import type { CardMove } from "../lib/cardMoveState";
 import { TypeChip } from "./TypeChip";
@@ -64,11 +65,12 @@ export function BoardCard({
 }: Props) {
   const points = issue.storyPoints ?? null;
   const assignee = issue.assignee || "Unassigned";
+  const summary = toPlainText(issue.summary, "summary");
   // A failed move is not pending in the sense the dot means: it was pushed
   // and refused, so a dot promising it will land is the one thing this card
   // must not say. Its border and the reason in its label carry it instead.
   const pendingMove = move.state !== "" && move.state !== "failed";
-  const label = [`${issue.key} ${issue.summary} ${columnName}`, move.reason].filter(Boolean).join(". ");
+  const label = [`${issue.key} ${summary} ${columnName}`, move.reason].filter(Boolean).join(". ");
   const className = [
     "board-card",
     nested ? "board-card-subtask" : "",
@@ -111,7 +113,7 @@ export function BoardCard({
         )}
         {menu}
       </div>
-      <div>{issue.summary}</div>
+      <div>{summary}</div>
       {issue.type === "subtask" && issue.parentKey && <div className="board-card-parent">↳ Subtask of {issue.parentKey}</div>}
       <div className="board-card-foot">
         <span>{assignee}</span>

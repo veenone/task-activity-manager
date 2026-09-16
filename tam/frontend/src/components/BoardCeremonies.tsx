@@ -125,7 +125,7 @@ export function BoardCeremonies({
         profileId={profileId}
         boardId={boardId}
         sprint={sprint}
-        futures={sprints.filter((s) => s.state === "future")}
+        futures={sprints.filter((s) => s.state === "future" && !s.draft)}
         incomplete={view ? unfinished(drawnCards(view), view.columns) : []}
         hidden={view ? hiddenCards(view) : 0}
         lastColumn={view?.columns[view.columns.length - 1]?.name ?? "the last column"}

@@ -18,6 +18,55 @@ func LinkField(d backend.LinkDraft) string {
 	return d.Type + "|" + d.Direction + "|" + d.ToKey
 }
 
+// rewriteLinkTarget repoints every link whose target is from: a pending
+// link's JSON and the field LinkField packs the target into, and a cached
+// link's to_key. Rekey calls it, so a link drafted from an issue Jira holds
+// to a TAM-NEW draft names the real key before the link pass sends it.
+func rewriteLinkTarget(ctx context.Context, tx *sql.Tx, profileID, from, to string) error {
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE issue_link SET to_key = ? WHERE profile_id = ? AND to_key = ?`, to, profileID, from); err != nil {
+		return fmt.Errorf("repoint cached links to %s: %w", from, err)
+	}
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id, after_val FROM pending_change WHERE profile_id = ? AND entity_type = ?`, profileID, EntityLink)
+	if err != nil {
+		return fmt.Errorf("pending links to %s: %w", from, err)
+	}
+	type repoint struct {
+		id int64
+		d  backend.LinkDraft
+	}
+	var todo []repoint
+	for rows.Next() {
+		var rp repoint
+		var raw string
+		if err := rows.Scan(&rp.id, &raw); err != nil {
+			rows.Close()
+			return err
+		}
+		if json.Unmarshal([]byte(raw), &rp.d) == nil && rp.d.ToKey == from {
+			todo = append(todo, rp)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, rp := range todo {
+		rp.d.ToKey = to
+		encoded, err := json.Marshal(rp.d)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE pending_change SET field = ?, after_val = ? WHERE profile_id = ? AND id = ?`,
+			LinkField(rp.d), string(encoded), profileID, rp.id); err != nil {
+			return fmt.Errorf("repoint pending link %d: %w", rp.id, err)
+		}
+	}
+	return nil
+}
+
 // AddLink journals a link from key to the draft's target. The source must
 // be a cached issue (a draft counts), the target another key, and the same
 // link must not exist yet, cached or pending.

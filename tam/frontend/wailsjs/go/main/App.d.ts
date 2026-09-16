@@ -34,6 +34,8 @@ export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function CreateProfileReusingToken(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
 
+export function CreateRitualRoot(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<main.RitualRootResult>;
+
 export function CreateSprint(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string):Promise<main.SprintCreated>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
@@ -127,6 +129,8 @@ export function PendingInSprint(arg1:string,arg2:number):Promise<number>;
 export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Preview>;
 
 export function RankIssue(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:number):Promise<void>;
+
+export function RefreshDetails(arg1:string):Promise<void>;
 
 export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>;
 

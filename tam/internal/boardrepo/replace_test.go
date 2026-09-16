@@ -618,3 +618,65 @@ func TestBoardSprintStateAnswersForOneBoard(t *testing.T) {
 		})
 	}
 }
+
+// A draft sprint is TAM's own row in Jira's table, and a boards refresh
+// rewrites the board's sprints from what Jira sent, which never names a
+// draft. The refresh leaves it where it is.
+func TestABoardsRefreshKeepsADraftSprintJiraNeverSent(t *testing.T) {
+	r, db := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), sampleSprints(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, draft)
+		VALUES ('p1', -1, 1, 'Sprint 15', 'future', '2026-09-30T09:00:00Z', '2026-10-14T09:00:00Z', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ReplaceBoard(ctx, "p1", board, oneColumn(), sampleSprints(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ReplaceSprints(ctx, "p1", 1, sampleSprints()); err != nil {
+		t.Fatal(err)
+	}
+
+	listed, err := r.ListSprints(ctx, "p1", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var draft *boardrepo.Sprint
+	for i := range listed {
+		if listed[i].ID == -1 {
+			draft = &listed[i]
+		}
+		if listed[i].ID == 13 && listed[i].Draft {
+			t.Errorf("a sprint Jira sent is not a draft: %+v", listed[i])
+		}
+	}
+	if draft == nil || !draft.Draft || draft.Name != "Sprint 15" {
+		t.Fatalf("sprints = %+v, want the draft kept and marked", listed)
+	}
+
+	open, err := r.OpenSprints(ctx, "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := open[len(open)-1]
+	if last != (boardrepo.SprintChoice{ID: -1, Name: "Sprint 15", BoardName: "PLAT Scrum", State: "future", Draft: true}) {
+		t.Errorf("open sprints = %+v, want the draft last by start date and marked", open)
+	}
+
+	details, err := r.BoardSprintDetails(ctx, newIssues(), "p1", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, d := range details {
+		if d.ID == -1 {
+			found = d.Draft
+		}
+	}
+	if !found {
+		t.Errorf("the Sprints view's read carries the draft flag: %+v", details)
+	}
+}

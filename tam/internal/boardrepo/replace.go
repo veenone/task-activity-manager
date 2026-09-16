@@ -182,7 +182,11 @@ func writeSprints(ctx context.Context, tx *sql.Tx, profileID string, boardID int
 	if err := invalidateChangedSprintReports(ctx, tx, profileID, boardID, sprints); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM sprint WHERE profile_id = ? AND board_id = ?`, profileID, boardID); err != nil {
+	// Only the rows Jira reported are replaced. A draft sprint is TAM's own
+	// row, never in what Jira sent, and issuerepo owns it until Commit makes
+	// it real; deleting it here would strand its journal row and every card
+	// moved into it.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sprint WHERE profile_id = ? AND board_id = ? AND draft = 0`, profileID, boardID); err != nil {
 		return fmt.Errorf("clear sprints of board %d: %w", boardID, err)
 	}
 	for _, s := range sprints {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent } from "react";
+import { toPlainText } from "@agile-suite/core";
 import type { Issue, SprintDetail } from "../api";
 import { MAX_CARDS_PER_VIEW, UNASSIGNED_SPRINT_STATE } from "../api";
 import { groupByAssignee } from "../lib/sprintGroups";
@@ -283,12 +284,13 @@ export function SprintList({
   function issueRow(issue: Issue, scope: string, nested: boolean) {
     const row: TreeRow = { id: issue.key, kind: "issue", scope, parentKey: nested ? issue.parentKey : undefined };
     const isChecked = checked.has(issue.key);
+    const summary = toPlainText(issue.summary, "summary");
     return (
       <div
         key={issue.key}
         role="treeitem"
         aria-selected={issue.key === selectedKey}
-        aria-label={`${issue.key} ${issue.summary}`}
+        aria-label={`${issue.key} ${summary}`}
         aria-level={nested ? 3 : 2}
         aria-expanded={counts.has(issue.key) ? !collapsed.has(issue.key) : undefined}
         tabIndex={focusId === issue.key ? 0 : -1}
@@ -312,9 +314,9 @@ export function SprintList({
         />
         <TypeChip type={issue.type} />
         <span className="sprint-cell epic-cell-key accent-text" title={issue.key}>{issue.key}</span>
-        <span className="sprint-cell epic-cell-summary" title={issue.summary}>
+        <span className="sprint-cell epic-cell-summary" title={summary}>
           <SubtaskToggle issueKey={issue.key} count={counts.get(issue.key) ?? 0} expanded={!collapsed.has(issue.key)} onToggle={() => toggleChildren(issue.key)} />
-          {nested && <span aria-hidden="true">↳ </span>}{issue.summary}
+          {nested && <span aria-hidden="true">↳ </span>}{summary}
           {nested && <small className="subtask-assignee">{issue.assignee || "Unassigned"}</small>}
         </span>
         <span className="sprint-cell">

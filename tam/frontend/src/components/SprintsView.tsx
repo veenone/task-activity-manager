@@ -166,6 +166,32 @@ export function SprintsView() {
   }
 
   async function askDelete(detail: SprintDetail) {
+    if (detail.draft) {
+      // A draft is not in Jira: deleting it is a discard, and the only thing
+      // to warn about is the cards moved into it, which go back.
+      const ok = await confirm({
+        title: `Delete the draft ${detail.name}?`,
+        message: <p>Nothing reaches Jira. Cards moved into it go back to where they were.</p>,
+        confirmLabel: "Delete draft",
+        cancelLabel: "Keep it",
+        danger: true,
+      });
+      if (!ok) return;
+      setBusyRowId(rowIdOf(detail));
+      del.mutate(
+        { boardId: board?.id ?? 0, sprintId: detail.id },
+        {
+          onSuccess: () => {
+            const sentence = `The draft ${detail.name} was deleted.`;
+            announce(sentence);
+            afterWrite("", sentence);
+          },
+          onError: (e) => void notice({ title: "The draft sprint was not deleted", message: errMsg(e), tone: "error" }),
+          onSettled: () => setBusyRowId(""),
+        },
+      );
+      return;
+    }
     // The count is a floor whenever this view knows it cannot be checked,
     // and three separate things make it so, not one. notSynced counts keys
     // this sprint holds that the issue cache does not, so the total is
@@ -435,7 +461,7 @@ export function SprintsView() {
             profileId={activeId}
             boardId={board.id}
             sprint={completing}
-            futures={sprints.filter((s) => s.state === "future")}
+            futures={sprints.filter((s) => s.state === "future" && !s.draft)}
             incomplete={unfinished(completing.issues, boardView.data.columns)}
             // What the list above cannot name: this sprint's keys the cache
             // does not hold, and the cards the shared budget stopped it

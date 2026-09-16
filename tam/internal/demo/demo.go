@@ -56,7 +56,32 @@ var curated = []backend.Issue{
 // way it will against a real suite.
 var curatedDetails = map[string]backend.IssueDetail{
 	"PLAT-412": {
-		Description: "As a shopper I can enter a promo code on the payment step and see the discount before I pay.\n\nAcceptance: the code is validated against the promotions service; an invalid or expired code shows an inline message and leaves the total unchanged.",
+		// Jira wiki markup, on purpose and in full: this is the issue the
+		// detail panel's renderer is read against, so it carries a heading,
+		// two bullets with marks in them, a table, a code block and a link.
+		Description: "As a shopper I can enter a promo code on the payment step and see the discount before I pay.\n\n" +
+			"h3. Acceptance criteria\n" +
+			"* The code is validated *before* the total is shown.\n" +
+			"* An expired code leaves the total unchanged and shows _\"This code has expired\"_.\n\n" +
+			"||Code||Discount||\n" +
+			"|SPRING10|10%|\n" +
+			"|WELCOME|5.00|\n\n" +
+			"{code}\nPOST /payment/promo\n{\"code\": \"SPRING10\", \"order\": 40128}\n{code}\n\n" +
+			"Design: [Figma checkout flow|https://www.figma.com/file/demo]",
+		Comments: []backend.Comment{
+			{
+				ID: "9001", Author: "ranand", AuthorName: "R. Anand",
+				Created: "2026-09-11T09:20:00Z", Updated: "2026-09-11T09:20:00Z",
+				Body: "Blocked on the gateway sandbox, see PLAT-409.\n\n{quote}\nThe sandbox rejects every code until the new keys are in place.\n{quote}",
+			},
+			{
+				// Markdown, and edited: the panel detects the syntax per
+				// comment, and an edited one says so.
+				ID: "9002", Author: "msoto", AuthorName: "M. Soto",
+				Created: "2026-09-12T14:05:00Z", Updated: "2026-09-12T16:41:00Z",
+				Body: "Rounding fixed in `discount.ts`:\n\n- **2 decimals** everywhere\n- the total is rounded once, at the end",
+			},
+		},
 		Links: []backend.Link{
 			{Direction: "inward", Type: "Tested By", Key: "XT-1018", Summary: "Promo code applies discount", IssueType: "Test"},
 			{Direction: "inward", Type: "Tested By", Key: "XT-1019", Summary: "Expired promo code rejected", IssueType: "Test"},
@@ -84,6 +109,13 @@ var curatedDetails = map[string]backend.IssueDetail{
 	},
 	"PLAT-401": {
 		Description: "Steps: add an item, change the shipping country to one with a different VAT rate, return to the summary. The total still shows the old VAT amount.",
+		Comments: []backend.Comment{
+			{
+				ID: "9003", Author: "mortiz", AuthorName: "M. Ortiz",
+				Created: "2026-09-10T11:30:00Z", Updated: "2026-09-10T11:30:00Z",
+				Body: "Reproduced on staging. The summary reads the cached rate, see the note on PLAT-331.",
+			},
+		},
 		Links: []backend.Link{
 			{Direction: "outward", Type: "Relates", Key: "PLAT-331", Summary: "Guest checkout without an account", IssueType: "Story"},
 		},
@@ -180,11 +212,20 @@ func Detail(projectKey, key string) (backend.IssueDetail, bool) {
 		canonical = ProjectKey + strings.TrimPrefix(key, projectKey)
 	}
 	if d, ok := curatedDetails[canonical]; ok {
-		out := backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}}
+		out := backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}, Comments: []backend.Comment{}}
 		for _, l := range d.Links {
 			l.Key = rekey(l.Key, projectKey)
 			out.Links = append(out.Links, l)
 		}
+		// Comments name other issues in their text, and the reader has the
+		// profile's own project on screen, so the keys move with it exactly
+		// as the links do. Copying is not optional either: curatedDetails is
+		// package state and the caller must never be handed its own slice.
+		for _, c := range d.Comments {
+			c.Body = rekeyText(c.Body, projectKey)
+			out.Comments = append(out.Comments, c)
+		}
+		out.CommentTotal = len(out.Comments)
 		return out, true
 	}
 	for _, iss := range Issues(projectKey) {
@@ -193,6 +234,7 @@ func Detail(projectKey, key string) (backend.IssueDetail, bool) {
 				Key:         key,
 				Description: "Generated demo issue. " + iss.Summary + ".",
 				Links:       []backend.Link{},
+				Comments:    []backend.Comment{},
 				Fields:      map[string]any{},
 			}, true
 		}
@@ -224,6 +266,12 @@ func ForeignIssues(projectKey string) []backend.Issue {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 	return out
+}
+
+// rekeyText swaps every PLAT key inside a body of text for projectKey's,
+// which is rekey over prose rather than over one whole key.
+func rekeyText(text, projectKey string) string {
+	return strings.ReplaceAll(text, ProjectKey+"-", projectKey+"-")
 }
 
 // rekey swaps the PLAT prefix for projectKey. Keys with another prefix (the

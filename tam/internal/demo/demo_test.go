@@ -2,6 +2,7 @@ package demo_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"agile-suite/tam/internal/backend"
@@ -69,6 +70,45 @@ func TestProjectKeyIsSubstituted(t *testing.T) {
 	d, ok := demo.Detail("DEMO", "DEMO-412")
 	if !ok || d.Key != "DEMO-412" {
 		t.Errorf("detail = %+v, ok=%v", d, ok)
+	}
+}
+
+func TestTheCuratedStoryCarriesCommentsInBothSyntaxes(t *testing.T) {
+	d, ok := demo.Detail(demo.ProjectKey, "PLAT-412")
+	if !ok {
+		t.Fatal("no detail for PLAT-412")
+	}
+	if len(d.Comments) != 2 || d.CommentTotal != 2 {
+		t.Fatalf("comments = %+v, total = %d", d.Comments, d.CommentTotal)
+	}
+	wiki, markdown := d.Comments[0], d.Comments[1]
+	if wiki.AuthorName != "R. Anand" || !strings.Contains(wiki.Body, "PLAT-409") || !strings.Contains(wiki.Body, "{quote}") {
+		t.Errorf("the wiki comment = %+v", wiki)
+	}
+	if markdown.AuthorName != "M. Soto" || !strings.Contains(markdown.Body, "**2 decimals**") {
+		t.Errorf("the Markdown comment = %+v", markdown)
+	}
+	if markdown.Updated <= markdown.Created {
+		t.Errorf("the edited comment's updated (%s) must be later than its created (%s)", markdown.Updated, markdown.Created)
+	}
+	if !strings.Contains(d.Description, "h3. Acceptance criteria") || !strings.Contains(d.Description, "||Code||Discount||") ||
+		!strings.Contains(d.Description, "{code}") || !strings.Contains(d.Description, "[Figma checkout flow|https://www.figma.com/file/demo]") {
+		t.Errorf("the curated description is not the wiki markup the mockup shows:\n%s", d.Description)
+	}
+	bug, _ := demo.Detail(demo.ProjectKey, "PLAT-401")
+	if len(bug.Comments) != 1 {
+		t.Errorf("PLAT-401 comments = %+v, want one", bug.Comments)
+	}
+
+	// A comment body names other issues, and the profile's own project key is
+	// what the reader has on screen, so the keys move with it exactly as the
+	// links do.
+	acme, _ := demo.Detail("ACME", "ACME-412")
+	if !strings.Contains(acme.Comments[0].Body, "ACME-409") || strings.Contains(acme.Comments[0].Body, "PLAT-") {
+		t.Errorf("comment body under ACME = %q", acme.Comments[0].Body)
+	}
+	if filler, _ := demo.Detail(demo.ProjectKey, "PLAT-260"); filler.Comments == nil {
+		t.Error("a filler issue's comments must be an empty slice, never nil")
 	}
 }
 

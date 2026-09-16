@@ -1,29 +1,27 @@
+import { compactUrl, isAllowedLink } from "@agile-suite/core";
+
 const URL_ATTRIBUTES = new Set(["href", "src", "xlink:href", "action"]);
-const SAFE_SCHEMES = new Set(["http", "https", "mailto"]);
 
-// compact drops ASCII control characters, space, and DEL, the characters the
-// browser removes from a URL before it resolves the scheme.
-function compact(value: string): string {
-  let out = "";
-  for (const ch of value) {
-    const code = ch.charCodeAt(0);
-    if (code > 0x20 && code !== 0x7f) out += ch;
-  }
-  return out;
-}
+// isAllowedLink now lives in frontend/core/src/lib/links.ts, one definition
+// shared with the rich text renderer's link nodes. Re-exported so
+// useRitualToolbar's import (and, before this move, this file's own test)
+// keeps working unchanged.
+export { isAllowedLink };
 
-// safeUrl allows only http, https, mailto and a relative URL. It reads the
-// scheme after compact, because "java&#9;script:" is a javascript: URL to the
-// browser, and a pattern tested against the raw value never saw it as one.
+// safeUrl is isAllowedLink's one relaxation: a relative address, which is
+// what a Confluence page's own links legitimately carry, passes too. No
+// second copy of the allowed-scheme set here (the ruling: one definition of
+// an allowed link) - a value with no scheme at all skips straight to true,
+// and everything else is exactly isAllowedLink's own answer.
 function safeUrl(value: string): boolean {
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compact(value));
-  return !scheme || SAFE_SCHEMES.has(scheme[1].toLowerCase());
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compactUrl(value));
+  return !scheme || isAllowedLink(value);
 }
 
 // A style can load a URL or, in old engines, run script. A backslash is
 // refused with them, since a CSS escape can spell either word.
 function unsafeStyle(value: string): boolean {
-  const flat = compact(value).toLowerCase();
+  const flat = compactUrl(value).toLowerCase();
   return flat.includes("url(") || flat.includes("expression(") || flat.includes(String.fromCharCode(0x5c));
 }
 

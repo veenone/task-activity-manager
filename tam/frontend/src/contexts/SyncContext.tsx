@@ -13,8 +13,8 @@ import {
   errMsg,
 } from "@agile-suite/core";
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
-import { CommitPendingChanges, EventsOn, REPORT_PROGRESS_EVENT, SyncBoards, SyncIssues, SyncRituals } from "../api";
-import type { BoardSummary, CommitResult, Profile, ReportProgress, RitualSyncResult, Settings } from "../api";
+import { CommitPendingChanges, CreateRitualRoot, EventsOn, REPORT_PROGRESS_EVENT, RefreshDetails, SyncBoards, SyncIssues, SyncRituals } from "../api";
+import type { BoardSummary, CommitResult, Profile, ReportProgress, RitualRootResult, RitualSyncResult, Settings } from "../api";
 import { progressStage } from "../lib/reportText";
 import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
@@ -47,6 +47,13 @@ interface SyncApi {
   canCommit: boolean;
   canSwitchProfile: boolean;
   runSync: (full: boolean) => Promise<void>;
+  // runRefresh is the shell's Refresh: it drops the profile's cached issue
+  // details and invalidates what is on screen, so the view reads again
+  // without a sync. RefreshDetails acquires Go's lock under the sync name, so
+  // this takes the same name here and drives the banner the way a boards
+  // refresh does. It swallows its failure into a notice the way runSync does,
+  // since its caller is a topbar button with nowhere to print one.
+  runRefresh: () => Promise<void>;
   // runBoardsRefresh is the Boards view's own Refresh. It holds the same
   // lock a sync does, because Go holds the same per-profile lock for both:
   // a refresh outside this reducer left the shell offering Sync while the
@@ -74,6 +81,12 @@ interface SyncApi {
   // does rather than staying quiet: a Sync button left enabled and inert
   // beside it is the bug "One lock, both ends" was written about.
   runRitualsSync: (boardId: number) => Promise<RitualSyncResult>;
+  // runRitualRoot is the missing-root dialog's create (or, with adopt, its
+  // adoption) and the Sync Go runs straight after it. CreateRitualRoot
+  // acquires Go's "rituals" lock, so this takes the same name and drives the
+  // same banner as runRitualsSync; the dialog must never call the binding
+  // bare.
+  runRitualRoot: (boardId: number, title: string, adopt: boolean) => Promise<RitualRootResult>;
   // runQuietLock is what a fast management write (creating, renaming, or
   // destroying a sprint) takes Go's per-profile lock through without reading
   // as a ceremony. It guards against overlapping a sync, a commit, a boards
@@ -230,6 +243,33 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     [activeId, qc, notice, take, release],
   );
 
+  // The refresh itself is one statement, but what follows it is a refetch of
+  // every query the active view has open, which is why it holds the lock and
+  // raises the banner rather than going quiet: Sync and Commit stay offered
+  // and inert otherwise, the bug "One lock, both ends" was written about.
+  const runRefresh = useCallback(async () => {
+    if (!activeId || statusRef.current !== "idle") return;
+    take("sync");
+    dispatch({
+      type: "SYNC_START",
+      clearError: true,
+      initialProgress: { phase: "issues", fetched: 0, total: 0, done: false, stage: "Refreshing" },
+    });
+    try {
+      await call(() => RefreshDetails(activeId));
+      // The same two the commit ends with: between them they cover every
+      // view's queries, details included, so whatever is on screen reads
+      // again and everything else reads again when it is next opened.
+      invalidateWrites(qc, activeId);
+      invalidateProfileData(qc, activeId);
+    } catch (e) {
+      void notice({ title: "Refresh failed", message: errMsg(e), tone: "error" });
+    } finally {
+      release();
+      dispatch({ type: "SYNC_END" });
+    }
+  }, [activeId, qc, notice, take, release]);
+
   const runBoardsRefresh = useCallback(async (): Promise<BoardSummary> => {
     if (!activeId) throw new Error("no profile selected");
     if (statusRef.current !== "idle") throw busyRefusal();
@@ -291,22 +331,40 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [activeId, busyRefusal, take, release]);
 
-  const runRitualsSync = useCallback(async (boardId: number): Promise<RitualSyncResult> => {
+  // Both of the Rituals view's locked calls, the Sync and the root page
+  // create that ends in one, hold the lock under "rituals" and drive the
+  // banner the same way; only the stage they start it with differs.
+  const runRituals = useCallback(async <T,>(stage: string, action: () => Promise<T>): Promise<T> => {
     if (!activeId) throw new Error("no profile selected");
     if (statusRef.current !== "idle") throw busyRefusal();
     take("rituals");
     dispatch({
       type: "SYNC_START",
       clearError: true,
-      initialProgress: { phase: "rituals", fetched: 0, total: 0, done: false, stage: "Syncing rituals with Confluence" },
+      initialProgress: { phase: "rituals", fetched: 0, total: 0, done: false, stage },
     });
     try {
-      return await call(() => SyncRituals(activeId, boardId));
+      return await action();
     } finally {
       release();
       dispatch({ type: "SYNC_END" });
     }
   }, [activeId, busyRefusal, take, release]);
+
+  const runRitualsSync = useCallback(
+    (boardId: number): Promise<RitualSyncResult> =>
+      runRituals("Syncing rituals with Confluence", () => call(() => SyncRituals(activeId, boardId))),
+    [activeId, runRituals],
+  );
+
+  const runRitualRoot = useCallback(
+    (boardId: number, title: string, adopt: boolean): Promise<RitualRootResult> =>
+      runRituals(
+        adopt ? "Using the existing page as the rituals root" : "Creating the rituals root page",
+        () => call(() => CreateRitualRoot(activeId, boardId, title, adopt)),
+      ),
+    [activeId, runRituals],
+  );
 
   // A quiet lock is the same statusRef guard every other run function
   // checks, so it still refuses while any of them is in flight, but it never
@@ -375,10 +433,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       canCommit: canCommitSel(state) && !!activeId,
       canSwitchProfile: canSwitchProfileSel(state),
       runSync,
+      runRefresh,
       runBoardsRefresh,
       runSprintCeremony,
       runReport,
       runRitualsSync,
+      runRitualRoot,
       runQuietLock,
       runCommit,
       lastCommit,
@@ -386,7 +446,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, running, activeId, runSync, runBoardsRefresh, runSprintCeremony, runReport, runRitualsSync, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
+    [state, running, activeId, runSync, runRefresh, runBoardsRefresh, runSprintCeremony, runReport, runRitualsSync, runRitualRoot, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -36,5 +37,21 @@ func seedSprintIssues(t *testing.T, a *App, profileID string, sprintID int) {
 	}
 	if err := a.repo.UpsertPage(a.ctx, profileID, issues, time.Now().UTC(), false); err != nil {
 		t.Fatalf("seed issues: %v", err)
+	}
+}
+
+// A draft sprint gets no ritual pages: Commit may never create it, and a
+// Sync would otherwise write Confluence pages for a sprint Jira does not
+// have.
+func TestEnsureSprintRitualsRefusesADraftSprint(t *testing.T) {
+	a, p := newTestAppWithRituals(t)
+	if err := a.boards.ReplaceBoard(a.ctx, p.ID, backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CreateSprint(p.ID, 1, "Sprint 15", "", "2026-09-16", "2026-09-30"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.EnsureSprintRituals(p.ID, 1, -1); err == nil || !strings.Contains(err.Error(), "draft") {
+		t.Errorf("EnsureSprintRituals on a draft = %v", err)
 	}
 }

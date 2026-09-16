@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { errMsg, useNotice } from "@agile-suite/core";
-import type { Issue, Link, SprintOption } from "../api";
+import { FORMAT_LABEL, RichText, detectFormat, errMsg, toPlainText, useNotice } from "@agile-suite/core";
+import type { RichFormat } from "@agile-suite/core";
+import { BrowserOpenURL } from "../api";
+import type { Issue, IssueComment, IssueDetail, Link, SprintOption } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { useDiscardById } from "../queries/pending";
 import { formatWhen } from "../lib/format";
 import { useSync } from "../contexts/SyncContext";
 import { TypeChip } from "./TypeChip";
-import { IssueKeyLink } from "./IssueKeyLink";
+import { IssueKeyLink, browseUrl } from "./IssueKeyLink";
 import { NewIssueModal } from "./NewIssueModal";
 import { useSubtaskType } from "../queries/people";
-import { EditableFields } from "./EditableFields";
+import { EditableFields, descriptionFormat } from "./EditableFields";
 import { SprintField } from "./SprintField";
 import { ActivityTab } from "./ActivityTab";
 import { AddLinkForm } from "./AddLinkForm";
@@ -121,6 +123,9 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const busy = status !== "idle";
   const subtaskType = useSubtaskType(profileId);
   const [drafting, setDrafting] = useState(false);
+  // The comment chips read the description's syntax, which the toggle in
+  // EditableFields can change; this is what carries that change up here.
+  const [, bumpFormat] = useState(0);
   // The panel's width is the reader's, not the layout's: a 352px column is
   // right for a glance and wrong for a long description. Kept per machine so
   // it survives a restart, the way XTM's does.
@@ -151,10 +156,28 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }
+  // The project key comes from the issue on screen (a ruling), not from the
+  // profile: it is the prefix of its own key, and it is all a renderer needs
+  // to tell one of this project's keys from a word with a number after it.
+  const projectKey = issue.key.slice(0, issue.key.lastIndexOf("-"));
+  // A key only becomes a button where there is an instance to open it on.
+  // browseUrl answers "" for a demo profile, a profile with no URL and a
+  // draft, and a button that opens nothing is worse than plain text.
+  const openIssueKey = browseUrl(jiraUrl, issue.key)
+    ? (key: string) => {
+        const url = browseUrl(jiraUrl, key);
+        if (url) BrowserOpenURL(url);
+      }
+    : undefined;
+  // A link never navigates the WebView: that would take the whole app away
+  // from TAM, the same reason IssueKeyLink opens in the user's own browser.
+  const openLink = (url: string) => BrowserOpenURL(url);
+  const descFormat = descriptionFormat(profileId, issue.key, detail.data?.description ?? "");
+
   // Jira allows a sub-task under any standard issue, and under neither an
-  // epic nor another sub-task; a draft has no key to hang one off yet.
+  // epic nor another sub-task. A draft parent is fine: Commit creates it
+  // first and the sub-task after it has a real key.
   const canHoldSubtasks =
-    !issue.draft &&
     issue.type !== "epic" &&
     issue.type !== "subtask" &&
     (subtaskType.data ?? "") !== "";
@@ -186,7 +209,12 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
       {issue.draft && (
         <p className="muted small detail-note">Commit creates this issue in Jira and gives it a real key.</p>
       )}
-      <p className="detail-summary">{issue.summary}</p>
+      {/* D5: the heading renders the summary's inline code and links and
+          nothing else. Jira DC does not wiki-render this field, so a mark
+          in it must read exactly as it was typed. */}
+      <p className="detail-summary">
+        <RichText inline text={issue.summary} projectKey={projectKey} onOpenLink={openLink} onIssueKey={openIssueKey} />
+      </p>
       <dl className="detail-fields">
         <dt>Sprint</dt>
         <dd>
@@ -205,15 +233,15 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
         <dt>Reporter</dt><dd>{issue.reporter || "-"}</dd>
       </dl>
 
+      {/* No Refresh of its own (D6): the shell's one Refresh covers the whole
+          view, and this one went through GetIssueDetail, so it did nothing
+          while the cached detail was fresh and nothing at all under
+          detail_cache_minutes = 0. The Retry below is a different thing: it
+          follows a failed read, where there is nothing cached to serve. */}
       <Section
         title="Fields"
         open={open.fields ?? false}
         onToggle={() => toggle("fields")}
-        action={
-          <button type="button" className="btn btn-ghost detail-section-action" onClick={() => void detail.refetch()} disabled={detail.isFetching}>
-            {detail.isFetching ? "Refreshing" : "Refresh"}
-          </button>
-        }
       >
         {detail.isError && (
           <p className="error-text" data-testid="detail-error">
@@ -227,6 +255,10 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
           description={detail.data?.description ?? ""}
           descriptionReady={detail.isSuccess}
           busy={busy}
+          projectKey={projectKey}
+          onOpenLink={openLink}
+          onIssueKey={openIssueKey}
+          onSyntaxPicked={() => bumpFormat((n) => n + 1)}
         />
       </Section>
 
@@ -242,6 +274,39 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
           </button>
         </div>
       )}
+
+      <Section
+        title="Comments"
+        count={detail.data?.commentTotal}
+        open={open.comments ?? false}
+        onToggle={() => toggle("comments")}
+        // TODO 1: a detail served from the cache while Jira is unreachable
+        // is still the whole panel, so it says how old it is rather than
+        // reading as if it had just been fetched.
+        action={
+          detail.data?.fetchedAt
+            ? <span className="muted small detail-section-note">cached {formatWhen(detail.data.fetchedAt)}</span>
+            : undefined
+        }
+      >
+        {detail.isPending ? (
+          <p className="muted">Loading comments</p>
+        ) : detail.isError ? (
+          <p className="error-text" data-testid="comments-error">
+            Could not load the comments: {detail.error.message}{" "}
+            <button type="button" className="btn btn-ghost" onClick={() => void detail.refetch()}>Retry</button>
+          </p>
+        ) : (
+          <Comments
+            key={issue.key}
+            detail={detail.data}
+            descFormat={descFormat}
+            projectKey={projectKey}
+            onOpenLink={openLink}
+            onIssueKey={openIssueKey}
+          />
+        )}
+      </Section>
 
       <Section
         title="Links"
@@ -301,7 +366,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
               {tests.data.map((t) => (
                 <li key={t.key} className="linked-row">
                   <span className="accent-text linked-key">{t.key}</span>
-                  <span>{t.summary}</span>
+                  <span>{toPlainText(t.summary, "summary")}</span>
                 </li>
               ))}
             </ul>
@@ -327,6 +392,95 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   );
 }
 
+// INLINE_COMMENTS is how many of the newest a closed-by-default section
+// shows before Show all; a long thread would otherwise be the whole panel.
+const INLINE_COMMENTS = 5;
+
+// initials are the avatar's whole content: a name's first and last letter,
+// which is what the mockup draws and all TAM has, since Jira's avatars are
+// images behind the instance's own authentication.
+function initials(name: string): string {
+  const parts = name.split(/\s+/).filter((p) => p !== "");
+  if (parts.length === 0) return "?";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return `${parts[0][0]}${last}`.toUpperCase();
+}
+
+interface CommentProps {
+  descFormat: RichFormat;
+  projectKey: string;
+  onOpenLink: (url: string) => void;
+  onIssueKey?: (key: string) => void;
+}
+
+// Comments is the read-only thread, oldest first the way Jira reads it, with
+// only the newest few drawn until the reader asks for the rest.
+function Comments({ detail, ...rest }: { detail: IssueDetail } & CommentProps) {
+  const [showAll, setShowAll] = useState(false);
+  const all = detail.comments;
+
+  if (all.length === 0) {
+    // Truncated with nothing in hand is a failed read, never an issue with
+    // no comments: an issue that genuinely has none answers a total of 0
+    // with truncated false. Calling that "No comments." would be TAM
+    // inventing an answer Jira never gave.
+    return detail.commentsTruncated ? (
+      <p className="error-text">The comments could not be read. Open in Jira to see them.</p>
+    ) : (
+      <p className="muted">No comments.</p>
+    );
+  }
+
+  const shown = showAll ? all : all.slice(-INLINE_COMMENTS);
+  return (
+    <>
+      {detail.commentsTruncated && (
+        <p className="muted small">
+          Showing {all.length} of {detail.commentTotal} comments. Open in Jira for the rest.
+        </p>
+      )}
+      {shown.length < all.length && (
+        // The count is what this button actually reveals, which is the
+        // issue's total only when nothing was truncated; promising 812 and
+        // drawing 500 would be the same lie the sentence above avoids.
+        <button type="button" className="btn btn-ghost" onClick={() => setShowAll(true)}>Show all {all.length}</button>
+      )}
+      <ul className="comment-list">
+        {shown.map((c) => (
+          <li key={c.id}>
+            <CommentCard comment={c} {...rest} />
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+// CommentCard reads one comment in its own syntax, and says so only when
+// that is not the syntax the description above it is read in: a chip on
+// every comment of an all-Markdown issue would be noise.
+function CommentCard({ comment, descFormat, projectKey, onOpenLink, onIssueKey }: { comment: IssueComment } & CommentProps) {
+  const format = useMemo(() => detectFormat(comment.body).format, [comment.body]);
+  const name = comment.authorName || comment.author || "Unknown user";
+  const edited = comment.updated !== "" && comment.updated !== comment.created;
+  return (
+    <article className="comment-card">
+      <div className="comment-head">
+        <span className="comment-avatar" aria-hidden="true">{initials(name)}</span>
+        <h5 className="comment-author">{name}</h5>
+        {format !== descFormat && <span className="chip chip-label">{FORMAT_LABEL[format]}</span>}
+        {/* Only the restriction's value reaches TAM, so the chip names it
+            and calls it nothing else: Jira restricts a comment to a role or
+            to a group and does not say which one this is. */}
+        {comment.restriction !== "" && <span className="chip chip-restricted">Restricted: {comment.restriction}</span>}
+        <span className="muted small comment-when">{formatWhen(comment.created)}</span>
+        {edited && <span className="muted small">edited</span>}
+      </div>
+      <RichText text={comment.body} format={format} projectKey={projectKey} onOpenLink={onOpenLink} onIssueKey={onIssueKey} />
+    </article>
+  );
+}
+
 // LinkGroups lists links grouped by type, then direction, in the order the
 // store returns them, and marks a link still pending a Commit.
 function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard: (id: number) => void; discarding: boolean }) {
@@ -344,7 +498,7 @@ function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard
             {items.map((l) => (
               <li key={`${l.type}-${l.direction}-${l.key}`} className="linked-row">
                 <span className="accent-text linked-key">{l.key}</span>
-                <span>{l.summary}</span>
+                <span>{toPlainText(l.summary, "summary")}</span>
                 <span className="muted small">{l.issueType}</span>
                 {l.pending && (
                   <>

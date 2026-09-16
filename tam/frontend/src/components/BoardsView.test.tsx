@@ -196,7 +196,7 @@ beforeEach(() => {
   vi.mocked(api.GetSyncState).mockResolvedValue({
     lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 61,
   });
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
+  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
@@ -318,6 +318,14 @@ describe("BoardsView board", () => {
     expect(promo).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "PLAT-409 Rotate payment gateway API keys To Do" })).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "PLAT-347 Write retro notes template Done" })).toBeInTheDocument();
+  });
+
+  it("shows a card summary carrying wiki markup as plain text (D5)", async () => {
+    const marked = issue({ key: "PLAT-500", summary: "Fix *login* at {{/auth}}" });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[marked], [], []]));
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: "PLAT-500 Fix *login* at /auth To Do" });
+    expect(within(card).getByText("Fix *login* at /auth")).toBeInTheDocument();
   });
 
   it("shows the assignee or Unassigned and the points on the card", async () => {
@@ -1561,7 +1569,7 @@ describe("BoardsView sprint create", () => {
     // region, so an unscoped query matches twice as soon as the region's own
     // timer fires.
     const banner = await screen.findByRole("status", { name: "Sprint outcome" });
-    expect(within(banner).getByText("Sprint 14 was created, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
+    expect(within(banner).getByText("Sprint 14 was drafted, 2026-09-14 to 2026-09-28. Commit creates it in Jira.")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("14"));
   });
 

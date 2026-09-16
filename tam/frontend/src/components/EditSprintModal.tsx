@@ -143,9 +143,9 @@ export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClos
       <div className="pending-head">
         <div className="edit-sprint-title">
           <h2 id="edit-sprint-title">{`Edit ${sprint.name}`}</h2>
-          <p>Changes save to Jira immediately.</p>
+          <p>{sprint.draft ? "A draft sprint. Changes stay local until Commit." : "Changes save to Jira immediately."}</p>
         </div>
-        <ImmediateWriteChip />
+        {!sprint.draft && <ImmediateWriteChip />}
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
 import { fieldLabel } from "../api";
-import type { IssueDraft, Profile, Settings } from "../api";
+import type { DraftSprint, IssueDraft, Profile, Settings } from "../api";
 import { ISSUE_TYPES } from "../api";
 import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
 import { useSync } from "../contexts/SyncContext";
-import { plural } from "../lib/format";
+import { dayInput, plural } from "../lib/format";
 import { CommitBanner } from "./CommitBanner";
 import { ConflictCard } from "./ConflictCard";
 import { PendingMoveRow } from "./PendingMoveRow";
@@ -15,11 +15,26 @@ interface Props {
   onClose: () => void;
 }
 
-// summaryLine is the dialog's subtitle: "3 changes on 2 issues, 1 of them new".
+// summaryLine is the dialog's subtitle: "3 changes on 2 issues, 1 of them
+// new", with the draft sprints counted apart, since a sprint is not an issue.
 export function summaryLine(groups: PendingGroup[], rowCount: number): string {
-  const drafts = groups.filter((g) => g.createRow).length;
-  const base = `${plural(rowCount, "change", "changes")} on ${plural(groups.length, "issue", "issues")}`;
-  return drafts > 0 ? `${base}, ${drafts} of them new` : base;
+  const issues = groups.filter((g) => !g.sprintRow);
+  const sprints = groups.length - issues.length;
+  const changes = plural(rowCount, "change", "changes");
+  const newSprints = plural(sprints, "new sprint", "new sprints");
+  if (issues.length === 0) return `${changes}: ${newSprints}`;
+  const drafts = issues.filter((g) => g.createRow).length;
+  let line = `${changes} on ${plural(issues.length, "issue", "issues")}`;
+  if (drafts > 0) line += `, ${drafts} of them new`;
+  if (sprints > 0) line += `, and ${newSprints}`;
+  return line;
+}
+
+// sprintDraftLine says where and when a draft sprint runs.
+export function sprintDraftLine(s: DraftSprint | null): string {
+  if (!s) return "A draft sprint that could not be read. Discard it and draft it again.";
+  const board = s.boardName || `board ${s.boardId}`;
+  return `New sprint on ${board}, ${dayInput(s.startDate)} to ${dayInput(s.endDate)}`;
 }
 
 function draftLine(d: IssueDraft, project: string): string {
@@ -50,15 +65,30 @@ export function PendingChangesModal({ onClose }: Props) {
   const rows = pending.data ?? [];
   const groups = useMemo(() => groupPending(rows), [rows]);
   const conflictKeys = new Set((lastCommit?.conflicts ?? []).map((c) => c.key).filter((k) => groups.some((g) => g.key === k)));
+
+  // What the last Commit held, by key: a row is held when something it names
+  // was not created, and the card says what that is.
+  const heldByKey = useMemo(() => {
+    const byKey = new Map<string, string[]>();
+    for (const h of lastCommit?.held ?? []) {
+      const reasons = byKey.get(h.key) ?? [];
+      if (!reasons.includes(h.reason)) reasons.push(h.reason);
+      byKey.set(h.key, reasons);
+    }
+    return byKey;
+  }, [lastCommit]);
+
   const pushable = groups.filter((g) => !conflictKeys.has(g.key)).length;
 
-  // The held-back issue sits above drafts and edits: it is what blocks a
-  // clean commit, so it belongs where the eye lands first.
+  // The held-back issue sits above everything: it is what blocks a clean
+  // commit, so it belongs where the eye lands first. Draft sprints follow,
+  // since Commit creates them before anything that moves into them.
   const orderedGroups = useMemo(
     () => [
       ...groups.filter((g) => conflictKeys.has(g.key)),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && g.createRow),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && !g.createRow),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && g.sprintRow),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && !g.sprintRow && g.createRow),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && !g.sprintRow && !g.createRow),
     ],
     [groups, conflictKeys],
   );
@@ -110,17 +140,37 @@ export function PendingChangesModal({ onClose }: Props) {
               if (conflict) {
                 return <ConflictCard key={g.key} profileId={activeId} conflict={conflict} disabled={busy} />;
               }
+              if (g.sprintRow) {
+                const name = g.sprint?.name ?? "Draft sprint";
+                return (
+                  <section key={g.key} className="pending-card" role="group" aria-label={name}>
+                    <div className="pending-card-head">
+                      <span className="b">{name}</span>
+                      <span className="chip chip-draft">Draft sprint</span>
+                      <button type="button" className="btn btn-discard pending-discard" disabled={busy} aria-label={`Discard ${name}`} onClick={() => discardOne.mutate(g.sprintRow!, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
+                      </button>
+                    </div>
+                    <p className="muted small">{sprintDraftLine(g.sprint)}</p>
+                    <p className="muted small">Commit creates it in Jira first, then moves its cards into it. Discarding it puts those cards back.</p>
+                  </section>
+                );
+              }
+              const heldReasons = heldByKey.get(g.key) ?? [];
               return (
                 <section key={g.key} className="pending-card" role="group" aria-label={g.key}>
                   <div className="pending-card-head">
                     <span className="b">{g.key}</span>
                     {g.createRow && <span className="chip chip-draft">Draft</span>}
+                    {heldReasons.length > 0 && <span className="chip chip-held">Waiting</span>}
                     {g.draft && <span className="pending-card-summary">{g.draft.summary}</span>}
                     {g.createRow && (
                       <button type="button" className="btn btn-discard pending-discard" disabled={busy} aria-label={`Discard ${g.key}`} onClick={() => discardOne.mutate(g.createRow!, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
                       </button>
                     )}
                   </div>
+                  {heldReasons.map((reason) => (
+                    <p key={reason} className="small pending-held">{`${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`}</p>
+                  ))}
                   {g.draft ? (
                     <>
                       <p className="muted small">{draftLine(g.draft, activeProfile?.projectKey ?? "")}</p>

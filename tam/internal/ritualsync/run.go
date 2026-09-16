@@ -32,6 +32,10 @@ type Result struct {
 	Gone      int           `json:"gone"`
 	Failed    []PageFailure `json:"failed"`
 	SyncedAt  string        `json:"syncedAt"`
+
+	// RootMissing is set, and nothing else is, when the root page answered
+	// 404. Nothing was written locally or in Confluence.
+	RootMissing *RootMissing `json:"rootMissing"`
 }
 
 type pass struct {
@@ -61,6 +65,13 @@ func Run(ctx context.Context, pages confluence.Pages, docs *ritualrepo.Repositor
 	}
 	res := Result{Failed: []PageFailure{}}
 	if _, err := pages.GetPageStorage(ctx, cfg.RootID); err != nil {
+		if errors.Is(err, confluence.ErrNotFound) {
+			res.RootMissing = &RootMissing{
+				PageID: cfg.RootID, SpaceKey: cfg.SpaceKey,
+				CanCreate: canCreate(ctx, pages, cfg.SpaceKey), SuggestedTitle: SuggestedRootTitle(cfg.ProjectKey),
+			}
+			return res, nil
+		}
 		return res, fmt.Errorf("The Confluence root page %s could not be read: %s", cfg.RootID, errtext.Line(err))
 	}
 	p := &pass{ctx: ctx, pages: pages, docs: docs, cfg: cfg, res: &res}

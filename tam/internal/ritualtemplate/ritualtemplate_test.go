@@ -138,6 +138,19 @@ func TestEarlierNotesKeepsOnlyWhatSomebodyWrote(t *testing.T) {
 	}
 }
 
+func TestRootBodyNamesTheProjectAndEscapesIt(t *testing.T) {
+	want := "<p>Sprint ritual pages for PLAT, kept by Task Activity Manager. Each sprint has a page here, with its Planning, Standup, Review and Retrospective pages beneath it.</p>"
+	if got := RootBody("PLAT"); got != want {
+		t.Fatalf("RootBody = %q", got)
+	}
+	if got := RootBody(`A<&"`); !strings.Contains(got, "for A&lt;&amp;&quot;,") {
+		t.Fatalf("unescaped: %q", got)
+	}
+	if got := RootBody(" "); !strings.HasPrefix(got, "<p>Sprint ritual pages, kept by Task Activity Manager.") {
+		t.Fatalf("blank project: %q", got)
+	}
+}
+
 func TestParseJQLReadsTheThreeFormsAndNothingElse(t *testing.T) {
 	for _, f := range []Filter{All, Done, NotDone} {
 		id, got, ok := ParseJQL(JQL(14, f))

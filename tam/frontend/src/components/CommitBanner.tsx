@@ -1,5 +1,5 @@
 import { isMoveEntity } from "../api";
-import type { CommitFailure, CommitMove, CommitResult } from "../api";
+import type { CommitFailure, CommitHeld, CommitMove, CommitResult } from "../api";
 import { plural } from "../lib/format";
 
 // movedPhrase names one board write the way a created issue names its new
@@ -13,6 +13,10 @@ export function movedPhrase(m: CommitMove): string {
 // bannerLine renders a commit result as one sentence.
 export function bannerLine(r: CommitResult): string {
   const parts: string[] = [];
+  const sprints = r.createdSprints ?? [];
+  if (sprints.length) {
+    parts.push(`${plural(sprints.length, "sprint created", "sprints created")} (${sprints.map((s) => `${s.name} is sprint ${s.id}`).join(", ")})`);
+  }
   if (r.committed.length) parts.push(plural(r.committed.length, "issue pushed", "issues pushed"));
   if (r.created.length) {
     const mapping = r.created.map((c) => `${c.tempKey} is now ${c.key}`).join(", ");
@@ -30,8 +34,10 @@ export function bannerLine(r: CommitResult): string {
   if (already) parts.push(`${already} already in place`);
   if (r.conflicts.length) parts.push(`${r.conflicts.length} held back`);
   if (r.failures.length) parts.push(`${r.failures.length} failed`);
+  const held = r.held ?? [];
+  if (held.length) parts.push(`${held.length} waiting`);
   if (parts.length === 0) return "Last commit: nothing to push.";
-  if (!r.committed.length && !r.created.length && !r.linked.length && !pushed.length) {
+  if (!sprints.length && !r.committed.length && !r.created.length && !r.linked.length && !pushed.length) {
     return `Last commit: nothing pushed, ${parts.join(", ")}.`;
   }
   return `Last commit: ${parts.join(", ")}.`;
@@ -80,7 +86,8 @@ export function CommitBanner({ result, heldKeys, pendingRowIds, busy, onUndo }: 
   // included; the lines below it are the work still outstanding, so a move
   // the user has since taken back drops out of them.
   const failures = result.failures.filter((f) => stillPending(f, pendingRowIds));
-  const warn = result.conflicts.length > 0 || failures.length > 0;
+  const held: CommitHeld[] = result.held ?? [];
+  const warn = result.conflicts.length > 0 || failures.length > 0 || held.length > 0;
   return (
     <div className={`pending-banner${warn ? " pending-banner-warn" : ""}`} role="status">
       {/* The sentence alone read the same whether everything landed or
@@ -103,8 +110,13 @@ export function CommitBanner({ result, heldKeys, pendingRowIds, busy, onUndo }: 
           )}
         </p>
       ))}
-      {retryWorthOffering(failures) && (
+      {held.map((h) => (
+        <p key={`held-${h.key}-${h.entityType}-${h.rowId}`} className="small">{`${h.key} ${h.reason}.`}</p>
+      ))}
+      {retryWorthOffering(failures) ? (
         <p className="muted small">Commit again to retry the failures.</p>
+      ) : (
+        held.length > 0 && <p className="muted small">Commit again once what they wait for is in Jira.</p>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { errMsg } from "@agile-suite/core";
 import {
   CreateProfile,
@@ -13,11 +13,29 @@ import {
   isDemoUrl,
 } from "../api";
 import type { Profile } from "../api";
+import { ROOT_FIX_BEFORE_SAVE, readRootPageInput } from "../lib/confluenceRoot";
 
 // REQUIREMENT_TYPE_KEY is the per-profile setting holding the Jira issue type
 // name TAM syncs as a requirement. It lives in tam.db, not on the shared
 // profile row, so it is read and written separately from the profile itself.
 const REQUIREMENT_TYPE_KEY = "requirement_issue_type";
+
+// DETAIL_CACHE_KEY is the per-profile setting holding how long a cached issue
+// detail is served before TAM asks Jira again. It lives in tam.db beside the
+// requirement type and is read and written the same way.
+const DETAIL_CACHE_KEY = "detail_cache_minutes";
+
+export const DETAIL_MINUTES_NOT_A_NUMBER =
+  "Minutes is a whole number, such as 10. Use 0 to keep issue details cached until a Refresh.";
+
+// detailMinutesError checks the freshness field. Blank is the default (ten
+// minutes) and 0 is the offline setting, so the only thing refused is a value
+// that is not a whole number of minutes.
+function detailMinutesError(value: string): string {
+  const v = value.trim();
+  if (v === "" || /^\d+$/.test(v)) return "";
+  return DETAIL_MINUTES_NOT_A_NUMBER;
+}
 
 interface Props {
   // Fires when the profile has been created or updated.
@@ -97,6 +115,7 @@ export function ProfileForm({
   const [projectKey, setProjectKey] = useState(profile?.projectKey ?? "");
   const [scopeJql, setScopeJql] = useState(profile?.scopeJql ?? "");
   const [requirementType, setRequirementType] = useState("");
+  const [detailMinutes, setDetailMinutes] = useState("");
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   // Reuse a stored credential from an existing profile (create only). "" =
@@ -129,6 +148,11 @@ export function ProfileForm({
       .catch(() => {
         /* a missing setting reads as blank; the placeholder says the default */
       });
+    GetProfileSetting(profile.id, DETAIL_CACHE_KEY)
+      .then((v) => live && setDetailMinutes(v))
+      .catch(() => {
+        /* same: blank is the default freshness */
+      });
     return () => {
       live = false;
     };
@@ -159,6 +183,17 @@ export function ProfileForm({
 
   const keyError = projectKeyError(projectKey);
   const urlError = jiraUrlError(jiraUrl);
+  // Each field error is the description of its input, so a screen reader
+  // reads it with the field rather than only where it sits on the page.
+  const urlErrorId = useId();
+  const keyErrorId = useId();
+  const rootErrorId = useId();
+  const minutesErrorId = useId();
+  const minutesError = detailMinutesError(detailMinutes);
+
+  // A Sync against a root page id that is not one answers 404 and offers to
+  // create a root nobody needed, so the id is checked where it is typed.
+  const rootInput = readRootPageInput(confluenceRootPageID, confluenceURL);
 
   // A demo profile needs no credential; a live one needs one on create unless
   // it is reusing another profile's. On edit a blank token keeps the stored one.
@@ -173,7 +208,9 @@ export function ProfileForm({
     urlError === "" &&
     projectKey.trim() !== "" &&
     keyError === "" &&
-    tokenSatisfied;
+    tokenSatisfied &&
+    rootInput.error === "" &&
+    minutesError === "";
 
   // Warn when an edit changes the project key or URL: App.UpdateProfile purges
   // the rows cached for the old project, so the next sync starts from nothing.
@@ -234,15 +271,16 @@ export function ProfileForm({
       // The requirement type lives in TAM's own store, keyed by profile id,
       // so it is written after the profile write hands one back.
       await SetProfileSetting(p.id, REQUIREMENT_TYPE_KEY, requirementType.trim());
+      await SetProfileSetting(p.id, DETAIL_CACHE_KEY, detailMinutes.trim());
       if ((isEdit && confluenceLoaded) || ((!demo && (confluenceURL.trim() || confluenceSpace.trim() || confluenceRootPageID.trim())) || confluenceToken.trim())) {
         await SetConfluenceConfig(p.id, {
           baseURL: confluenceURL.trim(),
           spaceKey: confluenceSpace.trim(),
-          rootPageID: confluenceRootPageID.trim(),
+          rootPageID: rootInput.id,
         }, confluenceToken.trim());
         setConfluenceURL(confluenceURL.trim().replace(/\/+$/, ""));
         setConfluenceSpace(confluenceSpace.trim());
-        setConfluenceRootPageID(confluenceRootPageID.trim());
+        setConfluenceRootPageID(rootInput.id);
         setConfluenceLoaded(true);
       }
       onSaved(p);
@@ -267,8 +305,10 @@ export function ProfileForm({
           onBlur={() => setJiraUrl(normalizeJiraUrl(jiraUrl))}
           placeholder="https://jira.example.com (or 'demo')"
           spellCheck={false}
+          aria-invalid={urlError ? true : undefined}
+          aria-describedby={urlError ? urlErrorId : undefined}
         />
-        {urlError && <span className="field-error">{urlError}</span>}
+        {urlError && <span id={urlErrorId} className="field-error">{urlError}</span>}
       </label>
       <label>
         Project key
@@ -277,8 +317,10 @@ export function ProfileForm({
           onChange={(e) => setProjectKey(e.target.value.toUpperCase())}
           placeholder="PLAT"
           spellCheck={false}
+          aria-invalid={keyError ? true : undefined}
+          aria-describedby={keyError ? keyErrorId : undefined}
         />
-        {keyError && <span className="field-error">{keyError}</span>}
+        {keyError && <span id={keyErrorId} className="field-error">{keyError}</span>}
       </label>
       <label>
         Scope JQL (optional)
@@ -302,6 +344,24 @@ export function ProfileForm({
           pulls everything again; run a Full sync to drop rows of the old type.
         </span>
       </label>
+      <label>
+        Issue detail freshness (minutes)
+        <input
+          value={detailMinutes}
+          onChange={(e) => setDetailMinutes(e.target.value)}
+          placeholder="10"
+          inputMode="numeric"
+          spellCheck={false}
+          aria-invalid={minutesError ? true : undefined}
+          aria-describedby={minutesError ? minutesErrorId : undefined}
+        />
+        {minutesError && <span id={minutesErrorId} className="field-error">{minutesError}</span>}
+        <span className="field-hint">
+          How long a cached issue detail is shown before TAM asks Jira for it
+          again. Leave it blank for 10 minutes. 0 keeps issue details cached
+          until you press Refresh, so TAM can be used with no Jira connection.
+        </span>
+      </label>
 
       <details className="profile-form-advanced">
         <summary>Confluence Rituals (optional)</summary>
@@ -315,7 +375,18 @@ export function ProfileForm({
         </label>
         <label>
           Root page ID (optional)
-          <input value={confluenceRootPageID} onChange={(e) => setConfluenceRootPageID(e.target.value)} placeholder="123456" spellCheck={false} />
+          <input
+            value={confluenceRootPageID}
+            onChange={(e) => setConfluenceRootPageID(e.target.value)}
+            onBlur={() => {
+              if (rootInput.id && !rootInput.error) setConfluenceRootPageID(rootInput.id);
+            }}
+            placeholder="123456, or paste the page's address"
+            spellCheck={false}
+            aria-invalid={rootInput.error ? true : undefined}
+            aria-describedby={rootInput.error ? rootErrorId : undefined}
+          />
+          {rootInput.error && <span id={rootErrorId} className="field-error">{rootInput.error}</span>}
         </label>
         <label>
           Confluence personal access token
@@ -415,6 +486,8 @@ export function ProfileForm({
           <span className={testOk ? "ok-text" : "error-text"}>{testResult}</span>
         )}
       </div>
+
+      {rootInput.error && <div className="field-error">{ROOT_FIX_BEFORE_SAVE}</div>}
 
       {error && (
         <div className="error-text" role="alert">

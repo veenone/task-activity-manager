@@ -367,6 +367,34 @@ input, button, select { font-family: inherit; font-size: inherit; }
   font-weight: 600;
 }
 .detail-section-action { margin-left: auto; font-size: 11px; }
+/* The cached stamp sits where a section's action would, but is a fact and
+   not a control, so it takes the same place without the button styling. */
+.detail-section-note { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
+/* The description's label, syntax toggle and Edit share one line above the
+   rendered text, the way the mockup heads the section. */
+.edit-row-head { display: flex; align-items: center; gap: 8px; }
+.edit-description-action { margin-left: auto; font-size: 11px; }
+/* One comment: an initials avatar, the author, then the time on the right,
+   over the rendered body. */
+.comment-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.comment-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface-2); font-size: 12px; }
+.comment-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.comment-avatar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.comment-author { font-size: 12px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-when { margin-left: auto; white-space: nowrap; }
+.chip-restricted { background: var(--warn-soft); color: var(--warn-text); border: 1px solid var(--warn-border); }
 .chip-label { background: var(--surface-3); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 8px; margin-right: 4px; }
 .accent-text { color: var(--accent); }
 .detail-description { white-space: pre-wrap; font-size: 12px; }
@@ -379,6 +407,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* Plan 1b: pending changes */
 .chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
+.chip-held { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
+.pending-held { margin: 4px 0 0; color: var(--warn-fg, #92400e); }
 .chip-conflict { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); text-transform: uppercase; font-size: 10px; }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }
@@ -455,6 +485,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
    not there is an error to show. */
 .new-issue-status { flex: 1; min-width: 0; }
 .meta-fields { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+.meta-more { display: flex; flex-direction: column; gap: 10px; }
+.meta-more-toggle { align-self: flex-start; padding-left: 0; }
+.meta-fields-optional { display: flex; flex-direction: column; gap: 10px; }
 /* A cell that stacks its control over a hint, for the fields whose value is a
    list and would otherwise say so only in a placeholder that vanishes on the
    first keystroke. */
@@ -698,11 +731,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-page-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .ritual-page-head h3 { margin: 0; font-size: 15px; }
 .ritual-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.ritual-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
-.ritual-toolbar .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
-.ritual-toolbar .ritual-add-entry { margin-left: auto; }
-.ritual-link-input { display: inline-flex; gap: 4px; align-items: center; }
-.ritual-link-input input { width: 220px; }
+.ritual-editor .editor-toolbar-group[data-group="ritual"] { margin-left: auto; border-right: 0; }
 .ritual-editor-content { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
 .ritual-editor-content .ProseMirror { outline: none; min-height: 100%; }
 .ritual-editor-content table { border-collapse: collapse; margin: 8px 0; }
@@ -734,6 +763,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-chip-conflict, .ritual-chip-gone { color: var(--warn-text); border-color: var(--warn-border); background: var(--warn-soft); }
 .ritual-banner { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--warn-border); background: var(--warn-soft); color: var(--warn-text); }
 .ritual-banner p { margin: 0 0 6px; }
+
+/* The missing-root dialog: a title box, where the page goes, what Sync does next. */
+.ritual-root-modal { max-width: 480px; }
+.ritual-root-modal .ritual-root-title { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.ritual-root-modal p { line-height: 1.45; }
 .ritual-sync-result { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
 .ritual-sync-result p, .ritual-sync-result ul { margin: 0; }
 @media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } .ritual-docs { border-right: 0; border-bottom: 1px solid var(--border); } }

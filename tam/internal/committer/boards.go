@@ -108,8 +108,8 @@ type movePlan struct {
 // then every rank as one group, in ranks.go. A failure is per row and does not stop the
 // pass; a row whose key is still a draft waits for the next Commit, the
 // rule the link pass already uses.
-func (e *Engine) commitBoardMoves(ctx context.Context, profileID string, res *Result) {
-	rows, err := e.boardRows(ctx, profileID)
+func (e *Engine) commitBoardMoves(ctx context.Context, profileID string, res *Result, deps *dependencies) {
+	rows, err := e.boardRows(ctx, profileID, res, deps)
 	if err != nil {
 		res.Failures = append(res.Failures, failure("board moves", "", "the journal could not be read for board moves: "+err.Error(), true))
 		return
@@ -139,8 +139,12 @@ func (e *Engine) commitBoardMoves(ctx context.Context, profileID string, res *Re
 // boardRows reads the journal again, after the creates and the edits have
 // run, and returns the board rows oldest first. Rereading is what lets a
 // row that was journaled against a draft be pushed under the key the create
-// pass gave it; a key that is still a draft is left out entirely.
-func (e *Engine) boardRows(ctx context.Context, profileID string) ([]journal.PendingChange, error) {
+// pass gave it. A row naming a placeholder this Commit could not make real,
+// a draft issue as its key or a draft sprint as its target, is held; a move
+// into a draft sprint whose create row is already gone fails, since nothing
+// will make that id real; any other row under a key that is still a draft
+// is left out, as before.
+func (e *Engine) boardRows(ctx context.Context, profileID string, res *Result, deps *dependencies) ([]journal.PendingChange, error) {
 	all, err := e.repo.ListPendingChanges(ctx, profileID)
 	if err != nil {
 		return nil, err
@@ -148,7 +152,18 @@ func (e *Engine) boardRows(ctx context.Context, profileID string) ([]journal.Pen
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	rows := make([]journal.PendingChange, 0, len(all))
 	for _, p := range all {
-		if !boardRow(p.EntityType) || isDraftKey(p.EntityKey) {
+		if !boardRow(p.EntityType) {
+			continue
+		}
+		if waits, held := deps.blockedBy(p.EntityKey, p.AfterVal); held {
+			deps.hold(res, p.EntityKey, p.EntityType, p.ID, waits)
+			continue
+		}
+		if isDraftKey(p.EntityKey) {
+			continue
+		}
+		if p.EntityType == issuerepo.EntitySprintMove && sprintNotRenamed(all, p.AfterVal) {
+			res.Failures = append(res.Failures, boardFailure(p, errSprintNotRenamed, false))
 			continue
 		}
 		rows = append(rows, p)
@@ -262,6 +277,12 @@ func (e *Engine) pushSprints(ctx context.Context, profileID string, w boardWrite
 			for _, p := range batch {
 				keys = append(keys, p.EntityKey)
 			}
+			if err := assertNoPlaceholders(map[string]any{"sprintId": target, "issues": keys}); err != nil {
+				for _, p := range batch {
+					res.Failures = append(res.Failures, boardFailure(p, err, false))
+				}
+				continue
+			}
 			if err := w.MoveIssuesToSprint(ctx, target, keys); err != nil {
 				for _, p := range batch {
 					res.Failures = append(res.Failures, boardFailure(p, err, true))
@@ -299,6 +320,10 @@ func (e *Engine) pushTransitions(ctx context.Context, profileID string, plan mov
 			// The board's columns are a local read; failing it should not
 			// cost the move, it should only cost the siblings.
 			targets = []string{target}
+		}
+		if err := assertNoPlaceholders(map[string]any{"issue": key}); err != nil {
+			res.Failures = append(res.Failures, boardFailure(p, err, false))
+			continue
 		}
 		if err := e.b.Transition(ctx, key, targets); err != nil {
 			res.Failures = append(res.Failures, boardFailure(p, namedTarget(err, issuerepo.MoveRawName(p.AfterVal)), true))

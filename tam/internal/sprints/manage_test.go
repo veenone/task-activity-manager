@@ -21,7 +21,7 @@ type auditCall struct {
 }
 
 // fakeIssues is the issue cache seam: the cached sprint columns a delete
-// blanks, and the audit rows all three management writes leave behind. Its
+// blanks, and the audit rows both management writes leave behind. Its
 // calls land in the store's own ordered log, because the thing worth
 // asserting is the order the two repositories are touched in, which neither
 // of them can enforce from inside its own transaction.
@@ -57,7 +57,7 @@ func (i *fakeIssues) AuditSprint(_ context.Context, _ string, sprintID int, acti
 	return i.auditErr
 }
 
-// manageService is the service the three management writes are exercised
+// manageService is the service the two management writes are exercised
 // through: the same one the ceremonies use, with the issue cache wired the
 // way app.go wires it.
 func manageService(b *fakeBackend, store *fakeStore, issues *fakeIssues) *sprints.Service {
@@ -70,87 +70,6 @@ func manageService(b *fakeBackend, store *fakeStore, issues *fakeIssues) *sprint
 // input produces.
 func draft(name, goal string) backend.SprintDraft {
 	return backend.SprintDraft{Name: name, Goal: goal, StartDate: "2026-09-09", EndDate: "2026-09-23"}
-}
-
-// TestCreateSendsTheDraftToJiraAndCachesTheSprintWithItsGoal is the whole of
-// a create: the two bare dates reach Jira in the Agile API's own datetime
-// format, the sprint Jira made comes back, and the board's re-read list
-// lands in the cache with the goal on it, which is the field the row and the
-// edit dialog are both drawn from.
-func TestCreateSendsTheDraftToJiraAndCachesTheSprintWithItsGoal(t *testing.T) {
-	made := backend.Sprint{ID: 14, BoardID: 1, Name: "Sprint 14", State: "future", Goal: "Ship the grid"}
-	b := &fakeBackend{made: made, sprints: []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active"}, made}}
-	store := newStore()
-	issues := newIssues(store)
-
-	got, note, err := manageService(b, store, issues).Create(context.Background(), "p1", 1, draft("Sprint 14", "Ship the grid"))
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if note != "" {
-		t.Errorf("note = %q, want none: the list was re-read", note)
-	}
-	if got.ID != 14 {
-		t.Errorf("create = %+v, want the sprint Jira made, id and all", got)
-	}
-	if len(b.created) != 1 || b.created[0].boardID != 1 {
-		t.Fatalf("creates = %+v, want one on board 1", b.created)
-	}
-	sent := b.created[0].draft
-	if sent.Goal != "Ship the grid" {
-		t.Errorf("goal sent = %q, want the one the dialog collected", sent.Goal)
-	}
-	if !strings.HasPrefix(sent.StartDate, "2026-09-09T09:00:00.000") || !strings.HasPrefix(sent.EndDate, "2026-09-23T09:00:00.000") {
-		t.Errorf("dates sent = %q..%q, want Jira's own datetime format", sent.StartDate, sent.EndDate)
-	}
-	if len(store.sprints) != 2 || store.sprints[1].Goal != "Ship the grid" {
-		t.Errorf("cached sprints = %+v, want the re-read list carrying the goal", store.sprints)
-	}
-	want := auditCall{sprintID: 14, action: "create", after: "Sprint 14"}
-	if len(issues.audits) != 1 || issues.audits[0] != want {
-		t.Errorf("audit rows = %+v, want one %+v", issues.audits, want)
-	}
-}
-
-// TestACreateWhoseRefreshComesBackEmptyStillReportsTheSprintAndWhatToDo is
-// the case the refusal in refreshSprints produces on this path. The sprint
-// exists in Jira, so the create is a success and the sprint has to travel
-// back with the note; Wails would drop it if the note were an error. The
-// note has to say what to do, because until a Refresh lands the picker shows
-// a board without the sprint that was just made on it.
-func TestACreateWhoseRefreshComesBackEmptyStillReportsTheSprintAndWhatToDo(t *testing.T) {
-	b := &fakeBackend{made: backend.Sprint{ID: 14, BoardID: 1, Name: "Sprint 14", State: "future"}}
-	store := newStore()
-	issues := newIssues(store)
-
-	got, note, err := manageService(b, store, issues).Create(context.Background(), "p1", 1, draft("Sprint 14", ""))
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if got.ID != 14 {
-		t.Errorf("create = %+v, want the new sprint back beside the note", got)
-	}
-	if !strings.Contains(note, "no sprints at all") || !strings.Contains(note, "Refresh") {
-		t.Errorf("note = %q, want it to say the list was left alone and to press Refresh", note)
-	}
-	if store.written != 0 {
-		t.Error("the empty answer was written to the cache, which would erase the board's whole sprint history")
-	}
-}
-
-// TestCreateRefusesAnEndBeforeItsStartBeforeJiraHearsAboutIt keeps the date
-// pair honest on the path the dialog is not the only way into.
-func TestCreateRefusesAnEndBeforeItsStartBeforeJiraHearsAboutIt(t *testing.T) {
-	b := &fakeBackend{}
-	store := newStore()
-	d := backend.SprintDraft{Name: "Sprint 14", StartDate: "2026-09-23", EndDate: "2026-09-09"}
-
-	if _, _, err := manageService(b, store, newIssues(store)).Create(context.Background(), "p1", 1, d); err == nil {
-		t.Fatal("create = nil error, want an end before a start refused")
-	}
-	if len(b.created) != 0 {
-		t.Errorf("creates = %+v, want none: the refusal happens before Jira is called", b.created)
-	}
 }
 
 // TestEditSendsTheDraftAndTheClearGoalFlagAndRecordsTheRename covers the one
@@ -208,6 +127,28 @@ func TestEditRefusesAClosedSprintJiraReportsWhileTheCacheStillCallsItFuture(t *t
 	}
 	if len(b.edited) != 0 {
 		t.Errorf("edits = %+v, want none: nothing may reach Jira after that refusal", b.edited)
+	}
+}
+
+// TestAnEditWithNoIssueCacheWiredStillLandsInJira is the shape of the seam
+// for Edit: its audit row is bookkeeping after the fact, so a service
+// without the issue cache still writes the edit to Jira and logs what it
+// could not record, rather than refusing the write. Delete is not this
+// shape, and TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked
+// below is why.
+func TestAnEditWithNoIssueCacheWiredStillLandsInJira(t *testing.T) {
+	b := &fakeBackend{sprints: []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active"}}}
+	store := newStore()
+
+	note, err := newService(b, store).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13 renamed", ""), false)
+	if err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	if note != "" {
+		t.Errorf("note = %q, want none", note)
+	}
+	if len(b.edited) != 1 || b.edited[0].sprintID != 13 {
+		t.Errorf("edits = %+v after %d calls, want sprint 13 edited in Jira anyway", b.edited, len(b.edited))
 	}
 }
 
@@ -430,28 +371,10 @@ func TestADeleteWhoseCacheWorkFailsIsStillADeleteWithANote(t *testing.T) {
 	}
 }
 
-// TestAManagementWriteWithNoIssueCacheWiredStillLandsInJira is the shape of
-// the seam for Create and Edit: their audit row is bookkeeping after the
-// fact, so a service without the issue cache writes to Jira and logs what it
-// could not record, rather than refusing the write. Delete is not this
-// shape, and the test below it is why.
-func TestAManagementWriteWithNoIssueCacheWiredStillLandsInJira(t *testing.T) {
-	made := backend.Sprint{ID: 14, BoardID: 1, Name: "Sprint 14", State: "future"}
-	b := &fakeBackend{made: made, sprints: []backend.Sprint{made}}
-	store := newStore()
-
-	got, _, err := newService(b, store).Create(context.Background(), "p1", 1, draft("Sprint 14", ""))
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if got.ID != 14 || len(b.created) != 1 {
-		t.Errorf("create = %+v after %d calls, want the sprint made in Jira anyway", got, len(b.created))
-	}
-}
-
-// TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked is the other
-// side of that seam. A delete's Issues calls are not a footnote the way
-// Create and Edit's are: they are what keeps Jira's board tables and the
+// TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked pins the other
+// side of the seam TestAnEditWithNoIssueCacheWiredStillLandsInJira pins
+// above. A delete's Issues calls are not a footnote the way Edit's is: they
+// are what keeps Jira's board tables and the
 // cached issues from naming a sprint forever that Jira no longer has, and
 // the one audit row that will be the only trace of the sprint left anywhere
 // once Jira has destroyed it. Both are lost for good if the delete is let

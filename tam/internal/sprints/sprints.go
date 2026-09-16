@@ -1,33 +1,34 @@
-// Package sprints owns the five writes that reach Jira the moment they are
-// made: starting a sprint, completing one, and creating, editing and
-// deleting one. They are the only writes in TAM that do not go through the
-// journal, and the reason is a cost rather than a principle.
+// Package sprints owns the four writes that reach Jira the moment they are
+// made: starting a sprint, completing one, and editing and deleting one. They
+// are the only writes in TAM that do not go through the journal, and the
+// reason is a cost rather than a principle.
 //
-// A sprint's id has to be real before anything can point at it. TAM carries
-// the machinery to defer an issue's id, the TAM-NEW- draft key and the
-// commit pass that swaps it for Jira's, and carries nothing that would defer
-// a sprint's: journaling a create would mean inventing a local sprint id,
-// teaching the commit pass to rekey every issue_sprint row aimed at it, and
-// putting an id that is not real into the board cache, the Backlog's sprint
-// filter and the importer's Sprint column. Calling that a principle is how a
-// sixth exception gets added without an argument, so it is written down as
-// what it is.
+// Creating a sprint was the fifth, on the argument that a sprint's id has to
+// be real before anything can point at it. The create and commit
+// correctness bundle paid the cost that argument named: a sprint created in
+// TAM is a sprint_create journal row and a draft row under a negative id,
+// every card moved into it journals that id, and Commit's first phase
+// creates it in Jira and rewrites the id everywhere before anything naming
+// it is sent. DraftSprint is the check a draft gets; issuerepo holds the
+// rest.
 //
-// The other four follow the first. A sprint is a container a whole team
-// plans into, so one that exists on a single laptop is one nobody else can
-// move an issue into, and there is nothing to reconcile later either: a card
-// move can be rebased onto a status that shifted underneath it, while a
-// sprint somebody else has already deleted cannot be renamed.
+// The other four follow for a reason that only starts once a sprint is real.
+// A sprint Jira holds is a container a whole team plans into, so editing,
+// deleting, starting or completing it on a single laptop while everyone else
+// still sees the old one would put that laptop out of step with the team,
+// and there is nothing to reconcile later either: a card move can be
+// rebased onto a status that shifted underneath it, while a sprint somebody
+// else has already deleted cannot be renamed.
 //
 // The exception has one home here, one place to test, and a fence:
-// exceptions_test.go names the Service's own exported methods, so a sixth
+// exceptions_test.go names the Service's own exported methods, so a fifth
 // immediate write arrives with a failing test rather than quietly.
 //
 // This package writes no journal rows. It reads their count, to refuse a
 // completion or a delete while changes are queued against the sprint, and it
-// leaves an audit row behind each of the three management writes. Moving an
-// issue into or out of a sprint stays an ordinary journal write and lives in
-// issuerepo, where every other one does.
+// leaves an audit row behind each of the two management writes, Edit and
+// Delete. Moving an issue into or out of a sprint stays an ordinary journal
+// write and lives in issuerepo, where every other one does.
 package sprints
 
 import (
@@ -81,7 +82,6 @@ type lifecycle interface {
 	MoveIssuesToSprint(ctx context.Context, sprintID string, keys []string) error
 	StartSprint(ctx context.Context, sprintID int, d backend.SprintDraft) error
 	CompleteSprint(ctx context.Context, sprintID int) error
-	CreateSprint(ctx context.Context, boardID int, d backend.SprintDraft) (backend.Sprint, error)
 	EditSprint(ctx context.Context, sprintID int, d backend.SprintDraft, clearGoal bool) error
 	DeleteSprint(ctx context.Context, sprintID int) error
 }
@@ -107,7 +107,7 @@ type Store interface {
 
 // Issues is the issue cache's side of a sprint write, which is a different
 // repository from the board cache Store is: the cached sprint columns a
-// delete has to blank, and the audit row each of the three management writes
+// delete has to blank, and the audit row each of the two management writes
 // leaves behind. issuerepo.Repository satisfies it.
 //
 // It is its own seam rather than two more methods on Store because the two
@@ -182,24 +182,23 @@ type Service struct {
 	Pending func(ctx context.Context, profileID string, sprintID int) (int, error)
 
 	// Issues, when set, is the issue cache: where a deleted sprint's name is
-	// blanked off the cards that carried it, and where the audit row of a
-	// create, an edit or a delete is written. It is wired beside Pending and
-	// for the same reason, since app.go is the one place holding both
-	// repositories.
+	// blanked off the cards that carried it, and where the audit row of an
+	// edit or a delete is written. It is wired beside Pending and for the
+	// same reason, since app.go is the one place holding both repositories.
 	//
-	// Create and Edit treat an unset seam as a footnote: both calls are
-	// bookkeeping after Jira has already moved, so a missing audit row is
-	// logged and nothing more. Delete does not get that leniency, because
-	// its call to Issues is not the same kind of afterthought: it is what
-	// keeps Jira's board tables and the issue cache from naming a sprint
-	// forever that Jira no longer has, the crash window boardrepo's own
-	// comment says a full sync repairs, made permanent instead of momentary,
-	// and it is what writes the one audit row that will be the only trace of
-	// the sprint left anywhere once Jira has destroyed it. Refusing before a
-	// delete touches Jira costs nothing; letting it through and losing both
-	// afterwards cannot be undone. So Delete checks this field for nil
-	// itself, before it calls Jira at all, rather than discovering the gap
-	// the way Create and Edit do, after there is nothing left to refuse.
+	// Edit treats an unset seam as a footnote: its call is bookkeeping after
+	// Jira has already moved, so a missing audit row is logged and nothing
+	// more. Delete does not get that leniency, because its call to Issues is
+	// not the same kind of afterthought: it is what keeps Jira's board tables
+	// and the issue cache from naming a sprint forever that Jira no longer
+	// has, the crash window boardrepo's own comment says a full sync repairs,
+	// made permanent instead of momentary, and it is what writes the one
+	// audit row that will be the only trace of the sprint left anywhere once
+	// Jira has destroyed it. Refusing before a delete touches Jira costs
+	// nothing; letting it through and losing both afterwards cannot be
+	// undone. So Delete checks this field for nil itself, before it calls
+	// Jira at all, rather than discovering the gap the way Edit does, after
+	// there is nothing left to refuse.
 	//
 	// That check only catches the field being left unset. app.go's a.repo is
 	// a concrete *issuerepo.Repository, and assigning a nil one here would
@@ -238,6 +237,9 @@ func New(b Backend, store Store, projectKey string) *Service {
 // still calls the running sprint future, the toolbar still offers Start for
 // it, and Jira answers that second start with a 400 nobody can explain.
 func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft) (string, error) {
+	if sprintID < 0 {
+		return "", errDraftSprint
+	}
 	b, err := s.board()
 	if err != nil {
 		return "", err
@@ -269,6 +271,9 @@ func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID
 // close has to be read against. An error is kept for the refusals that
 // happen before anything moves, which have nothing to report but themselves.
 func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (Completion, error) {
+	if sprintID < 0 {
+		return Completion{Failed: []string{}}, errDraftSprint
+	}
 	sid := strconv.Itoa(sprintID)
 	done := Completion{Failed: []string{}}
 	b, err := s.board()

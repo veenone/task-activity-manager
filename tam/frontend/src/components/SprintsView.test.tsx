@@ -164,7 +164,7 @@ beforeEach(() => {
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
   vi.mocked(api.PendingInSprint).mockResolvedValue(0);
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
+  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
@@ -423,6 +423,23 @@ describe("SprintsView", () => {
     await waitFor(() => expect(banner()).toHaveTextContent("Sprint 12 was deleted."));
   });
 
+  it("deletes a draft sprint without claiming Jira deletes anything", async () => {
+    const user = userEvent.setup();
+    const DRAFT = detail({ id: -1, name: "Sprint 15", state: "future", draft: true, goal: "", startDate: "", endDate: "", issues: [] });
+    vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([ACTIVE, DRAFT, FUTURE, CLOSED, BACKLOG]);
+    vi.mocked(api.DeleteSprint).mockResolvedValue("");
+    renderView();
+    const menu = await openMenu(user, "Sprint 15");
+    await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
+    const ask = await screen.findByRole("alertdialog");
+    expect(within(ask).getByText("Delete the draft Sprint 15?")).toBeInTheDocument();
+    expect(within(ask).getByText("Nothing reaches Jira. Cards moved into it go back to where they were.")).toBeInTheDocument();
+    expect(within(ask).queryByText("Sends to Jira now")).not.toBeInTheDocument();
+    await user.click(within(ask).getByRole("button", { name: "Delete draft" }));
+    await waitFor(() => expect(api.DeleteSprint).toHaveBeenCalledWith("p1", 1, -1));
+    await waitFor(() => expect(banner()).toHaveTextContent("The draft Sprint 15 was deleted."));
+  });
+
   it("edits a sprint from its own row, opening on what that sprint holds", async () => {
     const user = userEvent.setup();
     renderView();
@@ -476,23 +493,21 @@ describe("SprintsView", () => {
     await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
     await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
     await waitFor(() => expect(api.CreateSprint).toHaveBeenCalled());
-    await waitFor(() => expect(banner()).toHaveTextContent("Sprint 14 was created, 2026-09-14 to 2026-09-28."));
+    await waitFor(() => expect(banner()).toHaveTextContent("Sprint 14 was drafted, 2026-09-14 to 2026-09-28. Commit creates it in Jira."));
     // And announced, which is the report a reader who is not watching the
     // list gets. The shared live region is the unnamed status region; the
     // banner above is the named one.
     const live = screen.getAllByRole("status").find((el) => el.classList.contains("sr-only"));
-    await waitFor(() => expect(live).toHaveTextContent("Sprint 14 was created"));
+    await waitFor(() => expect(live).toHaveTextContent("Sprint 14 was drafted"));
   });
 
-  it("marks the create dialog as sending to Jira now, and still names Commit under it", async () => {
+  it("says the new sprint is drafted locally and created on Commit", async () => {
     const user = userEvent.setup();
     renderView();
     await user.click(await screen.findByRole("button", { name: "New sprint" }));
     const dialog = await screen.findByRole("dialog", { name: "New sprint" });
-    expect(within(dialog).getByText("Sends to Jira now")).toBeInTheDocument();
-    // Commit is the concept the whole app is built on and the word the user
-    // has been trained on, so the chip carries the sentence naming it.
-    expect(within(dialog).getByText("This does not wait for Commit.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Drafted locally. Commit creates it in Jira.")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Sends to Jira now")).not.toBeInTheDocument();
   });
 
   it("carries a partial success's note into the banner beside the sentence", async () => {

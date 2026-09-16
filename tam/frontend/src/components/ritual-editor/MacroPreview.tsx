@@ -1,4 +1,5 @@
 import { useContext, useEffect, useState } from "react";
+import { toPlainText } from "@agile-suite/core";
 import { RitualMacroIssues } from "../../api";
 import type { RitualMacroPreview } from "../../api";
 import { MACRO_CAVEAT } from "../../lib/ritualText";
@@ -52,7 +53,7 @@ export function MacroPreview({ xml }: { xml: string }) {
         <table className="ritual-macro-table">
           <thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Assignee</th></tr></thead>
           <tbody>
-            {shown.map((i) => <tr key={i.key}><td>{i.key}</td><td>{i.summary}</td><td>{i.status}</td><td>{i.assignee}</td></tr>)}
+            {shown.map((i) => <tr key={i.key}><td>{i.key}</td><td>{toPlainText(i.summary, "summary")}</td><td>{i.status}</td><td>{i.assignee}</td></tr>)}
           </tbody>
         </table>
       )}

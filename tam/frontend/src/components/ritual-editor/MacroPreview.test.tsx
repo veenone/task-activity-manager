@@ -43,6 +43,19 @@ describe("MacroPreview", () => {
     expect(api.RitualMacroIssues).toHaveBeenCalledWith("p1", "sprint = 14 ORDER BY Rank");
   });
 
+  // Fix round 3, Minor: the one summary surface left rendering its raw
+  // value, which showed a summary's own markup characters on a ritual page.
+  it("shows a summary as plain text, the same as every other summary", async () => {
+    vi.mocked(api.RitualMacroIssues).mockResolvedValue({
+      supported: true, jql: "sprint = 14 ORDER BY Rank",
+      issues: [
+        { key: "PLAT-3", summary: "Fix {{login}} at [Figma|https://f]", status: "To Do", assignee: "" },
+      ] as api.Issue[],
+    });
+    renderPreview(macro("sprint = 14 ORDER BY Rank"));
+    expect(await screen.findByText("Fix login at Figma")).toBeInTheDocument();
+  });
+
   it("shows any other query as text Confluence renders", async () => {
     vi.mocked(api.RitualMacroIssues).mockResolvedValue({ supported: false, jql: "project = PLAT", issues: [] });
     renderPreview(macro("project = PLAT"));

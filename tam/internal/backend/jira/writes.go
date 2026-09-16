@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 
+	corejira "agile-suite/core/jira"
 	"agile-suite/tam/internal/backend"
 )
 
@@ -98,10 +98,9 @@ func projectOf(issueKey string) string {
 	return issueKey
 }
 
-// CreateIssue POSTs the draft. Extra values are shaped from the type's
-// create-meta: option fields as {"id"}, arrays as [{"id"}], numbers as
-// numbers, everything else as the text entered. If the meta cannot be read
-// the values go as text and Jira's own validation decides.
+// CreateIssue POSTs the draft. TAM's own fields are set first and are never
+// overwritten; extras are then shaped from the type's create metadata and
+// filtered by applyExtras, so a field off the create screen is never sent.
 func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.IssueDraft) (string, error) {
 	ids := b.discover(ctx)
 	names := jiraTypeNames([]string{d.Type}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
@@ -146,24 +145,7 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 		}
 	}
 	if len(d.Extra) > 0 {
-		kinds := map[string]string{}
-		// Whether the field's create-meta listed allowed values, which is what
-		// decides between sending an option's id and sending the text the user
-		// typed. Without it a field whose options Jira did not expand was sent
-		// as {"id": "<what they typed>"}, which is never a valid id.
-		options := map[string]bool{}
-		if specs, err := b.CreateFields(ctx, projectKey, d.Type); err == nil {
-			for _, s := range specs {
-				kinds[s.ID] = s.Type
-				options[s.ID] = len(s.AllowedValues) > 0
-			}
-		}
-		for id, v := range d.Extra {
-			if v == "" {
-				continue
-			}
-			fields[id] = shapeExtra(kinds[id], options[id], v)
-		}
+		b.applyExtras(ctx, projectKey, names[0], d, ids, fields)
 	}
 	if d.Type == backend.TypeEpic && ids.EpicName != "" {
 		if _, set := fields[ids.EpicName]; !set {
@@ -182,122 +164,153 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	return resp.Key, nil
 }
 
-// shapeExtra turns the text the form holds into the JSON Jira wants for one
-// create-meta field. hasOptions says the field's create-meta listed allowed
-// values, so the text is an option id; without it the text is the value the
-// user typed and has to go as a name, not an id. An array field carries a
-// comma list, because a Jira array (components, fix versions, a multi-select)
-// takes more than one value and the form sends them joined.
-func shapeExtra(kind string, hasOptions bool, v string) any {
-	switch kind {
-	case "option":
-		if hasOptions {
-			return map[string]string{"id": v}
-		}
-		return map[string]string{"value": v}
-	case "array":
-		parts := splitList(v)
-		if hasOptions {
-			out := make([]map[string]string, 0, len(parts))
-			for _, p := range parts {
-				out = append(out, map[string]string{"id": p})
-			}
-			return out
-		}
-		return parts
-	case "number":
-		if n, err := strconv.ParseFloat(v, 64); err == nil {
-			return n
+// applyExtras writes the draft's extra fields into the payload, shaped from
+// the type's create metadata. Four rules keep an extra out, each logged:
+//
+//   - the payload already holds the id: what the form set is never
+//     overwritten, which is how Extra["parent"] once replaced the
+//     {"key": ...} object with a string;
+//   - the id is one of TAM's own fields, set by the form or by nothing;
+//   - the draft carries the ids its dialog offered and this one is not
+//     among them, which is the screen check Commit makes with no network;
+//   - the metadata read now came from the per-type endpoint and no longer
+//     lists the id, so the field is not on the screen today.
+//
+// An unreadable metadata read shapes every surviving extra as text, and
+// Jira's own validation decides.
+func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, d backend.IssueDraft, ids fieldIDs, fields map[string]any) {
+	meta, metaErr := b.createMeta(ctx, projectKey, d.Type)
+	var screen map[string]bool
+	if d.ScreenFields != nil {
+		screen = make(map[string]bool, len(d.ScreenFields))
+		for _, id := range d.ScreenFields {
+			screen[id] = true
 		}
 	}
-	return v
-}
-
-// splitList turns the form's comma list into its non-empty parts.
-func splitList(v string) []string {
-	out := []string{}
-	for _, p := range strings.Split(v, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
+	extraIDs := make([]string, 0, len(d.Extra))
+	for id := range d.Extra {
+		extraIDs = append(extraIDs, id)
 	}
-	return out
+	sort.Strings(extraIDs)
+	for _, id := range extraIDs {
+		v := d.Extra[id]
+		if strings.TrimSpace(v) == "" {
+			continue
+		}
+		if _, set := fields[id]; set || isBaseFieldID(id, ids) {
+			log.Printf("tam: the %s create of %q ignores extra %s, which is one of TAM's own fields", typeName, d.Summary, id)
+			continue
+		}
+		if screen != nil && !screen[id] {
+			log.Printf("tam: the %s create of %q leaves out %s, which was not on the screen it was drafted against", typeName, d.Summary, id)
+			continue
+		}
+		f, known := meta.Field(id)
+		if metaErr == nil && meta.Source == corejira.MetaPerType && !known {
+			log.Printf("tam: the %s create of %q leaves out %s, which is not on the %s create screen", typeName, d.Summary, id, typeName)
+			continue
+		}
+		if metaErr != nil || !known {
+			f = corejira.MetaField{ID: id, Schema: corejira.MetaSchema{Type: "string"}}
+		}
+		fields[id] = corejira.ShapeValue(f, v)
+	}
 }
 
-// createMeta is the slice of Jira's createmeta answer the form needs.
-type createMeta struct {
-	Projects []struct {
-		IssueTypes []struct {
-			Name   string `json:"name"`
-			Fields map[string]struct {
-				Name     string `json:"name"`
-				Required bool   `json:"required"`
-				Schema   struct {
-					Type  string `json:"type"`
-					Items string `json:"items"`
-				} `json:"schema"`
-				AllowedValues []struct {
-					ID    string `json:"id"`
-					Value string `json:"value"`
-					Name  string `json:"name"`
-				} `json:"allowedValues"`
-			} `json:"fields"`
-		} `json:"issuetypes"`
-	} `json:"projects"`
-}
-
-// formFields are the create-meta ids the New issue form already carries or
-// sets itself, so they never come back as extra required fields.
-var formFields = map[string]bool{
+// baseFieldIDs are the create-meta ids TAM's own form carries or sets itself.
+// An extra may never name one: the dialog does not offer them, and a create
+// never lets an extra overwrite what the form set.
+var baseFieldIDs = map[string]bool{
 	"project": true, "issuetype": true, "summary": true, "description": true,
-	"priority": true, "assignee": true, "labels": true, "reporter": true,
+	"priority": true, "assignee": true, "labels": true, "reporter": true, "parent": true,
 }
 
-// CreateFields returns the required fields of the type beyond the form's
-// own, sorted by name, with their options when they have any.
-func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType string) ([]backend.FieldSpec, error) {
-	ids := b.discover(ctx)
-	names := jiraTypeNames([]string{logicalType}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
-	if len(names) == 0 {
-		return nil, fmt.Errorf("unknown issue type %q", logicalType)
+// agileBaseTypes are the custom field types behind the Agile fields TAM owns.
+// They are matched by type as well as by the discovered ids, because
+// discovery can fail on an instance where the field still sits on the screen.
+var agileBaseTypes = []string{":gh-epic-link", ":gh-epic-label", ":gh-sprint", ":gh-lexo-rank"}
+
+// isBaseFieldID says the id is one of TAM's own fields: a fixed system id,
+// or the Story Points, Epic Link, Epic Name, Sprint, or Rank this instance
+// discovered.
+func isBaseFieldID(id string, ids fieldIDs) bool {
+	if baseFieldIDs[id] {
+		return true
 	}
-	q := url.Values{}
-	q.Set("projectKeys", projectKey)
-	q.Set("issuetypeNames", names[0])
-	q.Set("expand", "projects.issuetypes.fields")
-	var meta createMeta
-	if err := b.c.Get(ctx, "/rest/api/2/issue/createmeta?"+q.Encode(), &meta); err != nil {
+	for _, own := range ids.list() {
+		if id == own {
+			return true
+		}
+	}
+	return false
+}
+
+// isBaseField is isBaseFieldID plus the schema, which also catches a parent
+// field reported under another id and an Agile field discovery missed.
+func isBaseField(f corejira.MetaField, ids fieldIDs) bool {
+	if isBaseFieldID(f.ID, ids) || f.Schema.System == "parent" {
+		return true
+	}
+	for _, suffix := range agileBaseTypes {
+		if strings.HasSuffix(f.Schema.Custom, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+// createMeta reads the create fields of one logical type in the project. The
+// type's id comes from the project's own type list, so the per-type
+// endpoint can be asked; a type the list was read and does not name is asked
+// for by name through the classic call. A list that cannot be read is an
+// error, not a reason to fall back: the classic call lists fields that are
+// not on the screen.
+func (b *Backend) createMeta(ctx context.Context, projectKey, logicalType string) (corejira.CreateMeta, error) {
+	pt, err := b.resolveTypes(ctx, projectKey)
+	if err != nil {
+		return corejira.CreateMeta{}, fmt.Errorf("read the issue types of %s: %w", projectKey, err)
+	}
+	names := jiraTypeNames([]string{logicalType}, b.requirementType, pt)
+	if len(names) == 0 {
+		return corejira.CreateMeta{}, fmt.Errorf("unknown issue type %q", logicalType)
+	}
+	return b.c.CreateMeta(ctx, projectKey, pt.ids[strings.ToLower(names[0])], names[0])
+}
+
+// CreateFields returns the create-screen fields of the type beyond the
+// form's own, required and optional, sorted by name, with their options when
+// they have any. An optional field no text form can fill is left out; a
+// required one is still offered as text, because leaving it out would only
+// move the failure to a Jira 400 at Commit.
+func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType string) ([]backend.FieldSpec, error) {
+	meta, err := b.createMeta(ctx, projectKey, logicalType)
+	if err != nil {
 		return nil, err
 	}
+	ids := b.discover(ctx)
 	out := []backend.FieldSpec{}
-	for _, p := range meta.Projects {
-		for _, t := range p.IssueTypes {
-			for id, f := range t.Fields {
-				if !f.Required || formFields[id] || id == ids.Points || id == ids.EpicName {
-					continue
-				}
-				spec := backend.FieldSpec{ID: id, Name: f.Name, Type: fieldKind(f.Schema.Type), Required: true, AllowedValues: []backend.FieldOption{}}
-				for _, av := range f.AllowedValues {
-					v := av.Value
-					if v == "" {
-						v = av.Name
-					}
-					spec.AllowedValues = append(spec.AllowedValues, backend.FieldOption{ID: av.ID, Value: v})
-				}
-				out = append(out, spec)
-			}
+	for _, f := range meta.Fields {
+		if isBaseField(f, ids) {
+			continue
 		}
+		kind := f.Kind()
+		if kind == corejira.KindOther {
+			if !f.Required {
+				continue
+			}
+			kind = corejira.KindString
+		}
+		spec := backend.FieldSpec{ID: f.ID, Name: f.Name, Type: kind, Required: f.Required, AllowedValues: []backend.FieldOption{}}
+		for _, av := range f.AllowedValues {
+			spec.AllowedValues = append(spec.AllowedValues, backend.FieldOption{ID: av.ID, Value: av.Label()})
+		}
+		out = append(out, spec)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].ID < out[j].ID
+	})
 	return out, nil
-}
-
-func fieldKind(schemaType string) string {
-	switch schemaType {
-	case "option", "number", "array":
-		return schemaType
-	case "date", "datetime":
-		return "date"
-	}
-	return "string"
 }

@@ -16,6 +16,9 @@
 // Version 12 adds ritual_document's base_body, conflict_body and
 // conflict_version, the three facts the ritual sync compares and resolves
 // with.
+// Version 13 adds sprint's draft flag: a sprint drafted in TAM sits in
+// sprint under a negative id with draft = 1 until Commit creates it in
+// Jira.
 package tamstore
 
 import (
@@ -45,7 +48,7 @@ import (
 // Version 9 adds ritual_document through the same idempotent base DDL path
 // as sprint_report.
 var Schema = store.Schema{
-	Version: 12,
+	Version: 13,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -189,6 +192,17 @@ var Schema = store.Schema{
 				}
 			}
 			return nil
+		},
+	}, {
+		Version: 13,
+		// A sprint drafted in TAM is a row here under a negative id, flagged
+		// draft, beside a sprint_create journal row, until Commit creates it
+		// in Jira and rewrites the id. A column add in version 7's shape: a
+		// fresh database has it from sprintDDL already, which
+		// AddColumnIfMissing treats as success, and every cached sprint Jira
+		// sent is not a draft, which is what the default says.
+		Apply: func(db *sql.DB) error {
+			return store.AddColumnIfMissing(db, "sprint", "draft INTEGER NOT NULL DEFAULT 0")
 		},
 	}},
 	Indexes: indexDDL,
@@ -357,6 +371,7 @@ CREATE TABLE IF NOT EXISTS sprint (
 	end_date      TEXT NOT NULL DEFAULT '',
 	goal          TEXT NOT NULL DEFAULT '',
 	complete_date TEXT NOT NULL DEFAULT '',
+	draft         INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (profile_id, board_id, id)
 );`
 
