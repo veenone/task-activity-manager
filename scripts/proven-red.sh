@@ -83,11 +83,26 @@ support=$(printf '%s\n' "$files" | grep -E "$TEST_SUPPORT_RE" | grep -vE "$UNIT_
 source=$(printf '%s\n' "$files" | grep -vE "$UNIT_TEST_RE" | grep -vE "$TEST_SUPPORT_RE" | grep -vE "$NON_CODE_RE" || true)
 
 if [ -z "$source" ]; then echo "proven-red: skipped, no source file changed."; exit 0; fi
+
+# The title type is read before the tests are run, not only when no test
+# changed. SKIP_TYPES is the list of types that declare no behavior change, and
+# where there is no behavior there is nothing a test could have been red about.
+# Checking it only in the no-changed-test branch made one class of change
+# impossible to land: a formatting pass over a *_test.go file cannot be red on
+# the pre-change code, because whitespace is all it changed, and the gofmt gate
+# insists every file be formatted. There was no arrangement of commits that
+# satisfied both.
+#
+# The cost is that a mislabeled PR skips the gate. That trade already existed
+# below for the no-changed-test case, the title is checked by review, and
+# claiming "style" for a behavior change is a lie a reviewer can see in the
+# diff.
+type=$(printf '%s' "$title" | sed -nE 's/^([a-z]+)(\(.+\))?!?:.*/\1/p')
+for t in $SKIP_TYPES; do
+  [ "$type" = "$t" ] && { echo "proven-red: skipped, title type \"$type\" carries no behavior change."; exit 0; }
+done
+
 if [ -z "$unit" ]; then
-  type=$(printf '%s' "$title" | sed -nE 's/^([a-z]+)(\(.+\))?!?:.*/\1/p')
-  for t in $SKIP_TYPES; do
-    [ "$type" = "$t" ] && { echo "proven-red: skipped, title type \"$type\" carries no behavior change."; exit 0; }
-  done
   if [ -n "$support" ]; then echo "proven-red: skipped, only test-support or gate files changed; gates are proven red by scratch violation."; exit 0; fi
   echo "proven-red: a behavior change arrived with no changed test (P2)."; exit 1
 fi
