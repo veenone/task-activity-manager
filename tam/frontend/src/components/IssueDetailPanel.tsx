@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { RichText, detectFormat, errMsg, toPlainText, useNotice } from "@agile-suite/core";
+import { FORMAT_LABEL, RichText, detectFormat, errMsg, toPlainText, useNotice } from "@agile-suite/core";
 import type { RichFormat } from "@agile-suite/core";
 import { BrowserOpenURL } from "../api";
 import type { Issue, IssueComment, IssueDetail, Link, SprintOption } from "../api";
@@ -233,15 +233,15 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
         <dt>Reporter</dt><dd>{issue.reporter || "-"}</dd>
       </dl>
 
+      {/* No Refresh of its own (D6): the shell's one Refresh covers the whole
+          view, and this one went through GetIssueDetail, so it did nothing
+          while the cached detail was fresh and nothing at all under
+          detail_cache_minutes = 0. The Retry below is a different thing: it
+          follows a failed read, where there is nothing cached to serve. */}
       <Section
         title="Fields"
         open={open.fields ?? false}
         onToggle={() => toggle("fields")}
-        action={
-          <button type="button" className="btn btn-ghost detail-section-action" onClick={() => void detail.refetch()} disabled={detail.isFetching}>
-            {detail.isFetching ? "Refreshing" : "Refresh"}
-          </button>
-        }
       >
         {detail.isError && (
           <p className="error-text" data-testid="detail-error">
@@ -395,8 +395,6 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
 // INLINE_COMMENTS is how many of the newest a closed-by-default section
 // shows before Show all; a long thread would otherwise be the whole panel.
 const INLINE_COMMENTS = 5;
-
-const FORMAT_LABEL: Record<RichFormat, string> = { wiki: "Jira markup", markdown: "Markdown" };
 
 // initials are the avatar's whole content: a name's first and last letter,
 // which is what the mockup draws and all TAM has, since Jira's avatars are

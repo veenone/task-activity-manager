@@ -45,7 +45,7 @@ reconstruction cannot see.
 The renderer lives in `@agile-suite/core`'s `richtext/`, not in TAM: a small
 AST (`ast.ts`, one node per thing the renderer draws differently, nothing
 either format merely happens to have), a hand-written Jira wiki parser
-(`wiki.ts`, blocks in `lineToBlocks` then inline marks in `lineToInline`,
+(`wiki.ts`, blocks in `parseBlockLines` then inline marks in `lineToInline`,
 character scan only, escapes and all), Markdown on `marked`'s own lexer
 (`markdown.ts`, `marked.lexer`, never `marked.parse`, so there is no HTML
 renderer's output to sanitise), and per-field detection (`detect.ts`).
@@ -84,15 +84,32 @@ character. `{code:...}`'s own close search needs no such cache: on failure
 it advances straight to the end of the text, which ends the parse loop
 outright.
 
+**Three wiki delimiters are also ordinary punctuation, and prose wins each
+time.** `!...!` is an image only when what it wraps names a file or an
+address (no blanks, and either an extension or a scheme), so "Deploy
+failed! Check the logs!" stays a sentence instead of a paragraph ending in
+an image named " Check the logs", which is what it used to draw; the
+paragraph that joins consecutive lines means the two marks need not even
+share a line. `[...]` with no `|` becomes a link only when the inner text
+is an allowed link, so `[WIP] rework the step` and `[~jdoe]` keep their
+brackets rather than losing them to a link whose scheme the renderer then
+refuses; with a `|` the right half is the address whatever it says. A bare
+autolink gives back the trailing `.,;:!?` and any closing bracket it did
+not open, so "See http://x.com/a. Then go" links the address and leaves the
+full stop in the sentence.
+
 **Entities decode in ordinary Markdown text only, never in a code span, a
 code block, or the raw-HTML fallback.** This is CommonMark's own rule, not
-a TAM invention: `marked`'s lexer returns `&amp;`, `&lt;`, `&gt;`, `&quot;`
-and `&#39;` already escaped in every token's `text`, including `codespan`
-and raw HTML, so decoding everywhere would turn a code sample's literal
-`&amp;` into `&` and corrupt it. `markdown.ts` calls its decode step only
-from the `text`/`escape` case; the plan first assumed `marked` pre-escaped
-nothing and that assumption was wrong, caught by measuring `marked` 18
-directly rather than trusting the plan.
+a TAM invention: a character reference is prose that stands for a
+character, while a code span is the author's own bytes. `marked`'s lexer
+pre-escapes nothing, measured twice against `marked@18.0.13`: `a < b & c`
+comes back exactly as typed, and `` `a<b &amp;` `` comes back as a
+`codespan` still holding the five characters `&amp;`. So the decoding is
+TAM's to do and TAM's to withhold, and `markdown.ts` calls its decode step
+only from the `text`/`escape` case, which is what keeps a code sample's
+literal `&amp;` from being corrupted into `&`. The plan's outside-voice
+fix 5 assumed the opposite, that the lexer escaped every token's text; the
+plan file records the correction.
 
 **React elements only.** No `innerHTML`, no `dangerouslySetInnerHTML`, no
 `<img>`, no `href`, anywhere under `richtext/`; `noHtml.test.ts` reads the
@@ -148,7 +165,11 @@ elapsing, is the shell's own **Refresh** button beside Sync: it clears the
 profile's cached details (`issuerepo.ClearDetails`, one statement) under
 the same `"sync"` lock a sync or a commit takes, through
 `SyncContext.runRefresh`, so it refuses exactly when those would and the
-next read of whatever is on screen goes back to Jira.
+next read of whatever is on screen goes back to Jira. No section of the
+detail panel carries a Refresh of its own: one reading through
+`GetIssueDetail` would do nothing while the cached detail is fresh and
+nothing at all at 0. The Retry offered after a failed read is a different
+control, since a read that failed left nothing cached to serve.
 
 **The summary renders inline code and links only, never marks**, and every
 surface that shows a summary (grids, cards, the Epics tree, dialogs) shares
@@ -157,9 +178,15 @@ field, so `2*3*4 items` must read as typed in the heading and everywhere
 else, and only `{{code}}`/`` `code` `` and `[text|url]`/`[text](url)`
 unwrap. `toPlainText`'s `scope` argument (`"full"` for grids, tree rows,
 sort and search values; `"summary"` for the summary's own narrower rule)
-is what the panel heading and every list share. `ConflictCard`,
-`PendingChangesModal`, and a journaled link's own stored summary render raw
-text on purpose: they show the exact value being pushed or compared, and
+is what the panel heading and every list share, the ritual editor's Jira
+Issues macro preview included. `RichText`'s own `inline` mode keeps the
+inline children of paragraphs and headings and drops every other block, so
+a summary that parses as a list, a table or a rule would leave it with
+nothing to draw; it falls back to the capped raw text there rather than
+render an empty heading beside a grid row that shows the words.
+`ConflictCard`, `PendingChangesModal`, and a journaled link's own stored
+summary render raw text on purpose: they show the exact value being pushed
+or compared, and
 stripping markup there would make `*bold*` and `bold` look identical in the
 one place that distinction matters most.
 
@@ -170,12 +197,12 @@ field is opened, in the same TAM run, and forgotten on restart, which is
 what the spec's "session" means.
 
 Add to Layout: `frontend/core/src/richtext/` (`ast.ts`, `wiki.ts`,
-`markdown.ts`, `detect.ts`, `plain.ts`, `RichText.tsx`, `RichTextField.tsx`)
-and `frontend/core/src/lib/links.ts` (`isAllowedLink`, `compactUrl`, shared
-with the ritual editor's sanitizer). New TAM components:
-`SyntaxToggle` (exported from `RichTextField.tsx`) and `Comments` (in
-`IssueDetailPanel.tsx`), the read-only comment thread with its own
-"Show all" and restriction chip.
+`markdown.ts`, `detect.ts`, `plain.ts`, `RichText.tsx`, `RichTextField.tsx`,
+which also exports `SyntaxToggle` and the `FORMAT_LABEL` every surface that
+names a syntax reads) and `frontend/core/src/lib/links.ts` (`isAllowedLink`,
+`compactUrl`, shared with the ritual editor's sanitizer). The one new TAM
+component is `Comments` (in `IssueDetailPanel.tsx`), the read-only comment
+thread with its own "Show all" and restriction chip.
 
 ## Phase 4: the sprint report, the reconstruction
 

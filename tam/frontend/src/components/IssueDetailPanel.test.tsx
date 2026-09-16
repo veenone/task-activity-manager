@@ -193,6 +193,20 @@ describe("IssueDetailPanel", () => {
     expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412");
   });
 
+  // Fix round 3, Minor: D6 chose one Refresh for the whole view. The Fields
+  // section's own went through GetIssueDetail, so it did nothing at all
+  // while the cached detail was still fresh, and nothing ever at
+  // detail_cache_minutes = 0.
+  it("leaves the Fields section without a Refresh of its own", () => {
+    renderPanel();
+    const heading = (title: string) =>
+      screen.getByRole("button", { name: new RegExp(`^${title}`) }).closest("section") as HTMLElement;
+    expect(within(heading("Fields")).queryByRole("button", { name: /Refresh/ })).toBeNull();
+    // The linked tests are read by their own binding, not the detail cache,
+    // so that section keeps its Refresh: this is a removal, not a sweep.
+    expect(within(heading("Covered by tests")).getByRole("button", { name: /Refresh/ })).toBeInTheDocument();
+  });
+
   it("switches to Links and Tests", async () => {
     renderPanel();
     const links = await openSection("Links");
