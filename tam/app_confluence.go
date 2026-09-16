@@ -6,6 +6,7 @@ import (
 
 	"agile-suite/core/confluence"
 	"agile-suite/core/profile"
+	"agile-suite/tam/internal/suiteprofiles"
 )
 
 func (a *App) GetConfluenceConfig(profileID string) (profile.ConfluenceConfig, error) {
@@ -20,7 +21,7 @@ func (a *App) GetConfluenceConfig(profileID string) (profile.ConfluenceConfig, e
 	if err != nil {
 		return profile.ConfluenceConfig{}, err
 	}
-	if strings.TrimSpace(c.BaseURL) == "" && isRitualDemo(p.JiraURL) {
+	if strings.TrimSpace(c.BaseURL) == "" && suiteprofiles.IsDemoURL(p.JiraURL) {
 		return profile.ConfluenceConfig{BaseURL: "demo", SpaceKey: "DEMO", RootPageID: "demo-root"}, nil
 	}
 	return c, nil
@@ -47,22 +48,6 @@ func (a *App) SetConfluenceConfig(profileID string, config profile.ConfluenceCon
 		return a.creds.Save(profile.ConfluenceCredentialID(profileID), strings.TrimSpace(token))
 	}
 	return nil
-}
-
-func (a *App) GetConfluencePage(profileID, pageID string) (confluence.Page, error) {
-	_, client, err := a.confluenceClient(profileID)
-	if err != nil {
-		return confluence.Page{}, err
-	}
-	return client.GetPage(a.ctx, pageID)
-}
-
-func (a *App) ListConfluenceChildPages(profileID, parentID string, start, limit int) (confluence.ChildPageResult, error) {
-	_, client, err := a.confluenceClient(profileID)
-	if err != nil {
-		return confluence.ChildPageResult{}, err
-	}
-	return client.ListChildPages(a.ctx, parentID, start, limit)
 }
 
 func (a *App) confluenceClient(profileID string) (profile.ConfluenceConfig, *confluence.Client, error) {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, announce, errMsg } from "@agile-suite/core";
+import { Modal, announce, errMsg, toPlainText } from "@agile-suite/core";
 import type { Issue, Sprint, SprintCompletion } from "../api";
 import { useCompleteSprint } from "../queries/boards";
 import { useSync } from "../contexts/SyncContext";
@@ -171,7 +171,7 @@ export function CompleteSprintModal({
               {rows.map((row) => (
                 <div key={row.key} className="pending-card sprint-incomplete-card">
                   <span className="b accent-text">{row.key}</span>
-                  <span className="pending-card-summary">{row.summary}</span>
+                  <span className="pending-card-summary">{toPlainText(row.summary, "summary")}</span>
                 </div>
               ))}
             </div>

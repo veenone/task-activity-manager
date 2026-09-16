@@ -5,15 +5,17 @@ import {
   DiscardAllPendingChanges,
   DiscardPendingChange,
   EditIssue,
+  ENTITY_SPRINT_CREATE,
   GetCreateFields,
   GetLinkTypes,
   ListActivity,
   ListPendingChanges,
 } from "../api";
 import { isMoveEntity } from "../api";
-import type { IssueDraft, LinkDraft, PendingChange } from "../api";
+import type { DraftSprint, IssueDraft, LinkDraft, PendingChange } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
+import { invalidateSprintWrites } from "./sprints";
 
 const ACTIVITY_LIMIT = 200;
 
@@ -64,7 +66,12 @@ export function useDiscardChange(profileId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (change: PendingChange) => call(() => DiscardPendingChange(profileId, change.id)),
-    onSuccess: (_, change) => invalidateWrites(qc, profileId, change.entityKey),
+    onSuccess: (_, change) => {
+      invalidateWrites(qc, profileId, change.entityKey);
+      // Discarding a draft sprint removes it from every picker and puts the
+      // cards moved into it back, so the sprint lists refresh too.
+      if (change.entityType === ENTITY_SPRINT_CREATE) invalidateSprintWrites(qc, profileId);
+    },
   });
 }
 
@@ -72,7 +79,12 @@ export function useDiscardAll(profileId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => call(() => DiscardAllPendingChanges(profileId)),
-    onSuccess: () => invalidateWrites(qc, profileId),
+    onSuccess: () => {
+      invalidateWrites(qc, profileId);
+      // A discarded draft sprint among the rows removes it from every
+      // picker, so Discard all refreshes the sprint lists too.
+      invalidateSprintWrites(qc, profileId);
+    },
   });
 }
 
@@ -103,28 +115,31 @@ export function useDiscardById(profileId: string) {
   });
 }
 
-// A PendingGroup is one issue's rows. A draft group carries its decoded
-// draft; an edit group carries one row per field; a link group carries one
-// row per journaled link; a move group carries the board rows, which are
-// their own kind because they are pushed their own way and read as places
-// rather than as field values.
+// A PendingGroup is one issue's rows, or one draft sprint. A draft group
+// carries its decoded draft; a sprint group its decoded DraftSprint; an edit
+// group carries one row per field; a link group one row per journaled link;
+// a move group the board rows, which are their own kind because they are
+// pushed their own way and read as places rather than as field values.
 export interface PendingGroup {
   key: string;
   draft: IssueDraft | null;
   createRow: PendingChange | null;
+  sprint: DraftSprint | null;
+  sprintRow: PendingChange | null;
   edits: PendingChange[];
   links: { row: PendingChange; link: LinkDraft }[];
   moves: PendingChange[];
 }
 
-// groupPending folds the journal (newest first) into one group per key,
-// drafts first, then keys in the order they first appear.
+// groupPending folds the journal (newest first) into one group per key:
+// draft sprints first, since Commit creates them first, then drafts, then
+// keys in the order they first appear.
 export function groupPending(rows: PendingChange[]): PendingGroup[] {
   const byKey = new Map<string, PendingGroup>();
   for (const row of rows) {
     let g = byKey.get(row.entityKey);
     if (!g) {
-      g = { key: row.entityKey, draft: null, createRow: null, edits: [], links: [], moves: [] };
+      g = { key: row.entityKey, draft: null, createRow: null, sprint: null, sprintRow: null, edits: [], links: [], moves: [] };
       byKey.set(row.entityKey, g);
     }
     if (row.entityType === "issue_create") {
@@ -133,6 +148,13 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
         g.draft = JSON.parse(row.afterVal) as IssueDraft;
       } catch {
         g.draft = null;
+      }
+    } else if (row.entityType === ENTITY_SPRINT_CREATE) {
+      g.sprintRow = row;
+      try {
+        g.sprint = JSON.parse(row.afterVal) as DraftSprint;
+      } catch {
+        g.sprint = null;
       }
     } else if (isMoveEntity(row.entityType)) {
       g.moves.push(row);
@@ -147,5 +169,9 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     }
   }
   const groups = [...byKey.values()];
-  return [...groups.filter((g) => g.createRow), ...groups.filter((g) => !g.createRow)];
+  return [
+    ...groups.filter((g) => g.sprintRow),
+    ...groups.filter((g) => !g.sprintRow && g.createRow),
+    ...groups.filter((g) => !g.sprintRow && !g.createRow),
+  ];
 }

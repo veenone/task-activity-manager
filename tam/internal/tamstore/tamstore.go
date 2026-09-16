@@ -13,6 +13,12 @@
 // healthy version 10 database: some development builds recorded the version
 // 10 stamp before the issues_json migration actually ran, and this repairs
 // those files without re-running the conversion where it already happened.
+// Version 12 adds ritual_document's base_body, conflict_body and
+// conflict_version, the three facts the ritual sync compares and resolves
+// with.
+// Version 13 adds sprint's draft flag: a sprint drafted in TAM sits in
+// sprint under a negative id with draft = 1 until Commit creates it in
+// Jira.
 package tamstore
 
 import (
@@ -42,7 +48,7 @@ import (
 // Version 9 adds ritual_document through the same idempotent base DDL path
 // as sprint_report.
 var Schema = store.Schema{
-	Version: 11,
+	Version: 13,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -165,6 +171,38 @@ var Schema = store.Schema{
 				return err
 			}
 			return convertRitualIssueKeys(db)
+		},
+	}, {
+		Version: 12,
+		// The ritual sync keeps three more facts per page: the body as of the
+		// last synced version, and a newer remote body a Sync found while local
+		// edits were pending, with its version. Column adds in version 7's
+		// shape; a fresh database has them from ritualDocumentDDL already, which
+		// AddColumnIfMissing treats as success. No row is rewritten: this
+		// migration knows no sprint names to render a template from, so rows
+		// written before it are upgraded by ritualsync.Ensure instead.
+		Apply: func(db *sql.DB) error {
+			for _, column := range []string{
+				"base_body TEXT NOT NULL DEFAULT ''",
+				"conflict_body TEXT NOT NULL DEFAULT ''",
+				"conflict_version INTEGER NOT NULL DEFAULT 0",
+			} {
+				if err := store.AddColumnIfMissing(db, "ritual_document", column); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}, {
+		Version: 13,
+		// A sprint drafted in TAM is a row here under a negative id, flagged
+		// draft, beside a sprint_create journal row, until Commit creates it
+		// in Jira and rewrites the id. A column add in version 7's shape: a
+		// fresh database has it from sprintDDL already, which
+		// AddColumnIfMissing treats as success, and every cached sprint Jira
+		// sent is not a draft, which is what the default says.
+		Apply: func(db *sql.DB) error {
+			return store.AddColumnIfMissing(db, "sprint", "draft INTEGER NOT NULL DEFAULT 0")
 		},
 	}},
 	Indexes: indexDDL,
@@ -333,6 +371,7 @@ CREATE TABLE IF NOT EXISTS sprint (
 	end_date      TEXT NOT NULL DEFAULT '',
 	goal          TEXT NOT NULL DEFAULT '',
 	complete_date TEXT NOT NULL DEFAULT '',
+	draft         INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (profile_id, board_id, id)
 );`
 
@@ -372,6 +411,9 @@ CREATE TABLE IF NOT EXISTS ritual_document (
 	issues_json       TEXT NOT NULL DEFAULT '[]',
 	confluence_page_id TEXT NOT NULL DEFAULT '',
 	confluence_version INTEGER NOT NULL DEFAULT 0,
+	base_body         TEXT NOT NULL DEFAULT '',
+	conflict_body     TEXT NOT NULL DEFAULT '',
+	conflict_version  INTEGER NOT NULL DEFAULT 0,
 	status            TEXT NOT NULL DEFAULT '',
 	updated_at        TEXT NOT NULL DEFAULT '',
 	published_at      TEXT NOT NULL DEFAULT '',

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { call, errMsg } from "@agile-suite/core";
+import { call, errMsg, toPlainText } from "@agile-suite/core";
 import { LookupIssue } from "../api";
 import type { Issue, LinkDraft } from "../api";
 import { useAddLink, useLinkTypes } from "../queries/pending";
@@ -88,7 +88,7 @@ export function AddLinkForm({ profileId, issueKey, onAdded }: Props) {
         </span>
       </label>
       {target && (
-        <p className="small">{`${target.key}, ${target.type ? target.type[0].toUpperCase() + target.type.slice(1) : "Issue"}, ${target.summary}`}</p>
+        <p className="small">{`${target.key}, ${target.type ? target.type[0].toUpperCase() + target.type.slice(1) : "Issue"}, ${toPlainText(target.summary, "summary")}`}</p>
       )}
       {types.isError && <p className="error-text small">Link types could not be read: {types.error.message}</p>}
       {error && <p className="error-text small" role="alert">{error}</p>}

@@ -36,6 +36,15 @@ type fake struct {
 	// onTransition runs inside a transition push, which is where a test
 	// drags the same card again while the pass is mid-push.
 	onTransition func()
+
+	// createErrFor refuses the create of a draft by summary, so one draft
+	// of a plan can fail while the rest go through.
+	createErrFor map[string]error
+	// sprintsMade records "board name" for every sprint created, and
+	// sprintCreateErr refuses them all. Sprint ids count up from 100.
+	sprintsMade     []string
+	sprintCreateErr error
+	nextSprint      int
 }
 
 func newFake() *fake {
@@ -43,6 +52,7 @@ func newFake() *fake {
 		rows: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 501,
 		updateErr: map[string]error{}, getErr: map[string]error{},
 		transitionErr: map[string]error{}, rankErr: map[string]error{},
+		createErrFor: map[string]error{},
 	}
 }
 
@@ -107,6 +117,9 @@ func (f *fake) UpdateIssue(_ context.Context, key string, fields map[string]stri
 func (f *fake) CreateIssue(_ context.Context, projectKey string, d backend.IssueDraft) (string, error) {
 	if f.createErr != nil {
 		return "", f.createErr
+	}
+	if err := f.createErrFor[d.Summary]; err != nil {
+		return "", err
 	}
 	f.creates = append(f.creates, d)
 	key := fmt.Sprintf("%s-%d", projectKey, f.nextKey)
@@ -376,18 +389,11 @@ func TestAnEditNamingAnUncreatedDraftWaits(t *testing.T) {
 			t.Errorf("the story must not be pushed while its epic is still a draft: %v", f.updates)
 		}
 	}
-	if len(res.Failures) != 2 {
-		t.Fatalf("two failures, the create's and the story's: %+v", res.Failures)
+	if len(res.Failures) != 1 || !strings.Contains(res.Failures[0].Error, "Severity") || res.Failures[0].Key != temp {
+		t.Fatalf("one failure, the create's: %+v", res.Failures)
 	}
-	keys := map[string]string{}
-	for _, fl := range res.Failures {
-		keys[fl.Key] = fl.Error
-	}
-	if !strings.Contains(keys[temp], "Severity") {
-		t.Errorf("the create's failure: %v", keys)
-	}
-	if !strings.Contains(keys["PLAT-2"], temp) {
-		t.Errorf("the story's failure names the temp key: %v", keys)
+	if len(res.Held) != 1 || res.Held[0].Key != "PLAT-2" || res.Held[0].Reason != "waits for "+temp+", which Jira refused" {
+		t.Errorf("the story's edit is held with the reason: %+v", res.Held)
 	}
 	pend, err := repo.PendingForKey(ctx, "p1", "PLAT-2")
 	if err != nil || len(pend) != 1 {

@@ -94,7 +94,7 @@ beforeEach(() => {
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: rows, total: 1248 });
   vi.mocked(api.ListSprints).mockResolvedValue([{ id: "12", name: "Sprint 12" }, { id: "13", name: "Sprint 13" }]);
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
+  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
@@ -358,6 +358,16 @@ describe("BacklogView", () => {
     expect(within(rows[1]).getByText("Draft")).toBeInTheDocument();
     expect(within(rows[2]).getByLabelText("Pending changes")).toBeInTheDocument();
     expect(within(rows[3]).queryByLabelText("Pending changes")).not.toBeInTheDocument();
+  });
+
+  it("shows a summary carrying wiki markup as plain text (D5)", async () => {
+    vi.mocked(api.ListIssues).mockResolvedValue({
+      issues: [issue({ key: "PLAT-500", summary: "Fix *login* at {{/auth}}" })],
+      total: 1,
+    });
+    renderView();
+    const row = await screen.findByRole("row", { name: "PLAT-500 Fix *login* at /auth" });
+    expect(within(row).getByText("Fix *login* at /auth")).toHaveAttribute("title", "Fix *login* at /auth");
   });
 
   it("offers the profile's open sprints in the detail panel and journals a move", async () => {

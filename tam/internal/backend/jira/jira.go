@@ -9,11 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	corejira "agile-suite/core/jira"
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/sprintdate"
 )
 
 // Backend talks to one Jira instance for one profile.
@@ -43,10 +46,13 @@ type Backend struct {
 }
 
 // projectTypes are the Jira names one project gives the two levels TAM cannot
-// assume. Either is "" when the project defines no such type.
+// assume. Either is "" when the project defines no such type. ids maps each
+// type's lowercased name to its id, which the per-type create-meta endpoint
+// is asked with.
 type projectTypes struct {
 	task    string
 	subtask string
+	ids     map[string]string
 }
 
 // taskAliases are the names an instance gives the plain task level, in the
@@ -151,6 +157,7 @@ func (b *Backend) GetIssueDetail(ctx context.Context, key string) (backend.Issue
 	}
 	d := backend.IssueDetail{Key: raw.Key, Links: parseLinks(raw.Fields["issuelinks"]), Fields: map[string]any{}}
 	_ = json.Unmarshal(raw.Fields["description"], &d.Description)
+	d.Comments, d.CommentTotal, d.CommentsTruncated = b.comments(ctx, key)
 	for _, id := range ids.list() {
 		if v, ok := raw.Fields[id]; ok && len(v) > 0 && string(v) != "null" {
 			var decoded any
@@ -160,6 +167,124 @@ func (b *Backend) GetIssueDetail(ctx context.Context, key string) (backend.Issue
 		}
 	}
 	return d, nil
+}
+
+// commentPage is how many comments one request asks for and commentCap how
+// many the detail keeps. The comments are not read off the issue itself:
+// Data Center answers fields=comment with the whole list inline, however
+// long it is, so the detail of a year-old bug would carry hundreds of
+// bodies nobody asked for. The comment endpoint pages, and newest first is
+// what makes the cap keep the half a reader wants.
+const (
+	commentPage = 100
+	commentCap  = 500
+)
+
+// rawComment is Jira's own comment shape. author is null for an anonymous
+// comment and for one whose author has been deleted since, and visibility is
+// present only on a restricted comment.
+type rawComment struct {
+	ID      string `json:"id"`
+	Body    string `json:"body"`
+	Created string `json:"created"`
+	Updated string `json:"updated"`
+	Author  *struct {
+		Name        string `json:"name"`
+		DisplayName string `json:"displayName"`
+	} `json:"author"`
+	Visibility *struct {
+		Type  string `json:"type"`
+		Value string `json:"value"`
+	} `json:"visibility"`
+}
+
+// comment maps one row, normalising both timestamps and keeping whatever
+// restriction it carries.
+func (c rawComment) comment() backend.Comment {
+	out := backend.Comment{
+		ID:      c.ID,
+		Body:    c.Body,
+		Created: commentTime(c.Created),
+		Updated: commentTime(c.Updated),
+	}
+	if c.Author != nil {
+		out.Author, out.AuthorName = c.Author.Name, c.Author.DisplayName
+	}
+	if c.Visibility != nil {
+		out.Restriction = c.Visibility.Value
+	}
+	return out
+}
+
+// commentTime normalises one Jira timestamp to RFC 3339. Jira's offsets
+// carry no colon, so this goes through sprintdate, the one place that
+// reading lives; a value it cannot read is handed on exactly as it arrived,
+// since a comment with an odd stamp is still a comment.
+func commentTime(v string) string {
+	t, err := sprintdate.Parse(v)
+	if err != nil {
+		return v
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+// comments reads the issue's comments newest first and returns them oldest
+// first, with Jira's own total and whether the list is short of it.
+//
+// Newest first is what the request asks for, so the cap drops the oldest
+// rather than whatever Jira happened to send first; oldest first is what
+// comes back, because that is the order the panel reads them in and the
+// newest few it shows are then simply the last few.
+//
+// A failed page is not an error. The description, the links and the fields
+// are what the panel is for, and losing all of them because the comment
+// endpoint answered 500 would be the wrong trade; what was read is kept and
+// the list is marked short, which is the same thing the cap says.
+func (b *Backend) comments(ctx context.Context, key string) ([]backend.Comment, int, bool) {
+	out := []backend.Comment{}
+	total := 0
+	// The bound is a count of comments, not of pages, and the walk advances
+	// by what actually came back: an instance that clamps maxResults below
+	// what was asked for answers every page short, and stepping on by the
+	// size asked for would leave holes in the list that nothing downstream
+	// could see. Same arithmetic as core/jira's own Agile paging.
+	for startAt := 0; len(out) < commentCap; {
+		var page struct {
+			Total    int          `json:"total"`
+			Comments []rawComment `json:"comments"`
+		}
+		path := fmt.Sprintf("/rest/api/2/issue/%s/comment?orderBy=-created&startAt=%d&maxResults=%d",
+			url.PathEscape(key), startAt, commentPage)
+		if err := b.c.Get(ctx, path, &page); err != nil {
+			log.Printf("tam: read the comments of %s from %d: %v", key, startAt, err)
+			if total < len(out) {
+				total = len(out)
+			}
+			return oldestFirst(out), total, true
+		}
+		total = page.Total
+		for _, c := range page.Comments {
+			out = append(out, c.comment())
+		}
+		if len(page.Comments) == 0 || len(out) >= total {
+			break
+		}
+		startAt += len(page.Comments)
+	}
+	// The last page can carry the count past the ceiling. Cutting from the
+	// end keeps the newest, which is the half the cap is there to keep.
+	if len(out) > commentCap {
+		out = out[:commentCap]
+	}
+	return oldestFirst(out), total, len(out) < total
+}
+
+// oldestFirst reverses the newest-first list in place.
+func oldestFirst(c []backend.Comment) []backend.Comment {
+	for i, j := 0, len(c)-1; i < j; i, j = i+1, j-1 {
+		c[i], c[j] = c[j], c[i]
+	}
+	return c
 }
 
 // IssueTypes lists the project's issue types.
@@ -179,9 +304,12 @@ func (b *Backend) resolveTypes(ctx context.Context, projectKey string) (projectT
 	if err != nil {
 		return projectTypes{}, err
 	}
-	var pt projectTypes
+	pt := projectTypes{ids: map[string]string{}}
 	bestTask := len(taskAliases) // lower is a better match
 	for _, t := range types {
+		if _, seen := pt.ids[strings.ToLower(t.Name)]; !seen {
+			pt.ids[strings.ToLower(t.Name)] = t.ID
+		}
 		if t.Subtask {
 			if pt.subtask == "" {
 				pt.subtask = t.Name

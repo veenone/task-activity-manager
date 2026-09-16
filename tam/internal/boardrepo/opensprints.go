@@ -20,6 +20,9 @@ type SprintChoice struct {
 	Name      string `json:"name"`
 	BoardName string `json:"boardName"`
 	State     string `json:"state"`
+	// Draft marks a sprint drafted in TAM, so a picker can say so beside
+	// its name: a card moved into it waits for Commit to create the sprint.
+	Draft bool `json:"draft"`
 }
 
 // openSprintsSQL reads every board's active and future sprints in one pass,
@@ -39,7 +42,7 @@ type SprintChoice struct {
 // The lowest board id winning is as good a rule as any and, unlike an
 // unordered one, gives the same answer on every read.
 const openSprintsSQL = `
-	SELECT sprint.id, sprint.name, board.name, sprint.state
+	SELECT sprint.id, sprint.name, board.name, sprint.state, sprint.draft
 	FROM sprint
 	JOIN board ON board.profile_id = sprint.profile_id AND board.id = sprint.board_id
 	WHERE sprint.profile_id = ? AND sprint.state IN ('active', 'future')
@@ -73,7 +76,7 @@ func (r *Repository) OpenSprints(ctx context.Context, profileID string) ([]Sprin
 	seen := map[int]bool{}
 	for rows.Next() {
 		var s SprintChoice
-		if err := rows.Scan(&s.ID, &s.Name, &s.BoardName, &s.State); err != nil {
+		if err := rows.Scan(&s.ID, &s.Name, &s.BoardName, &s.State, &s.Draft); err != nil {
 			return nil, err
 		}
 		if seen[s.ID] {

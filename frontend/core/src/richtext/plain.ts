@@ -1,0 +1,159 @@
+import type { Block, Inline } from "./ast";
+import { parseRich } from "./detect";
+
+// D4: a string holding none of these can contain no mark, macro, link,
+// heading, list, table or code construct either parser recognises, so
+// parsing it is wasted work; toPlainText returns it unchanged.
+const HAS_MARKUP = /[*_+\-{}[\]|#~^!`]/;
+
+// D4: results cached in a bounded Map (insertion order lets the oldest
+// entry be dropped in O(1) once the cap is passed) so a grid re-rendering
+// the same 25 summaries every keystroke does not re-parse them.
+const CACHE_CAP = 2000;
+const cache = new Map<string, string>();
+
+function remember(key: string, value: string): string {
+  cache.set(key, value);
+  if (cache.size > CACHE_CAP) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  return value;
+}
+
+// D5: Jira DC never wiki- or Markdown-renders the summary field, so
+// "2*3*4 items" must read exactly as typed there. The one thing it does
+// still unwrap is inline code and links, in either syntax, so this scans
+// for just those two shapes and leaves every other character (marks,
+// headings, list markers) untouched; it never calls the block parsers.
+function summaryPlain(text: string): string {
+  let out = "";
+  const n = text.length;
+  let i = 0;
+  while (i < n) {
+    const ch = text[i];
+
+    if (ch === "{" && text[i + 1] === "{") {
+      const close = text.indexOf("}}", i + 2);
+      if (close !== -1) {
+        out += text.slice(i + 2, close);
+        i = close + 2;
+        continue;
+      }
+    }
+
+    if (ch === "`") {
+      const close = text.indexOf("`", i + 1);
+      if (close !== -1) {
+        out += text.slice(i + 1, close);
+        i = close + 1;
+        continue;
+      }
+    }
+
+    if (ch === "[") {
+      const close = text.indexOf("]", i + 1);
+      if (close !== -1) {
+        const inner = text.slice(i + 1, close);
+        const pipeIdx = inner.indexOf("|");
+        if (pipeIdx !== -1) {
+          out += inner.slice(0, pipeIdx);
+          i = close + 1;
+          continue;
+        }
+        if (text[close + 1] === "(") {
+          const parenClose = text.indexOf(")", close + 2);
+          if (parenClose !== -1) {
+            out += inner;
+            i = parenClose + 1;
+            continue;
+          }
+        }
+      }
+    }
+
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+function collapse(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function inlineText(nodes: Inline[]): string {
+  let out = "";
+  for (const node of nodes) {
+    switch (node.t) {
+      case "text":
+      case "code":
+        out += node.text;
+        break;
+      case "mark":
+      case "link":
+        out += inlineText(node.children);
+        break;
+      case "image":
+        out += node.name;
+        break;
+      case "br":
+        out += " ";
+        break;
+    }
+  }
+  return out;
+}
+
+function blockText(block: Block, parts: string[]): void {
+  switch (block.t) {
+    case "p":
+    case "h":
+      parts.push(inlineText(block.children));
+      break;
+    case "list":
+      for (const item of block.items) for (const child of item.children) blockText(child, parts);
+      break;
+    case "table":
+      for (const row of block.rows) for (const cell of row) parts.push(inlineText(cell.children));
+      break;
+    case "codeblock":
+      parts.push(block.text);
+      break;
+    case "quote":
+    case "panel":
+      for (const child of block.children) blockText(child, parts);
+      break;
+    case "rule":
+      break;
+  }
+}
+
+function fullPlain(text: string): string {
+  const parts: string[] = [];
+  for (const block of parseRich(text, "auto").blocks) blockText(block, parts);
+  return parts.join(" ");
+}
+
+// toPlainText renders a field for display outside its own syntax: grid
+// cells, card titles, tree rows, sort and search values. "full" (the
+// default) auto-detects the format, parses it and joins every block's
+// text, marks stripped to their content. "summary" (D5) is the Jira
+// summary field's own narrower rule: inline code and links unwrap, marks
+// and every block construct stay exactly as typed.
+//
+// The cache key joins scope and text with ":" rather than a NUL byte: a
+// raw 0x00 in a source file makes git (and most other tools) treat the
+// whole file as binary, which breaks diff, blame and patch for everyone
+// downstream. "full:x" and "summary:x" can never collide with a real
+// scope value since "full"/"summary" are the only two this function
+// accepts.
+export function toPlainText(text: string, scope: "full" | "summary" = "full"): string {
+  const key = `${scope}:${text}`;
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached;
+  if (!HAS_MARKUP.test(text)) return remember(key, text);
+
+  const joined = scope === "summary" ? summaryPlain(text) : fullPlain(text);
+  return remember(key, collapse(joined));
+}

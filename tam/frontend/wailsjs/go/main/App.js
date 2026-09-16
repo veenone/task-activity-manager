@@ -38,6 +38,10 @@ export function CreateProfileReusingToken(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['CreateProfileReusingToken'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function CreateRitualRoot(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateRitualRoot'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateSprint(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['CreateSprint'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
@@ -46,12 +50,8 @@ export function DeleteProfile(arg1) {
   return window['go']['main']['App']['DeleteProfile'](arg1);
 }
 
-export function DeleteRitualAssociation(arg1, arg2) {
-  return window['go']['main']['App']['DeleteRitualAssociation'](arg1, arg2);
-}
-
-export function DeleteRitualDraft(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['DeleteRitualDraft'](arg1, arg2, arg3, arg4);
+export function DeleteRitualDocument(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['DeleteRitualDocument'](arg1, arg2, arg3, arg4);
 }
 
 export function DeleteSprint(arg1, arg2, arg3) {
@@ -74,8 +74,16 @@ export function EditSprint(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['EditSprint'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
+export function EnsureSprintRituals(arg1, arg2, arg3) {
+  return window['go']['main']['App']['EnsureSprintRituals'](arg1, arg2, arg3);
+}
+
 export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
+}
+
+export function ForgetRitualPage(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ForgetRitualPage'](arg1, arg2, arg3, arg4);
 }
 
 export function GetBoard(arg1, arg2, arg3, arg4) {
@@ -84,10 +92,6 @@ export function GetBoard(arg1, arg2, arg3, arg4) {
 
 export function GetConfluenceConfig(arg1) {
   return window['go']['main']['App']['GetConfluenceConfig'](arg1);
-}
-
-export function GetConfluencePage(arg1, arg2) {
-  return window['go']['main']['App']['GetConfluencePage'](arg1, arg2);
 }
 
 export function GetCreateFields(arg1, arg2) {
@@ -112,14 +116,6 @@ export function GetLinkTypes(arg1) {
 
 export function GetProfileSetting(arg1, arg2) {
   return window['go']['main']['App']['GetProfileSetting'](arg1, arg2);
-}
-
-export function GetRitualDraft(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['GetRitualDraft'](arg1, arg2, arg3, arg4);
-}
-
-export function GetRitualPage(arg1, arg2) {
-  return window['go']['main']['App']['GetRitualPage'](arg1, arg2);
 }
 
 export function GetSettings() {
@@ -154,6 +150,10 @@ export function JournalSprintMoves(arg1, arg2, arg3) {
   return window['go']['main']['App']['JournalSprintMoves'](arg1, arg2, arg3);
 }
 
+export function LastRitualSync(arg1, arg2) {
+  return window['go']['main']['App']['LastRitualSync'](arg1, arg2);
+}
+
 export function ListActivity(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListActivity'](arg1, arg2, arg3);
 }
@@ -168,10 +168,6 @@ export function ListBoardSprints(arg1, arg2) {
 
 export function ListBoards(arg1) {
   return window['go']['main']['App']['ListBoards'](arg1);
-}
-
-export function ListConfluenceChildPages(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['ListConfluenceChildPages'](arg1, arg2, arg3, arg4);
 }
 
 export function ListEpics(arg1) {
@@ -202,16 +198,8 @@ export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
 }
 
-export function ListRitualAssociations(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListRitualAssociations'](arg1, arg2, arg3);
-}
-
-export function ListRitualDrafts(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListRitualDrafts'](arg1, arg2, arg3);
-}
-
-export function ListSprintIssues(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ListSprintIssues'](arg1, arg2, arg3);
+export function ListRitualDocuments(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ListRitualDocuments'](arg1, arg2, arg3);
 }
 
 export function ListSprints(arg1) {
@@ -242,6 +230,10 @@ export function RankIssue(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['RankIssue'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function RefreshDetails(arg1) {
+  return window['go']['main']['App']['RefreshDetails'](arg1);
+}
+
 export function ResolveConflictKeepRemote(arg1, arg2) {
   return window['go']['main']['App']['ResolveConflictKeepRemote'](arg1, arg2);
 }
@@ -250,16 +242,20 @@ export function ResolveConflictOverride(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResolveConflictOverride'](arg1, arg2, arg3);
 }
 
+export function ResolveRitualConflict(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['ResolveRitualConflict'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function RitualMacroIssues(arg1, arg2) {
+  return window['go']['main']['App']['RitualMacroIssues'](arg1, arg2);
+}
+
 export function SaveImportTemplate(arg1) {
   return window['go']['main']['App']['SaveImportTemplate'](arg1);
 }
 
-export function SaveRitualDraft(arg1, arg2) {
-  return window['go']['main']['App']['SaveRitualDraft'](arg1, arg2);
-}
-
-export function ScaffoldSprintRituals(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ScaffoldSprintRituals'](arg1, arg2, arg3);
+export function SaveRitualBody(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['SaveRitualBody'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
 export function SearchUsers(arg1, arg2) {
@@ -282,12 +278,12 @@ export function SetProfileSetting(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetProfileSetting'](arg1, arg2, arg3);
 }
 
-export function SetRitualAssociation(arg1, arg2) {
-  return window['go']['main']['App']['SetRitualAssociation'](arg1, arg2);
-}
-
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
+}
+
+export function StandupEntry(arg1) {
+  return window['go']['main']['App']['StandupEntry'](arg1);
 }
 
 export function StartSprint(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
@@ -304,6 +300,10 @@ export function SyncBoards(arg1) {
 
 export function SyncIssues(arg1, arg2) {
   return window['go']['main']['App']['SyncIssues'](arg1, arg2);
+}
+
+export function SyncRituals(arg1, arg2) {
+  return window['go']['main']['App']['SyncRituals'](arg1, arg2);
 }
 
 export function TestConnection(arg1, arg2, arg3, arg4) {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,9 +35,14 @@ const (
 	// and the backend falls back to the transition's first allowed value
 	// when this is unset or names something the transition does not offer.
 	settingTransitionResolution = "transition_resolution"
-	// detailFreshFor is how long a cached detail is served without asking
-	// Jira again.
-	detailFreshFor = 10 * time.Minute
+	// settingDetailCacheMinutes is the per-profile key for how long a cached
+	// detail is served without asking Jira again. Unset means
+	// defaultDetailCacheMinutes; 0 means it never expires, which is what
+	// makes a selected issue readable with no connection at all until the
+	// shell's Refresh clears the cache.
+	settingDetailCacheMinutes = "detail_cache_minutes"
+	// defaultDetailCacheMinutes is that setting's default.
+	defaultDetailCacheMinutes = 10
 	// syncProgressEvent carries syncer.Progress frames to the frontend.
 	syncProgressEvent = "tam:sync-progress"
 	// backendSlowLock is how long a backend lock wait or build has to take
@@ -234,6 +240,29 @@ func (a *App) ListIssues(profileID string, q issuerepo.IssueQuery) (issuerepo.Is
 	return a.repo.ListIssues(a.ctx, profileID, q)
 }
 
+// cachedDetailFresh reports whether a detail cached at fetchedAt is still
+// served without asking Jira. The window is the profile's
+// detail_cache_minutes, and 0 is not "always stale" but "never expires": a
+// profile set that way reads its details entirely out of the cache. An
+// unreadable setting is the default rather than an error, since this decides
+// when a refetch happens and never whether the panel may open.
+func (a *App) cachedDetailFresh(profileID string, fetchedAt time.Time) bool {
+	minutes := defaultDetailCacheMinutes
+	switch v, err := a.repo.ProfileSetting(a.ctx, profileID, settingDetailCacheMinutes); {
+	case err != nil:
+		log.Printf("tam: read the detail cache window for %s: %v", profileID, err)
+	case strings.TrimSpace(v) == "":
+	default:
+		m, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil || m < 0 {
+			log.Printf("tam: %s is %q for %s, using %d minutes", settingDetailCacheMinutes, v, profileID, defaultDetailCacheMinutes)
+			break
+		}
+		minutes = m
+	}
+	return minutes == 0 || time.Since(fetchedAt) < time.Duration(minutes)*time.Minute
+}
+
 // GetIssueDetail returns the cached detail when it is fresh, otherwise
 // fetches it from the backend and caches it.
 func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error) {
@@ -245,7 +274,7 @@ func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error)
 	if err != nil {
 		return backend.IssueDetail{}, err
 	}
-	if ok && (strings.HasPrefix(key, issuerepo.DraftPrefix) || time.Since(fetchedAt) < detailFreshFor) {
+	if ok && (strings.HasPrefix(key, issuerepo.DraftPrefix) || a.cachedDetailFresh(p.ID, fetchedAt)) {
 		return cached, nil
 	}
 	b, err := a.backendFor(p)
@@ -254,6 +283,15 @@ func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error)
 	}
 	d, err := b.GetIssueDetail(a.ctx, key)
 	if err != nil {
+		if ok {
+			// Offline, or Jira refused: the stale detail is the description,
+			// the links and the comments the panel was showing a moment ago,
+			// and it beats an error page in every case where this read fails.
+			// Its fetch time travels with it, so the panel can say how old it
+			// is rather than pass it off as current.
+			log.Printf("tam: serving the cached detail for %s: %v", key, err)
+			return cached, nil
+		}
 		return backend.IssueDetail{}, err
 	}
 	if err := a.repo.WriteDetail(a.ctx, p.ID, key, d, time.Now()); err != nil {
@@ -264,6 +302,27 @@ func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error)
 		return backend.IssueDetail{}, err
 	}
 	return fresh, nil
+}
+
+// RefreshDetails drops the profile's cached issue details, which is what the
+// shell's Refresh is: the next read of whatever is on screen goes back to
+// Jira. It is also the only way past a detail_cache_minutes of 0, where a
+// detail otherwise never expires.
+//
+// It takes the same per-profile lock under the same name a sync does. It is
+// the same class of operation, clearing the cache a sync, a commit and a
+// report all read, and the frontend reaches it through SyncContext for the
+// same reason, so neither end offers what the other would refuse.
+func (a *App) RefreshDetails(profileID string) error {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return err
+	}
+	if err := a.acquire(p.ID, "sync"); err != nil {
+		return err
+	}
+	defer a.release(p.ID)
+	return a.repo.ClearDetails(a.ctx, p.ID)
 }
 
 // ListLinkedTests returns the tests linked to key through the suite's

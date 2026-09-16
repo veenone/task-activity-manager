@@ -671,3 +671,79 @@ func TestVersionTenAddsIssuesJSONAndConvertsOldKeys(t *testing.T) {
 		t.Fatalf("issues_json = %s, want %s", got, want)
 	}
 }
+
+// Version 12 adds the three columns the ritual sync compares and resolves
+// with. It rewrites no rows: a body written before it keeps its text, and the
+// ensure step upgrades rows that have none.
+func TestSchemaVersionTwelveAddsTheRitualSyncColumns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE ritual_document DROP COLUMN base_body`,
+		`ALTER TABLE ritual_document DROP COLUMN conflict_body`,
+		`ALTER TABLE ritual_document DROP COLUMN conflict_version`,
+		`INSERT INTO ritual_document (profile_id, board_id, sprint_id, ritual_type, body) VALUES ('p', 1, 14, 'planning', '<p>kept</p>')`,
+		`UPDATE meta SET value = '11' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var n int
+	if err := db.DB().QueryRow(`SELECT COUNT(*) FROM pragma_table_info('ritual_document')
+		WHERE name IN ('base_body', 'conflict_body', 'conflict_version')`).Scan(&n); err != nil || n != 3 {
+		t.Fatalf("sync columns = %d, %v", n, err)
+	}
+	var body string
+	if err := db.DB().QueryRow(`SELECT body FROM ritual_document WHERE sprint_id = 14`).Scan(&body); err != nil || body != "<p>kept</p>" {
+		t.Fatalf("body = %q, %v", body, err)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}
+
+func TestSchemaVersionThirteenAddsTheSprintDraftFlag(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE sprint DROP COLUMN draft`,
+		`INSERT INTO sprint (profile_id, id, board_id, name, state) VALUES ('p1', 13, 1, 'Sprint 13', 'future')`,
+		`UPDATE meta SET value = '12' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var draft int
+	var name string
+	if err := db.DB().QueryRow(`SELECT name, draft FROM sprint WHERE profile_id = 'p1' AND id = 13`).Scan(&name, &draft); err != nil {
+		t.Fatalf("read the kept sprint: %v", err)
+	}
+	if name != "Sprint 13" || draft != 0 {
+		t.Errorf("sprint = %q draft %d, want the row kept and not a draft", name, draft)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != 13 || tamstore.Schema.Version != 13 {
+		t.Errorf("schema version = %d (Schema.Version %d), want 13", v, tamstore.Schema.Version)
+	}
+}

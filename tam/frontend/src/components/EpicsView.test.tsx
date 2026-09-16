@@ -82,7 +82,7 @@ beforeEach(() => {
   ]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
   vi.mocked(api.ListSprints).mockResolvedValue([{ id: "12", name: "Sprint 12" }]);
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-101", description: "", links: [], fields: {} });
+  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-101", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([]);
   vi.mocked(api.GetLinkTypes).mockResolvedValue([]);
@@ -140,6 +140,21 @@ describe("EpicsView", () => {
     expect(screen.getByText("1 of 2 done, 5 of 10 pts")).toBeInTheDocument();
     expect(screen.getByText("Apply promo code")).toBeInTheDocument();
     expect(screen.getByText("Add coupon banner")).toBeInTheDocument();
+  });
+
+  it("shows a summary carrying wiki markup as plain text (D5)", async () => {
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [
+        epicNode({
+          issue: issue({ key: "PLAT-100", type: "epic", summary: "Fix *login* at {{/auth}}" }),
+        }),
+      ],
+      orphans: [],
+      truncated: false,
+    });
+    renderView();
+    const row = await screen.findByRole("treeitem", { name: "PLAT-100 Fix *login* at /auth" });
+    expect(within(row).getByText("Fix *login* at /auth")).toHaveAttribute("title", "Fix *login* at /auth");
   });
 
   // The reported path: open an epic, select a story under it, draft a

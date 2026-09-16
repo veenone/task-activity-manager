@@ -1,5 +1,9 @@
 import type { SprintOption } from "../api";
 
+// DRAFT_SPRINT_HINT is the tooltip on every action a draft sprint cannot
+// take yet: Start and Complete need a sprint Jira holds.
+export const DRAFT_SPRINT_HINT = "Commit this sprint first";
+
 // duplicateNameIds is which sprint ids share a name with another sprint in
 // the same list, compared case-insensitively. Only those get their board
 // name beside them, both of them and not just the second; a sprint whose
@@ -29,7 +33,9 @@ export function duplicateNameIds(sprints: SprintOption[]): Set<number> {
 
 // sprintOptionLabel is the text an option shows: the sprint's own name,
 // with its board name beside it only when another sprint in the same list
-// answers to the same name.
+// answers to the same name, and "(draft)" after a sprint Commit has not
+// created yet.
 export function sprintOptionLabel(s: SprintOption, dupIds: Set<number>): string {
-  return dupIds.has(s.id) && s.boardName ? `${s.name} (${s.boardName})` : s.name;
+  const base = dupIds.has(s.id) && s.boardName ? `${s.name} (${s.boardName})` : s.name;
+  return s.draft ? `${base} (draft)` : base;
 }

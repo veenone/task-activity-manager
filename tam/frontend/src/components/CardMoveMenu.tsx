@@ -1,6 +1,7 @@
 import { Menu } from "@agile-suite/core";
 import type { MenuItem } from "@agile-suite/core";
 import type { ColumnView, Sprint } from "../api";
+import { sprintOptionLabel } from "../lib/sprintOptions";
 
 // CARD_MENU_CLASS is what the card's keyboard path clicks: the menu key
 // and Shift with F10 open the menu the mouse opens, and there is no other
@@ -43,7 +44,7 @@ export function CardMoveMenu({ issueKey, columns, col, sprints, sprintId, disabl
     for (const sprint of others) {
       items.push({
         key: `sprint-${sprint.id}`,
-        label: `Move to ${sprint.name}`,
+        label: `Move to ${sprintOptionLabel(sprint, new Set())}`,
         disabled,
         onClick: () => onSprint(sprint),
       });

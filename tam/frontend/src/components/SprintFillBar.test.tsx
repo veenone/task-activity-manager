@@ -49,6 +49,12 @@ describe("SprintFillBar", () => {
     expect(within(picker).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
   });
 
+  it("names a draft sprint as a draft", () => {
+    renderBar({ sprints: [...SPRINTS, { id: -1, boardId: 1, name: "Sprint 14", state: "future", startDate: "", endDate: "", goal: "", draft: true }] });
+    const picker = screen.getByRole("combobox", { name: "Move the checked cards to" });
+    expect(within(picker).getByRole("option", { name: "Sprint 14 (draft)" })).toBeInTheDocument();
+  });
+
   it("does nothing on a second press while the first is still in flight", async () => {
     const user = userEvent.setup();
     const { onFill } = renderBar({ busy: true });

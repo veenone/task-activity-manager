@@ -233,14 +233,17 @@ func TestRemoveBoardsTakesTheChildrenWithIt(t *testing.T) {
 	}
 }
 
-func TestRemoveBoardsClearsRitualDocuments(t *testing.T) {
+// A ritual page is text somebody wrote, possibly never pushed, and a board
+// drops out of Jira's list for reasons that say nothing about it: a setting
+// switched off, a lost permission. Only a profile purge removes the pages.
+func TestRemoveBoardsKeepsRitualDocuments(t *testing.T) {
 	ctx := context.Background()
 	r, db := newRepo(t)
 
 	for _, boardID := range []int{1, 2} {
 		if _, err := db.Exec(`INSERT INTO ritual_document
-			(profile_id, board_id, sprint_id, ritual_type, status)
-			VALUES ('p1', ?, 12, 'review', 'draft')`, boardID); err != nil {
+			(profile_id, board_id, sprint_id, ritual_type, body, status)
+			VALUES ('p1', ?, 12, 'review', '<p>never pushed</p>', 'local')`, boardID); err != nil {
 			t.Fatalf("seed board %d: %v", boardID, err)
 		}
 	}
@@ -249,20 +252,23 @@ func TestRemoveBoardsClearsRitualDocuments(t *testing.T) {
 		t.Fatalf("remove: %v", err)
 	}
 
-	var remaining int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE board_id = 1`).Scan(&remaining); err != nil {
+	var kept int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE board_id = 1`).Scan(&kept); err != nil {
 		t.Fatalf("count board 1: %v", err)
 	}
-	if remaining != 0 {
-		t.Fatalf("board 1 left %d ritual rows behind", remaining)
+	if kept != 1 {
+		t.Fatalf("board 1 has %d ritual rows, want its page kept", kept)
 	}
 
-	var untouched int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE board_id = 2`).Scan(&untouched); err != nil {
-		t.Fatalf("count board 2: %v", err)
+	if err := r.PurgeProfile(ctx, "p1"); err != nil {
+		t.Fatalf("purge: %v", err)
 	}
-	if untouched != 1 {
-		t.Fatalf("board 2 has %d ritual rows, want 1", untouched)
+	var purged int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM ritual_document WHERE profile_id = 'p1'`).Scan(&purged); err != nil {
+		t.Fatalf("count p1: %v", err)
+	}
+	if purged != 0 {
+		t.Fatalf("purge left %d ritual rows behind", purged)
 	}
 }
 

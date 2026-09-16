@@ -265,6 +265,57 @@ describe("PendingChangesModal", () => {
     await user.click(within(dialog).getByRole("button", { name: "Commit (1)" }));
     expect(await within(dialog).findByText("Last commit: 1 link pushed.")).toBeInTheDocument();
   });
+
+  it("shows a draft sprint as its own card, first, and discards it", async () => {
+    const user = userEvent.setup();
+    const sprintRow: PendingChange = {
+      id: 9, entityType: "sprint_create", entityKey: "-1", field: "create", beforeVal: "", baseVersion: "", createdAt: "2026-09-15T10:00:00Z",
+      afterVal: JSON.stringify({ boardId: 1, boardName: "PLAT Scrum", name: "Sprint 15", goal: "", startDate: "2026-09-16T09:00:00.000+0000", endDate: "2026-09-30T09:00:00.000+0000" }),
+    };
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([sprintRow, ...rows]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    expect(await within(dialog).findByText("4 changes on 2 issues, 1 of them new, and 1 new sprint")).toBeInTheDocument();
+    const cards = within(dialog).getAllByRole("group");
+    expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Sprint 15", "TAM-NEW-1", "PLAT-409"]);
+    expect(within(cards[0]).getByText("Draft sprint")).toBeInTheDocument();
+    expect(within(cards[0]).getByText("New sprint on PLAT Scrum, 2026-09-16 to 2026-09-30")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Commit (3)" })).toBeEnabled();
+    await user.click(within(cards[0]).getByRole("button", { name: "Discard Sprint 15" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 9));
+  });
+
+  it("says what the last Commit held and what each held row waits for", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], createdSprints: [{ draftId: -1, id: 100, name: "Sprint 15" }], linked: [], conflicts: [], remaining: 3,
+      failures: [{ key: "TAM-NEW-1", error: "POST failed: 400 Epic Name is required", entityType: "issue_create", rowId: 3, retryable: true }],
+      held: [{ key: "PLAT-409", entityType: "issue", rowId: 0, waitsFor: "TAM-NEW-1", reason: "waits for TAM-NEW-1, which Jira refused" }],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    expect(await within(dialog).findByText("Last commit: 1 sprint created (Sprint 15 is sprint 100), 1 failed, 1 waiting.")).toBeInTheDocument();
+    expect(within(dialog).getByText("PLAT-409 waits for TAM-NEW-1, which Jira refused.")).toBeInTheDocument();
+    const card = within(dialog).getByRole("group", { name: "PLAT-409" });
+    expect(within(card).getByText("Waiting")).toBeInTheDocument();
+    expect(within(card).getByText("Waits for TAM-NEW-1, which Jira refused.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Commit again to retry the failures.")).toBeInTheDocument();
+  });
+
+  it("offers Commit again for held rows even when nothing failed for good", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], linked: [], conflicts: [], remaining: 2,
+      failures: [{ key: "Sprint 15", error: "the draft sprint could not be decoded", entityType: "sprint_create", rowId: 9, retryable: false }],
+      held: [{ key: "TAM-NEW-1", entityType: "issue_create", rowId: 3, waitsFor: "-1", reason: "waits for sprint \"Sprint 15\", which could not be read" }],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    expect(await within(dialog).findByText("Commit again once what they wait for is in Jira.")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
+  });
 });
 
 describe("PendingChangesModal board moves", () => {

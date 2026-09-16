@@ -9,7 +9,7 @@
 // class's createFrom so the binding receives the shape it declares.
 
 import * as App from "../wailsjs/go/main/App";
-import { backend, confluence, importer, issuerepo, profile, ritualrepo } from "../wailsjs/go/models";
+import { backend, importer, issuerepo, profile } from "../wailsjs/go/models";
 
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 export type { SyncProgress } from "@agile-suite/core";
@@ -40,31 +40,6 @@ export interface Settings {
 }
 
 export interface ConfluenceConfig { baseURL: string; spaceKey: string; rootPageID: string }
-export type ConfluencePage = confluence.Page;
-export type ConfluenceChildPageResult = confluence.ChildPageResult;
-export interface RitualAssociation { boardID: number; sprintID: number; ritualType: string; pageID: string; pageTitle: string }
-
-export interface RitualIssue { key: string; remark: string }
-export type RitualDraft = ritualrepo.Draft;
-
-// parseRitualIssues reads the issues_json column. Stored data that cannot be
-// parsed yields no issues rather than throwing, because a draft with a damaged
-// column must still open in the wizard to be repaired.
-export function parseRitualIssues(json: string): RitualIssue[] {
-  const trimmed = (json ?? "").trim();
-  if (!trimmed) return [];
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((i) => ({ key: String(i?.key ?? ""), remark: String(i?.remark ?? "") })).filter((i) => i.key);
-  } catch {
-    return [];
-  }
-}
-
-export function encodeRitualIssues(issues: RitualIssue[]): string {
-  return JSON.stringify(issues.map((i) => ({ key: i.key, remark: i.remark ?? "" })));
-}
 
 export interface HealthInfo {
   ok: boolean;
@@ -141,11 +116,38 @@ export interface Link {
   pendingId?: number;
 }
 
+// One comment on an issue. Named IssueComment because Comment is a DOM
+// global. author and authorName are both empty for a comment Jira answered
+// with no author (anonymous, or a user deleted since); restriction is the
+// role or group a restricted comment is limited to, empty for an ordinary
+// one. created and updated are RFC 3339 unless Jira sent something that
+// could not be read, in which case they are exactly what it sent.
+export interface IssueComment {
+  id: string;
+  author: string;
+  authorName: string;
+  created: string;
+  updated: string;
+  body: string;
+  restriction: string;
+}
+
 export interface IssueDetail {
   key: string;
   description: string;
   links: Link[];
   fields: Record<string, unknown>;
+  // Oldest first, so the newest are the last few. commentTotal is how many
+  // the issue has, which is more than comments.length once commentsTruncated
+  // is true: the read keeps the newest 500, and a comment page that failed
+  // leaves the rest unread rather than failing the whole detail.
+  comments: IssueComment[];
+  commentTotal: number;
+  commentsTruncated: boolean;
+  // When the store cached this detail, RFC 3339, empty for one that never
+  // went through the cache. A detail served while Jira is unreachable is the
+  // cached one, and this is what lets the panel say so.
+  fetchedAt: string;
 }
 
 export interface IssueQuery {
@@ -272,6 +274,10 @@ export interface Sprint {
   // refresh, which is why a reader cannot tell an absent goal from one Jira
   // has none set on.
   goal: string;
+  // A sprint drafted in TAM and not yet created in Jira: its id is negative,
+  // its state is future, and Commit creates it before any card moved into it
+  // is sent. Absent on fixtures written before drafts existed.
+  draft?: boolean;
 }
 
 // SprintChoice mirrors boardrepo.SprintChoice field for field: every open
@@ -283,6 +289,8 @@ export interface SprintChoice {
   name: string;
   boardName: string;
   state: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 // SprintOption is the smallest shape the Sprint field actually reads. Sprint
@@ -294,6 +302,8 @@ export interface SprintOption {
   // The board this sprint belongs to, given only by the profile-wide list
   // (SprintChoice); a board's own list needs no such disambiguation.
   boardName?: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 // SprintChoice mirrors boardrepo.SprintChoice field for field: every open
@@ -305,6 +315,8 @@ export interface SprintChoice {
   name: string;
   boardName: string;
   state: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 // SprintOption is the smallest shape the Sprint field actually reads. Sprint
@@ -316,6 +328,8 @@ export interface SprintOption {
   // The board this sprint belongs to, given only by the profile-wide list
   // (SprintChoice); a board's own list needs no such disambiguation.
   boardName?: string;
+  // A sprint drafted in TAM, named so beside its name.
+  draft?: boolean;
 }
 
 export interface ColumnView {
@@ -640,6 +654,20 @@ export interface PendingChange {
   createdAt: string;
 }
 
+// ENTITY_SPRINT_CREATE is the journal entity of a sprint drafted in TAM. Its
+// entityKey is the draft's negative id and its afterVal a DraftSprint.
+export const ENTITY_SPRINT_CREATE = "sprint_create";
+
+// DraftSprint mirrors issuerepo.DraftSprint: what a sprint_create row carries.
+export interface DraftSprint {
+  boardId: number;
+  boardName: string;
+  name: string;
+  goal: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface AuditEntry {
   id: number;
   occurredAt: string;
@@ -680,6 +708,10 @@ export interface IssueDraft {
   sprintId?: string;
   sprintName?: string;
   extra: Record<string, string>;
+  // The extra field ids the dialog offered for this type, read off the
+  // create screen. The create sends no extra outside them. Absent on a draft
+  // written before the set existed and on the importer's drafts.
+  screenFields?: string[];
 }
 
 // JiraUser is one person the assignee picker can offer. name is the username
@@ -758,14 +790,29 @@ export interface CommitMove {
   satisfied: boolean;
 }
 
+// CommitHeld mirrors committer.Held: a row the Commit did not send because
+// something it names was not created in Jira. It stays pending; reason is
+// the sentence that says what it waits for.
+export interface CommitHeld {
+  key: string;
+  entityType: string;
+  rowId: number;
+  waitsFor: string;
+  reason: string;
+}
+
 export interface CommitResult {
   committed: string[];
   created: { tempKey: string; key: string }[];
+  // createdSprints and held are optional for the same reason CommitFailure's
+  // fields are: fixtures written before phased Commit do not spell them out.
+  createdSprints?: { draftId: number; id: number; name: string }[];
   linked: { key: string; toKey: string; type: string }[];
   // moved is optional for the same reason CommitFailure's fields are.
   moved?: CommitMove[];
   conflicts: Conflict[];
   failures: CommitFailure[];
+  held?: CommitHeld[];
   remaining: number;
 }
 
@@ -914,6 +961,11 @@ export const GetEpicTree = (profileId: string, q: TreeQuery): Promise<EpicTreeDa
 export const ListEpics: (profileId: string) => Promise<Issue[]> = App.ListEpics as (profileId: string) => Promise<Issue[]>;
 export const GetProfileSetting: (profileId: string, key: string) => Promise<string> =
   App.GetProfileSetting;
+// RefreshDetails is the shell's Refresh: it drops the profile's cached issue
+// details so the next read of whatever is on screen goes back to Jira. It
+// takes the app's per-profile lock, so it is called through SyncContext and
+// never from a component directly.
+export const RefreshDetails: (profileId: string) => Promise<void> = App.RefreshDetails;
 
 // The board bindings. GetBoard takes its arguments plainly: all four are
 // scalars, so nothing has to go through a generated class's createFrom. The
@@ -1108,19 +1160,67 @@ export const GetLinkTypes: (profileId: string) => Promise<LinkType[]> = App.GetL
 export const GetConfluenceConfig: (profileId: string) => Promise<ConfluenceConfig> = App.GetConfluenceConfig as any;
 export const SetConfluenceConfig = (profileId: string, config: ConfluenceConfig, token: string): Promise<void> =>
   App.SetConfluenceConfig(profileId, profile.ConfluenceConfig.createFrom(config), token);
-export const GetConfluencePage: (profileId: string, pageId: string) => Promise<ConfluencePage> = App.GetConfluencePage as any;
-export const ListConfluenceChildPages: (profileId: string, parentId: string, start: number, limit: number) => Promise<ConfluenceChildPageResult> = App.ListConfluenceChildPages as any;
-export const GetRitualPage: (profileId: string, pageId: string) => Promise<ConfluencePage> = App.GetRitualPage as any;
-export const ListRitualAssociations: (profileId: string, boardId: number, sprintId: number) => Promise<RitualAssociation[]> = App.ListRitualAssociations as any;
-export const SetRitualAssociation = (profileId: string, association: RitualAssociation): Promise<void> => App.SetRitualAssociation(profileId, profile.RitualAssociation.createFrom(association));
-export const DeleteRitualAssociation = (profileId: string, association: RitualAssociation): Promise<void> => App.DeleteRitualAssociation(profileId, profile.RitualAssociation.createFrom(association));
-export const ListRitualDrafts: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDraft[]> = App.ListRitualDrafts as any;
-export const GetRitualDraft: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<RitualDraft> = App.GetRitualDraft as any;
-export const SaveRitualDraft = (profileId: string, draft: RitualDraft): Promise<void> =>
-  App.SaveRitualDraft(profileId, ritualrepo.Draft.createFrom(draft));
-export const DeleteRitualDraft: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.DeleteRitualDraft as any;
-export const ScaffoldSprintRituals: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDraft[]> = App.ScaffoldSprintRituals as any;
-export const ListSprintIssues: (profileId: string, boardId: number, sprintId: number) => Promise<Issue[]> = App.ListSprintIssues as any;
+// A ritual page as tam.db keeps it. body is the local page in Confluence
+// storage format; baseBody the page as of version, the last one synced;
+// conflictBody a newer remote a Sync found while local edits were pending.
+export type RitualStatus = "local" | "synced" | "unsynced" | "conflict" | "gone";
+export interface RitualDocument {
+  profileId: string;
+  boardId: number;
+  sprintId: number;
+  ritualType: string;
+  title: string;
+  body: string;
+  baseBody: string;
+  pageId: string;
+  version: number;
+  conflictBody: string;
+  conflictVersion: number;
+  status: RitualStatus;
+  updatedAt: string;
+  syncedAt: string;
+}
+export interface RitualPageFailure { sprintName: string; title: string; reason: string }
+// RitualRootMissing is a Sync that stopped because the configured root page
+// answered 404. canCreate is the permission probe's answer, unknown read as yes.
+export interface RitualRootMissing { pageId: string; spaceKey: string; canCreate: boolean; suggestedTitle: string }
+export interface RitualSyncResult {
+  // Set, and nothing else is, when the root page is gone. Optional only so
+  // fixtures written before it stay valid; Go always sends it, null when the
+  // root was read.
+  rootMissing?: RitualRootMissing | null;
+  created: number;
+  pulled: number;
+  pushed: number;
+  conflicts: number;
+  gone: number;
+  failed: RitualPageFailure[];
+  syncedAt: string;
+}
+export interface RitualMacroPreview { supported: boolean; jql: string; issues: Issue[] }
+
+export const EnsureSprintRituals: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.EnsureSprintRituals as any;
+export const ListRitualDocuments: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.ListRitualDocuments as any;
+// version and pageId are what the editor was opened on; the save is refused
+// once a Sync has moved the row past either.
+export const SaveRitualBody: (profileId: string, boardId: number, sprintId: number, ritualType: string, body: string, version: number, pageId: string) => Promise<RitualDocument> = App.SaveRitualBody as any;
+export const ResolveRitualConflict: (profileId: string, boardId: number, sprintId: number, ritualType: string, choice: "mine" | "theirs") => Promise<void> = App.ResolveRitualConflict;
+export const ForgetRitualPage: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.ForgetRitualPage;
+export const DeleteRitualDocument: (profileId: string, boardId: number, sprintId: number, ritualType: string) => Promise<void> = App.DeleteRitualDocument;
+export const RitualMacroIssues: (profileId: string, jql: string) => Promise<RitualMacroPreview> = App.RitualMacroIssues as any;
+export const StandupEntry: (day: string) => Promise<string> = App.StandupEntry;
+export const LastRitualSync: (profileId: string, boardId: number) => Promise<string> = App.LastRitualSync;
+export const SyncRituals: (profileId: string, boardId: number) => Promise<RitualSyncResult> = App.SyncRituals as any;
+
+export type RitualRootOutcome = "created" | "adopted" | "forbidden" | "titleTaken";
+export interface RitualRoot { outcome: RitualRootOutcome; pageId: string; title: string; spaceKey: string; topLevel: boolean }
+// sync is the pass Go ran on the new root, null when no root was set; syncError
+// is that pass's refusal, with the new root saved either way.
+export interface RitualRootResult { root: RitualRoot; sync: RitualSyncResult | null; syncError: string }
+// CreateRitualRoot takes Go's "rituals" lock. Call it only through
+// SyncContext.runRitualRoot, never directly.
+export const CreateRitualRoot: (profileId: string, boardId: number, title: string, adopt: boolean) => Promise<RitualRootResult> = App.CreateRitualRoot as any;
+
 // LookupIssue is cast the same way ListIssues is above: the generated
 // binding types the issue type as a plain string, narrowed to IssueType here.
 export const LookupIssue = (profileId: string, key: string): Promise<Issue> =>

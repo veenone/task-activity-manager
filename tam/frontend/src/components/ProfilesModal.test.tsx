@@ -133,7 +133,12 @@ describe("ProfilesModal", () => {
 
   it("edits a profile it was opened on, keeping the stored token when the field is blank", async () => {
     vi.mocked(api.ListProfiles).mockResolvedValue([acme]);
-    vi.mocked(api.GetProfileSetting).mockResolvedValue("Business Requirement");
+    // The form reads two per-profile settings now, so the stand-in answers
+    // by key: a requirement type where the detail freshness is asked for
+    // would be refused as minutes that are not a number.
+    vi.mocked(api.GetProfileSetting).mockImplementation(async (_id, key) =>
+      key === "requirement_issue_type" ? "Business Requirement" : "",
+    );
     renderModal();
     await userEvent.click(await screen.findByText("Acme Platform"));
     const reqType = screen.getByLabelText(/Requirement issue type/);

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { toPlainText } from "@agile-suite/core";
 import { GRID_COLUMNS } from "../api";
 import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
@@ -119,13 +120,14 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
         {rows.map((iss, index) => {
           const selected = iss.key === selectedKey;
           const nested = iss.type === "subtask" && parentKeys.has(iss.parentKey);
+          const summary = toPlainText(iss.summary, "summary");
           return (
             <div
               key={iss.key}
               role="row"
               aria-selected={selected}
               aria-rowindex={index + 2}
-              aria-label={`${iss.key} ${iss.summary}${iss.type === "subtask" && iss.parentKey ? `, subtask of ${iss.parentKey}` : ""}`}
+              aria-label={`${iss.key} ${summary}${iss.type === "subtask" && iss.parentKey ? `, subtask of ${iss.parentKey}` : ""}`}
               data-row-index={index}
               className={`issue-row${nested ? " issue-row-subtask" : ""}${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
               onClick={() => onSelect(iss.key)}
@@ -155,10 +157,10 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
                 {iss.pending && <span className="pending-dot" role="img" aria-label="Pending changes" title="Has pending changes" />}
               </span>
               <span role="gridcell"><TypeChip type={iss.type} subtaskLabel={subtaskLabel} /></span>
-              <span role="gridcell" className="issue-summary" title={iss.summary}>
+              <span role="gridcell" className="issue-summary" title={summary}>
                 <SubtaskToggle issueKey={iss.key} count={counts.get(iss.key) ?? 0} expanded={!collapsed.has(iss.key)} onToggle={() => toggleChildren(iss.key)} />
                 {nested && <span className="issue-child-branch" aria-hidden="true">↳</span>}
-                {iss.summary}
+                {summary}
               </span>
               <span role="gridcell">
                 {iss.draft

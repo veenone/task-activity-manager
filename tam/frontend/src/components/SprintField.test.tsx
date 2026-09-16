@@ -81,4 +81,13 @@ describe("SprintField", () => {
     await user.selectOptions(select, "13");
     await waitFor(() => expect(api.MoveIssueToSprint).toHaveBeenCalledWith("p1", "PLAT-412", "13"));
   });
+
+  it("says which sprint is still a draft", () => {
+    renderField([
+      { id: -1, name: "Sprint 15", boardName: "PLAT Scrum", draft: true },
+      { id: 12, name: "Sprint 12" },
+    ]);
+    expect(screen.getByRole("option", { name: "Sprint 15 (draft)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Sprint 12" })).toBeInTheDocument();
+  });
 });

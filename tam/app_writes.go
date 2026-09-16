@@ -60,8 +60,8 @@ func (a *App) CreateIssue(profileID string, draft backend.IssueDraft) (string, e
 	return a.repo.CreateDraft(a.ctx, p.ID, p.ProjectKey, draft)
 }
 
-// GetCreateFields asks the backend which required fields the New issue
-// form must add for the type.
+// GetCreateFields asks the backend which fields, required and optional, the
+// New issue form adds for the type beyond its own.
 func (a *App) GetCreateFields(profileID, typeName string) ([]backend.FieldSpec, error) {
 	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
@@ -128,8 +128,8 @@ func (a *App) CommitPendingChanges(profileID string) (committer.Result, error) {
 		log.Printf("tam: commit %s (%s) failed: %v", p.Name, p.ProjectKey, err)
 		return res, err
 	}
-	log.Printf("tam: committed %s (%s): %d pushed, %d created, %d moved, %d conflicts, %d failures, %d left",
-		p.Name, p.ProjectKey, len(res.Committed), len(res.Created), len(res.Moved), len(res.Conflicts), len(res.Failures), res.Remaining)
+	log.Printf("tam: committed %s (%s): %d sprints created, %d pushed, %d created, %d moved, %d conflicts, %d failures, %d held, %d left",
+		p.Name, p.ProjectKey, len(res.CreatedSprints), len(res.Committed), len(res.Created), len(res.Moved), len(res.Conflicts), len(res.Failures), len(res.Held), res.Remaining)
 	return res, nil
 }
 

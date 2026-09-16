@@ -12,7 +12,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn(), BrowserOpenURL: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -36,17 +36,54 @@ const epics: Issue[] = [
 
 // The panel opens the create dialog for a sub-task, and that dialog reads the
 // active profile, so the harness carries a provider the way the app does.
-function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[], issue: Issue = story, emptyNote?: string) {
-  render(
+function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[], issue: Issue = story, emptyNote?: string, jiraUrl?: string) {
+  return render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <IssueDetailPanel profileId="p1" issue={issue} sprints={sprints} emptyNote={emptyNote} onClose={onClose} />
+          <IssueDetailPanel profileId="p1" issue={issue} jiraUrl={jiraUrl} sprints={sprints} emptyNote={emptyNote} onClose={onClose} />
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
   );
-  return onClose;
+}
+
+// detail is the fetched half of one issue, with only the parts a test cares
+// about spelled out.
+function detailOf(over: Partial<api.IssueDetail> = {}): api.IssueDetail {
+  return {
+    key: "PLAT-412",
+    description: "As a shopper I can enter a promo code on the payment step.",
+    links: [],
+    fields: {},
+    comments: [],
+    commentTotal: 0,
+    commentsTruncated: false,
+    fetchedAt: "",
+    ...over,
+  };
+}
+
+function commentOf(over: Partial<api.IssueComment> = {}): api.IssueComment {
+  return {
+    id: "1",
+    author: "ranand",
+    authorName: "R. Anand",
+    created: "2026-09-13T10:14:00Z",
+    updated: "2026-09-13T10:14:00Z",
+    body: "Looks right to me.",
+    restriction: "",
+    ...over,
+  };
+}
+
+// The read view has no form control, so the description is reached by its
+// text now and only through Edit as a textarea.
+async function openDescriptionEditor(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+  const edit = await screen.findByRole("button", { name: "Edit" });
+  await waitFor(() => expect(edit).toBeEnabled());
+  await user.click(edit);
+  return screen.getByLabelText("Description");
 }
 
 // BOARD_SPRINTS are what a caller with a board hands down. Away from one
@@ -60,15 +97,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   vi.mocked(useSync).mockReturnValue({ status: "idle" } as any);
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({
-    key: "PLAT-412",
-    description: "As a shopper I can enter a promo code on the payment step.",
+  vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({
     links: [
       { direction: "inward", type: "Tested By", key: "XT-1018", summary: "Promo code applies discount", issueType: "Test" },
       { direction: "outward", type: "Relates", key: "PLAT-388", summary: "Promo codes must be single-use", issueType: "Requirement" },
     ],
-    fields: {},
-  });
+  }));
   vi.mocked(api.ListLinkedTests).mockResolvedValue([
     { key: "XT-1018", summary: "Promo code applies discount", linkType: "Tested By" },
     { key: "XT-1019", summary: "Expired promo code rejected", linkType: "Tested By" },
@@ -124,6 +158,13 @@ describe("IssueDetailPanel", () => {
     expect(within(dialog).queryByLabelText("Type")).not.toBeInTheDocument();
   });
 
+  // A story still drafted as TAM-NEW-2 can hold a technical task: Commit
+  // creates the story first and the sub-task after it has a real key.
+  it("drafts a sub-task under a draft", async () => {
+    renderPanel(vi.fn(), undefined, { ...story, key: "TAM-NEW-2", status: "Draft", draft: true, pending: true });
+    expect(await screen.findByRole("button", { name: "+ Technical task" })).toBeInTheDocument();
+  });
+
   it("is resizeable, and remembers the width", async () => {
     renderPanel();
     const panel = await screen.findByRole("complementary");
@@ -147,8 +188,23 @@ describe("IssueDetailPanel", () => {
     expect(within(details).getByLabelText("Assignee")).toHaveValue("R. Anand");
     expect(within(details).getByLabelText("Story points")).toHaveValue("5");
     expect(within(details).getByLabelText("Labels")).toHaveValue("checkout, promo");
-    await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue("As a shopper I can enter a promo code on the payment step."));
+    // The description reads as rendered markup now, not as a textarea.
+    await waitFor(() => expect(within(details).getByText("As a shopper I can enter a promo code on the payment step.")).toBeInTheDocument());
     expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412");
+  });
+
+  // Fix round 3, Minor: D6 chose one Refresh for the whole view. The Fields
+  // section's own went through GetIssueDetail, so it did nothing at all
+  // while the cached detail was still fresh, and nothing ever at
+  // detail_cache_minutes = 0.
+  it("leaves the Fields section without a Refresh of its own", () => {
+    renderPanel();
+    const heading = (title: string) =>
+      screen.getByRole("button", { name: new RegExp(`^${title}`) }).closest("section") as HTMLElement;
+    expect(within(heading("Fields")).queryByRole("button", { name: /Refresh/ })).toBeNull();
+    // The linked tests are read by their own binding, not the detail cache,
+    // so that section keeps its Refresh: this is a removal, not a sweep.
+    expect(within(heading("Covered by tests")).getByRole("button", { name: /Refresh/ })).toBeInTheDocument();
   });
 
   it("switches to Links and Tests", async () => {
@@ -169,7 +225,7 @@ describe("IssueDetailPanel", () => {
     await waitFor(() => expect(screen.getByTestId("detail-error")).toHaveTextContent("jira: 502 Bad Gateway"));
     expect(screen.getByLabelText("Assignee")).toHaveValue("R. Anand");
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
-    await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue("As a shopper I can enter a promo code on the payment step."));
+    await waitFor(() => expect(screen.getByText("As a shopper I can enter a promo code on the payment step.")).toBeInTheDocument());
     expect(api.GetIssueDetail).toHaveBeenCalledTimes(2);
   });
 
@@ -194,7 +250,8 @@ describe("IssueDetailPanel", () => {
 
   it("says when there are no linked tests and closes", async () => {
     vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
-    const onClose = renderPanel();
+    const onClose = vi.fn();
+    renderPanel(onClose);
     await openSection("Covered by tests");
     await waitFor(() => expect(screen.getByText("No linked tests.")).toBeInTheDocument());
     await userEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -210,8 +267,7 @@ describe("IssueDetailPanel write path", () => {
     expect(summary).toHaveValue("Checkout: apply promo code at payment step");
     expect(screen.getByLabelText("Labels")).toHaveValue("checkout, promo");
     expect(screen.getByLabelText("Story points")).toHaveValue("5");
-    const description = await screen.findByLabelText("Description");
-    await waitFor(() => expect(description).toHaveValue("As a shopper I can enter a promo code on the payment step."));
+    await waitFor(() => expect(screen.getByText("As a shopper I can enter a promo code on the payment step.")).toBeInTheDocument());
     const save = screen.getByRole("button", { name: "Save edit" });
     expect(save).toBeDisabled();
 
@@ -313,7 +369,7 @@ describe("IssueDetailPanel write path", () => {
   it("marks a pending link on the Links tab and discards it", async () => {
     const user = userEvent.setup();
     vi.mocked(api.GetIssueDetail).mockResolvedValue({
-      key: "PLAT-412", description: "d", fields: {},
+      key: "PLAT-412", description: "d", fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "",
       links: [
         { direction: "inward", type: "Tested By", key: "XT-1018", summary: "Promo code applies discount", issueType: "Test" },
         { direction: "outward", type: "Relates", key: "XT-1031", summary: "Retried payment is not charged twice", issueType: "Test", pending: true, pendingId: 41 },
@@ -332,7 +388,7 @@ describe("IssueDetailPanel write path", () => {
   it("surfaces a failed link discard", async () => {
     const user = userEvent.setup();
     vi.mocked(api.GetIssueDetail).mockResolvedValue({
-      key: "PLAT-412", description: "d", fields: {},
+      key: "PLAT-412", description: "d", fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "",
       links: [
         { direction: "outward", type: "Relates", key: "XT-1031", summary: "Retried payment is not charged twice", issueType: "Test", pending: true, pendingId: 41 },
       ],
@@ -438,5 +494,201 @@ describe("IssueDetailPanel sprint field", () => {
     renderPanel(vi.fn(), [], story, "No sprints yet, sync a board first");
     await screen.findByRole("combobox", { name: "Sprint" });
     expect(screen.getByText("No sprints yet, sync a board first")).toBeInTheDocument();
+  });
+});
+
+describe("IssueDetailPanel description", () => {
+  // The picked syntax lives for the app run, so this test works on its own
+  // two issues: picking Markdown for PLAT-412 here would reach every later
+  // test in this file, which is exactly the memory being asserted.
+  const picky: Issue = { ...story, key: "PLAT-500" };
+
+  it("renders the markup, and remembers a picked syntax for that issue alone", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ description: "h3. Acceptance criteria\n* one" }));
+    const first = renderPanel(vi.fn(), undefined, picky);
+    const fields = section("Fields");
+    await waitFor(() => expect(within(fields).getByRole("heading", { name: "Acceptance criteria" })).toBeInTheDocument());
+    expect(within(fields).getByRole("listitem")).toHaveTextContent("one");
+    expect(screen.queryByLabelText("Description")).not.toBeInTheDocument();
+
+    // Detection guessed wiki; the toggle overrides it and the read view
+    // re-renders at once, with the heading now ordinary text.
+    await user.click(within(fields).getByRole("button", { name: "Markdown" }));
+    expect(within(fields).queryByRole("heading", { name: "Acceptance criteria" })).not.toBeInTheDocument();
+    expect(within(fields).getByText(/h3\. Acceptance criteria/)).toBeInTheDocument();
+    first.unmount();
+
+    // Reopening the same issue keeps the choice; another issue starts on
+    // auto, since the memory is keyed by profile, key and field.
+    const second = renderPanel(vi.fn(), undefined, picky);
+    await waitFor(() => expect(within(section("Fields")).getByRole("button", { name: "Markdown" })).toHaveAttribute("aria-pressed", "true"));
+    second.unmount();
+    renderPanel(vi.fn(), undefined, { ...story, key: "PLAT-501" });
+    await waitFor(() => expect(within(section("Fields")).getByRole("heading", { name: "Acceptance criteria" })).toBeInTheDocument());
+  });
+
+  it("holds Edit closed until the detail has loaded", async () => {
+    vi.mocked(api.GetIssueDetail).mockReturnValue(new Promise(() => {}));
+    renderPanel();
+    expect(await screen.findByRole("button", { name: "Edit" })).toBeDisabled();
+  });
+
+  it("edits the raw text through Write and journals exactly what was typed", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const box = await openDescriptionEditor(user);
+    expect(box).toHaveValue("As a shopper I can enter a promo code on the payment step.");
+    await user.clear(box);
+    await user.type(box, "h3. Steps");
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    await waitFor(() => expect(api.EditIssue).toHaveBeenCalledWith("p1", "PLAT-412", "description", "h3. Steps"));
+    // Saving closes the editor and hands the reader the rendered text back.
+    await waitFor(() => expect(screen.queryByLabelText("Description")).not.toBeInTheDocument());
+  });
+
+  it("restores the read view on Cancel with nothing journaled", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    const box = await openDescriptionEditor(user);
+    await user.clear(box);
+    await user.type(box, "throw this away");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("Description")).not.toBeInTheDocument();
+    expect(screen.getByText("As a shopper I can enter a promo code on the payment step.")).toBeInTheDocument();
+    expect(api.EditIssue).not.toHaveBeenCalled();
+  });
+
+  it("says so when an issue has no description", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ description: "" }));
+    renderPanel();
+    expect(await screen.findByText("No description.")).toBeInTheDocument();
+  });
+
+  // D5: the summary is one line Jira never wiki-renders, so marks stay
+  // exactly as typed and only inline code and links are unwrapped.
+  it("renders inline code in the summary heading and leaves marks alone", async () => {
+    renderPanel(vi.fn(), undefined, { ...story, summary: "apply at {{/payment}} step for 2*3*4 items" });
+    const summary = document.querySelector(".detail-summary") as HTMLElement;
+    expect(within(summary).getByText("/payment").tagName).toBe("CODE");
+    expect(summary).toHaveTextContent("2*3*4 items");
+    expect(summary.querySelector("strong")).toBeNull();
+  });
+});
+
+describe("IssueDetailPanel comments", () => {
+  const wikiComment = commentOf({ id: "1", body: "Blocked on the gateway sandbox.\nbq. Sandbox back Thursday" });
+  const mdComment = commentOf({
+    id: "2",
+    author: "msoto",
+    authorName: "M. Soto",
+    created: "2026-09-14T16:40:00Z",
+    updated: "2026-09-14T17:02:00Z",
+    body: "Rounding fixed:\n\n- **2 decimals** everywhere",
+  });
+
+  it("counts the comments in the heading and reads each one in its own syntax", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({
+      comments: [wikiComment, mdComment],
+      commentTotal: 2,
+      fetchedAt: "2026-09-16T14:02:00Z",
+    }));
+    renderPanel();
+    const toggle = await screen.findByRole("button", { name: /^Comments/ });
+    await waitFor(() => expect(toggle).toHaveTextContent("2"));
+    // The cached stamp rides beside the heading, so a stale offline detail
+    // says how old it is.
+    expect(screen.getByText(/^cached /)).toBeInTheDocument();
+
+    const region = await openSection("Comments");
+    const cards = within(region).getAllByRole("article");
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByRole("heading", { name: "R. Anand" })).toBeInTheDocument();
+    expect(within(cards[1]).getByRole("heading", { name: "M. Soto" })).toBeInTheDocument();
+    // Only the second was edited, and only the second reads in a syntax the
+    // description does not.
+    expect(within(region).getAllByText("edited")).toHaveLength(1);
+    expect(within(cards[1]).getByText("edited")).toBeInTheDocument();
+    expect(within(cards[1]).getByText("Markdown")).toBeInTheDocument();
+    expect(within(cards[0]).queryByText("Markdown")).not.toBeInTheDocument();
+    expect(within(cards[1]).getByText("2 decimals").tagName).toBe("STRONG");
+  });
+
+  it("shows the newest five until Show all is pressed", async () => {
+    const many = Array.from({ length: 7 }, (_, i) =>
+      commentOf({ id: String(i + 1), authorName: `Person ${i + 1}`, body: `note ${i + 1}` }),
+    );
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ comments: many, commentTotal: 7 }));
+    renderPanel();
+    const region = await openSection("Comments");
+    await waitFor(() => expect(within(region).getAllByRole("article")).toHaveLength(5));
+    expect(within(region).getByText("note 3")).toBeInTheDocument();
+    expect(within(region).queryByText("note 2")).not.toBeInTheDocument();
+    await userEvent.click(within(region).getByRole("button", { name: "Show all 7" }));
+    expect(within(region).getAllByRole("article")).toHaveLength(7);
+  });
+
+  it("says how many of the issue's comments it holds when the read was cut short", async () => {
+    const held = Array.from({ length: 500 }, (_, i) => commentOf({ id: String(i + 1), body: `note ${i + 1}` }));
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ comments: held, commentTotal: 812, commentsTruncated: true }));
+    renderPanel();
+    const region = await openSection("Comments");
+    await waitFor(() =>
+      expect(within(region).getByText("Showing 500 of 812 comments. Open in Jira for the rest.")).toBeInTheDocument());
+  });
+
+  // The DTO's rule: truncated with nothing in hand is a failed read, never
+  // an issue with no comments (that answers total 0 and truncated false).
+  it("says the comments could not be read rather than that there are none", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ comments: [], commentTotal: 0, commentsTruncated: true }));
+    renderPanel();
+    const region = await openSection("Comments");
+    await waitFor(() => expect(within(region).getByText(/could not be read/)).toBeInTheDocument());
+    expect(within(region).queryByText("No comments.")).not.toBeInTheDocument();
+  });
+
+  it("says when an issue has no comments", async () => {
+    renderPanel();
+    const region = await openSection("Comments");
+    await waitFor(() => expect(within(region).getByText("No comments.")).toBeInTheDocument());
+  });
+
+  it("names an authorless comment and marks a restricted one", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({
+      comments: [
+        commentOf({ id: "1", author: "", authorName: "", body: "left by nobody" }),
+        commentOf({ id: "2", restriction: "jira-developers", body: "internal note" }),
+      ],
+      commentTotal: 2,
+    }));
+    renderPanel();
+    const region = await openSection("Comments");
+    await waitFor(() => expect(within(region).getByRole("heading", { name: "Unknown user" })).toBeInTheDocument());
+    expect(within(region).getByText("Restricted: jira-developers")).toBeInTheDocument();
+  });
+
+  it("opens a comment's link in the browser, and refuses one that is not a web address", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({
+      comments: [commentOf({ body: "see [Figma|https://figma.example/flow] and [Bad|javascript:alert(1)]" })],
+      commentTotal: 1,
+    }));
+    renderPanel();
+    const region = await openSection("Comments");
+    const link = await within(region).findByRole("link", { name: "Figma" });
+    await userEvent.click(link);
+    expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://figma.example/flow");
+    expect(within(region).queryByRole("link", { name: "Bad" })).not.toBeInTheDocument();
+    expect(within(region).getByText(/Bad/)).toBeInTheDocument();
+  });
+
+  it("opens an issue key mentioned in a comment on the instance", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({
+      comments: [commentOf({ body: "Blocked on PLAT-409." })],
+      commentTotal: 1,
+    }));
+    renderPanel(vi.fn(), undefined, story, undefined, "https://jira.example");
+    const region = await openSection("Comments");
+    await userEvent.click(await within(region).findByRole("button", { name: "PLAT-409" }));
+    expect(api.BrowserOpenURL).toHaveBeenCalledWith("https://jira.example/browse/PLAT-409");
   });
 });

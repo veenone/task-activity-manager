@@ -3,9 +3,11 @@ package jira_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -26,6 +28,47 @@ type fakeJira struct {
 	createKey  string   // key the POST /issue answers with
 	createFail bool     // POST /issue answers 400
 	linkTypes  string   // the /rest/api/2/issueLinkType body
+
+	// The comment endpoint. commentTotal is how many comments the issue has;
+	// the fake generates them, newest first, since that is what
+	// orderBy=-created asks for. commentRaw, when set, is answered verbatim
+	// instead, for the shapes a generator would not produce. commentFailFrom
+	// is the startAt at which the endpoint starts answering 500, and
+	// commentStarts records the startAt of every request, in order.
+	commentTotal    int
+	commentRaw      string
+	commentClamp    int // the maxResults the instance really serves, 0 for whatever was asked
+	commentFailFrom int
+	commentStarts   []int
+	detailQuery     string // the query string of the last GET /issue/PLAT-412
+}
+
+// comments answers /rest/api/2/issue/{key}/comment. Comment n has id n and
+// body "comment n", with comment 1 the oldest, so a newest-first page
+// starting at startAt runs from total-startAt downwards.
+func (f *fakeJira) comments(w http.ResponseWriter, r *http.Request) {
+	startAt, _ := strconv.Atoi(r.URL.Query().Get("startAt"))
+	f.commentStarts = append(f.commentStarts, startAt)
+	if f.commentRaw != "" {
+		_, _ = w.Write([]byte(f.commentRaw))
+		return
+	}
+	if f.commentFailFrom > 0 && startAt >= f.commentFailFrom {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"errorMessages":["comments are unavailable"]}`))
+		return
+	}
+	maxResults, _ := strconv.Atoi(r.URL.Query().Get("maxResults"))
+	if f.commentClamp > 0 && f.commentClamp < maxResults {
+		maxResults = f.commentClamp
+	}
+	rows := []string{}
+	for n := f.commentTotal - startAt; n > 0 && len(rows) < maxResults; n-- {
+		rows = append(rows, fmt.Sprintf(
+			`{"id":"%d","body":"comment %d","created":"2026-09-13T10:14:00.000+0000","updated":"2026-09-13T10:14:00.000+0000","author":{"name":"ranand","displayName":"R. Anand"}}`, n, n))
+	}
+	_, _ = fmt.Fprintf(w, `{"startAt":%d,"maxResults":%d,"total":%d,"comments":[%s]}`,
+		startAt, maxResults, f.commentTotal, strings.Join(rows, ","))
 }
 
 func (f *fakeJira) handler(t *testing.T) http.Handler {
@@ -66,8 +109,46 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
+		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/createmeta/"):
+			f.searches = append(f.searches, "createmeta-type "+r.URL.Path)
+			switch r.URL.Path {
+			case "/rest/api/2/issue/createmeta/TKT/issuetypes/10001":
+				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":7,"isLast":true,"values":[
+					{"fieldId":"summary","name":"Summary","required":true,"schema":{"type":"string","system":"summary"}},
+					{"fieldId":"issuetype","name":"Issue Type","required":true,"schema":{"type":"issuetype","system":"issuetype"}},
+					{"fieldId":"customfield_10014","name":"Epic Link","required":false,"schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}},
+					{"fieldId":"customfield_10020","name":"Sprint","required":false,"schema":{"type":"array","items":"string","custom":"com.pyxis.greenhopper.jira:gh-sprint"}},
+					{"fieldId":"customfield_10050","name":"Severity","required":true,"schema":{"type":"option"},"allowedValues":[{"id":"1","value":"Minor"},{"id":"3","value":"Critical"}]},
+					{"fieldId":"customfield_10300","name":"Acceptance criteria","required":false,"schema":{"type":"string","custom":"com.atlassian.jira.plugin.system.customfieldtypes:textarea"}},
+					{"fieldId":"attachment","name":"Attachment","required":false,"schema":{"type":"array","items":"attachment","system":"attachment"}}
+				]}`))
+			case "/rest/api/2/issue/createmeta/TKT/issuetypes/10003":
+				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":3,"isLast":true,"values":[
+					{"fieldId":"parent","name":"Parent","required":true,"schema":{"type":"issuelink","system":"parent"}},
+					{"fieldId":"summary","name":"Summary","required":true,"schema":{"type":"string","system":"summary"}},
+					{"fieldId":"customfield_10300","name":"Acceptance criteria","required":false,"schema":{"type":"string","custom":"com.atlassian.jira.plugin.system.customfieldtypes:textarea"}}
+				]}`))
+			default:
+				// An instance before 8.4, or a type id this fake does not know:
+				// the backend falls back to the classic call.
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"errorMessages":["not found"]}`))
+			}
+		case r.URL.Path == "/rest/api/2/project/DOWN":
+			// A project whose type list cannot be read.
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"errorMessages":["down"]}`))
+		case r.URL.Path == "/rest/api/2/project/TKT":
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10001","name":"Story"},{"id":"10003","name":"Technical task","subtask":true}]}`))
 		case r.URL.Path == "/rest/api/2/issue/createmeta":
 			f.searches = append(f.searches, "createmeta "+r.URL.RawQuery)
+			if r.URL.Query().Get("projectKeys") == "TKT" {
+				_, _ = w.Write([]byte(`{"projects":[{"key":"TKT","issuetypes":[{"id":"10001","name":"Story","fields":{
+					"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},
+					"customfield_10253":{"required":false,"name":"Team","schema":{"type":"string"}}
+				}}]}]}`))
+				return
+			}
 			if r.URL.Query().Get("issuetypeNames") == "Epic" {
 				_, _ = w.Write([]byte(`{"projects":[{"key":"PLAT","issuetypes":[{"name":"Epic","fields":{
 					"summary":{"required":true,"name":"Summary","schema":{"type":"string"}},
@@ -88,10 +169,13 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				"customfield_10071":{"required":true,"name":"Keywords","schema":{"type":"array","items":"string"}},
 				"environment":{"required":false,"name":"Environment","schema":{"type":"string"}}
 			}}]}]}`))
+		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/") && strings.HasSuffix(r.URL.Path, "/comment"):
+			f.comments(w, r)
 		case r.URL.Path == "/rest/api/2/issue/PLAT-412/transitions":
 			f.searches = append(f.searches, "transitions "+r.URL.RawQuery)
 			_, _ = w.Write([]byte(transitionsBody))
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/PLAT-412"):
+			f.detailQuery = r.URL.RawQuery
 			_, _ = w.Write([]byte(`{"id":"1","key":"PLAT-412","fields":{"description":"As a shopper","issuelinks":[{"type":{"name":"Tested By"},"inwardIssue":{"key":"XT-1018","fields":{"summary":"Applies discount","issuetype":{"name":"Test"}}}}],"customfield_10016":5}}`))
 		case r.URL.Path == "/rest/api/2/user/assignable/search":
 			f.searches = append(f.searches, "users "+r.URL.RawQuery)
@@ -544,5 +628,167 @@ func TestStartAndCompleteSprintPassThroughToTheAgileEndpoint(t *testing.T) {
 	}
 	if strings.Join(f.writes, " | ") != strings.Join(want, " | ") {
 		t.Errorf("wrote %v", f.writes)
+	}
+}
+
+// commentIDs is the comment ids of a detail, in the order it holds them.
+func commentIDs(d backend.IssueDetail) []string {
+	out := []string{}
+	for _, c := range d.Comments {
+		out = append(out, c.ID)
+	}
+	return out
+}
+
+func TestTheDetailReadsCommentsFromTheirOwnEndpointOldestLast(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.commentTotal = 2
+	d, err := b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	// Data Center answers fields=comment with the whole list inline, however
+	// long it is, which is the one thing this read must never ask for.
+	if strings.Contains(f.detailQuery, "comment") {
+		t.Errorf("the detail asked Jira for the comment field: %s", f.detailQuery)
+	}
+	if got := strings.Join(commentIDs(d), ","); got != "1,2" {
+		t.Errorf("comment ids = %s, want the oldest first", got)
+	}
+	if d.CommentTotal != 2 || d.CommentsTruncated {
+		t.Errorf("total = %d truncated = %v", d.CommentTotal, d.CommentsTruncated)
+	}
+	if len(f.commentStarts) != 1 || f.commentStarts[0] != 0 {
+		t.Errorf("comment requests = %v, want one page", f.commentStarts)
+	}
+	c := d.Comments[0]
+	if c.Author != "ranand" || c.AuthorName != "R. Anand" || c.Body != "comment 1" {
+		t.Errorf("comment = %+v", c)
+	}
+}
+
+func TestCommentsPageInHundredsUpToTheTotal(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.commentTotal = 150
+	d, err := b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if len(d.Comments) != 150 || d.CommentTotal != 150 || d.CommentsTruncated {
+		t.Fatalf("comments = %d total = %d truncated = %v", len(d.Comments), d.CommentTotal, d.CommentsTruncated)
+	}
+	if d.Comments[0].ID != "1" || d.Comments[149].ID != "150" {
+		t.Errorf("order = %s ... %s, want oldest first", d.Comments[0].ID, d.Comments[149].ID)
+	}
+	if len(f.commentStarts) != 2 || f.commentStarts[0] != 0 || f.commentStarts[1] != 100 {
+		t.Errorf("comment requests = %v", f.commentStarts)
+	}
+}
+
+func TestCommentsStopAtFiveHundredAndKeepTheNewest(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.commentTotal = 812
+	d, err := b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if len(d.Comments) != 500 || d.CommentTotal != 812 || !d.CommentsTruncated {
+		t.Fatalf("comments = %d total = %d truncated = %v", len(d.Comments), d.CommentTotal, d.CommentsTruncated)
+	}
+	// The newest 500 of 812 are 313 to 812, and they are held oldest first.
+	if d.Comments[0].ID != "313" || d.Comments[499].ID != "812" {
+		t.Errorf("kept %s ... %s, want the newest 500", d.Comments[0].ID, d.Comments[499].ID)
+	}
+	for _, startAt := range f.commentStarts {
+		if startAt > 400 {
+			t.Errorf("comment requests = %v, none may go past 400", f.commentStarts)
+		}
+	}
+	if len(f.commentStarts) != 5 {
+		t.Errorf("comment requests = %v, want five pages", f.commentStarts)
+	}
+}
+
+func TestCommentPagingAdvancesByWhatCameBack(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	// An instance that clamps maxResults answers every page short. Advancing
+	// by the size asked for would step over the rest of each page, and the
+	// holes would arrive silently, since a short list only reads as
+	// truncated.
+	f.commentTotal, f.commentClamp = 250, 30
+	d, err := b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if len(d.Comments) != 250 || d.CommentsTruncated {
+		t.Fatalf("comments = %d truncated = %v, want all 250", len(d.Comments), d.CommentsTruncated)
+	}
+	for i, c := range d.Comments {
+		if want := strconv.Itoa(i + 1); c.ID != want {
+			t.Fatalf("comment %d has id %s, want %s: the walk left a hole", i, c.ID, want)
+		}
+	}
+
+	// The cap is a count of comments, not a count of pages, so a clamped
+	// instance must still stop at 500.
+	b, f = newBackend(t, twoFields)
+	f.commentTotal, f.commentClamp = 812, 30
+	d, err = b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if len(d.Comments) != 500 || d.CommentTotal != 812 || !d.CommentsTruncated {
+		t.Errorf("comments = %d total = %d truncated = %v, want the newest 500", len(d.Comments), d.CommentTotal, d.CommentsTruncated)
+	}
+	if d.Comments[0].ID != "313" || d.Comments[499].ID != "812" {
+		t.Errorf("kept %s ... %s, want the newest 500", d.Comments[0].ID, d.Comments[499].ID)
+	}
+}
+
+func TestAFailedCommentPageKeepsWhatWasReadAndIsNotAnError(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.commentTotal, f.commentFailFrom = 150, 100
+	d, err := b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v, comment trouble must never fail the detail", err)
+	}
+	if d.Description != "As a shopper" {
+		t.Errorf("description = %q, the rest of the detail must still arrive", d.Description)
+	}
+	if len(d.Comments) != 100 || !d.CommentsTruncated {
+		t.Errorf("comments = %d truncated = %v", len(d.Comments), d.CommentsTruncated)
+	}
+}
+
+func TestCommentTimestampsAuthorsAndRestrictions(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.commentRaw = `{"startAt":0,"maxResults":100,"total":2,"comments":[
+		{"id":"9","body":"restricted","created":"2026-09-13T10:14:00.000+0000","updated":"not a date","author":null,
+		 "visibility":{"type":"role","value":"Developers"}},
+		{"id":"8","body":"plain","created":"2026-09-12T08:00:00.000+0200","updated":"2026-09-12T08:00:00.000+0200",
+		 "author":{"name":"msoto","displayName":"M. Soto"}}
+	]}`
+	d, err := b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if len(d.Comments) != 2 {
+		t.Fatalf("comments = %+v", d.Comments)
+	}
+	newest := d.Comments[1]
+	if newest.ID != "9" || newest.Created != "2026-09-13T10:14:00Z" {
+		t.Errorf("created = %q, want it normalised to RFC 3339", newest.Created)
+	}
+	if newest.Updated != "not a date" {
+		t.Errorf("updated = %q, an unreadable stamp is kept as it is", newest.Updated)
+	}
+	if newest.Author != "" || newest.AuthorName != "" {
+		t.Errorf("a null author must leave both names empty: %+v", newest)
+	}
+	if newest.Restriction != "Developers" {
+		t.Errorf("restriction = %q, a restricted comment is never shown as an ordinary one", newest.Restriction)
+	}
+	if d.Comments[0].Restriction != "" || d.Comments[0].Created != "2026-09-12T06:00:00Z" {
+		t.Errorf("comment = %+v", d.Comments[0])
 	}
 }

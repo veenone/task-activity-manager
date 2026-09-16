@@ -13,6 +13,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "marked": "18.0.13"
+  },
   "peerDependencies": {
     "@tanstack/react-query": "^5.102.3",
     "react": "^19.2.7",

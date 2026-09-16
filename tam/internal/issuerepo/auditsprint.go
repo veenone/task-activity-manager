@@ -7,11 +7,15 @@ import (
 	"agile-suite/core/journal"
 )
 
-// EntitySprint is the audit trail's entity type for a sprint TAM created,
-// edited or deleted in Jira. Unlike every other entity type in this package
-// it is not a journal entity type: nothing about a sprint is ever queued in
-// pending_change, because those three writes reach Jira the moment they are
-// made.
+// EntitySprint is the audit trail's entity type for a sprint edit or delete
+// in Jira, and for the commit-time create of a sprint that was drafted.
+// Unlike EntitySprintCreate it is not a journal entity type: nothing about
+// an edit or a delete is ever queued in pending_change, because those writes
+// reach Jira the moment they are made. Creating a sprint is different now:
+// it is journaled first, as a sprint_create row (sprintdrafts.go) under
+// EntitySprintCreate, so it can be drafted offline; once Commit pushes that
+// row and Jira hands back a real id, the create itself is audited under
+// EntitySprint, the way this file always has.
 const EntitySprint = "sprint"
 
 // AuditSprint records one of those three writes. The entity key is the

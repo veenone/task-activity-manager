@@ -4,8 +4,11 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/issuerepo"
 )
 
 // manageLifecycleBackend answers the three management writes for real, so
@@ -23,6 +26,8 @@ type manageLifecycleBackend struct {
 	editedID        int
 	editedDraft     backend.SprintDraft
 	editedClearGoal bool
+
+	createCalls int
 }
 
 func (b *manageLifecycleBackend) BoardSprints(context.Context, int) ([]backend.Sprint, error) {
@@ -30,6 +35,7 @@ func (b *manageLifecycleBackend) BoardSprints(context.Context, int) ([]backend.S
 }
 
 func (b *manageLifecycleBackend) CreateSprint(context.Context, int, backend.SprintDraft) (backend.Sprint, error) {
+	b.createCalls++
 	return b.made, nil
 }
 
@@ -87,29 +93,93 @@ func TestManagementBindingsAreRefusedWhileABoardsRefreshHoldsTheLock(t *testing.
 	}
 }
 
-// TestCreateSprintReachesTheServiceAndReturnsTheSprintJiraMade is the
-// binding's happy path, past both guards: the sprint Jira made travels
-// back whole, and the board's own re-read lands with no note since the
-// backend answers with a real list carrying it.
-func TestCreateSprintReachesTheServiceAndReturnsTheSprintJiraMade(t *testing.T) {
+// Creating a sprint is journaled now: the binding answers with a draft under
+// a negative id, every picker offers it at once, and Jira hears nothing
+// until Commit.
+func TestCreateSprintDraftsTheSprintAndSendsNothingToJira(t *testing.T) {
 	a := newTestApp(t)
 	p := newTestProfile(t, a)
-	made := backend.Sprint{ID: 14, BoardID: 1, Name: "Sprint 14", State: "future", Goal: "Ship the grid"}
-	a.backends[p.ID] = &manageLifecycleBackend{
-		simpleBoardBackend: *twoBoards("PLAT Scrum", "PLAT Kanban", "To Do"),
-		sprints:            []backend.Sprint{made},
-		made:               made,
+	fake := &manageLifecycleBackend{simpleBoardBackend: *twoBoards("PLAT Scrum", "PLAT Kanban", "To Do")}
+	a.backends[p.ID] = fake
+	if err := a.boards.ReplaceBoard(a.ctx, p.ID, backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}, nil, nil, nil); err != nil {
+		t.Fatal(err)
 	}
 
-	got, err := a.CreateSprint(p.ID, 1, "Sprint 14", "Ship the grid", "2026-09-09", "2026-09-23")
+	got, err := a.CreateSprint(p.ID, 1, "Sprint 15", "Ship promos", "2026-09-16", "2026-09-30")
 	if err != nil {
 		t.Fatalf("CreateSprint: %v", err)
 	}
-	if got.Note != "" {
-		t.Errorf("note = %q, want none: the board's re-read carried the new sprint", got.Note)
+	if got.Sprint.ID != -1 || got.Sprint.State != "future" || got.Sprint.Goal != "Ship promos" || got.Note != "" {
+		t.Errorf("CreateSprint = %+v", got)
 	}
-	if got.Sprint.ID != 14 || got.Sprint.Goal != "Ship the grid" {
-		t.Errorf("CreateSprint = %+v, want the sprint Jira made, goal and all", got.Sprint)
+	if fake.createCalls != 0 {
+		t.Errorf("Jira was asked to create the sprint %d times, want none before Commit", fake.createCalls)
+	}
+	open, err := a.ListOpenSprints(p.ID)
+	if err != nil || len(open) != 1 || open[0] != (boardrepo.SprintChoice{ID: -1, Name: "Sprint 15", BoardName: "PLAT Scrum", State: "future", Draft: true}) {
+		t.Errorf("open sprints = %+v, %v", open, err)
+	}
+	listed, _ := a.ListBoardSprints(p.ID, 1)
+	if len(listed) != 1 || !strings.HasPrefix(listed[0].StartDate, "2026-09-16") || !listed[0].Draft {
+		t.Errorf("board sprints = %+v, want the draft with converted dates", listed)
+	}
+	pending, _ := a.ListPendingChanges(p.ID)
+	if len(pending) != 1 || pending[0].EntityType != issuerepo.EntitySprintCreate || pending[0].EntityKey != "-1" {
+		t.Errorf("pending = %+v", pending)
+	}
+	if _, err := a.CreateSprint(p.ID, 7, "Sprint 16", "", "2026-09-16", "2026-09-30"); err == nil || !strings.Contains(err.Error(), "not in the cache") {
+		t.Errorf("a board the cache does not hold = %v", err)
+	}
+}
+
+// A draft sprint is edited and deleted locally, cards and all.
+func TestEditAndDeleteOfADraftSprintStayLocal(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	fake := &manageLifecycleBackend{simpleBoardBackend: *twoBoards("PLAT Scrum", "PLAT Kanban", "To Do")}
+	a.backends[p.ID] = fake
+	if err := a.repo.UpsertPage(a.ctx, p.ID, []backend.Issue{
+		{Key: "PLAT-1", ID: "1", Project: "PLAT", Type: backend.TypeTask, Summary: "one", Status: "To Do", StatusID: "1", Updated: "2026-09-01T00:00:00Z"},
+	}, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.boards.ReplaceBoard(a.ctx, p.ID, backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum},
+		[]backend.BoardColumn{{Name: "To Do", StatusIDs: []string{"1"}}}, nil, map[string][]string{"": {"PLAT-1"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CreateSprint(p.ID, 1, "Sprint 15", "", "2026-09-16", "2026-09-30"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.MoveIssueToSprint(p.ID, "PLAT-1", "-1"); err != nil {
+		t.Fatal(err)
+	}
+
+	details, err := a.ListBoardSprintDetails(p.ID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(details) < 1 || details[0].ID != -1 || !details[0].Draft || details[0].Total != 1 || details[0].Issues[0].Key != "PLAT-1" {
+		t.Fatalf("details = %+v, want the draft sprint holding the moved card", details)
+	}
+
+	if note, err := a.EditSprint(p.ID, 1, -1, "Sprint 15 promos", "", "2026-09-16", "2026-10-01", false); err != nil || note != "" {
+		t.Fatalf("EditSprint = %q, %v", note, err)
+	}
+	if fake.editedID != 0 {
+		t.Errorf("the edit reached Jira for sprint %d", fake.editedID)
+	}
+	if listed, _ := a.ListBoardSprints(p.ID, 1); len(listed) != 1 || listed[0].Name != "Sprint 15 promos" {
+		t.Errorf("board sprints = %+v", listed)
+	}
+
+	if note, err := a.DeleteSprint(p.ID, 1, -1); err != nil || note != "" {
+		t.Fatalf("DeleteSprint = %q, %v", note, err)
+	}
+	if listed, _ := a.ListBoardSprints(p.ID, 1); len(listed) != 0 {
+		t.Errorf("board sprints after delete = %+v", listed)
+	}
+	if pending, _ := a.ListPendingChanges(p.ID); len(pending) != 0 {
+		t.Errorf("pending after delete = %+v, want the create and the move both gone", pending)
 	}
 }
 

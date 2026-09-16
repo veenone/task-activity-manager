@@ -5,6 +5,7 @@ package demo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -52,6 +53,11 @@ type Backend struct {
 	// nextSprintID hands out ids for CreateSprint, starting past the
 	// dataset's own three.
 	nextSprintID int
+	// refusedEpic is whether an epic carrying RefusedEpicMarker has already
+	// been refused this run. The refusal is staged once, the way the
+	// conflict on the curated story is, so a demo profile can show a Commit
+	// holding the drafts that wait on a refused create.
+	refusedEpic bool
 }
 
 // New returns a demo backend for the project key. An empty key uses the
@@ -77,6 +83,11 @@ func New(projectKey string) *Backend {
 	b.conflict[b.ConflictKey()] = true
 	return b
 }
+
+// RefusedEpicMarker is the word that stages a refusal: the first create of an
+// epic whose summary contains it, in any case, is refused, and the next one
+// goes through. An ordinary plan never trips it.
+const RefusedEpicMarker = "refused"
 
 // ConflictKey is the key whose first Commit conflicts, for tests and docs.
 func (b *Backend) ConflictKey() string {
@@ -180,7 +191,7 @@ func (b *Backend) GetIssueDetail(_ context.Context, key string) (backend.IssueDe
 	d, ok := demo.Detail(b.project, key)
 	if !ok {
 		if _, created := b.over[key]; created {
-			d = backend.IssueDetail{Key: key, Description: "", Links: []backend.Link{}, Fields: map[string]any{}}
+			d = backend.IssueDetail{Key: key, Description: "", Links: []backend.Link{}, Comments: []backend.Comment{}, Fields: map[string]any{}}
 		} else {
 			return backend.IssueDetail{}, fmt.Errorf("demo: no issue %s", key)
 		}
@@ -277,6 +288,15 @@ func (b *Backend) UpdateIssue(_ context.Context, key string, fields map[string]s
 func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.IssueDraft) (string, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	// Jira answers a parent it does not know with a 400. Commit should never
+	// send one; if it does, the demo says so the way the real thing would.
+	if strings.HasPrefix(d.ParentKey, "TAM-NEW-") {
+		return "", fmt.Errorf("demo: %s is not an issue, so it cannot be a parent", d.ParentKey)
+	}
+	if d.Type == backend.TypeEpic && !b.refusedEpic && strings.Contains(strings.ToLower(d.Summary), RefusedEpicMarker) {
+		b.refusedEpic = true
+		return "", errors.New("demo: Jira refused this epic once, so the drafts waiting for it are held; Commit again to create it")
+	}
 	key := fmt.Sprintf("%s-%d", projectKey, b.nextKey)
 	b.nextKey++
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -301,18 +321,26 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 	return key, nil
 }
 
-// CreateFields asks for one extra field on bugs and one on requirements,
-// so the New issue dialog's create-meta section can be seen offline for
-// both an option field and a text field.
+// CreateFields offers a required and an optional field on bugs, one required
+// field on requirements, and two optional fields on stories, so the New issue
+// dialog's required section and its More fields section can both be seen
+// offline, for an option, a text, a long text and a date field.
 func (b *Backend) CreateFields(_ context.Context, _, logicalType string) ([]backend.FieldSpec, error) {
 	switch logicalType {
 	case backend.TypeBug:
 		return []backend.FieldSpec{{
 			ID: "customfield_10050", Name: "Severity", Type: "option", Required: true,
 			AllowedValues: []backend.FieldOption{{ID: "1", Value: "Minor"}, {ID: "2", Value: "Major"}, {ID: "3", Value: "Critical"}},
+		}, {
+			ID: "environment", Name: "Environment", Type: "textarea", Required: false, AllowedValues: []backend.FieldOption{},
 		}}, nil
 	case backend.TypeRequirement:
 		return []backend.FieldSpec{{ID: "customfield_10060", Name: "Source", Type: "string", Required: true, AllowedValues: []backend.FieldOption{}}}, nil
+	case backend.TypeStory:
+		return []backend.FieldSpec{
+			{ID: "customfield_10300", Name: "Acceptance criteria", Type: "textarea", Required: false, AllowedValues: []backend.FieldOption{}},
+			{ID: "duedate", Name: "Due date", Type: "date", Required: false, AllowedValues: []backend.FieldOption{}},
+		}, nil
 	}
 	return []backend.FieldSpec{}, nil
 }
