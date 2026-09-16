@@ -51,6 +51,19 @@ function isLetter(ch: string | undefined): boolean {
   return (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
 }
 
+// BraceAttrsCache remembers the earliest position at which scanBraceOpen's
+// ":"-attrs search has already failed to find a closing "}": once true at
+// some position it is true at every later one too (the rest of the string
+// does not grow a "}" it did not have), so a caller creates one of these
+// per parse and threads it through every scanBraceOpen call, capping that
+// search to at most one full scan per parse regardless of how many
+// "{name:" fragments never close.
+type BraceAttrsCache = { failFrom: number };
+
+function newBraceAttrsCache(): BraceAttrsCache {
+  return { failFrom: Infinity };
+}
+
 // scanBraceOpen reads a "{name}" or "{name:attrs}" opening tag starting at
 // text[i] (text[i] must be "{"): a letter immediately after "{", a run of
 // further letters as the name, then either "}" (bare) or ":" followed
@@ -60,24 +73,20 @@ function isLetter(ch: string | undefined): boolean {
 // split, the two places that need to recognise this opening tag mid-string
 // rather than as a whole line (matchBraceTag's job, which requires the
 // closing "}" to be the line's last character).
-//
-// ponytail: the ":" branch's indexOf("}", j) is uncached, so many
-// "{name:" attempts whose attrs never close would each scan to the end of
-// the string. Real Jira macro attrs are short (a language, a colour, a
-// title) and few per field; a field built out of thousands of unclosed
-// "{x:" fragments would pay one scan each. Upgrade path, if that ever
-// matters: the same monotonic fail-position cache dbraceFailFrom uses in
-// lineToInline, since "no '}' found past position j" is just as global a
-// fact as "no '}}' found past position j" is there.
-function scanBraceOpen(text: string, i: number): { name: string; bodyStart: number } | null {
+function scanBraceOpen(text: string, i: number, attrsCache: BraceAttrsCache): { name: string; bodyStart: number } | null {
   const next = text[i + 1];
   if (!isLetter(next)) return null;
   let j = i + 1;
   while (j < text.length && isLetter(text[j])) j++;
   const name = text.slice(i + 1, j);
   if (text[j] === ":") {
+    if (j >= attrsCache.failFrom) return null;
     const closeAttrs = text.indexOf("}", j);
-    return closeAttrs === -1 ? null : { name, bodyStart: closeAttrs + 1 };
+    if (closeAttrs === -1) {
+      attrsCache.failFrom = j;
+      return null;
+    }
+    return { name, bodyStart: closeAttrs + 1 };
   }
   if (text[j] === "}") return { name, bodyStart: j + 1 };
   return null;
@@ -138,6 +147,7 @@ function lineToInline(text: string): Inline[] {
   let dbraceFailFrom = Infinity;
   let bracketFailFrom = Infinity;
   let imageFailFrom = Infinity;
+  const braceAttrsCache = newBraceAttrsCache();
 
   const current = (): Inline[] => (stack.length ? stack[stack.length - 1].children : root);
   const flush = (): void => {
@@ -191,7 +201,7 @@ function lineToInline(text: string): Inline[] {
     }
 
     if (ch === "{") {
-      const open = scanBraceOpen(text, i);
+      const open = scanBraceOpen(text, i, braceAttrsCache);
       if (!open) {
         buffer += "{";
         i += 1;
@@ -464,6 +474,7 @@ function parseTableRow(line: string): { header: boolean; children: Inline[] }[] 
   // same reason: a row like "|[[[[[[...]" would otherwise scan to the
   // row's end on every unclosed "[".
   let bracketFailFrom = Infinity;
+  const braceAttrsCache = newBraceAttrsCache();
 
   while (i < n) {
     let header = false;
@@ -488,7 +499,7 @@ function parseTableRow(line: string): { header: boolean; children: Inline[] }[] 
         continue;
       }
       if (line[i] === "{") {
-        const open = scanBraceOpen(line, i);
+        const open = scanBraceOpen(line, i, braceAttrsCache);
         if (open && open.name === "code") {
           const bodyClose = line.indexOf("{code}", open.bodyStart);
           i = bodyClose === -1 ? n : bodyClose + 6;

@@ -522,4 +522,16 @@ describe("parseWiki timing", () => {
     parseWiki(text);
     expect(performance.now() - start).toBeLessThan(200);
   });
+
+  // Fix round 2, closing the gap fix round 1 only documented: scanBraceOpen's
+  // ":"-attrs search used to re-scan to the end of the string on every
+  // "{name:" fragment whose attributes never close, the same shape of bug
+  // just fixed for "[" and "!". BraceAttrsCache closes it the same way.
+  it("parses 200,000 characters of repeated {a: with no closing brace in well under 200ms", () => {
+    const text = "{a:".repeat(66_666);
+
+    const start = performance.now();
+    parseWiki(text);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
 });
