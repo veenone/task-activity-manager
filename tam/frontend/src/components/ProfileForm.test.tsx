@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import * as api from "../api";
 import type { Profile } from "../api";
 import { ROOT_FIX_BEFORE_SAVE, ROOT_ID_NOT_A_NUMBER } from "../lib/confluenceRoot";
-import { ProfileForm } from "./ProfileForm";
+import { DETAIL_MINUTES_NOT_A_NUMBER, ProfileForm } from "./ProfileForm";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
@@ -66,6 +66,36 @@ describe("ProfileForm's Confluence root page id", () => {
     expect(screen.getByText(ROOT_FIX_BEFORE_SAVE)).toBeInTheDocument();
     expect(root).toHaveAttribute("aria-invalid", "true");
     expect(root).toHaveAccessibleDescription(ROOT_ID_NOT_A_NUMBER);
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+});
+
+describe("ProfileForm's issue detail freshness", () => {
+  it("accepts 0 and saves it, which is what keeps TAM readable offline", async () => {
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    const minutes = await screen.findByLabelText(/Issue detail freshness/);
+    await userEvent.type(minutes, "0");
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api.SetProfileSetting).toHaveBeenCalledWith("p1", "detail_cache_minutes", "0"),
+    );
+  });
+
+  it("loads the stored value", async () => {
+    vi.mocked(api.GetProfileSetting).mockImplementation(async (_id, key) =>
+      key === "detail_cache_minutes" ? "45" : "",
+    );
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    await waitFor(() => expect(screen.getByLabelText(/Issue detail freshness/)).toHaveValue("45"));
+  });
+
+  it("refuses minutes that are not a number, the way the root page id is refused", async () => {
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    const minutes = await screen.findByLabelText(/Issue detail freshness/);
+    await userEvent.type(minutes, "ten");
+    expect(screen.getByText(DETAIL_MINUTES_NOT_A_NUMBER)).toBeInTheDocument();
+    expect(minutes).toHaveAttribute("aria-invalid", "true");
+    expect(minutes).toHaveAccessibleDescription(DETAIL_MINUTES_NOT_A_NUMBER);
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
   });
 });

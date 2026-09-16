@@ -961,6 +961,11 @@ export const GetEpicTree = (profileId: string, q: TreeQuery): Promise<EpicTreeDa
 export const ListEpics: (profileId: string) => Promise<Issue[]> = App.ListEpics as (profileId: string) => Promise<Issue[]>;
 export const GetProfileSetting: (profileId: string, key: string) => Promise<string> =
   App.GetProfileSetting;
+// RefreshDetails is the shell's Refresh: it drops the profile's cached issue
+// details so the next read of whatever is on screen goes back to Jira. It
+// takes the app's per-profile lock, so it is called through SyncContext and
+// never from a component directly.
+export const RefreshDetails: (profileId: string) => Promise<void> = App.RefreshDetails;
 
 // The board bindings. GetBoard takes its arguments plainly: all four are
 // scalars, so nothing has to go through a generated class's createFrom. The

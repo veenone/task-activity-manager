@@ -20,6 +20,23 @@ import { ROOT_FIX_BEFORE_SAVE, readRootPageInput } from "../lib/confluenceRoot";
 // profile row, so it is read and written separately from the profile itself.
 const REQUIREMENT_TYPE_KEY = "requirement_issue_type";
 
+// DETAIL_CACHE_KEY is the per-profile setting holding how long a cached issue
+// detail is served before TAM asks Jira again. It lives in tam.db beside the
+// requirement type and is read and written the same way.
+const DETAIL_CACHE_KEY = "detail_cache_minutes";
+
+export const DETAIL_MINUTES_NOT_A_NUMBER =
+  "Minutes is a whole number, such as 10. Use 0 to keep issue details cached until a Refresh.";
+
+// detailMinutesError checks the freshness field. Blank is the default (ten
+// minutes) and 0 is the offline setting, so the only thing refused is a value
+// that is not a whole number of minutes.
+function detailMinutesError(value: string): string {
+  const v = value.trim();
+  if (v === "" || /^\d+$/.test(v)) return "";
+  return DETAIL_MINUTES_NOT_A_NUMBER;
+}
+
 interface Props {
   // Fires when the profile has been created or updated.
   onSaved: (p: Profile) => void;
@@ -98,6 +115,7 @@ export function ProfileForm({
   const [projectKey, setProjectKey] = useState(profile?.projectKey ?? "");
   const [scopeJql, setScopeJql] = useState(profile?.scopeJql ?? "");
   const [requirementType, setRequirementType] = useState("");
+  const [detailMinutes, setDetailMinutes] = useState("");
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   // Reuse a stored credential from an existing profile (create only). "" =
@@ -129,6 +147,11 @@ export function ProfileForm({
       .then((v) => live && setRequirementType(v))
       .catch(() => {
         /* a missing setting reads as blank; the placeholder says the default */
+      });
+    GetProfileSetting(profile.id, DETAIL_CACHE_KEY)
+      .then((v) => live && setDetailMinutes(v))
+      .catch(() => {
+        /* same: blank is the default freshness */
       });
     return () => {
       live = false;
@@ -165,6 +188,8 @@ export function ProfileForm({
   const urlErrorId = useId();
   const keyErrorId = useId();
   const rootErrorId = useId();
+  const minutesErrorId = useId();
+  const minutesError = detailMinutesError(detailMinutes);
 
   // A Sync against a root page id that is not one answers 404 and offers to
   // create a root nobody needed, so the id is checked where it is typed.
@@ -184,7 +209,8 @@ export function ProfileForm({
     projectKey.trim() !== "" &&
     keyError === "" &&
     tokenSatisfied &&
-    rootInput.error === "";
+    rootInput.error === "" &&
+    minutesError === "";
 
   // Warn when an edit changes the project key or URL: App.UpdateProfile purges
   // the rows cached for the old project, so the next sync starts from nothing.
@@ -245,6 +271,7 @@ export function ProfileForm({
       // The requirement type lives in TAM's own store, keyed by profile id,
       // so it is written after the profile write hands one back.
       await SetProfileSetting(p.id, REQUIREMENT_TYPE_KEY, requirementType.trim());
+      await SetProfileSetting(p.id, DETAIL_CACHE_KEY, detailMinutes.trim());
       if ((isEdit && confluenceLoaded) || ((!demo && (confluenceURL.trim() || confluenceSpace.trim() || confluenceRootPageID.trim())) || confluenceToken.trim())) {
         await SetConfluenceConfig(p.id, {
           baseURL: confluenceURL.trim(),
@@ -315,6 +342,24 @@ export function ProfileForm({
           The Jira issue type TAM syncs as a requirement. Leave it blank for
           "Requirement". Changing it resets the sync cursor, so the next sync
           pulls everything again; run a Full sync to drop rows of the old type.
+        </span>
+      </label>
+      <label>
+        Issue detail freshness (minutes)
+        <input
+          value={detailMinutes}
+          onChange={(e) => setDetailMinutes(e.target.value)}
+          placeholder="10"
+          inputMode="numeric"
+          spellCheck={false}
+          aria-invalid={minutesError ? true : undefined}
+          aria-describedby={minutesError ? minutesErrorId : undefined}
+        />
+        {minutesError && <span id={minutesErrorId} className="field-error">{minutesError}</span>}
+        <span className="field-hint">
+          How long a cached issue detail is shown before TAM asks Jira for it
+          again. Leave it blank for 10 minutes. 0 keeps issue details cached
+          until you press Refresh, so TAM can be used with no Jira connection.
         </span>
       </label>
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/suiteprofiles"
 )
 
 // detailBackend answers GetIssueDetail with one canned detail, or fails, and
@@ -112,5 +113,44 @@ func TestDetailCacheMinutesOfZeroNeverExpires(t *testing.T) {
 	}
 	if d.Description != "As a shopper" {
 		t.Errorf("detail = %+v, want the day-old cached one", d)
+	}
+}
+
+func TestRefreshDetailsClearsOneProfilesDetailsOnly(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	other, err := a.profiles.Create("Other", "https://jira.example.com", "OPS", "", "", "", "", "", false, suiteprofiles.Backend)
+	if err != nil {
+		t.Fatalf("create the second profile: %v", err)
+	}
+	seedCachedDetail(t, a, p.ID, time.Now())
+	seedCachedDetail(t, a, other.ID, time.Now())
+
+	if err := a.RefreshDetails(p.ID); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	ctx := context.Background()
+	if _, _, ok, err := a.repo.ReadDetail(ctx, p.ID, "PLAT-412"); err != nil || ok {
+		t.Errorf("ReadDetail after a refresh = ok %v, err %v, want the cached detail gone", ok, err)
+	}
+	if _, _, ok, err := a.repo.ReadDetail(ctx, other.ID, "PLAT-412"); err != nil || !ok {
+		t.Errorf("the other profile's detail = ok %v, err %v, want it left alone", ok, err)
+	}
+}
+
+func TestRefreshDetailsIsRefusedWhileTheProfileIsBusy(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	seedCachedDetail(t, a, p.ID, time.Now())
+	if err := a.acquire(p.ID, "commit"); err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	defer a.release(p.ID)
+
+	if err := a.RefreshDetails(p.ID); err == nil {
+		t.Fatal("a refresh beside a commit must be refused, not run against the cache it is reading")
+	}
+	if _, _, ok, err := a.repo.ReadDetail(context.Background(), p.ID, "PLAT-412"); err != nil || !ok {
+		t.Errorf("ReadDetail = ok %v, err %v, want a refused refresh to have cleared nothing", ok, err)
 	}
 }

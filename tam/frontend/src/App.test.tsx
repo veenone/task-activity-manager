@@ -64,6 +64,7 @@ vi.mock("./api", async () => {
     GetSprintReport: vi.fn(),
     CancelSprintReport: vi.fn(),
     SyncBoards: vi.fn(),
+    RefreshDetails: vi.fn(),
     SetProfileSetting: vi.fn(),
     EventsOn: vi.fn(menuBus.on),
     BrowserOpenURL: vi.fn(),
@@ -124,6 +125,7 @@ beforeEach(() => {
   // the binding stood in for even though no board here has a sprint.
   vi.mocked(api.CancelSprintReport).mockResolvedValue();
   vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
+  vi.mocked(api.RefreshDetails).mockResolvedValue();
 });
 
 describe("App shell", () => {
@@ -280,6 +282,43 @@ describe("App shell", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: "Sync changes" }));
     await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent(/60 issues, last synced today/));
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
+  });
+
+  it("refreshes from the topbar: the details are cleared and the view reads again", async () => {
+    renderApp();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    const reads = vi.mocked(api.ListIssues).mock.calls.length;
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(api.RefreshDetails).toHaveBeenCalledWith("p1"));
+    // The Backlog is what is on screen, so its query is one of the ones the
+    // refresh invalidates: the grid reads again without a sync.
+    await waitFor(() =>
+      expect(vi.mocked(api.ListIssues).mock.calls.length).toBeGreaterThan(reads),
+    );
+  });
+
+  it("refuses a refresh while a sync holds the profile", async () => {
+    // This suite does not clear its mocks between tests, and the refresh
+    // above called this one.
+    vi.mocked(api.RefreshDetails).mockClear();
+    let finish = () => {};
+    vi.mocked(api.SyncIssues).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({ fetched: 0, upserted: 0, skipped: 0, full: false, elapsed: "1s" });
+        }),
+    );
+    renderApp();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Sync" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Sync changes" }));
+    const refresh = await screen.findByRole("button", { name: "Refresh" });
+    await waitFor(() => expect(refresh).toBeDisabled());
+    await userEvent.click(refresh);
+    expect(api.RefreshDetails).not.toHaveBeenCalled();
+    await act(async () => {
+      finish();
+    });
   });
 
   it("shows the pending button beside Sync and opens the dialog", async () => {

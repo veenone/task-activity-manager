@@ -130,6 +130,8 @@ export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Previ
 
 export function RankIssue(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:number):Promise<void>;
 
+export function RefreshDetails(arg1:string):Promise<void>;
+
 export function ResolveConflictKeepRemote(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveConflictOverride(arg1:string,arg2:string,arg3:string):Promise<void>;

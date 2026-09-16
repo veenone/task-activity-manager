@@ -304,6 +304,27 @@ func (a *App) GetIssueDetail(profileID, key string) (backend.IssueDetail, error)
 	return fresh, nil
 }
 
+// RefreshDetails drops the profile's cached issue details, which is what the
+// shell's Refresh is: the next read of whatever is on screen goes back to
+// Jira. It is also the only way past a detail_cache_minutes of 0, where a
+// detail otherwise never expires.
+//
+// It takes the same per-profile lock under the same name a sync does. It is
+// the same class of operation, clearing the cache a sync, a commit and a
+// report all read, and the frontend reaches it through SyncContext for the
+// same reason, so neither end offers what the other would refuse.
+func (a *App) RefreshDetails(profileID string) error {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return err
+	}
+	if err := a.acquire(p.ID, "sync"); err != nil {
+		return err
+	}
+	defer a.release(p.ID)
+	return a.repo.ClearDetails(a.ctx, p.ID)
+}
+
 // ListLinkedTests returns the tests linked to key through the suite's
 // requirement link type.
 func (a *App) ListLinkedTests(profileID, key string) ([]issuerepo.LinkedTest, error) {

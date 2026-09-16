@@ -68,7 +68,7 @@ export default function App() {
   } = useProfile<Profile, Settings>();
   const { view, setView } = useView();
   const { isOpen, openModal, closeModal } = useModal();
-  const { progress, syncError, canSync, canSwitchProfile, runSync } = useSync();
+  const { progress, syncError, canSync, canSwitchProfile, runSync, runRefresh } = useSync();
   const syncState = useSyncState(activeId);
   const pending = usePendingChanges(activeId);
   const pendingCount = pending.data?.length ?? 0;
@@ -151,6 +151,20 @@ export default function App() {
               {`${pendingCount} pending`}
             </button>
           )}
+          {/* Refresh is for the whole window, not for one section: it drops
+              the cached issue details and reads the active view again, which
+              is how a profile whose details never expire asks Jira for them.
+              It takes the same lock a sync does, so it is offered on exactly
+              the same terms. */}
+          <button
+            type="button"
+            className="topbar-btn"
+            onClick={() => void runRefresh()}
+            disabled={!canSync}
+            title="Read this view again and fetch the issue details afresh"
+          >
+            Refresh
+          </button>
           <Menu
             label="Sync"
             align="right"
