@@ -13,22 +13,34 @@ import (
 // lanes, caps, and counts, while cellorder.go wants nothing but the order
 // the commit pass ranks against.
 
-// withMovedIn adds the keys of every card a pending sprint move has brought
-// into the sprint being viewed. A sprint's cards come from its own
-// board_issue rows, which are Jira's from the last sync, so a card that just
-// moved in is not among them and no placing logic further down can rescue
-// it: the key has to be in the list before the cards are read.
-func withMovedIn(boardKeys []string, moves []backend.PendingMove, sprintID string) []string {
-	if sprintID == "" {
-		return boardKeys
-	}
+// boardScopeBacklog mirrors issuerepo.ScopeBacklog, the literal AddToBoard
+// packs as the scope half of an issue_board row when a card is queued onto a
+// board's backlog rather than one of its sprints. boardrepo does not import
+// issuerepo (issuerepo already imports boardrepo, for the sprint table), so
+// the literal is kept here rather than shared.
+const boardScopeBacklog = "backlog"
+
+// withMovedIn adds the keys of every card a pending move has brought onto
+// this exact board scope: a sprint move into the sprint being viewed, or a
+// pending board add whose destination, backlog or a sprint, matches it. A
+// scope's cards come from its own board_issue rows, which are Jira's from
+// the last sync, so a card that just moved or was just added is not among
+// them and no placing logic further down can rescue it: the key has to be
+// in the list before the cards are read.
+func withMovedIn(boardKeys []string, moves []backend.PendingMove, boardID int, sprintID string) []string {
 	have := make(map[string]bool, len(boardKeys))
 	for _, k := range boardKeys {
 		have[k] = true
 	}
+	scope := sprintID
+	if scope == "" {
+		scope = boardScopeBacklog
+	}
 	keys := boardKeys
 	for _, m := range moves {
-		if !m.HasSprint || m.SprintID != sprintID || have[m.Key] {
+		tiedHere := (sprintID != "" && m.HasSprint && m.SprintID == sprintID) ||
+			(m.HasBoardAdd && m.BoardID == boardID && m.BoardScope == scope)
+		if !tiedHere || have[m.Key] {
 			continue
 		}
 		if len(keys) == len(boardKeys) {
@@ -38,6 +50,27 @@ func withMovedIn(boardKeys []string, moves []backend.PendingMove, sprintID strin
 		keys = append(keys, m.Key)
 	}
 	return keys
+}
+
+// tiedToBoard is the four ties that let a card Jira never put on this board
+// (a draft, or a real issue reached only through DraftIssues-style local
+// state) draw here anyway: a pending issue_board add for this exact board, a
+// pending sprint move to one of this board's own sprints, or a sprint id the
+// card already carries, real or drafted, that belongs to this board. A
+// draft exists on no board in Jira, so with none of the four it is drawn
+// nowhere.
+func tiedToBoard(card backend.Issue, boardID int, boardSprints map[string]bool, byKey map[string]backend.PendingMove) bool {
+	if boardSprints[card.SprintID] {
+		return true
+	}
+	m, ok := byKey[card.Key]
+	if !ok {
+		return false
+	}
+	if m.HasBoardAdd && m.BoardID == boardID {
+		return true
+	}
+	return m.HasSprint && boardSprints[m.SprintID]
 }
 
 // applyMoves overrides each card with the intent the journal holds for it,

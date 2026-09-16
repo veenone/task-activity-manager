@@ -157,7 +157,7 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 		// read; applyMoves then drops whatever the journal has moved back
 		// out. Skipping either step is what leaves a bulk move looking
 		// like it did nothing until the next boards sync.
-		movedKeys := withMovedIn(scopeKeys, moves, sprintID)
+		movedKeys := withMovedIn(scopeKeys, moves, boardID, sprintID)
 		cards, err := issues.IssuesByKeys(ctx, q, profileID, movedKeys)
 		if err != nil {
 			return nil, err

@@ -24,11 +24,14 @@ type Repository struct {
 // New wraps an open tam.db handle.
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
-// Board is one cached board.
+// Board is one cached board. Draft marks a board drafted in TAM and not yet
+// created in Jira, the way Sprint.Draft does for a sprint, so a picker can
+// label it the same way.
 type Board struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-	Type string `json:"type"`
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	Draft bool   `json:"draft"`
 }
 
 // Sprint is one cached sprint. State is Jira's own lowercase value: active,
