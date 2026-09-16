@@ -33,6 +33,15 @@ type Backend struct {
 	// asks for one and allows it. See transitions.go.
 	transitionResolution string
 
+	// projectKey is the profile's own project, set once when the backend is
+	// built, the same way transitionResolution is. A board create needs it
+	// to scope the filter's share and the board's location; every other
+	// method on this backend takes a project key as an argument instead,
+	// because those read paths can serve more than one project in a call,
+	// while a profile, and the board this backend creates for it, cannot.
+	// See boardcreate.go.
+	projectKey string
+
 	linkTypes       []backend.LinkType
 	linkTypesLoaded bool
 
