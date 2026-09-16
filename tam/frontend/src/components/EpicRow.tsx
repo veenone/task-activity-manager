@@ -1,4 +1,5 @@
 import type { KeyboardEvent, ReactNode } from "react";
+import { toPlainText } from "@agile-suite/core";
 import type { EpicNode, Issue } from "../api";
 import { TypeChip } from "./TypeChip";
 import { SubtaskToggle } from "./SubtaskToggle";
@@ -31,7 +32,8 @@ export function EpicRow({
   const isEpic = kind === "epic" && node;
   const typeIcon: ReactNode = isEpic ? <TypeChip type={node.issue.type} subtaskLabel={subtaskLabel} /> : <span />;
   const countText = isEpic ? progressText(node.done, node.total, node.donePoints, node.points) : String(count ?? 0);
-  const ariaLabel = isEpic ? `${rowKey} ${node.issue.summary}` : undefined;
+  const summary = isEpic ? toPlainText(node.issue.summary, "summary") : "";
+  const ariaLabel = isEpic ? `${rowKey} ${summary}` : undefined;
   const pending = isEpic && node.issue.pending;
   return (
     <div
@@ -53,8 +55,8 @@ export function EpicRow({
       <span className="epic-cell epic-cell-key accent-text" title={isEpic ? rowKey : undefined}>
         {isEpic ? rowKey : "No epic"}
       </span>
-      <span className="epic-cell epic-cell-summary" title={isEpic ? node.issue.summary : undefined}>
-        {isEpic ? node.issue.summary : ""}
+      <span className="epic-cell epic-cell-summary" title={isEpic ? summary : undefined}>
+        {isEpic ? summary : ""}
       </span>
       <span className="epic-cell folder-count epic-cell-progress">{countText}</span>
       {pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}
@@ -82,6 +84,7 @@ interface EpicChildRowProps {
 // the orphans group; ownerKey tells the keyboard model which it is.
 export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true, onToggleSubtasks, subtaskLabel, ownerKey, nested, index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
   const row: Row = { id: child.key, kind: "child", ownerKey };
+  const summary = toPlainText(child.summary, "summary");
   return (
     <div
       role="treeitem"
@@ -98,9 +101,9 @@ export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true,
       <span className="folder-caret" aria-hidden="true">{nested ? "↳" : ""}</span>
       <TypeChip type={child.type} subtaskLabel={subtaskLabel} />
       <span className="epic-cell epic-cell-key" title={child.key}>{child.key}</span>
-      <span className="epic-cell epic-cell-summary" title={child.summary}>
+      <span className="epic-cell epic-cell-summary" title={summary}>
         {onToggleSubtasks && <SubtaskToggle issueKey={child.key} count={subtaskCount} expanded={subtasksExpanded} onToggle={onToggleSubtasks} />}
-        {child.summary}
+        {summary}
       </span>
       <span className="epic-cell epic-cell-status">
         <span className={`chip chip-status chip-status-${statusClass(child.status)}`} title={child.status}>{child.status}</span>

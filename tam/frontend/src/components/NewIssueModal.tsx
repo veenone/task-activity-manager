@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Modal, announce, call, errMsg, useConfirm, useProfile } from "@agile-suite/core";
+import { Modal, announce, call, errMsg, toPlainText, useConfirm, useProfile } from "@agile-suite/core";
 import { CreateIssue, ISSUE_TYPES } from "../api";
 import type { FieldSpec, IssueDraft, IssueType, Profile, Settings } from "../api";
 import { MetaField, splitMetaFields } from "./MetaField";
@@ -51,7 +51,8 @@ const CREATABLE: IssueType[] = ["task", "epic", "story", "bug", "requirement"];
 const EPIC_SUMMARY_MAX = 48;
 
 function epicOptionLabel(key: string, summary: string): string {
-  const cut = summary.length > EPIC_SUMMARY_MAX ? `${summary.slice(0, EPIC_SUMMARY_MAX)}…` : summary;
+  const plain = toPlainText(summary, "summary");
+  const cut = plain.length > EPIC_SUMMARY_MAX ? `${plain.slice(0, EPIC_SUMMARY_MAX)}…` : plain;
   return `${key} ${cut}`;
 }
 
@@ -343,7 +344,7 @@ export function NewIssueModal({
                 user is about to create visible before they create it. */}
             <span className="new-issue-parent">
               {fixedParent || "none"}
-              {parentSummary && <span className="muted small"> {parentSummary}</span>}
+              {parentSummary && <span className="muted small"> {toPlainText(parentSummary, "summary")}</span>}
             </span>
           </div>
         )}

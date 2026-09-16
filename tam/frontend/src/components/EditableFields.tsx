@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { RichText, RichTextField, SyntaxToggle, detectFormat, errMsg } from "@agile-suite/core";
+import { RichText, RichTextField, SyntaxToggle, detectFormat, errMsg, toPlainText } from "@agile-suite/core";
 import type { RichFormat } from "@agile-suite/core";
 import { EDITABLE_FIELDS } from "../api";
 import type { EditableField, Issue } from "../api";
@@ -32,7 +32,8 @@ export function descriptionFormat(profileId: string, issueKey: string, text: str
 const EPIC_SUMMARY_MAX = 60;
 
 function epicOptionLabel(key: string, summary: string): string {
-  const cut = summary.length > EPIC_SUMMARY_MAX ? `${summary.slice(0, EPIC_SUMMARY_MAX)}…` : summary;
+  const plain = toPlainText(summary, "summary");
+  const cut = plain.length > EPIC_SUMMARY_MAX ? `${plain.slice(0, EPIC_SUMMARY_MAX)}…` : plain;
   return `${key} ${cut}`;
 }
 

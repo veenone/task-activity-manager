@@ -320,6 +320,14 @@ describe("BoardsView board", () => {
     expect(screen.getByRole("gridcell", { name: "PLAT-347 Write retro notes template Done" })).toBeInTheDocument();
   });
 
+  it("shows a card summary carrying wiki markup as plain text (D5)", async () => {
+    const marked = issue({ key: "PLAT-500", summary: "Fix *login* at {{/auth}}" });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[marked], [], []]));
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: "PLAT-500 Fix *login* at /auth To Do" });
+    expect(within(card).getByText("Fix *login* at /auth")).toBeInTheDocument();
+  });
+
   it("shows the assignee or Unassigned and the points on the card", async () => {
     renderView();
     const promo = await screen.findByRole("gridcell", { name: /PLAT-412/ });

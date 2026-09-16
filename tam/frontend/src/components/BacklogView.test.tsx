@@ -360,6 +360,16 @@ describe("BacklogView", () => {
     expect(within(rows[3]).queryByLabelText("Pending changes")).not.toBeInTheDocument();
   });
 
+  it("shows a summary carrying wiki markup as plain text (D5)", async () => {
+    vi.mocked(api.ListIssues).mockResolvedValue({
+      issues: [issue({ key: "PLAT-500", summary: "Fix *login* at {{/auth}}" })],
+      total: 1,
+    });
+    renderView();
+    const row = await screen.findByRole("row", { name: "PLAT-500 Fix *login* at /auth" });
+    expect(within(row).getByText("Fix *login* at /auth")).toHaveAttribute("title", "Fix *login* at /auth");
+  });
+
   it("offers the profile's open sprints in the detail panel and journals a move", async () => {
     vi.mocked(api.ListOpenSprints).mockResolvedValue([
       { id: 12, name: "Sprint 12", boardName: "Platform board", state: "active" },

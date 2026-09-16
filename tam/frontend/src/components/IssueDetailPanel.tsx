@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { RichText, detectFormat, errMsg, useNotice } from "@agile-suite/core";
+import { RichText, detectFormat, errMsg, toPlainText, useNotice } from "@agile-suite/core";
 import type { RichFormat } from "@agile-suite/core";
 import { BrowserOpenURL } from "../api";
 import type { Issue, IssueComment, IssueDetail, Link, SprintOption } from "../api";
@@ -366,7 +366,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
               {tests.data.map((t) => (
                 <li key={t.key} className="linked-row">
                   <span className="accent-text linked-key">{t.key}</span>
-                  <span>{t.summary}</span>
+                  <span>{toPlainText(t.summary, "summary")}</span>
                 </li>
               ))}
             </ul>
@@ -500,7 +500,7 @@ function LinkGroups({ links, onDiscard, discarding }: { links: Link[]; onDiscard
             {items.map((l) => (
               <li key={`${l.type}-${l.direction}-${l.key}`} className="linked-row">
                 <span className="accent-text linked-key">{l.key}</span>
-                <span>{l.summary}</span>
+                <span>{toPlainText(l.summary, "summary")}</span>
                 <span className="muted small">{l.issueType}</span>
                 {l.pending && (
                   <>
