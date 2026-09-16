@@ -114,6 +114,7 @@ func (a *App) backendFor(p profile.Profile) (backend.IssueBackend, error) {
 		client := corejira.NewClient(p.JiraURL, token, tlsOptions(p)...)
 		jb := jirabackend.New(client, reqType)
 		jb.SetTransitionResolution(resolution)
+		jb.SetProjectKey(p.ProjectKey)
 		b = jb
 	}
 	a.backends[p.ID] = b
