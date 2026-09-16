@@ -156,6 +156,62 @@ type BoardCreator interface {
 
 ---
 
+---
+
+## Task 7: journal the sprint edit and delete
+
+The last four immediate writes live in `internal/sprints`, fenced by
+`exceptions_test.go` as `Start`, `Complete`, `Edit`, `Delete`. Create was
+already journalled by bundle 01. These two are the straightforward half.
+
+**Files:** `tam/internal/issuerepo/` (two entities), `tam/internal/committer/`, `tam/internal/sprints/`, `tam/app_sprintmanage.go`, the frontend dialogs.
+
+**Produces** `sprint_edit` and `sprint_delete` journal entities, pushed in the
+existing `sprints` phase beside `sprint_create`.
+
+**Steps**
+1. Failing tests: an edit to a draft sprint changes the draft in place and journals nothing extra; an edit to a real sprint journals one row and pushes on Commit; a delete of a draft removes it and its journal row with no Jira call; a delete of a real sprint journals and pushes; discard reverses both.
+2. `clearGoal` already distinguishes "clear it" from "leave it" on `Edit`; carry that through the journal value rather than inventing a second convention.
+3. Remove `Edit` and `Delete` from `sprints.Service` and from the fenced list. Register both entities in the seven places.
+4. Gate: `cd tam && go test ./internal/issuerepo/... ./internal/committer/... ./internal/sprints/... . -count=1`.
+
+---
+
+## Task 8: journal the sprint ceremonies
+
+**Start** is easy and was only ever grouped with Complete. The dialog already
+asks for name, goal, start and end, so the dates are the user's, not a clock
+reading. Journal `sprint_start` and push it.
+
+**Complete is the one with a real design problem, and it needs a ruling before
+code.** Today the dialog reads the sprint's contents from Jira, computes which
+issues are unfinished by the board's last column, shows "47 cards are not
+finished and will move out of the sprint", and the user confirms. Journalling
+splits that: the preview is computed when the dialog opens, the move happens at
+Commit, and the two can disagree if anything changed in between.
+
+**Ruling: journal the intent, recompute at Commit, and word the dialog for it.**
+The journal row carries the sprint and the destination for unfinished work. The
+unfinished set is computed at push time from Jira, exactly as the current code
+computes it at button time, so Jira's state at the moment of the write is what
+decides, which is the only correct answer. The dialog says "about N cards",
+names that it is recomputed on Commit, and the Commit result reports the real
+number moved. What the dialog must not do is promise an exact count it cannot
+keep.
+
+**Steps**
+1. Write the disagreement test first: preview says N, the sprint changes, Commit moves M, and the result reports M without failing.
+2. `sprint_start` and `sprint_complete` entities; push in the `sprints` phase, after creates so a draft sprint can be started in the same Commit.
+3. Refuse to start a sprint whose cached state is not `future`, as `guards.go` already does, and keep that refusal local.
+4. Delete `internal/sprints/exceptions_test.go` and the fenced list rather than shortening it: an empty exception list is the point, and a fence guarding nothing is worse than none.
+5. Gate as Task 7, plus `cd tam/frontend && npx vitest run src/components/StartSprintModal.test.tsx src/components/CompleteSprintModal.test.tsx`.
+
+**Scope note:** tasks 7 and 8 roughly double this bundle. If the branch grows
+unwieldy they split into their own PR against the same issue; the boards work
+does not depend on them.
+
+---
+
 ## Whole-bundle gate, before the PR
 
 ```
