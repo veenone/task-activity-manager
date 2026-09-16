@@ -129,7 +129,7 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, Linked: []Linked{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
-	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies()}
+	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies(), boardRealID: map[int]int{}}
 	if err := run.reload(ctx); err != nil {
 		return res, err
 	}
@@ -154,13 +154,20 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 }
 
 // boardRow is true for the three board move entity types, which the board
-// pass owns. pushEdits takes only EntityIssue rows, which is what keeps them
-// out of the edits phase: sorting one into it would have commitEdit send
-// "statusId" to Jira as a field, fail on it, and take the issue's genuine
-// edits down with it.
+// moves pass (boards.go) owns. pushEdits takes only EntityIssue rows, which
+// is what keeps them out of the edits phase: sorting one into it would have
+// commitEdit send "statusId" to Jira as a field, fail on it, and take the
+// issue's genuine edits down with it.
+//
+// EntityIssueBoard is deliberately not one of the three: it is owned end to
+// end by the boards phase (boardcreate.go), which runs before this one and
+// clears every row it can, holds what it cannot, and leaves a draft-keyed
+// row for the next Commit. Routing it through boardRows too would have this
+// pass classify it against remote.StatusID, a comparison an issue_board row
+// was never meant to answer to, and raise a conflict that can never clear.
 func boardRow(entityType string) bool {
 	switch entityType {
-	case issuerepo.EntityTransition, issuerepo.EntityRank, issuerepo.EntitySprintMove, issuerepo.EntityIssueBoard:
+	case issuerepo.EntityTransition, issuerepo.EntityRank, issuerepo.EntitySprintMove:
 		return true
 	}
 	return false
