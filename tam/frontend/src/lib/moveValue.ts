@@ -1,4 +1,4 @@
-import { ENTITY_RANK, ENTITY_SPRINT_MOVE, ENTITY_TRANSITION, MOVE_LABELS } from "../api";
+import { ENTITY_ISSUE_BOARD, ENTITY_RANK, ENTITY_SPRINT_MOVE, ENTITY_TRANSITION, MOVE_LABELS } from "../api";
 import type { PendingChange } from "../api";
 
 // moveValue reads the values a board move journals. issuerepo packs a
@@ -87,6 +87,14 @@ export function moveWords(entityType: string, beforeVal: string, afterVal: strin
         from: "",
         to: `${rank.before ? "before" : "after"} ${rank.neighbourKey}`,
       };
+    }
+    case ENTITY_ISSUE_BOARD: {
+      // "boardId|scope", the same id|name packing a transition and a
+      // sprint move use, with scope ("backlog" or a sprint id) standing in
+      // for the name. Must agree with issuerepo.ScopeBacklog.
+      const scope = moveName(afterVal);
+      const where = scope === "backlog" ? BACKLOG : `sprint ${scope}`;
+      return { label: MOVE_LABELS[entityType], from: "", to: `board ${moveId(afterVal)}, ${where}` };
     }
     default:
       return { label: entityType, from: beforeVal, to: afterVal };

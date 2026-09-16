@@ -617,34 +617,41 @@ export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "parentKey", label: "Epic" },
 ];
 
-// The three journal entity types a board move writes, mirroring
-// issuerepo.EntityTransition, EntitySprintMove, and EntityRank. Both
-// dialogs that show pending work branch on them, and the board reads them
-// to know which of its cards carry a pending move.
+// The four journal entity types a board move writes, mirroring
+// issuerepo.EntityTransition, EntitySprintMove, EntityRank, and
+// EntityIssueBoard. Both dialogs that show pending work branch on them, and
+// the board reads them to know which of its cards carry a pending move.
 export const ENTITY_TRANSITION = "issue_transition";
 export const ENTITY_SPRINT_MOVE = "issue_sprint";
 export const ENTITY_RANK = "issue_rank";
-export const MOVE_ENTITIES: string[] = [ENTITY_TRANSITION, ENTITY_SPRINT_MOVE, ENTITY_RANK];
+export const ENTITY_ISSUE_BOARD = "issue_board";
+export const MOVE_ENTITIES: string[] = [ENTITY_TRANSITION, ENTITY_SPRINT_MOVE, ENTITY_RANK, ENTITY_ISSUE_BOARD];
 
 // The field each of those rows carries, mirroring issuerepo.FieldStatusID,
-// FieldSprintID, and FieldRank.
+// FieldSprintID, and FieldRank. An issue_board row has no field constant
+// here: unlike a status or a sprint, an issue can be queued onto more than
+// one board, so issuerepo.BoardField folds the board's id into the field
+// itself and there is no one fixed string for MOVE_FIELDS to name.
 export const FIELD_STATUS_ID = "statusId";
 export const FIELD_SPRINT_ID = "sprintId";
 export const FIELD_RANK = "rank";
 
 // MOVE_LABELS is the one word each board move goes by, in the Pending
 // changes dialog, the Activity tab, and the conflict table. One vocabulary
-// for the three moves: a surface that invented its own would have the same
+// for the four moves: a surface that invented its own would have the same
 // card read "Status" in one dialog and "statusId" in the next.
 export const MOVE_LABELS: Record<string, string> = {
   [ENTITY_TRANSITION]: "Status",
   [ENTITY_SPRINT_MOVE]: "Sprint",
   [ENTITY_RANK]: "Rank",
+  [ENTITY_ISSUE_BOARD]: "Board",
 };
 
 // MOVE_FIELDS names the entity behind a field, for the surfaces that hold
 // only the field: a held board write reaches the conflict card as
 // "statusId" or "sprintId" and has to read as Status or Sprint there too.
+// An issue_board row is never held (committer.heldBoardRow), so it never
+// reaches a surface that has only its field and needs this map.
 export const MOVE_FIELDS: Record<string, string> = {
   [FIELD_STATUS_ID]: ENTITY_TRANSITION,
   [FIELD_SPRINT_ID]: ENTITY_SPRINT_MOVE,
@@ -1126,6 +1133,19 @@ export const RankIssue: (
 ) => Promise<void> = App.RankIssue;
 export const CanTransition: (profileId: string, key: string, statusId: string) => Promise<TransitionCheck> =
   App.CanTransition;
+// CreateDraftBoard and AddIssuesToBoard are local writes too: no lock, no
+// Jira call, and they return as soon as the journal rows are written.
+// CreateDraftBoard answers with the board's negative placeholder id, which
+// the picker uses at once to add issues to it before it is real.
+export const CreateDraftBoard: (
+  profileId: string,
+  name: string,
+  boardType: string,
+  filterName: string,
+  jql: string,
+) => Promise<number> = App.CreateDraftBoard;
+export const AddIssuesToBoard: (profileId: string, keys: string[], boardId: number, scope: string) => Promise<void> =
+  App.AddIssuesToBoard;
 export const SetProfileSetting: (
   profileId: string,
   key: string,

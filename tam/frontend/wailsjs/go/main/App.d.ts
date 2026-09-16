@@ -16,6 +16,8 @@ import {importfile} from '../models';
 import {syncer} from '../models';
 import {ritualsync} from '../models';
 
+export function AddIssuesToBoard(arg1:string,arg2:Array<string>,arg3:number,arg4:string):Promise<void>;
+
 export function AddLink(arg1:string,arg2:string,arg3:backend.LinkDraft):Promise<void>;
 
 export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
@@ -27,6 +29,8 @@ export function CancelSprintReport(arg1:string):Promise<void>;
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
 export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<sprints.Completion>;
+
+export function CreateDraftBoard(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<number>;
 
 export function CreateIssue(arg1:string,arg2:backend.IssueDraft):Promise<string>;
 
