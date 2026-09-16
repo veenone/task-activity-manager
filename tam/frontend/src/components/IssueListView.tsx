@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProfile } from "@agile-suite/core";
 import { GRID_COLUMNS, ISSUE_TYPES } from "../api";
-import type { IssueQuery, Profile, Settings, SortColumn } from "../api";
+import type { Issue, IssueQuery, Profile, Settings, SortColumn } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
 import { useOpenSprints } from "../queries/boards";
 import { IssueTable } from "./IssueTable";
@@ -31,6 +31,11 @@ interface IssueListViewProps {
   showCreate?: boolean;
   showImport?: boolean;
   emptyNote: string;
+  // Fired with this page's total and rows after every successful load, so a
+  // caller that wants its own summary above the grid (Assigned to me's
+  // header and stale-rows note) can build it from the exact query this view
+  // already ran, instead of paying for a second one.
+  onPage?: (total: number, rows: Issue[]) => void;
 }
 
 // IssueListView is the issue grid with its filter bar and pager, generic over
@@ -38,7 +43,7 @@ interface IssueListViewProps {
 // and page state live here and reset in the same render the profile changes
 // in. Selection is kept here too, so the detail panel can sit beside the
 // table.
-export function IssueListView({ viewId, label, baseQuery, showCreate, showImport, emptyNote }: IssueListViewProps) {
+export function IssueListView({ viewId, label, baseQuery, showCreate, showImport, emptyNote, onPage }: IssueListViewProps) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const [text, setText] = useState("");
   const [types, setTypes] = useState<string[]>([]);
@@ -84,6 +89,9 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
     [baseQuery, search, types, sprintId, page, pageSize, sort, desc],
   );
   const issues = useIssues(activeId, query);
+  useEffect(() => {
+    if (issues.data) onPage?.(issues.data.total, issues.data.issues);
+  }, [issues.data, onPage]);
   const sprints = useSprints(activeId);
   // The detail panel's own Sprint field, not the filter bar above: away from
   // a board this is the only sprint list an issue here can be moved through.

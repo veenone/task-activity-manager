@@ -44,4 +44,7 @@ export const keys = {
   // The one profile setting the Boards view reads: whether this Jira
   // answered the boards call with no Agile API at all.
   boardsUnavailable: (profileId: string) => [profileId, "boardsUnavailable"] as const,
+  // The two profile settings Assigned to me reads to know who "me" is.
+  jiraUsername: (profileId: string) => [profileId, "jiraUsername"] as const,
+  jiraDisplayName: (profileId: string) => [profileId, "jiraDisplayName"] as const,
 };

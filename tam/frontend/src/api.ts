@@ -90,6 +90,10 @@ export interface Issue {
   // has always sent it.
   statusId?: string;
   assignee: string;
+  // The Jira username sync, edits, and drafts cache alongside assignee
+  // (schema 14). Optional so fixtures written before assigned-to-me still
+  // type-check; a row cached before schema 14 sends "" until the next sync.
+  assigneeName?: string;
   reporter: string;
   priority: string;
   labels: string[];
@@ -163,6 +167,12 @@ export interface IssueQuery {
   // would order 25 rows out of a project's thousands.
   sort: SortColumn | "";
   desc: boolean;
+  // Narrows to issues assigned to this Jira username, case-insensitively,
+  // with assigneeDisplayName as the fallback for a row cached before schema
+  // 14 (see issuerepo.IssueQuery.AssigneeName). Empty leaves the query
+  // unfiltered, which is what Backlog passes by leaving both unset.
+  assigneeName?: string;
+  assigneeDisplayName?: string;
 }
 
 // SortColumn is the set issuerepo.SortColumns accepts. A value outside it
@@ -576,6 +586,14 @@ export const SWIMLANES: { id: Swimlane; label: string }[] = [
 // when the instance answered with no Agile API at all. It matches
 // syncer.settingBoardsUnavailable.
 export const SETTING_BOARDS_UNAVAILABLE = "boards_unavailable";
+
+// SETTING_JIRA_USERNAME and SETTING_JIRA_DISPLAY_NAME are the profile
+// settings TestProfileConnection and the start of every sync write, and
+// what the Assigned to me tab reads to know who "me" is. They match
+// settingJiraUsername and settingJiraDisplayName in app_profiles.go and
+// internal/syncer/syncer.go.
+export const SETTING_JIRA_USERNAME = "jira_username";
+export const SETTING_JIRA_DISPLAY_NAME = "jira_display_name";
 
 export interface LinkedTest {
   key: string;

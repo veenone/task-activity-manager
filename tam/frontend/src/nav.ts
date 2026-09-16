@@ -1,6 +1,6 @@
 import { createViewContext } from "@agile-suite/core";
 
-export type View = "backlog" | "epics" | "boards" | "sprints" | "reports" | "rituals";
+export type View = "backlog" | "assigned" | "epics" | "boards" | "sprints" | "reports" | "rituals";
 
 export interface ViewInfo {
   id: View;
@@ -16,6 +16,12 @@ export const VIEWS: ViewInfo[] = [
     label: "Backlog",
     phase: "Phase 1",
     blurb: "Issue sync, the grid, and the detail panel are the first feature slice.",
+  },
+  {
+    id: "assigned",
+    label: "Assigned to me",
+    phase: "Phase 1",
+    blurb: "The synced project's issues narrowed to the connected Jira user.",
   },
   {
     id: "epics",
