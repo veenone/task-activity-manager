@@ -367,6 +367,34 @@ input, button, select { font-family: inherit; font-size: inherit; }
   font-weight: 600;
 }
 .detail-section-action { margin-left: auto; font-size: 11px; }
+/* The cached stamp sits where a section's action would, but is a fact and
+   not a control, so it takes the same place without the button styling. */
+.detail-section-note { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
+/* The description's label, syntax toggle and Edit share one line above the
+   rendered text, the way the mockup heads the section. */
+.edit-row-head { display: flex; align-items: center; gap: 8px; }
+.edit-description-action { margin-left: auto; font-size: 11px; }
+/* One comment: an initials avatar, the author, then the time on the right,
+   over the rendered body. */
+.comment-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.comment-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface-2); font-size: 12px; }
+.comment-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.comment-avatar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.comment-author { font-size: 12px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-when { margin-left: auto; white-space: nowrap; }
+.chip-restricted { background: var(--warn-soft); color: var(--warn-text); border: 1px solid var(--warn-border); }
 .chip-label { background: var(--surface-3); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 8px; margin-right: 4px; }
 .accent-text { color: var(--accent); }
 .detail-description { white-space: pre-wrap; font-size: 12px; }
