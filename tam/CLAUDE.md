@@ -40,6 +40,143 @@ reconstruction kept so view readable offline, and `complete_date` on
 here ship figures, method printed under them, plain statement of what
 reconstruction cannot see.
 
+## Rich text: descriptions, summaries, comments
+
+The renderer lives in `@agile-suite/core`'s `richtext/`, not in TAM: a small
+AST (`ast.ts`, one node per thing the renderer draws differently, nothing
+either format merely happens to have), a hand-written Jira wiki parser
+(`wiki.ts`, blocks in `lineToBlocks` then inline marks in `lineToInline`,
+character scan only, escapes and all), Markdown on `marked`'s own lexer
+(`markdown.ts`, `marked.lexer`, never `marked.parse`, so there is no HTML
+renderer's output to sanitise), and per-field detection (`detect.ts`).
+`RichText.tsx` walks the AST into React elements; `RichTextField.tsx` is the
+Write/Preview field wherever a long text field is typed.
+
+Jira's own `expand=renderedFields` was considered and dropped: it is
+server-rendered HTML, exact for wiki markup and wrong for Markdown text,
+needs its own sanitiser, and cannot render a draft or a pending edit that
+has never touched Jira. One local parser instead covers drafts, offline
+reading and both syntaxes with one code path, at the cost of writing the
+parser.
+
+**Detection scores distinct signal kinds, not occurrences**, so thirty `- `
+bullets cannot outvote one `{code}`: each format's scanner records at most
+one match per kind, keyed by the label of the line that found it, and
+Markdown needs a strict majority of kinds to win; a tie, including 0-0,
+reads as Jira markup, the safer default for a field that turns out to hold
+neither. A line beginning `#` is the one character both formats claim as
+their own marker (Jira's ordered list, Markdown's heading): `hashIsStacked`
+in `detect.ts` reads it as Markdown only when neither neighbouring line also
+starts with `#`, since two or more stacked `#` lines are a Jira numbered
+list far more often than back-to-back headings, and both scanners call the
+same function so one line can never register as both at once.
+
+**Character scan only, with a fail-position cache so a wall of unclosed
+delimiters cannot go quadratic.** `wiki.ts` never runs a nested-quantifier
+regex over user text; every construct is found by scanning forward from the
+current position. A bare `[`, `!`, `{{` or an unrecognised `{name:attrs}`
+that never closes would otherwise search to the end of the string once per
+occurrence one of many; `dbraceFailFrom`, `bracketFailFrom`,
+`imageFailFrom`, and `BraceAttrsCache`'s `failFrom` each remember the
+earliest position a scan is already known to fail from, so a field carrying
+thousands of one bare delimiter still pays for one failed scan, not one per
+character. `{code:...}`'s own close search needs no such cache: on failure
+it advances straight to the end of the text, which ends the parse loop
+outright.
+
+**Entities decode in ordinary Markdown text only, never in a code span, a
+code block, or the raw-HTML fallback.** This is CommonMark's own rule, not
+a TAM invention: `marked`'s lexer returns `&amp;`, `&lt;`, `&gt;`, `&quot;`
+and `&#39;` already escaped in every token's `text`, including `codespan`
+and raw HTML, so decoding everywhere would turn a code sample's literal
+`&amp;` into `&` and corrupt it. `markdown.ts` calls its decode step only
+from the `text`/`escape` case; the plan first assumed `marked` pre-escaped
+nothing and that assumption was wrong, caught by measuring `marked` 18
+directly rather than trusting the plan.
+
+**React elements only.** No `innerHTML`, no `dangerouslySetInnerHTML`, no
+`<img>`, no `href`, anywhere under `richtext/`; `noHtml.test.ts` reads the
+module sources as text and fails if any of the three spellings appears,
+which is why this paragraph cannot even name them without tripping its own
+guard in a differently-quoted way. A link renders as
+`<button role="link">` with no `href`, guarded by `isAllowedLink` (moved
+from the ritual editor's own `sanitizeHtml.ts` to core's `lib/links.ts`, one
+definition of an allowed scheme shared by both) and calling `onOpenLink` on
+click, never navigating the WebView; a refused scheme renders its label as
+plain text instead of a button. An image macro is a named placeholder
+(`Image: <file>`), never fetched or drawn. Issue keys are not an AST node:
+`RichText` splits a text leaf on `\b<projectKey>-\d+\b` at render time, so
+the parsers and `toPlainText` stay project-blind and the panel's own
+`issue.key` is the only source of the project key a bare mention is matched
+against.
+
+**Comments ride `IssueDetail` in the detail cache, not a new table or a
+separate fetch.** The detail cache already stores the whole `IssueDetail`
+as JSON, so adding `Comments`, `CommentTotal` and `CommentsTruncated` to
+that struct means comments are cached, read offline, and refreshed exactly
+when the description already is, with no schema change. They are read
+newest first, `GET /issue/{key}/comment?orderBy=-created`, paged by what
+actually came back rather than by arithmetic on `startAt`, kept to the
+newest 500. `CommentsTruncated` true with an empty `Comments` means the
+paged read failed, never that the issue has none (an issue nobody has
+commented on answers with a total of 0 and truncated false); a panel must
+tell those two apart; the detail itself is not failed by a comment page
+that failed, since Wails' either/or return means an error here would also
+drop the description just read. A comment's `author` can be null (anonymous
+or a deleted user), read as "Unknown user"; a comment carrying a
+`visibility` restriction is marked with the restriction's `value` (a role
+or group name), never labelled "role" or "group", since only the value is
+known.
+
+**The raw string is always what is saved.** Nothing anywhere in this
+feature converts wiki markup to Markdown or back; the journal, `EditField`,
+`CreateDraft` and Commit all see exactly the characters typed, the same
+guarantee every other TAM edit already gives.
+
+**Offline reading is a fallback with a setting, not a special mode.**
+`GetIssueDetail` in `app_issues.go` used to drop the cached detail whenever
+the backend read failed, so a panel open past `detail_cache_minutes` with
+no connection showed an error instead of the description, links and
+comments it already had a moment before; it now serves the cached detail
+with a logged line and a nil error whenever one exists, and the panel
+prints `cached <when>` beside the Comments heading so a stale offline read
+never passes as current. `detail_cache_minutes` is a per-profile setting,
+default 10, where 0 does not mean "always stale" but "never expires": a
+profile set that way reads every detail out of the cache and needs no Jira
+connection at all to open one. The one way past that, short of the window
+elapsing, is the shell's own **Refresh** button beside Sync: it clears the
+profile's cached details (`issuerepo.ClearDetails`, one statement) under
+the same `"sync"` lock a sync or a commit takes, through
+`SyncContext.runRefresh`, so it refuses exactly when those would and the
+next read of whatever is on screen goes back to Jira.
+
+**The summary renders inline code and links only, never marks**, and every
+surface that shows a summary (grids, cards, the Epics tree, dialogs) shares
+that one scope: Jira DC does not wiki- or Markdown-render the summary
+field, so `2*3*4 items` must read as typed in the heading and everywhere
+else, and only `{{code}}`/`` `code` `` and `[text|url]`/`[text](url)`
+unwrap. `toPlainText`'s `scope` argument (`"full"` for grids, tree rows,
+sort and search values; `"summary"` for the summary's own narrower rule)
+is what the panel heading and every list share. `ConflictCard`,
+`PendingChangesModal`, and a journaled link's own stored summary render raw
+text on purpose: they show the exact value being pushed or compared, and
+stripping markup there would make `*bold*` and `bold` look identical in the
+one place that distinction matters most.
+
+**The toggle's memory is a module-level `Map`, not state, and lives for the
+app run.** `EditableFields.tsx` keys it `profileId:key:description`; picking
+Markdown for one field on one issue is remembered the next time that same
+field is opened, in the same TAM run, and forgotten on restart, which is
+what the spec's "session" means.
+
+Add to Layout: `frontend/core/src/richtext/` (`ast.ts`, `wiki.ts`,
+`markdown.ts`, `detect.ts`, `plain.ts`, `RichText.tsx`, `RichTextField.tsx`)
+and `frontend/core/src/lib/links.ts` (`isAllowedLink`, `compactUrl`, shared
+with the ritual editor's sanitizer). New TAM components:
+`SyntaxToggle` (exported from `RichTextField.tsx`) and `Comments` (in
+`IssueDetailPanel.tsx`), the read-only comment thread with its own
+"Show all" and restriction chip.
+
 ## Phase 4: the sprint report, the reconstruction
 
 `internal/reports` turn sprint's issues + changelogs into numbers:
