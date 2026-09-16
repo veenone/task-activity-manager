@@ -461,22 +461,51 @@ describe("parseWiki quote, panel and rule", () => {
 // regex with nested quantifiers over user text, so both a very long line
 // and a very long run of list items stay linear. ~200ms is generous so CI
 // stays stable; a quadratic parser would blow well past it on either input.
-describe("parseWiki timing", () => {
-  it("parses 200,000 alternating mark characters in well under 200ms", () => {
-    const text = "*_+-".repeat(50_000);
-    expect(text.length).toBe(200_000);
+// D3's real promise is linear scan time, not any particular wall-clock
+// number: that number is only ever as good as the machine measuring it,
+// and a busy CI box measures differently from a quiet one (a review run of
+// this suite alongside everything else once turned the old absolute
+// "under 200ms" bound into a false failure at 344ms, while the same test
+// passed standalone). So every case below times the same pathological
+// shape at a base size and at 4x that size, and asserts the 4x run costs
+// at most ~6x the base run (linear, with slack for jitter) rather than
+// pinning either run to an absolute number: a quadratic regression fails
+// that ratio on any machine, a busy machine does not. The 2s bound on each
+// run is only a backstop against something hanging outright, not the real
+// assertion. { retry: 2 } absorbs the rare scheduler hiccup a ratio check
+// is still exposed to.
+function elapsedMs(run: () => void): number {
+  const start = performance.now();
+  run();
+  return performance.now() - start;
+}
 
-    const start = performance.now();
-    parseWiki(text);
-    expect(performance.now() - start).toBeLessThan(200);
+function expectLinearScaling(baseTime: number, largeTime: number): void {
+  expect(baseTime).toBeLessThan(2000);
+  expect(largeTime).toBeLessThan(2000);
+  expect(largeTime).toBeLessThan(Math.max(baseTime * 6, 25));
+}
+
+describe("parseWiki timing", () => {
+  it("parses alternating mark characters in time that scales linearly", { retry: 2 }, () => {
+    const build = (reps: number) => "*_+-".repeat(reps);
+
+    const baseTime = elapsedMs(() => parseWiki(build(12_500))); // 50,000 characters
+    const largeTime = elapsedMs(() => parseWiki(build(50_000))); // 200,000 characters
+
+    expectLinearScaling(baseTime, largeTime);
   });
 
-  it("parses 5,000 stacked list markers in well under 200ms", () => {
-    const lines = Array.from({ length: 5_000 }, (_, i) => `* item ${i}`);
+  it("parses stacked list markers correctly, in time that scales linearly", { retry: 2 }, () => {
+    const build = (count: number) => Array.from({ length: count }, (_, i) => `* item ${i}`).join("\n");
 
-    const start = performance.now();
-    const result = parseWiki(lines.join("\n"));
-    expect(performance.now() - start).toBeLessThan(200);
+    const baseTime = elapsedMs(() => parseWiki(build(1_250)));
+    let result: ReturnType<typeof parseWiki> = [];
+    const largeTime = elapsedMs(() => {
+      result = parseWiki(build(5_000));
+    });
+
+    expectLinearScaling(baseTime, largeTime);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ t: "list", ordered: false });
@@ -484,54 +513,57 @@ describe("parseWiki timing", () => {
   });
 
   // D3 extended to inline (binding): an opening {code that never closes
-  // must not turn a long field into a quadratic scan. The 200,000-character
-  // alternating-marks case above already exercises lineToInline directly
-  // (one giant paragraph), so it now covers the inline mark stack too.
-  it("parses a long unclosed {code fragment in well under 200ms", () => {
-    const text = "{code" + "x".repeat(200_000);
+  // must not turn a long field into a quadratic scan.
+  it("parses an unclosed {code fragment in time that scales linearly", { retry: 2 }, () => {
+    const build = (count: number) => "{code" + "x".repeat(count);
 
-    const start = performance.now();
-    parseWiki(text);
-    expect(performance.now() - start).toBeLessThan(200);
+    const baseTime = elapsedMs(() => parseWiki(build(50_000)));
+    const largeTime = elapsedMs(() => parseWiki(build(200_000)));
+
+    expectLinearScaling(baseTime, largeTime);
   });
 
   // Fix round 1, Critical: a run of unclosed "[" or "!" used to re-scan to
-  // the end of the string on every one of them (measured at 500ms for
-  // 200,000), the same class of quadratic blowup {{ and {code} were
-  // already guarded against. bracketFailFrom / imageFailFrom close that.
-  it("parses 200,000 unclosed [ characters in well under 200ms", () => {
-    const text = "[".repeat(200_000);
+  // the end of the string on every one of them, the same class of
+  // quadratic blowup {{ and {code} were already guarded against.
+  // bracketFailFrom / imageFailFrom close that.
+  it("parses unclosed [ characters in time that scales linearly", { retry: 2 }, () => {
+    const build = (count: number) => "[".repeat(count);
 
-    const start = performance.now();
-    parseWiki(text);
-    expect(performance.now() - start).toBeLessThan(200);
+    const baseTime = elapsedMs(() => parseWiki(build(50_000)));
+    const largeTime = elapsedMs(() => parseWiki(build(200_000)));
+
+    expectLinearScaling(baseTime, largeTime);
   });
 
-  it("parses 200,000 unclosed ! characters in well under 200ms", () => {
-    const text = "!".repeat(200_000);
+  it("parses unclosed ! characters in time that scales linearly", { retry: 2 }, () => {
+    const build = (count: number) => "!".repeat(count);
 
-    const start = performance.now();
-    parseWiki(text);
-    expect(performance.now() - start).toBeLessThan(200);
+    const baseTime = elapsedMs(() => parseWiki(build(50_000)));
+    const largeTime = elapsedMs(() => parseWiki(build(200_000)));
+
+    expectLinearScaling(baseTime, largeTime);
   });
 
-  it("parses a table row of 5,000 unclosed [ characters in well under 200ms", () => {
-    const text = "|" + "[".repeat(5_000);
+  it("parses a table row of unclosed [ characters in time that scales linearly", { retry: 2 }, () => {
+    const build = (count: number) => "|" + "[".repeat(count);
 
-    const start = performance.now();
-    parseWiki(text);
-    expect(performance.now() - start).toBeLessThan(200);
+    const baseTime = elapsedMs(() => parseWiki(build(1_250)));
+    const largeTime = elapsedMs(() => parseWiki(build(5_000)));
+
+    expectLinearScaling(baseTime, largeTime);
   });
 
   // Fix round 2, closing the gap fix round 1 only documented: scanBraceOpen's
   // ":"-attrs search used to re-scan to the end of the string on every
   // "{name:" fragment whose attributes never close, the same shape of bug
   // just fixed for "[" and "!". BraceAttrsCache closes it the same way.
-  it("parses 200,000 characters of repeated {a: with no closing brace in well under 200ms", () => {
-    const text = "{a:".repeat(66_666);
+  it("parses repeated {a: fragments with no closing brace in time that scales linearly", { retry: 2 }, () => {
+    const build = (reps: number) => "{a:".repeat(reps);
 
-    const start = performance.now();
-    parseWiki(text);
-    expect(performance.now() - start).toBeLessThan(200);
+    const baseTime = elapsedMs(() => parseWiki(build(16_666))); // ~50,000 characters
+    const largeTime = elapsedMs(() => parseWiki(build(66_664))); // ~200,000 characters
+
+    expectLinearScaling(baseTime, largeTime);
   });
 });
