@@ -22,7 +22,6 @@ var EditableFields = []string{"summary", "description", "priority", "labels", "s
 var fieldColumns = map[string]string{
 	"summary": "summary", "description": "", "priority": "priority",
 	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee", "parentKey": "parent_key",
-	"assigneeName": "assignee_name",
 }
 
 // draftTypes are the logical types a draft may have.
@@ -52,8 +51,6 @@ func FieldValue(iss backend.Issue, description, field string) string {
 		return iss.Priority
 	case "assignee":
 		return iss.Assignee
-	case "assigneeName":
-		return iss.AssigneeName
 	case "labels":
 		return strings.Join(iss.Labels, ", ")
 	case "storyPoints":
@@ -216,6 +213,12 @@ func writeField(ctx context.Context, q execer, profileID, key, field, value stri
 			points = sql.NullFloat64{Float64: *p, Valid: true}
 		}
 		_, err = q.ExecContext(ctx, `UPDATE issue SET story_points = ? WHERE profile_id = ? AND key = ?`, points, profileID, key)
+		return err
+	case "assignee":
+		// AssigneePicker sends a username, not a display name, so both
+		// columns take the same value here; see the bundle 03 finding on
+		// the pre-existing assignee/assignee_name mismatch left by sync.
+		_, err := q.ExecContext(ctx, `UPDATE issue SET assignee = ?, assignee_name = ? WHERE profile_id = ? AND key = ?`, value, value, profileID, key)
 		return err
 	}
 	col, ok := fieldColumns[field]
