@@ -99,6 +99,23 @@ describe("AssignedToMeView", () => {
     });
   });
 
+  it("explains itself when there is no profile at all, rather than rendering nothing", async () => {
+    // No profile means both settings queries are disabled, and a disabled
+    // query stays pending forever, so a bare isPending guard would leave the
+    // whole pane blank with nothing to explain it. A fresh install reaches
+    // exactly this state.
+    vi.mocked(api.ListProfiles).mockResolvedValue([]);
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "", theme: "light" });
+    vi.mocked(api.GetProfileSetting).mockResolvedValue("");
+    vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
+
+    renderView();
+
+    expect(
+      await screen.findByText("TAM does not know your Jira user yet. Sync once or test the connection."),
+    ).toBeInTheDocument();
+  });
+
   it("shows the no-username empty state with both actions, and no grid", async () => {
     vi.mocked(api.GetProfileSetting).mockResolvedValue("");
     vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });

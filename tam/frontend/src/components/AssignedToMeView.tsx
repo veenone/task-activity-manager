@@ -13,7 +13,7 @@ import { IssueListView } from "./IssueListView";
 // onPage) for the header count and the stale-rows note, rather than firing
 // a second query for either.
 export function AssignedToMeView() {
-  const { activeId } = useProfile<Profile, Settings>();
+  const { activeId, loading } = useProfile<Profile, Settings>();
   const username = useJiraUsername(activeId);
   const displayName = useJiraDisplayName(activeId);
   const { canSync, runSync } = useSync();
@@ -29,7 +29,12 @@ export function AssignedToMeView() {
   // Neither setting resolves until GetProfileSetting answers, and a query
   // that went out with assigneeName "" would list the whole project rather
   // than nothing, so the grid stays unmounted until both are known.
-  if (username.isPending || displayName.isPending) return null;
+  //
+  // With no active profile there is nothing to wait for: both queries are
+  // disabled, and a disabled query stays pending forever, so returning null
+  // on it would leave the whole pane blank with nothing to explain it. Fall
+  // through to the empty state, which already says what to do next.
+  if (loading || (activeId && (username.isPending || displayName.isPending))) return null;
 
   const me = username.data ?? "";
   const myDisplayName = displayName.data ?? "";
