@@ -253,3 +253,54 @@ func rekeyIssueBoard(ctx context.Context, tx *sql.Tx, profileID string, draftID,
 	}
 	return nil
 }
+
+// discardDraftBoard takes the board with the journal row that would have
+// created it, the way discardDraftSprint does for a sprint.
+//
+// Without this, discarding a board_create row would take the ordinary path
+// and delete only the journal row, leaving the board behind with draft = 1.
+// That board would sit in every picker, never be created, because the row
+// that would have created it is gone, and never be discardable again for the
+// same reason: stranded state with no way out, which is worse than either a
+// board that stays or a board that goes.
+//
+// The queued adds go too. An issue_board row names a board that is about to
+// stop existing, so keeping it would strand a second row against a third
+// missing id. Each one is audited rather than dropped silently: the user
+// queued those cards deliberately and is entitled to see where they went.
+func discardDraftBoard(ctx context.Context, tx *sql.Tx, profileID, key string) error {
+	draftID, err := strconv.Atoi(key)
+	if err != nil {
+		return fmt.Errorf("draft board id %q: %w", key, err)
+	}
+	field := BoardField(draftID)
+	rows, err := journal.List(tx, profileID)
+	if err != nil {
+		return err
+	}
+	for _, p := range rows {
+		if p.EntityType != EntityIssueBoard || p.Field != field {
+			continue
+		}
+		if err := journal.Delete(tx, profileID, []int64{p.ID}); err != nil {
+			return err
+		}
+		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "discard", p.Field, p.AfterVal, p.BeforeVal,
+			"the draft board it was queued onto was discarded"); err != nil {
+			return err
+		}
+	}
+	// The dependent tables first, then the board, so a failure part way
+	// cannot leave a board with rows hanging off an id nothing owns.
+	for _, table := range []string{"board_column", "board_issue", "sprint"} {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM `+table+` WHERE profile_id = ? AND board_id = ?`, profileID, draftID); err != nil {
+			return fmt.Errorf("drop %s of draft board %d: %w", table, draftID, err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM board WHERE profile_id = ? AND id = ? AND draft = 1`, profileID, draftID); err != nil {
+		return fmt.Errorf("drop draft board %d: %w", draftID, err)
+	}
+	return nil
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -291,5 +292,38 @@ func TestRekeyBoardRepointsARankJournaledAgainstIt(t *testing.T) {
 	}
 	if _, _, board := issuerepo.ParseRank(rank412.AfterVal); board != 9 {
 		t.Errorf("a rank dropped on another board is left alone: %d", board)
+	}
+}
+
+// TestDiscardingADraftBoardTakesTheBoardWithIt is the other half of drafting
+// one. Discarding a pending change deletes its journal row; with no case of
+// its own, a board_create row takes the ordinary path and leaves the board
+// row behind, still draft = 1. That board then sits in every picker, is never
+// created, because the journal row that would have created it is gone, and
+// can never be discarded again for the same reason. Stranded state with no
+// way out is the worst of the three outcomes.
+func TestDiscardingADraftBoardTakesTheBoardWithIt(t *testing.T) {
+	repo, db := newRepoWithDB(t)
+	ctx := context.Background()
+
+	made, err := repo.CreateDraftBoard(ctx, "p1", board14())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p, ok := rowOf(t, repo, strconv.Itoa(made.ID), issuerepo.EntityBoardCreate)
+	if !ok {
+		t.Fatal("no board_create row to discard")
+	}
+	if err := repo.DiscardPendingChange(ctx, "p1", p.ID); err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+
+	var boards int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM board WHERE profile_id = 'p1' AND id = ?`, made.ID).Scan(&boards); err != nil {
+		t.Fatal(err)
+	}
+	if boards != 0 {
+		t.Errorf("the draft board survived its own discard: %d row(s) left", boards)
 	}
 }
