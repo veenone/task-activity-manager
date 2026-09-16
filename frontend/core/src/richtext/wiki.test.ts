@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { parseWiki } from "./wiki";
 import type { Inline } from "./ast";
 
-// text(s) is the shape every block's content takes in Task 1a: Task 1b owns
-// marks, links, escapes and macros, so until then a block or cell's only
-// child is the line's raw text.
+// text(s) is the shape a run of plain content takes: one text node, since
+// lineToInline merges adjacent literal characters (escapes, macro fallback,
+// unclosed-mark repair) into a single node rather than emitting one per
+// character or per branch taken.
 function text(s: string): Inline[] {
   return [{ t: "text", text: s }];
 }
@@ -224,6 +225,28 @@ describe("parseWiki tables", () => {
       },
     ]);
   });
+
+  // Outside-voice fix 4 (binding): a cell's own "|" (inside a link or a
+  // {code} span) must not be read as the cell delimiter.
+  it("keeps a link's | from splitting the cell it lives in", () => {
+    expect(parseWiki("|[Figma|https://f]|")).toEqual([
+      {
+        t: "table",
+        rows: [
+          [{ header: false, children: [{ t: "link", href: "https://f", children: text("Figma") }] }],
+        ],
+      },
+    ]);
+  });
+
+  it("keeps a {code} span's | from splitting the cell it lives in", () => {
+    expect(parseWiki("|{code}a|b{code}|")).toEqual([
+      {
+        t: "table",
+        rows: [[{ header: false, children: [{ t: "code", text: "a|b" }] }]],
+      },
+    ]);
+  });
 });
 
 describe("parseWiki code blocks", () => {
@@ -247,6 +270,137 @@ describe("parseWiki code blocks", () => {
     expect(parseWiki("{code:java}\nint x = 1;\nint y = 2;")).toEqual([
       { t: "codeblock", lang: "java", text: "int x = 1;\nint y = 2;" },
     ]);
+  });
+});
+
+describe("parseWiki inline marks", () => {
+  it("parses each single-character mark", () => {
+    expect(parseWiki("*bold*")).toEqual([{ t: "p", children: [{ t: "mark", mark: "bold", children: text("bold") }] }]);
+    expect(parseWiki("_italic_")).toEqual([
+      { t: "p", children: [{ t: "mark", mark: "italic", children: text("italic") }] },
+    ]);
+    expect(parseWiki("+u+")).toEqual([{ t: "p", children: [{ t: "mark", mark: "underline", children: text("u") }] }]);
+    expect(parseWiki("-strike-")).toEqual([
+      { t: "p", children: [{ t: "mark", mark: "strike", children: text("strike") }] },
+    ]);
+    expect(parseWiki("^sup^")).toEqual([{ t: "p", children: [{ t: "mark", mark: "sup", children: text("sup") }] }]);
+    expect(parseWiki("~sub~")).toEqual([{ t: "p", children: [{ t: "mark", mark: "sub", children: text("sub") }] }]);
+  });
+
+  it("parses {{monospace}} as a code node", () => {
+    expect(parseWiki("{{mono}}")).toEqual([{ t: "p", children: [{ t: "code", text: "mono" }] }]);
+  });
+
+  it("nests italic inside bold", () => {
+    expect(parseWiki("*_both_*")).toEqual([
+      {
+        t: "p",
+        children: [
+          { t: "mark", mark: "bold", children: [{ t: "mark", mark: "italic", children: text("both") }] },
+        ],
+      },
+    ]);
+  });
+});
+
+describe("parseWiki mark boundaries", () => {
+  it("leaves a hyphenated word, an underscored identifier and digits around a star alone", () => {
+    expect(parseWiki("mid-session re-run")).toEqual([{ t: "p", children: text("mid-session re-run") }]);
+    expect(parseWiki("my_var_name")).toEqual([{ t: "p", children: text("my_var_name") }]);
+    expect(parseWiki("2*3*4")).toEqual([{ t: "p", children: text("2*3*4") }]);
+  });
+
+  it("strikes a word set off by spaces", () => {
+    expect(parseWiki("a -gone- b")).toEqual([
+      {
+        t: "p",
+        children: [
+          { t: "text", text: "a " },
+          { t: "mark", mark: "strike", children: text("gone") },
+          { t: "text", text: " b" },
+        ],
+      },
+    ]);
+  });
+});
+
+describe("parseWiki links", () => {
+  it("parses a labelled link", () => {
+    expect(parseWiki("[text|https://x]")).toEqual([
+      { t: "p", children: [{ t: "link", href: "https://x", children: text("text") }] },
+    ]);
+  });
+
+  it("parses a bracketed bare url", () => {
+    expect(parseWiki("[https://x]")).toEqual([
+      { t: "p", children: [{ t: "link", href: "https://x", children: text("https://x") }] },
+    ]);
+  });
+
+  it("autolinks a bare url in running text", () => {
+    expect(parseWiki("See https://x now")).toEqual([
+      {
+        t: "p",
+        children: [
+          { t: "text", text: "See " },
+          { t: "link", href: "https://x", children: text("https://x") },
+          { t: "text", text: " now" },
+        ],
+      },
+    ]);
+  });
+
+  it("carries a user mention's and a relative link's own text as href, for the renderer to refuse", () => {
+    expect(parseWiki("[~jdoe]")).toEqual([
+      { t: "p", children: [{ t: "link", href: "~jdoe", children: text("~jdoe") }] },
+    ]);
+    expect(parseWiki("[text|/relative]")).toEqual([
+      { t: "p", children: [{ t: "link", href: "/relative", children: text("text") }] },
+    ]);
+  });
+});
+
+// Outside-voice fix 3 (binding): an escaped special character renders as
+// itself, with no backslash and no mark firing.
+describe("parseWiki escapes", () => {
+  it("renders each escaped character as itself with no mark", () => {
+    // Only the opening delimiters (*, |, {, [, \) are in the escape
+    // grammar; a bare closing "}" or "]" was never going to start a
+    // construct on its own, so it needs no escape of its own.
+    expect(parseWiki("\\*not bold\\*")).toEqual([{ t: "p", children: text("*not bold*") }]);
+    expect(parseWiki("a\\|b")).toEqual([{ t: "p", children: text("a|b") }]);
+    expect(parseWiki("\\{not a macro}")).toEqual([{ t: "p", children: text("{not a macro}") }]);
+    expect(parseWiki("\\[not a link]")).toEqual([{ t: "p", children: text("[not a link]") }]);
+    expect(parseWiki("a\\\\b")).toEqual([{ t: "p", children: text("a\\b") }]);
+  });
+
+  it("reads \\\\ at the end of a line as a hard break instead of an escape", () => {
+    expect(parseWiki("a\\\\")).toEqual([{ t: "p", children: [{ t: "text", text: "a" }, { t: "br" }] }]);
+  });
+});
+
+describe("parseWiki colour, image and unknown macros", () => {
+  it("unwraps {color}, keeping only the text inside", () => {
+    expect(parseWiki("{color:red}warm{color}")).toEqual([{ t: "p", children: text("warm") }]);
+  });
+
+  it("makes an image node named after the file, attributes dropped", () => {
+    expect(parseWiki("!screen.png!")).toEqual([{ t: "p", children: [{ t: "image", name: "screen.png" }] }]);
+    expect(parseWiki("!screen.png|thumbnail!")).toEqual([
+      { t: "p", children: [{ t: "image", name: "screen.png" }] },
+    ]);
+  });
+
+  it("drops a lone unknown macro with no matching close", () => {
+    expect(parseWiki("{status}")).toEqual([{ t: "p", children: [] }]);
+  });
+
+  it("unwraps an unknown macro that has a matching close, keeping its text", () => {
+    expect(parseWiki("{expand}inner{expand}")).toEqual([{ t: "p", children: text("inner") }]);
+  });
+
+  it("reads a brace followed by a space as literal text, not a macro", () => {
+    expect(parseWiki('{ "code": 1 }')).toEqual([{ t: "p", children: text('{ "code": 1 }') }]);
   });
 });
 
@@ -308,5 +462,17 @@ describe("parseWiki timing", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ t: "list", ordered: false });
     expect((result[0] as { items: unknown[] }).items).toHaveLength(5_000);
+  });
+
+  // D3 extended to inline (binding): an opening {code that never closes
+  // must not turn a long field into a quadratic scan. The 200,000-character
+  // alternating-marks case above already exercises lineToInline directly
+  // (one giant paragraph), so it now covers the inline mark stack too.
+  it("parses a long unclosed {code fragment in well under 200ms", () => {
+    const text = "{code" + "x".repeat(200_000);
+
+    const start = performance.now();
+    parseWiki(text);
+    expect(performance.now() - start).toBeLessThan(200);
   });
 });

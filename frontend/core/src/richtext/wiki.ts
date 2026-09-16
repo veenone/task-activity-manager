@@ -1,4 +1,4 @@
-import type { Block, Inline } from "./ast";
+import type { Block, Inline, Mark } from "./ast";
 
 // parseWiki turns Jira wiki markup into the shared AST. This file (Task 1a)
 // only builds block structure: headings, paragraphs, lists, tables, code
@@ -21,14 +21,286 @@ function splitLines(text: string): string[] {
   return text.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
 }
 
-// lineToInline is the seam Task 1b replaces. It turns one block's raw text
-// (a heading's or paragraph's content, a table cell, a quote line) into
-// Inline[]; today that is always exactly one text node carrying the text
-// unchanged. 1b swaps this for real inline parsing (marks, links, escapes,
-// macros) without the block walker above needing to change, since every
-// call site already threads a single string through it.
+const MARKS: Record<string, Mark> = {
+  "*": "bold",
+  "_": "italic",
+  "+": "underline",
+  "-": "strike",
+  "^": "sup",
+  "~": "sub",
+};
+
+const MARK_CHARS: Record<Mark, string> = {
+  bold: "*",
+  italic: "_",
+  underline: "+",
+  strike: "-",
+  sup: "^",
+  sub: "~",
+};
+
+const ESCAPABLE = new Set(["*", "|", "{", "[", "\\"]);
+
+function isWordChar(ch: string): boolean {
+  const c = ch.charCodeAt(0);
+  return (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+}
+
+function isLetter(ch: string | undefined): boolean {
+  if (!ch) return false;
+  const c = ch.charCodeAt(0);
+  return (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
+}
+
+// pushText appends a run of plain text to a node list, merging into a
+// trailing text node rather than adding a new one, so escapes, macro
+// fallback and unclosed-mark repair all read back as one text node where a
+// hand-written expectation expects it, instead of a splintered run of them.
+function pushText(nodes: Inline[], value: string): void {
+  if (value === "") return;
+  const last = nodes[nodes.length - 1];
+  if (last && last.t === "text") {
+    last.text += value;
+  } else {
+    nodes.push({ t: "text", text: value });
+  }
+}
+
+type MarkFrame = { mark: Mark; children: Inline[] };
+
+// unwindFrame folds a mark that never found its closing delimiter back into
+// plain text: the delimiter character it opened with, followed by whatever
+// it had already collected (marks that did close inside it are kept as
+// nodes, not re-flattened).
+function unwindFrame(frame: MarkFrame, target: Inline[]): void {
+  pushText(target, MARK_CHARS[frame.mark]);
+  for (const child of frame.children) {
+    if (child.t === "text") pushText(target, child.text);
+    else target.push(child);
+  }
+}
+
+// lineToInline turns one block's raw text (a heading's or paragraph's
+// content, a table cell, a quote line, a list item) into Inline[]: marks,
+// links, escapes, images and macros, one character at a time (D3). A mark
+// can open only where the character before it is not part of a word and
+// the one after it is not blank, and can close only the mirror of that, so
+// "mid-session", "my_var_name" and "2*3*4" stay plain while "a -gone- b"
+// strikes; the stack of open marks is bounded by the six mark types, not by
+// input length, so it stays linear regardless of how marks nest or fail to
+// close.
 function lineToInline(text: string): Inline[] {
-  return [{ t: "text", text }];
+  const root: Inline[] = [];
+  const stack: MarkFrame[] = [];
+  const n = text.length;
+  let buffer = "";
+  let i = 0;
+  // Once a search for "}}" or a {code} close fails, it fails for every
+  // later position too (the rest of the string does not grow a closing tag
+  // it did not have), so these cap each parse to at most one full scan
+  // apiece instead of one per remaining brace.
+  let dbraceFailFrom = Infinity;
+  let codeFailFrom = Infinity;
+
+  const current = (): Inline[] => (stack.length ? stack[stack.length - 1].children : root);
+  const flush = (): void => {
+    if (buffer) {
+      pushText(current(), buffer);
+      buffer = "";
+    }
+  };
+
+  while (i < n) {
+    const ch = text[i];
+
+    if (ch === "\\") {
+      const next = text[i + 1];
+      if (next === "\\") {
+        const after = text[i + 2];
+        if (after === undefined || after === "\n") {
+          flush();
+          current().push({ t: "br" });
+          i += after === "\n" ? 3 : 2;
+        } else {
+          buffer += "\\";
+          i += 2;
+        }
+        continue;
+      }
+      if (next !== undefined && ESCAPABLE.has(next)) {
+        buffer += next;
+        i += 2;
+        continue;
+      }
+      buffer += "\\";
+      i += 1;
+      continue;
+    }
+
+    if (ch === "{" && text[i + 1] === "{") {
+      if (i < dbraceFailFrom) {
+        const close = text.indexOf("}}", i + 2);
+        if (close !== -1) {
+          flush();
+          current().push({ t: "code", text: text.slice(i + 2, close) });
+          i = close + 2;
+          continue;
+        }
+        dbraceFailFrom = i;
+      }
+      buffer += "{";
+      i += 1;
+      continue;
+    }
+
+    if (ch === "{") {
+      const next = text[i + 1];
+      if (!isLetter(next)) {
+        buffer += "{";
+        i += 1;
+        continue;
+      }
+      let j = i + 1;
+      while (j < n && isLetter(text[j])) j++;
+      const name = text.slice(i + 1, j);
+      let bodyStart: number;
+      if (text[j] === ":") {
+        const closeAttrs = text.indexOf("}", j);
+        if (closeAttrs === -1) {
+          buffer += "{";
+          i += 1;
+          continue;
+        }
+        bodyStart = closeAttrs + 1;
+      } else if (text[j] === "}") {
+        bodyStart = j + 1;
+      } else {
+        buffer += "{";
+        i += 1;
+        continue;
+      }
+
+      if (name === "code") {
+        if (bodyStart >= codeFailFrom) {
+          buffer += "{";
+          i += 1;
+          continue;
+        }
+        const close = text.indexOf("{code}", bodyStart);
+        flush();
+        if (close === -1) {
+          current().push({ t: "code", text: text.slice(bodyStart) });
+          codeFailFrom = bodyStart;
+          i = n;
+        } else {
+          current().push({ t: "code", text: text.slice(bodyStart, close) });
+          i = close + 6;
+        }
+        continue;
+      }
+
+      // ponytail: an unknown macro's closing tag is searched for with one
+      // indexOf per occurrence, uncached by name (unlike {{ and {code}
+      // above). Real Jira text carries at most a handful of macros per
+      // field, so this stays linear in practice; a field carrying
+      // thousands of distinct unclosed braces would pay one scan each.
+      // Upgrade path, if that ever shows up: the same fail-position cache
+      // used above, keyed by tag name.
+      const closeTag = "{" + name + "}";
+      const close = text.indexOf(closeTag, bodyStart);
+      if (close === -1) {
+        i = bodyStart; // a lone macro vanishes: nothing is emitted for it
+        continue;
+      }
+      flush();
+      current().push(...lineToInline(text.slice(bodyStart, close)));
+      i = close + closeTag.length;
+      continue;
+    }
+
+    if (ch === "[") {
+      const close = text.indexOf("]", i + 1);
+      if (close === -1) {
+        buffer += "[";
+        i += 1;
+        continue;
+      }
+      const inner = text.slice(i + 1, close);
+      const pipeIdx = inner.indexOf("|");
+      const label = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
+      const href = pipeIdx === -1 ? inner : inner.slice(pipeIdx + 1);
+      flush();
+      current().push({ t: "link", href, children: [{ t: "text", text: label }] });
+      i = close + 1;
+      continue;
+    }
+
+    if (ch === "!") {
+      const close = text.indexOf("!", i + 1);
+      if (close === -1) {
+        buffer += "!";
+        i += 1;
+        continue;
+      }
+      const inner = text.slice(i + 1, close);
+      const pipeIdx = inner.indexOf("|");
+      const name = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
+      flush();
+      current().push({ t: "image", name });
+      i = close + 1;
+      continue;
+    }
+
+    if (ch === "h" && (text.startsWith("https://", i) || text.startsWith("http://", i))) {
+      let j = i;
+      while (j < n && text[j] !== " " && text[j] !== "\t" && text[j] !== "\n") j++;
+      const url = text.slice(i, j);
+      flush();
+      current().push({ t: "link", href: url, children: [{ t: "text", text: url }] });
+      i = j;
+      continue;
+    }
+
+    const markType = MARKS[ch];
+    if (markType) {
+      const prev = i > 0 ? text[i - 1] : "";
+      const next = i + 1 < n ? text[i + 1] : "";
+      const canOpen = !isWordChar(prev) && next !== "" && next !== " " && next !== "\t";
+      const canClose = prev !== "" && prev !== " " && prev !== "\t" && !isWordChar(next);
+      const openIdx = stack.findIndex((f) => f.mark === markType);
+
+      if (openIdx !== -1 && canClose) {
+        flush();
+        while (stack.length - 1 > openIdx) {
+          const inner = stack.pop() as MarkFrame;
+          unwindFrame(inner, current());
+        }
+        const frame = stack.pop() as MarkFrame;
+        current().push({ t: "mark", mark: frame.mark, children: frame.children });
+        i += 1;
+        continue;
+      }
+      if (openIdx === -1 && canOpen) {
+        flush();
+        stack.push({ mark: markType, children: [] });
+        i += 1;
+        continue;
+      }
+      buffer += ch;
+      i += 1;
+      continue;
+    }
+
+    buffer += ch;
+    i += 1;
+  }
+
+  flush();
+  while (stack.length) {
+    const frame = stack.pop() as MarkFrame;
+    unwindFrame(frame, current());
+  }
+  return root;
 }
 
 function matchHeading(line: string): { level: 1 | 2 | 3 | 4 | 5 | 6; content: string } | null {
@@ -152,16 +424,12 @@ function buildList(entries: { markers: string; content: string }[]): Block[] {
 }
 
 // parseTableRow splits one "|"-prefixed line into cells. A cell opens with
-// "||" (header) or "|" (normal) and its content always ends at the next "|",
-// whatever cell that pipe goes on to open; that single rule is what makes a
-// row like "||h1||h2|c1|" resolve to two header cells then one normal cell
-// without special-casing the transition.
-//
-// ponytail: a cell's content is read verbatim up to the next "|", so a "|"
-// that is actually inside a {code} span or a [text|url] link splits the row
-// early. Table cells are Task 1b's, alongside real inline parsing: 1b scans
-// each cell's raw text for a balanced {code}...{code} or [...] span before
-// this splitter cuts on "|", so both stay intact.
+// "||" (header) or "|" (normal) and its content always ends at the next "|"
+// that is not inside a [text|url] link or a {code}...{code} span, whatever
+// cell that pipe would otherwise open; that single rule is what makes a row
+// like "||h1||h2|c1|" resolve to two header cells then one normal cell
+// without special-casing the transition, while a link's or a code span's
+// own "|" stays inside the cell that carries it.
 function parseTableRow(line: string): { header: boolean; children: Inline[] }[] {
   const cells: { header: boolean; children: Inline[] }[] = [];
   const n = line.length;
@@ -176,7 +444,22 @@ function parseTableRow(line: string): { header: boolean; children: Inline[] }[] 
       i += 1;
     }
     const start = i;
-    while (i < n && line[i] !== "|") i++;
+    while (i < n && line[i] !== "|") {
+      if (line[i] === "[") {
+        const close = line.indexOf("]", i + 1);
+        i = close === -1 ? i + 1 : close + 1;
+        continue;
+      }
+      if (line[i] === "{" && line.startsWith("code", i + 1) && (line[i + 5] === ":" || line[i + 5] === "}")) {
+        const attrsClose = line.indexOf("}", i);
+        if (attrsClose !== -1) {
+          const bodyClose = line.indexOf("{code}", attrsClose + 1);
+          i = bodyClose === -1 ? n : bodyClose + 6;
+          continue;
+        }
+      }
+      i++;
+    }
     if (start === i && i === n) break; // trailing closer, not another cell
     cells.push({ header, children: lineToInline(line.slice(start, i)) });
   }
