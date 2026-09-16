@@ -93,7 +93,7 @@ type BoardCreator interface {
 
 **Files:** `tam/internal/tamstore/tamstore.go`; `tam/internal/issuerepo/boarddrafts.go` (new) + test; `tam/internal/issuerepo/pending.go`; `tam/internal/committer/firewall.go`.
 
-**Produces** `board.draft` (schema 14), `EntityBoardCreate = "board_create"`, `CreateDraftBoard`, `RekeyBoard`.
+**Produces** `board.draft` (schema 15; 14 went to bundle 03), `EntityBoardCreate = "board_create"`, `CreateDraftBoard`, `RekeyBoard`.
 
 **Steps**
 1. Migration test in this repo's required shape: seed the **old** schema, rewind the recorded version, reopen, assert the column exists. A fresh open runs every migration, so a test that lets the new schema build the column proves nothing. `board` has no `draft` column today; `sprint` got one at 13, so copy that entry.
