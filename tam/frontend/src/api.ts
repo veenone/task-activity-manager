@@ -267,6 +267,10 @@ export interface Board {
   name: string;
   // Jira's own board type: "scrum" or "kanban".
   type: string;
+  // draft marks a board drafted in TAM and not yet created in Jira, the way
+  // Sprint.draft does for a sprint. Absent on fixtures written before board
+  // drafts existed.
+  draft?: boolean;
 }
 
 export interface Sprint {

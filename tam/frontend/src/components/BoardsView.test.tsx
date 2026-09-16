@@ -42,6 +42,10 @@ vi.mock("../api", async () => {
     CreateSprint: vi.fn(),
     SuggestSprintDates: vi.fn(),
     PendingInSprint: vi.fn(),
+    CreateDraftBoard: vi.fn(),
+    AddIssuesToBoard: vi.fn(),
+    ListBoardSprintDetails: vi.fn(),
+    ListIssues: vi.fn(),
   };
 });
 
@@ -218,6 +222,10 @@ beforeEach(() => {
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
   vi.mocked(api.PendingInSprint).mockResolvedValue(0);
+  vi.mocked(api.CreateDraftBoard).mockResolvedValue(-2);
+  vi.mocked(api.AddIssuesToBoard).mockResolvedValue();
+  vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([]);
+  vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
 });
 
 describe("BoardsView toolbar", () => {
@@ -236,6 +244,31 @@ describe("BoardsView toolbar", () => {
     expect(within(picker).getByRole("option", { name: "Sprint 12 (Active)" })).toBeInTheDocument();
     expect(within(picker).getByRole("option", { name: "Sprint 13 (Future)" })).toBeInTheDocument();
     await waitFor(() => expect(api.GetBoard).toHaveBeenCalledWith("p1", 1, "12", "none"));
+  });
+
+  it("reaches New board from the toolbar and reports what it drafted", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByRole("combobox", { name: "Board" });
+    await user.click(screen.getByRole("button", { name: "New board" }));
+    await user.type(screen.getByLabelText("Name"), "Payments Kanban");
+    await user.click(screen.getByRole("button", { name: "Create board" }));
+    await waitFor(() => expect(api.CreateDraftBoard).toHaveBeenCalledWith(
+      "p1", "Payments Kanban", "scrum", "Filter for Payments Kanban", "project = PLAT ORDER BY Rank",
+    ));
+    // The dialog closes and the outcome lands in the banner, the same place
+    // a sprint create's does.
+    expect(screen.queryByRole("heading", { name: "New board" })).not.toBeInTheDocument();
+    expect(await screen.findByText(/Payments Kanban was drafted/)).toBeInTheDocument();
+  });
+
+  it("reaches Add issues from the toolbar only once a board is on screen", async () => {
+    const user = userEvent.setup();
+    renderView();
+    const picker = await screen.findByRole("combobox", { name: "Board" });
+    await waitFor(() => expect(picker).toHaveValue("1"));
+    await user.click(screen.getByRole("button", { name: "Add issues" }));
+    expect(await screen.findByRole("heading", { name: "Add issues to Acme Platform Scrum" })).toBeInTheDocument();
   });
 
   it("hides the sprint picker when the chosen board is a kanban one", async () => {

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
 import {
+  AddIssuesToBoard,
   CanTransition,
   CompleteSprint,
+  CreateDraftBoard,
   CreateSprint,
   GetBoard,
   GetProfileSetting,
@@ -166,6 +168,34 @@ export function useJournalSprintMoves(profileId: string) {
   return useMutation({
     mutationFn: ({ keys, sprintId }: { keys: string[]; sprintId: string }) =>
       call(() => JournalSprintMoves(profileId, keys, sprintId)),
+    onSuccess: () => invalidateWrites(qc, profileId),
+  });
+}
+
+// useCreateDraftBoard is the New board dialog. Unlike useCreateSprint it
+// takes no lock: CreateDraftBoard is a plain local write, the way the three
+// board writes above are, so it refreshes the same things they do, plus the
+// board list itself, which is what grows a new entry.
+export function useCreateDraftBoard(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { name: string; type: string; filterName: string; jql: string }) =>
+      call(() => CreateDraftBoard(profileId, v.name, v.type, v.filterName, v.jql)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.boards(profileId) });
+      invalidateWrites(qc, profileId);
+    },
+  });
+}
+
+// useAddIssuesToBoard is the Add issues picker: also a plain local write,
+// one issue_board row per key, refreshed the same way the three board writes
+// above are.
+export function useAddIssuesToBoard(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { keys: string[]; boardId: number; scope: string }) =>
+      call(() => AddIssuesToBoard(profileId, v.keys, v.boardId, v.scope)),
     onSuccess: () => invalidateWrites(qc, profileId),
   });
 }

@@ -334,6 +334,7 @@ export namespace boardrepo {
 	    id: number;
 	    name: string;
 	    type: string;
+	    draft: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Board(source);
@@ -344,6 +345,7 @@ export namespace boardrepo {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.type = source["type"];
+	        this.draft = source["draft"];
 	    }
 	}
 	export class LaneView {

@@ -1,6 +1,6 @@
 import type { Board, Sprint, Swimlane } from "../api";
 import { SWIMLANES } from "../api";
-import { DRAFT_SPRINT_HINT } from "../lib/sprintOptions";
+import { DRAFT_SPRINT_HINT, draftLabel } from "../lib/sprintOptions";
 
 interface Props {
   boards: Board[];
@@ -28,6 +28,12 @@ interface Props {
   // on screen: unlike Start and Complete it needs no sprint already picked,
   // so it is not gated on one.
   onCreate: () => void;
+  // onNewBoard opens the New board dialog. Unlike New sprint it needs no
+  // board already picked either, since a profile can start with none.
+  onNewBoard: () => void;
+  // onAddIssues opens the Add issues picker. Gated on a board being on
+  // screen: there is nowhere local for the add to name without one.
+  onAddIssues: () => void;
   // filter narrows the cards drawn, by key, assignee, or issue type.
   filter: string;
   onFilter: (v: string) => void;
@@ -37,8 +43,14 @@ interface Props {
 // Commit has not created yet. Jira sends the state lowercase, so it is
 // capitalised here for display only.
 export function sprintOption(s: Sprint): string {
-  if (s.draft) return `${s.name} (draft)`;
+  if (s.draft) return draftLabel(s.name, true);
   return `${s.name} (${s.state.charAt(0).toUpperCase()}${s.state.slice(1)})`;
+}
+
+// boardOption labels a board "Name", or "Name (draft)" for one Commit has
+// not created yet in Jira, the same suffix sprintOption uses.
+export function boardOption(b: Board): string {
+  return draftLabel(b.name, !!b.draft);
 }
 
 // BoardsToolbar is XTM's board head, class for class: the pickers on the
@@ -47,7 +59,7 @@ export function sprintOption(s: Sprint): string {
 // for a board name and absurd for three swimlane options.
 export function BoardsToolbar({
   boards, board, onBoard, sprints, sprint, onSprint, swimlane, onSwimlane,
-  refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete, onCreate,
+  refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete, onCreate, onNewBoard, onAddIssues,
 }: Props) {
   // A ceremony belongs to the sprint on screen: the one that has not begun
   // can be started, the one that is running can be completed, and a closed
@@ -64,7 +76,7 @@ export function BoardsToolbar({
           onChange={(e) => onBoard(Number(e.target.value))}
         >
           {boards.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
+            <option key={b.id} value={b.id}>{boardOption(b)}</option>
           ))}
         </select>
       </label>
@@ -113,6 +125,10 @@ export function BoardsToolbar({
 
       <div className="board-head-actions">
         {refreshing && <span className="muted small">Refreshing</span>}
+        <button type="button" className="btn" onClick={onNewBoard}>New board</button>
+        {board && (
+          <button type="button" className="btn" onClick={onAddIssues}>Add issues</button>
+        )}
         {board?.type === "scrum" && (
           <button type="button" className="btn" onClick={onCreate}>New sprint</button>
         )}
