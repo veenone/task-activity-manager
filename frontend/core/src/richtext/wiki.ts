@@ -1,11 +1,10 @@
 import type { Block, Inline, Mark } from "./ast";
 
-// parseWiki turns Jira wiki markup into the shared AST. This file (Task 1a)
-// only builds block structure: headings, paragraphs, lists, tables, code
-// blocks, quotes, panels and rules. Every block's inline content is one
-// placeholder text node for now; Task 1b replaces lineToInline with real
-// mark, link, escape and macro parsing without touching the block walker
-// above it.
+// parseWiki turns Jira wiki markup into the shared AST: block structure
+// (headings, paragraphs, lists, tables, code blocks, quotes, panels, rules)
+// from parseBlockLines below, and real inline content (marks, links,
+// escapes, images, macros) from lineToInline, which every block-level call
+// site threads its raw text through.
 //
 // D3 (binding): scan character by character, no regex with nested
 // quantifiers over user text. Every match* helper below is a handful of
@@ -52,6 +51,38 @@ function isLetter(ch: string | undefined): boolean {
   return (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
 }
 
+// scanBraceOpen reads a "{name}" or "{name:attrs}" opening tag starting at
+// text[i] (text[i] must be "{"): a letter immediately after "{", a run of
+// further letters as the name, then either "}" (bare) or ":" followed
+// eventually by "}" (attrs). Returns the name and the index right after
+// the closing "}", or null when the shape does not hold. Shared by
+// lineToInline's inline macro handling and parseTableRow's {code} cell
+// split, the two places that need to recognise this opening tag mid-string
+// rather than as a whole line (matchBraceTag's job, which requires the
+// closing "}" to be the line's last character).
+//
+// ponytail: the ":" branch's indexOf("}", j) is uncached, so many
+// "{name:" attempts whose attrs never close would each scan to the end of
+// the string. Real Jira macro attrs are short (a language, a colour, a
+// title) and few per field; a field built out of thousands of unclosed
+// "{x:" fragments would pay one scan each. Upgrade path, if that ever
+// matters: the same monotonic fail-position cache dbraceFailFrom uses in
+// lineToInline, since "no '}' found past position j" is just as global a
+// fact as "no '}}' found past position j" is there.
+function scanBraceOpen(text: string, i: number): { name: string; bodyStart: number } | null {
+  const next = text[i + 1];
+  if (!isLetter(next)) return null;
+  let j = i + 1;
+  while (j < text.length && isLetter(text[j])) j++;
+  const name = text.slice(i + 1, j);
+  if (text[j] === ":") {
+    const closeAttrs = text.indexOf("}", j);
+    return closeAttrs === -1 ? null : { name, bodyStart: closeAttrs + 1 };
+  }
+  if (text[j] === "}") return { name, bodyStart: j + 1 };
+  return null;
+}
+
 // pushText appends a run of plain text to a node list, merging into a
 // trailing text node rather than adding a new one, so escapes, macro
 // fallback and unclosed-mark repair all read back as one text node where a
@@ -95,12 +126,18 @@ function lineToInline(text: string): Inline[] {
   const n = text.length;
   let buffer = "";
   let i = 0;
-  // Once a search for "}}" or a {code} close fails, it fails for every
-  // later position too (the rest of the string does not grow a closing tag
-  // it did not have), so these cap each parse to at most one full scan
-  // apiece instead of one per remaining brace.
+  // Once a search for "}}", a closing "]" or a closing "!" fails at some
+  // position, it fails for every later position too: the rest of the
+  // string does not grow a closer it did not have. These cap each of
+  // those three to at most one full scan per parse call instead of one per
+  // remaining unclosed delimiter (a string of many bare "[" or "!" would
+  // otherwise scan to the end on every one of them). {code}'s own close
+  // search needs no such cache: on failure it sets i = n itself, which
+  // ends the loop outright, so that branch can never run a second time in
+  // one call.
   let dbraceFailFrom = Infinity;
-  let codeFailFrom = Infinity;
+  let bracketFailFrom = Infinity;
+  let imageFailFrom = Infinity;
 
   const current = (): Inline[] => (stack.length ? stack[stack.length - 1].children : root);
   const flush = (): void => {
@@ -154,44 +191,20 @@ function lineToInline(text: string): Inline[] {
     }
 
     if (ch === "{") {
-      const next = text[i + 1];
-      if (!isLetter(next)) {
+      const open = scanBraceOpen(text, i);
+      if (!open) {
         buffer += "{";
         i += 1;
         continue;
       }
-      let j = i + 1;
-      while (j < n && isLetter(text[j])) j++;
-      const name = text.slice(i + 1, j);
-      let bodyStart: number;
-      if (text[j] === ":") {
-        const closeAttrs = text.indexOf("}", j);
-        if (closeAttrs === -1) {
-          buffer += "{";
-          i += 1;
-          continue;
-        }
-        bodyStart = closeAttrs + 1;
-      } else if (text[j] === "}") {
-        bodyStart = j + 1;
-      } else {
-        buffer += "{";
-        i += 1;
-        continue;
-      }
+      const { name, bodyStart } = open;
 
       if (name === "code") {
-        if (bodyStart >= codeFailFrom) {
-          buffer += "{";
-          i += 1;
-          continue;
-        }
         const close = text.indexOf("{code}", bodyStart);
         flush();
         if (close === -1) {
           current().push({ t: "code", text: text.slice(bodyStart) });
-          codeFailFrom = bodyStart;
-          i = n;
+          i = n; // runs to the end; the loop cannot reach this branch again
         } else {
           current().push({ t: "code", text: text.slice(bodyStart, close) });
           i = close + 6;
@@ -219,39 +232,52 @@ function lineToInline(text: string): Inline[] {
     }
 
     if (ch === "[") {
-      const close = text.indexOf("]", i + 1);
-      if (close === -1) {
-        buffer += "[";
-        i += 1;
-        continue;
+      if (i < bracketFailFrom) {
+        const close = text.indexOf("]", i + 1);
+        if (close !== -1) {
+          const inner = text.slice(i + 1, close);
+          const pipeIdx = inner.indexOf("|");
+          const label = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
+          const href = pipeIdx === -1 ? inner : inner.slice(pipeIdx + 1);
+          flush();
+          current().push({ t: "link", href, children: [{ t: "text", text: label }] });
+          i = close + 1;
+          continue;
+        }
+        bracketFailFrom = i;
       }
-      const inner = text.slice(i + 1, close);
-      const pipeIdx = inner.indexOf("|");
-      const label = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
-      const href = pipeIdx === -1 ? inner : inner.slice(pipeIdx + 1);
-      flush();
-      current().push({ t: "link", href, children: [{ t: "text", text: label }] });
-      i = close + 1;
+      buffer += "[";
+      i += 1;
       continue;
     }
 
     if (ch === "!") {
-      const close = text.indexOf("!", i + 1);
-      if (close === -1) {
-        buffer += "!";
-        i += 1;
-        continue;
+      if (i < imageFailFrom) {
+        const close = text.indexOf("!", i + 1);
+        if (close !== -1) {
+          const inner = text.slice(i + 1, close);
+          const pipeIdx = inner.indexOf("|");
+          const name = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
+          flush();
+          current().push({ t: "image", name });
+          i = close + 1;
+          continue;
+        }
+        imageFailFrom = i;
       }
-      const inner = text.slice(i + 1, close);
-      const pipeIdx = inner.indexOf("|");
-      const name = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
-      flush();
-      current().push({ t: "image", name });
-      i = close + 1;
+      buffer += "!";
+      i += 1;
       continue;
     }
 
-    if (ch === "h" && (text.startsWith("https://", i) || text.startsWith("http://", i))) {
+    // Autolink needs a left boundary too, the same shape as a mark's open
+    // check, so "seehttps://x" stays one plain word instead of linkifying
+    // from the middle of it.
+    if (
+      ch === "h" &&
+      (text.startsWith("https://", i) || text.startsWith("http://", i)) &&
+      !isWordChar(i > 0 ? text[i - 1] : "")
+    ) {
       let j = i;
       while (j < n && text[j] !== " " && text[j] !== "\t" && text[j] !== "\n") j++;
       const url = text.slice(i, j);
@@ -434,6 +460,10 @@ function parseTableRow(line: string): { header: boolean; children: Inline[] }[] 
   const cells: { header: boolean; children: Inline[] }[] = [];
   const n = line.length;
   let i = 0;
+  // Same fail-position cache as lineToInline's "[" handling, and for the
+  // same reason: a row like "|[[[[[[...]" would otherwise scan to the
+  // row's end on every unclosed "[".
+  let bracketFailFrom = Infinity;
 
   while (i < n) {
     let header = false;
@@ -446,14 +476,21 @@ function parseTableRow(line: string): { header: boolean; children: Inline[] }[] 
     const start = i;
     while (i < n && line[i] !== "|") {
       if (line[i] === "[") {
-        const close = line.indexOf("]", i + 1);
-        i = close === -1 ? i + 1 : close + 1;
+        if (i < bracketFailFrom) {
+          const close = line.indexOf("]", i + 1);
+          if (close !== -1) {
+            i = close + 1;
+            continue;
+          }
+          bracketFailFrom = i;
+        }
+        i++;
         continue;
       }
-      if (line[i] === "{" && line.startsWith("code", i + 1) && (line[i + 5] === ":" || line[i + 5] === "}")) {
-        const attrsClose = line.indexOf("}", i);
-        if (attrsClose !== -1) {
-          const bodyClose = line.indexOf("{code}", attrsClose + 1);
+      if (line[i] === "{") {
+        const open = scanBraceOpen(line, i);
+        if (open && open.name === "code") {
+          const bodyClose = line.indexOf("{code}", open.bodyStart);
           i = bodyClose === -1 ? n : bodyClose + 6;
           continue;
         }

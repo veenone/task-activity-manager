@@ -358,6 +358,25 @@ describe("parseWiki links", () => {
       { t: "p", children: [{ t: "link", href: "/relative", children: text("text") }] },
     ]);
   });
+
+  it("does not autolink a url stuck to the end of a word", () => {
+    expect(parseWiki("seehttps://x")).toEqual([{ t: "p", children: text("seehttps://x") }]);
+  });
+});
+
+// Fix round 1, Important #3: unwindFrame folds a mark that never found its
+// closing delimiter back into plain text, both when a different outer mark
+// closes around it and at the very end of input. It had no direct test.
+describe("parseWiki unclosed marks", () => {
+  it("folds an unclosed inner mark back to literal text when an outer mark closes around it", () => {
+    expect(parseWiki("*a _b c*")).toEqual([
+      { t: "p", children: [{ t: "mark", mark: "bold", children: text("a _b c") }] },
+    ]);
+  });
+
+  it("folds an entirely unclosed mark back to literal text at the end of input", () => {
+    expect(parseWiki("a *bold text")).toEqual([{ t: "p", children: text("a *bold text") }]);
+  });
 });
 
 // Outside-voice fix 3 (binding): an escaped special character renders as
@@ -470,6 +489,34 @@ describe("parseWiki timing", () => {
   // (one giant paragraph), so it now covers the inline mark stack too.
   it("parses a long unclosed {code fragment in well under 200ms", () => {
     const text = "{code" + "x".repeat(200_000);
+
+    const start = performance.now();
+    parseWiki(text);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+
+  // Fix round 1, Critical: a run of unclosed "[" or "!" used to re-scan to
+  // the end of the string on every one of them (measured at 500ms for
+  // 200,000), the same class of quadratic blowup {{ and {code} were
+  // already guarded against. bracketFailFrom / imageFailFrom close that.
+  it("parses 200,000 unclosed [ characters in well under 200ms", () => {
+    const text = "[".repeat(200_000);
+
+    const start = performance.now();
+    parseWiki(text);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+
+  it("parses 200,000 unclosed ! characters in well under 200ms", () => {
+    const text = "!".repeat(200_000);
+
+    const start = performance.now();
+    parseWiki(text);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+
+  it("parses a table row of 5,000 unclosed [ characters in well under 200ms", () => {
+    const text = "|" + "[".repeat(5_000);
 
     const start = performance.now();
     parseWiki(text);
