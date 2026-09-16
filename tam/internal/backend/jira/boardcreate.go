@@ -75,3 +75,19 @@ func (b *Backend) AddToBoardBacklog(ctx context.Context, boardID int, keys []str
 	}
 	return nil
 }
+
+// The only consumer is a type assertion, so drift here would skip the
+// filter check silently; this fails the build instead.
+var _ backend.BoardFilterChecker = (*Backend)(nil)
+
+// BoardFilterCheck reads which of keys are on boardID now, the committer's
+// courtesy read after an issue_board push. Empty and error answers both
+// pass straight through; the committer treats either as "skip the check",
+// never as a reason to undo a write that already landed.
+func (b *Backend) BoardFilterCheck(ctx context.Context, boardID int, keys []string) ([]string, error) {
+	present, err := b.c.BoardFilterCheck(ctx, boardID, keys)
+	if err != nil {
+		return nil, fmt.Errorf("board %d filter check: %w", boardID, err)
+	}
+	return present, nil
+}

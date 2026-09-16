@@ -464,6 +464,18 @@ type BoardCreator interface {
 	AddToBoardBacklog(ctx context.Context, boardID int, keys []string) error
 }
 
+// BoardFilterChecker is the courtesy read the committer makes once per board
+// after it pushes issue_board adds: of the keys just pushed, which ones
+// Jira's own board filter actually kept. Kept optional, the same as
+// BoardCreator and for the same reason, so a backend that cannot answer it
+// simply skips the check rather than the push it followed failing over it.
+type BoardFilterChecker interface {
+	// BoardFilterCheck reads which of keys are on boardID now. It is a read
+	// made after a write that already landed, so its own failure is never
+	// the commit's to report.
+	BoardFilterCheck(ctx context.Context, boardID int, keys []string) ([]string, error)
+}
+
 // ErrNoTransition is what Transition returns when no workflow transition of
 // the issue reaches the target status. It is the one board failure that
 // will fail identically on every retry, so the commit pass reports it as
