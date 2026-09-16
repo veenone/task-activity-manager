@@ -100,13 +100,6 @@ func (b *Backend) TestConnection(context.Context) (backend.User, error) {
 
 func (b *Backend) IsDemo() bool { return true }
 
-// demoAssigneeKeys are the curated issues (by their PLAT-rekeyed suffix)
-// assigned to the demo user's own account, so a demo profile has rows an
-// "Assigned to me" filter actually matches. Their display name is
-// overwritten to agree, the way a real sync's assignee and assignee_name
-// always name the same person.
-var demoAssigneeKeys = map[string]bool{"347": true, "402": true}
-
 // issues is the dataset with the overlay applied: rewritten rows replace
 // their originals, created rows follow. Every row leaves with its status id
 // filled in from its status name, since the dataset stores names and the
@@ -127,10 +120,6 @@ func (b *Backend) issues() []backend.Issue {
 	}
 	for i := range all {
 		all[i] = statusIDFor(all[i])
-		if suffix, ok := strings.CutPrefix(all[i].Key, b.project+"-"); ok && demoAssigneeKeys[suffix] {
-			all[i].Assignee = "Demo User"
-			all[i].AssigneeName = "demo"
-		}
 	}
 	return all
 }
@@ -325,7 +314,7 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 	}
 	b.over[key] = backend.Issue{
 		Key: key, ID: fmt.Sprintf("%d", 30000+b.nextKey), Project: projectKey, Type: d.Type, Summary: d.Summary,
-		Status: "To Do", Assignee: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
+		Status: "To Do", Assignee: d.Assignee, AssigneeName: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
 		ParentKey: parentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
 	}
 	b.desc[key] = d.Description
