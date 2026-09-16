@@ -5,7 +5,7 @@ import "strings"
 // ProjectConfig is one in-scope Jira project for the coverage module.
 type ProjectConfig struct {
 	ProjectKey string `json:"projectKey"`
-	Role       string `json:"role"`  // source | customer
+	Role       string `json:"role"` // source | customer
 	Label      string `json:"label"`
 	SortOrder  int    `json:"sortOrder"`
 }

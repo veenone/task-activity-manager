@@ -208,7 +208,10 @@ func (m *Module) ProjectRelationSankey(profileID string) (testrepo.Sankey, error
 	nodeLabel := map[string]string{}
 	nodeLayer := map[string]int{}
 
-	type sankeyLink struct{ source, target string; value int }
+	type sankeyLink struct {
+		source, target string
+		value          int
+	}
 	var links []sankeyLink
 
 	// Layer-0 → layer-1 links: one per (customer project, canonical) pair.

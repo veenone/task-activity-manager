@@ -208,9 +208,9 @@ func TestRealListTestsBasicSearchesAndMaps(t *testing.T) {
 // should be verified against the real Xray Server/DC 8.4.0 instance.
 func TestParseIssueTestFixVersions(t *testing.T) {
 	cases := []struct {
-		name     string
-		rawJSON  string
-		wantFVs  []string
+		name    string
+		rawJSON string
+		wantFVs []string
 	}{
 		{
 			name: "two fix versions",

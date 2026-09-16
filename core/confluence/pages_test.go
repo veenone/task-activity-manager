@@ -81,9 +81,9 @@ func TestCreatePageSendsSpaceParentAndStorageBody(t *testing.T) {
 		}
 		raw, _ := io.ReadAll(r.Body)
 		var got struct {
-			Type      string `json:"type"`
-			Title     string `json:"title"`
-			Space     struct{ Key string } `json:"space"`
+			Type      string                `json:"type"`
+			Title     string                `json:"title"`
+			Space     struct{ Key string }  `json:"space"`
 			Ancestors []struct{ ID string } `json:"ancestors"`
 			Body      struct {
 				Storage struct{ Value, Representation string } `json:"storage"`
@@ -118,7 +118,7 @@ func TestUpdatePageSendsTheVersionItIsGiven(t *testing.T) {
 		}
 		raw, _ := io.ReadAll(r.Body)
 		var got struct {
-			ID      string `json:"id"`
+			ID      string               `json:"id"`
 			Version struct{ Number int } `json:"version"`
 		}
 		_ = json.Unmarshal(raw, &got)

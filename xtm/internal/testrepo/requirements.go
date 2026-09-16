@@ -352,7 +352,7 @@ func (r *Repository) ListRequirementsWithCoverage(profileID string) ([]Requireme
 	defer reqRows.Close()
 
 	type req struct {
-		key, project, itype, summary, status                     string
+		key, project, itype, summary, status                            string
 		priority, components, fixVersions, sprint, description, epicKey string
 	}
 	reqs := []req{}
