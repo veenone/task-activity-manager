@@ -59,3 +59,27 @@ row that was locally edited before the migration, because that row's
 pending-edit overlay covers them.
 
 **Raised by:** bundle 03 planning, 2026-09-16.
+
+## The committer's held-draft-sprint-on-a-draft-board path is not reachable yet
+
+**What:** `tam/internal/committer/phases.go`'s `createSprints` resolves a draft
+sprint's `originBoardId` through `r.boardRealID` and holds the sprint
+(`r.deps.blockedBy`) when that board is itself still a draft this Commit
+could not (yet, or ever) create. `tam/internal/issuerepo/boarddrafts.go`'s
+`RekeyBoard` correspondingly does not repoint a draft sprint's scope inside
+an `issue_board` row's value (see its `ponytail:` comment).
+
+**Why it is not dead code:** both are correct and covered by tests
+(`boardcreate_test.go`'s board+sprint cases; `boarddrafts_test.go`), but
+`issuerepo.CreateDraftSprint` refuses `BoardID <= 0`
+(`tam/internal/issuerepo/sprintdrafts.go`), so nothing in the app can draft a
+sprint onto a draft board today. Read cold, the held-sprint path looks like
+speculative machinery for a state that cannot occur, and it would be easy to
+"clean up" as dead code. It is defensive, not dead.
+
+**Depends on:** `CreateDraftSprint`'s `BoardID <= 0` guard being lifted, if a
+future bundle wants to let someone draft a sprint straight onto a board that
+is also still a draft.
+
+**Raised by:** bundle 04 fix round 1, 2026-09-16 (task: `RekeyBoard` missing
+`issue_board` rows, fix-round-1.md item 2).
