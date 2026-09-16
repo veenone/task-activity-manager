@@ -151,6 +151,7 @@ type named struct {
 
 type userRef struct {
 	Name        string `json:"name"`
+	Key         string `json:"key"`
 	DisplayName string `json:"displayName"`
 }
 
@@ -183,6 +184,7 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 	var assignee, reporter *userRef
 	if err := json.Unmarshal(f["assignee"], &assignee); err == nil && assignee != nil {
 		iss.Assignee = displayName(*assignee)
+		iss.AssigneeName = assigneeName(*assignee)
 	}
 	if err := json.Unmarshal(f["reporter"], &reporter); err == nil && reporter != nil {
 		iss.Reporter = displayName(*reporter)
@@ -219,6 +221,16 @@ func displayName(u userRef) string {
 		return u.DisplayName
 	}
 	return u.Name
+}
+
+// assigneeName is the username sync caches for the "assigned to me" match:
+// name ordinarily, falling back to key, since Data Center in GDPR mode
+// populates that instead for some users.
+func assigneeName(u userRef) string {
+	if u.Name != "" {
+		return u.Name
+	}
+	return u.Key
 }
 
 // Legacy Sprint values are toString dumps of the GreenHopper sprint object.

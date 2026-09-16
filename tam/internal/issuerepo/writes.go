@@ -22,6 +22,7 @@ var EditableFields = []string{"summary", "description", "priority", "labels", "s
 var fieldColumns = map[string]string{
 	"summary": "summary", "description": "", "priority": "priority",
 	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee", "parentKey": "parent_key",
+	"assigneeName": "assignee_name",
 }
 
 // draftTypes are the logical types a draft may have.
@@ -51,6 +52,8 @@ func FieldValue(iss backend.Issue, description, field string) string {
 		return iss.Priority
 	case "assignee":
 		return iss.Assignee
+	case "assigneeName":
+		return iss.AssigneeName
 	case "labels":
 		return strings.Join(iss.Labels, ", ")
 	case "storyPoints":
@@ -89,8 +92,8 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (val
 		detail sql.NullString
 	)
 	err = q.QueryRowContext(ctx,
-		`SELECT summary, priority, assignee, labels, story_points, detail_json, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
-		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &labels, &points, &detail, &updated, &iss.ParentKey, &iss.Type)
+		`SELECT summary, priority, assignee, assignee_name, labels, story_points, detail_json, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
+		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &iss.AssigneeName, &labels, &points, &detail, &updated, &iss.ParentKey, &iss.Type)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", "", ErrNotFound
 	}
@@ -516,11 +519,15 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 		// Backlog's sprint field and the Boards view both read these two
 		// columns, so leaving them empty would show a draft in the backlog
 		// until the Commit that already knows better.
+		// A draft only ever knows the username AssigneePicker sent (see the
+		// bundle 03 finding: a local edit writes the username into assignee,
+		// where sync would have written a display name), so assignee_name
+		// carries that same value rather than a fabricated display name.
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
+			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, assignee_name, reporter, priority, labels,
 				sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
-			VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, '', '', ?, ?)`,
-			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Priority, string(labels),
+			VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, '', '', ?, ?)`,
+			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Assignee, d.Priority, string(labels),
 			d.SprintID, d.SprintName, d.ParentKey, points, now, string(detail), now); err != nil {
 			return nil, fmt.Errorf("insert draft: %w", err)
 		}

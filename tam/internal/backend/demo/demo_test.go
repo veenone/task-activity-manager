@@ -82,6 +82,36 @@ func TestDemoBackendPagesTheWholeDataset(t *testing.T) {
 	}
 }
 
+// TestDemoIssuesIncludeSomeAssignedToTheDemoUser gives the demo profile
+// something an "Assigned to me" filter actually matches: TestConnection's
+// own username is "demo", so at least one row has to carry it, with the
+// display name kept in step the way a real sync's would be.
+func TestDemoIssuesIncludeSomeAssignedToTheDemoUser(t *testing.T) {
+	b := demobackend.New("PLAT")
+	ctx := context.Background()
+	u, err := b.TestConnection(ctx)
+	if err != nil || u.Name != "demo" {
+		t.Fatalf("connection = %+v, %v", u, err)
+	}
+	issues, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 100)
+	if err != nil {
+		t.Fatalf("page: %v", err)
+	}
+	found := 0
+	for _, iss := range issues {
+		if iss.AssigneeName != u.Name {
+			continue
+		}
+		found++
+		if iss.Assignee != u.DisplayName {
+			t.Errorf("%s: assignee = %q, want the display name that matches assignee_name %q, the way one real user's sync row always does", iss.Key, iss.Assignee, iss.AssigneeName)
+		}
+	}
+	if found == 0 {
+		t.Error("no demo issue is assigned to the demo user; the Assigned to me filter would have nothing to show")
+	}
+}
+
 // TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer is the demo's
 // half of the sync's query: the issue types are honoured, and a scope JQL
 // this dataset has no engine for is ignored rather than guessed at. The one

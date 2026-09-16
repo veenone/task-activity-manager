@@ -89,12 +89,12 @@ func orderFor(q IssueQuery) string {
 }
 
 const upsertIssueSQL = `
-	INSERT INTO issue (profile_id, key, id, project, type, summary, status, status_id, assignee, reporter, priority, labels,
+	INSERT INTO issue (profile_id, key, id, project, type, summary, status, status_id, assignee, assignee_name, reporter, priority, labels,
 		sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, key) DO UPDATE SET
 		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
-		status = excluded.status, status_id = excluded.status_id, assignee = excluded.assignee, reporter = excluded.reporter,
+		status = excluded.status, status_id = excluded.status_id, assignee = excluded.assignee, assignee_name = excluded.assignee_name, reporter = excluded.reporter,
 		priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
 		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
 		story_points = excluded.story_points, rank = excluded.rank, created = excluded.created,
@@ -110,7 +110,7 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 		points = sql.NullFloat64{Float64: *iss.StoryPoints, Valid: true}
 	}
 	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, iss.Status, iss.StatusID,
-		iss.Assignee, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
+		iss.Assignee, iss.AssigneeName, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
 		points, iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
 		return fmt.Errorf("upsert %s: %w", iss.Key, err)
 	}
