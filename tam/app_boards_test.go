@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -830,6 +831,59 @@ func TestPendingInSprintCountsOnlyTheCardsStayingInIt(t *testing.T) {
 	}
 	if n, err = a.PendingInSprint(p.ID, 13); err != nil || n != 1 {
 		t.Errorf("pending in sprint 13 = %d, %v, want the card journaled into it", n, err)
+	}
+}
+
+// TestCreateDraftBoardJournalsADraftOnANegativeID proves the binding adapts
+// its flat arguments into the DraftBoard the repository takes and hands the
+// id straight back, so the picker that follows can add issues to it at
+// once, before Commit ever runs.
+func TestCreateDraftBoardJournalsADraftOnANegativeID(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+
+	id, err := a.CreateDraftBoard(p.ID, "New Board", "kanban", "New Board filter", "project = PLAT")
+	if err != nil {
+		t.Fatalf("create draft board: %v", err)
+	}
+	if id >= 0 {
+		t.Errorf("draft board id = %d, want a negative placeholder", id)
+	}
+	rows, err := a.repo.PendingForKey(a.ctx, p.ID, fmt.Sprint(id))
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(rows) != 1 || rows[0].EntityType != issuerepo.EntityBoardCreate {
+		t.Fatalf("pending = %+v, want the one board_create row", rows)
+	}
+	if _, err := a.CreateDraftBoard("", "x", "kanban", "", ""); err == nil {
+		t.Error("an empty profile id was accepted, want a refusal")
+	}
+}
+
+// TestAddIssuesToBoardJournalsTheBoardAndScope is test 7 of task 3's brief:
+// the binding through the real call path, proving its arguments reach the
+// journal row rather than the model regeneration being taken on faith.
+func TestAddIssuesToBoardJournalsTheBoardAndScope(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	seedCard(t, a, p.ID, "PLAT-1", "1")
+	seedCard(t, a, p.ID, "PLAT-2", "1")
+
+	if err := a.AddIssuesToBoard(p.ID, []string{"PLAT-1", "PLAT-2"}, 5, "backlog"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	for _, key := range []string{"PLAT-1", "PLAT-2"} {
+		rows, err := a.repo.PendingForKey(a.ctx, p.ID, key)
+		if err != nil {
+			t.Fatalf("pending for %s: %v", key, err)
+		}
+		if len(rows) != 1 || rows[0].EntityType != issuerepo.EntityIssueBoard || rows[0].AfterVal != "5|backlog" {
+			t.Fatalf("%s pending = %+v, want the one issue_board row naming board 5's backlog", key, rows)
+		}
+	}
+	if err := a.AddIssuesToBoard(p.ID, nil, 5, "backlog"); err == nil {
+		t.Error("an empty selection was accepted, want a refusal")
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/syncer"
 )
 
@@ -208,6 +209,43 @@ func (a *App) JournalSprintMoves(profileID string, keys []string, sprintID strin
 		return 0, fmt.Errorf("none of the %d selected cards is in the cache; sync first", len(keys))
 	}
 	return moved, nil
+}
+
+// CreateDraftBoard journals a new board, created locally on a negative id
+// until Commit creates it in Jira, and answers with that id, which the
+// picker uses at once to add issues to it before it is real. Like the board
+// writes above, it is a local write: no lock, no Jira call.
+func (a *App) CreateDraftBoard(profileID, name, boardType, filterName, jql string) (int, error) {
+	if err := a.requireStore(); err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(profileID) == "" {
+		return 0, errors.New("no profile selected")
+	}
+	made, err := a.repo.CreateDraftBoard(a.ctx, profileID, issuerepo.DraftBoard{
+		Name: name, Type: boardType, FilterName: filterName, JQL: jql,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return made.ID, nil
+}
+
+// AddIssuesToBoard journals "put these issues on this board", one row per
+// key, for the picker that follows CreateDraftBoard or offers an existing
+// one. Like the board writes above, it is a local write: no lock, no Jira
+// call, and it returns as soon as the journal rows are written.
+func (a *App) AddIssuesToBoard(profileID string, keys []string, boardID int, scope string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(profileID) == "" {
+		return errors.New("no profile selected")
+	}
+	if len(keys) == 0 {
+		return errors.New("no issues are selected")
+	}
+	return a.repo.AddToBoard(a.ctx, profileID, keys, boardID, scope)
 }
 
 // CanTransition asks Jira whether the card can reach statusID from where it
