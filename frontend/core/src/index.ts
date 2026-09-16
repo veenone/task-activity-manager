@@ -40,5 +40,5 @@ export { compactUrl, isAllowedLink } from "./lib/links";
 export { RichText, RICH_TEXT_LIMIT } from "./richtext/RichText";
 export { parseRich, detectFormat } from "./richtext/detect";
 export { toPlainText } from "./richtext/plain";
-export { RichTextField, SyntaxToggle, RICH_TEXT_SENTENCES } from "./richtext/RichTextField";
+export { RichTextField, SyntaxToggle, RICH_TEXT_SENTENCES, FORMAT_LABEL } from "./richtext/RichTextField";
 export type { RichFormat, Block, Inline } from "./richtext/ast";

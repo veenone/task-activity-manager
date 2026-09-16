@@ -2,13 +2,17 @@ import { useId, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactElement, TextareaHTMLAttributes } from "react";
 import type { RichFormat } from "./ast";
 import { detectFormat } from "./detect";
-import { RichText } from "./RichText";
+import { RichText, SIZE_SENTENCE } from "./RichText";
 
-const FORMAT_LABEL: Record<RichFormat, string> = { wiki: "Jira markup", markdown: "Markdown" };
+// The name of each syntax, wherever one is named: the toggle's two buttons,
+// the "Read as ..." hint, and the detail panel's chip saying a field is not
+// being read the way it was detected. Exported so that chip reads this one
+// record rather than a second copy of it.
+export const FORMAT_LABEL: Record<RichFormat, string> = { wiki: "Jira markup", markdown: "Markdown" };
 
-// Every sentence the field prints, exported so EditableFields, NewIssueModal
-// and MetaField (Task 6, 7) reuse the exact wording rather than retype it,
-// and so this test file can assert none of it carries an em dash.
+// Every sentence the field prints, exported so that its test can assert none
+// of it carries an em dash, and so anything outside this file that has to
+// print one of them reuses the exact wording rather than retyping it.
 export const RICH_TEXT_SENTENCES = {
   detected: (f: RichFormat, labels: string[]): string =>
     f === "wiki"
@@ -18,7 +22,7 @@ export const RICH_TEXT_SENTENCES = {
   picked: (f: RichFormat): string => `Read as ${FORMAT_LABEL[f]}, your choice. Saved exactly as typed.`,
   markdownWarning:
     "Jira Data Center renders this field as wiki markup, so Markdown will not look the same there. TAM renders it here; the text is sent to Jira unchanged.",
-  sizeGuard: "Showing the first 200 KB. Open in Jira for the rest.",
+  sizeGuard: SIZE_SENTENCE,
 };
 
 interface SyntaxToggleProps {
@@ -113,7 +117,9 @@ export function RichTextField({
     focusTab(TABS[(index + delta + TABS.length) % TABS.length]);
   };
 
-  const onTextareaKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  // Bound on the wrapper, not the textarea: from Preview the focus sits on
+  // the tab, and a shortcut that can only switch one way is not a toggle.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!e.ctrlKey || !e.shiftKey || e.key.toLowerCase() !== "p") return;
     e.preventDefault();
     setTab((t) => (t === "write" ? "preview" : "write"));
@@ -123,7 +129,7 @@ export function RichTextField({
   const previewPanelId = `${baseId}-panel-preview`;
 
   return (
-    <div className="richfield">
+    <div className="richfield" onKeyDown={onKeyDown}>
       <div className="richfield-controls">
         <div className="richfield-tabs" role="tablist" aria-label="Write and Preview" onKeyDown={onTablistKeyDown}>
           {TABS.map((t) => (
@@ -165,7 +171,6 @@ export function RichTextField({
           value={value}
           className={textarea?.className ? `richfield-textarea ${textarea.className}` : "richfield-textarea"}
           onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onTextareaKeyDown}
           onFocus={() => setTab("write")}
         />
       </div>

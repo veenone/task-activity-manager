@@ -9,7 +9,9 @@ import { isAllowedLink } from "../lib/links";
 // Jira's own web view is the place to read the rest.
 export const RICH_TEXT_LIMIT = 200_000;
 
-const SIZE_SENTENCE = "Showing the first 200 KB. Open in Jira for the rest.";
+// Exported so RICH_TEXT_SENTENCES.sizeGuard is this same string rather than
+// a second copy of it typed out in RichTextField.
+export const SIZE_SENTENCE = "Showing the first 200 KB. Open in Jira for the rest.";
 
 const MARK_TAGS = {
   bold: "strong",
@@ -237,12 +239,10 @@ function collectInline(blocks: Block[]): Inline[] {
 // reaches onOpenLink, and only http, https and mailto addresses render as
 // one at all (isAllowedLink).
 export function RichText({ text, format = "auto", inline = false, projectKey, onOpenLink, onIssueKey }: Props): ReactElement {
-  // D4: parsing is memoized on (text, format), the two things that decide
-  // its output; nothing else this component reads should re-run it.
-  const parsed = useMemo(() => {
-    const capped = text.length > RICH_TEXT_LIMIT ? text.slice(0, RICH_TEXT_LIMIT) : text;
-    return parseRich(capped, format);
-  }, [text, format]);
+  const capped = text.length > RICH_TEXT_LIMIT ? text.slice(0, RICH_TEXT_LIMIT) : text;
+  // D4: parsing is memoized on (capped text, format), the two things that
+  // decide its output; nothing else this component reads should re-run it.
+  const parsed = useMemo(() => parseRich(capped, format), [capped, format]);
 
   // Built once per projectKey, not once per text leaf (item 3): the regex
   // itself depends only on projectKey, never on onIssueKey's identity, so
@@ -257,7 +257,12 @@ export function RichText({ text, format = "auto", inline = false, projectKey, on
   const opts: RenderOpts = { issueKeyPattern, onIssueKey, onOpenLink, inline };
 
   if (inline) {
-    const nodes = collectInline(parsed.blocks);
+    // A summary that parses as a list, a table or a rule leaves collectInline
+    // with nothing to show ("* Fix the payment step" is one list item, no
+    // paragraph), and an empty heading is worse than an unrendered one, so
+    // the raw text stands in for it.
+    const collected = collectInline(parsed.blocks);
+    const nodes: Inline[] = collected.length > 0 || capped === "" ? collected : [{ t: "text", text: capped }];
     return (
       <span className="rich-text-inline">
         {truncated && <span className="rich-text-truncated">{SIZE_SENTENCE} </span>}

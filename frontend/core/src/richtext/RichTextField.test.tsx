@@ -53,6 +53,18 @@ describe("RichTextField tabs", () => {
     expect(screen.getByRole("tab", { name: "Write" })).toHaveAttribute("aria-selected", "true");
   });
 
+  // Fix round 3, Minor: the shortcut was bound to the textarea alone, so
+  // from Preview, where focus sits on the tab, it could not switch back.
+  it("Ctrl+Shift+P from the Preview tab switches back to Write", () => {
+    render(<ControlledField />);
+    const preview = screen.getByRole("tab", { name: "Preview" });
+    fireEvent.click(preview);
+    expect(preview).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(preview, { key: "P", ctrlKey: true, shiftKey: true });
+    expect(screen.getByRole("tab", { name: "Write" })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("ArrowRight and ArrowLeft move focus and selection between the tabs", async () => {
     const user = userEvent.setup();
     render(<ControlledField />);

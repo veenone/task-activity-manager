@@ -1,4 +1,5 @@
 import type { Block, Inline, Mark } from "./ast";
+import { isAllowedLink } from "../lib/links";
 
 // parseWiki turns Jira wiki markup into the shared AST: block structure
 // (headings, paragraphs, lists, tables, code blocks, quotes, panels, rules)
@@ -104,6 +105,54 @@ function pushText(nodes: Inline[], value: string): void {
   } else {
     nodes.push({ t: "text", text: value });
   }
+}
+
+// isImageTarget decides whether "!...!" is an image macro or just two
+// exclamation marks in a sentence ("Deploy failed! Check the logs!", which
+// used to swallow the prose between them and draw it as an image name). An
+// image target names a file or an address: no blanks in it, and either an
+// extension or a scheme. The "|params" tail is the caller's to strip before
+// it asks.
+function isImageTarget(name: string): boolean {
+  if (name === "") return false;
+  for (let i = 0; i < name.length; i++) {
+    const ch = name[i];
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") return false;
+  }
+  if (name.includes("://")) return true;
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && dot < name.length - 1;
+}
+
+// trimAutolink takes the sentence's own punctuation back off the end of a
+// bare URL, which otherwise runs to the next blank: "See http://x.com/a."
+// put the full stop inside the href. A closing bracket goes only when
+// nothing in the URL opened it, so "https://x/a_(b)" keeps its own pair.
+// The bracket counts are taken once and decremented as characters go, so
+// this stays linear however long the trailing run is (D3).
+const CLOSERS: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+
+function trimAutolink(url: string): string {
+  const counts: Record<string, number> = { "(": 0, ")": 0, "[": 0, "]": 0, "{": 0, "}": 0 };
+  for (let i = 0; i < url.length; i++) {
+    if (counts[url[i]] !== undefined) counts[url[i]]++;
+  }
+  let end = url.length;
+  while (end > 0) {
+    const ch = url[end - 1];
+    if (ch === "." || ch === "," || ch === ";" || ch === ":" || ch === "!" || ch === "?") {
+      end--;
+      continue;
+    }
+    const open = CLOSERS[ch];
+    if (open !== undefined && counts[ch] > counts[open]) {
+      counts[ch]--;
+      end--;
+      continue;
+    }
+    break;
+  }
+  return url.slice(0, end);
 }
 
 type MarkFrame = { mark: Mark; children: Inline[] };
@@ -247,10 +296,28 @@ function lineToInline(text: string): Inline[] {
         if (close !== -1) {
           const inner = text.slice(i + 1, close);
           const pipeIdx = inner.indexOf("|");
-          const label = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
-          const href = pipeIdx === -1 ? inner : inner.slice(pipeIdx + 1);
-          flush();
-          current().push({ t: "link", href, children: [{ t: "text", text: label }] });
+          // With a "|" the right half is the address and the left is the
+          // label, whatever either says. With no "|" the inner text is all
+          // there is, so it becomes a link only when it is one: "[WIP]" and
+          // "[~jdoe]" are ordinary bracketed writing and keep their
+          // brackets, where a bare "[https://x]" is still a link.
+          if (pipeIdx !== -1) {
+            flush();
+            current().push({
+              t: "link",
+              href: inner.slice(pipeIdx + 1),
+              children: [{ t: "text", text: inner.slice(0, pipeIdx) }],
+            });
+            i = close + 1;
+            continue;
+          }
+          if (isAllowedLink(inner)) {
+            flush();
+            current().push({ t: "link", href: inner, children: [{ t: "text", text: inner }] });
+            i = close + 1;
+            continue;
+          }
+          buffer += text.slice(i, close + 1);
           i = close + 1;
           continue;
         }
@@ -268,12 +335,15 @@ function lineToInline(text: string): Inline[] {
           const inner = text.slice(i + 1, close);
           const pipeIdx = inner.indexOf("|");
           const name = pipeIdx === -1 ? inner : inner.slice(0, pipeIdx);
-          flush();
-          current().push({ t: "image", name });
-          i = close + 1;
-          continue;
+          if (isImageTarget(name)) {
+            flush();
+            current().push({ t: "image", name });
+            i = close + 1;
+            continue;
+          }
+        } else {
+          imageFailFrom = i;
         }
-        imageFailFrom = i;
       }
       buffer += "!";
       i += 1;
@@ -290,10 +360,13 @@ function lineToInline(text: string): Inline[] {
     ) {
       let j = i;
       while (j < n && text[j] !== " " && text[j] !== "\t" && text[j] !== "\n") j++;
-      const url = text.slice(i, j);
+      // The trim never empties the run (it starts "http", which it never
+      // drops), so this always advances; what it gave back is read again as
+      // ordinary text, so a trailing "." or ")" still ends the sentence.
+      const url = trimAutolink(text.slice(i, j));
       flush();
       current().push({ t: "link", href: url, children: [{ t: "text", text: url }] });
-      i = j;
+      i += url.length;
       continue;
     }
 

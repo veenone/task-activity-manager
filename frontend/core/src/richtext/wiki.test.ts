@@ -350,12 +350,48 @@ describe("parseWiki links", () => {
     ]);
   });
 
-  it("carries a user mention's and a relative link's own text as href, for the renderer to refuse", () => {
-    expect(parseWiki("[~jdoe]")).toEqual([
-      { t: "p", children: [{ t: "link", href: "~jdoe", children: text("~jdoe") }] },
-    ]);
+  it("carries a labelled relative link's own href, for the renderer to refuse", () => {
     expect(parseWiki("[text|/relative]")).toEqual([
       { t: "p", children: [{ t: "link", href: "/relative", children: text("text") }] },
+    ]);
+  });
+
+  // Fix round 3, Important: with no "|" there is nothing but the inner text
+  // to read as an address, so anything that is not an allowed link stays the
+  // literal bracketed text it was typed as. A user mention and "[WIP]" are
+  // the same case.
+  it("keeps the brackets on a bracketed word that is not a link", () => {
+    expect(parseWiki("[WIP] rework the step")).toEqual([
+      { t: "p", children: text("[WIP] rework the step") },
+    ]);
+    expect(parseWiki("[~jdoe]")).toEqual([{ t: "p", children: text("[~jdoe]") }]);
+  });
+
+  // Fix round 3, Minor: a bare autolink used to run to the next whitespace,
+  // so a sentence's own punctuation ended up inside the href.
+  it("leaves a sentence's punctuation and an unmatched bracket outside a bare autolink", () => {
+    expect(parseWiki("See http://x.com/a. Then go")).toEqual([
+      {
+        t: "p",
+        children: [
+          { t: "text", text: "See " },
+          { t: "link", href: "http://x.com/a", children: text("http://x.com/a") },
+          { t: "text", text: ". Then go" },
+        ],
+      },
+    ]);
+    expect(parseWiki("(see https://x.com/a)")).toEqual([
+      {
+        t: "p",
+        children: [
+          { t: "text", text: "(see " },
+          { t: "link", href: "https://x.com/a", children: text("https://x.com/a") },
+          { t: "text", text: ")" },
+        ],
+      },
+    ]);
+    expect(parseWiki("https://x.com/a_(b)")).toEqual([
+      { t: "p", children: [{ t: "link", href: "https://x.com/a_(b)", children: text("https://x.com/a_(b)") }] },
     ]);
   });
 
@@ -408,6 +444,23 @@ describe("parseWiki colour, image and unknown macros", () => {
     expect(parseWiki("!screen.png|thumbnail!")).toEqual([
       { t: "p", children: [{ t: "image", name: "screen.png" }] },
     ]);
+    expect(parseWiki("!https://x/shot!")).toEqual([
+      { t: "p", children: [{ t: "image", name: "https://x/shot" }] },
+    ]);
+  });
+
+  // Fix round 3, Critical: two "!" in one block used to swallow the prose
+  // between them. Paired exclamation marks are ordinary writing, and a
+  // paragraph joins consecutive lines, so the pair need not even share one.
+  it("reads paired exclamation marks in prose as text, not an image", () => {
+    expect(parseWiki("Deploy failed! Check the logs!")).toEqual([
+      { t: "p", children: text("Deploy failed! Check the logs!") },
+    ]);
+    expect(parseWiki("Deploy failed!\nCheck the logs!")).toEqual([
+      { t: "p", children: text("Deploy failed!\nCheck the logs!") },
+    ]);
+    expect(parseWiki("Ship it!!")).toEqual([{ t: "p", children: text("Ship it!!") }]);
+    expect(parseWiki("!no extension!")).toEqual([{ t: "p", children: text("!no extension!") }]);
   });
 
   it("drops a lone unknown macro with no matching close", () => {

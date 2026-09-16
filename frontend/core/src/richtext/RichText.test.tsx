@@ -171,6 +171,21 @@ describe("RichText inline mode", () => {
     expect(container.textContent).toBe("bold and em");
   });
 
+  // Fix round 3, Important: collectInline keeps only paragraphs and
+  // headings, so a summary that parses as a list, a table or a rule used to
+  // render as an empty span: the grid row showed the text and the panel
+  // heading showed nothing.
+  it("falls back to the raw text when nothing inline survives the parse", () => {
+    const list = render(<RichText text="* Fix the payment step" format="wiki" inline onOpenLink={vi.fn()} />);
+    expect(list.container.textContent).toBe("* Fix the payment step");
+
+    const table = render(<RichText text="|Fix| the payment step" format="wiki" inline onOpenLink={vi.fn()} />);
+    expect(table.container.textContent).toBe("|Fix| the payment step");
+
+    const rule = render(<RichText text="----" format="wiki" inline onOpenLink={vi.fn()} />);
+    expect(rule.container.textContent).toBe("----");
+  });
+
   it("still renders a link as a button", async () => {
     const onOpenLink = vi.fn();
     render(<RichText text="[Figma|https://figma.com/f]" format="wiki" inline onOpenLink={onOpenLink} />);
