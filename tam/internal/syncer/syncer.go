@@ -112,11 +112,19 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 	}
 	// A failure here must not fail the sync: the user's issues are not lost
 	// because bookkeeping about who "me" is could not be written.
-	if err := e.repo.SetProfileSetting(ctx, profileID, settingJiraUsername, user.Name); err != nil {
-		log.Printf("tam: save jira username for %s: %v", profileID, err)
-	}
-	if err := e.repo.SetProfileSetting(ctx, profileID, settingJiraDisplayName, user.DisplayName); err != nil {
-		log.Printf("tam: save jira display name for %s: %v", profileID, err)
+	//
+	// An answer with no username is not written at all. Overwriting a good
+	// value with "" would leave a filter that matches nothing, and unlike a
+	// write failure it would leave no trace to find it by.
+	if user.Name == "" {
+		log.Printf("tam: jira user for %s carries no username; keeping the stored one", profileID)
+	} else {
+		if err := e.repo.SetProfileSetting(ctx, profileID, settingJiraUsername, user.Name); err != nil {
+			log.Printf("tam: save jira username for %s: %v", profileID, err)
+		}
+		if err := e.repo.SetProfileSetting(ctx, profileID, settingJiraDisplayName, user.DisplayName); err != nil {
+			log.Printf("tam: save jira display name for %s: %v", profileID, err)
+		}
 	}
 
 	since := ""

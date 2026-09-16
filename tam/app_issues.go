@@ -42,7 +42,8 @@ const (
 	// shell's Refresh clears the cache.
 	settingDetailCacheMinutes = "detail_cache_minutes"
 	// settingJiraUsername and settingJiraDisplayName are the per-profile keys
-	// for the connected Jira user, refreshed by TestProfileConnection.
+	// for the connected Jira user, written at the start of every sync and by
+	// TestProfileConnection.
 	settingJiraUsername    = "jira_username"
 	settingJiraDisplayName = "jira_display_name"
 	// defaultDetailCacheMinutes is that setting's default.

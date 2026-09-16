@@ -62,6 +62,9 @@ type fake struct {
 	// was asked for, so a test can assert only active and future sprints
 	// had their keys fetched.
 	keysRequested []boardKeyRequest
+	// connUser overrides what TestConnection answers. Nil keeps the
+	// {Name: "fake"} every other test in this file expects.
+	connUser *backend.User
 }
 
 // boardKeyRequest is one call the boards pass made to BoardIssueKeys.
@@ -71,6 +74,9 @@ type boardKeyRequest struct {
 }
 
 func (f *fake) TestConnection(context.Context) (backend.User, error) {
+	if f.connUser != nil {
+		return *f.connUser, f.connErr
+	}
 	return backend.User{Name: "fake"}, f.connErr
 }
 func (f *fake) IsDemo() bool { return false }
@@ -599,6 +605,35 @@ func TestSyncStoresJiraUserSettings(t *testing.T) {
 	displayName, err := repo.ProfileSetting(context.Background(), "p1", "jira_display_name")
 	if err != nil || displayName != "Demo User" {
 		t.Errorf("jira_display_name = %q, %v, want %q", displayName, err, "Demo User")
+	}
+}
+
+// TestSyncKeepsStoredUserWhenAnswerHasNoUsername pins the guard on the write.
+// An answer carrying no username leaves the stored one alone: writing ""
+// would leave the Assigned to me filter matching nothing, and unlike a write
+// failure it would log nothing to find the cause by.
+func TestSyncKeepsStoredUserWhenAnswerHasNoUsername(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	if err := repo.SetProfileSetting(ctx, "p1", "jira_username", "rahmad"); err != nil {
+		t.Fatalf("seed username: %v", err)
+	}
+	if err := repo.SetProfileSetting(ctx, "p1", "jira_display_name", "R. Anand"); err != nil {
+		t.Fatalf("seed display name: %v", err)
+	}
+
+	f := &fake{connUser: &backend.User{Name: "", DisplayName: "Nameless"}}
+	if _, err := syncer.New(f, repo).Sync(ctx, "p1", "DEMO", "", false, nil); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	username, err := repo.ProfileSetting(ctx, "p1", "jira_username")
+	if err != nil || username != "rahmad" {
+		t.Errorf("jira_username = %q, %v, want it left at %q", username, err, "rahmad")
+	}
+	displayName, err := repo.ProfileSetting(ctx, "p1", "jira_display_name")
+	if err != nil || displayName != "R. Anand" {
+		t.Errorf("jira_display_name = %q, %v, want it left at %q", displayName, err, "R. Anand")
 	}
 }
 
