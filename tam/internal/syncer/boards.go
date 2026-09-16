@@ -33,14 +33,14 @@ type BoardSummary struct {
 	// key that is both on a board's own list and in one of its sprints is
 	// one card, counted once. A key on two boards is two cards, because it
 	// is drawn on both.
-	Cards       int      `json:"cards"`
-	Dropped     []string `json:"dropped"`
+	Cards   int      `json:"cards"`
+	Dropped []string `json:"dropped"`
 	// Foreign is how many boards were left alone because they belong to
 	// another project. It is not a failure, so it is counted rather than
 	// listed in Dropped.
-	Foreign     int  `json:"foreign"`
-	Unavailable bool `json:"unavailable"`
-	Elapsed     string   `json:"elapsed"`
+	Foreign     int    `json:"foreign"`
+	Unavailable bool   `json:"unavailable"`
+	Elapsed     string `json:"elapsed"`
 }
 
 // EnsureDropped makes Dropped a non-nil slice, which is what the frontend

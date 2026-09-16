@@ -25,13 +25,13 @@ type BugLink struct {
 
 // BugWithTests is a bug plus the Test keys it affects, for the Bugs panel.
 type BugWithTests struct {
-	Key        string   `json:"key"`
-	ProjectKey string   `json:"projectKey"`
+	Key        string `json:"key"`
+	ProjectKey string `json:"projectKey"`
 	// IssueType is the Jira issue type of the bug (e.g. "Bug", "Defect").
-	IssueType string   `json:"issueType"`
-	Summary    string   `json:"summary"`
-	Status     string   `json:"status"`
-	Priority   string   `json:"priority"`
+	IssueType string `json:"issueType"`
+	Summary   string `json:"summary"`
+	Status    string `json:"status"`
+	Priority  string `json:"priority"`
 	// Updated is the Jira last-updated timestamp for the bug issue.
 	Updated  string   `json:"updated"`
 	TestKeys []string `json:"testKeys"`

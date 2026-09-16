@@ -32,10 +32,19 @@ jobs:
       - name: ratchet
         run: sh scripts/ratchet.sh
       - name: go vet
+        # tam and xtm embed their built frontend with `//go:embed all:frontend/dist`,
+        # and that pattern has to match something before the root package will
+        # typecheck. Vetting only ./internal/... would dodge it, but every
+        # app_*.go binding lives in the root package, so that is most of what
+        # is worth vetting. An empty dist is enough for the embed to resolve;
+        # the real frontends are built by the build-windows and build-macos
+        # jobs, which is where a broken dist should surface.
         run: |
-          cd core && go vet ./... && cd ..
-          cd tam && go vet ./... && cd ..
-          cd xtm && go vet ./...
+          mkdir -p tam/frontend/dist xtm/frontend/dist
+          touch tam/frontend/dist/.vet-placeholder xtm/frontend/dist/.vet-placeholder
+          for m in core tam xtm; do
+            (cd "$m" && go vet ./...) || exit 1
+          done
       - name: gofmt
         # Linux checkout is LF, so this is meaningful here and not on a
         # Windows clone where core.autocrlf makes gofmt flag every file.

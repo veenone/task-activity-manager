@@ -153,12 +153,12 @@ var euiccTheme = demoTheme{
 		{"Two profiles installed (one Enabled, one Disabled)", "Manual", ""},
 	},
 	FeaturePre: map[string][]int{
-		"Profile Download":            {0, 1, 2, 3, 4},
-		"Enable Profile":              {0, 2, 5, 7},
-		"Disable Profile":             {0, 2, 5, 7},
-		"Delete Profile":              {0, 2, 5},
-		"eUICC Memory Reset":          {0, 2},
-		"Profile Fall-Back":           {0, 1, 6, 7},
+		"Profile Download":             {0, 1, 2, 3, 4},
+		"Enable Profile":               {0, 2, 5, 7},
+		"Disable Profile":              {0, 2, 5, 7},
+		"Delete Profile":               {0, 2, 5},
+		"eUICC Memory Reset":           {0, 2},
+		"Profile Fall-Back":            {0, 1, 6, 7},
 		"Profile Enable with Rollback": {0, 2, 5, 7},
 	},
 	// Keep TestCount >= demoLinkedTests (200): the peripheral generic seeders

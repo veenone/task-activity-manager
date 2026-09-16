@@ -294,13 +294,13 @@ type BugFieldOption struct {
 // screen (beyond project/issuetype/summary/description/priority/labels which the
 // form always handles). Type is a simplified kind:
 //
-//   "text"     plain string input
-//   "option"   single-select with AllowedValues (POST as {"id": ...})
-//   "version"  single version picker with AllowedValues (POST as {"id": ...})
-//   "versions" multi-version picker with AllowedValues (POST as [{"id": ...},...])
-//   "number"   numeric input (POST as string)
-//   "date"     date input (POST as string)
-//   "array"    generic array of option objects
+//	"text"     plain string input
+//	"option"   single-select with AllowedValues (POST as {"id": ...})
+//	"version"  single version picker with AllowedValues (POST as {"id": ...})
+//	"versions" multi-version picker with AllowedValues (POST as [{"id": ...},...])
+//	"number"   numeric input (POST as string)
+//	"date"     date input (POST as string)
+//	"array"    generic array of option objects
 type BugCreateField struct {
 	ID            string           `json:"id"`
 	Name          string           `json:"name"`

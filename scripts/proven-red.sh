@@ -19,20 +19,60 @@ UNIT_TEST_RE=${GT_UNIT_TEST_RE:-'(_test\.go|_test\.py|/test_[^/]+\.py|\.test\.[j
 TEST_SUPPORT_RE=${GT_TEST_SUPPORT_RE:-'(^|/)(tests?|__tests__|spec|testdata|fixtures)/|conftest\.py$|/setup\.(ts|js)$|^scripts/'}
 NON_CODE_RE=${GT_NON_CODE_RE:-'^(docs/|agents/|\.github/|\.githooks/|Makefile$|\.ratchet-|.*\.(md|rst|txt|yml|yaml)$|.*baseline.*\.json$)'}
 SKIP_TYPES='docs chore ci refactor build style test'
-# ADAPT: run only the given test files. Go tests run by package, so map files to dirs.
+# ADAPT: run only the given test files. This repo is two languages, so the list
+# is split by extension and each half goes to its own runner. Handing a .test.ts
+# to `go test` is not a harmless no-op: it exits non-zero with "no Go files",
+# which this script reads as a red and reports as a pass, so every
+# frontend-only change would be rubber-stamped without running anything.
+# Go tests run by package, so map those files to dirs. Vitest resolves specs
+# from its own workspace root, so group those by workspace and strip the prefix.
+VITEST_WORKSPACES=${GT_VITEST_WORKSPACES:-'frontend/core tam/frontend xtm/frontend'}
 run_tests() {   # $@ = changed unit test paths relative to APP_DIR
-  go test $(for f in "$@"; do dirname "./$f"; done | sort -u)
-  # npx vitest run "$@"
-  # python -m pytest "$@"
-  # cargo test            # rust: cannot select by file; runs all
+  run_status=0
+  go_files=''
+  ts_files=''
+  for f in "$@"; do
+    case "$f" in
+      *_test.go) go_files="$go_files $f" ;;
+      *.test.ts|*.test.tsx|*.test.js|*.test.jsx) ts_files="$ts_files $f" ;;
+      *) echo "proven-red: no runner for $f" ; run_status=1 ;;
+    esac
+  done
+  if [ -n "$go_files" ]; then
+    # shellcheck disable=SC2046
+    go test $(for f in $go_files; do dirname "./$f"; done | sort -u) || run_status=1
+  fi
+  for w in $VITEST_WORKSPACES; do
+    in_w=''
+    for f in $ts_files; do
+      case "$f" in "$w"/*) in_w="$in_w ${f#"$w"/}" ;; esac
+    done
+    if [ -n "$in_w" ]; then
+      # shellcheck disable=SC2086
+      (cd "$w" && npx vitest run $in_w) || run_status=1
+    fi
+  done
+  return $run_status
 }
 # Symptoms of a missing symbol rather than a wrong value, across runners.
 MISSING_RE='undefined: |is not a function|Cannot find module|ImportError|ModuleNotFoundError|AttributeError: module|NameError|cannot find symbol|unresolved import|is not defined|no member named'
 ASSERTION_RE='AssertionError|assert|expected|Expected|--- FAIL|assertion failed|panic:'
 # ---- end config -----------------------------------------------------------
 
-base=$1; head=$2; shift 2
-title=''
+# Arguments win; the workflow passes the same three through the environment,
+# because a PR title is attacker-controlled and must never be interpolated
+# into a run script. With set -u and no arguments this used to die on "$1:
+# parameter not set" before it read anything, so the gate never ran on a PR.
+base=${1:-${BASE_SHA:-}}
+head=${2:-${HEAD_SHA:-}}
+[ $# -gt 0 ] && shift
+[ $# -gt 0 ] && shift
+if [ -z "$base" ] || [ -z "$head" ]; then
+  echo "proven-red: usage: proven-red.sh <base> <head> [--title \"<pr title>\"]"
+  echo "proven-red: or set BASE_SHA and HEAD_SHA in the environment."
+  exit 2
+fi
+title=${PR_TITLE:-}
 [ "${1:-}" = "--title" ] && title=$2
 [ -n "$title" ] || title=$(git log -1 --format=%s "$head")
 
@@ -43,11 +83,26 @@ support=$(printf '%s\n' "$files" | grep -E "$TEST_SUPPORT_RE" | grep -vE "$UNIT_
 source=$(printf '%s\n' "$files" | grep -vE "$UNIT_TEST_RE" | grep -vE "$TEST_SUPPORT_RE" | grep -vE "$NON_CODE_RE" || true)
 
 if [ -z "$source" ]; then echo "proven-red: skipped, no source file changed."; exit 0; fi
+
+# The title type is read before the tests are run, not only when no test
+# changed. SKIP_TYPES is the list of types that declare no behavior change, and
+# where there is no behavior there is nothing a test could have been red about.
+# Checking it only in the no-changed-test branch made one class of change
+# impossible to land: a formatting pass over a *_test.go file cannot be red on
+# the pre-change code, because whitespace is all it changed, and the gofmt gate
+# insists every file be formatted. There was no arrangement of commits that
+# satisfied both.
+#
+# The cost is that a mislabeled PR skips the gate. That trade already existed
+# below for the no-changed-test case, the title is checked by review, and
+# claiming "style" for a behavior change is a lie a reviewer can see in the
+# diff.
+type=$(printf '%s' "$title" | sed -nE 's/^([a-z]+)(\(.+\))?!?:.*/\1/p')
+for t in $SKIP_TYPES; do
+  [ "$type" = "$t" ] && { echo "proven-red: skipped, title type \"$type\" carries no behavior change."; exit 0; }
+done
+
 if [ -z "$unit" ]; then
-  type=$(printf '%s' "$title" | sed -nE 's/^([a-z]+)(\(.+\))?!?:.*/\1/p')
-  for t in $SKIP_TYPES; do
-    [ "$type" = "$t" ] && { echo "proven-red: skipped, title type \"$type\" carries no behavior change."; exit 0; }
-  done
   if [ -n "$support" ]; then echo "proven-red: skipped, only test-support or gate files changed; gates are proven red by scratch violation."; exit 0; fi
   echo "proven-red: a behavior change arrived with no changed test (P2)."; exit 1
 fi
