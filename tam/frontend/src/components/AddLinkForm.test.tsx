@@ -57,6 +57,19 @@ describe("AddLinkForm", () => {
     expect(screen.getByLabelText("Issue key")).toHaveValue("");
   });
 
+  it("shows the checked target's summary as plain text (D5)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.LookupIssue).mockResolvedValue({
+      key: "PAY-78", id: "10", project: "PAY", type: "task", summary: "Fix *login* at {{/auth}}", status: "To Do", assignee: "", reporter: "",
+      priority: "", labels: [], sprintId: "", sprintName: "", parentKey: "", storyPoints: null, rank: "", created: "", updated: "",
+    });
+    renderForm();
+    await screen.findByLabelText("Link");
+    await user.type(screen.getByLabelText("Issue key"), "PAY-78");
+    await user.click(screen.getByRole("button", { name: "Check" }));
+    expect(await screen.findByText("PAY-78, Task, Fix *login* at /auth")).toBeInTheDocument();
+  });
+
   it("shows lookup and add errors", async () => {
     const user = userEvent.setup();
     vi.mocked(api.LookupIssue).mockRejectedValueOnce(new Error("GET failed: 404"));
