@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"agile-suite/core/journal"
@@ -193,6 +194,37 @@ func (r *Repository) RankIssue(ctx context.Context, profileID, key, neighbourKey
 	})
 }
 
+// AddToBoard journals "put this issue on this board" for every key given, on
+// one board, one row per key: an issue can be queued onto more than one
+// board, so BoardField folds the board into the field and the journal's own
+// uniqueness on (type, key, field) is what keeps one row per key per board
+// rather than one replacing another. scope is "backlog" or a sprint id,
+// exactly as it reads back.
+func (r *Repository) AddToBoard(ctx context.Context, profileID string, keys []string, boardID int, scope string) error {
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return errors.New("a board add needs a scope: backlog or a sprint id")
+	}
+	field := BoardField(boardID)
+	after := MoveValue(strconv.Itoa(boardID), scope)
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		for _, key := range keys {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			row, err := readBoardRow(ctx, tx, profileID, key)
+			if err != nil {
+				return err
+			}
+			if err := recordMove(ctx, tx, profileID, key, EntityIssueBoard, field, "", after, row.updated); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // recordMove is the body every board write shares. current is the value the
 // row holds now and after the value it was dropped on; both are packed by
 // MoveValue, except a rank's, whose current is empty.
@@ -251,11 +283,12 @@ func recordMove(ctx context.Context, tx *sql.Tx, profileID, key, entityType, fie
 }
 
 // sameMove compares two board values the way every decision here does: on
-// ids for a transition and a sprint move, and on the whole text for a rank,
-// whose value is a side, a neighbour, and a board with no id half to
-// compare.
+// ids for a transition and a sprint move, whose name half is decoration, and
+// on the whole text for a rank and an issue_board add, whose second half
+// (the neighbour's side, or the scope) changes what the row means and so
+// has to be compared too.
 func sameMove(entityType, a, b string) bool {
-	if entityType == EntityRank {
+	if entityType == EntityRank || entityType == EntityIssueBoard {
 		return a == b
 	}
 	return MoveID(a) == MoveID(b)
@@ -281,9 +314,11 @@ func readJournaledMove(ctx context.Context, q execer, profileID, entityType, key
 // a drag rewrites the draft's own JSON and the row's columns and journals
 // nothing new: the create row is the only journal row a draft has, and
 // Commit sends the draft, not the move. A rank has neither a column nor a
-// draft field, so it is where a draft's drag stops.
+// draft field, so it is where a draft's drag stops; an issue_board add is
+// the same, since a draft's eventual board membership has nowhere local to
+// live until it is a real issue.
 func moveDraft(ctx context.Context, tx *sql.Tx, profileID, key, entityType, field, current, after string) error {
-	if entityType == EntityRank || sameMove(entityType, after, current) {
+	if entityType == EntityRank || entityType == EntityIssueBoard || sameMove(entityType, after, current) {
 		return nil
 	}
 	if entityType == EntityTransition {

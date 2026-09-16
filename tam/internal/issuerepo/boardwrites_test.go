@@ -677,3 +677,137 @@ func TestPendingMovesFoldsTheThreeTypesPerIssue(t *testing.T) {
 		t.Errorf("PLAT-2 = %+v, want only the rank", two)
 	}
 }
+
+func TestAddToBoardWritesOneRowPerKeyWithScopePacked(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1", "PLAT-2"}, 5, "backlog"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	for _, key := range []string{"PLAT-1", "PLAT-2"} {
+		p := oneRow(t, repo, key)
+		if p.EntityType != issuerepo.EntityIssueBoard || p.Field != issuerepo.BoardField(5) {
+			t.Errorf("%s journal row = %+v, want an issue_board row on board 5's field", key, p)
+		}
+		if p.BeforeVal != "" || p.AfterVal != "5|backlog" {
+			t.Errorf("%s journal row = %+v, want no before value and the board and scope packed as boardId|scope", key, p)
+		}
+	}
+}
+
+func TestAddingTheSameKeyToTheSameBoardIsANoOp(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 5, "backlog"); err != nil {
+		t.Fatalf("first add: %v", err)
+	}
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 5, "backlog"); err != nil {
+		t.Fatalf("second add: %v", err)
+	}
+	rows, err := repo.PendingForKey(ctx, "p1", "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("pending rows = %+v, want the second identical add to write nothing new", rows)
+	}
+	act, err := repo.ListActivity(ctx, "p1", "PLAT-1", 0)
+	if err != nil {
+		t.Fatalf("activity: %v", err)
+	}
+	if len(act) != 1 {
+		t.Errorf("audit = %+v, want one move rather than a second that changed nothing", act)
+	}
+}
+
+func TestAddingTheSameKeyToADifferentBoardWritesASecondRow(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 5, "backlog"); err != nil {
+		t.Fatalf("first board: %v", err)
+	}
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 6, "12"); err != nil {
+		t.Fatalf("second board: %v", err)
+	}
+	rows, err := repo.PendingForKey(ctx, "p1", "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("pending rows = %+v, want one row per board, not one row per key", rows)
+	}
+	byField := map[string]string{}
+	for _, r := range rows {
+		byField[r.Field] = r.AfterVal
+	}
+	if byField[issuerepo.BoardField(5)] != "5|backlog" || byField[issuerepo.BoardField(6)] != "6|12" {
+		t.Errorf("rows by field = %+v, want both boards represented", byField)
+	}
+}
+
+// TestDiscardingABoardAddRemovesTheRow mirrors
+// TestDiscardingARankOnlyDropsTheRow: an issue_board row has no column to
+// put back, so discarding it only ever removes the journal row. Nothing in
+// this package ever reaches Jira, so the absence of any backend here is
+// itself the proof that discarding makes no Jira call.
+func TestDiscardingABoardAddRemovesTheRow(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 5, "backlog"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	n, err := repo.DiscardKey(ctx, "p1", "PLAT-1")
+	if err != nil || n != 1 {
+		t.Fatalf("discard = %d, %v", n, err)
+	}
+	rows, err := repo.PendingForKey(ctx, "p1", "PLAT-1")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if len(rows) != 0 {
+		t.Errorf("pending = %+v, want the row gone", rows)
+	}
+	act, _ := repo.ListActivity(ctx, "p1", "PLAT-1", 0)
+	if len(act) != 2 || act[0].Action != "discard" {
+		t.Errorf("audit = %+v, want the discard recorded", act)
+	}
+}
+
+// TestPendingMovesReportsABoardAdd is test 5 of task 3's brief: the board
+// read has to be able to draw a pending add the same way it draws a
+// transition or a sprint move.
+func TestPendingMovesReportsABoardAdd(t *testing.T) {
+	repo, db := newRepoWithDB(t)
+	ctx := context.Background()
+	seedBoardCards(t, repo)
+
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 5, issuerepo.ScopeBacklog); err != nil {
+		t.Fatalf("add to backlog: %v", err)
+	}
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-2"}, 7, "13"); err != nil {
+		t.Fatalf("add to a sprint: %v", err)
+	}
+
+	moves, err := repo.PendingMoves(ctx, db, "p1")
+	if err != nil {
+		t.Fatalf("pending moves: %v", err)
+	}
+	if len(moves) != 2 {
+		t.Fatalf("moves = %+v, want one per issue with a pending add", moves)
+	}
+	one, two := moves[0], moves[1]
+	if one.Key != "PLAT-1" || !one.HasBoardAdd || one.BoardID != 5 || one.BoardScope != issuerepo.ScopeBacklog {
+		t.Errorf("PLAT-1 = %+v, want its board add folded in", one)
+	}
+	if two.Key != "PLAT-2" || !two.HasBoardAdd || two.BoardID != 7 || two.BoardScope != "13" {
+		t.Errorf("PLAT-2 = %+v, want the sprint scope carried through", two)
+	}
+}

@@ -131,6 +131,17 @@ type PendingMove struct {
 	RankNeighbour string `json:"rankNeighbour"`
 	RankBefore    bool   `json:"rankBefore"`
 
+	// BoardID and BoardScope are what AddToBoard queued for this issue: the
+	// destination board and where on it, "backlog" or a sprint id. HasBoardAdd
+	// says whether one is pending.
+	//
+	// ponytail: an issue queued onto two boards at once keeps only the last
+	// one this fold saw, the way every other field here holds one value per
+	// issue; a per-board list would be needed to draw both at once.
+	BoardID     int    `json:"boardId"`
+	BoardScope  string `json:"boardScope"`
+	HasBoardAdd bool   `json:"hasBoardAdd"`
+
 	HasTransition bool `json:"hasTransition"`
 	HasSprint     bool `json:"hasSprint"`
 	HasRank       bool `json:"hasRank"`

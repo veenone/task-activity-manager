@@ -62,6 +62,14 @@ func MoveName(value string) string {
 	return name
 }
 
+// BoardField is the journal field of one issue_board row: FieldBoardID plus
+// the destination board's id, so an issue queued onto two different boards
+// writes two rows rather than one replacing the other. See FieldBoardID
+// (pending.go).
+func BoardField(boardID int) string {
+	return FieldBoardID + ":" + strconv.Itoa(boardID)
+}
+
 // RankValue renders a rank's after_val as "side|neighbour|board". The
 // neighbour is the key the card was dropped against, the side says which of
 // it, and the board is the one the drop was made on. The board is not

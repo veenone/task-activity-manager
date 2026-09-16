@@ -29,6 +29,15 @@ const (
 	// DraftBoard as JSON.
 	EntityBoardCreate = "board_create"
 
+	// EntityIssueBoard is the journal entity type of "put this issue on this
+	// board". Its key is the issue key, its field BoardField(boardID), and
+	// its after_val MoveValue(boardID, scope): the same "id|Name" packing a
+	// transition and a sprint move use, with scope standing in for the name.
+	// An issue can be queued onto more than one board at once, unlike a
+	// status or a sprint, so the field is not fixed the way FieldStatusID and
+	// FieldSprintID are; see FieldBoardID below.
+	EntityIssueBoard = "issue_board"
+
 	// The three board moves are three entity types and not one because they
 	// fail separately, are checked separately, and are pushed in a fixed
 	// order. One combined move row would make a failed transition drag its
@@ -56,11 +65,24 @@ const (
 	FieldStatusID = "statusId"
 	FieldSprintID = "sprintId"
 	FieldRank     = "rank"
+
+	// FieldBoardID is not a fixed field like the three above: unlike a
+	// card's status or its sprint, an issue is not limited to one pending
+	// board, so a fixed field would let a second board's add silently
+	// replace the first's row instead of sitting beside it. BoardField
+	// (movevalue.go) folds the destination board's id into the field
+	// itself, so the journal's own uniqueness on (type, key, field) is what
+	// keeps one row per key per board.
+	FieldBoardID = "boardId"
+
+	// ScopeBacklog is the scope AddToBoard takes for a card queued onto the
+	// board's backlog rather than a specific sprint.
+	ScopeBacklog = "backlog"
 )
 
-// BoardEntities are the three board move entity types, for the reads that
+// BoardEntities are the four board move entity types, for the reads that
 // have to name all of them in one statement.
-var BoardEntities = []string{EntityTransition, EntityRank, EntitySprintMove}
+var BoardEntities = []string{EntityTransition, EntityRank, EntitySprintMove, EntityIssueBoard}
 
 // pendingFlag is the computed column every issue read carries.
 const pendingFlag = `EXISTS (SELECT 1 FROM pending_change p WHERE p.profile_id = issue.profile_id AND p.entity_key = issue.key)`
