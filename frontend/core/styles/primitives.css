@@ -1409,3 +1409,25 @@
 .rich-panel-body { padding: 8px; }
 .rich-image-placeholder { color: var(--text-muted); font-style: italic; }
 .rich-text blockquote { margin: 0; padding-left: 10px; border-left: 3px solid var(--border-strong); color: var(--text-muted); }
+
+/* Write and Preview field (RichTextField.tsx): a tablist over one textarea,
+   a syntax toggle beside it, and a hint line under both. Preview hides the
+   textarea's panel with .sr-only (clip, not display: none, not the hidden
+   attribute) so an outside <label htmlFor> can still reach and focus it. */
+.richfield-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.richfield-tabs { display: inline-flex; gap: 2px; }
+.richfield-tab { padding: 4px 10px; border: 1px solid var(--border); border-bottom: 0; border-radius: 4px 4px 0 0; background: var(--surface-2); color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.richfield-tab:hover { background: var(--ghost-hover); }
+.richfield-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.richfield-tab[aria-selected="true"] { background: var(--surface); color: var(--text); font-weight: 600; }
+.richfield-syntax { display: inline-flex; gap: 2px; }
+.richfield-syntax button { padding: 3px 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.richfield-syntax button:first-child { border-radius: 4px 0 0 4px; }
+.richfield-syntax button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.richfield-syntax button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.richfield-syntax button:disabled { opacity: 0.45; cursor: default; }
+.richfield-hint { margin: 4px 0; }
+.richfield-panel { border: 1px solid var(--border); border-radius: 0 4px 4px 4px; }
+.richfield-panel .rich-text { padding: 8px; }
+.richfield-textarea { display: block; width: 100%; box-sizing: border-box; border: 0; padding: 8px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px; resize: vertical; }
+.richfield-textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
