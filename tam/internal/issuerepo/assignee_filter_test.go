@@ -59,6 +59,16 @@ func TestListIssuesFiltersByAssigneeName(t *testing.T) {
 			nil,
 		},
 		{
+			// With no display name there is no fallback at all. Comparing
+			// assignee against "" would match every unassigned row, so the
+			// list would fill with work belonging to nobody: PLAT-409 carries
+			// neither an assignee nor an assignee_name. Only the username
+			// branch may match here.
+			"no display name means no fallback, and unassigned rows stay out",
+			issuerepo.IssueQuery{AssigneeName: "ranand"},
+			[]string{"PLAT-412"},
+		},
+		{
 			"empty AssigneeName leaves the Backlog unfiltered",
 			issuerepo.IssueQuery{},
 			[]string{"PLAT-409", "PLAT-412", "PLAT-347", "PLAT-350"},

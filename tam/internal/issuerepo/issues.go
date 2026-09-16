@@ -455,8 +455,19 @@ func issueFilter(profileID string, q IssueQuery) (string, []any) {
 		// sharing a display name would both show as "assigned to me". The
 		// fallback to the assignee display name is only for rows cached
 		// before schema 14, whose assignee_name is still empty.
-		where = append(where, "(assignee_name = ? COLLATE NOCASE OR (assignee_name = '' AND assignee = ? COLLATE NOCASE))")
-		args = append(args, q.AssigneeName, q.AssigneeDisplayName)
+		clause := "assignee_name = ? COLLATE NOCASE"
+		args = append(args, q.AssigneeName)
+		// With no display name to fall back to there is no fallback. Keeping
+		// the branch would compare assignee against "", which every
+		// unassigned row matches, so the list would quietly fill with work
+		// belonging to nobody. A username with no display name beside it is
+		// reachable: the two settings are written independently and either
+		// can fail on its own, and Jira can answer with an empty displayName.
+		if q.AssigneeDisplayName != "" {
+			clause = "(" + clause + " OR (assignee_name = '' AND assignee = ? COLLATE NOCASE))"
+			args = append(args, q.AssigneeDisplayName)
+		}
+		where = append(where, clause)
 	}
 	return strings.Join(where, " AND "), args
 }
