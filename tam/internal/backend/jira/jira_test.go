@@ -37,6 +37,7 @@ type fakeJira struct {
 	// commentStarts records the startAt of every request, in order.
 	commentTotal    int
 	commentRaw      string
+	commentClamp    int // the maxResults the instance really serves, 0 for whatever was asked
 	commentFailFrom int
 	commentStarts   []int
 	detailQuery     string // the query string of the last GET /issue/PLAT-412
@@ -58,6 +59,9 @@ func (f *fakeJira) comments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	maxResults, _ := strconv.Atoi(r.URL.Query().Get("maxResults"))
+	if f.commentClamp > 0 && f.commentClamp < maxResults {
+		maxResults = f.commentClamp
+	}
 	rows := []string{}
 	for n := f.commentTotal - startAt; n > 0 && len(rows) < maxResults; n-- {
 		rows = append(rows, fmt.Sprintf(
@@ -702,6 +706,42 @@ func TestCommentsStopAtFiveHundredAndKeepTheNewest(t *testing.T) {
 	}
 	if len(f.commentStarts) != 5 {
 		t.Errorf("comment requests = %v, want five pages", f.commentStarts)
+	}
+}
+
+func TestCommentPagingAdvancesByWhatCameBack(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	// An instance that clamps maxResults answers every page short. Advancing
+	// by the size asked for would step over the rest of each page, and the
+	// holes would arrive silently, since a short list only reads as
+	// truncated.
+	f.commentTotal, f.commentClamp = 250, 30
+	d, err := b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if len(d.Comments) != 250 || d.CommentsTruncated {
+		t.Fatalf("comments = %d truncated = %v, want all 250", len(d.Comments), d.CommentsTruncated)
+	}
+	for i, c := range d.Comments {
+		if want := strconv.Itoa(i + 1); c.ID != want {
+			t.Fatalf("comment %d has id %s, want %s: the walk left a hole", i, c.ID, want)
+		}
+	}
+
+	// The cap is a count of comments, not a count of pages, so a clamped
+	// instance must still stop at 500.
+	b, f = newBackend(t, twoFields)
+	f.commentTotal, f.commentClamp = 812, 30
+	d, err = b.GetIssueDetail(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if len(d.Comments) != 500 || d.CommentTotal != 812 || !d.CommentsTruncated {
+		t.Errorf("comments = %d total = %d truncated = %v, want the newest 500", len(d.Comments), d.CommentTotal, d.CommentsTruncated)
+	}
+	if d.Comments[0].ID != "313" || d.Comments[499].ID != "812" {
+		t.Errorf("kept %s ... %s, want the newest 500", d.Comments[0].ID, d.Comments[499].ID)
 	}
 }
 

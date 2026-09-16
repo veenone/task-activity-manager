@@ -268,6 +268,18 @@ type IssueDetail struct {
 	// a comment page that failed leaves what was already read behind rather
 	// than failing the whole detail. Every surface printing a count has to
 	// say which of the two it is.
+	//
+	// CommentsTruncated with an empty Comments means the comment read
+	// failed, and never that the issue has none: an issue nobody has
+	// commented on comes back with a total of 0 and truncated false. So a
+	// panel must not print "No comments." for the first case, which would
+	// report a transport failure as a fact about the issue.
+	//
+	// Comment.Restriction is only visibility.value, not its type, so a
+	// restricted comment can be named by its role or group but never
+	// described as one or the other. Saying "role: Developers" over a group
+	// of that name would be a confident wrong answer about who can see it;
+	// the value alone is enough to mark the comment as restricted.
 	Comments          []Comment `json:"comments"`
 	CommentTotal      int       `json:"commentTotal"`
 	CommentsTruncated bool      `json:"commentsTruncated"`

@@ -243,7 +243,12 @@ func commentTime(v string) string {
 func (b *Backend) comments(ctx context.Context, key string) ([]backend.Comment, int, bool) {
 	out := []backend.Comment{}
 	total := 0
-	for startAt := 0; startAt < commentCap; startAt += commentPage {
+	// The bound is a count of comments, not of pages, and the walk advances
+	// by what actually came back: an instance that clamps maxResults below
+	// what was asked for answers every page short, and stepping on by the
+	// size asked for would leave holes in the list that nothing downstream
+	// could see. Same arithmetic as core/jira's own Agile paging.
+	for startAt := 0; len(out) < commentCap; {
 		var page struct {
 			Total    int          `json:"total"`
 			Comments []rawComment `json:"comments"`
@@ -264,6 +269,12 @@ func (b *Backend) comments(ctx context.Context, key string) ([]backend.Comment, 
 		if len(page.Comments) == 0 || len(out) >= total {
 			break
 		}
+		startAt += len(page.Comments)
+	}
+	// The last page can carry the count past the ceiling. Cutting from the
+	// end keeps the newest, which is the half the cap is there to keep.
+	if len(out) > commentCap {
+		out = out[:commentCap]
 	}
 	return oldestFirst(out), total, len(out) < total
 }
