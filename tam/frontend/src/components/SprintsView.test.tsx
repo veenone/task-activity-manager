@@ -164,7 +164,7 @@ beforeEach(() => {
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
   vi.mocked(api.PendingInSprint).mockResolvedValue(0);
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
+  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);

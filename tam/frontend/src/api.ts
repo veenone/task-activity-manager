@@ -116,11 +116,38 @@ export interface Link {
   pendingId?: number;
 }
 
+// One comment on an issue. Named IssueComment because Comment is a DOM
+// global. author and authorName are both empty for a comment Jira answered
+// with no author (anonymous, or a user deleted since); restriction is the
+// role or group a restricted comment is limited to, empty for an ordinary
+// one. created and updated are RFC 3339 unless Jira sent something that
+// could not be read, in which case they are exactly what it sent.
+export interface IssueComment {
+  id: string;
+  author: string;
+  authorName: string;
+  created: string;
+  updated: string;
+  body: string;
+  restriction: string;
+}
+
 export interface IssueDetail {
   key: string;
   description: string;
   links: Link[];
   fields: Record<string, unknown>;
+  // Oldest first, so the newest are the last few. commentTotal is how many
+  // the issue has, which is more than comments.length once commentsTruncated
+  // is true: the read keeps the newest 500, and a comment page that failed
+  // leaves the rest unread rather than failing the whole detail.
+  comments: IssueComment[];
+  commentTotal: number;
+  commentsTruncated: boolean;
+  // When the store cached this detail, RFC 3339, empty for one that never
+  // went through the cache. A detail served while Jira is unreachable is the
+  // cached one, and this is what lets the panel say so.
+  fetchedAt: string;
 }
 
 export interface IssueQuery {

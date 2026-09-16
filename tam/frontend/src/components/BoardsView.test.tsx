@@ -196,7 +196,7 @@ beforeEach(() => {
   vi.mocked(api.GetSyncState).mockResolvedValue({
     lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 61,
   });
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
+  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);

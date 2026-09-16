@@ -229,6 +229,29 @@ type Link struct {
 	PendingID int64 `json:"pendingId"`
 }
 
+// Comment is one comment on an issue, as the detail panel reads it.
+//
+// Author (the username) and AuthorName (the display name) are both empty
+// for a comment Jira answered with no author at all, which is what an
+// anonymous comment and one whose author has since been deleted look like;
+// the panel words that for itself rather than inventing a name here.
+// Restriction is the role or group a restricted comment is limited to, and
+// empty for an ordinary one: a comment only some people can see must never
+// be drawn as one everybody can.
+//
+// Created and Updated are RFC 3339, normalised from whatever Jira sent (its
+// offsets carry no colon); a value that cannot be read is kept exactly as it
+// arrived rather than dropped.
+type Comment struct {
+	ID          string `json:"id"`
+	Author      string `json:"author"`
+	AuthorName  string `json:"authorName"`
+	Created     string `json:"created"`
+	Updated     string `json:"updated"`
+	Body        string `json:"body"`
+	Restriction string `json:"restriction"`
+}
+
 // IssueDetail is what the detail panel shows beyond the grid columns.
 // Fields holds the decoded custom fields keyed by field id, so a later
 // phase's edit form can build on the same shape.
@@ -237,6 +260,22 @@ type IssueDetail struct {
 	Description string         `json:"description"`
 	Links       []Link         `json:"links"`
 	Fields      map[string]any `json:"fields"`
+
+	// Comments are the issue's comments, oldest first, so the newest are the
+	// last few the panel shows. CommentTotal is how many the issue has,
+	// which is not len(Comments) once either limit below has bitten, and
+	// CommentsTruncated says so: the read keeps the newest 500 and stops, and
+	// a comment page that failed leaves what was already read behind rather
+	// than failing the whole detail. Every surface printing a count has to
+	// say which of the two it is.
+	Comments          []Comment `json:"comments"`
+	CommentTotal      int       `json:"commentTotal"`
+	CommentsTruncated bool      `json:"commentsTruncated"`
+
+	// FetchedAt is when the store cached this detail, RFC 3339. The
+	// repository's read fills it in; a detail straight off the wire has
+	// none, and the panel prints it so a stale offline read says so.
+	FetchedAt string `json:"fetchedAt"`
 }
 
 // IssueType is one issue type a project offers.

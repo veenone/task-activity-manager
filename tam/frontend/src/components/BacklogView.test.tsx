@@ -94,7 +94,7 @@ beforeEach(() => {
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: rows, total: 1248 });
   vi.mocked(api.ListSprints).mockResolvedValue([{ id: "12", name: "Sprint 12" }, { id: "13", name: "Sprint 13" }]);
-  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {} });
+  vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);
   vi.mocked(api.ListEpics).mockResolvedValue([]);
   vi.mocked(api.ListOpenSprints).mockResolvedValue([]);

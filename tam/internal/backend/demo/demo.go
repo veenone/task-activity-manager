@@ -191,7 +191,7 @@ func (b *Backend) GetIssueDetail(_ context.Context, key string) (backend.IssueDe
 	d, ok := demo.Detail(b.project, key)
 	if !ok {
 		if _, created := b.over[key]; created {
-			d = backend.IssueDetail{Key: key, Description: "", Links: []backend.Link{}, Fields: map[string]any{}}
+			d = backend.IssueDetail{Key: key, Description: "", Links: []backend.Link{}, Comments: []backend.Comment{}, Fields: map[string]any{}}
 		} else {
 			return backend.IssueDetail{}, fmt.Errorf("demo: no issue %s", key)
 		}

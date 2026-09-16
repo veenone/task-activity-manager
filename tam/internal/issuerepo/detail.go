@@ -59,6 +59,12 @@ func (r *Repository) ReadDetail(ctx context.Context, profileID, key string) (bac
 	links = append(links, pending...)
 	d.Key = key
 	d.Links = links
+	// A detail cached before comments existed has no comments key, and null
+	// is what the panel would otherwise have to tell apart from "none".
+	if d.Comments == nil {
+		d.Comments = []backend.Comment{}
+	}
+	d.FetchedAt = at.UTC().Format(time.RFC3339)
 	return d, at, true, nil
 }
 
@@ -72,6 +78,17 @@ func (r *Repository) ClearDetail(ctx context.Context, profileID, key string) err
 	return nil
 }
 
+// ClearDetails drops every cached detail of one profile, which is what the
+// shell's Refresh is: the next open of whatever is on screen goes back to
+// Jira, whatever the profile's detail_cache_minutes says.
+func (r *Repository) ClearDetails(ctx context.Context, profileID string) error {
+	if _, err := r.db.ExecContext(ctx,
+		`UPDATE issue SET detail_json = NULL, detail_fetched_at = NULL WHERE profile_id = ?`, profileID); err != nil {
+		return fmt.Errorf("clear the details of %s: %w", profileID, err)
+	}
+	return nil
+}
+
 // WriteDetail caches d for key and replaces the issue's links, in one
 // transaction. The links are stored in issue_link rather than inside the
 // JSON so the Tests tab and later phases can query them.
@@ -79,6 +96,9 @@ func (r *Repository) WriteDetail(ctx context.Context, profileID, key string, d b
 	stored := d
 	stored.Key = key
 	stored.Links = nil
+	// The fetch time is the column's, not the JSON's; storing it twice is
+	// how the two would come to disagree.
+	stored.FetchedAt = ""
 	raw, err := json.Marshal(stored)
 	if err != nil {
 		return fmt.Errorf("encode detail for %s: %w", key, err)

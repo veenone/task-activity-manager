@@ -1,5 +1,29 @@
 export namespace backend {
 	
+	export class Comment {
+	    id: string;
+	    author: string;
+	    authorName: string;
+	    created: string;
+	    updated: string;
+	    body: string;
+	    restriction: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Comment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.author = source["author"];
+	        this.authorName = source["authorName"];
+	        this.created = source["created"];
+	        this.updated = source["updated"];
+	        this.body = source["body"];
+	        this.restriction = source["restriction"];
+	    }
+	}
 	export class FieldOption {
 	    id: string;
 	    value: string;
@@ -131,6 +155,10 @@ export namespace backend {
 	    description: string;
 	    links: Link[];
 	    fields: Record<string, any>;
+	    comments: Comment[];
+	    commentTotal: number;
+	    commentsTruncated: boolean;
+	    fetchedAt: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new IssueDetail(source);
@@ -142,6 +170,10 @@ export namespace backend {
 	        this.description = source["description"];
 	        this.links = this.convertValues(source["links"], Link);
 	        this.fields = source["fields"];
+	        this.comments = this.convertValues(source["comments"], Comment);
+	        this.commentTotal = source["commentTotal"];
+	        this.commentsTruncated = source["commentsTruncated"];
+	        this.fetchedAt = source["fetchedAt"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -68,6 +68,10 @@ beforeEach(() => {
       { direction: "outward", type: "Relates", key: "PLAT-388", summary: "Promo codes must be single-use", issueType: "Requirement" },
     ],
     fields: {},
+    comments: [],
+    commentTotal: 0,
+    commentsTruncated: false,
+    fetchedAt: "",
   });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([
     { key: "XT-1018", summary: "Promo code applies discount", linkType: "Tested By" },
@@ -320,7 +324,7 @@ describe("IssueDetailPanel write path", () => {
   it("marks a pending link on the Links tab and discards it", async () => {
     const user = userEvent.setup();
     vi.mocked(api.GetIssueDetail).mockResolvedValue({
-      key: "PLAT-412", description: "d", fields: {},
+      key: "PLAT-412", description: "d", fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "",
       links: [
         { direction: "inward", type: "Tested By", key: "XT-1018", summary: "Promo code applies discount", issueType: "Test" },
         { direction: "outward", type: "Relates", key: "XT-1031", summary: "Retried payment is not charged twice", issueType: "Test", pending: true, pendingId: 41 },
@@ -339,7 +343,7 @@ describe("IssueDetailPanel write path", () => {
   it("surfaces a failed link discard", async () => {
     const user = userEvent.setup();
     vi.mocked(api.GetIssueDetail).mockResolvedValue({
-      key: "PLAT-412", description: "d", fields: {},
+      key: "PLAT-412", description: "d", fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "",
       links: [
         { direction: "outward", type: "Relates", key: "XT-1031", summary: "Retried payment is not charged twice", issueType: "Test", pending: true, pendingId: 41 },
       ],

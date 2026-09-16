@@ -151,6 +151,9 @@ func TestDemoBackendDetailAndTypes(t *testing.T) {
 	if err != nil || len(d.Links) != 3 {
 		t.Errorf("detail = %+v, %v", d, err)
 	}
+	if len(d.Comments) != 2 || d.CommentTotal != 2 || d.CommentsTruncated {
+		t.Errorf("comments = %+v, total = %d, truncated = %v", d.Comments, d.CommentTotal, d.CommentsTruncated)
+	}
 	if _, err := b.GetIssueDetail(ctx, "DEMO-9999"); err == nil {
 		t.Error("unknown key should fail")
 	}
