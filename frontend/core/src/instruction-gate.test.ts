@@ -123,6 +123,11 @@ describe('instruction gate', () => {
     }
   });
 
+  // One synchronous `git grep` per cited name, so this is spawn-bound: it fits
+  // in the default 5s when run alone and does not when the whole workspace
+  // suite runs in parallel. The timeout is generous on purpose, so a failure
+  // here means a name is genuinely missing rather than that the machine was
+  // busy.
   it('every name a contract cites exists in the tree', () => {
     const tokens = new Set<string>();
     for (const line of projectFile.split('\n')) {
@@ -143,7 +148,7 @@ describe('instruction gate', () => {
       }
     }
     expect(missing, `contracts name things that do not exist: ${missing.join(', ')}`).toEqual([]);
-  });
+  }, 120_000);
 
   it('the portable core stays portable', () => {
     const core = read('AGENTS.md');
@@ -210,6 +215,15 @@ describe('instruction gate', () => {
     // issuerepo sweeps issue data, boardrepo sweeps board data. A table must
     // appear in one of them, and a board-keyed table must also be in
     // RemoveBoards or removing a board orphans its rows.
+    //
+    // ritual_document is the one board-keyed table deliberately left out of
+    // RemoveBoards: it holds page text people wrote and may never have pushed,
+    // and a board leaves Jira's list for reasons that say nothing about that
+    // text (a setting switched off, a location change, a lost permission).
+    // PurgeProfile still sweeps it, so the rows are owned, not orphaned. The
+    // reasoning lives on RemoveBoards itself in boardrepo/boards.go. Naming it
+    // here keeps the gate failing for every other board-keyed table.
+    const REMOVE_BOARDS_EXEMPT = new Set(['ritual_document']);
     const purgeLists =
       read('tam/internal/issuerepo/state.go') + read('tam/internal/boardrepo/boardrepo.go');
     const removeBoards = read('tam/internal/boardrepo/boards.go');
@@ -219,7 +233,9 @@ describe('instruction gate', () => {
         .exec(schema)?.[1]
         .includes('board_id');
       if (!purgeLists.includes(`"${table}"`)) missing.push(`${table} in no PurgeProfile`);
-      if (boardKeyed && !removeBoards.includes(`"${table}"`)) missing.push(`${table} not in RemoveBoards`);
+      if (boardKeyed && !REMOVE_BOARDS_EXEMPT.has(table) && !removeBoards.includes(`"${table}"`)) {
+        missing.push(`${table} not in RemoveBoards`);
+      }
     }
     expect(missing, missing.join('; ')).toEqual([]);
   });
