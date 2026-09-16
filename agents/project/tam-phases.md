@@ -1335,6 +1335,26 @@ plus its own header line and stale-rows note (both built off `onPage`) and
 its own empty state for no username yet, with Sync and Test connection
 both reachable from it.
 
+**Filter, sort and page state do not survive a tab switch, and that is a
+deliberate deviation from the design.** The design asked that switching tabs
+never reset the other tab's state, by way of the query key carrying the view
+id. That mechanism would not have produced the effect: the filters live in
+`useState` inside `IssueListView`, not in the query key, and `App.tsx` renders
+one view at a time, so a switch unmounts the view and takes its state with it.
+Backlog has always behaved this way, and matching it is the consistent choice.
+Real persistence needs either every view mounted at once or the filter state
+lifted above the view switch, which is a navigation-model change and not a
+tab's to make. `viewId` survives as the namespace for the pager's element ids,
+which is precautionary: nothing mounts two `IssueListView`s at once today.
+
+**Waiting for the profile is two conditions, not one.** With no active profile
+both settings queries are disabled, and a disabled query stays pending for
+ever, so waiting on `isPending` alone left the whole pane blank on a fresh
+install. Waiting only on the active id instead flashed the no-username empty
+state on mount, before the settings had been asked for. The view waits for the
+profile list's own load and, separately, for the settings of a profile that is
+actually there.
+
 ## One lock, both ends
 
 Go hold single per-profile lock (`App.acquire`) for sync, commit, import,
