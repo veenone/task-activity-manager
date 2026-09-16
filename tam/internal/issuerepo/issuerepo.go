@@ -43,6 +43,15 @@ type IssueQuery struct {
 	// would order 25 rows out of a project's thousands.
 	Sort string `json:"sort"`
 	Desc bool   `json:"desc"`
+	// AssigneeName filters to issues assigned to this Jira username,
+	// matched against the assignee_name column, case-insensitively. Empty
+	// means no assignee filter. AssigneeDisplayName is the display name
+	// that goes with it, used only as a fallback for rows cached before
+	// schema 14, whose assignee_name is still empty; the caller supplies
+	// it (the connected user's display name), since this repository does
+	// no settings lookups of its own.
+	AssigneeName        string `json:"assigneeName"`
+	AssigneeDisplayName string `json:"assigneeDisplayName"`
 }
 
 // IssuePage is one page of rows plus the total the filter matches.

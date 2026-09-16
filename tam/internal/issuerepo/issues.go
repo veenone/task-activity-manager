@@ -20,7 +20,7 @@ const (
 )
 
 // issueColumns is the SELECT list every row read uses, in scan order.
-const issueColumns = `key, id, project, type, summary, status, status_id, assignee, reporter, priority, labels,
+const issueColumns = `key, id, project, type, summary, status, status_id, assignee, assignee_name, reporter, priority, labels,
 	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
 // issueOrder puts drafts first, then ranked rows by rank with unranked rows
@@ -449,6 +449,15 @@ func issueFilter(profileID string, q IssueQuery) (string, []any) {
 		where = append(where, "(key LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR labels LIKE ? ESCAPE '\\')")
 		args = append(args, like, like, like)
 	}
+	if q.AssigneeName != "" {
+		// A non-empty assignee_name is matched on that alone: a row's display
+		// name is never consulted once it has a username, or two people
+		// sharing a display name would both show as "assigned to me". The
+		// fallback to the assignee display name is only for rows cached
+		// before schema 14, whose assignee_name is still empty.
+		where = append(where, "(assignee_name = ? COLLATE NOCASE OR (assignee_name = '' AND assignee = ? COLLATE NOCASE))")
+		args = append(args, q.AssigneeName, q.AssigneeDisplayName)
+	}
 	return strings.Join(where, " AND "), args
 }
 
@@ -470,7 +479,7 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		points  sql.NullFloat64
 		pending int
 	)
-	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.StatusID, &iss.Assignee,
+	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.StatusID, &iss.Assignee, &iss.AssigneeName,
 		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
 		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err
