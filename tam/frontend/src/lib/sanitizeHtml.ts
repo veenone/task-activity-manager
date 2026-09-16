@@ -1,7 +1,6 @@
 import { compactUrl, isAllowedLink } from "@agile-suite/core";
 
 const URL_ATTRIBUTES = new Set(["href", "src", "xlink:href", "action"]);
-const SAFE_SCHEMES = new Set(["http", "https", "mailto"]);
 
 // isAllowedLink now lives in frontend/core/src/lib/links.ts, one definition
 // shared with the rich text renderer's link nodes. Re-exported so
@@ -9,14 +8,14 @@ const SAFE_SCHEMES = new Set(["http", "https", "mailto"]);
 // keeps working unchanged.
 export { isAllowedLink };
 
-// safeUrl allows only http, https, mailto and a relative URL. It reads the
-// scheme after compactUrl, because "java&#9;script:" is a javascript: URL to
-// the browser, and a pattern tested against the raw value never saw it as
-// one. Unlike isAllowedLink it allows a relative address, which is what a
-// Confluence page's own links legitimately carry.
+// safeUrl is isAllowedLink's one relaxation: a relative address, which is
+// what a Confluence page's own links legitimately carry, passes too. No
+// second copy of the allowed-scheme set here (the ruling: one definition of
+// an allowed link) - a value with no scheme at all skips straight to true,
+// and everything else is exactly isAllowedLink's own answer.
 function safeUrl(value: string): boolean {
   const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compactUrl(value));
-  return !scheme || SAFE_SCHEMES.has(scheme[1].toLowerCase());
+  return !scheme || isAllowedLink(value);
 }
 
 // A style can load a URL or, in old engines, run script. A backslash is

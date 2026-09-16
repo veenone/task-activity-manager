@@ -1,7 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { RichText, RICH_TEXT_LIMIT } from "./RichText";
+import { parseRich } from "./detect";
+
+// spy: true keeps parseRich's real implementation (every rendering test
+// below still gets real parsed output) while recording calls, so D3 (the
+// size cut happens before parsing) and D4 (parsing is memoized) can be
+// asserted directly rather than inferred from render output or timing.
+vi.mock("./detect", { spy: true });
+
+beforeEach(() => {
+  vi.mocked(parseRich).mockClear();
+});
 
 describe("RichText blocks", () => {
   it("renders a wiki heading at its semantic level", () => {
@@ -181,5 +192,35 @@ describe("RichText size guard", () => {
   it("says nothing about size for text under the limit", () => {
     const { container } = render(<RichText text="short" format="wiki" onOpenLink={vi.fn()} />);
     expect(container.textContent).not.toContain("Showing the first 200 KB");
+  });
+
+  it("cuts to RICH_TEXT_LIMIT before parsing, not after", () => {
+    const raw = "a".repeat(250_000);
+    render(<RichText text={raw} format="wiki" onOpenLink={vi.fn()} />);
+    expect(parseRich).toHaveBeenCalledTimes(1);
+    const [textArgument] = vi.mocked(parseRich).mock.calls[0];
+    // A rendered-length assertion alone would pass even if the cut ran
+    // after parsing (the AST for 250,000 identical "a" characters renders
+    // as one 250,000-character text node either way); this instead reads
+    // what parseRich itself was handed.
+    expect(textArgument.length).toBeLessThanOrEqual(RICH_TEXT_LIMIT);
+  });
+});
+
+describe("RichText memoization (D4)", () => {
+  it("parses once, and does not reparse when only onOpenLink's identity changes", () => {
+    const { rerender } = render(<RichText text="h3. Stable" format="wiki" onOpenLink={() => {}} />);
+    expect(parseRich).toHaveBeenCalledTimes(1);
+
+    rerender(<RichText text="h3. Stable" format="wiki" onOpenLink={() => {}} />);
+    expect(parseRich).toHaveBeenCalledTimes(1);
+  });
+
+  it("reparses when the text changes", () => {
+    const { rerender } = render(<RichText text="h3. First" format="wiki" onOpenLink={vi.fn()} />);
+    expect(parseRich).toHaveBeenCalledTimes(1);
+
+    rerender(<RichText text="h3. Second" format="wiki" onOpenLink={vi.fn()} />);
+    expect(parseRich).toHaveBeenCalledTimes(2);
   });
 });

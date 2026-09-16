@@ -46,7 +46,16 @@ interface Props {
 }
 
 interface RenderOpts {
-  projectKey?: string;
+  // issueKeyPattern is built once per render, from projectKey alone (see
+  // RichText's own useMemo), and reused across every text leaf: a fresh
+  // RegExp per leaf was measurable render cost in the one component whose
+  // whole point is being cheap to re-render. It carries the "g" flag, so
+  // renderText resets lastIndex before each leaf's scan; a global regex
+  // that runs to exhaustion (every call here does, via the while loop
+  // below) already resets its own lastIndex to 0 on that final failed
+  // match, but the explicit reset removes any doubt a future change could
+  // introduce by returning out of the loop early.
+  issueKeyPattern: RegExp | null;
   onIssueKey?: (key: string) => void;
   onOpenLink: (url: string) => void;
   inline: boolean;
@@ -62,9 +71,10 @@ function escapeRegExp(value: string): string {
 // comes from the panel showing the issue, not from anything a parser could
 // see in the field itself).
 function renderText(value: string, opts: RenderOpts, keyPrefix: string): ReactNode {
-  if (!opts.projectKey || !opts.onIssueKey) return value;
+  if (!opts.issueKeyPattern || !opts.onIssueKey) return value;
   const onIssueKey = opts.onIssueKey;
-  const re = new RegExp(`\\b${escapeRegExp(opts.projectKey)}-\\d+\\b`, "g");
+  const re = opts.issueKeyPattern;
+  re.lastIndex = 0;
   const parts: ReactNode[] = [];
   let last = 0;
   let match: RegExpExecArray | null;
@@ -126,6 +136,14 @@ function renderInlineNode(node: Inline, opts: RenderOpts, key: string): ReactNod
       // Constraint: no <img> anywhere under richtext/. An image macro is a
       // named placeholder, never fetched or drawn.
       return <span className="rich-image-placeholder">{`Image: ${node.name}`}</span>;
+    default: {
+      // Exhaustiveness guard: if a seventh Inline kind is ever added to
+      // ast.ts without a case here, this assignment stops compiling
+      // instead of silently rendering nothing and, for a link-shaped
+      // addition, silently skipping isAllowedLink.
+      const _never: never = node;
+      return null;
+    }
   }
 }
 
@@ -226,8 +244,17 @@ export function RichText({ text, format = "auto", inline = false, projectKey, on
     return parseRich(capped, format);
   }, [text, format]);
 
+  // Built once per projectKey, not once per text leaf (item 3): the regex
+  // itself depends only on projectKey, never on onIssueKey's identity, so
+  // a caller passing a fresh onIssueKey closure every render (a common
+  // React shape) does not force a rebuild.
+  const issueKeyPattern = useMemo(
+    () => (projectKey ? new RegExp(`\\b${escapeRegExp(projectKey)}-\\d+\\b`, "g") : null),
+    [projectKey]
+  );
+
   const truncated = text.length > RICH_TEXT_LIMIT;
-  const opts: RenderOpts = { projectKey, onIssueKey, onOpenLink, inline };
+  const opts: RenderOpts = { issueKeyPattern, onIssueKey, onOpenLink, inline };
 
   if (inline) {
     const nodes = collectInline(parsed.blocks);
