@@ -1067,7 +1067,9 @@ views still distinguishable to screen reader and to test.
 Native menu bar carry same list, way XTM View menu do: `menuViews` in
 `main.go` list views and each item emit `menu:view` with view id, which
 `App.tsx` route on. That list must stay in step with `VIEWS` in
-`frontend/src/nav.ts` by hand; native menu cannot read frontend's.
+`frontend/src/nav.ts` by hand; native menu cannot read frontend's. Bundle 03
+add Assigned to me between Backlog and Epics in both lists, which is why its
+accelerator is Ctrl+2 and every view after it shifted one key down.
 
 Left nav rail = second, optional way to reach same places, off by default and
 toggled from View → Navigation Rail (Ctrl+B) or from own close button.
@@ -1266,6 +1268,72 @@ Priority = instance's own list through `App.ListPriorities`. Both pickers
 degrade to text input they replaced when lookup fail, same shape create
 dialog use for failed create-meta read: lookup that cannot reach its list
 must not be reason issue cannot be assigned.
+
+## Assigned to me
+
+Fourth tab (`assigned` in `nav.ts` / `menuViews`), between Backlog and
+Epics: same grid, filters, sort, pager, detail panel, narrowed to the
+connected Jira user, read entirely from `tam.db` so it works offline and
+includes the user's own uncommitted drafts.
+
+Knowing "me": profile settings `jira_username`, `jira_display_name`
+(`app_issues.go`), written by `TestProfileConnection` (`app_profiles.go`)
+and at the start of every sync (`internal/syncer/syncer.go`), off the one
+`GET /rest/api/2/myself` the connection check already makes and, until now,
+threw away. An answer with no username is refused at both write sites
+rather than written: overwriting a good stored value with "" would leave
+the filter matching nothing, and unlike a write failure it would leave
+nothing in the log to find the cause by (fixed 915c431; proven red with the
+guard disabled, which recorded `jira_username = ""` over a seeded
+"rahmad").
+
+Caching the assignee key: schema 14 adds `issue.assignee_name`, written by
+the sync normaliser off `fields.assignee.name` (falling back to the key
+when name is empty, Data Center's GDPR mode), and by `EditField` and
+`CreateDraft` off `AssigneePicker`, which already stores the username, not
+the display name. The migration clears every profile's sync watermark
+(`last_synced = ''`), the same reason version 5 did for `status_id`: an
+incremental sync only touches rows whose fields changed since that
+watermark, so a column added by a migration alone would stay empty on
+every already-cached row forever without a full resync forcing it.
+
+Match rule: `IssueQuery.AssigneeName` matches `assignee_name`
+case-insensitively (`COLLATE NOCASE`, the same collation `sortColumns` uses
+for the assignee sort). A row whose `assignee_name` is already populated
+never falls through to the display-name check, even when the display name
+would also match: the fallback exists only for a row cached before schema
+14, whose `assignee_name` is still empty, not as a second chance for a
+populated row, which would risk pulling in a different person who happens
+to share a display name.
+
+The limitation, plainly: `issue.assignee` holds two different kinds of
+value, the display name sync writes (`fields.go`'s `displayName()`) and the
+username a local edit writes (`AssigneePicker`, through `writes.go`). The
+fallback above cannot match a row that was edited locally before the
+migration ran, because that row's `assignee` already holds a username, not
+the display name the fallback is matching against. Such a row does carry a
+pending journal entry, though, and the pending-edit overlay covers it the
+way it covers every uncommitted change, so it still shows up correctly,
+just not through the fallback. Full write-up in `TODOS.md` ("The assignee
+column holds two different kinds of value").
+
+A pending reassignment needs no replay to be seen by this filter:
+`EditField` writes `assignee_name` straight into the `issue` row
+(`writes.go`), so the SQL `WHERE` already sees it, the same reason a
+pending summary edit already shows in the Backlog grid with no merge step
+of its own.
+
+Reuse: `IssueListView` (extracted out of `BacklogView` this bundle) owns
+the toolbar, grid, pager, detail panel and resize grip, parameterised by
+`viewId`, `label`, `baseQuery: Partial<IssueQuery>`, which toolbar actions
+show, `emptyNote`, and `onPage` (fires with the page's total and rows after
+every load, so a caller can build its own summary off the same query
+instead of firing a second one). `BacklogView` passes no `baseQuery`
+(project-wide) with `showCreate` and `showImport`; `AssignedToMeView`
+passes `baseQuery={{ assigneeName, assigneeDisplayName }}` with neither,
+plus its own header line and stale-rows note (both built off `onPage`) and
+its own empty state for no username yet, with Sync and Test connection
+both reachable from it.
 
 ## One lock, both ends
 
@@ -1508,7 +1576,9 @@ entered. Kiwi profile file refused.
     app_rituals.go       the ritual bindings: ensure, list, save, resolve, forget, delete, macro
                           preview, standup entry, last sync, Sync, CreateRitualRoot; all but Sync and
                           CreateRitualRoot under no lock, those two under the "rituals" lock name
-    internal/tamstore/   TAM's own SQLite file (schema version 13: issue (with status_id), issue_link,
+    internal/tamstore/   TAM's own SQLite file (schema version 14: issue (with status_id and,
+                          added at version 14, assignee_name, whose migration clears every
+                          profile's sync watermark the way version 5's did), issue_link,
                           sync_state, profile_setting, jira_user, board, board_column, board_issue,
                           sprint (with goal, added at version 7, and complete_date, added at
                           version 8, and draft, added at version 13), sprint_report (a sprint's
@@ -1626,7 +1696,9 @@ entered. Kiwi profile file refused.
                           read out of a pasted page address
       src/lib/standupLog.ts  finds where today's dated Yesterday/Today/Blockers section belongs
                           in a Standup page's Daily log, and whether it is already there
-      src/components/    BacklogView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
+      src/components/    BacklogView (a thin wrapper), IssueListView (the extracted toolbar, grid,
+                          pager and detail panel both it and AssignedToMeView mount),
+                          AssignedToMeView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
                           AssigneePicker, PriorityPicker,
                           PendingChangesModal, ConflictCard, NewIssueModal,
                           MetaField (a create-meta field's input, by type, through META_INPUTS),
