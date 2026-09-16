@@ -106,12 +106,21 @@ func nextDraftBoardID(ctx context.Context, tx *sql.Tx, profileID string) (int, e
 // RekeyBoard turns a draft board into the board Jira just created, in one
 // transaction: the draft row takes Jira's id and stops being a draft, every
 // table keyed by board_id (board_column, board_issue, sprint) repoints from
-// the negative id to the real one, and any rank journaled against the
-// draft board (RankValue's board-carrying third field) repoints the same
-// way. The board_create row goes. A row Jira's id already has on the board
-// table, which a boards refresh between the create and this call would
-// leave, is replaced rather than collided with, the same way RekeySprint
-// clears its own table first.
+// the negative id to the real one, any rank journaled against the draft
+// board (RankValue's board-carrying third field) repoints the same way, and
+// every issue_board row queued onto the draft board (BoardField's
+// board-carrying field) repoints too. The board_create row goes. A row
+// Jira's id already has on the board table, which a boards refresh between
+// the create and this call would leave, is replaced rather than collided
+// with, the same way RekeySprint clears its own table first.
+//
+// ponytail: an issue_board row's scope can itself be a draft sprint's id
+// (AddToBoard's non-backlog scope), and this does not repoint that. It is
+// dead weight today: CreateDraftSprint refuses BoardID <= 0, so a sprint
+// cannot be drafted onto a draft board, and a scope naming a draft sprint on
+// a real board is rewriteSprintID's row to fix, not this one's. Upgrade path
+// if CreateDraftSprint's guard is ever lifted: reach into after_val's scope
+// half here the same way rekeyIssueBoard reaches into its id half.
 func (r *Repository) RekeyBoard(ctx context.Context, profileID string, draftID, realID int) error {
 	from, to := strconv.Itoa(draftID), strconv.Itoa(realID)
 	return r.inTx(ctx, func(tx *sql.Tx) error {
@@ -141,6 +150,9 @@ func (r *Repository) RekeyBoard(ctx context.Context, profileID string, draftID, 
 			}
 		}
 		if err := rekeyRankBoard(ctx, tx, profileID, draftID, realID); err != nil {
+			return err
+		}
+		if err := rekeyIssueBoard(ctx, tx, profileID, draftID, realID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx,
@@ -192,6 +204,51 @@ func rekeyRankBoard(ctx context.Context, tx *sql.Tx, profileID string, draftID, 
 			`UPDATE pending_change SET after_val = ? WHERE profile_id = ? AND id = ?`,
 			rp.value, profileID, rp.id); err != nil {
 			return fmt.Errorf("repoint rank %d to board %d: %w", rp.id, realID, err)
+		}
+	}
+	return nil
+}
+
+// rekeyIssueBoard repoints every issue_board row queued onto the draft
+// board. AddToBoard folds the board id into the FIELD (BoardField), not the
+// value, so the journal's own uniqueness gives one row per key per board;
+// that means this is a field rewrite, rewriteSprintID's neighbour done on
+// the field instead of the value. The value's id half (MoveValue's id,
+// packed by AddToBoard as boardId|scope) still names the draft too and is
+// rewritten alongside it, keeping the scope it was queued with.
+func rekeyIssueBoard(ctx context.Context, tx *sql.Tx, profileID string, draftID, realID int) error {
+	fromField, toField := BoardField(draftID), BoardField(realID)
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id, after_val FROM pending_change WHERE profile_id = ? AND entity_type = ? AND field = ?`,
+		profileID, EntityIssueBoard, fromField)
+	if err != nil {
+		return fmt.Errorf("issue_board rows on board %d: %w", draftID, err)
+	}
+	type repoint struct {
+		id    int64
+		value string
+	}
+	var todo []repoint
+	for rows.Next() {
+		var (
+			id    int64
+			value string
+		)
+		if err := rows.Scan(&id, &value); err != nil {
+			rows.Close()
+			return err
+		}
+		todo = append(todo, repoint{id: id, value: MoveValue(strconv.Itoa(realID), MoveRawName(value))})
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, rp := range todo {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE pending_change SET field = ?, after_val = ? WHERE profile_id = ? AND id = ?`,
+			toField, rp.value, profileID, rp.id); err != nil {
+			return fmt.Errorf("repoint issue_board %d to board %d: %w", rp.id, realID, err)
 		}
 	}
 	return nil

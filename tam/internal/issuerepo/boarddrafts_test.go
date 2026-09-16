@@ -197,6 +197,60 @@ func TestRekeyBoardRepointsEveryTableItOwns(t *testing.T) {
 	}
 }
 
+// TestRekeyBoardRepointsIssueBoardRows covers the journal row RekeyBoard
+// still misses: an issue_board row carries the board id in its FIELD
+// (BoardField), not its value, so the field itself has to be rewritten
+// for the row to move -- and a row on another board must stay put, the
+// same one-sided check TestRekeyBoardRepointsEveryTableItOwns already runs
+// for the table-backed rows.
+func TestRekeyBoardRepointsIssueBoardRows(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	if err := repo.UpsertPage(ctx, "p1", sample(), time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	made, err := repo.CreateDraftBoard(ctx, "p1", board14())
+	if err != nil {
+		t.Fatal(err)
+	}
+	draftID := made.ID
+
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-409", "PLAT-412"}, draftID, issuerepo.ScopeBacklog); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-347"}, 9, issuerepo.ScopeBacklog); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.RekeyBoard(ctx, "p1", draftID, 100); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range []string{"PLAT-409", "PLAT-412"} {
+		p, ok := rowOf(t, repo, key, issuerepo.EntityIssueBoard)
+		if !ok {
+			t.Fatalf("%s: no issue_board row", key)
+		}
+		if p.Field != issuerepo.BoardField(100) {
+			t.Errorf("%s: field = %q, want %q", key, p.Field, issuerepo.BoardField(100))
+		}
+		if issuerepo.MoveID(p.AfterVal) != "100" {
+			t.Errorf("%s: after_val = %q, want board 100", key, p.AfterVal)
+		}
+	}
+
+	other, ok := rowOf(t, repo, "PLAT-347", issuerepo.EntityIssueBoard)
+	if !ok {
+		t.Fatal("PLAT-347: no issue_board row")
+	}
+	if other.Field != issuerepo.BoardField(9) {
+		t.Errorf("PLAT-347: field = %q, want left naming board 9", other.Field)
+	}
+	if issuerepo.MoveID(other.AfterVal) != "9" {
+		t.Errorf("PLAT-347: after_val = %q, want left naming board 9", other.AfterVal)
+	}
+}
+
 // TestRekeyBoardRepointsARankJournaledAgainstIt covers the journal row
 // RekeyBoard has to repoint that is not a table: a rank's after_val packs
 // the board it was dropped on (RankValue), and a rank dropped on another
