@@ -126,22 +126,24 @@ func TestEditFieldHandlesEveryEditableField(t *testing.T) {
 	}
 }
 
-// TestEditFieldWritesAssigneeName exercises the new field on its own: the
-// assignee_name column is not part of the issue DTO ListIssues and GetIssue
-// project, so it is read back straight from the store.
-func TestEditFieldWritesAssigneeName(t *testing.T) {
+// TestEditFieldWritesBothAssigneeColumns pins the two-column write: an
+// "assignee" edit is a username from AssigneePicker, so it has to land in
+// assignee_name too or "assigned to me" cannot see it. assignee_name is not
+// part of the issue DTO ListIssues and GetIssue project, so it is read back
+// straight from the store.
+func TestEditFieldWritesBothAssigneeColumns(t *testing.T) {
 	repo, db := newRepoWithDB(t)
 	ctx := context.Background()
 	seedOne(t, repo, "p1")
-	if err := repo.EditField(ctx, "p1", "PLAT-1", "assigneeName", "jdoe"); err != nil {
+	if err := repo.EditField(ctx, "p1", "PLAT-1", "assignee", "jdoe"); err != nil {
 		t.Fatalf("edit: %v", err)
 	}
-	var got string
-	if err := db.QueryRow(`SELECT assignee_name FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-1'`).Scan(&got); err != nil {
-		t.Fatalf("read assignee_name: %v", err)
+	var assignee, assigneeName string
+	if err := db.QueryRow(`SELECT assignee, assignee_name FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-1'`).Scan(&assignee, &assigneeName); err != nil {
+		t.Fatalf("read assignee columns: %v", err)
 	}
-	if got != "jdoe" {
-		t.Errorf("assignee_name = %q, want jdoe", got)
+	if assignee != "jdoe" || assigneeName != "jdoe" {
+		t.Errorf("assignee = %q assignee_name = %q, want both jdoe", assignee, assigneeName)
 	}
 }
 

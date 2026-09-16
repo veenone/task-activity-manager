@@ -86,8 +86,8 @@ func TestListIssuesFiltersByAssigneeName(t *testing.T) {
 // covers the two cases beyond the plain column match: a draft only ever
 // carries a username (CreateDraft writes it into both assignee and
 // assignee_name), and a pending reassignment is a direct write to the row
-// (writeField, via EditField.assigneeName), so the filter sees it
-// immediately, before any Commit.
+// (writeField, via EditField's "assignee" path, which AssigneePicker
+// actually sends), so the filter sees it immediately, before any Commit.
 func TestListIssuesFiltersByAssigneeNameIncludesDraftsAndPendingReassignment(t *testing.T) {
 	r := newRepo(t)
 	ctx := context.Background()
@@ -101,10 +101,10 @@ func TestListIssuesFiltersByAssigneeNameIncludesDraftsAndPendingReassignment(t *
 	if err != nil {
 		t.Fatalf("create draft: %v", err)
 	}
-	if err := r.EditField(ctx, "p1", "PLAT-412", "assigneeName", "me"); err != nil {
+	if err := r.EditField(ctx, "p1", "PLAT-412", "assignee", "me"); err != nil {
 		t.Fatalf("reassign to me: %v", err)
 	}
-	if err := r.EditField(ctx, "p1", "PLAT-409", "assigneeName", "bob"); err != nil {
+	if err := r.EditField(ctx, "p1", "PLAT-409", "assignee", "bob"); err != nil {
 		t.Fatalf("reassign away: %v", err)
 	}
 
