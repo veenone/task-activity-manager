@@ -214,6 +214,71 @@ func TestABacklogAddFailureLeavesItsRowAndTheRestOfTheCommitLands(t *testing.T) 
 	}
 }
 
+// Test 4b: the bundle's headline flow -- draft a board, queue an add onto
+// it while it is still a draft, then Commit. The board is created and
+// rekeyed before the queued add is pushed, so the add must go out against
+// the real board id, not the placeholder the row was journaled under.
+func TestADraftBoardWithAQueuedAddCommitsTheAddAgainstTheRealBoardID(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	boardID := draftBoard(t, h, "PLAT Checkout Board")
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, issuerepo.ScopeBacklog); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Failures) != 0 || len(res.Held) != 0 || res.Remaining != 0 {
+		t.Fatalf("result: %+v", res)
+	}
+	if len(h.jira.backlogAdds) != 1 || h.jira.backlogAdds[0] != "900 PLAT-1" {
+		t.Fatalf("the add is pushed with the real board id, not the placeholder: %v", h.jira.backlogAdds)
+	}
+}
+
+// Test 4c: the board create lands but the queued add fails on the same
+// Commit (a retryable Jira error), so the row survives for a retry. The
+// board's create row is gone by then -- r.boardRealID, which only lives for
+// one Commit, cannot resolve it on the retry -- so the row's own board id
+// must already be the real one, which only RekeyBoard can have made true.
+func TestARetriedBoardAddAfterTheBoardWasAlreadyCreatedPushesWithTheRealBoardID(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	boardID := draftBoard(t, h, "PLAT Checkout Board")
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, issuerepo.ScopeBacklog); err != nil {
+		t.Fatal(err)
+	}
+	h.jira.backlogErr = errors.New("POST failed: 503 service unavailable")
+
+	res, err := h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.jira.boardsMade) != 1 {
+		t.Fatalf("the board was created on the first Commit: %v", h.jira.boardsMade)
+	}
+	if len(res.Failures) != 1 || res.Failures[0].Key != "PLAT-1" || !res.Failures[0].Retryable {
+		t.Fatalf("the add failed and is worth retrying: %+v", res.Failures)
+	}
+
+	h.jira.backlogErr = nil
+	res, err = h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.jira.boardsMade) != 1 {
+		t.Fatalf("the board is not created a second time: %v", h.jira.boardsMade)
+	}
+	if len(res.Failures) != 0 {
+		t.Fatalf("the retried add is pushed with the real board id, not refused as a placeholder: %+v", res.Failures)
+	}
+	if len(h.jira.backlogAdds) != 1 || h.jira.backlogAdds[0] != "900 PLAT-1" {
+		t.Fatalf("the retry pushes with the real board id: %v", h.jira.backlogAdds)
+	}
+}
+
 // Test 5: a sprint-scope add goes through MoveIssuesToSprint and makes no
 // AddToBoardBacklog call. Which call was made is the behaviour under test
 // here, per the brief.
@@ -346,5 +411,31 @@ func TestTheFilterCheckReportsMissingKeysRemovesRowsAnywayAndASingleBoardsFailur
 	}
 	if !byBoard["1 PLAT-1,PLAT-2"] || !byBoard["2 PLAT-3"] {
 		t.Errorf("checks: %v", h.jira.filterChecks)
+	}
+}
+
+// Test 8: the filter-check message names a board this Commit itself
+// created by the name it was drafted with, not its id -- the spec's own
+// wording ("PLAT-360 is outside PLAT Checkout Board's filter...") -- since
+// this is the one case the committer actually knows a board's name in.
+func TestTheFilterCheckMessageNamesABoardCreatedThisCommitByName(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	boardID := draftBoard(t, h, "PLAT Checkout Board")
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, issuerepo.ScopeBacklog); err != nil {
+		t.Fatal(err)
+	}
+	h.jira.filterMissing[900] = []string{"PLAT-1"}
+
+	res, err := h.eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Failures) != 1 {
+		t.Fatalf("one result line, for the key outside the filter: %+v", res.Failures)
+	}
+	want := "PLAT-1 is outside PLAT Checkout Board's filter, so it will not show on that board."
+	if res.Failures[0].Error != want {
+		t.Errorf("message = %q, want %q", res.Failures[0].Error, want)
 	}
 }

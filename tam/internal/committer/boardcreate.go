@@ -76,6 +76,7 @@ func (r *commitRun) createBoards(ctx context.Context) {
 			continue
 		}
 		r.boardRealID[draftID] = realID
+		r.boardName[realID] = d.Name
 	}
 }
 
@@ -120,6 +121,16 @@ func (r *commitRun) pushBoardAdds(ctx context.Context) {
 			continue
 		}
 		if real, ok := r.boardRealID[boardID]; ok {
+			// issuerepo.RekeyBoard already rewrote this row's field and
+			// value in the store the moment its board went real; r.rows is
+			// the snapshot from before that ran, so p is corrected to match
+			// what is on disk now. Left stale, clearMove's after_val match
+			// (boards.go) finds nothing to delete and a pushed add reports
+			// Moved while its row lives on for the next Commit to push
+			// again.
+			scope := issuerepo.MoveRawName(p.AfterVal)
+			p.Field = issuerepo.BoardField(real)
+			p.AfterVal = issuerepo.MoveValue(strconv.Itoa(real), scope)
 			boardID = real
 		} else if waits, held := r.deps.blockedBy(strconv.Itoa(boardID)); held {
 			r.deps.hold(r.res, p.EntityKey, issuerepo.EntityIssueBoard, p.ID, waits)
@@ -219,6 +230,16 @@ func (r *commitRun) settleBoardAdds(ctx context.Context, rows []journal.PendingC
 	}
 }
 
+// boardLabel names a board for a result message: its drafted name when this
+// Commit is the one that created it, else "board <id>", since the committer
+// owns no general board-name lookup.
+func (r *commitRun) boardLabel(boardID int) string {
+	if name, ok := r.boardName[boardID]; ok {
+		return name
+	}
+	return fmt.Sprintf("board %d", boardID)
+}
+
 func rowKeys(rows []journal.PendingChange) []string {
 	keys := make([]string, 0, len(rows))
 	for _, p := range rows {
@@ -264,7 +285,7 @@ func (r *commitRun) checkBoardFilters(ctx context.Context, pushed map[int][]stri
 			r.res.Failures = append(r.res.Failures, Failure{
 				Key:        k,
 				EntityType: issuerepo.EntityIssueBoard,
-				Error:      fmt.Sprintf("%s is outside board %d's filter, so it will not show on that board.", k, boardID),
+				Error:      fmt.Sprintf("%s is outside %s's filter, so it will not show on that board.", k, r.boardLabel(boardID)),
 				Retryable:  false,
 				Reachable:  []string{},
 			})

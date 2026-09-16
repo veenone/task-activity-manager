@@ -129,7 +129,7 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, Linked: []Linked{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
-	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies(), boardRealID: map[int]int{}}
+	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies(), boardRealID: map[int]int{}, boardName: map[int]string{}}
 	if err := run.reload(ctx); err != nil {
 		return res, err
 	}

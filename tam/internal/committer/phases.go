@@ -70,6 +70,12 @@ type commitRun struct {
 	// Jira the moment the board itself was created but nothing else in this
 	// Commit's journal rows knew its new id yet.
 	boardRealID map[int]int
+	// boardName carries a board this Commit itself created (boardcreate.go)
+	// from its real id to the name it was drafted with, for the filter
+	// check's message (checkBoardFilters). It is not a general board-name
+	// lookup -- the committer has none, and does not own the board list --
+	// so a board this Commit did not create is named by its id there.
+	boardName map[int]string
 }
 
 // reload reads the journal again, oldest first.
