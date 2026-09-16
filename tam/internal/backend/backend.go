@@ -426,6 +426,33 @@ type BoardBackend interface {
 	DeleteSprint(ctx context.Context, sprintID int) error
 }
 
+// BoardDraft is a new board's fields as the create dialog captured them:
+// the name and type it should have, and the filter that will back it, built
+// from a name and the JQL that scopes it.
+type BoardDraft struct {
+	Name       string
+	Type       string // "scrum" or "kanban"
+	FilterName string
+	JQL        string
+}
+
+// BoardCreator is the board-creating half of BoardBackend, kept off it on
+// purpose: BoardBackend's own doc says it never writes, and a board create
+// is exactly that, a write. It is a separate optional interface the
+// committer type-asserts for, the same way it already type-asserts
+// boardWriter at committer/boards.go:125, so a backend that cannot create
+// boards simply does not answer for it rather than forcing every
+// BoardBackend to grow a method it may not support.
+type BoardCreator interface {
+	// CreateBoard creates a board from the draft and returns its id. The
+	// Jira implementation makes it in two Jira calls, a filter then the
+	// board on it, and rolls the filter back when the board create fails,
+	// so a failed attempt never leaves an orphaned filter behind.
+	CreateBoard(ctx context.Context, d BoardDraft) (int, error)
+	// AddToBoardBacklog adds keys to boardID's backlog.
+	AddToBoardBacklog(ctx context.Context, boardID int, keys []string) error
+}
+
 // ErrNoTransition is what Transition returns when no workflow transition of
 // the issue reaches the target status. It is the one board failure that
 // will fail identically on every retry, so the commit pass reports it as
