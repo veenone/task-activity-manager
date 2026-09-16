@@ -2,6 +2,7 @@ package syncer_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -18,12 +19,21 @@ import (
 
 func newRepo(t *testing.T) *issuerepo.Repository {
 	t.Helper()
+	repo, _ := newRepoWithDB(t)
+	return repo
+}
+
+// newRepoWithDB is newRepo plus the raw *sql.DB, for the one test that needs
+// to break a table out from under the repository to prove a write failure
+// there does not propagate.
+func newRepoWithDB(t *testing.T) (*issuerepo.Repository, *sql.DB) {
+	t.Helper()
 	db, err := tamstore.Open(filepath.Join(t.TempDir(), "tam.db"))
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return issuerepo.New(db.DB())
+	return issuerepo.New(db.DB()), db.DB()
 }
 
 // fake is a scripted IssueBackend: fixed pages, an optional page that
@@ -573,6 +583,37 @@ func TestErrNoAgileMarksUnavailableAndRemovesNoBoards(t *testing.T) {
 	v, err := repo.ProfileSetting(context.Background(), "p1", "boards_unavailable")
 	if err != nil || v != "true" {
 		t.Errorf("boards_unavailable = %q, %v, want it recorded", v, err)
+	}
+}
+
+func TestSyncStoresJiraUserSettings(t *testing.T) {
+	repo := newRepo(t)
+	e := syncer.New(demobackend.New("DEMO"), repo)
+	if _, err := e.Sync(context.Background(), "p1", "DEMO", "", false, nil); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	username, err := repo.ProfileSetting(context.Background(), "p1", "jira_username")
+	if err != nil || username != "demo" {
+		t.Errorf("jira_username = %q, %v, want %q", username, err, "demo")
+	}
+	displayName, err := repo.ProfileSetting(context.Background(), "p1", "jira_display_name")
+	if err != nil || displayName != "Demo User" {
+		t.Errorf("jira_display_name = %q, %v, want %q", displayName, err, "Demo User")
+	}
+}
+
+func TestSettingsWriteFailureDuringSyncDoesNotFailTheSync(t *testing.T) {
+	repo, db := newRepoWithDB(t)
+	if _, err := db.Exec(`DROP TABLE profile_setting`); err != nil {
+		t.Fatalf("drop profile_setting: %v", err)
+	}
+	e := syncer.New(demobackend.New("DEMO"), repo)
+	sum, err := e.Sync(context.Background(), "p1", "DEMO", "", false, nil)
+	if err != nil {
+		t.Fatalf("sync: %v, want a settings-write failure not to fail the sync", err)
+	}
+	if sum.Fetched != 60 || sum.Upserted != 60 {
+		t.Errorf("summary = %+v, want the sync to complete despite the settings write failure", sum)
 	}
 }
 

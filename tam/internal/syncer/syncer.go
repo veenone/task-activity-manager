@@ -38,6 +38,16 @@ type Summary struct {
 	Boards *BoardSummary `json:"boards,omitempty"`
 }
 
+// settingJiraUsername and settingJiraDisplayName are the per-profile keys
+// for the connected Jira user, written from the connection test every sync
+// already makes. They mirror the same-named keys app_profiles.go writes
+// from TestProfileConnection; the two packages do not share an import, so
+// each defines its own copy of the string.
+const (
+	settingJiraUsername    = "jira_username"
+	settingJiraDisplayName = "jira_display_name"
+)
+
 // PartialSyncError says a sync stopped after some pages had already been
 // written. The rows stay; the sync state is not advanced.
 type PartialSyncError struct {
@@ -96,8 +106,17 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 	if err != nil {
 		return sum, err
 	}
-	if _, err := e.b.TestConnection(ctx); err != nil {
+	user, err := e.b.TestConnection(ctx)
+	if err != nil {
 		return e.fail(ctx, profileID, state, 0, sum, err, emit)
+	}
+	// A failure here must not fail the sync: the user's issues are not lost
+	// because bookkeeping about who "me" is could not be written.
+	if err := e.repo.SetProfileSetting(ctx, profileID, settingJiraUsername, user.Name); err != nil {
+		log.Printf("tam: save jira username for %s: %v", profileID, err)
+	}
+	if err := e.repo.SetProfileSetting(ctx, profileID, settingJiraDisplayName, user.DisplayName); err != nil {
+		log.Printf("tam: save jira display name for %s: %v", profileID, err)
 	}
 
 	since := ""

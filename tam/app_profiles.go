@@ -203,6 +203,14 @@ func (a *App) TestProfileConnection(profileID, jiraURL, caCert string, allowUntr
 	if err != nil {
 		return "", err
 	}
+	// A settings write failure does not fail the test: the connection is
+	// verified either way, and the display name still has somewhere to go.
+	if err := a.repo.SetProfileSetting(a.ctx, profileID, settingJiraUsername, user.Name); err != nil {
+		log.Printf("tam: save jira username for %s: %v", profileID, err)
+	}
+	if err := a.repo.SetProfileSetting(a.ctx, profileID, settingJiraDisplayName, user.DisplayName); err != nil {
+		log.Printf("tam: save jira display name for %s: %v", profileID, err)
+	}
 	return user.DisplayName, nil
 }
 
