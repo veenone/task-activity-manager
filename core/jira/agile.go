@@ -264,6 +264,24 @@ func (c *Client) BoardIssueKeys(ctx context.Context, boardID int, sprintID, proj
 	return pageAgileIssues(ctx, c, path, jql)
 }
 
+// BoardFilterCheck reads /board/{id}/issue narrowed to exactly the keys
+// given, via jql=key in (...), and answers with the ones Jira actually
+// returned: the keys that both exist and match the board's own filter. It
+// is the committer's courtesy read after pushing an issue_board add, so it
+// costs one page of those keys rather than the whole board BoardIssueKeys
+// reads. An empty keys asks Jira nothing.
+func (c *Client) BoardFilterCheck(ctx context.Context, boardID int, keys []string) ([]string, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	quoted := make([]string, len(keys))
+	for i, k := range keys {
+		quoted[i] = strconv.Quote(k)
+	}
+	path := fmt.Sprintf("/rest/agile/1.0/board/%d/issue", boardID)
+	return pageAgileIssues(ctx, c, path, "key in ("+strings.Join(quoted, ", ")+")")
+}
+
 // RankIssue ranks key immediately before or after neighbourKey via PUT
 // /rest/agile/1.0/issue/rank, one of the endpoint-specific write calls in
 // this package. The endpoint answers 204 when the rank landed and 207
