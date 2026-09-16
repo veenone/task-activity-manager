@@ -1386,3 +1386,26 @@
 @media (forced-colors: active) {
   .editor-toolbar-button[aria-pressed="true"], .editor-toolbar-button[data-active="true"] { outline: 2px solid CanvasText; }
 }
+
+/* Rich text renderer: wiki markup and Markdown drawn as semantic elements
+   (RichText.tsx), tokens only so dark mode follows without a second pass.
+   Tables and code blocks scroll sideways inside their own box, never the
+   panel around them. */
+.rich-text > :first-child, .rich-text-inline > :first-child { margin-top: 0; }
+.rich-text > :last-child, .rich-text-inline > :last-child { margin-bottom: 0; }
+.rich-text-truncated { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--warn-border); border-radius: 4px; background: var(--warn-soft); color: var(--warn-text); font-size: 12px; }
+.rich-link, .rich-issue-key { display: inline; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.rich-link { text-decoration: underline; }
+.rich-link:hover, .rich-issue-key:hover { color: var(--accent-hover); }
+.rich-inline-code, .rich-code-scroll code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+.rich-inline-code { padding: 0 4px; border: 1px solid var(--border-subtle); border-radius: 3px; background: var(--surface-2); }
+.rich-table-scroll, .rich-code-scroll { overflow-x: auto; }
+.rich-text table { border-collapse: collapse; width: max-content; min-width: 100%; }
+.rich-text th, .rich-text td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
+.rich-text th { background: var(--surface-2); }
+.rich-code-scroll { margin: 0; padding: 8px; border: 1px solid var(--border-subtle); border-radius: 4px; background: var(--surface-2); }
+.rich-panel { border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.rich-panel-title { padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--surface-2); font-weight: 600; }
+.rich-panel-body { padding: 8px; }
+.rich-image-placeholder { color: var(--text-muted); font-style: italic; }
+.rich-text blockquote { margin: 0; padding-left: 10px; border-left: 3px solid var(--border-strong); color: var(--text-muted); }

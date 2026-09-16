@@ -36,3 +36,8 @@ export type {
 export { EditorToolbar } from "./components/EditorToolbar/EditorToolbar";
 export type { ToolbarGroup, ToolbarItem, ToolbarToggle, ToolbarAction, ToolbarLink } from "./components/EditorToolbar/types";
 export type { IconName } from "./components/EditorToolbar/icons";
+export { compactUrl, isAllowedLink } from "./lib/links";
+export { RichText, RICH_TEXT_LIMIT } from "./richtext/RichText";
+export { parseRich, detectFormat } from "./richtext/detect";
+export { toPlainText } from "./richtext/plain";
+export type { RichFormat, Block, Inline } from "./richtext/ast";
