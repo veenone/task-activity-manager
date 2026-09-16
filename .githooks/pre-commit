@@ -1,0 +1,6 @@
+#!/bin/sh
+# Enable once per clone: git config core.hooksPath .githooks
+# Cheap gates only; CI re-runs everything, so a skipped hook merges nothing new.
+set -e
+sh scripts/ratchet.sh
+cd frontend/core && npx vitest run src/instruction-gate.test.ts

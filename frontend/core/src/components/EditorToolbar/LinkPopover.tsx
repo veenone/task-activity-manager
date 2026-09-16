@@ -33,6 +33,11 @@ export function LinkPopover({ href, onApply, onRemove, onClose }: Props) {
   };
 
   return (
+    // Escape closes the popover and has to be caught wherever focus sits inside
+    // it, so the handler belongs on the dialog rather than on the input. The
+    // rule counts "dialog" as non-interactive; closing on Escape is what a
+    // dialog is supposed to do.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       className="editor-link-popover"
       role="dialog"

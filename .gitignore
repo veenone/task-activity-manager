@@ -46,5 +46,7 @@ docs/user_doc_config.yml
 # Generated user-guide build output
 docs/user-guide/dist/
 
+eslint-report.json
+
 # local agent work notes (briefs, reports, ledgers)
 .work/

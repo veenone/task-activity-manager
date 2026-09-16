@@ -109,7 +109,22 @@ export function RichTextField({
     tabRefs.current[t]?.focus();
   };
 
-  const onTablistKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+  // Ctrl+Shift+P toggles, so it has to be reachable from both sides: in Write
+  // the focus is in the textarea, in Preview it sits on the tab. Those are the
+  // only two focusable places in the field, so both carry it. It is not on the
+  // wrapper because a shortcut on a div with no role is invisible to assistive
+  // technology and cannot be focused to begin with.
+  const onToggleKey = (e: KeyboardEvent<Element>) => {
+    if (!e.ctrlKey || !e.shiftKey || e.key.toLowerCase() !== "p") return;
+    e.preventDefault();
+    setTab((t) => (t === "write" ? "preview" : "write"));
+  };
+
+  // Arrow keys sit on the tabs themselves, not on the tablist: the tablist is
+  // never focused (the tabs carry the roving tabindex), so a handler up there
+  // only ever fires by bubbling.
+  const onTabKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    onToggleKey(e);
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     e.preventDefault();
     const index = TABS.indexOf(tab);
@@ -117,21 +132,13 @@ export function RichTextField({
     focusTab(TABS[(index + delta + TABS.length) % TABS.length]);
   };
 
-  // Bound on the wrapper, not the textarea: from Preview the focus sits on
-  // the tab, and a shortcut that can only switch one way is not a toggle.
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (!e.ctrlKey || !e.shiftKey || e.key.toLowerCase() !== "p") return;
-    e.preventDefault();
-    setTab((t) => (t === "write" ? "preview" : "write"));
-  };
-
   const writePanelId = `${baseId}-panel-write`;
   const previewPanelId = `${baseId}-panel-preview`;
 
   return (
-    <div className="richfield" onKeyDown={onKeyDown}>
+    <div className="richfield">
       <div className="richfield-controls">
-        <div className="richfield-tabs" role="tablist" aria-label="Write and Preview" onKeyDown={onTablistKeyDown}>
+        <div className="richfield-tabs" role="tablist" aria-label="Write and Preview">
           {TABS.map((t) => (
             <button
               key={t}
@@ -146,6 +153,7 @@ export function RichTextField({
                 tabRefs.current[t] = el;
               }}
               onClick={() => setTab(t)}
+              onKeyDown={onTabKeyDown}
             >
               {TAB_LABEL[t]}
             </button>
@@ -172,6 +180,10 @@ export function RichTextField({
           className={textarea?.className ? `richfield-textarea ${textarea.className}` : "richfield-textarea"}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setTab("write")}
+          onKeyDown={(e) => {
+            onToggleKey(e);
+            textarea?.onKeyDown?.(e);
+          }}
         />
       </div>
 
