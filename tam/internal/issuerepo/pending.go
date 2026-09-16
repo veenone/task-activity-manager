@@ -23,6 +23,11 @@ const (
 	// EntityLink is the journal entity type of a link to create. The row's
 	// field is LinkField(d) and its after_val the LinkDraft as JSON.
 	EntityLink = "link"
+	// EntityBoardCreate is the journal entity type of a drafted board, the
+	// board twin of EntitySprintCreate (sprintdrafts.go): its key is the
+	// negative id as text, its field FieldCreate, and its after_val the
+	// DraftBoard as JSON.
+	EntityBoardCreate = "board_create"
 
 	// The three board moves are three entity types and not one because they
 	// fail separately, are checked separately, and are pushed in a fixed
