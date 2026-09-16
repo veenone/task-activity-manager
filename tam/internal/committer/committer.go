@@ -160,7 +160,7 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 // edits down with it.
 func boardRow(entityType string) bool {
 	switch entityType {
-	case issuerepo.EntityTransition, issuerepo.EntityRank, issuerepo.EntitySprintMove:
+	case issuerepo.EntityTransition, issuerepo.EntityRank, issuerepo.EntitySprintMove, issuerepo.EntityIssueBoard:
 		return true
 	}
 	return false
@@ -168,7 +168,9 @@ func boardRow(entityType string) bool {
 
 // heldBoardRow says whether any of the rows is a board move that the board
 // pass can hold back as a conflict. A rank is not one: it has no before_val
-// to compare and is never held.
+// to compare and is never held. Neither is an issue_board add: it has no
+// remote scalar to check it against the way a status or a sprint id does,
+// so the board pass pushes it straight, the same as a rank.
 func heldBoardRow(rows []journal.PendingChange) bool {
 	for _, p := range rows {
 		if p.EntityType == issuerepo.EntityTransition || p.EntityType == issuerepo.EntitySprintMove {

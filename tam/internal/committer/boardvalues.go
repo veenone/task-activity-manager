@@ -52,6 +52,13 @@ func moveLabel(entityType, value string) string {
 	if entityType == issuerepo.EntitySprintMove && issuerepo.MoveID(value) == "" {
 		return backlogLabel
 	}
+	if entityType == issuerepo.EntityIssueBoard {
+		scope := backlogLabel
+		if s := issuerepo.MoveRawName(value); s != issuerepo.ScopeBacklog {
+			scope = "sprint " + s
+		}
+		return "board " + issuerepo.MoveID(value) + ", " + scope
+	}
 	return issuerepo.MoveName(value)
 }
 
