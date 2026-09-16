@@ -18,11 +18,18 @@ export function parseMarkdown(text: string): Block[] {
   return blocks;
 }
 
-// Outside-voice fix 5: marked's lexer can return text and codespan token
-// text already HTML-escaped; decode exactly these five entities once so
-// React never shows them literally. A single-pass regex (rather than five
-// sequential replaces) means "&amp;lt;" decodes to the literal text "&lt;"
-// and not a second time to "<".
+// CommonMark decodes character references (&amp; &lt; &gt; &quot; &#39;)
+// only in ordinary text; a code span, a code block and raw HTML all pass
+// through literal, entities included, because they are the user's own
+// source bytes, not prose. marked's own HTML renderer follows this rule
+// (marked.parse("`&amp;amp;`") keeps the codespan's "&amp;amp;" literal;
+// marked.parse("plain &amp;amp; text") decodes the same text to "plain
+// &amp; text"), so decode() below is called ONLY from the "text"/"escape"
+// case. Do not add it to codespan, code, or raw HTML without re-reading
+// this comment: those three must stay byte for byte with what was typed.
+// A single-pass regex (rather than five sequential replaces) means
+// "&amp;lt;" decodes to the literal text "&lt;" and not a second time to
+// "<".
 const ENTITY_RE = /&amp;|&lt;|&gt;|&quot;|&#39;/g;
 const ENTITIES: Record<string, string> = {
   "&amp;": "&",
@@ -66,8 +73,10 @@ function mapBlock(token: MarkedToken): Block | null {
       // Constraint: raw HTML in Markdown renders as literal text, never as
       // markup. A block-level HTML token (or anything else this AST has no
       // shape for) falls back to its own literal source rather than being
-      // dropped, so user content is never silently lost.
-      return token.raw.trim() ? { t: "p", children: [{ t: "text", text: decode(token.raw) }] } : null;
+      // dropped, so user content is never silently lost. No decode(): raw
+      // HTML is not ordinary text (see the comment above ENTITY_RE), and
+      // .raw is always the untouched source slice regardless of token type.
+      return token.raw.trim() ? { t: "p", children: [{ t: "text", text: token.raw }] } : null;
   }
 }
 
@@ -127,7 +136,9 @@ function mapInline(token: MarkedToken): Inline | null {
     case "del":
       return { t: "mark", mark: "strike", children: mapInlines(token.tokens) };
     case "codespan":
-      return { t: "code", text: decode(token.text) };
+      // No decode(): a code span keeps character references literal (see
+      // the comment above ENTITY_RE).
+      return { t: "code", text: token.text };
     case "link":
       return { t: "link", href: token.href, children: mapInlines(token.tokens) };
     case "image":
@@ -136,11 +147,15 @@ function mapInline(token: MarkedToken): Inline | null {
       return { t: "br" };
     case "html":
       // Constraint: raw HTML renders as literal text, never interpreted.
-      return { t: "text", text: decode(token.text) };
+      // No decode(): raw HTML is not ordinary text (see the comment above
+      // ENTITY_RE).
+      return { t: "text", text: token.text };
     case "space":
       return null;
     default:
-      return "raw" in token && token.raw ? { t: "text", text: decode(token.raw) } : null;
+      // .raw is always the untouched source slice, never escaped by marked
+      // regardless of token type, so it is never decoded either.
+      return "raw" in token && token.raw ? { t: "text", text: token.raw } : null;
   }
 }
 

@@ -123,19 +123,38 @@ describe("parseMarkdown raw HTML", () => {
   it("keeps <b>hi</b> as literal text", () => {
     expect(parseMarkdown("<b>hi</b>")).toEqual([{ t: "p", children: text("<b>hi</b>") }]);
   });
+
+  it("keeps a character reference inside a raw-HTML fallback literal", () => {
+    // A block-level construct this AST has no shape for (e.g. an HTML
+    // comment) falls back to its own literal source; per CommonMark, raw
+    // HTML is never entity-decoded, so "&amp;" must survive untouched.
+    expect(parseMarkdown("<!-- a &amp; b -->")).toEqual([{ t: "p", children: text("<!-- a &amp; b -->") }]);
+  });
 });
 
-describe("parseMarkdown entity decoding (outside-voice fix 5)", () => {
-  it("decodes marked's escaped entities exactly once in a codespan", () => {
-    // marked's lexer can hand back text/codespan tokens with &amp; &lt;
-    // &gt; &quot; &#39; already substituted in; markdown.ts must undo that
-    // once (not zero times, and not twice) so the AST holds the actual
-    // characters rather than the HTML-safe stand-ins.
-    expect(parseMarkdown("`a<b &amp;`")).toEqual([{ t: "p", children: [{ t: "code", text: "a<b &" }] }]);
+describe("parseMarkdown entity decoding (fix round 1, D5 correction)", () => {
+  // CommonMark decodes character references only in ordinary text; a code
+  // span, a code block and raw HTML all keep them literal (verified against
+  // marked's own renderer: marked.parse("`&amp;amp;`") keeps the codespan's
+  // "&amp;amp;" literal, while marked.parse("plain &amp;amp; text") decodes
+  // the surrounding prose to "plain &amp; text"). The original outside-voice
+  // fix 5 decoded codespan text too, which corrupted any code sample that
+  // itself quoted an entity; these tests pin the corrected behaviour so it
+  // is not "fixed" back.
+  it("decodes an entity in ordinary text", () => {
+    expect(parseMarkdown("Tom &amp; Jerry")).toEqual([{ t: "p", children: text("Tom & Jerry") }]);
   });
 
-  it("does not re-decode a literal &amp;lt; into <", () => {
-    expect(parseMarkdown("`&amp;lt;`")).toEqual([{ t: "p", children: [{ t: "code", text: "&lt;" }] }]);
+  it("keeps an entity inside a codespan literal, not decoded", () => {
+    expect(parseMarkdown("`a<b &amp;`")).toEqual([{ t: "p", children: [{ t: "code", text: "a<b &amp;" }] }]);
+  });
+
+  it("keeps a doubled entity inside a codespan literal (no decoding at all, let alone twice)", () => {
+    expect(parseMarkdown("`&amp;lt;`")).toEqual([{ t: "p", children: [{ t: "code", text: "&amp;lt;" }] }]);
+  });
+
+  it("keeps an entity inside a fenced code block literal", () => {
+    expect(parseMarkdown("```\nTom &amp; Jerry\n```")).toEqual([{ t: "codeblock", lang: "", text: "Tom &amp; Jerry" }]);
   });
 });
 
