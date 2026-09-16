@@ -53,6 +53,14 @@ type Backend struct {
 	// nextSprintID hands out ids for CreateSprint, starting past the
 	// dataset's own three.
 	nextSprintID int
+	// boardCreated holds every board CreateBoard has made this run, keyed by
+	// id, beside the fixed scrum and kanban pair. Boards, knownBoard, and
+	// BoardColumns all read through it, so a board this run created is a
+	// real board everywhere a dataset one is.
+	boardCreated map[int]backend.Board
+	// nextBoardID hands out ids for CreateBoard, starting past the fixed
+	// pair, the same scheme nextSprintID uses.
+	nextBoardID int
 	// refusedEpic is whether an epic carrying RefusedEpicMarker has already
 	// been refused this run. The refusal is staged once, the way the
 	// conflict on the curated story is, so a demo profile can show a Commit
@@ -79,6 +87,8 @@ func New(projectKey string) *Backend {
 		sprintDeleted: map[int]bool{},
 		sprintEdits:   map[int]sprintEdit{},
 		nextSprintID:  14,
+		boardCreated:  map[int]backend.Board{},
+		nextBoardID:   3,
 	}
 	b.conflict[b.ConflictKey()] = true
 	return b

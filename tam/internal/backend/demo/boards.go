@@ -12,6 +12,7 @@ import (
 
 // The only consumer is a type assertion, so drift would skip the sync silently; this fails the build.
 var _ backend.BoardBackend = (*Backend)(nil)
+var _ backend.BoardCreator = (*Backend)(nil)
 
 // The demo's boards. Board 1 is the scrum board the sprints hang off,
 // board 2 the kanban board that has none. Both are derived from the
@@ -65,17 +66,31 @@ func boardColumns() []backend.BoardColumn {
 	}
 }
 
-// Boards is the pair of boards the demo profile shows.
+// Boards is the fixed pair plus every board CreateBoard has made this run,
+// oldest created first, so a created board shows up here the same way a
+// created sprint shows up in BoardSprints.
 func (b *Backend) Boards(context.Context, string) ([]backend.Board, error) {
-	return []backend.Board{
+	out := []backend.Board{
 		{ID: scrumBoardID, Name: b.project + " Scrum", Type: backend.BoardTypeScrum},
 		{ID: kanbanBoardID, Name: b.project + " Kanban", Type: backend.BoardTypeKanban},
-	}, nil
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	ids := make([]int, 0, len(b.boardCreated))
+	for id := range b.boardCreated {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	for _, id := range ids {
+		out = append(out, b.boardCreated[id])
+	}
+	return out, nil
 }
 
-// BoardColumns gives both boards the same three columns.
+// BoardColumns gives every known board, fixed or created, the same three
+// columns.
 func (b *Backend) BoardColumns(_ context.Context, boardID int) ([]backend.BoardColumn, error) {
-	if err := knownBoard(boardID); err != nil {
+	if err := b.knownBoard(boardID); err != nil {
 		return nil, err
 	}
 	return boardColumns(), nil
@@ -85,7 +100,7 @@ func (b *Backend) BoardColumns(_ context.Context, boardID int) ([]backend.BoardC
 // one active, one future, in Jira's lowercase states, with any lifecycle
 // action this run has taken (StartSprint, CompleteSprint) overlaid on top.
 func (b *Backend) BoardSprints(_ context.Context, boardID int) ([]backend.Sprint, error) {
-	if err := knownBoard(boardID); err != nil {
+	if err := b.knownBoard(boardID); err != nil {
 		return nil, err
 	}
 	if boardID != scrumBoardID {
@@ -293,7 +308,7 @@ func (b *Backend) CompleteSprint(_ context.Context, sprintID int) error {
 // same issues fall straight into the board's own list, sprintID empty,
 // exactly the board scope a real Jira returns them to.
 func (b *Backend) BoardIssueKeys(_ context.Context, boardID int, sprintID, _ string) ([]string, error) {
-	if err := knownBoard(boardID); err != nil {
+	if err := b.knownBoard(boardID); err != nil {
 		return nil, err
 	}
 	b.mu.Lock()
@@ -477,7 +492,7 @@ func (b *Backend) demoSprintName(sprintID string) string {
 // to read from it: the dataset gives it no sprints, and a real board
 // without the Agile sprint field would refuse a create the same way.
 func (b *Backend) CreateSprint(_ context.Context, boardID int, d backend.SprintDraft) (backend.Sprint, error) {
-	if err := knownBoard(boardID); err != nil {
+	if err := b.knownBoard(boardID); err != nil {
 		return backend.Sprint{}, err
 	}
 	if boardID != scrumBoardID {
@@ -550,9 +565,50 @@ func (b *Backend) DeleteSprint(_ context.Context, sprintID int) error {
 	return nil
 }
 
-func knownBoard(boardID int) error {
-	if boardID != scrumBoardID && boardID != kanbanBoardID {
+// knownBoard says whether boardID is one of the fixed pair or a board this
+// run created; everything else is refused the way an unknown key already
+// is elsewhere in this package.
+func (b *Backend) knownBoard(boardID int) error {
+	if boardID == scrumBoardID || boardID == kanbanBoardID {
+		return nil
+	}
+	b.mu.Lock()
+	_, ok := b.boardCreated[boardID]
+	b.mu.Unlock()
+	if !ok {
 		return fmt.Errorf("demo: no board %d", boardID)
+	}
+	return nil
+}
+
+// CreateBoard mints a new board id above the fixed pair, the same numbering
+// scheme CreateSprint uses. A kanban board created this way gets no sprints
+// for free: BoardSprints only ever answers for the scrum board, whatever
+// board id is asked, so nothing here has to special-case the type.
+func (b *Backend) CreateBoard(_ context.Context, d backend.BoardDraft) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	id := b.nextBoardID
+	b.nextBoardID++
+	b.boardCreated[id] = backend.Board{ID: id, Name: d.Name, Type: d.Type, ProjectKey: b.project}
+	return id, nil
+}
+
+// AddToBoardBacklog refuses an unknown board or an unknown issue, the same
+// guard RankIssue and MoveIssuesToSprint apply, but otherwise records
+// nothing further: every known board already answers BoardIssueKeys with
+// the whole project's issues (kanban) or the sprint-scoped ones (scrum), so
+// there is no per-board membership for this dataset to track.
+func (b *Backend) AddToBoardBacklog(_ context.Context, boardID int, keys []string) error {
+	if err := b.knownBoard(boardID); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, k := range keys {
+		if _, ok := b.find(k); !ok {
+			return fmt.Errorf("demo: no issue %s", k)
+		}
 	}
 	return nil
 }
