@@ -614,4 +614,20 @@ describe("NewIssueModal", () => {
     await user.click(within(confirmDialog).getByRole("button", { name: "Discard" }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
+
+  it("shows Write and Preview over Description and drafts exactly what was typed", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    await user.type(within(dialog).getByLabelText("Summary *"), "Add docs");
+    await user.type(within(dialog).getByLabelText("Description"), "h2. Steps");
+    await user.click(within(dialog).getByRole("tab", { name: "Preview" }));
+    expect(within(dialog).getByRole("heading", { name: "Steps" })).toBeInTheDocument();
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalledWith("p1", {
+      ...baseDraft,
+      summary: "Add docs",
+      description: "h2. Steps",
+    }));
+  });
 });

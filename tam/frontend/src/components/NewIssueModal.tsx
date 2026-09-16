@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Modal, announce, call, errMsg, toPlainText, useConfirm, useProfile } from "@agile-suite/core";
-import { CreateIssue, ISSUE_TYPES } from "../api";
+import { Modal, RichTextField, announce, call, errMsg, toPlainText, useConfirm, useProfile } from "@agile-suite/core";
+import type { RichFormat } from "@agile-suite/core";
+import { BrowserOpenURL, CreateIssue, ISSUE_TYPES } from "../api";
 import type { FieldSpec, IssueDraft, IssueType, Profile, Settings } from "../api";
 import { MetaField, splitMetaFields } from "./MetaField";
 import { useCreateFields } from "../queries/pending";
@@ -103,6 +104,10 @@ export function NewIssueModal({
   const [type, setType] = useState<IssueType>(initialType);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
+  // The syntax picked for this draft's description, starting at "auto" the
+  // way a fresh RichTextField always does; there is no issue key yet for
+  // this to be remembered against, unlike EditableFields' module map.
+  const [descriptionFormat, setDescriptionFormat] = useState<RichFormat | "auto">("auto");
   const [priority, setPriority] = useState("");
   const [labels, setLabels] = useState("");
   const [assignee, setAssignee] = useState("");
@@ -403,10 +408,22 @@ export function NewIssueModal({
             </select>
           </label>
         )}
-        <label className="edit-row" htmlFor="new-description">
-          <span className="muted small">Description</span>
-          <textarea id="new-description" className="detail-input" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
+        {/* A <label> here would wrap the tab buttons too and forward their
+            clicks to the textarea instead of running them, so the label is
+            its own element pointing at the textarea by id, the same shape
+            EditableFields' description row uses. */}
+        <div className="edit-row">
+          <label className="muted small" htmlFor="new-description">Description</label>
+          <RichTextField
+            value={description}
+            onChange={setDescription}
+            format={descriptionFormat}
+            onFormatChange={setDescriptionFormat}
+            onOpenLink={BrowserOpenURL}
+            projectKey={activeProfile?.projectKey}
+            textarea={{ id: "new-description", className: "detail-input" }}
+          />
+        </div>
         <div className="edit-row">
           <label className="muted small" htmlFor="new-priority">Priority</label>
           <PriorityPicker

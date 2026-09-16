@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { FieldSpec } from "../api";
-import { META_INPUTS, MetaField, splitMetaFields } from "./MetaField";
+import { LongTextInput, META_INPUTS, MetaField, splitMetaFields } from "./MetaField";
 
 const spec = (over: Partial<FieldSpec>): FieldSpec => ({
   id: "customfield_1", name: "Field", type: "string", required: false, allowedValues: [], ...over,
@@ -22,14 +22,17 @@ describe("splitMetaFields", () => {
 });
 
 describe("MetaField", () => {
-  it("draws long text as a text area, through the table later inputs replace", async () => {
+  it("draws long text with Write and Preview, keeps aria-invalid on the textarea, and its value unchanged", async () => {
     const onChange = vi.fn();
-    render(<MetaField spec={spec({ name: "Acceptance criteria", type: "textarea" })} value="" invalid={false} onChange={onChange} />);
+    render(<MetaField spec={spec({ name: "Acceptance criteria", type: "textarea" })} value="" invalid onChange={onChange} />);
     const box = screen.getByLabelText("Acceptance criteria");
     expect(box.tagName).toBe("TEXTAREA");
+    expect(box).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("tab", { name: "Write" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Preview" })).toBeInTheDocument();
     await userEvent.type(box, "G");
     expect(onChange).toHaveBeenCalledWith("G");
-    expect(Object.keys(META_INPUTS)).toContain("textarea");
+    expect(META_INPUTS.textarea).toBe(LongTextInput);
   });
 
   it("draws a date for date and datetime, and says a user field wants a username", () => {

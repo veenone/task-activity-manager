@@ -1,4 +1,8 @@
+import { useState } from "react";
 import type { ReactElement } from "react";
+import { RichTextField } from "@agile-suite/core";
+import type { RichFormat } from "@agile-suite/core";
+import { BrowserOpenURL } from "../api";
 import type { FieldSpec } from "../api";
 
 // FORM_OWNED_FIELDS are the create-meta ids the New issue dialog carries
@@ -77,20 +81,33 @@ function TextInput({ spec, value, onChange, shared }: MetaInputProps) {
   );
 }
 
-function TextareaInput({ value, onChange, shared }: MetaInputProps) {
+// LongTextInput is Jira's "textarea" create-meta type: a long text field
+// (Acceptance criteria, Steps to reproduce) that gets the same Write and
+// Preview a description does. Each field holds its own syntax choice,
+// starting at "auto" the way a fresh RichTextField always does, because two
+// long-text fields on one draft have no reason to share a pick. onOpenLink
+// reaches the browser the same way the detail panel's own description does:
+// directly, since this field carries no profile context to route it through.
+export function LongTextInput({ value, onChange, shared }: MetaInputProps) {
+  const [format, setFormat] = useState<RichFormat | "auto">("auto");
   return (
-    <span className="edit-cell">
-      <textarea {...shared} rows={3} value={value} onChange={(e) => onChange(e.target.value)} />
-    </span>
+    <RichTextField
+      value={value}
+      onChange={onChange}
+      format={format}
+      onFormatChange={setFormat}
+      onOpenLink={BrowserOpenURL}
+      textarea={shared}
+      minRows={3}
+    />
   );
 }
 
 // META_INPUTS picks the input for a field type that has no options. It is a
 // table rather than a branch so a type gets a richer input by replacing its
-// one entry: the long-text Write and Preview input takes over "textarea"
-// here and touches nothing else.
+// one entry.
 export const META_INPUTS: Record<string, (p: MetaInputProps) => ReactElement> = {
-  textarea: TextareaInput,
+  textarea: LongTextInput,
 };
 
 // MetaField renders one create-meta field: its label, a required mark, and
