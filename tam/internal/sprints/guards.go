@@ -213,7 +213,7 @@ func (s *Service) requireEditable(ctx context.Context, b lifecycle, boardID, spr
 		return backend.Sprint{}, fmt.Errorf("board %d no longer lists sprint %d, so TAM cannot tell whether it is closed and did not change it; press Refresh", boardID, sprintID)
 	}
 	if sprintState(sp) == "closed" {
-		return backend.Sprint{}, fmt.Errorf("sprint %d is closed, and its dates are what velocity and burndown are computed from, so TAM does not edit it", sprintID)
+		return backend.Sprint{}, refusal{fmt.Errorf("sprint %d is closed, and its dates are what velocity and burndown are computed from, so TAM does not edit it", sprintID)}
 	}
 	return sp, nil
 }
@@ -262,7 +262,7 @@ func (s *Service) requireDeletable(ctx context.Context, b lifecycle, boardID, sp
 		return backend.Sprint{}, true, nil
 	}
 	if state := sprintState(sp); state != "future" {
-		return backend.Sprint{}, false, fmt.Errorf("sprint %d is %s, and only a sprint that has never been started can be deleted; complete it instead, or press Refresh if TAM still shows it as future", sprintID, statePhrase(state))
+		return backend.Sprint{}, false, refusal{fmt.Errorf("sprint %d is %s, and only a sprint that has never been started can be deleted; complete it instead, or press Refresh if TAM still shows it as future", sprintID, statePhrase(state))}
 	}
 	return sp, false, nil
 }
@@ -294,10 +294,20 @@ func statePhrase(state string) string {
 // user discards it from the Pending changes dialog.
 func (s *Service) refusePendingDelete(ctx context.Context, profileID string, sprintID int) error {
 	n, err := s.pendingInSprint(ctx, profileID, sprintID)
-	if err != nil || n == 0 {
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before deleting it, or they will be pushed at a sprint that no longer exists", n)
+	return RefusePendingDelete(n)
+}
+
+// RefusePendingDelete is the refusal for n pending changes on cards in a
+// sprint about to be deleted, nil when there are none. The app asks it before
+// it journals a delete, and the push asks it again at Commit.
+func RefusePendingDelete(n int) error {
+	if n == 0 {
+		return nil
+	}
+	return refusal{fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before deleting it, or they will be pushed at a sprint that no longer exists", n)}
 }
 
 // pendingInSprint is how many journal rows belong to cards staying in the

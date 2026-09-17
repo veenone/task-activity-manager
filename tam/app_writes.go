@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"agile-suite/core/journal"
+	"agile-suite/core/profile"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/committer"
 	"agile-suite/tam/internal/issuerepo"
+	"agile-suite/tam/internal/sprints"
 )
 
 // acquire marks the profile as running what ("sync", "commit", or "import")
@@ -123,22 +125,25 @@ func (a *App) CommitPendingChanges(profileID string) (committer.Result, error) {
 	if err != nil {
 		return committer.Result{}, err
 	}
-	res, err := a.commitEngine(b).Commit(a.ctx, p.ID, p.ProjectKey)
+	res, err := a.commitEngine(p, b).Commit(a.ctx, p.ID, p.ProjectKey)
 	if err != nil {
 		log.Printf("tam: commit %s (%s) failed: %v", p.Name, p.ProjectKey, err)
 		return res, err
 	}
-	log.Printf("tam: committed %s (%s): %d sprints created, %d pushed, %d created, %d moved, %d conflicts, %d failures, %d held, %d left",
-		p.Name, p.ProjectKey, len(res.CreatedSprints), len(res.Committed), len(res.Created), len(res.Moved), len(res.Conflicts), len(res.Failures), len(res.Held), res.Remaining)
+	log.Printf("tam: committed %s (%s): %d sprints created, %d sprints changed, %d pushed, %d created, %d moved, %d conflicts, %d failures, %d held, %d left",
+		p.Name, p.ProjectKey, len(res.CreatedSprints), len(res.SprintsChanged), len(res.Committed), len(res.Created), len(res.Moved), len(res.Conflicts), len(res.Failures), len(res.Held), res.Remaining)
 	return res, nil
 }
 
 // commitEngine builds the commit engine over the profile's backend. The
 // board order comes from boardrepo paired with the issue cache, which is
 // what the rank group re-derives each neighbour from; app.go is the one
-// place holding both repositories, so it is where they are joined.
-func (a *App) commitEngine(b backend.IssueBackend) *committer.Engine {
-	return committer.New(b, a.repo, a.boardOrder())
+// place holding both repositories, so it is where they are joined, and
+// where the sprint service that pushes sprint edits and deletes is wired.
+func (a *App) commitEngine(p profile.Profile, b backend.IssueBackend) *committer.Engine {
+	e := committer.New(b, a.repo, a.boardOrder())
+	e.Sprints = sprints.ForCommit(a.sprintService(p, b))
+	return e
 }
 
 // ResolveConflictOverride rebases a held issue's edits so the next Commit
@@ -148,7 +153,7 @@ func (a *App) ResolveConflictOverride(profileID, key, remoteVersion string) erro
 	if err != nil {
 		return err
 	}
-	return a.commitEngine(b).ResolveOverride(a.ctx, p.ID, key, remoteVersion)
+	return a.commitEngine(p, b).ResolveOverride(a.ctx, p.ID, key, remoteVersion)
 }
 
 // ResolveConflictKeepRemote drops a held issue's edits and takes Jira's row.
@@ -157,7 +162,7 @@ func (a *App) ResolveConflictKeepRemote(profileID, key string) error {
 	if err != nil {
 		return err
 	}
-	return a.commitEngine(b).ResolveKeepRemote(a.ctx, p.ID, key)
+	return a.commitEngine(p, b).ResolveKeepRemote(a.ctx, p.ID, key)
 }
 
 // ListActivity returns the local audit trail of one issue, newest first.

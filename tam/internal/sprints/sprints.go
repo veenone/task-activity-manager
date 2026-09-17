@@ -1,34 +1,30 @@
-// Package sprints owns the four writes that reach Jira the moment they are
-// made: starting a sprint, completing one, and editing and deleting one. They
-// are the only writes in TAM that do not go through the journal, and the
-// reason is a cost rather than a principle.
+// Package sprints owns the two writes that still reach Jira the moment they
+// are made: starting a sprint and completing one. They are the only writes in
+// TAM that do not go through the journal, and the reason is a cost rather
+// than a principle.
 //
-// Creating a sprint was the fifth, on the argument that a sprint's id has to
-// be real before anything can point at it. The create and commit
-// correctness bundle paid the cost that argument named: a sprint created in
-// TAM is a sprint_create journal row and a draft row under a negative id,
+// Creating, editing and deleting a sprint were three more. A sprint created
+// in TAM is a sprint_create journal row and a draft row under a negative id,
 // every card moved into it journals that id, and Commit's first phase
 // creates it in Jira and rewrites the id everywhere before anything naming
 // it is sent. DraftSprint is the check a draft gets; issuerepo holds the
-// rest.
+// rest. An edit or a delete of a sprint Jira holds is a sprint_edit or
+// sprint_delete row, and Commit pushes it through ForCommit, which still
+// reads the sprint's state from Jira before it writes.
 //
-// The other four follow for a reason that only starts once a sprint is real.
-// A sprint Jira holds is a container a whole team plans into, so editing,
-// deleting, starting or completing it on a single laptop while everyone else
-// still sees the old one would put that laptop out of step with the team,
-// and there is nothing to reconcile later either: a card move can be
-// rebased onto a status that shifted underneath it, while a sprint somebody
-// else has already deleted cannot be renamed.
+// Starting and completing a sprint Jira holds stay immediate for now: a
+// sprint is a container a whole team plans into, and those two change what
+// everyone else's board shows. Bundle 04's Task 8 journals them as well.
 //
 // The exception has one home here, one place to test, and a fence:
-// exceptions_test.go names the Service's own exported methods, so a fifth
+// exceptions_test.go names the Service's own exported methods, so a third
 // immediate write arrives with a failing test rather than quietly.
 //
 // This package writes no journal rows. It reads their count, to refuse a
 // completion or a delete while changes are queued against the sprint, and it
-// leaves an audit row behind each of the two management writes, Edit and
-// Delete. Moving an issue into or out of a sprint stays an ordinary journal
-// write and lives in issuerepo, where every other one does.
+// leaves an audit row behind each pushed edit and delete. Moving an issue
+// into or out of a sprint stays an ordinary journal write and lives in
+// issuerepo, where every other one does.
 package sprints
 
 import (

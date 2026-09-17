@@ -30,8 +30,8 @@ import (
 // repositories would mean two transactions and a crash window leaving a
 // sprint nobody can discard.
 //
-// Only the creation moves into the journal. Starting, completing, editing
-// and deleting a sprint Jira already holds stay immediate writes in
+// Editing and deleting a sprint Jira already holds are journaled too
+// (sprintwrites.go); starting and completing one stay immediate writes in
 // internal/sprints.
 
 // EntitySprintCreate is the journal entity type of a drafted sprint. Its key

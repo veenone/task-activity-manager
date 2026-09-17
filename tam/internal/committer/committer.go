@@ -94,6 +94,7 @@ type Result struct {
 	Committed      []string        `json:"committed"`
 	Created        []Created       `json:"created"`
 	CreatedSprints []CreatedSprint `json:"createdSprints"`
+	SprintsChanged []string        `json:"sprintsChanged"`
 	Linked         []Linked        `json:"linked"`
 	Moved          []Moved         `json:"moved"`
 	Conflicts      []Conflict      `json:"conflicts"`
@@ -110,6 +111,8 @@ type Engine struct {
 	b     backend.IssueBackend
 	repo  *issuerepo.Repository
 	order BoardOrder
+	// Sprints pushes sprint edits and deletes; nil fails each one.
+	Sprints SprintWriter
 }
 
 // New returns an engine over the backend, the store, and the board order.
@@ -126,7 +129,7 @@ func New(b backend.IssueBackend, repo *issuerepo.Repository, order BoardOrder) *
 // rows left that cannot be read keeps the last count that could.
 func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Result, error) {
 	res := Result{
-		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, Linked: []Linked{},
+		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, Linked: []Linked{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
 	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies(), boardRealID: map[int]int{}, boardName: map[int]string{}}

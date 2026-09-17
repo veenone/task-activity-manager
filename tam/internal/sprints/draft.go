@@ -7,7 +7,7 @@ import (
 	"agile-suite/tam/internal/backend"
 )
 
-// errDraftSprint is what every immediate write answers for a draft sprint's
+// errDraftSprint is what every write to a real sprint answers for a draft sprint's
 // negative id. The id means nothing to Jira, and the bound methods are
 // reachable without the menus that disable these actions for a draft.
 var errDraftSprint = errors.New("this sprint is a draft in TAM; Commit creates it in Jira first")

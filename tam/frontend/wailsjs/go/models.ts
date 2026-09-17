@@ -738,6 +738,7 @@ export namespace committer {
 	    committed: string[];
 	    created: Created[];
 	    createdSprints: CreatedSprint[];
+	    sprintsChanged: string[];
 	    linked: Linked[];
 	    moved: Moved[];
 	    conflicts: Conflict[];
@@ -754,6 +755,7 @@ export namespace committer {
 	        this.committed = source["committed"];
 	        this.created = this.convertValues(source["created"], Created);
 	        this.createdSprints = this.convertValues(source["createdSprints"], CreatedSprint);
+	        this.sprintsChanged = source["sprintsChanged"];
 	        this.linked = this.convertValues(source["linked"], Linked);
 	        this.moved = this.convertValues(source["moved"], Moved);
 	        this.conflicts = this.convertValues(source["conflicts"], Conflict);

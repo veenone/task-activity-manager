@@ -18,8 +18,11 @@ import (
 // A plan that starts with a new sprint could not be drafted offline while
 // creating one reached Jira at once, so creation moved into the journal: a
 // sprint_create row and a draft sprint under a negative id, created in
-// Commit's first phase. Editing, deleting, starting and completing a sprint
-// Jira already holds stay here, for the reasons the sprints design gives.
+// Commit's first phase. Editing and deleting a sprint Jira already holds
+// followed in bundle 04: they are sprint_edit and sprint_delete rows now, and
+// Commit pushes them through ForCommit, which is a separate type so this
+// list cannot see it. Starting and completing a sprint stay here until
+// bundle 04's Task 8 journals them too and deletes this fence.
 //
 // It is the Service's own exported method set and deliberately not the
 // lifecycle interface, which is a different list for a different purpose:
@@ -27,12 +30,12 @@ import (
 // other caller journals like every other membership change. A test claiming
 // those were immediate writes would have been false the day it was written,
 // and a fence nobody believes is worse than no fence.
-var immediateWrites = []string{"Complete", "Delete", "Edit", "Start"}
+var immediateWrites = []string{"Complete", "Start"}
 
-// TestTheImmediateWritesAreExactlyTheFourThatWereArguedFor is what makes the
+// TestTheImmediateWritesAreExactlyTheTwoThatAreLeft is what makes the
 // rule structural. The previous version of it lived in a sentence in a spec
 // and lasted one phase.
-func TestTheImmediateWritesAreExactlyTheFourThatWereArguedFor(t *testing.T) {
+func TestTheImmediateWritesAreExactlyTheTwoThatAreLeft(t *testing.T) {
 	service := reflect.TypeOf(&sprints.Service{})
 	got := make([]string, 0, service.NumMethod())
 	for i := 0; i < service.NumMethod(); i++ {
@@ -44,11 +47,11 @@ func TestTheImmediateWritesAreExactlyTheFourThatWereArguedFor(t *testing.T) {
 		t.Errorf("sprints.Service exports %s, want exactly %s.\n"+
 			"This list is the fence around the one exception in TAM: a write that goes to Jira "+
 			"without passing through the journal and without waiting for Commit. Adding a method "+
-			"here adds a fifth, so amend section 3 of the sprints design "+
+			"here adds a third, so amend section 3 of the sprints design "+
 			"(docs/superpowers/specs/2026-09-10-tam-sprints-view-design.md) with the argument for "+
 			"it and then add its name above, deliberately. If what you are adding is not an "+
 			"immediate write, it does not belong on Service: Suggest is a package function for "+
-			"exactly that reason, and so is DraftSprint. This fence only ever sees methods, and cannot: a fifth immediate "+
+			"exactly that reason, and so is DraftSprint. This fence only ever sees methods, and cannot: a third immediate "+
 			"write hung off an exported func field instead, the way Pending and Issues already sit "+
 			"on Service, would reach Jira without tripping it, so a reviewer still has to read every "+
 			"new exported field on this type as carefully as a new method.",

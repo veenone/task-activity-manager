@@ -25,9 +25,9 @@ func TestDraftSprintConvertsTheDatesAndRefusesWhatCannotBeASprint(t *testing.T) 
 	}
 }
 
-// A draft sprint's id is negative and means nothing to Jira. None of the four
-// immediate writes may send it, and a completion may not push cards into
-// one, whichever path reached the service.
+// A draft sprint's id is negative and means nothing to Jira. None of the
+// writes to a real sprint may send it, and a completion may not push cards
+// into one, whichever path reached the service.
 func TestNoImmediateWriteReachesJiraForADraftSprint(t *testing.T) {
 	b := &fakeBackend{sprints: []backend.Sprint{{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active"}}}
 	store := newStore()
@@ -37,10 +37,10 @@ func TestNoImmediateWriteReachesJiraForADraftSprint(t *testing.T) {
 	if _, err := s.Start(ctx, "p1", 1, -1, draft("Sprint 15", "")); err == nil || !strings.Contains(err.Error(), "draft") {
 		t.Errorf("start = %v", err)
 	}
-	if _, err := s.Edit(ctx, "p1", 1, -1, draft("Sprint 15", ""), false); err == nil || !strings.Contains(err.Error(), "draft") {
+	if _, err := sprints.ForCommit(s).Edit(ctx, "p1", 1, -1, draft("Sprint 15", ""), false); err == nil || !strings.Contains(err.Error(), "draft") {
 		t.Errorf("edit = %v", err)
 	}
-	if _, err := s.Delete(ctx, "p1", 1, -1); err == nil || !strings.Contains(err.Error(), "draft") {
+	if _, err := sprints.ForCommit(s).Delete(ctx, "p1", 1, -1); err == nil || !strings.Contains(err.Error(), "draft") {
 		t.Errorf("delete = %v", err)
 	}
 	if _, err := s.Complete(ctx, "p1", 1, -1, ""); err == nil || !strings.Contains(err.Error(), "draft") {

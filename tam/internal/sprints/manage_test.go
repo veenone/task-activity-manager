@@ -81,7 +81,7 @@ func TestEditSendsTheDraftAndTheClearGoalFlagAndRecordsTheRename(t *testing.T) {
 	store := newStore()
 	issues := newIssues(store)
 
-	note, err := manageService(b, store, issues).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13 renamed", ""), true)
+	note, err := sprints.ForCommit(manageService(b, store, issues)).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13 renamed", ""), true)
 	if err != nil {
 		t.Fatalf("edit: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestEditRefusesAClosedSprintJiraReportsWhileTheCacheStillCallsItFuture(t *t
 		t.Fatalf("the fixture's cached state is %q, and this test needs the stale future it was written for", state)
 	}
 
-	_, err := manageService(b, store, newIssues(store)).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13", ""), false)
+	_, err := sprints.ForCommit(manageService(b, store, newIssues(store))).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13", ""), false)
 	if err == nil {
 		t.Fatal("edit = nil error, want a closed sprint refused")
 	}
@@ -140,7 +140,7 @@ func TestAnEditWithNoIssueCacheWiredStillLandsInJira(t *testing.T) {
 	b := &fakeBackend{sprints: []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active"}}}
 	store := newStore()
 
-	note, err := newService(b, store).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13 renamed", ""), false)
+	note, err := sprints.ForCommit(newService(b, store)).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13 renamed", ""), false)
 	if err != nil {
 		t.Fatalf("edit: %v", err)
 	}
@@ -165,11 +165,11 @@ func TestNeitherEditNorDeleteTrustsASprintListWithNothingInIt(t *testing.T) {
 		call func(*sprints.Service) error
 	}{
 		{"an edit", func(s *sprints.Service) error {
-			_, err := s.Edit(context.Background(), "p1", 1, 13, draft("Sprint 13", ""), false)
+			_, err := sprints.ForCommit(s).Edit(context.Background(), "p1", 1, 13, draft("Sprint 13", ""), false)
 			return err
 		}},
 		{"a delete", func(s *sprints.Service) error {
-			_, err := s.Delete(context.Background(), "p1", 1, 13)
+			_, err := sprints.ForCommit(s).Delete(context.Background(), "p1", 1, 13)
 			return err
 		}},
 	} {
@@ -204,7 +204,7 @@ func TestDeleteRefusesASprintJiraSaysIsActiveWhileTheCacheStillCallsItFuture(t *
 	store := newStore()
 	issues := newIssues(store)
 
-	_, err := manageService(b, store, issues).Delete(context.Background(), "p1", 1, 13)
+	_, err := sprints.ForCommit(manageService(b, store, issues)).Delete(context.Background(), "p1", 1, 13)
 	if err == nil {
 		t.Fatal("delete = nil error, want a running sprint refused")
 	}
@@ -224,7 +224,7 @@ func TestDeleteRefusesWhenTheSprintListCouldNotBeReadAtAll(t *testing.T) {
 	store := newStore()
 	issues := newIssues(store)
 
-	_, err := manageService(b, store, issues).Delete(context.Background(), "p1", 1, 13)
+	_, err := sprints.ForCommit(manageService(b, store, issues)).Delete(context.Background(), "p1", 1, 13)
 	if err == nil {
 		t.Fatal("delete = nil error, want an unreadable sprint list refused")
 	}
@@ -244,7 +244,7 @@ func TestDeleteOfASprintJiraNoLongerHasIsAlreadyGoneAndStillCleansTheCache(t *te
 	issues := newIssues(store)
 	issues.carrying = map[string]string{"PLAT-1": "13"}
 
-	line, err := manageService(b, store, issues).Delete(context.Background(), "p1", 1, 13)
+	line, err := sprints.ForCommit(manageService(b, store, issues)).Delete(context.Background(), "p1", 1, 13)
 	if err != nil {
 		t.Fatalf("delete: %v", err)
 	}
@@ -280,7 +280,7 @@ func TestDeleteRefusesWhilePendingChangesTargetTheSprintAndNamesCommit(t *testin
 	s := manageService(b, store, issues)
 	s.Pending = func(context.Context, string, int) (int, error) { return 2, nil }
 
-	_, err := s.Delete(context.Background(), "p1", 1, 13)
+	_, err := sprints.ForCommit(s).Delete(context.Background(), "p1", 1, 13)
 	if err == nil {
 		t.Fatal("delete = nil error, want it refused while changes are queued against the sprint")
 	}
@@ -309,7 +309,7 @@ func TestACleanDeleteReachesEveryBoardsCopyAndEveryIssueCarryingIt(t *testing.T)
 	issues := newIssues(store)
 	issues.carrying = map[string]string{"PLAT-1": "13", "PLAT-2": "13", "PLAT-3": "12"}
 
-	line, err := manageService(b, store, issues).Delete(context.Background(), "p1", 1, 13)
+	line, err := sprints.ForCommit(manageService(b, store, issues)).Delete(context.Background(), "p1", 1, 13)
 	if err != nil {
 		t.Fatalf("delete: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestADeleteWhoseCacheWorkFailsIsStillADeleteWithANote(t *testing.T) {
 	store.deleteErr = errors.New("database is locked")
 	issues := newIssues(store)
 
-	line, err := manageService(b, store, issues).Delete(context.Background(), "p1", 1, 13)
+	line, err := sprints.ForCommit(manageService(b, store, issues)).Delete(context.Background(), "p1", 1, 13)
 	if err != nil {
 		t.Fatalf("delete = %v, want the delete reported as the success it was", err)
 	}
@@ -384,7 +384,7 @@ func TestADeleteWithNoIssueCacheWiredIsRefusedBeforeJiraIsAsked(t *testing.T) {
 	b := &fakeBackend{sprints: []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "future"}}}
 	store := newStore()
 
-	_, err := newService(b, store).Delete(context.Background(), "p1", 1, 13)
+	_, err := sprints.ForCommit(newService(b, store)).Delete(context.Background(), "p1", 1, 13)
 	if err == nil {
 		t.Fatal("delete = nil error, want it refused with no issue cache wired")
 	}

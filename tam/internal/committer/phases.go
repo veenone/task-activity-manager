@@ -35,7 +35,8 @@ type phase struct {
 //
 //  0. boards, so a draft sprint's originBoardId and a card queued onto a
 //     drafted board both name a real board before anything else runs;
-//  1. sprints, so a card moved into a draft sprint names a real one;
+//  1. sprints, so a card moved into a draft sprint names a real one, then
+//     the edits and deletes of sprints Jira already holds;
 //  2. epics, so a story's Epic Link names a real key;
 //  3. every other creatable type, so a sub-task's parent does;
 //  4. sub-tasks;
@@ -44,7 +45,7 @@ type phase struct {
 func phases() []phase {
 	return []phase{
 		{name: "boards", run: func(ctx context.Context, r *commitRun) { r.createBoards(ctx); r.pushBoardAdds(ctx) }},
-		{name: "sprints", run: func(ctx context.Context, r *commitRun) { r.createSprints(ctx) }},
+		{name: "sprints", run: func(ctx context.Context, r *commitRun) { r.createSprints(ctx); r.pushSprintWrites(ctx) }},
 		{name: "epics", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelEpic) }},
 		{name: "issues", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelIssue) }},
 		{name: "sub-tasks", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelSubtask) }},
