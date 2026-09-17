@@ -285,6 +285,34 @@ describe("PendingChangesModal", () => {
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 9));
   });
 
+  it("shows an edit and a delete of real sprints in words, and discards each", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 21, entityType: "sprint_delete", entityKey: "13", field: "delete", beforeVal: "Sprint 13", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ boardId: 1, name: "Sprint 13" }) },
+      { id: 20, entityType: "sprint_edit", entityKey: "12", field: "edit", baseVersion: "", createdAt: "",
+        beforeVal: JSON.stringify({ name: "Sprint 12", goal: "Ship", startDate: "2026-09-01T09:00:00.000+0000", endDate: "2026-09-14T09:00:00.000+0000" }),
+        afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12b", goal: "", startDate: "2026-09-01T09:00:00.000+0000", endDate: "2026-09-15T09:00:00.000+0000", clearGoal: true }) },
+      ...rows,
+    ]);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], sprintsChanged: ["Sprint 12b edited"], linked: [], conflicts: [], failures: [], remaining: 0,
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    expect(await within(dialog).findByText("5 changes on 2 issues, 1 of them new, and 2 sprint changes")).toBeInTheDocument();
+    const cards = within(dialog).getAllByRole("group");
+    expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Sprint 13", "Sprint 12", "TAM-NEW-1", "PLAT-409"]);
+    expect(cards[1]).toHaveTextContent("Edit sprint Sprint 12: name to Sprint 12b, goal removed, dates to 2026-09-01 to 2026-09-15");
+    expect(cards[0]).toHaveTextContent("Delete sprint Sprint 13");
+    await user.click(within(cards[1]).getByRole("button", { name: "Discard the change to Sprint 12" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 20));
+    await user.click(within(cards[0]).getByRole("button", { name: "Discard the change to Sprint 13" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 21));
+    await user.click(within(dialog).getByRole("button", { name: "Commit (4)" }));
+    expect(await within(dialog).findByText("Last commit: 1 sprint change pushed (Sprint 12b edited).")).toBeInTheDocument();
+  });
+
   it("says what the last Commit held and what each held row waits for", async () => {
     const user = userEvent.setup();
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({

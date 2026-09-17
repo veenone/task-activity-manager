@@ -64,9 +64,10 @@ describe("EditSprintModal", () => {
     expect(screen.queryByText("Reading this board's sprint length.")).not.toBeInTheDocument();
   });
 
-  it("marks the write as one that is sent to Jira now", () => {
+  it("says the edit is saved locally and sent to Jira on Commit", () => {
     renderModal();
-    expect(screen.getByText("Sends to Jira now")).toBeInTheDocument();
+    expect(screen.getByText("Changes are saved locally and sent to Jira on Commit.")).toBeInTheDocument();
+    expect(screen.queryByText("Sends to Jira now")).not.toBeInTheDocument();
   });
 
   it("sends clearGoal only when a goal that was there has been emptied", async () => {
@@ -107,7 +108,7 @@ describe("EditSprintModal", () => {
     await user.type(screen.getByLabelText("End"), "2026-09-19");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     const ask = await screen.findByRole("alertdialog", { name: "Move a running sprint's end date?" });
-    expect(within(ask).getByText(/everyone reading this board sees the sprint end on 2026-09-19/)).toBeInTheDocument();
+    expect(within(ask).getByText(/Once Commit sends it, everyone reading this board sees the sprint end on 2026-09-19/)).toBeInTheDocument();
     await user.click(within(ask).getByRole("button", { name: "Leave it" }));
     expect(api.EditSprint).not.toHaveBeenCalled();
   });
@@ -143,14 +144,11 @@ describe("EditSprintModal", () => {
     expect(api.EditSprint).not.toHaveBeenCalled();
   });
 
-  it("carries a note back beside its success", async () => {
+  it("reports the edit as waiting for Commit", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.EditSprint).mockResolvedValue("The board's sprints could not be re-read. Press Refresh.");
     const { onEdited } = renderModal();
     await user.click(screen.getByRole("button", { name: "Save changes" }));
-    await waitFor(() => expect(onEdited).toHaveBeenCalledWith(
-      "Sprint 12 was updated. The board's sprints could not be re-read. Press Refresh.",
-    ));
+    await waitFor(() => expect(onEdited).toHaveBeenCalledWith("Sprint 12 was updated. Commit sends the change to Jira."));
   });
 
   it("edits a draft sprint locally and says so instead of the Jira chip", () => {

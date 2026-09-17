@@ -1,9 +1,10 @@
 // ImmediateWriteChip marks the handful of actions that do not wait for
 // Commit. Everything else in TAM is journaled: an edit, a move, a create all
 // sit in the pending list until the user pushes them, and the whole app is
-// built so that closing the window loses nothing. The five sprint writes are
-// the exception, for the reasons internal/sprints' package doc gives, and a
-// user who has learned that TAM never surprises Jira needs telling.
+// built so that closing the window loses nothing. Starting and completing a
+// sprint are the exception, for the reasons internal/sprints' package doc
+// gives, and a user who has learned that TAM never surprises Jira needs
+// telling.
 //
 // It is painted in the accent, never in amber. Amber in this app has one
 // meaning already: held locally, waiting for Commit, which is the pending

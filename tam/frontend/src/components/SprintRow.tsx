@@ -31,6 +31,8 @@ interface Props {
   // greying out the whole tree for one rename would be a worse lie than
   // letting Jira answer.
   busy: boolean;
+  // deleting is a delete of this sprint waiting for Commit.
+  deleting?: boolean;
   onToggle: () => void;
   onKeyDown: (e: KeyboardEvent) => void;
   actions: SprintActions;
@@ -60,7 +62,7 @@ function stateClass(state: string): string {
 // would be the first to lose its width. It is rendered under the sprint
 // when the sprint is expanded, where a sentence has a line to itself.
 export function SprintRow({
-  detail, rowId, index, open, focused, flashed, busy, onToggle, onKeyDown, actions,
+  detail, rowId, index, open, focused, flashed, busy, deleting = false, onToggle, onKeyDown, actions,
 }: Props) {
   // The board's own unassigned work arrives in the same list and under the
   // same shape, and is not a sprint: it has no state to chip, no dates to
@@ -116,6 +118,7 @@ export function SprintRow({
             {label}
           </span>
         )}
+        {deleting && <span className="chip chip-draft">Deleting on Commit</span>}
       </span>
       <span className="sprint-cell sprint-cell-dates">{dates}</span>
       <span className="sprint-cell folder-count sprint-cell-progress">{progress}</span>

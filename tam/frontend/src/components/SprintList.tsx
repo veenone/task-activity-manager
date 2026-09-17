@@ -88,6 +88,8 @@ interface Props {
   // busyRowId is the sprint whose own write is in flight, whose menu is
   // closed for the duration.
   busyRowId: string;
+  // deletingIds are the sprints whose delete waits for Commit.
+  deletingIds?: ReadonlySet<number>;
   onStart: (detail: SprintDetail) => void;
   onComplete: (detail: SprintDetail) => void;
   onEdit: (detail: SprintDetail) => void;
@@ -104,7 +106,7 @@ interface Props {
 // "waiting for Commit".
 export function SprintList({
   details, selectedKey, onSelect, checked, onCheck, onExtend, onClearTo,
-  movedRowId, busyRowId, onStart, onComplete, onEdit, onDelete,
+  movedRowId, busyRowId, deletingIds, onStart, onComplete, onEdit, onDelete,
   collapsedIssues, onCollapsedIssuesChange,
 }: Props) {
   const rootRef = useRef<HTMLElement>(null);
@@ -406,6 +408,7 @@ export function SprintList({
               focused={focusId === id}
               flashed={flashId === id}
               busy={busyRowId === id}
+              deleting={deletingIds?.has(detail.id)}
               onToggle={() => toggle(id, true)}
               onKeyDown={(e) => onKeyDown(e, { id, kind: "sprint", scope: id })}
               actions={{

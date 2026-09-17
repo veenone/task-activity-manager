@@ -351,16 +351,16 @@ describe("SprintsView", () => {
     release(1);
   });
 
-  it("says by name what a delete destroys, where its issues go, and that it cannot be undone", async () => {
+  it("says by name what a delete destroys on Commit, where its issues go, and until when it can be taken back", async () => {
     const user = userEvent.setup();
     renderView();
     const menu = await openMenu(user, "Sprint 12");
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
     const ask = await screen.findByRole("alertdialog", { name: "Delete Sprint 12?" });
-    expect(within(ask).getByText("Jira deletes Sprint 12.")).toBeInTheDocument();
-    expect(within(ask).getByText("Jira moves its 3 issues back to the backlog. The issues themselves are not deleted.")).toBeInTheDocument();
-    expect(within(ask).getByText("This cannot be undone, from TAM or from Jira.")).toBeInTheDocument();
-    expect(within(ask).getByText("Sends to Jira now")).toBeInTheDocument();
+    expect(within(ask).getByText("Commit deletes Sprint 12 in Jira.")).toBeInTheDocument();
+    expect(within(ask).getByText("Jira then moves its 3 issues back to the backlog. The issues themselves are not deleted.")).toBeInTheDocument();
+    expect(within(ask).getByText("Until then you can discard the delete in Pending changes. Once Commit sends it, it cannot be undone.")).toBeInTheDocument();
+    expect(within(ask).queryByText("Sends to Jira now")).not.toBeInTheDocument();
     expect(within(ask).getByRole("button", { name: "Delete sprint" })).toBeInTheDocument();
     expect(within(ask).getByRole("button", { name: "Keep it" })).toBeInTheDocument();
     await user.click(within(ask).getByRole("button", { name: "Keep it" }));
@@ -378,7 +378,7 @@ describe("SprintsView", () => {
     const ask = await screen.findByRole("alertdialog", { name: "Delete Sprint 12?" });
     // A wrong number in the one confirmation nobody can undo is worse than
     // an admitted floor.
-    expect(within(ask).getByText(/Jira moves at least 1 issue back to the backlog/)).toBeInTheDocument();
+    expect(within(ask).getByText(/Jira then moves at least 1 issue back to the backlog/)).toBeInTheDocument();
     expect(within(ask).getByText(/Some of this sprint's issues are not in this cache/)).toBeInTheDocument();
   });
 
@@ -397,11 +397,11 @@ describe("SprintsView", () => {
     const menu = await openMenu(user, "Sprint 12");
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
     const ask = await screen.findByRole("alertdialog", { name: "Delete Sprint 12?" });
-    expect(within(ask).getByText(/Jira moves at least 3 issues back to the backlog/)).toBeInTheDocument();
+    expect(within(ask).getByText(/Jira then moves at least 3 issues back to the backlog/)).toBeInTheDocument();
     expect(within(ask).getByText(/Cards are waiting for Commit to move in or out of this sprint/)).toBeInTheDocument();
   });
 
-  it("reports a refused delete, which arrives after the confirmation has closed", async () => {
+  it("reports a refused delete once the confirmation has closed", async () => {
     const user = userEvent.setup();
     vi.mocked(api.DeleteSprint).mockRejectedValue(new Error("403 Forbidden: Manage Sprints"));
     renderView();
@@ -420,7 +420,17 @@ describe("SprintsView", () => {
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete sprint" }));
     await waitFor(() => expect(api.DeleteSprint).toHaveBeenCalledWith("p1", 1, 12));
-    await waitFor(() => expect(banner()).toHaveTextContent("Sprint 12 was deleted."));
+    await waitFor(() => expect(banner()).toHaveTextContent("Sprint 12 will be deleted on Commit."));
+  });
+
+  it("marks a sprint waiting to be deleted on Commit", async () => {
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 5, entityType: "sprint_delete", entityKey: "13", field: "delete", beforeVal: "Sprint 13", afterVal: '{"boardId":1,"name":"Sprint 13"}', baseVersion: "", createdAt: "" },
+    ]);
+    renderView();
+    const row = await screen.findByRole("treeitem", { name: /^Sprint 13,/ });
+    expect(await within(row).findByText("Deleting on Commit")).toBeInTheDocument();
+    expect(within(screen.getByRole("treeitem", { name: /^Sprint 12,/ })).queryByText("Deleting on Commit")).not.toBeInTheDocument();
   });
 
   it("deletes a draft sprint without claiming Jira deletes anything", async () => {

@@ -687,6 +687,25 @@ export interface PendingChange {
 // entityKey is the draft's negative id and its afterVal a DraftSprint.
 export const ENTITY_SPRINT_CREATE = "sprint_create";
 
+// ENTITY_SPRINT_EDIT and ENTITY_SPRINT_DELETE are the journal entities of an
+// edit and a delete of a sprint Jira holds, mirroring issuerepo's. Their
+// entityKey is the sprint id. An edit's afterVal is a SprintEdit and its
+// beforeVal the cached name, goal and dates; a delete's afterVal is
+// { boardId, name } and its beforeVal the name.
+export const ENTITY_SPRINT_EDIT = "sprint_edit";
+export const ENTITY_SPRINT_DELETE = "sprint_delete";
+export const SPRINT_ENTITIES: string[] = [ENTITY_SPRINT_CREATE, ENTITY_SPRINT_EDIT, ENTITY_SPRINT_DELETE];
+
+// SprintEdit mirrors issuerepo.SprintEdit: what a sprint_edit row carries.
+export interface SprintEdit {
+  boardId: number;
+  name: string;
+  goal: string;
+  startDate: string;
+  endDate: string;
+  clearGoal: boolean;
+}
+
 // DraftSprint mirrors issuerepo.DraftSprint: what a sprint_create row carries.
 export interface DraftSprint {
   boardId: number;
@@ -836,6 +855,9 @@ export interface CommitResult {
   // createdSprints and held are optional for the same reason CommitFailure's
   // fields are: fixtures written before phased Commit do not spell them out.
   createdSprints?: { draftId: number; id: number; name: string }[];
+  // sprintsChanged names each pushed sprint edit or delete, "Sprint 12
+  // edited"; optional for the same reason.
+  sprintsChanged?: string[];
   linked: { key: string; toKey: string; type: string }[];
   // moved is optional for the same reason CommitFailure's fields are.
   moved?: CommitMove[];
@@ -1044,10 +1066,9 @@ export const CompleteSprint = (
 export const SuggestSprintDates = (profileId: string, boardId: number): Promise<SprintSuggestion> =>
   App.SuggestSprintDates(profileId, boardId) as Promise<SprintSuggestion>;
 // CreateSprint, EditSprint and DeleteSprint make, change and destroy a
-// sprint, the same immediate writes the two ceremonies are: none of the
-// three is journaled, and all three take the same per-profile lock, so a
-// caller reaches them through the lock SyncContext holds rather than calling
-// them directly. CreateSprint's four fields are the dialog's whole draft;
+// sprint. All three are journaled and sent on Commit, but they take the
+// same per-profile lock the two ceremonies do, so a caller reaches them
+// through the lock SyncContext holds rather than calling them directly. CreateSprint's four fields are the dialog's whole draft;
 // EditSprint's clearGoal is the one argument the draft alone cannot carry,
 // since an empty goal box left alone and one asking to clear a goal that was
 // there are different requests.

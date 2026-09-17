@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
-import { fieldLabel } from "../api";
-import type { DraftSprint, IssueDraft, Profile, Settings } from "../api";
+import { ENTITY_SPRINT_EDIT, fieldLabel } from "../api";
+import type { DraftSprint, IssueDraft, PendingChange, Profile, Settings, SprintEdit } from "../api";
 import { ISSUE_TYPES } from "../api";
 import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
@@ -15,19 +15,61 @@ interface Props {
   onClose: () => void;
 }
 
+// isSprintGroup says a group is a sprint's rather than an issue's.
+function isSprintGroup(g: PendingGroup): boolean {
+  return !!g.sprintRow || g.sprintChanges.length > 0;
+}
+
 // summaryLine is the dialog's subtitle: "3 changes on 2 issues, 1 of them
-// new", with the draft sprints counted apart, since a sprint is not an issue.
+// new", with the sprints counted apart, since a sprint is not an issue.
 export function summaryLine(groups: PendingGroup[], rowCount: number): string {
-  const issues = groups.filter((g) => !g.sprintRow);
-  const sprints = groups.length - issues.length;
+  const issues = groups.filter((g) => !isSprintGroup(g));
+  const newCount = groups.filter((g) => g.sprintRow).length;
+  const changedCount = groups.filter((g) => !g.sprintRow && g.sprintChanges.length > 0).length;
   const changes = plural(rowCount, "change", "changes");
-  const newSprints = plural(sprints, "new sprint", "new sprints");
-  if (issues.length === 0) return `${changes}: ${newSprints}`;
+  const sprints: string[] = [];
+  if (newCount > 0 || changedCount === 0) sprints.push(plural(newCount, "new sprint", "new sprints"));
+  if (changedCount > 0) sprints.push(plural(changedCount, "sprint change", "sprint changes"));
+  if (issues.length === 0) return `${changes}: ${sprints.join(", ")}`;
   const drafts = issues.filter((g) => g.createRow).length;
   let line = `${changes} on ${plural(issues.length, "issue", "issues")}`;
   if (drafts > 0) line += `, ${drafts} of them new`;
-  if (sprints > 0) line += `, and ${newSprints}`;
+  if (newCount + changedCount > 0) line += `, and ${sprints.join(", ")}`;
   return line;
+}
+
+// sprintChangeName is the sprint's name as Jira has it: an edit's before
+// value, a delete's own.
+function sprintChangeName(row: PendingChange): string {
+  try {
+    const name = row.entityType === ENTITY_SPRINT_EDIT
+      ? (JSON.parse(row.beforeVal) as { name?: string }).name
+      : (JSON.parse(row.afterVal) as { name?: string }).name;
+    return name || `sprint ${row.entityKey}`;
+  } catch {
+    return `sprint ${row.entityKey}`;
+  }
+}
+
+// sprintChangeLine reads a sprint edit or delete in words: "Edit sprint
+// Sprint 12: name to Sprint 12b, goal removed".
+export function sprintChangeLine(row: PendingChange): string {
+  const name = sprintChangeName(row);
+  if (row.entityType !== ENTITY_SPRINT_EDIT) return `Delete sprint ${name}`;
+  try {
+    const was = JSON.parse(row.beforeVal) as DraftSprint;
+    const now = JSON.parse(row.afterVal) as SprintEdit;
+    const changed: string[] = [];
+    if (now.name !== was.name) changed.push(`name to ${now.name}`);
+    if (now.clearGoal) changed.push("goal removed");
+    else if (now.goal && now.goal !== was.goal) changed.push(`goal to ${now.goal}`);
+    const from = dayInput(now.startDate);
+    const to = dayInput(now.endDate);
+    if (from !== dayInput(was.startDate) || to !== dayInput(was.endDate)) changed.push(`dates to ${from} to ${to}`);
+    return `Edit sprint ${name}: ${changed.length ? changed.join(", ") : "nothing changed"}`;
+  } catch {
+    return `Edit sprint ${name}: the change could not be read. Discard it and edit the sprint again.`;
+  }
 }
 
 // sprintDraftLine says where and when a draft sprint runs.
@@ -86,9 +128,9 @@ export function PendingChangesModal({ onClose }: Props) {
   const orderedGroups = useMemo(
     () => [
       ...groups.filter((g) => conflictKeys.has(g.key)),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && g.sprintRow),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && !g.sprintRow && g.createRow),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && !g.sprintRow && !g.createRow),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && isSprintGroup(g)),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && !isSprintGroup(g) && g.createRow),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && !isSprintGroup(g) && !g.createRow),
     ],
     [groups, conflictKeys],
   );
@@ -136,14 +178,14 @@ export function PendingChangesModal({ onClose }: Props) {
         ) : (
           <div className="pending-list">
             {orderedGroups.map((g) => {
-              const conflict = lastCommit?.conflicts.find((c) => c.key === g.key && conflictKeys.has(c.key));
+              const conflict = isSprintGroup(g) ? undefined : lastCommit?.conflicts.find((c) => c.key === g.key && conflictKeys.has(c.key));
               if (conflict) {
-                return <ConflictCard key={g.key} profileId={activeId} conflict={conflict} disabled={busy} />;
+                return <ConflictCard key={g.id} profileId={activeId} conflict={conflict} disabled={busy} />;
               }
               if (g.sprintRow) {
                 const name = g.sprint?.name ?? "Draft sprint";
                 return (
-                  <section key={g.key} className="pending-card" role="group" aria-label={name}>
+                  <section key={g.id} className="pending-card" role="group" aria-label={name}>
                     <div className="pending-card-head">
                       <span className="b">{name}</span>
                       <span className="chip chip-draft">Draft sprint</span>
@@ -155,9 +197,28 @@ export function PendingChangesModal({ onClose }: Props) {
                   </section>
                 );
               }
+              if (g.sprintChanges.length > 0) {
+                const name = sprintChangeName(g.sprintChanges[0]);
+                return (
+                  <section key={g.id} className="pending-card" role="group" aria-label={name}>
+                    {g.sprintChanges.map((row) => (
+                      <div key={row.id} className="pending-card-head">
+                        <span className="b">{sprintChangeLine(row)}</span>
+                        <button type="button" className="btn btn-discard pending-discard" disabled={busy} aria-label={`Discard the change to ${name}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
+                        </button>
+                      </div>
+                    ))}
+                    <p className="muted small">
+                      {g.sprintChanges[0].entityType === ENTITY_SPRINT_EDIT
+                        ? "Saved locally. Commit sends the change to Jira."
+                        : "Commit deletes it in Jira, and Jira moves its cards to the backlog."}
+                    </p>
+                  </section>
+                );
+              }
               const heldReasons = heldByKey.get(g.key) ?? [];
               return (
-                <section key={g.key} className="pending-card" role="group" aria-label={g.key}>
+                <section key={g.id} className="pending-card" role="group" aria-label={g.key}>
                   <div className="pending-card-head">
                     <span className="b">{g.key}</span>
                     {g.createRow && <span className="chip chip-draft">Draft</span>}

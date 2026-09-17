@@ -43,8 +43,8 @@ export function useBoardSprintDetails(profileId: string, boardId: number) {
 // a sprint and opening Reports shows the sprint before it, under its own
 // name, for the rest of the session.
 //
-// The pending list is here because creating, editing or deleting a draft
-// sprint is a journal write.
+// The pending list is here because creating, editing or deleting a sprint
+// is a journal write, and the Commit badge counts it.
 export function invalidateSprintWrites(qc: QueryClient, profileId: string) {
   if (!profileId) return;
   for (const queryKey of [
@@ -74,11 +74,11 @@ export interface EditSprintArgs {
   clearGoal: boolean;
 }
 
-// useEditSprint renames a sprint, rewrites its goal, or moves its dates. It
-// reaches Jira the moment it is called, like the ceremonies, but it is not
-// one: a rename is nothing the other views need announced, so run here is
-// SyncContext's runQuietLock rather than runSprintCeremony, injected the
-// same way and holding Go's per-profile lock just as tightly.
+// useEditSprint renames a sprint, rewrites its goal, or moves its dates,
+// locally, for Commit to send. It takes the per-profile lock the ceremonies
+// take, but a rename is nothing the other views need announced, so run here
+// is SyncContext's runQuietLock rather than runSprintCeremony, injected the
+// same way and holding Go's lock just as tightly.
 //
 // That lock is also why the dialog reports its own failures in words.
 // Suppressing the sync banner suppresses the banner and nothing else: the
@@ -99,11 +99,9 @@ export interface DeleteSprintArgs {
   sprintId: number;
 }
 
-// useDeleteSprint destroys the sprint in Jira and then TAM's copies of it.
-// It settles rather than succeeds into the invalidation for the same reason
-// a completion does: the sprint can be gone from Jira while the cache
-// bookkeeping after it fails, and the list left behind is not the list it
-// started from.
+// useDeleteSprint discards a draft sprint, or queues a real one for Commit
+// to delete. It settles rather than succeeds into the invalidation, so a
+// refusal still refreshes a list that may have moved underneath it.
 export function useDeleteSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
   const qc = useQueryClient();
   return useMutation<string, Error, DeleteSprintArgs>({

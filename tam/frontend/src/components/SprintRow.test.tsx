@@ -14,7 +14,7 @@ function detail(over: Partial<SprintDetail> = {}): SprintDetail {
   };
 }
 
-function renderRow(over: Partial<SprintDetail> = {}, busy = false) {
+function renderRow(over: Partial<SprintDetail> = {}, busy = false, deleting = false) {
   const actions = { onStart: vi.fn(), onComplete: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn() };
   const onToggle = vi.fn();
   render(
@@ -26,6 +26,7 @@ function renderRow(over: Partial<SprintDetail> = {}, busy = false) {
       focused
       flashed={false}
       busy={busy}
+      deleting={deleting}
       onToggle={onToggle}
       onKeyDown={() => {}}
       actions={actions}
@@ -45,6 +46,16 @@ describe("SprintRow", () => {
     // The goal is a sentence and every cell here clips, so it is rendered
     // under the sprint when the sprint is open rather than in a cell.
     expect(screen.queryByText("Ship checkout")).not.toBeInTheDocument();
+  });
+
+  it("says when the sprint is waiting to be deleted on Commit", () => {
+    renderRow({ state: "future" }, false, true);
+    expect(screen.getByText("Deleting on Commit")).toBeInTheDocument();
+  });
+
+  it("says nothing about a delete that is not pending", () => {
+    renderRow({ state: "future" });
+    expect(screen.queryByText("Deleting on Commit")).not.toBeInTheDocument();
   });
 
   it("says nothing about progress in a sprint that holds nothing", () => {
