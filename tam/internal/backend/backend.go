@@ -37,24 +37,25 @@ var AllTypes = []string{TypeTask, TypeEpic, TypeStory, TypeBug, TypeRequirement,
 // Issue is one row of the Backlog: the columns the grid shows plus what sync
 // needs to keep it current. StoryPoints is nil when the issue has none.
 type Issue struct {
-	Key         string   `json:"key"`
-	ID          string   `json:"id"`
-	Project     string   `json:"project"`
-	Type        string   `json:"type"`
-	Summary     string   `json:"summary"`
-	Status      string   `json:"status"`
-	StatusID    string   `json:"statusId"`
-	Assignee    string   `json:"assignee"`
-	Reporter    string   `json:"reporter"`
-	Priority    string   `json:"priority"`
-	Labels      []string `json:"labels"`
-	SprintID    string   `json:"sprintId"`
-	SprintName  string   `json:"sprintName"`
-	ParentKey   string   `json:"parentKey"`
-	StoryPoints *float64 `json:"storyPoints"`
-	Rank        string   `json:"rank"`
-	Created     string   `json:"created"`
-	Updated     string   `json:"updated"`
+	Key          string   `json:"key"`
+	ID           string   `json:"id"`
+	Project      string   `json:"project"`
+	Type         string   `json:"type"`
+	Summary      string   `json:"summary"`
+	Status       string   `json:"status"`
+	StatusID     string   `json:"statusId"`
+	Assignee     string   `json:"assignee"`
+	AssigneeName string   `json:"assigneeName"`
+	Reporter     string   `json:"reporter"`
+	Priority     string   `json:"priority"`
+	Labels       []string `json:"labels"`
+	SprintID     string   `json:"sprintId"`
+	SprintName   string   `json:"sprintName"`
+	ParentKey    string   `json:"parentKey"`
+	StoryPoints  *float64 `json:"storyPoints"`
+	Rank         string   `json:"rank"`
+	Created      string   `json:"created"`
+	Updated      string   `json:"updated"`
 
 	// Pending and Draft are computed by the repository's reads, never
 	// stored: Pending says the journal holds a change for this key, Draft

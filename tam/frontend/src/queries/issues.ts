@@ -2,10 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
 import {
   GetIssueDetail,
+  GetProfileSetting,
   GetSyncState,
   ListIssues,
   ListLinkedTests,
   ListSprints,
+  SETTING_JIRA_DISPLAY_NAME,
+  SETTING_JIRA_USERNAME,
 } from "../api";
 import type { IssueQuery } from "../api";
 import { keys } from "./keys";
@@ -57,6 +60,26 @@ export function useSyncState(profileId: string) {
   return useQuery({
     queryKey: keys.syncState(profileId),
     queryFn: () => call(() => GetSyncState(profileId)),
+    enabled: !!profileId,
+  });
+}
+
+// useJiraUsername and useJiraDisplayName are who "me" is for the Assigned to
+// me tab: the two settings TestProfileConnection and the start of every sync
+// write. Missing (never synced or tested) reads back "", the boards.ts
+// GetProfileSetting pattern.
+export function useJiraUsername(profileId: string) {
+  return useQuery({
+    queryKey: keys.jiraUsername(profileId),
+    queryFn: () => call(() => GetProfileSetting(profileId, SETTING_JIRA_USERNAME)),
+    enabled: !!profileId,
+  });
+}
+
+export function useJiraDisplayName(profileId: string) {
+  return useQuery({
+    queryKey: keys.jiraDisplayName(profileId),
+    queryFn: () => call(() => GetProfileSetting(profileId, SETTING_JIRA_DISPLAY_NAME)),
     enabled: !!profileId,
   });
 }

@@ -89,8 +89,8 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (val
 		detail sql.NullString
 	)
 	err = q.QueryRowContext(ctx,
-		`SELECT summary, priority, assignee, labels, story_points, detail_json, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
-		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &labels, &points, &detail, &updated, &iss.ParentKey, &iss.Type)
+		`SELECT summary, priority, assignee, assignee_name, labels, story_points, detail_json, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
+		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &iss.AssigneeName, &labels, &points, &detail, &updated, &iss.ParentKey, &iss.Type)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", "", ErrNotFound
 	}
@@ -213,6 +213,12 @@ func writeField(ctx context.Context, q execer, profileID, key, field, value stri
 			points = sql.NullFloat64{Float64: *p, Valid: true}
 		}
 		_, err = q.ExecContext(ctx, `UPDATE issue SET story_points = ? WHERE profile_id = ? AND key = ?`, points, profileID, key)
+		return err
+	case "assignee":
+		// AssigneePicker sends a username, not a display name, so both
+		// columns take the same value here; see the bundle 03 finding on
+		// the pre-existing assignee/assignee_name mismatch left by sync.
+		_, err := q.ExecContext(ctx, `UPDATE issue SET assignee = ?, assignee_name = ? WHERE profile_id = ? AND key = ?`, value, value, profileID, key)
 		return err
 	}
 	col, ok := fieldColumns[field]
@@ -516,11 +522,15 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 		// Backlog's sprint field and the Boards view both read these two
 		// columns, so leaving them empty would show a draft in the backlog
 		// until the Commit that already knows better.
+		// A draft only ever knows the username AssigneePicker sent (see the
+		// bundle 03 finding: a local edit writes the username into assignee,
+		// where sync would have written a display name), so assignee_name
+		// carries that same value rather than a fabricated display name.
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, reporter, priority, labels,
+			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, assignee_name, reporter, priority, labels,
 				sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
-			VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, '', '', ?, ?)`,
-			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Priority, string(labels),
+			VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, '', '', ?, ?)`,
+			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Assignee, d.Priority, string(labels),
 			d.SprintID, d.SprintName, d.ParentKey, points, now, string(detail), now); err != nil {
 			return nil, fmt.Errorf("insert draft: %w", err)
 		}

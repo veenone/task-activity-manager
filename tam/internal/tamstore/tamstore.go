@@ -19,6 +19,9 @@
 // Version 13 adds sprint's draft flag: a sprint drafted in TAM sits in
 // sprint under a negative id with draft = 1 until Commit creates it in
 // Jira.
+// Version 14 adds the issue's assignee_name: the assignee column holds a
+// display name, which is neither unique nor stable, so matching an issue to
+// the connected user needs the username instead.
 package tamstore
 
 import (
@@ -48,7 +51,7 @@ import (
 // Version 9 adds ritual_document through the same idempotent base DDL path
 // as sprint_report.
 var Schema = store.Schema{
-	Version: 13,
+	Version: 14,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -204,6 +207,21 @@ var Schema = store.Schema{
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "sprint", "draft INTEGER NOT NULL DEFAULT 0")
 		},
+	}, {
+		Version: 14,
+		// The issue's assignee column holds a display name, which is not
+		// unique and changes, so "Assigned to me" needs the username
+		// instead. Same shape as version 5's status id: a column add, and a
+		// watermark clear so the next sync backfills every row already
+		// cached, since an incremental sync only re-reads what Jira reports
+		// changed.
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "issue", "assignee_name TEXT NOT NULL DEFAULT ''"); err != nil {
+				return err
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -283,6 +301,7 @@ CREATE TABLE IF NOT EXISTS issue (
 	status            TEXT NOT NULL DEFAULT '',
 	status_id         TEXT NOT NULL DEFAULT '',
 	assignee          TEXT NOT NULL DEFAULT '',
+	assignee_name     TEXT NOT NULL DEFAULT '',
 	reporter          TEXT NOT NULL DEFAULT '',
 	priority          TEXT NOT NULL DEFAULT '',
 	labels            TEXT NOT NULL DEFAULT '[]',

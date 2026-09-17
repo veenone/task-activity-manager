@@ -314,7 +314,7 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 	}
 	b.over[key] = backend.Issue{
 		Key: key, ID: fmt.Sprintf("%d", 30000+b.nextKey), Project: projectKey, Type: d.Type, Summary: d.Summary,
-		Status: "To Do", Assignee: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
+		Status: "To Do", Assignee: d.Assignee, AssigneeName: d.Assignee, Reporter: "Demo User", Priority: priority, Labels: labels,
 		ParentKey: parentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
 	}
 	b.desc[key] = d.Description

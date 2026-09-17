@@ -20,7 +20,7 @@ const (
 )
 
 // issueColumns is the SELECT list every row read uses, in scan order.
-const issueColumns = `key, id, project, type, summary, status, status_id, assignee, reporter, priority, labels,
+const issueColumns = `key, id, project, type, summary, status, status_id, assignee, assignee_name, reporter, priority, labels,
 	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
 // issueOrder puts drafts first, then ranked rows by rank with unranked rows
@@ -89,12 +89,12 @@ func orderFor(q IssueQuery) string {
 }
 
 const upsertIssueSQL = `
-	INSERT INTO issue (profile_id, key, id, project, type, summary, status, status_id, assignee, reporter, priority, labels,
+	INSERT INTO issue (profile_id, key, id, project, type, summary, status, status_id, assignee, assignee_name, reporter, priority, labels,
 		sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, key) DO UPDATE SET
 		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
-		status = excluded.status, status_id = excluded.status_id, assignee = excluded.assignee, reporter = excluded.reporter,
+		status = excluded.status, status_id = excluded.status_id, assignee = excluded.assignee, assignee_name = excluded.assignee_name, reporter = excluded.reporter,
 		priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
 		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
 		story_points = excluded.story_points, rank = excluded.rank, created = excluded.created,
@@ -110,7 +110,7 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 		points = sql.NullFloat64{Float64: *iss.StoryPoints, Valid: true}
 	}
 	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, iss.Status, iss.StatusID,
-		iss.Assignee, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
+		iss.Assignee, iss.AssigneeName, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
 		points, iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
 		return fmt.Errorf("upsert %s: %w", iss.Key, err)
 	}
@@ -449,6 +449,26 @@ func issueFilter(profileID string, q IssueQuery) (string, []any) {
 		where = append(where, "(key LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR labels LIKE ? ESCAPE '\\')")
 		args = append(args, like, like, like)
 	}
+	if q.AssigneeName != "" {
+		// A non-empty assignee_name is matched on that alone: a row's display
+		// name is never consulted once it has a username, or two people
+		// sharing a display name would both show as "assigned to me". The
+		// fallback to the assignee display name is only for rows cached
+		// before schema 14, whose assignee_name is still empty.
+		clause := "assignee_name = ? COLLATE NOCASE"
+		args = append(args, q.AssigneeName)
+		// With no display name to fall back to there is no fallback. Keeping
+		// the branch would compare assignee against "", which every
+		// unassigned row matches, so the list would quietly fill with work
+		// belonging to nobody. A username with no display name beside it is
+		// reachable: the two settings are written independently and either
+		// can fail on its own, and Jira can answer with an empty displayName.
+		if q.AssigneeDisplayName != "" {
+			clause = "(" + clause + " OR (assignee_name = '' AND assignee = ? COLLATE NOCASE))"
+			args = append(args, q.AssigneeDisplayName)
+		}
+		where = append(where, clause)
+	}
 	return strings.Join(where, " AND "), args
 }
 
@@ -470,7 +490,7 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		points  sql.NullFloat64
 		pending int
 	)
-	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.StatusID, &iss.Assignee,
+	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.StatusID, &iss.Assignee, &iss.AssigneeName,
 		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
 		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err

@@ -496,6 +496,17 @@ func TestFreshDatabaseHasTheSprintGoalColumn(t *testing.T) {
 	if goal != "Ship it" {
 		t.Errorf("goal = %q, want what was inserted", goal)
 	}
+	// Same proof, for baseDDL's assignee_name column (version 14): the
+	// migration loop ran nothing here, so only Base could have built it.
+	if _, err := db.DB().Exec(
+		`INSERT INTO issue (profile_id, key, assignee_name) VALUES ('p1', 'PLAT-1', 'ranand')`,
+	); err != nil {
+		t.Fatalf("insert with assignee_name: %v", err)
+	}
+	var assigneeName string
+	if err := db.DB().QueryRow(`SELECT assignee_name FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-1'`).Scan(&assigneeName); err != nil || assigneeName != "ranand" {
+		t.Errorf("assignee_name = %q, %v, want ranand", assigneeName, err)
+	}
 }
 
 func TestSchemaVersionEightAddsTheReportTableToAnOlderDatabase(t *testing.T) {
@@ -713,6 +724,64 @@ func TestSchemaVersionTwelveAddsTheRitualSyncColumns(t *testing.T) {
 	}
 }
 
+// TestVersionFourteenMigrationAddsAssigneeNameAndClearsEveryWatermark follows
+// the version 5 shape: an issue row cached before the column existed keeps an
+// empty assignee_name, and the watermark clears so the next sync refetches
+// every issue and fills it in.
+func TestVersionFourteenMigrationAddsAssigneeNameAndClearsEveryWatermark(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE issue DROP COLUMN assignee_name`,
+		`INSERT INTO issue (profile_id, key, summary, status, assignee) VALUES ('p1', 'PLAT-412', 'Promo code', 'In Progress', 'R. Anand')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p1', '2026-09-05T10:42:00Z', '2026-09-01T09:00:00Z', '')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p2', '2026-09-06T11:00:00Z', '2026-09-02T09:00:00Z', '')`,
+		`UPDATE meta SET value = '13' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var assigneeName, lastSynced, lastFull string
+	if err := db.DB().QueryRow(`SELECT assignee_name FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-412'`).Scan(&assigneeName); err != nil {
+		t.Fatalf("read assignee_name: %v", err)
+	}
+	if assigneeName != "" {
+		t.Errorf("assignee_name = %q, want empty for a row cached before version 14", assigneeName)
+	}
+	if err := db.DB().QueryRow(`SELECT last_synced, last_full FROM sync_state WHERE profile_id = 'p1'`).Scan(&lastSynced, &lastFull); err != nil {
+		t.Fatalf("read sync_state: %v", err)
+	}
+	if lastSynced != "" {
+		t.Errorf("last_synced = %q, want empty so the next sync refetches every issue", lastSynced)
+	}
+	if lastFull != "2026-09-01T09:00:00Z" {
+		t.Errorf("last_full = %q, want the migration to leave it alone", lastFull)
+	}
+	// The clear is for every profile, not just the one this test happens to
+	// seed first: a second profile's watermark must come out empty too.
+	var p2Synced string
+	if err := db.DB().QueryRow(`SELECT last_synced FROM sync_state WHERE profile_id = 'p2'`).Scan(&p2Synced); err != nil {
+		t.Fatalf("read p2 sync_state: %v", err)
+	}
+	if p2Synced != "" {
+		t.Errorf("p2 last_synced = %q, want cleared too", p2Synced)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}
+
 func TestSchemaVersionThirteenAddsTheSprintDraftFlag(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tam.db")
 	db, err := tamstore.Open(path)
@@ -743,7 +812,7 @@ func TestSchemaVersionThirteenAddsTheSprintDraftFlag(t *testing.T) {
 	if name != "Sprint 13" || draft != 0 {
 		t.Errorf("sprint = %q draft %d, want the row kept and not a draft", name, draft)
 	}
-	if v, _ := store.ReadSchemaVersion(db.DB()); v != 13 || tamstore.Schema.Version != 13 {
-		t.Errorf("schema version = %d (Schema.Version %d), want 13", v, tamstore.Schema.Version)
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
 	}
 }

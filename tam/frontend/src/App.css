@@ -170,6 +170,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* Both views are a fixed toolbar over a body that takes the rest. */
 .backlog { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Assigned to me's header and stale-rows note sit above the reused Backlog
+   grid; the wrapper takes .backlog's own sizing so the grid below still
+   fills the remaining height. */
+.assigned-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.assigned-header { margin: 0 0 8px; font-weight: 600; }
+.assigned-note { margin: 0 0 8px; }
+.assigned-empty-actions { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
 /* No gap and no rounded seam: XTM's table and detail sidebar meet on a
    single 1px border, so the pair reads as one surface rather than two cards
    with a gutter between them. */

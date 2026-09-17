@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as bindings from "../wailsjs/go/main/App";
-import { GetSprintReport, isDemoUrl } from "./api";
+import { GetSprintReport, ListIssues, isDemoUrl } from "./api";
 
-// Only the report binding is stood in for. The rest of the generated module
-// is the real thing, so this file still exercises api.ts as it ships.
+// Only the report and list-issues bindings are stood in for. The rest of the
+// generated module is the real thing, including issuerepo.IssueQuery's own
+// createFrom, so this file still exercises api.ts and the generated
+// bindings as they ship.
 vi.mock("../wailsjs/go/main/App", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../wailsjs/go/main/App")>()),
   GetSprintReport: vi.fn(),
+  ListIssues: vi.fn(),
 }));
 
 describe("isDemoUrl", () => {
@@ -57,5 +60,29 @@ describe("GetSprintReport's sprint id guard", () => {
     vi.mocked(bindings.GetSprintReport).mockResolvedValue({ unavailable: "" } as never);
     await GetSprintReport("p1", 1, 11, true);
     expect(bindings.GetSprintReport).toHaveBeenCalledWith("p1", 1, 11, true);
+  });
+});
+
+// ListIssues goes through issuerepo.IssueQuery.createFrom, the generated
+// class that only copies the fields it was built to know about. A field
+// added to api.ts's IssueQuery interface without regenerating
+// wailsjs/go/models.ts is silently dropped here: no error, no type
+// complaint, just a query the store never actually filters by. This asserts
+// the field survives the hop by reading it off the object the real
+// generated binding actually received, not by reading models.ts.
+describe("ListIssues carries the assignee filter through createFrom", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keeps assigneeName and assigneeDisplayName on the query handed to the binding", async () => {
+    vi.mocked(bindings.ListIssues).mockResolvedValue({ issues: [], total: 0 } as never);
+    await ListIssues("p1", {
+      text: "", types: [], sprintId: "", offset: 0, limit: 25, sort: "", desc: false,
+      assigneeName: "ranand", assigneeDisplayName: "R. Anand",
+    });
+    const sent = vi.mocked(bindings.ListIssues).mock.calls[0][1];
+    expect(sent.assigneeName).toBe("ranand");
+    expect(sent.assigneeDisplayName).toBe("R. Anand");
   });
 });

@@ -206,6 +206,42 @@ func TestUpsertKeepsTheStatusID(t *testing.T) {
 	}
 }
 
+// TestUpsertPageUpdatesAssigneeNameOnConflict pins the ON CONFLICT branch: a
+// column only written on insert never refreshes on a later sync of an issue
+// already cached, the same trap the plain assignee column would have if its
+// upsert ever lost the DO UPDATE SET clause.
+func TestUpsertPageUpdatesAssigneeNameOnConflict(t *testing.T) {
+	r, db := newRepoWithDB(t)
+	ctx := context.Background()
+	now := time.Date(2026, 9, 5, 10, 42, 0, 0, time.UTC)
+	page := sample()
+	page[0].AssigneeName = "ranand"
+	if err := r.UpsertPage(ctx, "p1", page, now, false); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if got := readAssigneeName(t, db, "p1", "PLAT-412"); got != "ranand" {
+		t.Fatalf("assignee_name after insert = %q, want ranand", got)
+	}
+	// A second sync of the same issue under a new assignee has to update the
+	// existing row, not just insert alongside it.
+	page[0].AssigneeName = "mortiz"
+	if err := r.UpsertPage(ctx, "p1", page[:1], now.Add(time.Minute), false); err != nil {
+		t.Fatalf("second upsert: %v", err)
+	}
+	if got := readAssigneeName(t, db, "p1", "PLAT-412"); got != "mortiz" {
+		t.Fatalf("assignee_name after the second sync = %q, want mortiz (the ON CONFLICT branch must update it)", got)
+	}
+}
+
+func readAssigneeName(t *testing.T, db *sql.DB, profileID, key string) string {
+	t.Helper()
+	var got string
+	if err := db.QueryRow(`SELECT assignee_name FROM issue WHERE profile_id = ? AND key = ?`, profileID, key).Scan(&got); err != nil {
+		t.Fatalf("read assignee_name: %v", err)
+	}
+	return got
+}
+
 func TestIssuesByKeysReturnsTheCallersOrderAndSkipsWhatIsNotCached(t *testing.T) {
 	r, db := newRepoWithDB(t)
 	ctx := context.Background()

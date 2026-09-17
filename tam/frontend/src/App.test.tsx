@@ -174,6 +174,21 @@ describe("App shell", () => {
       .toHaveAttribute("aria-current", "page");
   });
 
+  it("switches to the Assigned to me view, which the View menu now carries too", async () => {
+    renderApp();
+    await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());
+    await menuBus.emit("menu:view", "assigned" as never);
+    // GetProfileSetting resolves "" (no stored username) after this event,
+    // so the empty state's own async render is what proves the switch, the
+    // way the region only appears once AssignedToMeView knows who "me" is.
+    expect(
+      await screen.findByText("TAM does not know your Jira user yet. Sync once or test the connection."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Assigned to me" })).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Assigned to me" }))
+      .toHaveAttribute("aria-current", "page");
+  });
+
   it("ignores a view id the frontend does not know", async () => {
     renderApp();
     await waitFor(() => expect(screen.getByText("DEMO")).toBeInTheDocument());

@@ -126,6 +126,47 @@ func TestEditFieldHandlesEveryEditableField(t *testing.T) {
 	}
 }
 
+// TestEditFieldWritesBothAssigneeColumns pins the two-column write: an
+// "assignee" edit is a username from AssigneePicker, so it has to land in
+// assignee_name too or "assigned to me" cannot see it. assignee_name is not
+// part of the issue DTO ListIssues and GetIssue project, so it is read back
+// straight from the store.
+func TestEditFieldWritesBothAssigneeColumns(t *testing.T) {
+	repo, db := newRepoWithDB(t)
+	ctx := context.Background()
+	seedOne(t, repo, "p1")
+	if err := repo.EditField(ctx, "p1", "PLAT-1", "assignee", "jdoe"); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	var assignee, assigneeName string
+	if err := db.QueryRow(`SELECT assignee, assignee_name FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-1'`).Scan(&assignee, &assigneeName); err != nil {
+		t.Fatalf("read assignee columns: %v", err)
+	}
+	if assignee != "jdoe" || assigneeName != "jdoe" {
+		t.Errorf("assignee = %q assignee_name = %q, want both jdoe", assignee, assigneeName)
+	}
+}
+
+// TestCreateDraftCarriesAssigneeName pins the draft INSERT: a draft only ever
+// knows the username AssigneePicker sent, so the new column carries the same
+// value the assignee column already does, not a fabricated display name.
+func TestCreateDraftCarriesAssigneeName(t *testing.T) {
+	repo, db := newRepoWithDB(t)
+	ctx := context.Background()
+	d := backend.IssueDraft{Type: backend.TypeTask, Summary: "Add a retry", Assignee: "mortiz"}
+	k, err := repo.CreateDraft(ctx, "p1", "PLAT", d)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	var assignee, assigneeName string
+	if err := db.QueryRow(`SELECT assignee, assignee_name FROM issue WHERE profile_id = 'p1' AND key = ?`, k).Scan(&assignee, &assigneeName); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if assignee != "mortiz" || assigneeName != "mortiz" {
+		t.Errorf("assignee = %q assignee_name = %q, want both mortiz", assignee, assigneeName)
+	}
+}
+
 func TestCreateDraftNumbersPerProfileAndEditsUpdateItsJSON(t *testing.T) {
 	repo := newRepo(t)
 	ctx := context.Background()

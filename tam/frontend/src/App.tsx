@@ -7,6 +7,7 @@ import type { View } from "./nav";
 import { useModal } from "./modals";
 import { Placeholder } from "./components/Placeholder";
 import { BacklogView } from "./components/BacklogView";
+import { AssignedToMeView } from "./components/AssignedToMeView";
 import { EpicsView } from "./components/EpicsView";
 import { BoardsView } from "./components/BoardsView";
 import { SprintsView } from "./components/SprintsView";
@@ -266,6 +267,8 @@ export default function App() {
             // instead of borrowing an id from a heading that is gone.
             current.id === "backlog" ? (
               <BacklogView />
+            ) : current.id === "assigned" ? (
+              <AssignedToMeView />
             ) : current.id === "epics" ? (
               <EpicsView />
             ) : current.id === "boards" ? (

@@ -85,6 +85,7 @@ export namespace backend {
 	    status: string;
 	    statusId: string;
 	    assignee: string;
+	    assigneeName: string;
 	    reporter: string;
 	    priority: string;
 	    labels: string[];
@@ -112,6 +113,7 @@ export namespace backend {
 	        this.status = source["status"];
 	        this.statusId = source["statusId"];
 	        this.assignee = source["assignee"];
+	        this.assigneeName = source["assigneeName"];
 	        this.reporter = source["reporter"];
 	        this.priority = source["priority"];
 	        this.labels = source["labels"];
@@ -970,6 +972,8 @@ export namespace issuerepo {
 	    groupSubtasks: boolean;
 	    sort: string;
 	    desc: boolean;
+	    assigneeName: string;
+	    assigneeDisplayName: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new IssueQuery(source);
@@ -985,6 +989,8 @@ export namespace issuerepo {
 	        this.groupSubtasks = source["groupSubtasks"];
 	        this.sort = source["sort"];
 	        this.desc = source["desc"];
+	        this.assigneeName = source["assigneeName"];
+	        this.assigneeDisplayName = source["assigneeDisplayName"];
 	    }
 	}
 	export class LinkedTest {

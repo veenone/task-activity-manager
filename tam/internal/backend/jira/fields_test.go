@@ -128,6 +128,42 @@ func TestParseIssuePrefersParentOverEpicLinkAndToleratesMissingFields(t *testing
 	if iss.Assignee != "" || iss.Labels == nil || len(iss.Labels) != 0 || iss.StoryPoints != nil {
 		t.Errorf("issue = %+v", iss)
 	}
+	if iss.AssigneeName != "" {
+		t.Errorf("assignee name = %q, want empty when there is no assignee", iss.AssigneeName)
+	}
+}
+
+// TestParseIssueAssigneeNameFromTheUsername is the ordinary case: an
+// assignee's own name field is the username the write path and the
+// "assigned to me" match both need, distinct from the display name Assignee
+// already carries.
+func TestParseIssueAssigneeNameFromTheUsername(t *testing.T) {
+	raw := corejira.RawIssue{ID: "1", Key: "PLAT-412", Fields: map[string]json.RawMessage{
+		"summary":  json.RawMessage(`"x"`),
+		"assignee": json.RawMessage(`{"name":"ranand","displayName":"R. Anand"}`),
+		"labels":   json.RawMessage(`null`),
+	}}
+	iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{})
+	if iss.Assignee != "R. Anand" {
+		t.Errorf("assignee = %q, want the display name unchanged", iss.Assignee)
+	}
+	if iss.AssigneeName != "ranand" {
+		t.Errorf("assignee name = %q, want the username", iss.AssigneeName)
+	}
+}
+
+// TestParseIssueAssigneeNameFallsBackToKey covers Data Center in GDPR mode,
+// which populates key rather than name for some users.
+func TestParseIssueAssigneeNameFallsBackToKey(t *testing.T) {
+	raw := corejira.RawIssue{ID: "1", Key: "PLAT-412", Fields: map[string]json.RawMessage{
+		"summary":  json.RawMessage(`"x"`),
+		"assignee": json.RawMessage(`{"key":"ranand-key","displayName":"R. Anand"}`),
+		"labels":   json.RawMessage(`null`),
+	}}
+	iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{})
+	if iss.AssigneeName != "ranand-key" {
+		t.Errorf("assignee name = %q, want the key when name is empty", iss.AssigneeName)
+	}
 }
 
 func TestParseLinksSeesBothDirections(t *testing.T) {

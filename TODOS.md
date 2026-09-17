@@ -15,3 +15,47 @@ Deferred work, with enough context to pick it up cold.
 **Depends on:** TAM bundle 06 merged (branch `feat/tam-bundles-01-06`).
 
 **Raised by:** /plan-eng-review of the bundle 06 plan, 2026-09-16.
+
+## TestProfileConnection records a user for the URL in the form, not the saved one
+
+**What:** `App.TestProfileConnection` (`tam/app_profiles.go`) writes
+`jira_username` and `jira_display_name` for the profile after a successful
+test, using the URL passed from the Profiles form rather than the one on the
+saved row. Its doc comment says that is deliberate, so an unsaved edit is what
+gets tested. The consequence is that pointing a profile at a second instance,
+pressing Test and then pressing Cancel leaves the second instance's user
+recorded against a profile that still points at the first.
+
+**Why it was left:** the next sync overwrites both settings, so the window is
+bounded and self-correcting. Gating the write on the URL matching the saved
+row costs a profile read on every connection test and breaks the ordinary
+flow of testing a URL you are about to save.
+
+**When it would matter:** if anything starts trusting these settings without a
+sync having run since, or if the Assigned to me list is ever wrong in a way
+that traces back to a connection test. Then gate the write on
+`jiraURL == p.JiraURL`, or move it to the save path.
+
+**Raised by:** review of bundle 03 task 1, 2026-09-16.
+
+## The assignee column holds two different kinds of value
+
+**What:** sync writes the assignee's **display name** into `issue.assignee`
+(`tam/internal/backend/jira/fields.go`, via `displayName()`), while a local
+edit through `AssigneePicker` writes the **username**
+(`tam/internal/issuerepo/writes.go`). So after reassigning an issue in TAM the
+Backlog grid's ASSIGNEE cell shows a raw username until the next sync
+overwrites it with the display name.
+
+**Why it was left:** bundle 03 adds `assignee_name` beside it rather than
+changing what either path writes, because normalising the existing column
+means a backfill migration over every cached row and a decision about which
+value wins for rows that were edited but not yet committed.
+
+**Consequence to know about:** the Assigned to me display-name fallback (for
+rows synced before schema 14, whose `assignee_name` is empty) cannot match a
+row that was locally edited before the migration, because that row's
+`assignee` holds a username. Those rows carry a pending journal entry, so the
+pending-edit overlay covers them.
+
+**Raised by:** bundle 03 planning, 2026-09-16.
