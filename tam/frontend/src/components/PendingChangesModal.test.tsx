@@ -313,6 +313,25 @@ describe("PendingChangesModal", () => {
     expect(await within(dialog).findByText("Last commit: 1 sprint change pushed (Sprint 12b edited).")).toBeInTheDocument();
   });
 
+  it("shows a draft board as its own card, first, apart from a draft sprint with the same id", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 31, entityType: "sprint_create", entityKey: "-1", field: "create", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ boardId: -1, boardName: "Checkout", name: "Sprint 1", goal: "", startDate: "2026-09-16T09:00:00.000+0000", endDate: "2026-09-30T09:00:00.000+0000" }) },
+      { id: 30, entityType: "board_create", entityKey: "-1", field: "create", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ name: "Checkout", type: "scrum", filterName: "Checkout filter", jql: "project = PLAT" }) },
+    ]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    expect(await within(dialog).findByText("2 changes: 1 new board, 1 new sprint")).toBeInTheDocument();
+    const cards = within(dialog).getAllByRole("group");
+    expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Checkout", "Sprint 1"]);
+    expect(cards[0]).toHaveTextContent("New board Checkout");
+    expect(cards[0]).toHaveTextContent("Scrum board on the filter Checkout filter: project = PLAT");
+    await user.click(within(cards[0]).getByRole("button", { name: "Discard Checkout" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 30));
+  });
+
   it("says what the last Commit held and what each held row waits for", async () => {
     const user = userEvent.setup();
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({

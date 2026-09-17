@@ -11,8 +11,8 @@ import {
   ListActivity,
   ListPendingChanges,
 } from "../api";
-import { SPRINT_ENTITIES, isMoveEntity } from "../api";
-import type { DraftSprint, IssueDraft, LinkDraft, PendingChange } from "../api";
+import { ENTITY_BOARD_CREATE, SPRINT_ENTITIES, isMoveEntity } from "../api";
+import type { DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
 import { invalidateSprintWrites } from "./sprints";
@@ -116,7 +116,8 @@ export function useDiscardById(profileId: string) {
   });
 }
 
-// A PendingGroup is one issue's rows, or one sprint's. A draft group
+// A PendingGroup is one issue's rows, one sprint's, or one draft board's
+// with its decoded DraftBoard. A draft group
 // carries its decoded draft; a draft sprint group its decoded DraftSprint;
 // a real sprint's group its edit or delete row in sprintChanges; an edit
 // group carries one row per field; a link group one row per journaled link;
@@ -135,6 +136,8 @@ export interface PendingGroup {
   sprint: DraftSprint | null;
   sprintRow: PendingChange | null;
   sprintChanges: PendingChange[];
+  board: DraftBoard | null;
+  boardRow: PendingChange | null;
   edits: PendingChange[];
   links: { row: PendingChange; link: LinkDraft }[];
   moves: PendingChange[];
@@ -143,12 +146,13 @@ export interface PendingGroup {
 // groupKind is the namespace a row's group lives in.
 function groupKind(entityType: string): string {
   if (SPRINT_ENTITIES.includes(entityType)) return "sprint";
-  if (entityType === "board_create") return "board";
+  if (entityType === ENTITY_BOARD_CREATE) return "board";
   return "issue";
 }
 
 // groupPending folds the journal (newest first) into one group per key and
-// kind: draft sprints first, since Commit creates them first, then the
+// kind: draft boards first and draft sprints next, in the order Commit
+// creates them, then the
 // edits and deletes of real sprints, pushed right after, then drafts, then
 // keys in the order they first appear.
 export function groupPending(rows: PendingChange[]): PendingGroup[] {
@@ -157,7 +161,7 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     const id = `${groupKind(row.entityType)}:${row.entityKey}`;
     let g = byKey.get(id);
     if (!g) {
-      g = { id, key: row.entityKey, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], edits: [], links: [], moves: [] };
+      g = { id, key: row.entityKey, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], moves: [] };
       byKey.set(id, g);
     }
     if (row.entityType === "issue_create") {
@@ -173,6 +177,13 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
         g.sprint = JSON.parse(row.afterVal) as DraftSprint;
       } catch {
         g.sprint = null;
+      }
+    } else if (row.entityType === ENTITY_BOARD_CREATE) {
+      g.boardRow = row;
+      try {
+        g.board = JSON.parse(row.afterVal) as DraftBoard;
+      } catch {
+        g.board = null;
       }
     } else if (SPRINT_ENTITIES.includes(row.entityType)) {
       g.sprintChanges.push(row);
@@ -190,10 +201,12 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
   }
   const groups = [...byKey.values()];
   const isSprintChange = (g: PendingGroup) => !g.sprintRow && g.sprintChanges.length > 0;
+  const isIssue = (g: PendingGroup) => !g.boardRow && !g.sprintRow && !isSprintChange(g);
   return [
+    ...groups.filter((g) => g.boardRow),
     ...groups.filter((g) => g.sprintRow),
     ...groups.filter(isSprintChange),
-    ...groups.filter((g) => !g.sprintRow && !isSprintChange(g) && g.createRow),
-    ...groups.filter((g) => !g.sprintRow && !isSprintChange(g) && !g.createRow),
+    ...groups.filter((g) => isIssue(g) && g.createRow),
+    ...groups.filter((g) => isIssue(g) && !g.createRow),
   ];
 }

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
 import { ENTITY_SPRINT_EDIT, fieldLabel } from "../api";
-import type { DraftSprint, IssueDraft, PendingChange, Profile, Settings, SprintEdit } from "../api";
+import type { DraftBoard, DraftSprint, IssueDraft, PendingChange, Profile, Settings, SprintEdit } from "../api";
 import { ISSUE_TYPES } from "../api";
 import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
@@ -20,22 +20,36 @@ function isSprintGroup(g: PendingGroup): boolean {
   return !!g.sprintRow || g.sprintChanges.length > 0;
 }
 
+// isIssueGroup says a group is an issue's: not a board's, not a sprint's.
+function isIssueGroup(g: PendingGroup): boolean {
+  return !g.boardRow && !isSprintGroup(g);
+}
+
 // summaryLine is the dialog's subtitle: "3 changes on 2 issues, 1 of them
-// new", with the sprints counted apart, since a sprint is not an issue.
+// new", with boards and sprints counted apart, since neither is an issue.
 export function summaryLine(groups: PendingGroup[], rowCount: number): string {
-  const issues = groups.filter((g) => !isSprintGroup(g));
+  const issues = groups.filter(isIssueGroup);
+  const boards = groups.filter((g) => g.boardRow).length;
   const newCount = groups.filter((g) => g.sprintRow).length;
   const changedCount = groups.filter((g) => !g.sprintRow && g.sprintChanges.length > 0).length;
   const changes = plural(rowCount, "change", "changes");
-  const sprints: string[] = [];
-  if (newCount > 0 || changedCount === 0) sprints.push(plural(newCount, "new sprint", "new sprints"));
-  if (changedCount > 0) sprints.push(plural(changedCount, "sprint change", "sprint changes"));
-  if (issues.length === 0) return `${changes}: ${sprints.join(", ")}`;
+  const others: string[] = [];
+  if (boards > 0) others.push(plural(boards, "new board", "new boards"));
+  if (newCount > 0) others.push(plural(newCount, "new sprint", "new sprints"));
+  if (changedCount > 0) others.push(plural(changedCount, "sprint change", "sprint changes"));
+  if (issues.length === 0) return `${changes}: ${others.join(", ")}`;
   const drafts = issues.filter((g) => g.createRow).length;
   let line = `${changes} on ${plural(issues.length, "issue", "issues")}`;
   if (drafts > 0) line += `, ${drafts} of them new`;
-  if (newCount + changedCount > 0) line += `, and ${sprints.join(", ")}`;
+  if (others.length > 0) line += `, and ${others.join(", ")}`;
   return line;
+}
+
+// boardDraftLine says what kind of board a draft is and what it collects.
+export function boardDraftLine(b: DraftBoard | null): string {
+  if (!b) return "A draft board that could not be read. Discard it and draft it again.";
+  const type = b.type.charAt(0).toUpperCase() + b.type.slice(1);
+  return `${type} board on the filter ${b.filterName}: ${b.jql}`;
 }
 
 // sprintChangeName is the sprint's name as Jira has it: an edit's before
@@ -127,10 +141,10 @@ export function PendingChangesModal({ onClose }: Props) {
   // since Commit creates them before anything that moves into them.
   const orderedGroups = useMemo(
     () => [
-      ...groups.filter((g) => conflictKeys.has(g.key)),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && isSprintGroup(g)),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && !isSprintGroup(g) && g.createRow),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && !isSprintGroup(g) && !g.createRow),
+      ...groups.filter((g) => isIssueGroup(g) && conflictKeys.has(g.key)),
+      ...groups.filter((g) => !isIssueGroup(g)),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && isIssueGroup(g) && g.createRow),
+      ...groups.filter((g) => !conflictKeys.has(g.key) && isIssueGroup(g) && !g.createRow),
     ],
     [groups, conflictKeys],
   );
@@ -178,9 +192,24 @@ export function PendingChangesModal({ onClose }: Props) {
         ) : (
           <div className="pending-list">
             {orderedGroups.map((g) => {
-              const conflict = isSprintGroup(g) ? undefined : lastCommit?.conflicts.find((c) => c.key === g.key && conflictKeys.has(c.key));
+              const conflict = !isIssueGroup(g) ? undefined : lastCommit?.conflicts.find((c) => c.key === g.key && conflictKeys.has(c.key));
               if (conflict) {
                 return <ConflictCard key={g.id} profileId={activeId} conflict={conflict} disabled={busy} />;
+              }
+              if (g.boardRow) {
+                const name = g.board?.name ?? "Draft board";
+                return (
+                  <section key={g.id} className="pending-card" role="group" aria-label={name}>
+                    <div className="pending-card-head">
+                      <span className="b">{`New board ${name}`}</span>
+                      <span className="chip chip-draft">Draft board</span>
+                      <button type="button" className="btn btn-discard pending-discard" disabled={busy} aria-label={`Discard ${name}`} onClick={() => discardOne.mutate(g.boardRow!, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
+                      </button>
+                    </div>
+                    <p className="muted small">{boardDraftLine(g.board)}</p>
+                    <p className="muted small">Commit creates its filter and the board in Jira before anything else.</p>
+                  </section>
+                );
               }
               if (g.sprintRow) {
                 const name = g.sprint?.name ?? "Draft sprint";

@@ -687,6 +687,19 @@ export interface PendingChange {
 // entityKey is the draft's negative id and its afterVal a DraftSprint.
 export const ENTITY_SPRINT_CREATE = "sprint_create";
 
+// ENTITY_BOARD_CREATE is the journal entity of a board drafted in TAM,
+// mirroring issuerepo.EntityBoardCreate. Its entityKey is the draft's
+// negative id and its afterVal a DraftBoard.
+export const ENTITY_BOARD_CREATE = "board_create";
+
+// DraftBoard mirrors issuerepo.DraftBoard: what a board_create row carries.
+export interface DraftBoard {
+  name: string;
+  type: string;
+  filterName: string;
+  jql: string;
+}
+
 // ENTITY_SPRINT_EDIT and ENTITY_SPRINT_DELETE are the journal entities of an
 // edit and a delete of a sprint Jira holds, mirroring issuerepo's. Their
 // entityKey is the sprint id. An edit's afterVal is a SprintEdit and its
