@@ -175,6 +175,16 @@ existing `sprints` phase beside `sprint_create`.
 3. Remove `Edit` and `Delete` from `sprints.Service` and from the fenced list. Register both entities in the seven places.
 4. Gate: `cd tam && go test ./internal/issuerepo/... ./internal/committer/... ./internal/sprints/... . -count=1`.
 
+**Decisions**
+1. Entities `sprint_edit` and `sprint_delete` in `issuerepo/sprintwrites.go`, keyed by the sprint id as text, one fixed field each, so a second edit replaces the first and keeps the original before value.
+2. `sprint_edit` carries `{boardId, name, goal, startDate, endDate, clearGoal}`, and its before value is the cached `{name, goal, startDate, endDate}`. The cached sprint row and the cards' sprint name change at once, in the same transaction. A closed sprint, one the cache does not hold, and one with a pending delete are refused locally with nothing journalled. A later edit with an empty goal keeps an earlier edit's `clearGoal`, the way two partial updates in Jira would.
+3. `sprint_delete` carries `{boardId, name}`, before value the name. Nothing local is removed until Commit. It is refused locally unless the cached state is `future`, and while cards in the sprint have pending changes (the wording `refusePendingDelete` uses). A pending `sprint_edit` for the same sprint is reverted and dropped in the same transaction.
+4. Discard: an edit restores the row and the cards' sprint name from the before value; a delete just drops its row.
+5. The push stays in `internal/sprints`: `Edit` and `Delete` move off `*Service` onto `sprints.ForCommit(s)`, used only by Commit. A guard refusal at push time is marked with `sprints.ErrRefused`.
+6. The committer takes an optional `SprintWriter` seam; the `sprints` phase pushes edits then deletes, oldest first, after `createSprints`. A guard refusal is a non-retryable failure that keeps the row; a nil seam fails each row with "this connection cannot manage sprints". Notes go to the log, since `Result` has no slot for them. Pushed sprint writes are listed in a new `Result.SprintsChanged`, not in `Committed`, because the Commit banner counts every `Committed` entry as an issue.
+7. `EditSprint` and `DeleteSprint` on a real sprint work offline and answer "".
+8. Pending changes groups sprint and board rows under their own namespaced keys, so a draft sprint `-1` and a draft board `-1` stop sharing a group.
+
 ---
 
 ## Task 8: journal the sprint ceremonies
