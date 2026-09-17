@@ -752,7 +752,7 @@ back to key, so whole batch fail together and smaller batch limit how much
 of completion one refusal can take down.
 
 Completion that reached Jira then failed reported inside `sprints.Completion`
-(`Moved`, `MovedTo`, `Failed`, `Note`, `Message`) not as Go error, because
+(`Moved`, `MovedTo`, `Note`, `Message`) not as Go error, because
 Wails discard bound method return value whenever method also return non-nil
 error: dispatcher fill in either result or error, never both. Error would
 therefore deliver sentence and drop counts and keys it is about, which is
@@ -1211,8 +1211,7 @@ Commit, and both bindings work offline.
 - **Local refusals** (nothing journaled): edit of a closed sprint, of one the
   cache does not hold, or of one with a pending delete; delete of anything
   but a cached future sprint, or while cards in it have pending changes
-  (`app.pendingInSprint` + `sprints.RefusePendingDelete`, the wording the
-  push uses too).
+  (`sprints.Service.CheckDelete`, which the push runs too).
 - **Delete supersedes edit.** A pending edit of the sprint is reverted and
   dropped (through `discardOne`) in the delete's transaction, so the delete
   row names the sprint as Jira has it.
@@ -1226,7 +1225,7 @@ Commit, and both bindings work offline.
   `sprints.ForCommit(a.sprintService(p, b))`. Every write to Jira in
   `internal/sprints` hangs off `sprints.Committed`; `Service` exports none.
   The push keeps the guards (`requireEditable`, `requireDeletable`,
-  `refusePendingDelete`, `requireCompletable`, `refusePending`), the audit
+  `CheckDelete`, `CheckComplete`, `requireCompletable`), the audit
   row and the cache work. A guard refusal wraps `sprints.ErrRefused` and
   becomes a non-retryable `Failure` naming the row; any other error is
   retryable; both keep the row. A nil seam fails each row with "this
@@ -1247,29 +1246,27 @@ that reached Jira at once.
 - **Entities** (`issuerepo/sprintceremonies.go`): `sprint_start` (field
   `start`, after_val `SprintStart{boardId, name, goal, startDate,
   endDate}`, dates already in Agile format) and `sprint_complete` (field
-  `complete`, after_val `SprintComplete{boardId, name, moveTo, moveToName,
-  previewCount}`, `moveTo` empty for the backlog). No before_val. Neither
+  `complete`, after_val `SprintComplete{boardId, name, moveTo, moveToName}`,
+  `moveTo` empty for the backlog). No before_val. Neither
   changes the cache until Commit; the Sprints view shows "Starting on
   Commit" / "Completing on Commit" through the chip the delete uses
   (`sprintWaiting` in `queries/pending.ts`).
 - **Local refusals.** `JournalSprintStart`: a real sprint unless cached
-  `future`, or while its delete waits. `CompleteSprint` (the binding): a
-  draft (`sprints.ErrDraftSprint`), a cached `future` sprint
-  (`sprints.NotStarted`), a draft or self destination
-  (`sprints.DestinationID`), pending changes on cards staying in it
-  (`sprints.RefusePendingComplete`), all in the push's own words;
+  `future`, or while its delete waits. `CompleteSprint` (the binding) runs
+  `sprints.Service.CheckComplete`, the check the push runs too: a draft, a
+  cached `future` sprint, a draft or self destination, pending changes on
+  cards staying in it;
   `JournalSprintComplete` then refuses a sprint the cache does not hold and
   one whose delete waits. `JournalSprintDelete` now also refuses while a
   start or a completion waits (`refuseQueued`).
 - **Draft sprints can be started.** `sprint_start` on a negative id takes
-  the draft's own board. `RekeySprint` moves the row to the real id and
-  board (`rekeySprintStart`); `discardDraftSprint` drops it. In the push, a
+  the draft's own board, which is always real. `RekeySprint` moves the row
+  to the real id (`rekeySprintStart`); `discardDraftSprint` drops it. In the push, a
   start still keyed negative is held (`deps.blockedBy` / `hold`) when its
   create was blocked, and fails for good when the create row is gone.
   Start is offered on a draft in the Sprints menu and the Boards toolbar;
   Complete stays held back.
-- **Complete recomputes.** The row stores intent and the dialog's
-  `previewCount` only. At push `Committed.Complete` reads the sprint from
+- **Complete recomputes.** The row stores intent only. At push `Committed.Complete` reads the sprint from
   Jira, moves what is unfinished by the board's last column, closes it, and
   `SprintsChanged` reports the real count ("Sprint 12 completed, 45
   unfinished cards moved to Sprint 13"). A completion that moved cards and
@@ -1278,8 +1275,9 @@ that reached Jira at once.
   and keeps the row. A retry moves whatever is still unfinished and closes;
   a sprint the refreshed cache holds as `closed` is treated as done and
   moves nothing.
-- **Bindings.** `StartSprint` (answers "") and `CompleteSprint(profileID,
-  boardID, sprintID, moveTo, previewCount) error` need no backend and take
+- **Bindings.** `StartSprint` and `CompleteSprint(profileID, boardID,
+  sprintID, moveTo)` return only an error (as do `EditSprint` and
+  `DeleteSprint`), need no backend, and take
   the `"sprint"` lock; the frontend calls both through `runQuietLock`
   (`runSprintCeremony` and `ImmediateWriteChip` are gone).
 - **Dialogs.** Start says "Saved locally. Commit starts the sprint in
@@ -1295,7 +1293,7 @@ that reached Jira at once.
 
 ## Phased Commit
 
-`committer.Commit` = `phases()` in order: boards, sprints, sprint changes, epics, issues
+`committer.Commit` = `phases()` in order: boards, board adds, sprints, sprint changes, epics, issues
 (task, story, bug, requirement), sub-tasks, edits, board moves, links;
 journal re-read (`commitRun.reload`) after each, so next phase see ids last
 one rewrote. Inside create phase, drafts by `draftOrdinal` (n of TAM-NEW-n),
@@ -1316,7 +1314,7 @@ neighbour), never free text: `TAM-NEW-` string, or negative whole number under
 key naming sprint, fail that one write with internal error, never 400 from
 Jira. New phase must pass references only, not whole payload. Pending changes dialog show draft sprint
 as own card first, held rows with Waiting chip + reason; banner count
-"n waiting". The boards phase, first in `phases()`, is that later addition;
+"n waiting". The boards and board adds phases, first in `phases()`, are that later addition;
 see Draft boards below. Demo: epic whose summary contain "refused" refused
 once per run; demo refuse placeholder parent.
 
@@ -1328,10 +1326,10 @@ transaction, a `board` row under a negative id with `draft = 1` (schema
 version 15 adds the column, both to `baseDDL` and as a migration) and a
 `board_create` journal row (`EntityBoardCreate = "board_create"`) whose
 `after_val` is `DraftBoard{Name, Type, FilterName, JQL}` as JSON. The id
-comes from `nextDraftBoardID`, one below the lowest of a stored
+comes from `nextDraftID`, one below the lowest of a stored
 `draft_board_seq` setting and any negative id already in the table, so a
-discarded or committed draft's id is never handed to a new one, the same
-scheme `nextDraftSprintID` already used. `assertNoPlaceholders` (the
+discarded or committed draft's id is never handed to a new one; draft
+sprints use the same function over their own table and setting. `assertNoPlaceholders` (the
 firewall that used to check only for a stray `sprintId`) now trips on a
 negative `boardId` too, string or number, under its renamed `negRef`
 parameter, so a board id that skipped a rekey fails loud, inside TAM, rather
@@ -1351,9 +1349,9 @@ stale row Jira's id might already hold in `board` (a boards refresh between
 the create and the rekey could have cached one), moves the draft row onto
 the real id and turns off its `draft` flag, then repoints every table keyed
 by `board_id`: `board_column`, `board_issue`, `sprint`. It also repoints two
-things that are not tables: an `issue_rank` journal row whose packed value
-names the draft board (`rekeyRankBoard`), and every `issue_board` journal
-row queued onto it (`rekeyIssueBoard`).
+things that are not tables, both through `repointRows`: an `issue_rank`
+journal row whose packed value names the draft board, and every
+`issue_board` journal row queued onto it.
 
 That last one is worth being exact about, because it was the fix-round-1
 defect that broke the bundle's own headline flow. `AddToBoard`
@@ -1367,30 +1365,25 @@ let a second board's add silently collapse onto the first board's row
 instead of sitting beside it. So `RekeyBoard` has to rewrite the row's
 field, not just a value inside it, a different operation from every other
 rekey in this codebase, and was what `RekeyBoard`'s first version missed;
-`rekeyIssueBoard` rewrites both the field (`BoardField`) and the value's id
-half, leaving the scope half (backlog or a sprint id) exactly as queued.
+its repoint rewrites both the field (`BoardField`) and the value's id half, leaving the scope half (backlog or a sprint id) exactly as queued.
 
-**Phase order.** The `boards` phase runs first in `phases()`, before
-`sprints`, because a draft sprint's `originBoardId` and a card queued onto a
-board both name the board by id before Commit ever runs, and neither can be
-sent while that id is still a negative placeholder. Inside the boards
-phase, `createBoards` runs before `pushBoardAdds`: every drafted board is
-created and rekeyed first, so an add queued in the same Commit can resolve
-through the in-memory `boardRealID` map the moment it is pushed.
+**Phase order.** The `boards` phase runs first in `phases()`, then `board
+adds`, because a card queued onto a board names the board by id before
+Commit ever runs, and cannot be sent while that id is still a negative
+placeholder. `createBoards` creates and rekeys every drafted board; the
+journal re-read between the two phases hands `pushBoardAdds` the rows
+`RekeyBoard` already rewrote, so an add queued onto a board created in the
+same Commit is pushed with the real id. A sprint is never drafted onto a
+draft board: `CreateDraftSprint` refuses `BoardID <= 0`.
 
 A board create Jira refuses (or a connection that cannot create boards, or a
 create Jira accepts but answers with no id, or a rekey that fails locally
 after Jira already made the board) blocks the draft's negative id
-(`r.deps.block`) rather than sending anything with a placeholder in it.
-`createSprints` checks that block before it ever calls `CreateSprint`: a
-draft sprint whose `originBoardId` is still blocked is held instead, with a
-reason naming the board (`waits for board "PLAT Checkout Board", which Jira
-refused`). Both the `board_create` row and the `sprint_create` row survive
-the Commit; nothing was sent for either. The next Commit retries the
-still-present `board_create` row, and since nothing about the failed
-attempt left a second row or a stray Jira board, that retry creates the
-board exactly once, then creates the held sprint in the same Commit, now
-against the real id.
+(`r.deps.block`) rather than sending anything with a placeholder in it, so
+an add queued onto it is held with a reason naming the board. The
+`board_create` row survives the Commit, and since nothing about the failed
+attempt left a second row or a stray Jira board, the next Commit creates the
+board exactly once.
 
 **The filter check after Commit.** Once `pushBoardAdds` lands a board's
 queued issues (backlog scope batched through
@@ -1402,11 +1395,8 @@ retrying it would only repeat it. `checkBoardFilters` is a courtesy read
 after that, once per board that received at least one add this Commit:
 which of the pushed keys the board's own filter actually kept. A key it
 dropped becomes a non-retryable result line (`"PLAT-1 is outside board 1's
-filter, so it will not show on that board."`), naming the board by the name
-TAM itself gave it a moment earlier, when this Commit is the one that
-created the board, and by id otherwise (the committer owns no general
-board-name lookup, and one only exists for a board this Commit just
-drafted). A backend that cannot answer the check, or a read that fails,
+filter, so it will not show on that board."`), naming the board by id (the
+committer owns no board-name lookup). A backend that cannot answer the check, or a read that fails,
 changes nothing about the Commit: it is a read after a write that already
 landed, logged and otherwise ignored, never a reason to fail it.
 
@@ -1847,7 +1837,7 @@ entered. Kiwi profile file refused.
     internal/boardrepo/  the store layer over board, board_column, board_issue, and sprint; view.go
                           composes the Boards view's data over the issue cache through IssueSource,
                           both in one deferred read transaction (tx.go); pendingmoves.go's
-                          tiedToBoard is the four ties that let a draft, or a real issue reached
+                          tiedToBoard is the three ties that let a draft, or a real issue reached
                           only through a pending board add, draw on a board Jira never put it on;
                           cellorder.go is the board's final local order the commit pass ranks
                           against, on the same kind of transaction; sprintlength.go is the
@@ -1860,9 +1850,10 @@ entered. Kiwi profile file refused.
     internal/sprints/    the push half of every journaled sprint write, for Commit alone:
                           ForCommit's Committed carries Edit, Delete (manage.go), Start and
                           Complete (sprints.go), and Service exports no write; draft.go is
-                          DraftSprint, the check a drafted sprint gets, and ErrDraftSprint;
-                          guards.go is what a push refuses before it reaches Jira, with the
-                          refusals the app also makes before it journals, cache.go the board
+                          DraftSprint, the check a drafted sprint gets, and errDraftSprint;
+                          guards.go is what a push refuses before it reaches Jira, with
+                          CheckComplete and CheckDelete, which the app also runs before it
+                          journals, cache.go the board
                           cache's bookkeeping after it has, and suggest.go the start and create
                           dialogs' suggested name and dates
     internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
@@ -1890,8 +1881,8 @@ entered. Kiwi profile file refused.
                           firewall.go is assertNoPlaceholders, which trips on a negative sprint or
                           board id alike (negRef); boards.go, ranks.go, and boardvalues.go are the
                           board pass, after the edits and before the links; boardcreate.go is the
-                          boards phase, first in phases(): createBoards and RekeyBoard,
-                          pushBoardAdds (backlog batched through AddToBoardBacklog, sprint scope
+                          boards and board adds phases, first in phases(): createBoards and
+                          RekeyBoard, then pushBoardAdds (backlog batched through AddToBoardBacklog, sprint scope
                           through the same MoveIssuesToSprint the board pass already uses), and
                           checkBoardFilters, the post-Commit filter courtesy read
     internal/importer/   maps import columns to draft fields and validates rows
