@@ -83,3 +83,38 @@ is also still a draft.
 
 **Raised by:** bundle 04 fix round 1, 2026-09-16 (task: `RekeyBoard` missing
 `issue_board` rows, fix-round-1.md item 2).
+
+## Two sprint writes still reach Jira at once
+
+**What:** `internal/sprints` held four writes that reached Jira the moment
+they were made, outside the journal, which sits against the local-first rule
+bundle 04 is built on. Edit and Delete are done: bundle 04 Task 7 made them
+`sprint_edit` and `sprint_delete` journal rows pushed in Commit's sprints
+phase. Start and Complete remain, fenced by
+`tam/internal/sprints/exceptions_test.go`.
+
+**Why they are separate:** Start is straightforward, since the dialog
+already collects every value it sends. Complete is not: its dialog computes
+which cards are unfinished when it opens, and journalling it means Commit
+may move a different set. The plan's Task 8 carries the ruling (journal the
+intent, recompute at Commit, word the dialog as "about N cards").
+
+**Depends on:** bundle 04 Task 8.
+
+**Raised by:** bundle 04 planning, 2026-09-16; updated by Task 7, 2026-09-17.
+
+## A boards refresh shows a pending sprint edit as undone
+
+**What:** a journaled `sprint_edit` changes the cached `sprint` row at once.
+A boards refresh (or the re-read after a start or a completion) replaces
+every non-draft `sprint` row with what Jira sent, so the old name and dates
+come back on screen while the edit is still pending. Commit still pushes the
+edit, and Discard still restores the before value, so nothing is lost; only
+the display is stale until Commit.
+
+**When it would matter:** if users edit sprints and refresh before
+committing often enough to be confused by it. The fix is to re-apply
+pending `sprint_edit` rows after `boardrepo.writeSprints`, the way issue
+syncs keep pending field edits.
+
+**Raised by:** bundle 04 Task 7, 2026-09-17.

@@ -1195,9 +1195,60 @@ id; completion cannot move cards into draft. Edit + delete of draft local
 (`EditDraftSprint` rename everywhere through `rewriteSprintID`;
 `DiscardDraftSprint` = discard of `sprint_create` row: revert every move into
 it, clear it off draft issues, drop row). Bindings keep `"sprint"` lock,
-frontend keep `runQuietLock`. Rituals skip drafts. `RemoveBoards` unchanged:
+frontend keep `runQuietLock`. Edit + delete of a real sprint are journaled
+too; see Sprint edit and delete, journaled. Rituals skip drafts. `RemoveBoards` unchanged:
 draft on board that leave cache go with it, journal row stay in Pending
 changes.
+
+## Sprint edit and delete, journaled
+
+Bundle 04 Task 7. Edit and delete of a sprint Jira holds (positive id) used to
+reach Jira at once through `sprints.Service`. Now journal rows, pushed on
+Commit, and both bindings work offline.
+
+- **Entities** (`issuerepo/sprintwrites.go`): `sprint_edit` and
+  `sprint_delete`, key = sprint id text, one fixed field each (`edit`,
+  `delete`), so a second edit replaces the first and keeps its before value.
+  `sprint_edit` after_val = `SprintEdit{boardId, name, goal, startDate,
+  endDate, clearGoal}`, before_val = cached `{name, goal, startDate,
+  endDate}`. `sprint_delete` after_val = `{boardId, name}`, before_val = name.
+- **Local effect.** `JournalSprintEdit` updates the cached `sprint` row on
+  every board holding it and renames the cards (`rewriteSprintID`), in the
+  same transaction. Goal follows Jira's partial update: cleared with
+  `clearGoal`, kept when the new goal is empty, else replaced. A later edit
+  with an empty goal keeps an earlier `clearGoal`, because the dialog reopens
+  on the cleared goal and cannot ask again. `JournalSprintDelete` changes
+  nothing locally: Jira holds the sprint until Commit.
+- **Local refusals** (nothing journaled): edit of a closed sprint, of one the
+  cache does not hold, or of one with a pending delete; delete of anything
+  but a cached future sprint, or while cards in it have pending changes
+  (`app.pendingInSprint` + `sprints.RefusePendingDelete`, the wording the
+  push uses too).
+- **Delete supersedes edit.** A pending edit of the sprint is reverted and
+  dropped (through `discardOne`) in the delete's transaction, so the delete
+  row names the sprint as Jira has it.
+- **Discard.** `discardOne` has a case for each: an edit restores the row and
+  card names from before_val, a delete just drops its row.
+- **Push.** The sprints phase runs `createSprints`, then
+  `pushSprintWrites`: every edit, then every delete, oldest first, through
+  `Engine.Sprints` (`committer.SprintWriter`), which `app_writes.go` wires to
+  `sprints.ForCommit(a.sprintService(p, b))`. `ForCommit` is a separate type,
+  so the push keeps Jira-side guards (`requireEditable`, `requireDeletable`,
+  `refusePendingDelete`), the audit row and the cache work, while
+  `Service`'s exported methods stay the fenced list (now Start, Complete).
+  A guard refusal wraps `sprints.ErrRefused` and becomes a non-retryable
+  `Failure` naming the row; any other error is retryable; both keep the row.
+  A nil seam fails each row with "this connection cannot manage sprints".
+  A pushed write is listed in `Result.SprintsChanged` ("Sprint 12 edited");
+  a note is logged.
+- **Frontend.** `groupPending` keys groups by kind and key (`sprint:12`,
+  `board:-1`), so a draft sprint and a draft board with the same negative id
+  get separate cards; `PendingGroup.id` is that identity, `key` the entity
+  key. Pending changes reads an edit as "Edit sprint <name>: <what changed>"
+  and a delete as "Delete sprint <name>", each with Discard; a draft board
+  as "New board <name>". The Sprints view marks a sprint with a pending
+  delete "Deleting on Commit". Known edge: a boards refresh replaces the
+  edited sprint row with Jira's until Commit (TODOS.md).
 
 ## Phased Commit
 
