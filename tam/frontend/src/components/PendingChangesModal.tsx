@@ -15,23 +15,13 @@ interface Props {
   onClose: () => void;
 }
 
-// isSprintGroup says a group is a sprint's rather than an issue's.
-function isSprintGroup(g: PendingGroup): boolean {
-  return !!g.sprintRow || g.sprintChanges.length > 0;
-}
-
-// isIssueGroup says a group is an issue's: not a board's, not a sprint's.
-function isIssueGroup(g: PendingGroup): boolean {
-  return !g.boardRow && !isSprintGroup(g);
-}
-
 // summaryLine is the dialog's subtitle: "3 changes on 2 issues, 1 of them
 // new", with boards and sprints counted apart, since neither is an issue.
 export function summaryLine(groups: PendingGroup[], rowCount: number): string {
-  const issues = groups.filter(isIssueGroup);
-  const boards = groups.filter((g) => g.boardRow).length;
+  const issues = groups.filter((g) => g.kind === "issue");
+  const boards = groups.filter((g) => g.kind === "board").length;
   const newCount = groups.filter((g) => g.sprintRow).length;
-  const changedCount = groups.filter((g) => !g.sprintRow && g.sprintChanges.length > 0).length;
+  const changedCount = groups.filter((g) => g.kind === "sprint" && !g.sprintRow).length;
   const changes = plural(rowCount, "change", "changes");
   const others: string[] = [];
   if (boards > 0) others.push(plural(boards, "new board", "new boards"));
@@ -46,7 +36,7 @@ export function summaryLine(groups: PendingGroup[], rowCount: number): string {
 }
 
 // boardDraftLine says what kind of board a draft is and what it collects.
-export function boardDraftLine(b: DraftBoard | null): string {
+function boardDraftLine(b: DraftBoard | null): string {
   if (!b) return "A draft board that could not be read. Discard it and draft it again.";
   const type = b.type.charAt(0).toUpperCase() + b.type.slice(1);
   return `${type} board on the filter ${b.filterName}: ${b.jql}`;
@@ -164,17 +154,9 @@ export function PendingChangesModal({ onClose }: Props) {
   const pushable = groups.filter((g) => !conflictKeys.has(g.key)).length;
 
   // The held-back issue sits above everything: it is what blocks a clean
-  // commit, so it belongs where the eye lands first. Draft sprints follow,
-  // since Commit creates them before anything that moves into them.
-  const orderedGroups = useMemo(
-    () => [
-      ...groups.filter((g) => isIssueGroup(g) && conflictKeys.has(g.key)),
-      ...groups.filter((g) => !isIssueGroup(g)),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && isIssueGroup(g) && g.createRow),
-      ...groups.filter((g) => !conflictKeys.has(g.key) && isIssueGroup(g) && !g.createRow),
-    ],
-    [groups, conflictKeys],
-  );
+  // commit, so it belongs where the eye lands first. The rest keep
+  // groupPending's order.
+  const orderedGroups = [...groups.filter((g) => conflictKeys.has(g.key)), ...groups.filter((g) => !conflictKeys.has(g.key))];
   const busy = status !== "idle" || discardOne.isPending || discardAll.isPending || discardRow.isPending;
 
   function onDiscardError(e: unknown) {
@@ -234,7 +216,7 @@ export function PendingChangesModal({ onClose }: Props) {
         ) : (
           <div className="pending-list">
             {orderedGroups.map((g) => {
-              const conflict = !isIssueGroup(g) ? undefined : lastCommit?.conflicts.find((c) => c.key === g.key && conflictKeys.has(c.key));
+              const conflict = lastCommit?.conflicts.find((c) => c.key === g.key && conflictKeys.has(c.key));
               if (conflict) {
                 return <ConflictCard key={g.id} profileId={activeId} conflict={conflict} disabled={busy} />;
               }

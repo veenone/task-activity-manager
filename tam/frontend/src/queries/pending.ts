@@ -131,6 +131,7 @@ export function useDiscardById(profileId: string) {
 export interface PendingGroup {
   id: string;
   key: string;
+  kind: "board" | "sprint" | "issue";
   draft: IssueDraft | null;
   createRow: PendingChange | null;
   sprint: DraftSprint | null;
@@ -144,7 +145,7 @@ export interface PendingGroup {
 }
 
 // groupKind is the namespace a row's group lives in.
-function groupKind(entityType: string): string {
+function groupKind(entityType: string): PendingGroup["kind"] {
   if (SPRINT_ENTITIES.includes(entityType)) return "sprint";
   if (entityType === ENTITY_BOARD_CREATE) return "board";
   return "issue";
@@ -158,10 +159,11 @@ function groupKind(entityType: string): string {
 export function groupPending(rows: PendingChange[]): PendingGroup[] {
   const byKey = new Map<string, PendingGroup>();
   for (const row of rows) {
-    const id = `${groupKind(row.entityType)}:${row.entityKey}`;
+    const kind = groupKind(row.entityType);
+    const id = `${kind}:${row.entityKey}`;
     let g = byKey.get(id);
     if (!g) {
-      g = { id, key: row.entityKey, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], moves: [] };
+      g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], moves: [] };
       byKey.set(id, g);
     }
     if (row.entityType === "issue_create") {
@@ -200,14 +202,12 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     }
   }
   const groups = [...byKey.values()];
-  const isSprintChange = (g: PendingGroup) => !g.sprintRow && g.sprintChanges.length > 0;
-  const isIssue = (g: PendingGroup) => !g.boardRow && !g.sprintRow && !isSprintChange(g);
   return [
-    ...groups.filter((g) => g.boardRow),
-    ...groups.filter((g) => g.sprintRow),
-    ...groups.filter(isSprintChange),
-    ...groups.filter((g) => isIssue(g) && g.createRow),
-    ...groups.filter((g) => isIssue(g) && !g.createRow),
+    ...groups.filter((g) => g.kind === "board"),
+    ...groups.filter((g) => g.kind === "sprint" && g.sprintRow),
+    ...groups.filter((g) => g.kind === "sprint" && !g.sprintRow),
+    ...groups.filter((g) => g.kind === "issue" && g.createRow),
+    ...groups.filter((g) => g.kind === "issue" && !g.createRow),
   ];
 }
 
