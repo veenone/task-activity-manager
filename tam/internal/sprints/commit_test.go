@@ -32,9 +32,6 @@ func TestAGuardRefusalAtPushTimeIsMarkedRefused(t *testing.T) {
 	if _, err := sprints.ForCommit(s).Delete(ctx, "p1", 1, 13); !errors.Is(err, sprints.ErrRefused) {
 		t.Errorf("deleting a sprint with pending moves = %v, want ErrRefused", err)
 	}
-	if err := sprints.RefusePendingDelete(0); err != nil {
-		t.Errorf("nothing pending = %v", err)
-	}
 
 	failing := &fakeBackend{sprintErr: errors.New("502 Bad Gateway")}
 	if _, err := sprints.ForCommit(manageService(failing, store, newIssues(store))).Edit(ctx, "p1", 1, 13, draft("Sprint 13", ""), false); err == nil || errors.Is(err, sprints.ErrRefused) {
@@ -75,7 +72,9 @@ func TestACompletionRefusalIsMarkedRefused(t *testing.T) {
 	if _, err := sprints.ForCommit(newService(&fakeBackend{}, store)).Complete(context.Background(), "p1", 1, 12, ""); !errors.Is(err, sprints.ErrRefused) {
 		t.Errorf("completing a future sprint = %v, want ErrRefused", err)
 	}
-	if err := sprints.RefusePendingComplete(2); !errors.Is(err, sprints.ErrRefused) || !strings.Contains(err.Error(), "commit them before completing") {
+	pending := newService(&fakeBackend{}, newStore())
+	pending.Pending = func(context.Context, string, int) (int, error) { return 2, nil }
+	if _, err := pending.CheckComplete(context.Background(), "p1", 1, 12, ""); !errors.Is(err, sprints.ErrRefused) || !strings.Contains(err.Error(), "commit them before completing") {
 		t.Errorf("pending = %v", err)
 	}
 }

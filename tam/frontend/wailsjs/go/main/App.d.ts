@@ -28,7 +28,7 @@ export function CancelSprintReport(arg1:string):Promise<void>;
 
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
-export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:number):Promise<void>;
+export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
 export function CreateDraftBoard(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<number>;
 
@@ -46,7 +46,7 @@ export function DeleteProfile(arg1:string):Promise<void>;
 
 export function DeleteRitualDocument(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
-export function DeleteSprint(arg1:string,arg2:number,arg3:number):Promise<string>;
+export function DeleteSprint(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function DiscardAllPendingChanges(arg1:string):Promise<number>;
 
@@ -54,7 +54,7 @@ export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
 
 export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
-export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<string>;
+export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<void>;
 
 export function EnsureSprintRituals(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
 
@@ -162,7 +162,7 @@ export function SetTheme(arg1:string):Promise<void>;
 
 export function StandupEntry(arg1:string):Promise<string>;
 
-export function StartSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string):Promise<string>;
+export function StartSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string):Promise<void>;
 
 export function SuggestSprintDates(arg1:string,arg2:number):Promise<sprints.Suggestion>;
 

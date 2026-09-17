@@ -208,7 +208,7 @@ beforeEach(() => {
   vi.mocked(api.RankIssue).mockResolvedValue();
   vi.mocked(api.CanTransition).mockResolvedValue({ reachable: [], allowed: true });
   vi.mocked(api.JournalSprintMoves).mockResolvedValue(3);
-  vi.mocked(api.StartSprint).mockResolvedValue("");
+  vi.mocked(api.StartSprint).mockResolvedValue(undefined);
   vi.mocked(api.CompleteSprint).mockResolvedValue(undefined);
   vi.mocked(api.CreateSprint).mockResolvedValue({
     sprint: { id: 14, boardId: 1, name: "Sprint 14", state: "future", startDate: "2026-09-14T09:00:00Z", endDate: "2026-09-28T09:00:00Z", goal: "" },
@@ -1396,7 +1396,7 @@ describe("BoardsView sprint ceremonies", () => {
     await user.selectOptions(within(dialog).getByRole("combobox", { name: "Move them to" }), "13");
     await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
 
-    await waitFor(() => expect(api.CompleteSprint).toHaveBeenCalledWith("p1", 1, 12, "13", 2));
+    await waitFor(() => expect(api.CompleteSprint).toHaveBeenCalledWith("p1", 1, 12, "13"));
     const banner = await screen.findByRole("status", { name: "Sprint outcome" });
     expect(
       within(banner).getByText("Sprint 12 will be completed on Commit. Unfinished cards move to Sprint 13."),

@@ -42,43 +42,37 @@ func (a *App) sprintService(p profile.Profile, b backend.IssueBackend) *sprints.
 // them and are converted here; a value that is not a date, or an end before
 // a start, is refused with nothing journaled. A draft sprint can be started
 // too, and Commit starts it once it has created it.
-//
-// It answers "" always; the string stays so the frontend's one path reads
-// the same shape the other sprint writes answer with.
-func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, start, end string) (string, error) {
+func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, start, end string) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err := a.acquire(p.ID, "sprint"); err != nil {
-		return "", err
+		return err
 	}
 	defer a.release(p.ID)
 
 	d, err := sprints.DraftSprint(backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end})
 	if err != nil {
-		return "", err
+		return err
 	}
 	log.Printf("tam: journaling a start of sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
-	return "", a.repo.JournalSprintStart(a.ctx, p.ID, sprintID, issuerepo.SprintStart{
+	return a.repo.JournalSprintStart(a.ctx, p.ID, sprintID, issuerepo.SprintStart{
 		BoardID: boardID, Name: d.Name, Goal: d.Goal, StartDate: d.StartDate, EndDate: d.EndDate,
 	})
 }
 
 // CompleteSprint queues a completion of the sprint for Commit, moving its
-// unfinished cards to moveTo, the backlog when it is empty. previewCount is
-// how many unfinished cards the dialog showed; Commit works the set out
-// again from Jira and reports what it really moved.
+// unfinished cards to moveTo, the backlog when it is empty. Commit works the
+// unfinished set out from Jira and reports what it really moved.
 //
-// The refusals the push would make from the cache are made here first, with
-// the same words: a draft sprint, a sprint that has never started, a
-// destination that is a draft or the sprint itself, and pending changes on
-// cards staying in the sprint.
+// The refusals the push would make without Jira are made here first, by the
+// same check (sprints.Service.CheckComplete).
 //
 // boardID is needed because "unfinished" is defined by the board's last
 // column, which cannot be read without knowing which board is being
 // completed on.
-func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo string, previewCount int) error {
+func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo string) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
 		return err
@@ -88,28 +82,12 @@ func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo str
 	}
 	defer a.release(p.ID)
 
-	if sprintID < 0 {
-		return sprints.ErrDraftSprint
-	}
-	if moveTo, err = sprints.DestinationID(moveTo, sprintID); err != nil {
-		return err
-	}
-	sid := strconv.Itoa(sprintID)
-	if state, _, err := a.boards.BoardSprintState(a.ctx, p.ID, boardID, sid); err != nil {
-		return err
-	} else if state == "future" {
-		return sprints.NotStarted(sid)
-	}
-	n, err := a.pendingInSprint(a.ctx, p.ID, sprintID)
-	if err != nil {
-		return err
-	}
-	if err := sprints.RefusePendingComplete(n); err != nil {
+	if moveTo, err = a.sprintService(p, nil).CheckComplete(a.ctx, p.ID, boardID, sprintID, moveTo); err != nil {
 		return err
 	}
 	log.Printf("tam: journaling a completion of sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
 	return a.repo.JournalSprintComplete(a.ctx, p.ID, sprintID, issuerepo.SprintComplete{
-		BoardID: boardID, MoveTo: moveTo, PreviewCount: previewCount,
+		BoardID: boardID, MoveTo: moveTo,
 	})
 }
 

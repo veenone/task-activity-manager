@@ -66,7 +66,7 @@ var errNoIssueCache = errors.New("the issue cache is not wired, so this delete c
 func (c Committed) Edit(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft, clearGoal bool) (string, error) {
 	s := c.s
 	if sprintID < 0 {
-		return "", ErrDraftSprint
+		return "", errDraftSprint
 	}
 	b, err := s.board()
 	if err != nil {
@@ -162,8 +162,8 @@ func datesChanged(wasStart, wasEnd, start, end string) bool {
 // bookkeeping for.
 func (c Committed) Delete(ctx context.Context, profileID string, boardID, sprintID int) (string, error) {
 	s := c.s
-	if sprintID < 0 {
-		return "", ErrDraftSprint
+	if err := s.CheckDelete(ctx, profileID, sprintID); err != nil {
+		return "", err
 	}
 	if s.Issues == nil {
 		return "", errNoIssueCache
@@ -174,9 +174,6 @@ func (c Committed) Delete(ctx context.Context, profileID string, boardID, sprint
 	}
 	doomed, gone, err := s.requireDeletable(ctx, b, boardID, sprintID)
 	if err != nil {
-		return "", err
-	}
-	if err := s.refusePendingDelete(ctx, profileID, sprintID); err != nil {
 		return "", err
 	}
 	if !gone {

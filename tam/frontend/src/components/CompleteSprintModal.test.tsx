@@ -67,7 +67,7 @@ describe("CompleteSprintModal", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "Move them to" }), "13");
     expect(screen.getByText("On Commit, unfinished cards move to Sprint 13.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Complete sprint" }));
-    await waitFor(() => expect(api.CompleteSprint).toHaveBeenCalledWith("p1", 1, 12, "13", 2));
+    await waitFor(() => expect(api.CompleteSprint).toHaveBeenCalledWith("p1", 1, 12, "13"));
     await waitFor(() => expect(onCompleted).toHaveBeenCalledWith("12", "Sprint 12 will be completed on Commit. Unfinished cards move to Sprint 13."));
   });
 

@@ -155,9 +155,9 @@ beforeEach(() => {
     sprint: { id: 14, boardId: 1, name: "Sprint 14", state: "future", startDate: "", endDate: "", goal: "" },
     note: "",
   });
-  vi.mocked(api.EditSprint).mockResolvedValue("");
-  vi.mocked(api.DeleteSprint).mockResolvedValue("");
-  vi.mocked(api.StartSprint).mockResolvedValue("");
+  vi.mocked(api.EditSprint).mockResolvedValue(undefined);
+  vi.mocked(api.DeleteSprint).mockResolvedValue(undefined);
+  vi.mocked(api.StartSprint).mockResolvedValue(undefined);
   vi.mocked(api.CompleteSprint).mockResolvedValue(undefined);
   vi.mocked(api.SuggestSprintDates).mockResolvedValue({
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
@@ -449,7 +449,7 @@ describe("SprintsView", () => {
     const user = userEvent.setup();
     const DRAFT = detail({ id: -1, name: "Sprint 15", state: "future", draft: true, goal: "", startDate: "", endDate: "", issues: [] });
     vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([ACTIVE, DRAFT, FUTURE, CLOSED, BACKLOG]);
-    vi.mocked(api.DeleteSprint).mockResolvedValue("");
+    vi.mocked(api.DeleteSprint).mockResolvedValue(undefined);
     renderView();
     const menu = await openMenu(user, "Sprint 15");
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));

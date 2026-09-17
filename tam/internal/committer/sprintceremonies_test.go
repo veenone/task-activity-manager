@@ -32,7 +32,7 @@ func TestSprintChangesArePushedEditsStartsCompletionsThenDeletes(t *testing.T) {
 	if err := h.repo.JournalSprintDelete(ctx, "p1", 1, 21); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.repo.JournalSprintComplete(ctx, "p1", 22, issuerepo.SprintComplete{BoardID: 1, MoveTo: "20", PreviewCount: 9}); err != nil {
+	if err := h.repo.JournalSprintComplete(ctx, "p1", 22, issuerepo.SprintComplete{BoardID: 1, MoveTo: "20"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.repo.JournalSprintStart(ctx, "p1", 20, startAs("Sprint 20")); err != nil {
@@ -129,7 +129,7 @@ func TestACompletionThatStoppedAfterMovingCardsKeepsItsRow(t *testing.T) {
 	if err := h.repo.JournalSprintComplete(ctx, "p1", 22, issuerepo.SprintComplete{BoardID: 1}); err != nil {
 		t.Fatal(err)
 	}
-	f.done[22] = sprints.Completion{Moved: 2, MovedTo: "the backlog", Failed: []string{},
+	f.done[22] = sprints.Completion{Moved: 2, MovedTo: "the backlog",
 		Message: "2 of 2 unfinished issues moved to the backlog (PLAT-1, PLAT-2), but the sprint could not be closed and is open with none of them in it: 403 Forbidden"}
 
 	res, err := h.eng.Commit(ctx, "p1", "PLAT")

@@ -128,12 +128,12 @@ func TestCompletingASprintJournalsTheIntentNamedFromTheCache(t *testing.T) {
 	for _, c := range []struct {
 		moveTo, name string
 	}{{"13", "Sprint 13"}, {"", "the backlog"}, {"88", "sprint 88"}} {
-		if err := repo.JournalSprintComplete(ctx, "p1", 12, issuerepo.SprintComplete{BoardID: 1, Name: "ignored", MoveTo: c.moveTo, PreviewCount: 4}); err != nil {
+		if err := repo.JournalSprintComplete(ctx, "p1", 12, issuerepo.SprintComplete{BoardID: 1, Name: "ignored", MoveTo: c.moveTo}); err != nil {
 			t.Fatal(err)
 		}
 		row, _ := rowOf(t, repo, "12", issuerepo.EntitySprintComplete)
 		var after issuerepo.SprintComplete
-		want := issuerepo.SprintComplete{BoardID: 1, Name: "Sprint 12", MoveTo: c.moveTo, MoveToName: c.name, PreviewCount: 4}
+		want := issuerepo.SprintComplete{BoardID: 1, Name: "Sprint 12", MoveTo: c.moveTo, MoveToName: c.name}
 		if err := json.Unmarshal([]byte(row.AfterVal), &after); err != nil || after != want {
 			t.Errorf("after_val = %s, %v; want %+v", row.AfterVal, err, want)
 		}

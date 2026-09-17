@@ -709,7 +709,6 @@ export interface SprintComplete {
   name: string;
   moveTo: string;
   moveToName: string;
-  previewCount: number;
 }
 
 // SprintEdit mirrors issuerepo.SprintEdit: what a sprint_edit row carries.
@@ -1059,9 +1058,8 @@ export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.Sync
 // The two sprint ceremonies and the read the start dialog opens with. Both
 // ceremonies are journaled and sent on Commit, but take the app's
 // per-profile lock, so both go through SyncContext's runQuietLock rather
-// than being called from a component directly. StartSprint answers "".
-// CompleteSprint carries the dialog's count of unfinished cards; Commit
-// works the set out again from Jira.
+// than being called from a component directly. Commit works a completion's
+// unfinished set out from Jira.
 export const StartSprint: (
   profileId: string,
   boardId: number,
@@ -1070,13 +1068,12 @@ export const StartSprint: (
   goal: string,
   start: string,
   end: string,
-) => Promise<string> = App.StartSprint;
+) => Promise<void> = App.StartSprint;
 export const CompleteSprint: (
   profileId: string,
   boardId: number,
   sprintId: number,
   moveTo: string,
-  previewCount: number,
 ) => Promise<void> = App.CompleteSprint;
 export const SuggestSprintDates = (profileId: string, boardId: number): Promise<SprintSuggestion> =>
   App.SuggestSprintDates(profileId, boardId) as Promise<SprintSuggestion>;
@@ -1105,8 +1102,8 @@ export const EditSprint = (
   start: string,
   end: string,
   clearGoal: boolean,
-): Promise<string> => App.EditSprint(profileId, boardId, sprintId, name, goal, start, end, clearGoal);
-export const DeleteSprint: (profileId: string, boardId: number, sprintId: number) => Promise<string> =
+): Promise<void> => App.EditSprint(profileId, boardId, sprintId, name, goal, start, end, clearGoal);
+export const DeleteSprint: (profileId: string, boardId: number, sprintId: number) => Promise<void> =
   App.DeleteSprint;
 // ListBoardSprintDetails is the Sprints view's whole read: one board's
 // sprints in the order that view wants them, each with its cards and its

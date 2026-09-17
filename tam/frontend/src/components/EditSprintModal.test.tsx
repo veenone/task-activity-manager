@@ -46,7 +46,7 @@ function renderModal(sprint: Partial<Sprint> = {}, otherNames: string[] = []) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(api.EditSprint).mockResolvedValue("");
+  vi.mocked(api.EditSprint).mockResolvedValue(undefined);
 });
 
 describe("EditSprintModal", () => {

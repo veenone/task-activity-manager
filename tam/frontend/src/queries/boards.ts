@@ -240,8 +240,8 @@ export interface StartSprintArgs {
 
 export function useStartSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: StartSprintArgs) =>
+  return useMutation<void, Error, StartSprintArgs>({
+    mutationFn: (v) =>
       run(() => call(() => StartSprint(profileId, v.boardId, v.sprintId, v.name, v.goal, v.start, v.end))),
     onSettled: () => invalidateSprintWrites(qc, profileId),
   });
@@ -253,14 +253,12 @@ export interface CompleteSprintArgs {
   // moveTo is the destination sprint's id, empty for the backlog, which is a
   // destination and not an absence.
   moveTo: string;
-  // previewCount is how many unfinished cards the dialog showed.
-  previewCount: number;
 }
 
 export function useCompleteSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
   const qc = useQueryClient();
   return useMutation<void, Error, CompleteSprintArgs>({
-    mutationFn: (v) => run(() => call(() => CompleteSprint(profileId, v.boardId, v.sprintId, v.moveTo, v.previewCount))),
+    mutationFn: (v) => run(() => call(() => CompleteSprint(profileId, v.boardId, v.sprintId, v.moveTo))),
     onSettled: () => invalidateSprintWrites(qc, profileId),
   });
 }

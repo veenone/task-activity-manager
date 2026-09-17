@@ -89,7 +89,7 @@ func withCeremonies(t *testing.T) (*App, string, *ceremonyBackend) {
 // result reports the three it moved without calling that a failure.
 func TestACompletionMovesWhatJiraHoldsAtCommitNotWhatThePreviewSaid(t *testing.T) {
 	a, pid, fake := withCeremonies(t)
-	if err := a.CompleteSprint(pid, 1, 12, "13", 1); err != nil {
+	if err := a.CompleteSprint(pid, 1, 12, "13"); err != nil {
 		t.Fatal(err)
 	}
 	if len(fake.completed) != 0 || len(fake.moves) != 0 {
@@ -117,13 +117,13 @@ func TestACompletionMovesWhatJiraHoldsAtCommitNotWhatThePreviewSaid(t *testing.T
 func TestStartSprintWaitsForCommitAndWorksOffline(t *testing.T) {
 	a, pid, fake := withCeremonies(t)
 	delete(a.backends, pid)
-	if note, err := a.StartSprint(pid, 1, 13, "Sprint 13", "Ship", "2026-09-14", "2026-09-28"); err != nil || note != "" {
-		t.Fatalf("StartSprint = %q, %v", note, err)
+	if err := a.StartSprint(pid, 1, 13, "Sprint 13", "Ship", "2026-09-14", "2026-09-28"); err != nil {
+		t.Fatalf("StartSprint = %v", err)
 	}
-	if _, err := a.StartSprint(pid, 1, 12, "Sprint 12", "", "2026-09-14", "2026-09-28"); err == nil {
+	if err := a.StartSprint(pid, 1, 12, "Sprint 12", "", "2026-09-14", "2026-09-28"); err == nil {
 		t.Error("an active sprint was queued to start")
 	}
-	if _, err := a.StartSprint(pid, 1, 13, "Sprint 13", "", "2026-09-28", "2026-09-14"); err == nil {
+	if err := a.StartSprint(pid, 1, 13, "Sprint 13", "", "2026-09-28", "2026-09-14"); err == nil {
 		t.Error("an end before the start was journaled")
 	}
 	if listed, _ := a.ListBoardSprints(pid, 1); len(listed) != 2 || listed[1].State != "future" {
@@ -149,7 +149,7 @@ func TestADraftSprintCanBeStartedBeforeItExists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.StartSprint(pid, 1, made.Sprint.ID, "Sprint 14", "", "2026-09-14", "2026-09-28"); err != nil {
+	if err := a.StartSprint(pid, 1, made.Sprint.ID, "Sprint 14", "", "2026-09-14", "2026-09-28"); err != nil {
 		t.Fatal(err)
 	}
 	res, err := a.CommitPendingChanges(pid)
@@ -175,14 +175,14 @@ func TestCompleteSprintRefusesLocallyWithNothingJournaled(t *testing.T) {
 		{12, "-1", "draft sprint"},
 		{12, "12", "into itself"},
 	} {
-		if err := a.CompleteSprint(pid, 1, c.sprintID, c.moveTo, 1); err == nil || !strings.Contains(err.Error(), c.want) {
+		if err := a.CompleteSprint(pid, 1, c.sprintID, c.moveTo); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("complete %d to %q = %v, want %q", c.sprintID, c.moveTo, err, c.want)
 		}
 	}
 	if err := a.EditIssue(pid, "PLAT-2", "summary", "edited"); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.CompleteSprint(pid, 1, 12, "", 1); err == nil || !strings.Contains(err.Error(), "commit them before completing") {
+	if err := a.CompleteSprint(pid, 1, 12, ""); err == nil || !strings.Contains(err.Error(), "commit them before completing") {
 		t.Errorf("complete with a pending card change = %v", err)
 	}
 	pending, _ := a.ListPendingChanges(pid)

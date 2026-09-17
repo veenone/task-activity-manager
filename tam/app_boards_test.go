@@ -633,14 +633,14 @@ func TestALifecycleCallIsRefusedWhileABoardsRefreshHoldsTheLock(t *testing.T) {
 	}
 	defer a.release(p.ID)
 
-	_, err := a.StartSprint(p.ID, 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23")
+	err := a.StartSprint(p.ID, 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23")
 	if err == nil {
 		t.Fatal("StartSprint during a boards refresh = nil error, want a refusal")
 	}
 	if !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("err = %v, want it to name the operation that is running", err)
 	}
-	if err = a.CompleteSprint(p.ID, 1, 12, "", 0); err == nil || !strings.Contains(err.Error(), "boards refresh") {
+	if err = a.CompleteSprint(p.ID, 1, 12, ""); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("CompleteSprint err = %v, want the same refusal", err)
 	}
 }

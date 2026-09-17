@@ -15,9 +15,9 @@ import (
 // Starting and completing a sprint. Both are journal rows now, pushed by
 // Commit's sprint changes phase through internal/sprints, and neither
 // changes the cache until then: the sprint stays future or active on screen,
-// with a chip saying what Commit will do. A completion stores the intent and
-// the preview's count only; Commit works the unfinished set out again from
-// Jira and reports what it really moved.
+// with a chip saying what Commit will do. A completion stores the intent
+// only; Commit works the unfinished set out from Jira and reports what it
+// really moved.
 
 // EntitySprintStart is the journal entity type of a start. Its key is the
 // sprint id as text, a draft's negative id included, its field FieldStart and
@@ -47,14 +47,12 @@ type SprintStart struct {
 }
 
 // SprintComplete is what a sprint_complete row carries. MoveTo is the
-// destination sprint's id, empty for the backlog; PreviewCount is how many
-// unfinished cards the dialog showed, which Commit does not rely on.
+// destination sprint's id, empty for the backlog.
 type SprintComplete struct {
-	BoardID      int    `json:"boardId"`
-	Name         string `json:"name"`
-	MoveTo       string `json:"moveTo"`
-	MoveToName   string `json:"moveToName"`
-	PreviewCount int    `json:"previewCount"`
+	BoardID    int    `json:"boardId"`
+	Name       string `json:"name"`
+	MoveTo     string `json:"moveTo"`
+	MoveToName string `json:"moveToName"`
 }
 
 // JournalSprintStart queues a start for Commit. A draft sprint can be

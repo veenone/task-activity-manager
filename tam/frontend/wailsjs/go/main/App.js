@@ -26,8 +26,8 @@ export function CommitPendingChanges(arg1) {
   return window['go']['main']['App']['CommitPendingChanges'](arg1);
 }
 
-export function CompleteSprint(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CompleteSprint'](arg1, arg2, arg3, arg4, arg5);
+export function CompleteSprint(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CompleteSprint'](arg1, arg2, arg3, arg4);
 }
 
 export function CreateDraftBoard(arg1, arg2, arg3, arg4, arg5) {

@@ -87,26 +87,26 @@ func (a *App) cachedBoardName(profileID string, boardID int) (string, error) {
 // goal that was there, the distinction sprints.Committed.Edit's doc
 // explains; a draft needs no such flag, since its goal is simply what the
 // dialog sent.
-func (a *App) EditSprint(profileID string, boardID, sprintID int, name, goal, start, end string, clearGoal bool) (string, error) {
+func (a *App) EditSprint(profileID string, boardID, sprintID int, name, goal, start, end string, clearGoal bool) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err := a.acquire(p.ID, "sprint"); err != nil {
-		return "", err
+		return err
 	}
 	defer a.release(p.ID)
 
 	d, err := sprints.DraftSprint(backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end})
 	if err != nil {
-		return "", err
+		return err
 	}
 	if sprintID < 0 {
 		_, err := a.repo.EditDraftSprint(a.ctx, p.ID, sprintID, issuerepo.DraftSprint{Name: d.Name, Goal: d.Goal, StartDate: d.StartDate, EndDate: d.EndDate})
-		return "", err
+		return err
 	}
 	log.Printf("tam: journaling an edit of sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
-	return "", a.repo.JournalSprintEdit(a.ctx, p.ID, sprintID, issuerepo.SprintEdit{
+	return a.repo.JournalSprintEdit(a.ctx, p.ID, sprintID, issuerepo.SprintEdit{
 		BoardID: boardID, Name: d.Name, Goal: d.Goal, StartDate: d.StartDate, EndDate: d.EndDate, ClearGoal: clearGoal,
 	})
 }
@@ -116,28 +116,24 @@ func (a *App) EditSprint(profileID string, boardID, sprintID int, name, goal, st
 // queued for Commit, which destroys it in Jira and then removes TAM's
 // copies. The queue is refused while cards in the sprint have pending
 // changes, the same refusal the push itself makes.
-func (a *App) DeleteSprint(profileID string, boardID, sprintID int) (string, error) {
+func (a *App) DeleteSprint(profileID string, boardID, sprintID int) error {
 	p, err := a.requireProfile(profileID)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err := a.acquire(p.ID, "sprint"); err != nil {
-		return "", err
+		return err
 	}
 	defer a.release(p.ID)
 
 	if sprintID < 0 {
-		return "", a.repo.DiscardDraftSprint(a.ctx, p.ID, sprintID)
+		return a.repo.DiscardDraftSprint(a.ctx, p.ID, sprintID)
 	}
-	n, err := a.pendingInSprint(a.ctx, p.ID, sprintID)
-	if err != nil {
-		return "", err
-	}
-	if err := sprints.RefusePendingDelete(n); err != nil {
-		return "", err
+	if err := a.sprintService(p, nil).CheckDelete(a.ctx, p.ID, sprintID); err != nil {
+		return err
 	}
 	log.Printf("tam: journaling a delete of sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
-	return "", a.repo.JournalSprintDelete(a.ctx, p.ID, boardID, sprintID)
+	return a.repo.JournalSprintDelete(a.ctx, p.ID, boardID, sprintID)
 }
 
 // ListBoardSprintDetails composes the Sprints view's data: one board's

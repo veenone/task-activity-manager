@@ -34,7 +34,7 @@ function renderModal(sprint: Partial<Sprint> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(api.StartSprint).mockResolvedValue("");
+  vi.mocked(api.StartSprint).mockResolvedValue(undefined);
   vi.mocked(api.SuggestSprintDates).mockResolvedValue({ name: "", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true });
 });
 

@@ -63,10 +63,10 @@ func TestManagementBindingsRequireAProfile(t *testing.T) {
 	if _, err := a.CreateSprint("", 1, "Sprint 14", "", "2026-09-09", "2026-09-23"); err == nil {
 		t.Error("CreateSprint with no profile = nil error, want a refusal")
 	}
-	if _, err := a.EditSprint("", 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23", false); err == nil {
+	if err := a.EditSprint("", 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23", false); err == nil {
 		t.Error("EditSprint with no profile = nil error, want a refusal")
 	}
-	if _, err := a.DeleteSprint("", 1, 13); err == nil {
+	if err := a.DeleteSprint("", 1, 13); err == nil {
 		t.Error("DeleteSprint with no profile = nil error, want a refusal")
 	}
 }
@@ -91,10 +91,10 @@ func TestManagementBindingsAreRefusedWhileABoardsRefreshHoldsTheLock(t *testing.
 	if _, err := a.CreateSprint(p.ID, 1, "Sprint 14", "", "2026-09-09", "2026-09-23"); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("CreateSprint err = %v, want it to name the operation that is running", err)
 	}
-	if _, err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", false); err == nil || !strings.Contains(err.Error(), "boards refresh") {
+	if err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", false); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("EditSprint err = %v, want it to name the operation that is running", err)
 	}
-	if _, err := a.DeleteSprint(p.ID, 1, 13); err == nil || !strings.Contains(err.Error(), "boards refresh") {
+	if err := a.DeleteSprint(p.ID, 1, 13); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("DeleteSprint err = %v, want it to name the operation that is running", err)
 	}
 }
@@ -168,8 +168,8 @@ func TestEditAndDeleteOfADraftSprintStayLocal(t *testing.T) {
 		t.Fatalf("details = %+v, want the draft sprint holding the moved card", details)
 	}
 
-	if note, err := a.EditSprint(p.ID, 1, -1, "Sprint 15 promos", "", "2026-09-16", "2026-10-01", false); err != nil || note != "" {
-		t.Fatalf("EditSprint = %q, %v", note, err)
+	if err := a.EditSprint(p.ID, 1, -1, "Sprint 15 promos", "", "2026-09-16", "2026-10-01", false); err != nil {
+		t.Fatalf("EditSprint = %v", err)
 	}
 	if fake.editedID != 0 {
 		t.Errorf("the edit reached Jira for sprint %d", fake.editedID)
@@ -178,8 +178,8 @@ func TestEditAndDeleteOfADraftSprintStayLocal(t *testing.T) {
 		t.Errorf("board sprints = %+v", listed)
 	}
 
-	if note, err := a.DeleteSprint(p.ID, 1, -1); err != nil || note != "" {
-		t.Fatalf("DeleteSprint = %q, %v", note, err)
+	if err := a.DeleteSprint(p.ID, 1, -1); err != nil {
+		t.Fatalf("DeleteSprint = %v", err)
 	}
 	if listed, _ := a.ListBoardSprints(p.ID, 1); len(listed) != 0 {
 		t.Errorf("board sprints after delete = %+v", listed)
@@ -211,23 +211,23 @@ func TestEditAndDeleteOfARealSprintWaitForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if note, err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", true); err != nil || note != "" {
-		t.Fatalf("EditSprint = %q, %v", note, err)
+	if err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", true); err != nil {
+		t.Fatalf("EditSprint = %v", err)
 	}
 	if err := a.EditIssue(p.ID, "PLAT-1", "summary", "one, edited"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.DeleteSprint(p.ID, 1, 14); err == nil || !strings.Contains(err.Error(), "commit them") {
+	if err := a.DeleteSprint(p.ID, 1, 14); err == nil || !strings.Contains(err.Error(), "commit them") {
 		t.Errorf("a delete with a pending change on a card in the sprint = %v", err)
 	}
 	if _, err := a.DiscardAllPendingChanges(p.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", true); err != nil {
+	if err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", true); err != nil {
 		t.Fatal(err)
 	}
-	if note, err := a.DeleteSprint(p.ID, 1, 14); err != nil || note != "" {
-		t.Fatalf("DeleteSprint = %q, %v", note, err)
+	if err := a.DeleteSprint(p.ID, 1, 14); err != nil {
+		t.Fatalf("DeleteSprint = %v", err)
 	}
 	if fake.editedID != 0 || fake.deletedID != 0 {
 		t.Fatalf("Jira was written before Commit: edit %d, delete %d", fake.editedID, fake.deletedID)

@@ -289,7 +289,7 @@ describe("PendingChangesModal", () => {
     const user = userEvent.setup();
     vi.mocked(api.ListPendingChanges).mockResolvedValue([
       { id: 42, entityType: "sprint_complete", entityKey: "12", field: "complete", beforeVal: "", baseVersion: "", createdAt: "",
-        afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", moveTo: "13", moveToName: "Sprint 13", previewCount: 3 }) },
+        afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", moveTo: "13", moveToName: "Sprint 13" }) },
       { id: 41, entityType: "sprint_start", entityKey: "13", field: "start", beforeVal: "", baseVersion: "", createdAt: "",
         afterVal: JSON.stringify({ boardId: 1, name: "Sprint 13", goal: "", startDate: "2026-09-14T09:00:00.000+0000", endDate: "2026-09-28T09:00:00.000+0000" }) },
       { id: 40, entityType: "sprint_start", entityKey: "-1", field: "start", beforeVal: "", baseVersion: "", createdAt: "",
@@ -321,7 +321,7 @@ describe("PendingChangesModal", () => {
 
   it("reads a completion into the backlog as such", () => {
     expect(sprintChangeLine({ id: 1, entityType: "sprint_complete", entityKey: "12", field: "complete", beforeVal: "", baseVersion: "", createdAt: "",
-      afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", moveTo: "", moveToName: "", previewCount: 0 }) }))
+      afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", moveTo: "", moveToName: "" }) }))
       .toBe("Complete sprint Sprint 12, unfinished cards to the backlog");
   });
 

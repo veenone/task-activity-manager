@@ -99,40 +99,26 @@ type Issues interface {
 // Completion is what a completion did, and a push that failed partway is one
 // of the things it can have done. A failed push has already taken some cards
 // out of the sprint, so "twelve of forty moved and the sprint is still open"
-// is the only honest report, and a count alone cannot say it: Failed names
-// the cards still in the sprint, which is the list the user needs to decide
-// what to do next.
+// is the only honest report, and a count alone cannot say it.
 //
 // That report travels in Message rather than in a Go error, so Commit can
 // tell a completion that moved cards and stopped, which it reports as a
 // failure worth retrying and keeps the row for, from a refusal before
-// anything moved. Message names the keys that did move.
+// anything moved. Message names the keys that did move, and is empty when
+// the completion finished. Note is what did not land after the sprint was
+// closed, or that the cache already held the sprint as closed; it is never a
+// failure of the completion. MovedTo names where the moved cards went, the
+// backlog or a sprint by name.
 //
 // Every count here is over the issue types TAM syncs (backend.AllTypes) and
 // nothing else. A sprint holding a card of a type this project defines for
 // itself is a sprint the completion never sees that card in: it is not
 // counted, not moved to the chosen destination, and lands in the backlog by
-// Jira's own close behaviour. So Moved and Failed describe what the
-// completion considered, and neither is offered as the size of the sprint.
+// Jira's own close behaviour. So Moved describes what the completion
+// considered, and is not offered as the size of the sprint.
 type Completion struct {
-	// Moved is how many of the issues it considered left the sprint.
-	Moved int `json:"moved"`
-	// MovedTo names where they went, the backlog or a sprint by name.
-	MovedTo string `json:"movedTo"`
-	// Failed are the incomplete issues that did not move, empty when they
-	// all did.
-	Failed []string `json:"failed"`
-	// Note is what did not land after the sprint was closed, empty when
-	// everything did, or that the cache already held the sprint as closed.
-	// It is never a failure of the completion: the sprint is closed, and this
-	// is the cache bookkeeping after it.
-	Note string `json:"note"`
-	// Message is why the completion did not finish, empty when it did. A
-	// completion carrying one has left the sprint open: either the push
-	// stopped partway, and Failed names the cards still in the sprint, or
-	// every card left and the close itself was refused, and Failed is empty
-	// because the open sprint holds none of them.
-	Message string `json:"message"`
+	Moved                  int
+	MovedTo, Note, Message string
 }
 
 // Service holds what a push needs: one profile's backend and the board
@@ -182,9 +168,10 @@ type Service struct {
 	// produce a typed nil interface, which s.Issues == nil does not see; a
 	// build that wired a nil repository would panic inside Issues' own
 	// calls rather than being caught here. Nothing in this package guards
-	// against that: app.go's startup sets a.repo before anything can reach a
-	// bound sprint method, and that ordering, not this field, is what keeps
-	// a nil repository from ever being wired in the first place.
+	// against that: app.go's startup sets a.repo before anything can reach
+	// Commit, the only caller of these pushes, and that ordering, not this
+	// field, is what keeps a nil repository from ever being wired in the
+	// first place.
 	Issues Issues
 }
 
@@ -212,7 +199,7 @@ func New(b Backend, store Store, projectKey string) *Service {
 func (c Committed) Start(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft) (string, error) {
 	s := c.s
 	if sprintID < 0 {
-		return "", ErrDraftSprint
+		return "", errDraftSprint
 	}
 	b, err := s.board()
 	if err != nil {
@@ -252,23 +239,17 @@ func (c Committed) Start(ctx context.Context, profileID string, boardID, sprintI
 // reports Jira's refusal, which the user discards.
 func (c Committed) Complete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (Completion, error) {
 	s := c.s
-	if sprintID < 0 {
-		return Completion{Failed: []string{}}, ErrDraftSprint
+	var done Completion
+	moveTo, err := s.CheckComplete(ctx, profileID, boardID, sprintID, moveTo)
+	if err != nil {
+		return done, err
 	}
 	sid := strconv.Itoa(sprintID)
-	done := Completion{Failed: []string{}}
 	b, err := s.board()
 	if err != nil {
 		return done, err
 	}
-	moveTo, err = DestinationID(moveTo, sprintID)
-	if err != nil {
-		return done, err
-	}
 	if done.MovedTo, err = s.destination(ctx, profileID, moveTo); err != nil {
-		return done, err
-	}
-	if err := s.refusePending(ctx, profileID, sprintID); err != nil {
 		return done, err
 	}
 	complete, err := s.completeStatuses(ctx, profileID, boardID)
@@ -297,7 +278,6 @@ func (c Committed) Complete(ctx context.Context, profileID string, boardID, spri
 			// chunks before it are not, so the cache is corrected before the
 			// user is told, or they are left with cards that vanished from an
 			// open sprint with nothing recording where they went.
-			done.Failed = append(done.Failed, incomplete[start:]...)
 			done.Moved = len(moved)
 			done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s%s, so the sprint was left open: %s",
 				done.Moved, len(incomplete), done.MovedTo, keyList(moved), errtext.Line(err))

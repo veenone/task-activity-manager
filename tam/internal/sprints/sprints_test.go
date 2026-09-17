@@ -419,7 +419,7 @@ func TestCompleteMovesTheUnfinishedCardsThenCloses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
-	if done.Moved != 3 || done.MovedTo != "the backlog" || len(done.Failed) != 0 {
+	if done.Moved != 3 || done.MovedTo != "the backlog" || done.Message != "" {
 		t.Errorf("completion = %+v, want three cards moved to the backlog and nothing failed", done)
 	}
 	if len(b.moves) != 1 {
@@ -472,7 +472,7 @@ func TestCompleteWithNothingUnfinishedClosesWithoutAMove(t *testing.T) {
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
-	if done.Moved != 0 || len(done.Failed) != 0 {
+	if done.Moved != 0 || done.Message != "" {
 		t.Errorf("completion = %+v, want nothing moved and nothing failed", done)
 	}
 	if len(b.moves) != 0 {
@@ -505,8 +505,8 @@ func TestCompleteWhoseMoveFailsLeavesTheSprintOpen(t *testing.T) {
 	if !strings.Contains(done.Message, "403 Forbidden") || !strings.Contains(done.Message, "left open") {
 		t.Errorf("message = %q, want Jira's reason and the fact the sprint is still open", done.Message)
 	}
-	if done.Moved != 0 || len(done.Failed) != 3 {
-		t.Errorf("completion = %+v, want nothing moved and all three named", done)
+	if done.Moved != 0 || !strings.Contains(done.Message, "0 of 3") {
+		t.Errorf("completion = %+v, want nothing moved out of three", done)
 	}
 	if len(b.completed) != 0 {
 		t.Errorf("sprint %v was closed after a move that failed", b.completed)
@@ -548,14 +548,8 @@ func TestAMiddleChunkThatFailsReportsWhatMovedAndCorrectsTheCache(t *testing.T) 
 	if !strings.Contains(done.Message, "3 of 9") {
 		t.Errorf("message = %q, want it to say how many of the unfinished cards moved", done.Message)
 	}
-	if done.Moved != 3 || len(done.Failed) != 6 {
-		t.Errorf("completion = %+v, want three moved and the other six named", done)
-	}
-	// The chunk that failed and the chunk after it, which was never
-	// attempted: both are still in the sprint, and the failing chunk alone
-	// would be a report that loses three cards.
-	if strings.Join(done.Failed, ",") != "PLAT-4,PLAT-5,PLAT-6,PLAT-7,PLAT-8,PLAT-9" {
-		t.Errorf("failed = %v, want the failing chunk and everything after it", done.Failed)
+	if done.Moved != 3 || !strings.Contains(done.Message, "(PLAT-1, PLAT-2, PLAT-3)") {
+		t.Errorf("completion = %+v, want three moved and named", done)
 	}
 	if len(b.completed) != 0 {
 		t.Errorf("sprint %v was closed after a chunk that failed", b.completed)
@@ -869,11 +863,6 @@ func TestACloseThatFailsSaysWhereTheCardsWent(t *testing.T) {
 	}
 	if done.Moved != 2 {
 		t.Errorf("completion = %+v, want the two cards it did move", done)
-	}
-	// Nothing failed to move, so nothing is named: the sprint is open and
-	// holds none of them, which is what the message says.
-	if len(done.Failed) != 0 {
-		t.Errorf("failed = %v, want it empty when every card moved", done.Failed)
 	}
 	if got := strings.Join(store.membership["12"], ","); got != "PLAT-3" {
 		t.Errorf("cached membership = %q, want the cards that are still in the sprint", got)

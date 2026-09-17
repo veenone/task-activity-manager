@@ -58,7 +58,7 @@ export function CompleteSprintModal({
     if (complete.isPending) return;
     setError("");
     complete.mutate(
-      { boardId, sprintId: sprint.id, moveTo, previewCount: n },
+      { boardId, sprintId: sprint.id, moveTo },
       {
         onSuccess: () => {
           const line = `${sprint.name} will be completed on Commit. Unfinished cards move to ${where}.`;

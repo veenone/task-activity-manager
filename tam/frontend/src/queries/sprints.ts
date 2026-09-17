@@ -85,7 +85,7 @@ export interface EditSprintArgs {
 // dialog is then the only place that refusal can be read.
 export function useEditSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
   const qc = useQueryClient();
-  return useMutation<string, Error, EditSprintArgs>({
+  return useMutation<void, Error, EditSprintArgs>({
     mutationFn: (v) =>
       run(() => call(() => EditSprint(profileId, v.boardId, v.sprintId, v.name, v.goal, v.start, v.end, v.clearGoal))),
     onSettled: () => invalidateSprintWrites(qc, profileId),
@@ -102,7 +102,7 @@ export interface DeleteSprintArgs {
 // refusal still refreshes a list that may have moved underneath it.
 export function useDeleteSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
   const qc = useQueryClient();
-  return useMutation<string, Error, DeleteSprintArgs>({
+  return useMutation<void, Error, DeleteSprintArgs>({
     mutationFn: (v) => run(() => call(() => DeleteSprint(profileId, v.boardId, v.sprintId))),
     onSettled: () => invalidateSprintWrites(qc, profileId),
   });
