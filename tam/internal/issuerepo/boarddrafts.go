@@ -21,8 +21,8 @@ import (
 // Nothing here talks to Jira: the journal is what Commit pushes.
 
 // draftBoardSeq is the profile setting holding the last negative id handed
-// out, the same scheme draftSprintSeq uses so a discarded or committed
-// draft's id is never handed out again.
+// out (nextDraftID), so a discarded or committed draft's id is never handed
+// out again.
 const draftBoardSeq = "draft_board_seq"
 
 // DraftBoard is what a board_create row carries: the fields Commit needs to
@@ -43,7 +43,7 @@ func (r *Repository) CreateDraftBoard(ctx context.Context, profileID string, d D
 	}
 	var made backend.Board
 	err := r.inTx(ctx, func(tx *sql.Tx) error {
-		id, err := nextDraftBoardID(ctx, tx, profileID)
+		id, err := nextDraftID(ctx, tx, profileID, "board", draftBoardSeq)
 		if err != nil {
 			return err
 		}
@@ -72,37 +72,6 @@ func (r *Repository) CreateDraftBoard(ctx context.Context, profileID string, d D
 	return made, nil
 }
 
-// nextDraftBoardID mirrors nextDraftSprintID (sprintdrafts.go): one below
-// the lowest of the stored sequence and every negative id already in the
-// board table, recording itself as the new sequence inside the caller's
-// transaction so two creates cannot share it.
-func nextDraftBoardID(ctx context.Context, tx *sql.Tx, profileID string) (int, error) {
-	lowest := 0
-	var stored string
-	err := tx.QueryRowContext(ctx, `SELECT value FROM profile_setting WHERE profile_id = ? AND key = ?`, profileID, draftBoardSeq).Scan(&stored)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("draft board sequence: %w", err)
-	}
-	if n, perr := strconv.Atoi(stored); perr == nil && n < lowest {
-		lowest = n
-	}
-	var inTable sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT MIN(id) FROM board WHERE profile_id = ? AND id < 0`, profileID).Scan(&inTable); err != nil {
-		return 0, fmt.Errorf("lowest draft board id: %w", err)
-	}
-	if inTable.Valid && int(inTable.Int64) < lowest {
-		lowest = int(inTable.Int64)
-	}
-	next := lowest - 1
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO profile_setting (profile_id, key, value) VALUES (?, ?, ?)
-		 ON CONFLICT(profile_id, key) DO UPDATE SET value = excluded.value`,
-		profileID, draftBoardSeq, strconv.Itoa(next)); err != nil {
-		return 0, fmt.Errorf("record draft board sequence: %w", err)
-	}
-	return next, nil
-}
-
 // RekeyBoard turns a draft board into the board Jira just created, in one
 // transaction: the draft row takes Jira's id and stops being a draft, every
 // table keyed by board_id (board_column, board_issue, sprint) repoints from
@@ -120,7 +89,7 @@ func nextDraftBoardID(ctx context.Context, tx *sql.Tx, profileID string) (int, e
 // cannot be drafted onto a draft board, and a scope naming a draft sprint on
 // a real board is rewriteSprintID's row to fix, not this one's. Upgrade path
 // if CreateDraftSprint's guard is ever lifted: reach into after_val's scope
-// half here the same way rekeyIssueBoard reaches into its id half.
+// half here the same way the issue_board repoint reaches into its id half.
 func (r *Repository) RekeyBoard(ctx context.Context, profileID string, draftID, realID int) error {
 	from, to := strconv.Itoa(draftID), strconv.Itoa(realID)
 	return r.inTx(ctx, func(tx *sql.Tx) error {
@@ -149,10 +118,22 @@ func (r *Repository) RekeyBoard(ctx context.Context, profileID string, draftID, 
 				return fmt.Errorf("repoint %s from board %s: %w", table, from, err)
 			}
 		}
-		if err := rekeyRankBoard(ctx, tx, profileID, draftID, realID); err != nil {
+		// A rank carries the board in its value's third field (RankValue);
+		// left naming the draft, the commit pass's board-scoped order read
+		// would come back empty and the drop would never resolve.
+		if err := repointRows(ctx, tx, profileID, EntityRank, func(field, value string) (string, string, bool) {
+			neighbour, before, boardID := ParseRank(value)
+			return field, RankValue(neighbour, before, realID), boardID == draftID
+		}); err != nil {
 			return err
 		}
-		if err := rekeyIssueBoard(ctx, tx, profileID, draftID, realID); err != nil {
+		// An issue_board row carries the board in its FIELD (BoardField), so
+		// the journal's uniqueness gives one row per key per board, and in
+		// its value's id half (boardId|scope), which keeps its scope.
+		fromField, toField := BoardField(draftID), BoardField(realID)
+		if err := repointRows(ctx, tx, profileID, EntityIssueBoard, func(field, value string) (string, string, bool) {
+			return toField, MoveValue(to, MoveRawName(value)), field == fromField
+		}); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx,
@@ -164,81 +145,29 @@ func (r *Repository) RekeyBoard(ctx context.Context, profileID string, draftID, 
 	})
 }
 
-// rekeyRankBoard repoints every rank journaled against the draft board's id
-// (RankValue's "side|neighbour|board") to the real one, keeping the side
-// and neighbour it was dropped with. Left naming the draft, the commit
-// pass's board-scoped order read would come back empty and the drop would
-// never resolve.
-func rekeyRankBoard(ctx context.Context, tx *sql.Tx, profileID string, draftID, realID int) error {
+// repointRows rewrites the field and after_val of every journal row of
+// entityType that fn matches, to what fn answers.
+func repointRows(ctx context.Context, tx *sql.Tx, profileID, entityType string, fn func(field, value string) (string, string, bool)) error {
 	rows, err := tx.QueryContext(ctx,
-		`SELECT id, after_val FROM pending_change WHERE profile_id = ? AND entity_type = ?`,
-		profileID, EntityRank)
+		`SELECT id, field, after_val FROM pending_change WHERE profile_id = ? AND entity_type = ?`,
+		profileID, entityType)
 	if err != nil {
-		return fmt.Errorf("rank rows on board %d: %w", draftID, err)
+		return fmt.Errorf("%s rows: %w", entityType, err)
 	}
 	type repoint struct {
-		id    int64
-		value string
+		id           int64
+		field, value string
 	}
 	var todo []repoint
 	for rows.Next() {
-		var (
-			id    int64
-			value string
-		)
-		if err := rows.Scan(&id, &value); err != nil {
+		var rp repoint
+		if err := rows.Scan(&rp.id, &rp.field, &rp.value); err != nil {
 			rows.Close()
 			return err
 		}
-		neighbour, before, boardID := ParseRank(value)
-		if boardID == draftID {
-			todo = append(todo, repoint{id: id, value: RankValue(neighbour, before, realID)})
+		if field, value, ok := fn(rp.field, rp.value); ok {
+			todo = append(todo, repoint{id: rp.id, field: field, value: value})
 		}
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	for _, rp := range todo {
-		if _, err := tx.ExecContext(ctx,
-			`UPDATE pending_change SET after_val = ? WHERE profile_id = ? AND id = ?`,
-			rp.value, profileID, rp.id); err != nil {
-			return fmt.Errorf("repoint rank %d to board %d: %w", rp.id, realID, err)
-		}
-	}
-	return nil
-}
-
-// rekeyIssueBoard repoints every issue_board row queued onto the draft
-// board. AddToBoard folds the board id into the FIELD (BoardField), not the
-// value, so the journal's own uniqueness gives one row per key per board;
-// that means this is a field rewrite, rewriteSprintID's neighbour done on
-// the field instead of the value. The value's id half (MoveValue's id,
-// packed by AddToBoard as boardId|scope) still names the draft too and is
-// rewritten alongside it, keeping the scope it was queued with.
-func rekeyIssueBoard(ctx context.Context, tx *sql.Tx, profileID string, draftID, realID int) error {
-	fromField, toField := BoardField(draftID), BoardField(realID)
-	rows, err := tx.QueryContext(ctx,
-		`SELECT id, after_val FROM pending_change WHERE profile_id = ? AND entity_type = ? AND field = ?`,
-		profileID, EntityIssueBoard, fromField)
-	if err != nil {
-		return fmt.Errorf("issue_board rows on board %d: %w", draftID, err)
-	}
-	type repoint struct {
-		id    int64
-		value string
-	}
-	var todo []repoint
-	for rows.Next() {
-		var (
-			id    int64
-			value string
-		)
-		if err := rows.Scan(&id, &value); err != nil {
-			rows.Close()
-			return err
-		}
-		todo = append(todo, repoint{id: id, value: MoveValue(strconv.Itoa(realID), MoveRawName(value))})
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -247,8 +176,8 @@ func rekeyIssueBoard(ctx context.Context, tx *sql.Tx, profileID string, draftID,
 	for _, rp := range todo {
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE pending_change SET field = ?, after_val = ? WHERE profile_id = ? AND id = ?`,
-			toField, rp.value, profileID, rp.id); err != nil {
-			return fmt.Errorf("repoint issue_board %d to board %d: %w", rp.id, realID, err)
+			rp.field, rp.value, profileID, rp.id); err != nil {
+			return fmt.Errorf("repoint %s %d: %w", entityType, rp.id, err)
 		}
 	}
 	return nil

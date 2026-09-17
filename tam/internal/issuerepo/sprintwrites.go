@@ -14,7 +14,7 @@ import (
 )
 
 // Editing and deleting a sprint Jira already holds. Both are journal rows
-// now, pushed by Commit's sprints phase through internal/sprints, which still
+// now, pushed by Commit's sprint changes phase through internal/sprints, which still
 // asks Jira for the sprint's state before it writes. What is checked here is
 // the cache's copy, so a refusal the cache can already give costs no Commit.
 //
@@ -81,10 +81,8 @@ func (r *Repository) JournalSprintEdit(ctx context.Context, profileID string, sp
 		if state == "closed" {
 			return fmt.Errorf("sprint %d is closed, and its dates are what velocity and burndown are computed from, so TAM does not edit it", sprintID)
 		}
-		if _, queued, err := pendingSprintRow(ctx, tx, profileID, EntitySprintDelete, key); err != nil {
+		if err := refuseQueued(ctx, tx, profileID, sprintID, "editing", EntitySprintDelete); err != nil {
 			return err
-		} else if queued {
-			return fmt.Errorf("sprint %d is waiting to be deleted on Commit; discard the delete before editing it", sprintID)
 		}
 		prev, edited, err := pendingSprintRow(ctx, tx, profileID, EntitySprintEdit, key)
 		if err != nil {

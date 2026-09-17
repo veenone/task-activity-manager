@@ -79,7 +79,7 @@ func (r *Repository) CreateDraftSprint(ctx context.Context, profileID string, d 
 	}
 	var made backend.Sprint
 	err := r.inTx(ctx, func(tx *sql.Tx) error {
-		id, err := nextDraftSprintID(ctx, tx, profileID)
+		id, err := nextDraftID(ctx, tx, profileID, "sprint", draftSprintSeq)
 		if err != nil {
 			return err
 		}
@@ -109,22 +109,23 @@ func (r *Repository) CreateDraftSprint(ctx context.Context, profileID string, d 
 	return made, nil
 }
 
-// nextDraftSprintID is one below the lowest of the stored sequence and every
-// negative id already in the sprint table, and records itself as the new
-// sequence inside the caller's transaction, so two creates cannot share it.
-func nextDraftSprintID(ctx context.Context, tx *sql.Tx, profileID string) (int, error) {
+// nextDraftID is one below the lowest of the stored sequence under seqKey
+// and every negative id already in table (sprint or board, never user
+// input), and records itself as the new sequence inside the caller's
+// transaction, so two creates cannot share it.
+func nextDraftID(ctx context.Context, tx *sql.Tx, profileID, table, seqKey string) (int, error) {
 	lowest := 0
 	var stored string
-	err := tx.QueryRowContext(ctx, `SELECT value FROM profile_setting WHERE profile_id = ? AND key = ?`, profileID, draftSprintSeq).Scan(&stored)
+	err := tx.QueryRowContext(ctx, `SELECT value FROM profile_setting WHERE profile_id = ? AND key = ?`, profileID, seqKey).Scan(&stored)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return 0, fmt.Errorf("draft sprint sequence: %w", err)
+		return 0, fmt.Errorf("draft %s sequence: %w", table, err)
 	}
 	if n, perr := strconv.Atoi(stored); perr == nil && n < lowest {
 		lowest = n
 	}
 	var inTable sql.NullInt64
-	if err := tx.QueryRowContext(ctx, `SELECT MIN(id) FROM sprint WHERE profile_id = ? AND id < 0`, profileID).Scan(&inTable); err != nil {
-		return 0, fmt.Errorf("lowest draft sprint id: %w", err)
+	if err := tx.QueryRowContext(ctx, `SELECT MIN(id) FROM `+table+` WHERE profile_id = ? AND id < 0`, profileID).Scan(&inTable); err != nil {
+		return 0, fmt.Errorf("lowest draft %s id: %w", table, err)
 	}
 	if inTable.Valid && int(inTable.Int64) < lowest {
 		lowest = int(inTable.Int64)
@@ -133,8 +134,8 @@ func nextDraftSprintID(ctx context.Context, tx *sql.Tx, profileID string) (int, 
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO profile_setting (profile_id, key, value) VALUES (?, ?, ?)
 		 ON CONFLICT(profile_id, key) DO UPDATE SET value = excluded.value`,
-		profileID, draftSprintSeq, strconv.Itoa(next)); err != nil {
-		return 0, fmt.Errorf("record draft sprint sequence: %w", err)
+		profileID, seqKey, strconv.Itoa(next)); err != nil {
+		return 0, fmt.Errorf("record draft %s sequence: %w", table, err)
 	}
 	return next, nil
 }
