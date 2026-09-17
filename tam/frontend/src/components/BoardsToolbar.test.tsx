@@ -6,10 +6,10 @@ import { BoardsToolbar, sprintOption } from "./BoardsToolbar";
 const board: Board = { id: 1, name: "PLAT Scrum", type: "scrum" };
 const draft: Sprint = { id: -1, boardId: 1, name: "Sprint 15", state: "future", startDate: "", endDate: "", goal: "", draft: true };
 
-function renderToolbar(sprint: Sprint, over: { board?: Board; onNewBoard?: () => void; onAddIssues?: () => void } = {}) {
+function renderToolbar(sprint: Sprint, over: { boards?: Board[]; board?: Board; onNewBoard?: () => void; onAddIssues?: () => void } = {}) {
   render(
     <BoardsToolbar
-      boards={[board]} board={over.board ?? board} onBoard={vi.fn()}
+      boards={over.boards ?? [board]} board={over.board ?? board} onBoard={vi.fn()}
       sprints={[sprint]} sprint={sprint} onSprint={vi.fn()}
       swimlane="none" onSwimlane={vi.fn()}
       refreshing={false} canRefresh onRefresh={vi.fn()}
@@ -27,6 +27,12 @@ describe("BoardsToolbar", () => {
     const start = screen.getByRole("button", { name: "Start sprint" });
     expect(start).toBeEnabled();
     expect(start).not.toHaveAttribute("title");
+  });
+
+  it("labels a draft board in the board picker", () => {
+    renderToolbar(draft, { boards: [board, { id: -2, name: "Ops board", type: "scrum", draft: true }] });
+    expect(screen.getByRole("option", { name: "PLAT Scrum" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Ops board (draft)" })).toBeInTheDocument();
   });
 
   it("starts a future sprint Jira holds", () => {
