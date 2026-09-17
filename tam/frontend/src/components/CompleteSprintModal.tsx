@@ -48,7 +48,6 @@ export function CompleteSprintModal({
   const { runQuietLock } = useSync();
   const complete = useCompleteSprint(profileId, runQuietLock);
   const [moveTo, setMoveTo] = useState("");
-  const [error, setError] = useState("");
   const dates = sprintDates(sprint);
   const destination = futures.find((s) => String(s.id) === moveTo);
   const where = destination ? destination.name : "the backlog";
@@ -56,7 +55,6 @@ export function CompleteSprintModal({
 
   function onSubmit() {
     if (complete.isPending) return;
-    setError("");
     complete.mutate(
       { boardId, sprintId: sprint.id, moveTo },
       {
@@ -66,10 +64,6 @@ export function CompleteSprintModal({
           onCompleted(String(sprint.id), line);
           onClose();
         },
-        // A refusal is a sentence that stands on its own: pending changes
-        // on cards in the sprint, a sprint that never started, a delete
-        // waiting for Commit, or the busy guard.
-        onError: (e) => setError(errMsg(e)),
       },
     );
   }
@@ -91,7 +85,10 @@ export function CompleteSprintModal({
           <p className="muted small">{`A card counts as finished when it sits in ${lastColumn}, this board's last column.`}</p>
         </div>
 
-        {error && <p className="error-text" role="alert">{error}</p>}
+        {/* A refusal is a sentence that stands on its own: pending changes
+            on cards in the sprint, a sprint that never started, a delete
+            waiting for Commit, or the busy guard. */}
+        {complete.error && <p className="error-text" role="alert">{errMsg(complete.error)}</p>}
 
         <p>
           {n === 0

@@ -41,7 +41,7 @@ export function NewBoardModal({ profileId, onClose, onCreated }: Props) {
       {
         name: trimmed,
         type,
-        filterName: filterName.trim() || `Filter for ${trimmed}`,
+        filterName: filterName.trim() || filterPlaceholder,
         jql: jql.trim() || jqlPlaceholder,
       },
       {

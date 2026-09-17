@@ -5,6 +5,7 @@ import { useIssues } from "../queries/issues";
 import { useBoardSprintDetails } from "../queries/sprints";
 import { useAddIssuesToBoard } from "../queries/boards";
 import { useDebounced } from "../lib/useDebounced";
+import { plural } from "../lib/format";
 import { sprintOption } from "./BoardsToolbar";
 
 const SEARCH_DELAY_MS = 250;
@@ -32,7 +33,6 @@ export function AddIssuesModal({ profileId, boardId, boardName, sprints, onClose
   const [text, setText] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [into, setInto] = useState(BACKLOG_SCOPE);
-  const [error, setError] = useState("");
   const search = useDebounced(text, SEARCH_DELAY_MS, boardId);
   const add = useAddIssuesToBoard(profileId);
 
@@ -66,19 +66,16 @@ export function AddIssuesModal({ profileId, boardId, boardName, sprints, onClose
   }
 
   function onAdd() {
-    if (checked.size === 0) return;
-    setError("");
     add.mutate(
       { keys: [...checked], boardId, scope: into },
       {
         onSuccess: () => {
           const destination = into === BACKLOG_SCOPE ? "the backlog" : sprints.find((s) => String(s.id) === into)?.name || "the sprint";
-          const line = `${checked.size} issue${checked.size === 1 ? "" : "s"} queued onto ${boardName}'s ${destination}. Commit pushes it to Jira.`;
+          const line = `${plural(checked.size, "issue", "issues")} queued onto ${boardName}'s ${destination}. Commit pushes it to Jira.`;
           announce(line);
           onAdded(line);
           onClose();
         },
-        onError: (err) => setError(errMsg(err)),
       },
     );
   }
@@ -126,7 +123,7 @@ export function AddIssuesModal({ profileId, boardId, boardName, sprints, onClose
           </select>
         </label>
 
-        {error && <p className="error-text small" role="alert">{error}</p>}
+        {add.error && <p className="error-text small" role="alert">{errMsg(add.error)}</p>}
       </div>
 
       <div className="pending-actions">
