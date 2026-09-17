@@ -64,29 +64,3 @@ func TestTheFilterCheckReportsMissingKeysRemovesRowsAnywayAndASingleBoardsFailur
 		t.Errorf("checks: %v", h.jira.filterChecks)
 	}
 }
-
-// Test 8: the filter-check message names a board this Commit itself
-// created by the name it was drafted with, not its id -- the spec's own
-// wording ("PLAT-360 is outside PLAT Checkout Board's filter...") -- since
-// this is the one case the committer actually knows a board's name in.
-func TestTheFilterCheckMessageNamesABoardCreatedThisCommitByName(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	boardID := draftBoard(t, h, "PLAT Checkout Board")
-	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, issuerepo.ScopeBacklog); err != nil {
-		t.Fatal(err)
-	}
-	h.jira.filterMissing[900] = []string{"PLAT-1"}
-
-	res, err := h.eng.Commit(ctx, "p1", "PLAT")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Failures) != 1 {
-		t.Fatalf("one result line, for the key outside the filter: %+v", res.Failures)
-	}
-	want := "PLAT-1 is outside PLAT Checkout Board's filter, so it will not show on that board."
-	if res.Failures[0].Error != want {
-		t.Errorf("message = %q, want %q", res.Failures[0].Error, want)
-	}
-}

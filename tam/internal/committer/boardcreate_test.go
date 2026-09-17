@@ -2,7 +2,6 @@ package committer_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -66,124 +65,6 @@ func draftBoard(t *testing.T, h harness, name string) int {
 	return made.ID
 }
 
-// draftSprintOnDraftBoard journals a sprint_create row naming a draft
-// board's own negative id as its originBoardId, sprint draft id -1.
-//
-// issuerepo.CreateDraftSprint refuses a BoardID <= 0 (sprintdrafts.go:77),
-// which blocks drafting a sprint directly onto a draft board through the
-// public entry point; that guard predates draft boards and is unchanged by
-// this bundle (issuerepo is out of this task's files). This writes the
-// journal and draft-sprint row by hand, the same way
-// TestABoardRowUnderADraftKeyWaitsForTheNextCommit (boards_test.go) already
-// writes a pending_change row by hand for a shape the public API cannot
-// produce, to exercise the boards phase's own resolution of it in isolation.
-func draftSprintOnDraftBoard(t *testing.T, h harness, boardDraftID int, boardName, sprintName string) {
-	t.Helper()
-	d := issuerepo.DraftSprint{BoardID: boardDraftID, BoardName: boardName, Name: sprintName}
-	encoded, err := json.Marshal(d)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.db.Exec(
-		`INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, goal, draft) VALUES (?, -1, ?, ?, 'future', '', '', '', 1)`,
-		"p1", boardDraftID, sprintName); err != nil {
-		t.Fatal(err)
-	}
-	if err := journal.Put(h.db, "p1", issuerepo.EntitySprintCreate, "-1", issuerepo.FieldCreate, "", string(encoded), ""); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Case 1: board create succeeds, then the sprint is pushed with the real
-// board id -- the case the boards-before-sprints ordering exists for.
-func TestADraftBoardWithADraftSprintOnItCommitTogetherWithTheRealBoardID(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	boardID := draftBoard(t, h, "PLAT Checkout Board")
-	draftSprintOnDraftBoard(t, h, boardID, "PLAT Checkout Board", "Sprint 1")
-
-	res, err := h.eng.Commit(ctx, "p1", "PLAT")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Failures) != 0 || len(res.Held) != 0 || res.Remaining != 0 {
-		t.Fatalf("result: %+v", res)
-	}
-	if len(h.jira.boardsMade) != 1 || h.jira.boardsMade[0] != "PLAT Checkout Board scrum PLAT Checkout Board filter project = PLAT" {
-		t.Errorf("board created: %v", h.jira.boardsMade)
-	}
-	if len(h.jira.sprintsMade) != 1 || h.jira.sprintsMade[0] != "900 Sprint 1" {
-		t.Fatalf("the sprint is pushed with the real board id, not the placeholder: %v", h.jira.sprintsMade)
-	}
-}
-
-// Case 2: board create fails, so the sprint is held with a stated reason and
-// no placeholder reaches Jira; the held row survives for the next Commit.
-func TestADraftBoardCreateFailureHoldsItsDraftSprintWithAReason(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	boardID := draftBoard(t, h, "PLAT Checkout Board")
-	draftSprintOnDraftBoard(t, h, boardID, "PLAT Checkout Board", "Sprint 1")
-	h.jira.boardCreateErr = errors.New("POST failed: 403 you cannot manage boards")
-
-	res, err := h.eng.Commit(ctx, "p1", "PLAT")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(h.jira.sprintsMade) != 0 {
-		t.Fatalf("no placeholder board id reached Jira: %v", h.jira.sprintsMade)
-	}
-	if len(res.Failures) != 1 || res.Failures[0].Key != "PLAT Checkout Board" || res.Failures[0].EntityType != issuerepo.EntityBoardCreate || !res.Failures[0].Retryable {
-		t.Fatalf("the board create failed and is worth retrying: %+v", res.Failures)
-	}
-	if len(res.Held) != 1 || res.Held[0].Key != "-1" || res.Held[0].EntityType != issuerepo.EntitySprintCreate {
-		t.Fatalf("the sprint is held: %+v", res.Held)
-	}
-	want := `waits for board "PLAT Checkout Board", which Jira refused`
-	if res.Held[0].Reason != want {
-		t.Errorf("reason = %q, want %q", res.Held[0].Reason, want)
-	}
-	if res.Remaining != 2 {
-		t.Errorf("remaining = %d, want the board and the sprint both kept", res.Remaining)
-	}
-	pend, err := h.repo.ListPendingChanges(ctx, "p1")
-	if err != nil || len(pend) != 2 {
-		t.Fatalf("both rows survive for the next Commit: %+v %v", pend, err)
-	}
-}
-
-// Case 3: neither of the above leaves the journal in a state where a second
-// Commit double-creates the board.
-func TestASecondCommitAfterAFailedBoardCreateDoesNotCreateTheBoardTwice(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	boardID := draftBoard(t, h, "PLAT Checkout Board")
-	draftSprintOnDraftBoard(t, h, boardID, "PLAT Checkout Board", "Sprint 1")
-	h.jira.boardCreateErr = errors.New("POST failed: 403 you cannot manage boards")
-
-	if _, err := h.eng.Commit(ctx, "p1", "PLAT"); err != nil {
-		t.Fatal(err)
-	}
-	if len(h.jira.boardsMade) != 0 {
-		t.Fatalf("nothing was created on the failed attempt: %v", h.jira.boardsMade)
-	}
-
-	h.jira.boardCreateErr = nil
-	res, err := h.eng.Commit(ctx, "p1", "PLAT")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(h.jira.boardsMade) != 1 {
-		t.Errorf("the retry creates the board exactly once: %v", h.jira.boardsMade)
-	}
-	if len(h.jira.sprintsMade) != 1 || h.jira.sprintsMade[0] != "900 Sprint 1" {
-		t.Errorf("the held sprint is finally pushed, with the real id: %v", h.jira.sprintsMade)
-	}
-	if len(res.Failures) != 0 || len(res.Held) != 0 || res.Remaining != 0 {
-		t.Errorf("result: %+v", res)
-	}
-}
-
 // Test 4: a backlog add batches and a 207 fails that batch without failing
 // the whole Commit's other work. The batching and the 207 handling
 // themselves are core/jira's (bulkWrite, tested there); here only the
@@ -240,9 +121,8 @@ func TestADraftBoardWithAQueuedAddCommitsTheAddAgainstTheRealBoardID(t *testing.
 
 // Test 4c: the board create lands but the queued add fails on the same
 // Commit (a retryable Jira error), so the row survives for a retry. The
-// board's create row is gone by then -- r.boardRealID, which only lives for
-// one Commit, cannot resolve it on the retry -- so the row's own board id
-// must already be the real one, which only RekeyBoard can have made true.
+// board's create row is gone by then, so the row's own board id must already
+// be the real one, which only RekeyBoard can have made true.
 func TestARetriedBoardAddAfterTheBoardWasAlreadyCreatedPushesWithTheRealBoardID(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"agile-suite/core/journal"
-	"agile-suite/tam/internal/backend"
 )
 
 // Starting and completing a sprint. Both are journal rows now, pushed by
@@ -45,11 +44,6 @@ type SprintStart struct {
 	Goal      string `json:"goal"`
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
-}
-
-// SprintDraft is the part of the start the Agile call takes.
-func (s SprintStart) SprintDraft() backend.SprintDraft {
-	return backend.SprintDraft{Name: s.Name, Goal: s.Goal, StartDate: s.StartDate, EndDate: s.EndDate}
 }
 
 // SprintComplete is what a sprint_complete row carries. MoveTo is the
@@ -152,25 +146,13 @@ func refuseQueued(ctx context.Context, tx *sql.Tx, profileID string, sprintID in
 	return nil
 }
 
-// rekeySprintStart moves a draft sprint's pending start to the id and board
-// Jira gave it, so Commit's sprint changes phase starts the real sprint.
-func rekeySprintStart(ctx context.Context, tx *sql.Tx, profileID, from string, made backend.Sprint) error {
-	p, queued, err := pendingSprintRow(ctx, tx, profileID, EntitySprintStart, from)
-	if err != nil || !queued {
-		return err
-	}
-	var s SprintStart
-	if err := json.Unmarshal([]byte(p.AfterVal), &s); err != nil {
-		return fmt.Errorf("decode the start of draft sprint %s: %w", from, err)
-	}
-	s.BoardID = made.BoardID
-	after, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE pending_change SET entity_key = ?, after_val = ? WHERE profile_id = ? AND id = ?`,
-		strconv.Itoa(made.ID), string(after), profileID, p.ID); err != nil {
-		return fmt.Errorf("move the start of draft sprint %s to sprint %d: %w", from, made.ID, err)
+// rekeySprintStart moves a draft sprint's pending start to the id Jira gave
+// it, so Commit's sprint changes phase starts the real sprint. The start's
+// boardId needs no rewrite: a sprint is only ever drafted onto a real board.
+func rekeySprintStart(ctx context.Context, tx *sql.Tx, profileID, from, to string) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE pending_change SET entity_key = ? WHERE profile_id = ? AND entity_type = ? AND entity_key = ?`,
+		to, profileID, EntitySprintStart, from); err != nil {
+		return fmt.Errorf("move the start of draft sprint %s to sprint %s: %w", from, to, err)
 	}
 	return nil
 }

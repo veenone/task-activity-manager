@@ -65,7 +65,7 @@ func (r *Repository) RekeySprint(ctx context.Context, profileID string, draftID 
 		if err := rewriteSprintID(ctx, tx, profileID, from, to, made.Name); err != nil {
 			return err
 		}
-		if err := rekeySprintStart(ctx, tx, profileID, from, made); err != nil {
+		if err := rekeySprintStart(ctx, tx, profileID, from, to); err != nil {
 			return err
 		}
 		if err := deleteDraftSprintRow(ctx, tx, profileID, from); err != nil {

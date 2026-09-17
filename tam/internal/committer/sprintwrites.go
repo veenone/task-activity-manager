@@ -67,20 +67,20 @@ func (r *commitRun) pushSprintWrite(ctx context.Context, p journal.PendingChange
 			r.deps.hold(r.res, p.EntityKey, p.EntityType, p.ID, waits)
 			return
 		}
-		r.fail(p, w.name, "the draft sprint it starts is no longer waiting to be created; discard this start and start the sprint again once Jira has it", false)
+		r.fail(p, w.Name, "the draft sprint it starts is no longer waiting to be created; discard this start and start the sprint again once Jira has it", false)
 		return
 	}
 	if err != nil || sprintID <= 0 {
-		r.fail(p, w.name, "the sprint id "+p.EntityKey+" is not a sprint Jira holds", false)
+		r.fail(p, w.Name, "the sprint id "+p.EntityKey+" is not a sprint Jira holds", false)
 		return
 	}
 	if r.e.Sprints == nil {
-		r.fail(p, w.name, "this connection cannot manage sprints", false)
+		r.fail(p, w.Name, "this connection cannot manage sprints", false)
 		return
 	}
 	did, note, err := r.sendSprintWrite(ctx, p.EntityType, sprintID, w)
 	if err != nil {
-		r.fail(p, w.name, err.Error(), !errors.Is(err, sprints.ErrRefused) && !errors.Is(err, corejira.ErrNoAgile))
+		r.fail(p, w.Name, err.Error(), !errors.Is(err, sprints.ErrRefused) && !errors.Is(err, corejira.ErrNoAgile))
 		return
 	}
 	if note != "" {
@@ -91,38 +91,22 @@ func (r *commitRun) pushSprintWrite(ctx context.Context, p journal.PendingChange
 		// state again, so a second edit or start is refused or harmless, a
 		// second completion finds the sprint closed, and a second delete
 		// finds it gone.
-		r.fail(p, w.name, "pushed to Jira but the journal could not be cleared: "+err.Error(), true)
+		r.fail(p, w.Name, "pushed to Jira but the journal could not be cleared: "+err.Error(), true)
 		return
 	}
-	r.res.SprintsChanged = append(r.res.SprintsChanged, w.name+did)
+	r.res.SprintsChanged = append(r.res.SprintsChanged, w.Name+did)
 }
 
-// sprintWrite is a decoded row of any of the four kinds.
+// sprintWrite is a decoded row of any of the four kinds: each kind's JSON
+// is a subset of an edit's fields plus a completion's destination.
 type sprintWrite struct {
-	name     string
-	edit     issuerepo.SprintEdit
-	start    issuerepo.SprintStart
-	complete issuerepo.SprintComplete
-	del      issuerepo.SprintDelete
+	issuerepo.SprintEdit
+	MoveTo string `json:"moveTo"`
 }
 
 func decodeSprintWrite(p journal.PendingChange) (sprintWrite, error) {
 	var w sprintWrite
-	var err error
-	switch p.EntityType {
-	case issuerepo.EntitySprintEdit:
-		err = json.Unmarshal([]byte(p.AfterVal), &w.edit)
-		w.name = w.edit.Name
-	case issuerepo.EntitySprintStart:
-		err = json.Unmarshal([]byte(p.AfterVal), &w.start)
-		w.name = w.start.Name
-	case issuerepo.EntitySprintComplete:
-		err = json.Unmarshal([]byte(p.AfterVal), &w.complete)
-		w.name = w.complete.Name
-	default:
-		err = json.Unmarshal([]byte(p.AfterVal), &w.del)
-		w.name = w.del.Name
-	}
+	err := json.Unmarshal([]byte(p.AfterVal), &w)
 	return w, err
 }
 
@@ -133,13 +117,13 @@ func (r *commitRun) sendSprintWrite(ctx context.Context, entityType string, spri
 	s := r.e.Sprints
 	switch entityType {
 	case issuerepo.EntitySprintEdit:
-		note, err := s.Edit(ctx, r.profileID, w.edit.BoardID, sprintID, w.edit.SprintDraft(), w.edit.ClearGoal)
+		note, err := s.Edit(ctx, r.profileID, w.BoardID, sprintID, w.SprintDraft(), w.ClearGoal)
 		return " edited", note, err
 	case issuerepo.EntitySprintStart:
-		note, err := s.Start(ctx, r.profileID, w.start.BoardID, sprintID, w.start.SprintDraft())
+		note, err := s.Start(ctx, r.profileID, w.BoardID, sprintID, w.SprintDraft())
 		return " started", note, err
 	case issuerepo.EntitySprintComplete:
-		done, err := s.Complete(ctx, r.profileID, w.complete.BoardID, sprintID, w.complete.MoveTo)
+		done, err := s.Complete(ctx, r.profileID, w.BoardID, sprintID, w.MoveTo)
 		if err == nil && done.Message != "" {
 			err = errors.New(done.Message)
 		}
@@ -149,7 +133,7 @@ func (r *commitRun) sendSprintWrite(ctx context.Context, entityType string, spri
 		}
 		return fmt.Sprintf(" completed, %d %s moved to %s", done.Moved, noun, done.MovedTo), done.Note, err
 	}
-	note, err := s.Delete(ctx, r.profileID, w.del.BoardID, sprintID)
+	note, err := s.Delete(ctx, r.profileID, w.BoardID, sprintID)
 	return " deleted", note, err
 }
 

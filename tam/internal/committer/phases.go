@@ -33,8 +33,8 @@ type phase struct {
 
 // phases is the order a Commit runs in:
 //
-//  0. boards, so a draft sprint's originBoardId and a card queued onto a
-//     drafted board both name a real board before anything else runs;
+//  0. boards, then the adds queued onto them, so a card queued onto a
+//     drafted board names a real board by the time its add is pushed;
 //  1. sprints, so a card moved into a draft sprint names a real one;
 //  2. sprint changes: the edits, starts, completions and deletes, after the
 //     creates so a draft sprint can be started in the same Commit, and in a
@@ -46,7 +46,8 @@ type phase struct {
 //     links, exactly as before phases existed.
 func phases() []phase {
 	return []phase{
-		{name: "boards", run: func(ctx context.Context, r *commitRun) { r.createBoards(ctx); r.pushBoardAdds(ctx) }},
+		{name: "boards", run: func(ctx context.Context, r *commitRun) { r.createBoards(ctx) }},
+		{name: "board adds", run: func(ctx context.Context, r *commitRun) { r.pushBoardAdds(ctx) }},
 		{name: "sprints", run: func(ctx context.Context, r *commitRun) { r.createSprints(ctx) }},
 		{name: "sprint changes", run: func(ctx context.Context, r *commitRun) { r.pushSprintWrites(ctx) }},
 		{name: "epics", run: func(ctx context.Context, r *commitRun) { r.createDrafts(ctx, levelEpic) }},
@@ -67,19 +68,6 @@ type commitRun struct {
 	deps       *dependencies
 	// rows is the journal as the last phase left it, oldest first.
 	rows []journal.PendingChange
-	// boardRealID maps a drafted board's negative id to the real one the
-	// boards phase (boardcreate.go) gave it this Commit, so a later phase
-	// reading a draft sprint's or a card's originBoardId can resolve it
-	// before anything is sent: a placeholder board id would otherwise reach
-	// Jira the moment the board itself was created but nothing else in this
-	// Commit's journal rows knew its new id yet.
-	boardRealID map[int]int
-	// boardName carries a board this Commit itself created (boardcreate.go)
-	// from its real id to the name it was drafted with, for the filter
-	// check's message (checkBoardFilters). It is not a general board-name
-	// lookup -- the committer has none, and does not own the board list --
-	// so a board this Commit did not create is named by its id there.
-	boardName map[int]string
 }
 
 // reload reads the journal again, oldest first.
@@ -170,24 +158,7 @@ func (r *commitRun) createSprints(ctx context.Context) {
 			r.deps.block(p.EntityKey, "draft sprint "+p.EntityKey, "which could not be read")
 			continue
 		}
-		// A sprint drafted onto a board that was itself still a draft
-		// carries that board's negative id (originBoardId). The boards phase
-		// runs before this one and rewrites it here, in r.boardRealID, the
-		// moment the board is real; the board table's own row is repointed
-		// too, but this draft's JSON is not, so this substitution is the
-		// only place that happens for a sprint create.
-		if real, ok := r.boardRealID[d.BoardID]; ok {
-			d.BoardID = real
-		}
 		label := fmt.Sprintf("sprint %q", d.Name)
-		// A board that is still a draft because its own create failed (or
-		// is itself waiting on something else) leaves d.BoardID unresolved;
-		// the sprint waits for it rather than naming a placeholder to Jira.
-		if waits, blocked := r.deps.blockedBy(strconv.Itoa(d.BoardID)); blocked {
-			r.deps.hold(r.res, p.EntityKey, issuerepo.EntitySprintCreate, p.ID, waits)
-			r.deps.block(p.EntityKey, label, "which is waiting for "+r.deps.blocked[waits].label)
-			continue
-		}
 		draftID, err := strconv.Atoi(p.EntityKey)
 		if err != nil || draftID >= 0 {
 			r.res.Failures = append(r.res.Failures, sprintFailure(p, d.Name, fmt.Sprintf("the draft sprint's id %q is not a draft id", p.EntityKey), false))
