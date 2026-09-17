@@ -185,21 +185,20 @@ export function BoardsView() {
     if (nextSprintId) setSprintId(nextSprintId);
   }
 
-  // afterBoardCreated switches the picker to the board just drafted, the way
-  // choosing one from the picker itself does.
-  function afterBoardCreated(newBoardId: number, line: string) {
-    setBoardId(newBoardId);
+  // pickBoard switches to a board from the picker, starting it clean.
+  function pickBoard(id: number) {
+    setBoardId(id);
     setSprintId("");
     setSelectedKey("");
     setFocusId("");
     selection.reset();
-    setCeremonyLine(line);
+    setCeremonyLine("");
   }
 
-  // afterIssuesAdded leaves the board and sprint on screen alone: the picker
-  // that opened the dialog is still what was being looked at, only with more
-  // cards pending on it now.
-  function afterIssuesAdded(line: string) {
+  // afterBoardCreated switches the picker to the board just drafted, the way
+  // choosing one from the picker itself does.
+  function afterBoardCreated(newBoardId: number, line: string) {
+    pickBoard(newBoardId);
     setCeremonyLine(line);
   }
 
@@ -217,14 +216,7 @@ export function BoardsView() {
       <BoardsToolbar
         boards={boardList}
         board={board}
-        onBoard={(id) => {
-          setBoardId(id);
-          setSprintId("");
-          setSelectedKey("");
-          setFocusId("");
-          selection.reset();
-          setCeremonyLine("");
-        }}
+        onBoard={pickBoard}
         sprints={openSprints}
         sprint={sprint}
         onSprint={(id) => {
@@ -380,7 +372,7 @@ export function BoardsView() {
           boardName={board.name}
           sprints={openSprints}
           onClose={() => setAddingIssues(false)}
-          onAdded={afterIssuesAdded}
+          onAdded={setCeremonyLine}
         />
       )}
     </section>

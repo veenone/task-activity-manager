@@ -63,7 +63,7 @@ function stateClass(state: string): string {
 // would be the first to lose its width. It is rendered under the sprint
 // when the sprint is expanded, where a sentence has a line to itself.
 export function SprintRow({
-  detail, rowId, index, open, focused, flashed, busy, waiting = "", onToggle, onKeyDown, actions,
+  detail, rowId, index, open, focused, flashed, busy, waiting, onToggle, onKeyDown, actions,
 }: Props) {
   // The board's own unassigned work arrives in the same list and under the
   // same shape, and is not a sprint: it has no state to chip, no dates to
@@ -77,14 +77,14 @@ export function SprintRow({
     : "";
 
   const items: MenuItem[] = [];
+  // A draft can be started, since Commit creates it before it starts it,
+  // but a sprint that is not in Jira cannot have run, so Complete is shown
+  // and held back to say what Commit unlocks.
+  if (detail.draft || detail.state === "future") {
+    items.push({ key: "start", label: "Start sprint…", disabled: busy, onClick: actions.onStart });
+  }
   if (detail.draft) {
-    // A draft can be started, since Commit creates it before it starts it,
-    // but a sprint that is not in Jira cannot have run, so Complete is shown
-    // and held back to say what Commit unlocks.
-    items.push({ key: "start", label: "Start sprint…", disabled: busy, onClick: actions.onStart });
     items.push({ key: "complete", label: "Complete sprint…", disabled: true, title: DRAFT_SPRINT_HINT });
-  } else if (detail.state === "future") {
-    items.push({ key: "start", label: "Start sprint…", disabled: busy, onClick: actions.onStart });
   } else if (detail.state === "active") {
     items.push({ key: "complete", label: "Complete sprint…", disabled: busy, onClick: actions.onComplete });
   }

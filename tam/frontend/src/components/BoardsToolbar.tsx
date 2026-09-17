@@ -47,12 +47,6 @@ export function sprintOption(s: Sprint): string {
   return `${s.name} (${s.state.charAt(0).toUpperCase()}${s.state.slice(1)})`;
 }
 
-// boardOption labels a board "Name", or "Name (draft)" for one Commit has
-// not created yet in Jira, the same suffix sprintOption uses.
-export function boardOption(b: Board): string {
-  return draftLabel(b.name, !!b.draft);
-}
-
 // BoardsToolbar is XTM's board head, class for class: the pickers on the
 // left, the actions pushed right. The board picker keeps XTM's 280px; the
 // sprint and swimlane pickers take the narrow modifier, since 280px is right
@@ -76,7 +70,7 @@ export function BoardsToolbar({
           onChange={(e) => onBoard(Number(e.target.value))}
         >
           {boards.map((b) => (
-            <option key={b.id} value={b.id}>{boardOption(b)}</option>
+            <option key={b.id} value={b.id}>{draftLabel(b.name, !!b.draft)}</option>
           ))}
         </select>
       </label>
