@@ -889,26 +889,15 @@ since condition that would hide it read cache that profile has not filled
 yet. Project with no scrum board see empty state that say so and point at
 Boards view instead.
 
-**Edit and delete of sprint Jira hold reach Jira immediately; create does
-not any more.** Reason for immediate edit + delete = cost not principle: TAM
-journal is issue machinery (pending change keyed by issue key, conflict by
-`updated` stamp), and sprint have no cached version to rebase edit on and no
-conflict card. Create was same exception until bundle 01 paid its cost: plan
-starting with new sprint could not be drafted offline. Now sprint create =
-`sprint_create` journal row + draft row in `sprint` under negative id, and
-Commit phase 1 create it. Full argument for edit + delete still on
-`UpdateSprint` in `core/jira/sprintwrite.go`.
-
-Fence structural rather than sentence in spec, because previous version of
-this rule lived in one sentence in boards design and lasted one phase.
-`internal/sprints/exceptions_test.go` assert, by name, that `sprints.Service`
-exported method set is exactly `Complete`, `Delete`, `Edit`, `Start`;
-growing it mean editing failing test whose message say what list is
-for. Fence deliberately service's own methods and not `lifecycle` interface
-ceremony use internally: that interface also carry `BoardSprints`, a read,
-and `MoveIssuesToSprint`, whose other caller (multi-select move) journal it
-like every other membership change, so asserting `lifecycle` as
-immediate-write list would have been false day it was written. Membership
+**Every sprint write is journaled now.** Phase 3c made create, edit, delete,
+start and complete reach Jira at once, for cost reasons: TAM journal was
+issue machinery (pending change keyed by issue key, conflict by `updated`
+stamp), and sprint have no cached version to rebase edit on and no conflict
+card. Bundle 01 journaled create (`sprint_create` + draft row under negative
+id), bundle 04 Task 7 edit and delete, Task 8 start and complete (see Sprint
+writes, journaled). The fence test that named the writes reaching Jira at
+once went with the last two: an empty
+list is the point, and a fence guarding nothing is worse than none. Membership
 stay journaled everywhere in this view exactly as on board: detail panel
 Sprint field and tree's own multi-select move both go through same journaled
 `MoveManyToSprint` path board selection use, with same conflict story and
@@ -1196,11 +1185,11 @@ id; completion cannot move cards into draft. Edit + delete of draft local
 `DiscardDraftSprint` = discard of `sprint_create` row: revert every move into
 it, clear it off draft issues, drop row). Bindings keep `"sprint"` lock,
 frontend keep `runQuietLock`. Edit + delete of a real sprint are journaled
-too; see Sprint edit and delete, journaled. Rituals skip drafts. `RemoveBoards` unchanged:
+too; see Sprint writes, journaled. Rituals skip drafts. `RemoveBoards` unchanged:
 draft on board that leave cache go with it, journal row stay in Pending
 changes.
 
-## Sprint edit and delete, journaled
+## Sprint writes, journaled
 
 Bundle 04 Task 7. Edit and delete of a sprint Jira holds (positive id) used to
 reach Jira at once through `sprints.Service`. Now journal rows, pushed on
@@ -1229,18 +1218,20 @@ Commit, and both bindings work offline.
   row names the sprint as Jira has it.
 - **Discard.** `discardOne` has a case for each: an edit restores the row and
   card names from before_val, a delete just drops its row.
-- **Push.** The sprints phase runs `createSprints`, then
-  `pushSprintWrites`: every edit, then every delete, oldest first, through
-  `Engine.Sprints` (`committer.SprintWriter`), which `app_writes.go` wires to
-  `sprints.ForCommit(a.sprintService(p, b))`. `ForCommit` is a separate type,
-  so the push keeps Jira-side guards (`requireEditable`, `requireDeletable`,
-  `refusePendingDelete`), the audit row and the cache work, while
-  `Service`'s exported methods stay the fenced list (now Start, Complete).
-  A guard refusal wraps `sprints.ErrRefused` and becomes a non-retryable
-  `Failure` naming the row; any other error is retryable; both keep the row.
-  A nil seam fails each row with "this connection cannot manage sprints".
-  A pushed write is listed in `Result.SprintsChanged` ("Sprint 12 edited");
-  a note is logged.
+- **Push.** Commit's `sprint changes` phase (its own phase after
+  `sprints`, so it reads the ids the creates rewrote) runs
+  `pushSprintWrites`: edits, then starts, then completions, then deletes,
+  oldest first within a kind (`sprintWriteOrder`), through `Engine.Sprints`
+  (`committer.SprintWriter`), which `app_writes.go` wires to
+  `sprints.ForCommit(a.sprintService(p, b))`. Every write to Jira in
+  `internal/sprints` hangs off `sprints.Committed`; `Service` exports none.
+  The push keeps the guards (`requireEditable`, `requireDeletable`,
+  `refusePendingDelete`, `requireCompletable`, `refusePending`), the audit
+  row and the cache work. A guard refusal wraps `sprints.ErrRefused` and
+  becomes a non-retryable `Failure` naming the row; any other error is
+  retryable; both keep the row. A nil seam fails each row with "this
+  connection cannot manage sprints". A pushed write is listed in
+  `Result.SprintsChanged` ("Sprint 12 edited"); a note is logged.
 - **Frontend.** `groupPending` keys groups by kind and key (`sprint:12`,
   `board:-1`), so a draft sprint and a draft board with the same negative id
   get separate cards; `PendingGroup.id` is that identity, `key` the entity
@@ -1250,9 +1241,61 @@ Commit, and both bindings work offline.
   delete "Deleting on Commit". Known edge: a boards refresh replaces the
   edited sprint row with Jira's until Commit (TODOS.md).
 
+Bundle 04 Task 8 did the same for start and complete, the last two writes
+that reached Jira at once.
+
+- **Entities** (`issuerepo/sprintceremonies.go`): `sprint_start` (field
+  `start`, after_val `SprintStart{boardId, name, goal, startDate,
+  endDate}`, dates already in Agile format) and `sprint_complete` (field
+  `complete`, after_val `SprintComplete{boardId, name, moveTo, moveToName,
+  previewCount}`, `moveTo` empty for the backlog). No before_val. Neither
+  changes the cache until Commit; the Sprints view shows "Starting on
+  Commit" / "Completing on Commit" through the chip the delete uses
+  (`sprintWaiting` in `queries/pending.ts`).
+- **Local refusals.** `JournalSprintStart`: a real sprint unless cached
+  `future`, or while its delete waits. `CompleteSprint` (the binding): a
+  draft (`sprints.ErrDraftSprint`), a cached `future` sprint
+  (`sprints.NotStarted`), a draft or self destination
+  (`sprints.DestinationID`), pending changes on cards staying in it
+  (`sprints.RefusePendingComplete`), all in the push's own words;
+  `JournalSprintComplete` then refuses a sprint the cache does not hold and
+  one whose delete waits. `JournalSprintDelete` now also refuses while a
+  start or a completion waits (`refuseQueued`).
+- **Draft sprints can be started.** `sprint_start` on a negative id takes
+  the draft's own board. `RekeySprint` moves the row to the real id and
+  board (`rekeySprintStart`); `discardDraftSprint` drops it. In the push, a
+  start still keyed negative is held (`deps.blockedBy` / `hold`) when its
+  create was blocked, and fails for good when the create row is gone.
+  Start is offered on a draft in the Sprints menu and the Boards toolbar;
+  Complete stays held back.
+- **Complete recomputes.** The row stores intent and the dialog's
+  `previewCount` only. At push `Committed.Complete` reads the sprint from
+  Jira, moves what is unfinished by the board's last column, closes it, and
+  `SprintsChanged` reports the real count ("Sprint 12 completed, 45
+  unfinished cards moved to Sprint 13"). A completion that moved cards and
+  stopped (a failed chunk, a refused close) comes back with a `Message`
+  naming the moved keys; the committer turns that into a retryable failure
+  and keeps the row. A retry moves whatever is still unfinished and closes;
+  a sprint the refreshed cache holds as `closed` is treated as done and
+  moves nothing.
+- **Bindings.** `StartSprint` (answers "") and `CompleteSprint(profileID,
+  boardID, sprintID, moveTo, previewCount) error` need no backend and take
+  the `"sprint"` lock; the frontend calls both through `runQuietLock`
+  (`runSprintCeremony` and `ImmediateWriteChip` are gone).
+- **Dialogs.** Start says "Saved locally. Commit starts the sprint in
+  Jira." Complete lists the cached unfinished cards and says "About N cards
+  are not finished. The exact set is worked out again on Commit, and the
+  Commit result reports how many moved."; it never promises an exact count.
+- **Release note.** Starting and completing a sprint now wait for Commit,
+  like every other change in TAM. The sprint stays future or active on
+  screen, marked Starting or Completing on Commit, until you commit; a
+  completion moves the cards that are unfinished when Commit runs, which
+  can differ from the number the dialog showed, and the Commit result says
+  how many moved.
+
 ## Phased Commit
 
-`committer.Commit` = `phases()` in order: boards, sprints, epics, issues
+`committer.Commit` = `phases()` in order: boards, sprints, sprint changes, epics, issues
 (task, story, bug, requirement), sub-tasks, edits, board moves, links;
 journal re-read (`commitRun.reload`) after each, so next phase see ids last
 one rewrote. Inside create phase, drafts by `draftOrdinal` (n of TAM-NEW-n),
@@ -1814,13 +1857,13 @@ entered. Kiwi profile file refused.
                           Board.Draft labels a drafted board the way a drafted sprint already is;
                           deletesprint.go is DeleteSprintEverywhere, the two-repository delete's
                           first transaction, across every board that holds a copy of the sprint
-    internal/sprints/    the sprint writes that reach Jira outside a Commit: Start and Complete,
-                          the ceremonies, and Edit and Delete of a sprint Jira holds;
-                          exceptions_test.go fences the package's exported method set to
-                          exactly those four; draft.go is DraftSprint, the check a drafted
-                          sprint gets, and errDraftSprint; guards.go is what a write refuses before it reaches
-                          Jira, cache.go the board cache's bookkeeping after it has, manage.go
-                          Edit and Delete themselves, and suggest.go the start and create
+    internal/sprints/    the push half of every journaled sprint write, for Commit alone:
+                          ForCommit's Committed carries Edit, Delete (manage.go), Start and
+                          Complete (sprints.go), and Service exports no write; draft.go is
+                          DraftSprint, the check a drafted sprint gets, and ErrDraftSprint;
+                          guards.go is what a push refuses before it reaches Jira, with the
+                          refusals the app also makes before it journals, cache.go the board
+                          cache's bookkeeping after it has, and suggest.go the start and create
                           dialogs' suggested name and dates
     internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
                           datetime format, shared by the ceremonies, the suggestion, and every
