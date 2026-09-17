@@ -255,7 +255,10 @@ describe("BoardsView toolbar", () => {
     // The dialog closes and the outcome lands in the banner, the same place
     // a sprint create's does.
     expect(screen.queryByRole("heading", { name: "New board" })).not.toBeInTheDocument();
-    expect(await screen.findByText(/Payments Kanban was drafted/)).toBeInTheDocument();
+    // Scoped to the banner for the same reason as the sprint create test:
+    // the shared live region repeats the sentence once its timer fires.
+    const banner = await screen.findByRole("status", { name: "Sprint outcome" });
+    expect(await within(banner).findByText(/Payments Kanban was drafted/)).toBeInTheDocument();
   });
 
   it("reaches Add issues from the toolbar only once a board is on screen", async () => {
