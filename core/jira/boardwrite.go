@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 )
 
@@ -65,11 +66,11 @@ func (c *Client) CreateBoard(ctx context.Context, name, boardType, filterID, pro
 	// takes it that way); the id CreateFilter hands back is the classic
 	// filter API's own string, which is always digits, so this reparses
 	// rather than asking every caller to carry two representations of one id.
-	if n, err := strconv.Atoi(filterID); err == nil {
-		body["filterId"] = n
-	} else {
-		body["filterId"] = filterID
+	n, err := strconv.Atoi(filterID)
+	if err != nil {
+		return 0, fmt.Errorf("jira: filter id %q is not a number", filterID)
 	}
+	body["filterId"] = n
 	var resp struct {
 		ID int `json:"id"`
 	}
@@ -95,12 +96,7 @@ const backlogBatch = 20
 // the first is never sent once an earlier one has failed.
 func (c *Client) AddToBoardBacklog(ctx context.Context, boardID int, keys []string) error {
 	path := fmt.Sprintf("/rest/agile/1.0/backlog/%d/issue", boardID)
-	for start := 0; start < len(keys); start += backlogBatch {
-		end := start + backlogBatch
-		if end > len(keys) {
-			end = len(keys)
-		}
-		batch := keys[start:end]
+	for batch := range slices.Chunk(keys, backlogBatch) {
 		if err := c.bulkWrite(ctx, "add to board backlog", http.MethodPost, path, map[string]any{"issues": batch}, batch); err != nil {
 			return err
 		}
