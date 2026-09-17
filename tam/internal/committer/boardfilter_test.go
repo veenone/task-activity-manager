@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
 )
 
@@ -16,11 +17,11 @@ import (
 func TestTheFilterCheckReportsMissingKeysRemovesRowsAnywayAndASingleBoardsFailureDoesNotFailTheCommit(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
-	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1", "PLAT-2"}, demoBoard, issuerepo.ScopeBacklog); err != nil {
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1", "PLAT-2"}, demoBoard, backend.BoardScopeBacklog); err != nil {
 		t.Fatal(err)
 	}
 	const otherBoard = 2
-	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-3"}, otherBoard, issuerepo.ScopeBacklog); err != nil {
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-3"}, otherBoard, backend.BoardScopeBacklog); err != nil {
 		t.Fatal(err)
 	}
 	h.jira.filterMissing[demoBoard] = []string{"PLAT-1"}

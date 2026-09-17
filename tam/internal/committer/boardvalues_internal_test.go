@@ -3,6 +3,7 @@ package committer
 import (
 	"testing"
 
+	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
 )
 
@@ -10,7 +11,7 @@ import (
 // Pending changes label has to name the board and the scope rather than
 // print the raw "5|backlog" the journal holds.
 func TestMoveLabelReadsAnIssueBoardAddInWords(t *testing.T) {
-	backlog := issuerepo.MoveValue("5", issuerepo.ScopeBacklog)
+	backlog := issuerepo.MoveValue("5", backend.BoardScopeBacklog)
 	if got := moveLabel(issuerepo.EntityIssueBoard, backlog); got != "board 5, Backlog" {
 		t.Errorf("label = %q, want the board named and the backlog spelled out", got)
 	}

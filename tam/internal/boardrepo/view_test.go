@@ -205,7 +205,7 @@ func TestADraftLandsInTheFirstColumnThatHasStatusIDs(t *testing.T) {
 	// must appear under both.
 	seedScopes(t, r, sampleColumns(), map[string][]string{"12": {"PLAT-409"}, "": {"PLAT-409"}})
 	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(draftCard("TAM-NEW-1")).
-		withMoves(backend.PendingMove{Key: "TAM-NEW-1", HasBoardAdd: true, BoardID: 1})
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"})
 
 	for _, tc := range []struct {
 		name     string
@@ -241,7 +241,7 @@ func TestADraftDoesNotArriveThroughIssuesByKeys(t *testing.T) {
 	r, _ := newRepo(t)
 	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
 		withDrafts(draftCard("TAM-NEW-1")).
-		withMoves(backend.PendingMove{Key: "TAM-NEW-1", HasBoardAdd: true, BoardID: 1})
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"})
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
@@ -266,7 +266,7 @@ func TestADraftIsUnmappedWhenNoColumnHasAStatus(t *testing.T) {
 	r, _ := newRepo(t)
 	cols := []backend.BoardColumn{{Name: "Backlog", StatusIDs: []string{}}, {Name: "Later", StatusIDs: []string{}}}
 	src := seedBoard(t, r, cols, nil).withDrafts(draftCard("TAM-NEW-1")).
-		withMoves(backend.PendingMove{Key: "TAM-NEW-1", HasBoardAdd: true, BoardID: 1})
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"})
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
@@ -831,8 +831,8 @@ func TestADraggedDraftIsDrawnInTheColumnItsStatusIDNames(t *testing.T) {
 	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
 		withDrafts(dragged, unknown).
 		withMoves(
-			backend.PendingMove{Key: "TAM-NEW-1", HasBoardAdd: true, BoardID: 1},
-			backend.PendingMove{Key: "TAM-NEW-2", HasBoardAdd: true, BoardID: 1},
+			backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"},
+			backend.PendingMove{Key: "TAM-NEW-2", BoardID: 1, BoardScope: "13"},
 		)
 
 	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
@@ -907,7 +907,7 @@ func TestADraftTiedByAPendingBoardAddIsDrawn(t *testing.T) {
 	r, _ := newRepo(t)
 	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
 		withDrafts(draftCard("TAM-NEW-1")).
-		withMoves(backend.PendingMove{Key: "TAM-NEW-1", HasBoardAdd: true, BoardID: 1, BoardScope: "backlog"})
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "backlog"})
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
@@ -991,7 +991,7 @@ func TestAPendingBoardAddDrawsARealIssueOnItsTargetBoard(t *testing.T) {
 	r, _ := newRepo(t)
 	seedScopes(t, r, sampleColumns(), map[string][]string{"": {"PLAT-409"}})
 	src := newIssues(card("PLAT-409", "To Do", "1"), card("PLAT-500", "To Do", "1")).
-		withMoves(backend.PendingMove{Key: "PLAT-500", HasBoardAdd: true, BoardID: 1, BoardScope: "backlog"})
+		withMoves(backend.PendingMove{Key: "PLAT-500", BoardID: 1, BoardScope: "backlog"})
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
@@ -1009,7 +1009,7 @@ func TestAPendingBoardAddOnlyDrawsInItsOwnScope(t *testing.T) {
 	seedScopes(t, r, sampleColumns(), map[string][]string{"": {"PLAT-409"}})
 	// Queued onto sprint 12, not the backlog being viewed here.
 	src := newIssues(card("PLAT-409", "To Do", "1"), card("PLAT-500", "To Do", "1")).
-		withMoves(backend.PendingMove{Key: "PLAT-500", HasBoardAdd: true, BoardID: 1, BoardScope: "12"})
+		withMoves(backend.PendingMove{Key: "PLAT-500", BoardID: 1, BoardScope: "12"})
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)

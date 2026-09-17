@@ -53,7 +53,7 @@ func (r *commitRun) createBoards(ctx context.Context) {
 			r.deps.block(p.EntityKey, label, "which this connection cannot create")
 			continue
 		}
-		realID, err := bc.CreateBoard(ctx, backend.BoardDraft{Name: d.Name, Type: d.Type, FilterName: d.FilterName, JQL: d.JQL})
+		realID, err := bc.CreateBoard(ctx, r.projectKey, backend.BoardDraft{Name: d.Name, Type: d.Type, FilterName: d.FilterName, JQL: d.JQL})
 		if err != nil {
 			r.fail(p, d.Name, err.Error(), true)
 			r.deps.block(p.EntityKey, label, "which Jira refused")
@@ -123,7 +123,7 @@ func (r *commitRun) pushBoardAdds(ctx context.Context) {
 		var sprints []string
 		for _, p := range byBoard[boardID] {
 			scope := issuerepo.MoveRawName(p.AfterVal)
-			if scope == issuerepo.ScopeBacklog {
+			if scope == backend.BoardScopeBacklog {
 				backlog = append(backlog, p)
 				continue
 			}

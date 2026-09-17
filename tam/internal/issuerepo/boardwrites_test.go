@@ -789,7 +789,7 @@ func TestPendingMovesReportsABoardAdd(t *testing.T) {
 	ctx := context.Background()
 	seedBoardCards(t, repo)
 
-	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 5, issuerepo.ScopeBacklog); err != nil {
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, 5, backend.BoardScopeBacklog); err != nil {
 		t.Fatalf("add to backlog: %v", err)
 	}
 	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-2"}, 7, "13"); err != nil {
@@ -804,10 +804,10 @@ func TestPendingMovesReportsABoardAdd(t *testing.T) {
 		t.Fatalf("moves = %+v, want one per issue with a pending add", moves)
 	}
 	one, two := moves[0], moves[1]
-	if one.Key != "PLAT-1" || !one.HasBoardAdd || one.BoardID != 5 || one.BoardScope != issuerepo.ScopeBacklog {
+	if one.Key != "PLAT-1" || one.BoardID != 5 || one.BoardScope != backend.BoardScopeBacklog {
 		t.Errorf("PLAT-1 = %+v, want its board add folded in", one)
 	}
-	if two.Key != "PLAT-2" || !two.HasBoardAdd || two.BoardID != 7 || two.BoardScope != "13" {
+	if two.Key != "PLAT-2" || two.BoardID != 7 || two.BoardScope != "13" {
 		t.Errorf("PLAT-2 = %+v, want the sprint scope carried through", two)
 	}
 }

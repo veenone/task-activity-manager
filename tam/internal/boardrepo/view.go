@@ -178,14 +178,11 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 	if err != nil {
 		return BoardView{}, err
 	}
-	byKey := make(map[string]backend.PendingMove, len(moves))
-	for _, m := range moves {
-		byKey[m.Key] = m
-	}
+	byKey := movesByKey(moves)
 
 	// The drafts come from the cache rather than from the board's key list,
 	// which is Jira's and can never name one. A draft exists on no board in
-	// Jira, so it is drawn only when tiedToBoard finds one of the four ties
+	// Jira, so it is drawn only when tiedToBoard finds one of the three ties
 	// that says it belongs here; with none of them it is drawn nowhere.
 	drafts, err := issues.DraftIssues(ctx, q, profileID)
 	if err != nil {

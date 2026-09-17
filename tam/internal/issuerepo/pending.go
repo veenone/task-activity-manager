@@ -74,10 +74,6 @@ const (
 	// itself, so the journal's own uniqueness on (type, key, field) is what
 	// keeps one row per key per board.
 	FieldBoardID = "boardId"
-
-	// ScopeBacklog is the scope AddToBoard takes for a card queued onto the
-	// board's backlog rather than a specific sprint.
-	ScopeBacklog = "backlog"
 )
 
 // BoardEntities are the four board move entity types, for the reads that

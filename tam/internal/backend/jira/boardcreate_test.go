@@ -49,7 +49,6 @@ func boardCreateServer(t *testing.T, boardStatus, deleteStatus int) (*httptest.S
 func newBoardBackend(srv *httptest.Server) *jirabackend.Backend {
 	c := corejira.NewClientWithHTTP(srv.URL, "tok", srv.Client())
 	b := jirabackend.New(c, "")
-	b.SetProjectKey("PLAT")
 	return b
 }
 
@@ -65,7 +64,7 @@ func TestCreateBoardRollsBackTheFilterWhenTheBoardCreateFails(t *testing.T) {
 	srv, calls := boardCreateServer(t, http.StatusBadRequest, http.StatusNoContent)
 	b := newBoardBackend(srv)
 
-	_, err := b.CreateBoard(context.Background(), draft)
+	_, err := b.CreateBoard(context.Background(), "PLAT", draft)
 	if err == nil {
 		t.Fatal("want an error: the board create was refused")
 	}
@@ -89,7 +88,7 @@ func TestCreateBoardNamesTheStrandedFilterWhenCleanupAlsoFails(t *testing.T) {
 	srv, _ := boardCreateServer(t, http.StatusBadRequest, http.StatusInternalServerError)
 	b := newBoardBackend(srv)
 
-	_, err := b.CreateBoard(context.Background(), draft)
+	_, err := b.CreateBoard(context.Background(), "PLAT", draft)
 	if err == nil {
 		t.Fatal("want an error: the board create was refused")
 	}
@@ -110,7 +109,7 @@ func TestCreateBoardReturnsTheBoardID(t *testing.T) {
 	srv, calls := boardCreateServer(t, http.StatusCreated, http.StatusNoContent)
 	b := newBoardBackend(srv)
 
-	id, err := b.CreateBoard(context.Background(), draft)
+	id, err := b.CreateBoard(context.Background(), "PLAT", draft)
 	if err != nil {
 		t.Fatalf("create board: %v", err)
 	}

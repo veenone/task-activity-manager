@@ -91,7 +91,7 @@ export function moveWords(entityType: string, beforeVal: string, afterVal: strin
     case ENTITY_ISSUE_BOARD: {
       // "boardId|scope", the same id|name packing a transition and a
       // sprint move use, with scope ("backlog" or a sprint id) standing in
-      // for the name. Must agree with issuerepo.ScopeBacklog.
+      // for the name. Must agree with backend.BoardScopeBacklog.
       const scope = moveName(afterVal);
       const where = scope === "backlog" ? BACKLOG : `sprint ${scope}`;
       return { label: MOVE_LABELS[entityType], from: "", to: `board ${moveId(afterVal)}, ${where}` };

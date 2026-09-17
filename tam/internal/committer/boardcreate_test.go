@@ -17,7 +17,7 @@ import (
 // three Jira-facing calls, alongside CreateSprint (phases_test.go) and the
 // board-move writes (boards_test.go).
 
-func (f *fake) CreateBoard(_ context.Context, d backend.BoardDraft) (int, error) {
+func (f *fake) CreateBoard(_ context.Context, _ string, d backend.BoardDraft) (int, error) {
 	if f.boardCreateErr != nil {
 		return 0, f.boardCreateErr
 	}
@@ -72,7 +72,7 @@ func draftBoard(t *testing.T, h harness, name string) int {
 func TestABacklogAddFailureLeavesItsRowAndTheRestOfTheCommitLands(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
-	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, demoBoard, issuerepo.ScopeBacklog); err != nil {
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, demoBoard, backend.BoardScopeBacklog); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.repo.EditField(ctx, "p1", "PLAT-2", "summary", "dos"); err != nil {
@@ -103,7 +103,7 @@ func TestADraftBoardWithAQueuedAddCommitsTheAddAgainstTheRealBoardID(t *testing.
 	h := newHarness(t)
 	ctx := context.Background()
 	boardID := draftBoard(t, h, "PLAT Checkout Board")
-	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, issuerepo.ScopeBacklog); err != nil {
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, backend.BoardScopeBacklog); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,7 +127,7 @@ func TestARetriedBoardAddAfterTheBoardWasAlreadyCreatedPushesWithTheRealBoardID(
 	h := newHarness(t)
 	ctx := context.Background()
 	boardID := draftBoard(t, h, "PLAT Checkout Board")
-	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, issuerepo.ScopeBacklog); err != nil {
+	if err := h.repo.AddToBoard(ctx, "p1", []string{"PLAT-1"}, boardID, backend.BoardScopeBacklog); err != nil {
 		t.Fatal(err)
 	}
 	h.jira.backlogErr = errors.New("POST failed: 503 service unavailable")
@@ -205,7 +205,7 @@ func TestABoardAddOnADraftIssueWaitsForItsCreateThenPushesOnTheNextCommit(t *tes
 		t.Fatal(err)
 	}
 	if err := journal.Put(h.db, "p1", issuerepo.EntityIssueBoard, temp, issuerepo.BoardField(demoBoard),
-		"", issuerepo.MoveValue(strconv.Itoa(demoBoard), issuerepo.ScopeBacklog), ""); err != nil {
+		"", issuerepo.MoveValue(strconv.Itoa(demoBoard), backend.BoardScopeBacklog), ""); err != nil {
 		t.Fatal(err)
 	}
 

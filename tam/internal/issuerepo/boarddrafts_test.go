@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
 )
 
@@ -216,10 +217,10 @@ func TestRekeyBoardRepointsIssueBoardRows(t *testing.T) {
 	}
 	draftID := made.ID
 
-	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-409", "PLAT-412"}, draftID, issuerepo.ScopeBacklog); err != nil {
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-409", "PLAT-412"}, draftID, backend.BoardScopeBacklog); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-347"}, 9, issuerepo.ScopeBacklog); err != nil {
+	if err := repo.AddToBoard(ctx, "p1", []string{"PLAT-347"}, 9, backend.BoardScopeBacklog); err != nil {
 		t.Fatal(err)
 	}
 

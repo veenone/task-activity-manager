@@ -76,15 +76,7 @@ func (b *Backend) Boards(context.Context, string) ([]backend.Board, error) {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	ids := make([]int, 0, len(b.boardCreated))
-	for id := range b.boardCreated {
-		ids = append(ids, id)
-	}
-	sort.Ints(ids)
-	for _, id := range ids {
-		out = append(out, b.boardCreated[id])
-	}
-	return out, nil
+	return append(out, b.boardCreated...), nil
 }
 
 // BoardColumns gives every known board, fixed or created, the same three
@@ -573,9 +565,9 @@ func (b *Backend) knownBoard(boardID int) error {
 		return nil
 	}
 	b.mu.Lock()
-	_, ok := b.boardCreated[boardID]
+	created := len(b.boardCreated)
 	b.mu.Unlock()
-	if !ok {
+	if boardID <= kanbanBoardID || boardID > kanbanBoardID+created {
 		return fmt.Errorf("demo: no board %d", boardID)
 	}
 	return nil
@@ -585,12 +577,11 @@ func (b *Backend) knownBoard(boardID int) error {
 // scheme CreateSprint uses. A kanban board created this way gets no sprints
 // for free: BoardSprints only ever answers for the scrum board, whatever
 // board id is asked, so nothing here has to special-case the type.
-func (b *Backend) CreateBoard(_ context.Context, d backend.BoardDraft) (int, error) {
+func (b *Backend) CreateBoard(_ context.Context, _ string, d backend.BoardDraft) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	id := b.nextBoardID
-	b.nextBoardID++
-	b.boardCreated[id] = backend.Board{ID: id, Name: d.Name, Type: d.Type, ProjectKey: b.project}
+	id := kanbanBoardID + 1 + len(b.boardCreated)
+	b.boardCreated = append(b.boardCreated, backend.Board{ID: id, Name: d.Name, Type: d.Type, ProjectKey: b.project})
 	return id, nil
 }
 

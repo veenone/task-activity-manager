@@ -782,7 +782,7 @@ func TestDemoCreateBoardMintsANewIDAndAKanbanBoardHasNoSprints(t *testing.T) {
 	b := demobackend.New("ACME")
 	ctx := context.Background()
 
-	id, err := b.CreateBoard(ctx, backend.BoardDraft{Name: "ACME Kanban 2", Type: backend.BoardTypeKanban})
+	id, err := b.CreateBoard(ctx, "ACME", backend.BoardDraft{Name: "ACME Kanban 2", Type: backend.BoardTypeKanban})
 	if err != nil {
 		t.Fatalf("create board: %v", err)
 	}

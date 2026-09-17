@@ -408,7 +408,7 @@ func (r *Repository) PendingMoves(ctx context.Context, q dbtx.Querier, profileID
 			out[i].HasRank = true
 		case EntityIssueBoard:
 			boardID, _ := strconv.Atoi(MoveID(value))
-			out[i].BoardID, out[i].BoardScope, out[i].HasBoardAdd = boardID, MoveRawName(value), true
+			out[i].BoardID, out[i].BoardScope = boardID, MoveRawName(value)
 		}
 	}
 	return out, rows.Err()

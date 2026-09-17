@@ -132,15 +132,15 @@ type PendingMove struct {
 	RankBefore    bool   `json:"rankBefore"`
 
 	// BoardID and BoardScope are what AddToBoard queued for this issue: the
-	// destination board and where on it, "backlog" or a sprint id. HasBoardAdd
-	// says whether one is pending.
+	// destination board and where on it, BoardScopeBacklog or a sprint id.
+	// AddToBoard refuses an empty scope, so a non-empty BoardScope is what
+	// says an add is pending.
 	//
 	// ponytail: an issue queued onto two boards at once keeps only the last
 	// one this fold saw, the way every other field here holds one value per
 	// issue; a per-board list would be needed to draw both at once.
-	BoardID     int    `json:"boardId"`
-	BoardScope  string `json:"boardScope"`
-	HasBoardAdd bool   `json:"hasBoardAdd"`
+	BoardID    int    `json:"boardId"`
+	BoardScope string `json:"boardScope"`
 
 	HasTransition bool `json:"hasTransition"`
 	HasSprint     bool `json:"hasSprint"`
@@ -447,6 +447,10 @@ type BoardDraft struct {
 	JQL        string
 }
 
+// BoardScopeBacklog is the scope AddToBoard takes for a card queued onto a
+// board's backlog rather than one of its sprints.
+const BoardScopeBacklog = "backlog"
+
 // BoardCreator is the board-creating half of BoardBackend, kept off it on
 // purpose: BoardBackend's own doc says it never writes, and a board create
 // is exactly that, a write. It is a separate optional interface the
@@ -458,8 +462,9 @@ type BoardCreator interface {
 	// CreateBoard creates a board from the draft and returns its id. The
 	// Jira implementation makes it in two Jira calls, a filter then the
 	// board on it, and rolls the filter back when the board create fails,
-	// so a failed attempt never leaves an orphaned filter behind.
-	CreateBoard(ctx context.Context, d BoardDraft) (int, error)
+	// so a failed attempt never leaves an orphaned filter behind. projectKey
+	// is the project the board and its filter belong to.
+	CreateBoard(ctx context.Context, projectKey string, d BoardDraft) (int, error)
 	// AddToBoardBacklog adds keys to boardID's backlog.
 	AddToBoardBacklog(ctx context.Context, boardID int, keys []string) error
 }

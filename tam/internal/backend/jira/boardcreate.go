@@ -12,24 +12,6 @@ import (
 // silently; this fails the build instead.
 var _ backend.BoardCreator = (*Backend)(nil)
 
-// SetProjectKey records the profile's own project, the same way
-// SetTransitionResolution records its setting: once, when the backend is
-// built. CreateBoard is the one write on this backend that needs a project
-// of its own rather than taking one as an argument, since a board and the
-// filter behind it belong to exactly one project and a profile serves
-// exactly one project.
-func (b *Backend) SetProjectKey(key string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.projectKey = strings.TrimSpace(key)
-}
-
-func (b *Backend) project() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.projectKey
-}
-
 // CreateBoard makes the draft's board in two Jira calls: a filter, shared
 // with the project so the board it backs is visible to the whole team, and
 // then the board on that filter. When the board create fails, the filter it
@@ -42,8 +24,10 @@ func (b *Backend) project() string {
 // so it is never swallowed: the returned error still leads with the board
 // create's own failure and then names the filter id that was left behind,
 // which is the only way anyone could find and remove it later.
-func (b *Backend) CreateBoard(ctx context.Context, d backend.BoardDraft) (int, error) {
-	projectKey := b.project()
+//
+// projectKey scopes the filter's share and the board's location, since a
+// board and the filter behind it belong to exactly one project.
+func (b *Backend) CreateBoard(ctx context.Context, projectKey string, d backend.BoardDraft) (int, error) {
 	if projectKey == "" {
 		return 0, fmt.Errorf("create board %q: no project is configured for this connection", d.Name)
 	}
@@ -65,11 +49,8 @@ func (b *Backend) CreateBoard(ctx context.Context, d backend.BoardDraft) (int, e
 }
 
 // AddToBoardBacklog adds keys to boardID's backlog. An empty batch asks
-// Jira nothing, the same rule MoveIssuesToSprint follows.
+// Jira nothing: core's batching loop sends no request for no keys.
 func (b *Backend) AddToBoardBacklog(ctx context.Context, boardID int, keys []string) error {
-	if len(keys) == 0 {
-		return nil
-	}
 	if err := b.c.AddToBoardBacklog(ctx, boardID, keys); err != nil {
 		return fmt.Errorf("add %s to board %d backlog: %w", strings.Join(keys, ", "), boardID, err)
 	}
