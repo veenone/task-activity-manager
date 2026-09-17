@@ -105,8 +105,8 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		if err := discardSprintEdit(ctx, tx, profileID, p); err != nil {
 			return err
 		}
-	case p.EntityType == EntitySprintDelete:
-		// Nothing local changed when the delete was queued.
+	case p.EntityType == EntitySprintDelete, p.EntityType == EntitySprintStart, p.EntityType == EntitySprintComplete:
+		// Nothing local changed when these were queued.
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
 	case p.EntityType == EntityTransition, p.EntityType == EntitySprintMove, p.EntityType == EntityRank, p.EntityType == EntityIssueBoard:

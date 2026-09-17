@@ -30,9 +30,9 @@ import (
 // repositories would mean two transactions and a crash window leaving a
 // sprint nobody can discard.
 //
-// Editing and deleting a sprint Jira already holds are journaled too
-// (sprintwrites.go); starting and completing one stay immediate writes in
-// internal/sprints.
+// Editing, deleting, starting and completing a sprint are journaled too
+// (sprintwrites.go, sprintceremonies.go), and a draft can be started before
+// Commit creates it.
 
 // EntitySprintCreate is the journal entity type of a drafted sprint. Its key
 // is the negative id as text, its field FieldCreate, and its after_val the
@@ -224,8 +224,9 @@ func readDraftSprint(ctx context.Context, tx *sql.Tx, profileID, key string) (Dr
 }
 
 // discardDraftSprint is what discarding a sprint_create row takes with it:
-// every journaled move into the sprint is reverted and dropped, every draft
-// issue in it leaves it, and its draft row goes. The create row itself is
+// every journaled move into the sprint is reverted and dropped, its pending
+// start is dropped, every draft issue in it leaves it, and its draft row
+// goes. The create row itself is
 // deleted and audited by discardOne, like every other row.
 func discardDraftSprint(ctx context.Context, tx *sql.Tx, profileID, key string) error {
 	all, err := journal.List(tx, profileID)
@@ -233,16 +234,21 @@ func discardDraftSprint(ctx context.Context, tx *sql.Tx, profileID, key string) 
 		return err
 	}
 	for _, p := range all {
-		if p.EntityType != EntitySprintMove || MoveID(p.AfterVal) != key {
+		why := "the draft sprint it was moving into was discarded"
+		switch {
+		case p.EntityType == EntitySprintStart && p.EntityKey == key:
+			why = "the draft sprint it would start was discarded"
+		case p.EntityType == EntitySprintMove && MoveID(p.AfterVal) == key:
+			if err := revertMove(ctx, tx, profileID, p); err != nil {
+				return err
+			}
+		default:
 			continue
-		}
-		if err := revertMove(ctx, tx, profileID, p); err != nil {
-			return err
 		}
 		if err := journal.Delete(tx, profileID, []int64{p.ID}); err != nil {
 			return err
 		}
-		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "discard", p.Field, p.AfterVal, p.BeforeVal, "the draft sprint it was moving into was discarded"); err != nil {
+		if err := journal.Audit(tx, profileID, p.EntityType, p.EntityKey, "discard", p.Field, p.AfterVal, p.BeforeVal, why); err != nil {
 			return err
 		}
 	}

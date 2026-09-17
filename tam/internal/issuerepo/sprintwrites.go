@@ -137,6 +137,9 @@ func (r *Repository) JournalSprintDelete(ctx context.Context, profileID string, 
 				return err
 			}
 		}
+		if err := refuseQueued(ctx, tx, profileID, sprintID, "deleting", EntitySprintStart, EntitySprintComplete); err != nil {
+			return err
+		}
 		was, state, err := cachedSprint(ctx, tx, profileID, boardID, sprintID)
 		if err != nil {
 			return err
