@@ -28,8 +28,8 @@ const PROGRESS_EVENT = "tam:sync-progress";
 // LockedOperation is what this client can be holding the per-profile lock
 // for. The names are the ones Go's App.acquire is called with, so a refusal
 // made here and a refusal made there are the same sentence about the same
-// operation. The three sprint management writes acquire under "sprint" in
-// Go, the same name the two ceremonies use, so they share it here too.
+// operation. The sprint writes all acquire under "sprint" in Go, so they
+// share that name here too.
 export type LockedOperation = "sync" | "commit" | "boards refresh" | "sprint" | "report" | "rituals";
 
 interface SyncApi {
@@ -60,12 +60,6 @@ interface SyncApi {
   // backend was bound to refuse it. It rejects on failure so the caller's
   // mutation still sees the error.
   runBoardsRefresh: () => Promise<BoardSummary>;
-  // runSprintCeremony runs a start or a completion under the same lock. Both
-  // bound methods take Go's per-profile lock the moment they are called, so
-  // a ceremony started while a sync runs would be refused by the backend on a
-  // shell that still offered Sync. It rejects rather than swallowing: the
-  // dialog is what reports a ceremony's failure, word for word.
-  runSprintCeremony: <T>(action: () => Promise<T>) => Promise<T>;
   // runReport is how the Reports view takes Go's per-profile lock. It is
   // not runQuietLock: a report runs for minutes with no dialog over it and
   // the user looking straight at the window, so leaving the reducer idle
@@ -87,13 +81,13 @@ interface SyncApi {
   // same banner as runRitualsSync; the dialog must never call the binding
   // bare.
   runRitualRoot: (boardId: number, title: string, adopt: boolean) => Promise<RitualRootResult>;
-  // runQuietLock is what a fast management write (creating, renaming, or
-  // destroying a sprint) takes Go's per-profile lock through without reading
-  // as a ceremony. It guards against overlapping a sync, a commit, a boards
-  // refresh, or a ceremony the same synchronous way runSprintCeremony does,
-  // so two locked calls from this client can never race each other, but it
+  // runQuietLock is what a fast sprint write (creating, renaming, starting,
+  // completing or destroying a sprint, all journaled) takes Go's per-profile
+  // lock through. It guards against overlapping a sync, a commit, a boards
+  // refresh, or a report the same synchronous way runReport does, so two
+  // locked calls from this client can never race each other, but it
   // dispatches neither SYNC_START nor SYNC_END: status, canSync, and the
-  // progress banner never move for it, because a create is not something
+  // progress banner never move for it, because a local write is not something
   // every other view needs to announce. Go's own lock still refuses the call
   // outright when another operation already holds it there, and that
   // refusal reaches the caller as an ordinary rejected promise.
@@ -289,27 +283,6 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     }
   }, [activeId, busyRefusal, take, release]);
 
-  // A ceremony is short, one Jira call or a handful, so it reports a stage
-  // rather than a count: there is nothing to page through and no total to
-  // fill in. It emits no progress frames of its own, exactly as the boards
-  // refresh does not.
-  const runSprintCeremony = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
-    if (!activeId) throw new Error("no profile selected");
-    if (statusRef.current !== "idle") throw busyRefusal();
-    take("sprint");
-    dispatch({
-      type: "SYNC_START",
-      clearError: true,
-      initialProgress: { phase: "sprint", fetched: 0, total: 0, done: false, stage: "Talking to Jira" },
-    });
-    try {
-      return await action();
-    } finally {
-      release();
-      dispatch({ type: "SYNC_END" });
-    }
-  }, [activeId, busyRefusal, take, release]);
-
   // A report is the heaviest read this app makes, so it starts the bar with
   // a stage that is true before the first frame lands: nothing has been
   // fetched yet and no total is known, and a bar with no count draws no
@@ -435,7 +408,6 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       runSync,
       runRefresh,
       runBoardsRefresh,
-      runSprintCeremony,
       runReport,
       runRitualsSync,
       runRitualRoot,
@@ -446,7 +418,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       lastBoards: boards.summary,
       lastBoardsAt: boards.at,
     }),
-    [state, running, activeId, runSync, runRefresh, runBoardsRefresh, runSprintCeremony, runReport, runRitualsSync, runRitualRoot, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
+    [state, running, activeId, runSync, runRefresh, runBoardsRefresh, runReport, runRitualsSync, runRitualRoot, runQuietLock, runCommit, lastCommit, dismissConflict, boards],
   );
 
   return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;

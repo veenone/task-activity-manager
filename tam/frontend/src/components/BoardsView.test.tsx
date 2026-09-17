@@ -62,12 +62,8 @@ const sync = vi.hoisted(() => ({
   // refresh and a sync alike. The stub does what the real one does: call the
   // binding and record the pass where the banner reads it.
   runBoardsRefresh: async () => ({}) as api.BoardSummary,
-  // The two ceremonies take Go's per-profile lock, so they run through the
-  // reducer as well. The stub is what the real one is once the lock is
-  // free: it runs the action and hands the answer back.
-  runSprintCeremony: async <T,>(action: () => Promise<T>) => action(),
-  // A create takes the same lock through runQuietLock instead, since it is
-  // not a ceremony; the stub is the same shape once the lock is free, and
+  // Every sprint write takes Go's per-profile lock through runQuietLock; the
+  // stub is what the real one is once the lock is free, and
   // SyncContext.test.tsx is what tests the lock itself.
   runQuietLock: async <T,>(action: () => Promise<T>) => action(),
 }));
@@ -213,7 +209,7 @@ beforeEach(() => {
   vi.mocked(api.CanTransition).mockResolvedValue({ reachable: [], allowed: true });
   vi.mocked(api.JournalSprintMoves).mockResolvedValue(3);
   vi.mocked(api.StartSprint).mockResolvedValue("");
-  vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [], note: "", message: "" });
+  vi.mocked(api.CompleteSprint).mockResolvedValue(undefined);
   vi.mocked(api.CreateSprint).mockResolvedValue({
     sprint: { id: 14, boardId: 1, name: "Sprint 14", state: "future", startDate: "2026-09-14T09:00:00Z", endDate: "2026-09-28T09:00:00Z", goal: "" },
     note: "",
@@ -1341,31 +1337,10 @@ describe("BoardsView sprint ceremonies", () => {
     // region, so an unscoped query matches twice as soon as the region's
     // own timer fires.
     const banner = await screen.findByRole("status", { name: "Sprint outcome" });
-    expect(within(banner).getByText("Sprint 13 is running, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
+    expect(within(banner).getByText("Sprint 13 will start on Commit, 2026-09-14 to 2026-09-28.")).toBeInTheDocument();
   });
 
-  // The sprint started and its board's sprint list did not come back, so the
-  // cached row still calls it future: the picker offers it as a future
-  // sprint and the toolbar offers to start it a second time, which Jira
-  // answers with a 400. The ceremony succeeded, so the note rides with the
-  // sentence rather than replacing it.
-  it("reports a sprint list it could not re-read beside the start it did make", async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.StartSprint).mockResolvedValue(
-      "the board's sprint list could not be re-read: 503 Service Unavailable, so the sprint list on screen may be out of date; press Refresh.",
-    );
-    renderView();
-    const dialog = await openStart(user);
-    await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
-    await user.click(within(dialog).getByRole("button", { name: "Start sprint" }));
-
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Start Sprint 13" })).not.toBeInTheDocument());
-    const banner = await screen.findByRole("status", { name: "Sprint outcome" });
-    expect(within(banner).getByText(/Sprint 13 is running, 2026-09-14 to 2026-09-28\./)).toBeInTheDocument();
-    expect(within(banner).getByText(/press Refresh\./)).toBeInTheDocument();
-  });
-
-  it("refuses an end date before the start without asking Jira", async () => {
+  it("refuses an end date before the start without saving it", async () => {
     const user = userEvent.setup();
     renderView();
     const dialog = await openStart(user);
@@ -1376,14 +1351,14 @@ describe("BoardsView sprint ceremonies", () => {
     expect(api.StartSprint).not.toHaveBeenCalled();
   });
 
-  it("keeps the start dialog open with Jira's message when the start fails", async () => {
+  it("keeps the start dialog open with the refusal when the start is refused", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.StartSprint).mockRejectedValue(new Error("Sprint 12 is already active on this board"));
+    vi.mocked(api.StartSprint).mockRejectedValue(new Error("sprint 13 is waiting to be deleted on Commit"));
     renderView();
     const dialog = await openStart(user);
     await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
     await user.click(within(dialog).getByRole("button", { name: "Start sprint" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Sprint 12 is already active on this board");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("sprint 13 is waiting to be deleted on Commit");
     // Still open, still holding what the user typed, and the button is the
     // retry: there is no offline state to disable it for.
     expect(screen.getByRole("dialog", { name: "Start Sprint 13" })).toBeInTheDocument();
@@ -1399,8 +1374,8 @@ describe("BoardsView sprint ceremonies", () => {
     const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
 
     // Two of the three cards are outside the board's last column, and the
-    // dialog names them rather than counting them.
-    expect(within(dialog).getByText("2 cards are not finished and will move out of the sprint:")).toBeInTheDocument();
+    // dialog names them beside its estimate.
+    expect(within(dialog).getByText(/^About 2 cards are not finished. The exact set is worked out again on Commit/)).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-409")).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
     expect(within(dialog).queryByText("PLAT-347")).not.toBeInTheDocument();
@@ -1412,9 +1387,8 @@ describe("BoardsView sprint ceremonies", () => {
     expect(within(destination).getByRole("option", { name: "Sprint 13" })).toBeInTheDocument();
   });
 
-  it("completes into the chosen sprint and says what moved where", async () => {
+  it("saves the completion into the chosen sprint and says it waits for Commit", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "Sprint 13", failed: [], note: "", message: "" });
     renderView();
     await screen.findByRole("gridcell", { name: /PLAT-412/ });
     await user.click(screen.getByRole("button", { name: "Complete sprint" }));
@@ -1422,104 +1396,14 @@ describe("BoardsView sprint ceremonies", () => {
     await user.selectOptions(within(dialog).getByRole("combobox", { name: "Move them to" }), "13");
     await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
 
-    await waitFor(() => expect(api.CompleteSprint).toHaveBeenCalledWith("p1", 1, 12, "13"));
+    await waitFor(() => expect(api.CompleteSprint).toHaveBeenCalledWith("p1", 1, 12, "13", 2));
     const banner = await screen.findByRole("status", { name: "Sprint outcome" });
     expect(
-      within(banner).getByText("Sprint 12 is closed. 2 unfinished cards moved to Sprint 13."),
+      within(banner).getByText("Sprint 12 will be completed on Commit. Unfinished cards move to Sprint 13."),
     ).toBeInTheDocument();
-    // The picker moved to where the cards went, rather than to whatever is
-    // first in the list.
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("13"));
-  });
-
-  // The same postscript on the other ceremony: the sprint is closed and the
-  // cards have moved, and only the list the picker reads is stale.
-  it("reports a sprint list it could not re-read beside the completion it did make", async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockResolvedValue({
-      moved: 2,
-      movedTo: "the backlog",
-      failed: [],
-      note: "the board's sprint list could not be cached: disk full, so the sprint list on screen may be out of date; press Refresh.",
-      message: "",
-    });
-    renderView();
-    await screen.findByRole("gridcell", { name: /PLAT-412/ });
-    await user.click(screen.getByRole("button", { name: "Complete sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
-    await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
-
-    const banner = await screen.findByRole("status", { name: "Sprint outcome" });
-    expect(within(banner).getByText(/Sprint 12 is closed\. 2 unfinished cards moved to the backlog\./)).toBeInTheDocument();
-    expect(within(banner).getByText(/press Refresh\./)).toBeInTheDocument();
-  });
-
-  // A push that fell over partway comes back as a completion carrying its
-  // own message, never as a rejection: Wails hands the frontend the value or
-  // the error and never both, and the keys are the half that matters. The
-  // dialog then stops promising a move and names the cards that did not make
-  // it, which is the one thing the user needs when every unfinished card has
-  // already left an open sprint.
-  it("names the cards a half finished completion did not move", async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockResolvedValue({
-      moved: 1,
-      movedTo: "the backlog",
-      failed: ["PLAT-412"],
-      note: "",
-      message: "1 of 2 unfinished issues moved to the backlog, so the sprint was left open: 403 Forbidden",
-    });
-    renderView();
-    await screen.findByRole("gridcell", { name: /PLAT-412/ });
-    await user.click(screen.getByRole("button", { name: "Complete sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
-    await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
-
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("the sprint was left open");
-    expect(screen.getByRole("dialog", { name: "Complete Sprint 12" })).toBeInTheDocument();
-    // The list is about the cards that did not move now, and says so rather
-    // than promising a move over a list that has changed meaning underneath.
-    expect(
-      within(dialog).getByText("1 card did not move and is still in Sprint 12:"),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
-    expect(within(dialog).queryByText("PLAT-409")).not.toBeInTheDocument();
-    // The foot reports what happened instead of promising what will.
-    expect(within(dialog).getByText("1 card moved to the backlog.")).toBeInTheDocument();
-    expect(within(dialog).queryByText(/cards move to/)).not.toBeInTheDocument();
-  });
-
-  // Every card moved and then Jira refused the close, which is the worst
-  // state this feature reaches. It comes back as a completion carrying a
-  // message and naming no failed card, so the dialog reports what happened
-  // and drops everything that was about what would: the list, the
-  // destination, and the footer's promise were all future tense over a move
-  // that had already been made.
-  it("stops promising a move when the close failed after every card moved", async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.CompleteSprint).mockResolvedValue({
-      moved: 2,
-      movedTo: "the backlog",
-      failed: [],
-      note: "",
-      message: "2 of 2 unfinished issues moved to the backlog, but the sprint could not be closed and is open with none of them in it: 403 Forbidden",
-    });
-    renderView();
-    await screen.findByRole("gridcell", { name: /PLAT-412/ });
-    await user.click(screen.getByRole("button", { name: "Complete sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
-    await user.click(within(dialog).getByRole("button", { name: "Complete sprint" }));
-
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent("could not be closed");
-    expect(screen.getByRole("dialog", { name: "Complete Sprint 12" })).toBeInTheDocument();
-    // No list, because no card is still in the sprint to be listed.
-    expect(within(dialog).queryByText(/will move out of the sprint/)).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("PLAT-409")).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("combobox", { name: "Move them to" })).not.toBeInTheDocument();
-    // The foot reports the move rather than promising it.
-    expect(within(dialog).getByText("2 cards moved to the backlog.")).toBeInTheDocument();
-    expect(within(dialog).queryByText(/cards move to/)).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/Jira is re-read when the sprint is completed/)).not.toBeInTheDocument();
+    // Nothing has moved yet, so the picker stays on the sprint being
+    // completed.
+    expect(screen.getByRole("combobox", { name: "Sprint" })).toHaveValue("12");
   });
 
   // The list is the drawn board, and a drawn board is not the whole sprint.
@@ -1541,7 +1425,7 @@ describe("BoardsView sprint ceremonies", () => {
     await user.click(screen.getByRole("button", { name: "Complete sprint" }));
     const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
 
-    expect(within(dialog).getByText(/This is the board as TAM last synced it/)).toBeInTheDocument();
+    expect(within(dialog).getByText("The list is the board as TAM last synced it.")).toBeInTheDocument();
     // Two in the first column's overflow, three unmapped and one unsynced.
     // The four in the last column's overflow have finished, so they are not
     // cards this list is meant to be naming.

@@ -11,7 +11,7 @@ import {
   ListActivity,
   ListPendingChanges,
 } from "../api";
-import { ENTITY_BOARD_CREATE, SPRINT_ENTITIES, isMoveEntity } from "../api";
+import { ENTITY_BOARD_CREATE, ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, SPRINT_ENTITIES, isMoveEntity } from "../api";
 import type { DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
@@ -209,4 +209,23 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     ...groups.filter((g) => isIssue(g) && g.createRow),
     ...groups.filter((g) => isIssue(g) && !g.createRow),
   ];
+}
+
+// WAITING_LABELS is the chip a sprint wears while a start, a completion or a
+// delete of it waits for Commit.
+const WAITING_LABELS: Record<string, string> = {
+  [ENTITY_SPRINT_START]: "Starting on Commit",
+  [ENTITY_SPRINT_COMPLETE]: "Completing on Commit",
+  [ENTITY_SPRINT_DELETE]: "Deleting on Commit",
+};
+
+// sprintWaiting maps each sprint id to the chip it wears, from the journal.
+// A sprint has at most one of the three, since each refuses the others.
+export function sprintWaiting(rows: PendingChange[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const row of rows) {
+    const label = WAITING_LABELS[row.entityType];
+    if (label) out.set(Number(row.entityKey), label);
+  }
+  return out;
 }

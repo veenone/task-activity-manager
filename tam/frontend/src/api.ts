@@ -400,30 +400,6 @@ export interface SprintSuggestion {
   fromHistory: boolean;
 }
 
-// SprintCompletion is what a completion did, mirroring sprints.Completion.
-// It comes back with a failure as well as with a success: a push that fell
-// over partway has already taken cards out of the sprint, and the dialog has
-// to say how many went where before it says the sprint is still open.
-//
-// message is how that failure arrives, rather than as a rejected promise.
-// Wails hands the frontend either a bound method's value or its error and
-// never both, so a partial completion reported as an error would deliver the
-// sentence and drop failed, which is the list the user needs. A non-empty
-// message means the completion did not finish.
-//
-// note is the other way round: the sprint closed and the cards moved, and
-// something after that did not land. Today that is the board's sprint list,
-// which the ceremony re-reads so the picker stops calling a closed sprint
-// active, and which leaves the toolbar offering the wrong button when it
-// cannot be read. It is reported beside the success, never instead of it.
-export interface SprintCompletion {
-  moved: number;
-  movedTo: string;
-  failed: string[];
-  note: string;
-  message: string;
-}
-
 // SprintCreated is what CreateSprint answers with, mirroring the App-level
 // SprintCreated struct: the sprint Jira made, whose id is what the dialog
 // switches the board's picker to, and the note beside it when the board's
@@ -707,7 +683,34 @@ export interface DraftBoard {
 // { boardId, name } and its beforeVal the name.
 export const ENTITY_SPRINT_EDIT = "sprint_edit";
 export const ENTITY_SPRINT_DELETE = "sprint_delete";
-export const SPRINT_ENTITIES: string[] = [ENTITY_SPRINT_CREATE, ENTITY_SPRINT_EDIT, ENTITY_SPRINT_DELETE];
+// ENTITY_SPRINT_START and ENTITY_SPRINT_COMPLETE are a start and a completion
+// waiting for Commit, keyed by the sprint id (a draft's negative id for a
+// start). A start's afterVal is a SprintStart, a completion's a
+// SprintComplete; neither has a beforeVal.
+export const ENTITY_SPRINT_START = "sprint_start";
+export const ENTITY_SPRINT_COMPLETE = "sprint_complete";
+export const SPRINT_ENTITIES: string[] = [
+  ENTITY_SPRINT_CREATE, ENTITY_SPRINT_EDIT, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, ENTITY_SPRINT_COMPLETE,
+];
+
+// SprintStart mirrors issuerepo.SprintStart: what a sprint_start row carries.
+export interface SprintStart {
+  boardId: number;
+  name: string;
+  goal: string;
+  startDate: string;
+  endDate: string;
+}
+
+// SprintComplete mirrors issuerepo.SprintComplete: what a sprint_complete row
+// carries. moveTo is empty for the backlog.
+export interface SprintComplete {
+  boardId: number;
+  name: string;
+  moveTo: string;
+  moveToName: string;
+  previewCount: number;
+}
 
 // SprintEdit mirrors issuerepo.SprintEdit: what a sprint_edit row carries.
 export interface SprintEdit {
@@ -868,8 +871,8 @@ export interface CommitResult {
   // createdSprints and held are optional for the same reason CommitFailure's
   // fields are: fixtures written before phased Commit do not spell them out.
   createdSprints?: { draftId: number; id: number; name: string }[];
-  // sprintsChanged names each pushed sprint edit or delete, "Sprint 12
-  // edited"; optional for the same reason.
+  // sprintsChanged names each pushed sprint edit, start, completion or
+  // delete, "Sprint 12 edited"; optional for the same reason.
   sprintsChanged?: string[];
   linked: { key: string; toKey: string; type: string }[];
   // moved is optional for the same reason CommitFailure's fields are.
@@ -1053,13 +1056,12 @@ export const GetBoard = (
   App.GetBoard(profileId, boardId, sprintId, swimlane) as Promise<BoardView>;
 export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.SyncBoards;
 
-// The two sprint ceremonies and the two reads the dialogs open with. Unlike
-// every other write on this surface, the ceremonies push to Jira the moment
-// they are called and take the app's per-profile lock while they do, so both
-// go through SyncContext rather than being called from a component directly.
-// StartSprint answers with the note the ceremony left, empty when there is
-// none: the sprint started and the board's sprint list could not be re-read
-// afterwards, so the picker on screen is stale.
+// The two sprint ceremonies and the read the start dialog opens with. Both
+// ceremonies are journaled and sent on Commit, but take the app's
+// per-profile lock, so both go through SyncContext's runQuietLock rather
+// than being called from a component directly. StartSprint answers "".
+// CompleteSprint carries the dialog's count of unfinished cards; Commit
+// works the set out again from Jira.
 export const StartSprint: (
   profileId: string,
   boardId: number,
@@ -1069,19 +1071,19 @@ export const StartSprint: (
   start: string,
   end: string,
 ) => Promise<string> = App.StartSprint;
-export const CompleteSprint = (
+export const CompleteSprint: (
   profileId: string,
   boardId: number,
   sprintId: number,
   moveTo: string,
-): Promise<SprintCompletion> =>
-  App.CompleteSprint(profileId, boardId, sprintId, moveTo) as Promise<SprintCompletion>;
+  previewCount: number,
+) => Promise<void> = App.CompleteSprint;
 export const SuggestSprintDates = (profileId: string, boardId: number): Promise<SprintSuggestion> =>
   App.SuggestSprintDates(profileId, boardId) as Promise<SprintSuggestion>;
 // CreateSprint, EditSprint and DeleteSprint make, change and destroy a
-// sprint. All three are journaled and sent on Commit, but they take the
-// same per-profile lock the two ceremonies do, so a caller reaches them
-// through the lock SyncContext holds rather than calling them directly. CreateSprint's four fields are the dialog's whole draft;
+// sprint. All three are journaled and sent on Commit, and take the same
+// per-profile lock the two ceremonies do, the same way. CreateSprint's four
+// fields are the dialog's whole draft;
 // EditSprint's clearGoal is the one argument the draft alone cannot carry,
 // since an empty goal box left alone and one asking to clear a goal that was
 // there are different requests.

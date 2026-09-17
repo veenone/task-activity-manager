@@ -1,7 +1,7 @@
 import type { SprintOption } from "../api";
 
 // DRAFT_SPRINT_HINT is the tooltip on every action a draft sprint cannot
-// take yet: Start and Complete need a sprint Jira holds.
+// take yet: Complete needs a sprint Jira holds.
 export const DRAFT_SPRINT_HINT = "Commit this sprint first";
 
 // duplicateNameIds is which sprint ids share a name with another sprint in

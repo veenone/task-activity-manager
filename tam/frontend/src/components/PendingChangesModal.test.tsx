@@ -8,7 +8,7 @@ import * as api from "../api";
 import type { PendingChange } from "../api";
 import { profileBackend } from "../profileBackend";
 import { SyncProvider } from "../contexts/SyncContext";
-import { PendingChangesModal } from "./PendingChangesModal";
+import { PendingChangesModal, sprintChangeLine } from "./PendingChangesModal";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
@@ -283,6 +283,46 @@ describe("PendingChangesModal", () => {
     expect(within(dialog).getByRole("button", { name: "Commit (3)" })).toBeEnabled();
     await user.click(within(cards[0]).getByRole("button", { name: "Discard Sprint 15" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 9));
+  });
+
+  it("shows a start and a completion in words, a draft's start on its own card, and discards each", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 42, entityType: "sprint_complete", entityKey: "12", field: "complete", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", moveTo: "13", moveToName: "Sprint 13", previewCount: 3 }) },
+      { id: 41, entityType: "sprint_start", entityKey: "13", field: "start", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ boardId: 1, name: "Sprint 13", goal: "", startDate: "2026-09-14T09:00:00.000+0000", endDate: "2026-09-28T09:00:00.000+0000" }) },
+      { id: 40, entityType: "sprint_start", entityKey: "-1", field: "start", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ boardId: 1, name: "Sprint 15", goal: "", startDate: "2026-09-29T09:00:00.000+0000", endDate: "2026-10-12T09:00:00.000+0000" }) },
+      { id: 39, entityType: "sprint_create", entityKey: "-1", field: "create", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ boardId: 1, boardName: "PLAT Scrum", name: "Sprint 15", goal: "", startDate: "2026-09-29T09:00:00.000+0000", endDate: "2026-10-12T09:00:00.000+0000" }) },
+    ]);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [], linked: [], conflicts: [], failures: [], remaining: 0,
+      sprintsChanged: ["Sprint 12 completed, 45 unfinished cards moved to Sprint 13"],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    expect(await within(dialog).findByText("4 changes: 1 new sprint, 2 sprint changes")).toBeInTheDocument();
+    const cards = within(dialog).getAllByRole("group");
+    expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Sprint 15", "Sprint 12", "Sprint 13"]);
+    expect(cards[0]).toHaveTextContent("Start sprint Sprint 15, 2026-09-29 to 2026-10-12");
+    expect(cards[2]).toHaveTextContent("Start sprint Sprint 13, 2026-09-14 to 2026-09-28");
+    expect(cards[2]).toHaveTextContent("Commit starts it in Jira.");
+    expect(cards[1]).toHaveTextContent("Complete sprint Sprint 12, unfinished cards to Sprint 13");
+    expect(cards[1]).toHaveTextContent("Commit works out the unfinished cards from Jira again");
+    await user.click(within(cards[0]).getByRole("button", { name: "Discard the change to Sprint 15" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 40));
+    await user.click(within(cards[1]).getByRole("button", { name: "Discard the change to Sprint 12" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 42));
+    await user.click(within(dialog).getByRole("button", { name: "Commit (3)" }));
+    expect(await within(dialog).findByText("Last commit: 1 sprint change pushed (Sprint 12 completed, 45 unfinished cards moved to Sprint 13).")).toBeInTheDocument();
+  });
+
+  it("reads a completion into the backlog as such", () => {
+    expect(sprintChangeLine({ id: 1, entityType: "sprint_complete", entityKey: "12", field: "complete", beforeVal: "", baseVersion: "", createdAt: "",
+      afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", moveTo: "", moveToName: "", previewCount: 0 }) }))
+      .toBe("Complete sprint Sprint 12, unfinished cards to the backlog");
   });
 
   it("shows an edit and a delete of real sprints in words, and discards each", async () => {

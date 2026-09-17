@@ -1,6 +1,6 @@
 import type { Board, Sprint, Swimlane } from "../api";
 import { SWIMLANES } from "../api";
-import { DRAFT_SPRINT_HINT, draftLabel } from "../lib/sprintOptions";
+import { draftLabel } from "../lib/sprintOptions";
 
 interface Props {
   boards: Board[];
@@ -19,9 +19,9 @@ interface Props {
   canRefresh: boolean;
   onRefresh: () => void;
   // The two ceremonies, offered by the state of the sprint on screen: a
-  // future sprint can be started and the active one completed. Neither
-  // button is ever disabled for a connection TAM cannot see: the call is
-  // attempted and its dialog reports what Jira said.
+  // future sprint, a draft among them, can be started and the active one
+  // completed. Neither is ever disabled: each dialog saves locally and
+  // reports a refusal in its own words.
   onStart: () => void;
   onComplete: () => void;
   // onCreate opens the New sprint dialog, offered whenever a scrum board is
@@ -133,15 +133,7 @@ export function BoardsToolbar({
           <button type="button" className="btn" onClick={onCreate}>New sprint</button>
         )}
         {canStart && (
-          <button
-            type="button"
-            className="btn"
-            onClick={onStart}
-            disabled={!!sprint?.draft}
-            title={sprint?.draft ? DRAFT_SPRINT_HINT : undefined}
-          >
-            Start sprint
-          </button>
+          <button type="button" className="btn" onClick={onStart}>Start sprint</button>
         )}
         {canComplete && (
           <button type="button" className="btn" onClick={onComplete}>Complete sprint</button>

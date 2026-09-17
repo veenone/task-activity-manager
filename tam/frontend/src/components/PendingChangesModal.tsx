@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/core";
-import { ENTITY_SPRINT_EDIT, fieldLabel } from "../api";
-import type { DraftBoard, DraftSprint, IssueDraft, PendingChange, Profile, Settings, SprintEdit } from "../api";
+import { ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_EDIT, ENTITY_SPRINT_START, fieldLabel } from "../api";
+import type { DraftBoard, DraftSprint, IssueDraft, PendingChange, Profile, Settings, SprintComplete, SprintEdit, SprintStart } from "../api";
 import { ISSUE_TYPES } from "../api";
 import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
@@ -52,8 +52,8 @@ export function boardDraftLine(b: DraftBoard | null): string {
   return `${type} board on the filter ${b.filterName}: ${b.jql}`;
 }
 
-// sprintChangeName is the sprint's name as Jira has it: an edit's before
-// value, a delete's own.
+// sprintChangeName is the sprint's name: an edit's before value, the name
+// every other change carries.
 function sprintChangeName(row: PendingChange): string {
   try {
     const name = row.entityType === ENTITY_SPRINT_EDIT
@@ -65,10 +65,37 @@ function sprintChangeName(row: PendingChange): string {
   }
 }
 
-// sprintChangeLine reads a sprint edit or delete in words: "Edit sprint
-// Sprint 12: name to Sprint 12b, goal removed".
+// sprintChangeNote says what Commit does with a sprint change.
+function sprintChangeNote(row: PendingChange): string {
+  switch (row.entityType) {
+    case ENTITY_SPRINT_EDIT: return "Saved locally. Commit sends the change to Jira.";
+    case ENTITY_SPRINT_START: return "Commit starts it in Jira.";
+    case ENTITY_SPRINT_COMPLETE: return "Commit works out the unfinished cards from Jira again, moves them, and closes the sprint.";
+    default: return "Commit deletes it in Jira, and Jira moves its cards to the backlog.";
+  }
+}
+
+// sprintChangeLine reads a sprint change in words: "Edit sprint Sprint 12:
+// name to Sprint 12b, goal removed", "Start sprint Sprint 13, 2026-09-14 to
+// 2026-09-28", "Complete sprint Sprint 12, unfinished cards to the backlog".
 export function sprintChangeLine(row: PendingChange): string {
   const name = sprintChangeName(row);
+  if (row.entityType === ENTITY_SPRINT_START) {
+    try {
+      const s = JSON.parse(row.afterVal) as SprintStart;
+      return `Start sprint ${name}, ${dayInput(s.startDate)} to ${dayInput(s.endDate)}`;
+    } catch {
+      return `Start sprint ${name}`;
+    }
+  }
+  if (row.entityType === ENTITY_SPRINT_COMPLETE) {
+    try {
+      const c = JSON.parse(row.afterVal) as SprintComplete;
+      return `Complete sprint ${name}, unfinished cards to ${c.moveToName || "the backlog"}`;
+    } catch {
+      return `Complete sprint ${name}`;
+    }
+  }
   if (row.entityType !== ENTITY_SPRINT_EDIT) return `Delete sprint ${name}`;
   try {
     const was = JSON.parse(row.beforeVal) as DraftSprint;
@@ -154,6 +181,21 @@ export function PendingChangesModal({ onClose }: Props) {
     void notice({ title: "Discard failed", message: errMsg(e), tone: "error" });
   }
 
+  // sprintChangeRows is a sprint's pending edit, start, completion or delete,
+  // each in words with its own Discard, on a real sprint's card or a draft's.
+  function sprintChangeRows(changes: PendingChange[], name: string) {
+    return changes.map((row) => (
+      <div key={row.id}>
+        <div className="pending-card-head">
+          <span className="b">{sprintChangeLine(row)}</span>
+          <button type="button" className="btn btn-discard pending-discard" disabled={busy} aria-label={`Discard the change to ${name}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
+          </button>
+        </div>
+        <p className="muted small">{sprintChangeNote(row)}</p>
+      </div>
+    ));
+  }
+
   async function onDiscardAll() {
     const ok = await confirm({
       title: "Discard all pending changes?",
@@ -223,6 +265,7 @@ export function PendingChangesModal({ onClose }: Props) {
                     </div>
                     <p className="muted small">{sprintDraftLine(g.sprint)}</p>
                     <p className="muted small">Commit creates it in Jira first, then moves its cards into it. Discarding it puts those cards back.</p>
+                    {sprintChangeRows(g.sprintChanges, name)}
                   </section>
                 );
               }
@@ -230,18 +273,7 @@ export function PendingChangesModal({ onClose }: Props) {
                 const name = sprintChangeName(g.sprintChanges[0]);
                 return (
                   <section key={g.id} className="pending-card" role="group" aria-label={name}>
-                    {g.sprintChanges.map((row) => (
-                      <div key={row.id} className="pending-card-head">
-                        <span className="b">{sprintChangeLine(row)}</span>
-                        <button type="button" className="btn btn-discard pending-discard" disabled={busy} aria-label={`Discard the change to ${name}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
-                        </button>
-                      </div>
-                    ))}
-                    <p className="muted small">
-                      {g.sprintChanges[0].entityType === ENTITY_SPRINT_EDIT
-                        ? "Saved locally. Commit sends the change to Jira."
-                        : "Commit deletes it in Jira, and Jira moves its cards to the backlog."}
-                    </p>
+                    {sprintChangeRows(g.sprintChanges, name)}
                   </section>
                 );
               }

@@ -574,25 +574,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-incomplete-card { display: flex; align-items: baseline; gap: 10px; padding: 6px 10px; }
 
 /* Phase 3c: the Sprints view. The tree reuses the Epics view's pane and the
-   shared folder-tree classes; what it adds is its own two row shapes, the
-   assignee bands between them, and the marker for a write that does not wait
-   for Commit. */
-
-/* Painted in the accent, never in amber: amber already means held locally
-   and waiting for Commit (the pending dot, the draft chip, a flashed row),
-   and this chip is that claim's opposite. */
-.chip-now {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  white-space: nowrap;
-}
-
-/* The chip with the sentence that was there before it. The chip is the
-   marker the eye finds; the line under it names Commit, which is what the
-   marker is about and what the reader has been trained on everywhere else
-   in the app. */
-.immediate-write { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+   shared folder-tree classes; what it adds is its own two row shapes and the
+   assignee bands between them. */
 
 /* One scrum board is named rather than picked, so the heading sits where the
    picker would have and reads at the same weight as its label. */

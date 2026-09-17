@@ -20,7 +20,7 @@ import {
   SuggestSprintDates,
   SyncBoards,
 } from "../api";
-import type { BoardSummary, SprintCompletion, SprintCreated } from "../api";
+import type { BoardSummary, SprintCreated } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
 import { invalidateSprintWrites } from "./sprints";
@@ -218,17 +218,16 @@ export function useSprintSuggestion(profileId: string, boardId: number, enabled:
   });
 }
 
-// The sprint writes that reach Jira the moment they are called. The two
-// ceremonies below go through run, which is SyncContext's runSprintCeremony:
-// it holds the same per-profile lock a sync and a commit hold, injected
-// rather than reached for so this module stays free of the context. Creating
-// a sprint takes that same lock through a quieter path, for the reason
-// useCreateSprint's own comment gives.
+// The two sprint ceremonies. Both are journal writes Commit sends, and both
+// go through run, which is SyncContext's runQuietLock: it holds Go's
+// per-profile lock for the call, injected rather than reached for so this
+// module stays free of the context.
 //
 // What each of them refreshes afterwards is queries/sprints.ts's
-// invalidateSprintWrites, shared with the edit and the delete: every one of
-// the five changes the same set of lists, and two lists of keys that had to
-// agree would be one review away from not agreeing.
+// invalidateSprintWrites, shared with the create, the edit and the delete:
+// every one of the five changes the same set of lists, the pending list
+// among them, and two lists of keys that had to agree would be one review
+// away from not agreeing.
 
 export interface StartSprintArgs {
   boardId: number;
@@ -254,19 +253,15 @@ export interface CompleteSprintArgs {
   // moveTo is the destination sprint's id, empty for the backlog, which is a
   // destination and not an absence.
   moveTo: string;
+  // previewCount is how many unfinished cards the dialog showed.
+  previewCount: number;
 }
 
-// A completion refreshes on settle rather than on success, because a
-// completion that failed partway has still moved cards: the board it leaves
-// behind is not the board it started from.
 export function useCompleteSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {
   const qc = useQueryClient();
-  return useMutation<SprintCompletion, Error, CompleteSprintArgs>({
-    mutationFn: (v) => run(() => call(() => CompleteSprint(profileId, v.boardId, v.sprintId, v.moveTo))),
-    onSettled: () => {
-      invalidateSprintWrites(qc, profileId);
-      invalidateWrites(qc, profileId);
-    },
+  return useMutation<void, Error, CompleteSprintArgs>({
+    mutationFn: (v) => run(() => call(() => CompleteSprint(profileId, v.boardId, v.sprintId, v.moveTo, v.previewCount))),
+    onSettled: () => invalidateSprintWrites(qc, profileId),
   });
 }
 
@@ -279,11 +274,8 @@ export interface CreateSprintArgs {
 }
 
 // useCreateSprint is the New sprint button, on the Boards toolbar and on the
-// Sprints view alike. It is a management write, not a ceremony: unlike Start
-// and Complete it does not go through runSprintCeremony, since making a
-// sprint is not something every other view needs to announce with the sync
-// banner. run is SyncContext's runQuietLock, injected the same way the
-// ceremonies' run is, and it still takes Go's per-profile lock for the
+// Sprints view alike. run is SyncContext's runQuietLock, injected the same
+// way the ceremonies' run is, and it takes Go's per-profile lock for the
 // call's duration, so a create during a boards refresh is refused exactly as
 // a start would be, and the dialog is where that refusal is read.
 export function useCreateSprint(profileId: string, run: <T>(action: () => Promise<T>) => Promise<T>) {

@@ -48,7 +48,6 @@ vi.mock("../contexts/SyncContext", () => ({
   useSync: () => ({
     status: "idle",
     runQuietLock: async <T,>(action: () => Promise<T>) => action(),
-    runSprintCeremony: async <T,>(action: () => Promise<T>) => action(),
   }),
 }));
 
@@ -159,7 +158,7 @@ beforeEach(() => {
   vi.mocked(api.EditSprint).mockResolvedValue("");
   vi.mocked(api.DeleteSprint).mockResolvedValue("");
   vi.mocked(api.StartSprint).mockResolvedValue("");
-  vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [], note: "", message: "" });
+  vi.mocked(api.CompleteSprint).mockResolvedValue(undefined);
   vi.mocked(api.SuggestSprintDates).mockResolvedValue({
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
@@ -433,6 +432,19 @@ describe("SprintsView", () => {
     expect(within(screen.getByRole("treeitem", { name: /^Sprint 12,/ })).queryByText("Deleting on Commit")).not.toBeInTheDocument();
   });
 
+  it("marks a sprint waiting to be started or completed on Commit", async () => {
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 6, entityType: "sprint_start", entityKey: "13", field: "start", beforeVal: "", afterVal: "{}", baseVersion: "", createdAt: "" },
+      { id: 7, entityType: "sprint_complete", entityKey: "12", field: "complete", beforeVal: "", afterVal: "{}", baseVersion: "", createdAt: "" },
+    ]);
+    renderView();
+    const future = await screen.findByRole("treeitem", { name: /^Sprint 13,/ });
+    expect(await within(future).findByText("Starting on Commit")).toBeInTheDocument();
+    const active = screen.getByRole("treeitem", { name: /^Sprint 12,/ });
+    expect(within(active).getByText("Completing on Commit")).toBeInTheDocument();
+    expect(within(active).queryByText("Starting on Commit")).not.toBeInTheDocument();
+  });
+
   it("deletes a draft sprint without claiming Jira deletes anything", async () => {
     const user = userEvent.setup();
     const DRAFT = detail({ id: -1, name: "Sprint 15", state: "future", draft: true, goal: "", startDate: "", endDate: "", issues: [] });
@@ -487,7 +499,7 @@ describe("SprintsView", () => {
     const menu = await openMenu(user, "Sprint 12");
     await user.click(within(menu).getByRole("menuitem", { name: "Complete sprint…" }));
     const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
-    expect(within(dialog).getByText("2 cards are not finished and will move out of the sprint:")).toBeInTheDocument();
+    expect(within(dialog).getByText(/^About 2 cards are not finished./)).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
     // PLAT-347 sits in a status the board's Done column collects, so it is
     // finished and does not move.

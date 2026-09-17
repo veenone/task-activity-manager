@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PendingChange } from "../api";
-import { groupPending } from "./pending";
+import { groupPending, sprintWaiting } from "./pending";
 
 function row(id: number, entityType: string, entityKey: string, afterVal = "{}"): PendingChange {
   return { id, entityType, entityKey, field: "x", beforeVal: "", afterVal, baseVersion: "", createdAt: "" };
@@ -35,5 +35,22 @@ describe("groupPending", () => {
     ]);
     expect(groups.map((g) => g.key)).toEqual(["-1", "13", "TAM-NEW-1", "PLAT-1"]);
     expect(groups[1].sprintChanges.map((r) => r.id)).toEqual([3]);
+  });
+});
+
+describe("sprintWaiting", () => {
+  it("names what Commit will do to each sprint and ignores every other row", () => {
+    const waiting = sprintWaiting([
+      row(1, "sprint_start", "13"),
+      row(2, "sprint_complete", "12"),
+      row(3, "sprint_delete", "14"),
+      row(4, "sprint_edit", "15"),
+      row(5, "issue", "16"),
+    ]);
+    expect([...waiting.entries()]).toEqual([
+      [13, "Starting on Commit"],
+      [12, "Completing on Commit"],
+      [14, "Deleting on Commit"],
+    ]);
   });
 });

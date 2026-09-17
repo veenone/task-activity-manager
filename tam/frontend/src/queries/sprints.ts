@@ -43,8 +43,8 @@ export function useBoardSprintDetails(profileId: string, boardId: number) {
 // a sprint and opening Reports shows the sprint before it, under its own
 // name, for the rest of the session.
 //
-// The pending list is here because creating, editing or deleting a sprint
-// is a journal write, and the Commit badge counts it.
+// The pending list is here because every sprint write is a journal write,
+// and the Commit badge counts it.
 export function invalidateSprintWrites(qc: QueryClient, profileId: string) {
   if (!profileId) return;
   for (const queryKey of [
@@ -75,10 +75,8 @@ export interface EditSprintArgs {
 }
 
 // useEditSprint renames a sprint, rewrites its goal, or moves its dates,
-// locally, for Commit to send. It takes the per-profile lock the ceremonies
-// take, but a rename is nothing the other views need announced, so run here
-// is SyncContext's runQuietLock rather than runSprintCeremony, injected the
-// same way and holding Go's lock just as tightly.
+// locally, for Commit to send. run is SyncContext's runQuietLock, the
+// per-profile lock every sprint write takes, injected.
 //
 // That lock is also why the dialog reports its own failures in words.
 // Suppressing the sync banner suppresses the banner and nothing else: the

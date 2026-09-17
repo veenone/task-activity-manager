@@ -3,8 +3,7 @@ import { announce, errMsg, useConfirm, useNotice, useProfile } from "@agile-suit
 import type { Issue, Profile, Settings, SprintDetail } from "../api";
 import { UNASSIGNED_SPRINT_STATE } from "../api";
 import { useBoard, useBoards, useJournalSprintMoves } from "../queries/boards";
-import { usePendingChanges } from "../queries/pending";
-import { ENTITY_SPRINT_DELETE } from "../api";
+import { sprintWaiting, usePendingChanges } from "../queries/pending";
 import { useBoardSprintDetails, useDeleteSprint } from "../queries/sprints";
 import { useSync } from "../contexts/SyncContext";
 import { MOVED_FLASH_MS } from "../lib/flash";
@@ -34,9 +33,8 @@ export function SprintsView() {
   const [showClosed, setShowClosed] = useState(false);
   const [selectedKey, setSelectedKey] = useState("");
   const [collapsedIssues, setCollapsedIssues] = useState(new Set<string>());
-  // The sentence the last sprint write left behind. A write here reaches
-  // Jira at once and the dialog that made it closes on success, so the
-  // banner is where the outcome, and any note riding with it, is read.
+  // The sentence the last sprint write left behind. The dialog that made it
+  // closes on success, so the banner is where the outcome is read.
   const [line, setLine] = useState("");
   const [movedRowId, setMovedRowId] = useState("");
   // Which dialog is open. Each one holds the sprint it was opened on rather
@@ -107,14 +105,11 @@ export function SprintsView() {
   const fill = useJournalSprintMoves(activeId);
   // The profile's journal, read here for two things: the delete
   // confirmation has to know whether a pending move has moved the count it
-  // is about to quote, and a sprint waiting to be deleted wears a chip. It
-  // is the same query the shell's pending badge runs, so this view joins a
-  // read that is already in the cache.
+  // is about to quote, and a sprint waiting to be started, completed or
+  // deleted wears a chip. It is the same query the shell's pending badge
+  // runs, so this view joins a read that is already in the cache.
   const pending = usePendingChanges(activeId);
-  const deletingIds = useMemo(
-    () => new Set((pending.data ?? []).filter((r) => r.entityType === ENTITY_SPRINT_DELETE).map((r) => Number(r.entityKey))),
-    [pending.data],
-  );
+  const waiting = useMemo(() => sprintWaiting(pending.data ?? []), [pending.data]);
   const del = useDeleteSprint(activeId, runQuietLock);
   const askBeforeCompleting = useCompleteGuard(activeId);
 
@@ -322,7 +317,7 @@ export function SprintsView() {
         onClearTo={selection.clearTo}
         movedRowId={movedRowId}
         busyRowId={busyRowId}
-        deletingIds={deletingIds}
+        waiting={waiting}
         onStart={setStarting}
         onComplete={(d) => void askComplete(d)}
         onEdit={setEditing}

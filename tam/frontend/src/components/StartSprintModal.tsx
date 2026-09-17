@@ -3,14 +3,13 @@ import { Modal, announce, errMsg } from "@agile-suite/core";
 import type { Sprint } from "../api";
 import { useSprintSuggestion, useStartSprint } from "../queries/boards";
 import { useSync } from "../contexts/SyncContext";
-import { ImmediateWriteChip } from "./ImmediateWriteChip";
 import { SprintDraftFields, useSprintDraft } from "./SprintDraftForm";
 
 interface Props {
   profileId: string;
   boardId: number;
-  // sprint is the future sprint being started. It already exists in Jira,
-  // with a name Jira gave it; this dialog fills in what starting one needs.
+  // sprint is the future sprint being started, or a draft Commit has not
+  // created yet; this dialog fills in what starting one needs.
   sprint: Sprint;
   // active is the sprint already running on this board, when there is one.
   // Naming it is reading the picker's own data, which is a fact TAM holds;
@@ -18,25 +17,23 @@ interface Props {
   // give, and this dialog does not guess at it.
   active: Sprint | undefined;
   onClose: () => void;
-  // onStarted hands back the sprint that was started and the sentence saying
-  // so, so the board can move its picker to it rather than falling back to
-  // whatever is first, and report what happened where the board reports
-  // everything else.
+  // onStarted hands back the sprint the start was saved for and the sentence
+  // saying so, so the board can keep its picker on it and report what
+  // happened where the board reports everything else.
   onStarted: (sprintId: string, line: string) => void;
 }
 
-// StartSprintModal starts one sprint on Jira. Unlike every other write on
-// the board it does not go through the journal: a sprint's start is a
-// timestamped fact a whole team reads, so it happens now or not at all, and
-// this dialog is where "not at all" is reported.
+// StartSprintModal saves a start of one sprint. Like every other write on
+// the board it goes through the journal: nothing reaches Jira until Commit,
+// which starts the sprint with these values.
 export function StartSprintModal({ profileId, boardId, sprint, active, onClose, onStarted }: Props) {
-  const { runSprintCeremony } = useSync();
+  const { runQuietLock } = useSync();
   const suggestion = useSprintSuggestion(profileId, boardId, true);
-  const start = useStartSprint(profileId, runSprintCeremony);
+  const start = useStartSprint(profileId, runQuietLock);
   const suggested = suggestion.data;
-  // The goal comes from the sprint. Starting one sends the goal box back to
-  // Jira whatever is in it, so a dialog that opened empty over a real goal
-  // was a blank field the user typed into without ever seeing what they were
+  // The goal comes from the sprint. Starting one sends the goal box to Jira
+  // whatever is in it, so a dialog that opened empty over a real goal was a
+  // blank field the user typed into without ever seeing what they were
   // replacing. It is empty for a sprint cached before the goal column
   // existed, which a boards refresh fills in.
   const draft = useSprintDraft({
@@ -53,22 +50,17 @@ export function StartSprintModal({ profileId, boardId, sprint, active, onClose, 
     start.mutate(
       { boardId, sprintId: sprint.id, name: values.name, goal: values.goal, start: values.from, end: values.to },
       {
-        // The note is the ceremony's own postscript, empty almost always:
-        // Jira started the sprint and the board's sprint list could not be
-        // re-read afterwards, so the picker still calls it future and the
-        // toolbar still offers Start. It rides with the sentence into the
-        // board's banner, since this dialog closes on success.
-        onSuccess: (note) => {
-          const started = `${values.name} is running, ${values.from} to ${values.to}.`;
-          const line = note ? `${started} ${note}` : started;
+        // The sentence rides into the board's banner, since this dialog
+        // closes on success.
+        onSuccess: () => {
+          const line = `${values.name} will start on Commit, ${values.from} to ${values.to}.`;
           announce(line);
           onStarted(String(sprint.id), line);
           onClose();
         },
         // The dialog stays open with what the user typed still in it: the
-        // failure is usually Jira's own sentence about a second active
-        // sprint or a permission, and pressing the button again is the
-        // retry.
+        // refusal is a sprint that is not future, a delete waiting for
+        // Commit, or the busy guard naming whichever operation is running.
         onError: (err) => draft.fail(errMsg(err)),
       },
     );
@@ -77,22 +69,17 @@ export function StartSprintModal({ profileId, boardId, sprint, active, onClose, 
   return (
     <Modal onClose={onClose} className="modal pending-modal" labelledBy="start-sprint-title" closeOnOverlayClick={false}>
       <div className="pending-head">
-        <h2 id="start-sprint-title">{`Start ${sprint.name}`}</h2>
-        <span className="immediate-write">
-          <ImmediateWriteChip />
-          {/* The chip is the marker, and this is the word it cannot fit: a
-              user who has learned that nothing in TAM reaches Jira until
-              Commit is owed the sentence that names Commit, and it is the
-              sentence this chip replaced. */}
-          <span className="muted small">This does not wait for Commit.</span>
-        </span>
+        <div className="edit-sprint-title">
+          <h2 id="start-sprint-title">{`Start ${sprint.name}`}</h2>
+          <p>{sprint.draft ? "A draft sprint. Commit creates it in Jira, then starts it." : "Saved locally. Commit starts the sprint in Jira."}</p>
+        </div>
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 
       <form id="start-sprint-form" ref={draft.formRef} className="bulk-body edit-form" onSubmit={onSubmit}>
         {active && (
           <p className="muted small">
-            {`${active.name} is already active on this board, and Jira may refuse a second one.`}
+            {`${active.name} is already active on this board, and Jira may refuse a second one when Commit sends the start.`}
           </p>
         )}
         <SprintDraftFields draft={draft} suggestion={suggested} suggestionError={suggestion.error} />
@@ -105,7 +92,7 @@ export function StartSprintModal({ profileId, boardId, sprint, active, onClose, 
         <span className="pending-footer-buttons">
           <button type="button" className="btn" onClick={onClose} disabled={start.isPending}>Cancel</button>
           <button type="submit" form="start-sprint-form" className="btn btn-primary" disabled={start.isPending}>
-            {start.isPending ? "Starting" : "Start sprint"}
+            {start.isPending ? "Saving" : "Start sprint"}
           </button>
         </span>
       </div>

@@ -22,12 +22,12 @@ function renderToolbar(sprint: Sprint, over: { board?: Board; onNewBoard?: () =>
 }
 
 describe("BoardsToolbar", () => {
-  it("labels a draft sprint in the picker and holds Start back", () => {
+  it("labels a draft sprint in the picker and offers to start it on Commit", () => {
     renderToolbar(draft);
     expect(sprintOption(draft)).toBe("Sprint 15 (draft)");
     const start = screen.getByRole("button", { name: "Start sprint" });
-    expect(start).toBeDisabled();
-    expect(start).toHaveAttribute("title", "Commit this sprint first");
+    expect(start).toBeEnabled();
+    expect(start).not.toHaveAttribute("title");
   });
 
   it("starts a future sprint Jira holds", () => {
