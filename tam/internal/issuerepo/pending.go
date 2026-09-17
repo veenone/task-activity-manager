@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"agile-suite/core/journal"
+	"agile-suite/tam/internal/backend"
 )
 
 const (
-	// DraftPrefix starts the temporary key of an issue created locally and
-	// not yet committed. Commit swaps it for Jira's key.
-	DraftPrefix = "TAM-NEW-"
+	// DraftPrefix is backend.DraftPrefix, kept here for its many callers.
+	DraftPrefix = backend.DraftPrefix
 	// StatusDraft is the status a draft row shows until Commit creates it.
 	StatusDraft = "Draft"
 	// EntityIssue is the journal entity type of a field edit on an issue.

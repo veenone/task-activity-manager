@@ -2,6 +2,7 @@ package boardrepo
 
 import (
 	"strconv"
+	"strings"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -33,7 +34,9 @@ func withMovedIn(boardKeys []string, moves []backend.PendingMove, boardID int, s
 	for _, m := range moves {
 		tiedHere := (sprintID != "" && m.HasSprint && m.SprintID == sprintID) ||
 			(m.BoardID == boardID && m.BoardScope == scope)
-		if !tiedHere || have[m.Key] {
+		// A draft is read from DraftIssues, never by key: the issue table
+		// holds its row too, so looking it up here would draw it twice.
+		if !tiedHere || have[m.Key] || strings.HasPrefix(m.Key, backend.DraftPrefix) {
 			continue
 		}
 		if len(keys) == len(boardKeys) {

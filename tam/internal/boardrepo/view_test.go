@@ -262,6 +262,28 @@ func TestADraftDoesNotArriveThroughIssuesByKeys(t *testing.T) {
 	}
 }
 
+// A draft queued onto the board's backlog carries the real "backlog" scope,
+// which withMovedIn matches on the backlog view. It must still arrive only
+// through DraftIssues, once.
+func TestADraftQueuedOntoTheBacklogIsNotLookedUpByKey(t *testing.T) {
+	r, _ := newRepo(t)
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
+		withDrafts(draftCard("TAM-NEW-1")).
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: backend.BoardScopeBacklog})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Fatalf("To Do = %v, want the card and the draft once each", got)
+	}
+	for _, k := range *src.asked {
+		if strings.HasPrefix(k, "TAM-NEW-") {
+			t.Errorf("the board asked IssuesByKeys for %s; drafts come from DraftIssues", k)
+		}
+	}
+}
+
 func TestADraftIsUnmappedWhenNoColumnHasAStatus(t *testing.T) {
 	r, _ := newRepo(t)
 	cols := []backend.BoardColumn{{Name: "Backlog", StatusIDs: []string{}}, {Name: "Later", StatusIDs: []string{}}}

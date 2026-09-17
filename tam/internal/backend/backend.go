@@ -451,6 +451,10 @@ type BoardDraft struct {
 // board's backlog rather than one of its sprints.
 const BoardScopeBacklog = "backlog"
 
+// DraftPrefix starts the temporary key of an issue created locally and not
+// yet committed. Commit swaps it for Jira's key.
+const DraftPrefix = "TAM-NEW-"
+
 // BoardCreator is the board-creating half of BoardBackend, kept off it on
 // purpose: BoardBackend's own doc says it never writes, and a board create
 // is exactly that, a write. It is a separate optional interface the
