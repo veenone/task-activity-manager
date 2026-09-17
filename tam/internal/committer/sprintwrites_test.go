@@ -13,10 +13,22 @@ import (
 )
 
 // fakeSprints is the SprintWriter seam: every push it was handed, in order,
-// and the error each sprint id answers with.
+// the error each sprint id answers with, and the completion each sprint id
+// reports.
 type fakeSprints struct {
 	calls []string
 	errs  map[int]error
+	done  map[int]sprints.Completion
+}
+
+func (f *fakeSprints) Start(_ context.Context, _ string, boardID, sprintID int, d backend.SprintDraft) (string, error) {
+	f.calls = append(f.calls, fmt.Sprintf("start %d on %d: %s %s", sprintID, boardID, d.Name, d.StartDate))
+	return "", f.errs[sprintID]
+}
+
+func (f *fakeSprints) Complete(_ context.Context, _ string, boardID, sprintID int, moveTo string) (sprints.Completion, error) {
+	f.calls = append(f.calls, fmt.Sprintf("complete %d on %d to %q", sprintID, boardID, moveTo))
+	return f.done[sprintID], f.errs[sprintID]
 }
 
 func (f *fakeSprints) Edit(_ context.Context, _ string, boardID, sprintID int, d backend.SprintDraft, clearGoal bool) (string, error) {
@@ -39,7 +51,7 @@ func withSprints(t *testing.T) (harness, *fakeSprints) {
 			t.Fatal(err)
 		}
 	}
-	f := &fakeSprints{errs: map[int]error{}}
+	f := &fakeSprints{errs: map[int]error{}, done: map[int]sprints.Completion{}}
 	h.eng.Sprints = f
 	return h, f
 }

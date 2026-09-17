@@ -590,24 +590,6 @@ func TestCanTransitionPassesOnBothAnswers(t *testing.T) {
 	}
 }
 
-// lifecycleBackend blocks inside StartSprint until the test lets it go, so a
-// second ceremony can be attempted while the first is genuinely in flight.
-// Everything else it answers comes from the simple board backend.
-type lifecycleBackend struct {
-	simpleBoardBackend
-	started chan struct{}
-	proceed chan struct{}
-	once    sync.Once
-}
-
-func (b *lifecycleBackend) StartSprint(context.Context, int, backend.SprintDraft) error {
-	b.once.Do(func() { close(b.started) })
-	<-b.proceed
-	return nil
-}
-
-var _ backend.BoardBackend = (*lifecycleBackend)(nil)
-
 // seedSprintCard puts one card in the cache in a named sprint, so the bulk
 // move has rows to read, journal against and move.
 func seedSprintCard(t *testing.T, a *App, profileID, key, sprintID, sprintName string) {
@@ -638,9 +620,9 @@ func seedScrumBoard(t *testing.T, a *App, profileID string) {
 }
 
 // TestALifecycleCallIsRefusedWhileABoardsRefreshHoldsTheLock is the guard
-// these two take and the journal writes deliberately do not: they push to
-// Jira, so they queue behind a sync, a commit, an import or a boards
-// refresh, and the refusal has to name which of them is actually running.
+// the two ceremonies take although they only journal: they queue behind a
+// sync, a commit, an import or a boards refresh rewriting the same rows, and
+// the refusal has to name which of them is actually running.
 func TestALifecycleCallIsRefusedWhileABoardsRefreshHoldsTheLock(t *testing.T) {
 	a := newTestApp(t)
 	p := newTestProfile(t, a)
@@ -658,49 +640,8 @@ func TestALifecycleCallIsRefusedWhileABoardsRefreshHoldsTheLock(t *testing.T) {
 	if !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("err = %v, want it to name the operation that is running", err)
 	}
-	if _, err = a.CompleteSprint(p.ID, 1, 12, ""); err == nil || !strings.Contains(err.Error(), "boards refresh") {
+	if err = a.CompleteSprint(p.ID, 1, 12, "", 0); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("CompleteSprint err = %v, want the same refusal", err)
-	}
-}
-
-// TestASecondCeremonyIsRefusedWhileTheFirstRuns catches the guard doing its
-// real job: a start that is in flight, not one the test set a flag for. Two
-// sprints being started at once is exactly what the lock exists to stop.
-func TestASecondCeremonyIsRefusedWhileTheFirstRuns(t *testing.T) {
-	a := newTestApp(t)
-	p := newTestProfile(t, a)
-	seed := twoBoards("PLAT Scrum", "PLAT Kanban", "To Do")
-	blocking := &lifecycleBackend{
-		simpleBoardBackend: *seed,
-		started:            make(chan struct{}),
-		proceed:            make(chan struct{}),
-	}
-	a.backends[p.ID] = blocking
-
-	done := make(chan error, 1)
-	go func() {
-		_, err := a.StartSprint(p.ID, 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23")
-		done <- err
-	}()
-	<-blocking.started
-
-	_, err := a.CompleteSprint(p.ID, 1, 12, "")
-	if err == nil {
-		t.Fatal("a second ceremony while one runs = nil error, want a refusal")
-	}
-	if !strings.Contains(err.Error(), "sprint") || !strings.Contains(err.Error(), "already running") {
-		t.Errorf("err = %v, want the guard's own refusal naming the sprint action", err)
-	}
-
-	close(blocking.proceed)
-	if err := <-done; err != nil {
-		t.Fatalf("the first start: %v, want it to finish", err)
-	}
-	// The lock is released, so the next ceremony is attempted rather than
-	// refused: it fails on the board's own state, which is the backend
-	// talking and not the guard.
-	if _, err := a.CompleteSprint(p.ID, 1, 12, ""); err == nil || strings.Contains(err.Error(), "already running") {
-		t.Errorf("err = %v, want the guard free once the first call returned", err)
 	}
 }
 

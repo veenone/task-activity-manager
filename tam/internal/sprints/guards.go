@@ -17,8 +17,9 @@ import (
 // they refuse. Every one of them exists because the bound method is
 // reachable without the dialog that would have asked the same question.
 
-// destinationID reads the destination the dialog sent: a sprint id, or the
+// DestinationID reads the destination the dialog sent: a sprint id, or the
 // empty string for the backlog, which is a destination and not an absence.
+// The app asks it before it journals a completion, and the push asks again.
 //
 // The id ends up in a URL path, so only a plain positive number is a sprint
 // id here. strconv.Atoi on its own takes "+13", "-1", "0" and "012", and
@@ -26,7 +27,7 @@ import (
 // and went to Jira as it was typed. Comparing the numbers is what catches
 // that, and refusing everything but the canonical form is what keeps the
 // value that reaches Jira the one that was checked.
-func destinationID(moveTo string, sprintID int) (string, error) {
+func DestinationID(moveTo string, sprintID int) (string, error) {
 	moveTo = strings.TrimSpace(moveTo)
 	if moveTo == "" {
 		return "", nil
@@ -46,7 +47,8 @@ func destinationID(moveTo string, sprintID int) (string, error) {
 
 // requireCompletable is what the cache has to say about the sprint before a
 // completion touches Jira: the board holds it, and it is not one that has
-// never been started.
+// never been started. It also says whether the cache holds it as closed,
+// which is a completion that already happened.
 //
 // The pair first. The completion judges "finished" against the board's last
 // column while the cards come from the sprint, so a mismatched pair would
@@ -65,18 +67,24 @@ func destinationID(moveTo string, sprintID int) (string, error) {
 // future in a cache nobody has refreshed since, and refusing that costs a
 // Refresh, where emptying it costs the sprint. A state the cache does not
 // recognise is left to Jira to answer for.
-func (s *Service) requireCompletable(ctx context.Context, profileID string, boardID int, sprintID string) error {
+func (s *Service) requireCompletable(ctx context.Context, profileID string, boardID int, sprintID string) (bool, error) {
 	state, ok, err := s.store.BoardSprintState(ctx, profileID, boardID, sprintID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !ok {
-		return fmt.Errorf("sprint %s is not on board %d, so that board's last column cannot say which of the sprint's cards finished; complete the sprint from the board it belongs to", sprintID, boardID)
+		return false, refusal{fmt.Errorf("sprint %s is not on board %d, so that board's last column cannot say which of the sprint's cards finished; complete the sprint from the board it belongs to", sprintID, boardID)}
 	}
 	if state == "future" {
-		return fmt.Errorf("sprint %s has not been started, and completing it would move its cards out and then fail to close it; start it first, or press Refresh if it was started somewhere else", sprintID)
+		return false, refusal{NotStarted(sprintID)}
 	}
-	return nil
+	return state == "closed", nil
+}
+
+// NotStarted is the refusal for completing a sprint that has never been
+// started, which the app gives from the cache before it journals one.
+func NotStarted(sprintID string) error {
+	return fmt.Errorf("sprint %s has not been started, and completing it would move its cards out and then fail to close it; start it first, or press Refresh if it was started somewhere else", sprintID)
 }
 
 // destination is what the completion reports as the place the cards went.
@@ -99,10 +107,20 @@ func (s *Service) destination(ctx context.Context, profileID, sprintID string) (
 // board and Jira agree about which cards finished.
 func (s *Service) refusePending(ctx context.Context, profileID string, sprintID int) error {
 	n, err := s.pendingInSprint(ctx, profileID, sprintID)
-	if err != nil || n == 0 {
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before completing it, or Jira will be asked which cards finished before it has been told", n)
+	return RefusePendingComplete(n)
+}
+
+// RefusePendingComplete is the refusal for n pending changes on cards staying
+// in a sprint about to be completed, nil when there are none. The app asks it
+// before it journals a completion, and the push asks it again at Commit.
+func RefusePendingComplete(n int) error {
+	if n == 0 {
+		return nil
+	}
+	return refusal{fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before completing it, or Jira will be asked which cards finished before it has been told", n)}
 }
 
 // completeStatuses is what counts as finished for this completion: the rule

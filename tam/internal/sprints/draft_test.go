@@ -34,7 +34,7 @@ func TestNoImmediateWriteReachesJiraForADraftSprint(t *testing.T) {
 	s := manageService(b, store, newIssues(store))
 	ctx := context.Background()
 
-	if _, err := s.Start(ctx, "p1", 1, -1, draft("Sprint 15", "")); err == nil || !strings.Contains(err.Error(), "draft") {
+	if _, err := sprints.ForCommit(s).Start(ctx, "p1", 1, -1, draft("Sprint 15", "")); err == nil || !strings.Contains(err.Error(), "draft") {
 		t.Errorf("start = %v", err)
 	}
 	if _, err := sprints.ForCommit(s).Edit(ctx, "p1", 1, -1, draft("Sprint 15", ""), false); err == nil || !strings.Contains(err.Error(), "draft") {
@@ -43,10 +43,10 @@ func TestNoImmediateWriteReachesJiraForADraftSprint(t *testing.T) {
 	if _, err := sprints.ForCommit(s).Delete(ctx, "p1", 1, -1); err == nil || !strings.Contains(err.Error(), "draft") {
 		t.Errorf("delete = %v", err)
 	}
-	if _, err := s.Complete(ctx, "p1", 1, -1, ""); err == nil || !strings.Contains(err.Error(), "draft") {
+	if _, err := sprints.ForCommit(s).Complete(ctx, "p1", 1, -1, ""); err == nil || !strings.Contains(err.Error(), "draft") {
 		t.Errorf("complete = %v", err)
 	}
-	if _, err := s.Complete(ctx, "p1", 1, 12, "-1"); err == nil || !strings.Contains(err.Error(), "draft sprint") {
+	if _, err := sprints.ForCommit(s).Complete(ctx, "p1", 1, 12, "-1"); err == nil || !strings.Contains(err.Error(), "draft sprint") {
 		t.Errorf("complete into a draft = %v", err)
 	}
 	if b.sprintReads != 0 || len(b.starts) != 0 || len(b.edited) != 0 || len(b.deleted) != 0 || len(b.completed) != 0 || len(b.moves) != 0 {

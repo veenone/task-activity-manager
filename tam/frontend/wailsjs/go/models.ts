@@ -1705,26 +1705,6 @@ export namespace sprintreport {
 
 export namespace sprints {
 	
-	export class Completion {
-	    moved: number;
-	    movedTo: string;
-	    failed: string[];
-	    note: string;
-	    message: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Completion(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.moved = source["moved"];
-	        this.movedTo = source["movedTo"];
-	        this.failed = source["failed"];
-	        this.note = source["note"];
-	        this.message = source["message"];
-	    }
-	}
 	export class Suggestion {
 	    name: string;
 	    start: string;

@@ -3,7 +3,6 @@
 import {backend} from '../models';
 import {importer} from '../models';
 import {committer} from '../models';
-import {sprints} from '../models';
 import {profile} from '../models';
 import {main} from '../models';
 import {ritualrepo} from '../models';
@@ -13,6 +12,7 @@ import {settings} from '../models';
 import {sprintreport} from '../models';
 import {journal} from '../models';
 import {importfile} from '../models';
+import {sprints} from '../models';
 import {syncer} from '../models';
 import {ritualsync} from '../models';
 
@@ -28,7 +28,7 @@ export function CancelSprintReport(arg1:string):Promise<void>;
 
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
-export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<sprints.Completion>;
+export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:number):Promise<void>;
 
 export function CreateDraftBoard(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<number>;
 

@@ -10,28 +10,26 @@ import (
 	"agile-suite/core/profile"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
-	"agile-suite/tam/internal/errtext"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/sprints"
 )
 
-// The sprint ceremonies. Unlike the board writes in app_boards.go, which
-// journal and take no guard, these two push to Jira the moment they are
-// called, so they take the same per-profile lock a sync, a commit and a
-// boards refresh take, under their own name so a refusal can say which
-// operation is actually running. Anything calling them from the frontend
-// goes through the sync reducer, the rule tam/CLAUDE.md records for every
-// bound method that takes acquire.
+// The sprint ceremonies. Like every other sprint write they are journal rows
+// that Commit pushes, so neither needs a backend and both work offline. They
+// still take a.acquire(p.ID, "sprint"), the lock the management bindings in
+// app_sprintmanage.go take, which serialises them against a Commit rewriting
+// the same rows.
 
-// sprintService builds the lifecycle service over the profile's backend and
-// the board cache, the way commitEngine builds the commit engine: the
-// backend belongs to a profile, so the service is built per call.
+// sprintService builds the service Commit pushes sprint writes through, over
+// the profile's backend and the board cache, the way commitEngine builds the
+// commit engine: the backend belongs to a profile, so the service is built
+// per Commit.
 //
 // Pending and Issues are wired here because the service's store is the board
 // cache and both of them are the issue cache, and app.go is the one place
 // holding both repositories. Issues is what a delete blanks a vanished
-// sprint's name through, and where all three management writes leave their
-// audit row.
+// sprint's name through, and where a pushed edit or delete leaves its audit
+// row.
 func (a *App) sprintService(p profile.Profile, b backend.IssueBackend) *sprints.Service {
 	s := sprints.New(b, a.boards, p.ProjectKey)
 	s.Pending = a.pendingInSprint
@@ -39,17 +37,16 @@ func (a *App) sprintService(p profile.Profile, b backend.IssueBackend) *sprints.
 	return s
 }
 
-// StartSprint starts a sprint on Jira with the name, goal and dates the
-// dialog collected, and refreshes that board's sprint list afterwards. The
-// dates arrive as a date input wrote them and are parsed by the service; a
-// value that is not a date, or an end before a start, never reaches Jira.
+// StartSprint queues a start of the sprint for Commit, with the name, goal
+// and dates the dialog collected. The dates arrive as a date input wrote
+// them and are converted here; a value that is not a date, or an end before
+// a start, is refused with nothing journaled. A draft sprint can be started
+// too, and Commit starts it once it has created it.
 //
-// It answers with the note the ceremony left, empty when there is none: the
-// sprint started, and the board's own sprint list could not be re-read
-// afterwards, so the picker on screen is stale and the toolbar will offer to
-// start the sprint a second time. The dialog reports it beside the success.
+// It answers "" always; the string stays so the frontend's one path reads
+// the same shape the other sprint writes answer with.
 func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, start, end string) (string, error) {
-	p, b, err := a.backendForProfile(profileID)
+	p, err := a.requireProfile(profileID)
 	if err != nil {
 		return "", err
 	}
@@ -58,75 +55,62 @@ func (a *App) StartSprint(profileID string, boardID, sprintID int, name, goal, s
 	}
 	defer a.release(p.ID)
 
-	log.Printf("tam: starting sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
-	draft := backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end}
-	note, err := a.sprintService(p, b).Start(a.ctx, p.ID, boardID, sprintID, draft)
+	d, err := sprints.DraftSprint(backend.SprintDraft{Name: name, Goal: goal, StartDate: start, EndDate: end})
 	if err != nil {
-		log.Printf("tam: start sprint %d for %s failed: %v", sprintID, p.Name, err)
-		return "", ceremonyError(err)
+		return "", err
 	}
-	if note != "" {
-		log.Printf("tam: sprint %d for %s started, with a note: %s", sprintID, p.Name, note)
-	}
-	return note, nil
+	log.Printf("tam: journaling a start of sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
+	return "", a.repo.JournalSprintStart(a.ctx, p.ID, sprintID, issuerepo.SprintStart{
+		BoardID: boardID, Name: d.Name, Goal: d.Goal, StartDate: d.StartDate, EndDate: d.EndDate,
+	})
 }
 
-// ceremonyError is what a sprint write's refusal reads as on screen. The two
-// ceremonies here and the three management bindings in app_sprintmanage.go
-// are the calls whose errors come straight off the wire, Jira's own
-// sentence about a second active sprint or a missing permission, and a Data
-// Center answering 403 with an HTML login page hands the transport a
-// kilobyte of markup that the start dialog renders inline beside its
-// buttons. internal/errtext is the same reduction the sync summaries and the
-// dropped-board reasons take.
-func ceremonyError(err error) error {
-	if err == nil {
-		return nil
-	}
-	return errors.New(errtext.Line(err))
-}
-
-// CompleteSprint moves the sprint's unfinished issues to moveTo, the
-// backlog when it is empty, and then closes the sprint.
+// CompleteSprint queues a completion of the sprint for Commit, moving its
+// unfinished cards to moveTo, the backlog when it is empty. previewCount is
+// how many unfinished cards the dialog showed; Commit works the set out
+// again from Jira and reports what it really moved.
 //
-// A ceremony that reached Jira and then failed, a push that stopped partway
-// or a close Jira refused once every card had already moved, comes back as a
-// Completion carrying its own Message and no Go error: Wails hands the
-// frontend either the value or the error and never both, so an error there
-// would deliver the sentence and drop the counts and keys it is about, and
-// the dialog would print it over a list still promising the move it is
-// reporting. A refusal that happens before anything moves is still an error,
-// and says everything it has to say in its own words.
+// The refusals the push would make from the cache are made here first, with
+// the same words: a draft sprint, a sprint that has never started, a
+// destination that is a draft or the sprint itself, and pending changes on
+// cards staying in the sprint.
 //
-// boardID is not in the plan's one-line signature and is needed all the
-// same: "unfinished" is defined by the board's last column, which cannot be
-// read without knowing which board is being completed on.
-func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo string) (sprints.Completion, error) {
-	p, b, err := a.backendForProfile(profileID)
+// boardID is needed because "unfinished" is defined by the board's last
+// column, which cannot be read without knowing which board is being
+// completed on.
+func (a *App) CompleteSprint(profileID string, boardID, sprintID int, moveTo string, previewCount int) error {
+	p, err := a.requireProfile(profileID)
 	if err != nil {
-		return sprints.Completion{Failed: []string{}}, err
+		return err
 	}
 	if err := a.acquire(p.ID, "sprint"); err != nil {
-		return sprints.Completion{Failed: []string{}}, err
+		return err
 	}
 	defer a.release(p.ID)
 
-	log.Printf("tam: completing sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
-	done, err := a.sprintService(p, b).Complete(a.ctx, p.ID, boardID, sprintID, moveTo)
-	done.Failed = backend.NonNil(done.Failed)
+	if sprintID < 0 {
+		return sprints.ErrDraftSprint
+	}
+	if moveTo, err = sprints.DestinationID(moveTo, sprintID); err != nil {
+		return err
+	}
+	sid := strconv.Itoa(sprintID)
+	if state, _, err := a.boards.BoardSprintState(a.ctx, p.ID, boardID, sid); err != nil {
+		return err
+	} else if state == "future" {
+		return sprints.NotStarted(sid)
+	}
+	n, err := a.pendingInSprint(a.ctx, p.ID, sprintID)
 	if err != nil {
-		log.Printf("tam: complete sprint %d for %s failed after moving %d: %v", sprintID, p.Name, done.Moved, err)
-		return done, ceremonyError(err)
+		return err
 	}
-	if done.Message != "" {
-		log.Printf("tam: complete sprint %d for %s did not finish: %s", sprintID, p.Name, done.Message)
-		return done, nil
+	if err := sprints.RefusePendingComplete(n); err != nil {
+		return err
 	}
-	if done.Note != "" {
-		log.Printf("tam: complete sprint %d for %s left a note: %s", sprintID, p.Name, done.Note)
-	}
-	log.Printf("tam: completed sprint %d for %s: %d issues moved to %s", sprintID, p.Name, done.Moved, done.MovedTo)
-	return done, nil
+	log.Printf("tam: journaling a completion of sprint %d on board %d for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
+	return a.repo.JournalSprintComplete(a.ctx, p.ID, sprintID, issuerepo.SprintComplete{
+		BoardID: boardID, MoveTo: moveTo, PreviewCount: previewCount,
+	})
 }
 
 // SuggestSprintDates is what the start dialog opens with: today, today plus

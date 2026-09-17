@@ -111,7 +111,8 @@ type Engine struct {
 	b     backend.IssueBackend
 	repo  *issuerepo.Repository
 	order BoardOrder
-	// Sprints pushes sprint edits and deletes; nil fails each one.
+	// Sprints pushes sprint edits, starts, completions and deletes; nil fails
+	// each one.
 	Sprints SprintWriter
 }
 

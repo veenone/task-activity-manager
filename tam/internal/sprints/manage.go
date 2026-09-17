@@ -21,17 +21,17 @@ import (
 // first, before either does anything else; what follows is what each of them
 // refuses next.
 
-// Committed is the push half of an edit or a delete, for Commit alone. It is
-// its own type, off Service, so Service's exported methods stay the list of
-// writes that reach Jira the moment the user asks (exceptions_test.go).
+// Committed is the push half of an edit, a delete, a start or a completion,
+// for Commit alone: every write this package makes to Jira hangs off it.
 type Committed struct{ s *Service }
 
-// ForCommit is how Commit pushes a journaled sprint edit or delete.
+// ForCommit is how Commit pushes a journaled sprint write.
 func ForCommit(s *Service) Committed { return Committed{s: s} }
 
 // ErrRefused marks a push the sprint's own state refused: a closed sprint's
-// edit, a started sprint's delete, a delete while cards in the sprint have
-// pending changes. Committing again does not change any of those.
+// edit, a started sprint's delete, a completion of a sprint that never
+// started, a delete or a completion while cards in the sprint have pending
+// changes. Committing again does not change any of those.
 var ErrRefused = errors.New("refused by the sprint's state")
 
 // refusal is an error that answers errors.Is(err, ErrRefused) and reads as
@@ -66,7 +66,7 @@ var errNoIssueCache = errors.New("the issue cache is not wired, so this delete c
 func (c Committed) Edit(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft, clearGoal bool) (string, error) {
 	s := c.s
 	if sprintID < 0 {
-		return "", errDraftSprint
+		return "", ErrDraftSprint
 	}
 	b, err := s.board()
 	if err != nil {
@@ -163,7 +163,7 @@ func datesChanged(wasStart, wasEnd, start, end string) bool {
 func (c Committed) Delete(ctx context.Context, profileID string, boardID, sprintID int) (string, error) {
 	s := c.s
 	if sprintID < 0 {
-		return "", errDraftSprint
+		return "", ErrDraftSprint
 	}
 	if s.Issues == nil {
 		return "", errNoIssueCache

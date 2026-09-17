@@ -3,6 +3,7 @@ package sprints_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"agile-suite/tam/internal/backend"
@@ -38,5 +39,43 @@ func TestAGuardRefusalAtPushTimeIsMarkedRefused(t *testing.T) {
 	failing := &fakeBackend{sprintErr: errors.New("502 Bad Gateway")}
 	if _, err := sprints.ForCommit(manageService(failing, store, newIssues(store))).Edit(ctx, "p1", 1, 13, draft("Sprint 13", ""), false); err == nil || errors.Is(err, sprints.ErrRefused) {
 		t.Errorf("a failed read = %v, want an error that is not a refusal", err)
+	}
+}
+
+// TestAStoppedCompletionNamesTheCardsItMoved is what lets Commit's failure
+// say which cards already left an open sprint.
+func TestAStoppedCompletionNamesTheCardsItMoved(t *testing.T) {
+	b := &fakeBackend{issues: sprintOf("1", "5", "1"), completeErr: errors.New("403 Forbidden")}
+	done, err := sprints.ForCommit(newService(b, newStore())).Complete(context.Background(), "p1", 1, 12, "")
+	if err != nil || !strings.Contains(done.Message, "(PLAT-1, PLAT-3)") {
+		t.Errorf("completion = %+v, %v; want the moved keys named", done, err)
+	}
+}
+
+// TestACompletionOfASprintTheCacheHoldsAsClosedMovesNothing is the retry of
+// a completion whose close landed and whose journal row did not clear.
+func TestACompletionOfASprintTheCacheHoldsAsClosedMovesNothing(t *testing.T) {
+	b := &fakeBackend{issues: sprintOf("1", "1")}
+	store := newStore()
+	store.onBoard["1/12"] = "closed"
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "")
+	if err != nil || done.Message != "" || done.Moved != 0 || !strings.Contains(done.Note, "already closed") {
+		t.Errorf("completion = %+v, %v; want a success that moved nothing", done, err)
+	}
+	if len(b.order) != 0 {
+		t.Errorf("Jira was asked %v", b.order)
+	}
+}
+
+// TestACompletionRefusalIsMarkedRefused keeps a future sprint's completion
+// from being offered as something a retry fixes.
+func TestACompletionRefusalIsMarkedRefused(t *testing.T) {
+	store := newStore()
+	store.onBoard["1/12"] = "future"
+	if _, err := sprints.ForCommit(newService(&fakeBackend{}, store)).Complete(context.Background(), "p1", 1, 12, ""); !errors.Is(err, sprints.ErrRefused) {
+		t.Errorf("completing a future sprint = %v, want ErrRefused", err)
+	}
+	if err := sprints.RefusePendingComplete(2); !errors.Is(err, sprints.ErrRefused) || !strings.Contains(err.Error(), "commit them before completing") {
+		t.Errorf("pending = %v", err)
 	}
 }

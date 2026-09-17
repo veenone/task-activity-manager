@@ -1,24 +1,10 @@
-// Package sprints owns the two writes that still reach Jira the moment they
-// are made: starting a sprint and completing one. They are the only writes in
-// TAM that do not go through the journal, and the reason is a cost rather
-// than a principle.
-//
-// Creating, editing and deleting a sprint were three more. A sprint created
-// in TAM is a sprint_create journal row and a draft row under a negative id,
-// every card moved into it journals that id, and Commit's first phase
-// creates it in Jira and rewrites the id everywhere before anything naming
-// it is sent. DraftSprint is the check a draft gets; issuerepo holds the
-// rest. An edit or a delete of a sprint Jira holds is a sprint_edit or
-// sprint_delete row, and Commit pushes it through ForCommit, which still
-// reads the sprint's state from Jira before it writes.
-//
-// Starting and completing a sprint Jira holds stay immediate for now: a
-// sprint is a container a whole team plans into, and those two change what
-// everyone else's board shows. Bundle 04's Task 8 journals them as well.
-//
-// The exception has one home here, one place to test, and a fence:
-// exceptions_test.go names the Service's own exported methods, so a third
-// immediate write arrives with a failing test rather than quietly.
+// Package sprints pushes the sprint writes Commit sends: an edit, a delete,
+// a start and a completion of a sprint Jira holds. None of them reaches Jira
+// when the user asks. Each is a journal row issuerepo writes, and Commit's
+// sprint changes phase pushes it through ForCommit, which reads what Jira or
+// the cache holds before it writes. Creating a sprint is a draft under a
+// negative id that Commit creates first; DraftSprint is the check a draft
+// gets.
 //
 // This package writes no journal rows. It reads their count, to refuse a
 // completion or a delete while changes are queued against the sprint, and it
@@ -32,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/errtext"
@@ -62,17 +49,12 @@ type Backend interface {
 	SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, since string, types []string, startAt, maxResults int) ([]backend.Issue, int, error)
 }
 
-// lifecycle is the part of backend.BoardBackend a ceremony uses: the six
-// writes and the one read that records what they did. Like the committer's
-// own board writer, it asks for those and not for the board configuration,
-// so a test's backend does not have to answer for a board's columns to close
-// a sprint.
-//
-// MoveIssuesToSprint is the call the plan names PushIssuesToSprint when it
-// is used this way. The name matters: the completion pushes to Jira now,
-// bypassing the journal exactly as the rest of the ceremony does, and it is
-// not the bulk binding of the same underlying call, which only ever writes
-// journal rows.
+// lifecycle is the part of backend.BoardBackend a push uses: the writes and
+// the one read that records what they did. Like the committer's own board
+// writer, it asks for those and not for the board configuration, so a test's
+// backend does not have to answer for a board's columns to close a sprint.
+// MoveIssuesToSprint is the completion's own move of the unfinished cards,
+// made at Commit from Jira's read, and not a journaled sprint move.
 type lifecycle interface {
 	BoardSprints(ctx context.Context, boardID int) ([]backend.Sprint, error)
 	MoveIssuesToSprint(ctx context.Context, sprintID string, keys []string) error
@@ -121,11 +103,10 @@ type Issues interface {
 // the cards still in the sprint, which is the list the user needs to decide
 // what to do next.
 //
-// That report travels in Message rather than in a Go error, because Wails
-// discards a bound method's return value whenever the method also returns a
-// non-nil error: the dispatcher fills in either the result or the error and
-// never both. An error would therefore deliver the sentence and drop the
-// keys it is about, which is the one thing the user needs at that moment.
+// That report travels in Message rather than in a Go error, so Commit can
+// tell a completion that moved cards and stopped, which it reports as a
+// failure worth retrying and keeps the row for, from a refusal before
+// anything moved. Message names the keys that did move.
 //
 // Every count here is over the issue types TAM syncs (backend.AllTypes) and
 // nothing else. A sprint holding a card of a type this project defines for
@@ -142,10 +123,9 @@ type Completion struct {
 	// all did.
 	Failed []string `json:"failed"`
 	// Note is what did not land after the sprint was closed, empty when
-	// everything did. It is never a failure of the completion: the sprint is
-	// closed and the cards have moved, and this is the cache bookkeeping
-	// after them, whose one visible consequence is a picker still offering
-	// Start for a sprint that is already running.
+	// everything did, or that the cache already held the sprint as closed.
+	// It is never a failure of the completion: the sprint is closed, and this
+	// is the cache bookkeeping after it.
 	Note string `json:"note"`
 	// Message is why the completion did not finish, empty when it did. A
 	// completion carrying one has left the sprint open: either the push
@@ -155,9 +135,10 @@ type Completion struct {
 	Message string `json:"message"`
 }
 
-// Service runs the ceremonies against one profile's backend and the board
-// cache. It is built per call, the way the commit engine is, because the
-// backend it wraps belongs to a profile.
+// Service holds what a push needs: one profile's backend and the board
+// cache. It is built per Commit, the way the commit engine is, because the
+// backend it wraps belongs to a profile. It exports no write; ForCommit is
+// how Commit reaches them.
 type Service struct {
 	b       Backend
 	store   Store
@@ -213,15 +194,12 @@ func New(b Backend, store Store, projectKey string) *Service {
 	return &Service{b: b, store: store, project: projectKey, PageSize: searchPage, PushBatch: pushBatch}
 }
 
-// Start starts the sprint on Jira with the draft the dialog filled in, and
+// Start pushes a journaled start with the draft the dialog filled in, and
 // records the new state by refreshing that board's sprint list.
 //
-// The dates arrive as a date input produced them, a bare day with no time
-// and no zone, and are read and rewritten in Jira's own datetime format
-// here rather than concatenated into one: a value that is not a date is
-// refused where the message can name it. So is an end before a start, and
-// that check lives here rather than in the dialog because the bound method
-// is reachable without it.
+// The dates are read and rewritten in Jira's own datetime format again, so a
+// row that is not a date is refused where the message can name it, and so
+// is an end before a start.
 //
 // Jira's own error is returned unchanged. A sprint that cannot be started,
 // because another is already active or because the account cannot manage
@@ -230,11 +208,11 @@ func New(b Backend, store Store, projectKey string) *Service {
 // The sprint has started once Jira says so, whatever happens to the cache
 // afterwards, so a sprint list that could not be re-read comes back as the
 // note beside a success rather than as a failure. Without it the picker
-// still calls the running sprint future, the toolbar still offers Start for
-// it, and Jira answers that second start with a 400 nobody can explain.
-func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft) (string, error) {
+// still calls the running sprint future and the toolbar still offers Start.
+func (c Committed) Start(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft) (string, error) {
+	s := c.s
 	if sprintID < 0 {
-		return "", errDraftSprint
+		return "", ErrDraftSprint
 	}
 	b, err := s.board()
 	if err != nil {
@@ -249,26 +227,33 @@ func (s *Service) Start(ctx context.Context, profileID string, boardID, sprintID
 	return note(s.refreshSprints(ctx, b, profileID, boardID)), nil
 }
 
-// Complete moves the sprint's unfinished cards and then closes it, in that
-// order: the reverse would leave a closed sprint whose issues went nowhere,
-// which nobody can undo from TAM. moveTo is the destination sprint's id, or
-// empty for the backlog, which is a destination and not an absence.
+// Complete pushes a journaled completion: it moves the sprint's unfinished
+// cards and then closes it, in that order, since the reverse would leave a
+// closed sprint whose issues went nowhere. moveTo is the destination
+// sprint's id, or empty for the backlog, which is a destination and not an
+// absence.
 //
-// The sprint's issues are re-read from Jira and not from the cache, which
-// can be minutes stale and would otherwise decide the fate of cards the user
-// cannot see. The read is the issue search rather than the board's key list,
-// because a key alone cannot say whether the card finished: an issue is
-// complete when its status id is in the last board column's status ids, the
-// same mapping the board itself draws with.
+// The unfinished set is worked out here, from Jira, and not taken from the
+// dialog's preview: Jira's state at the moment of the write is what decides.
+// The read is the issue search rather than the board's key list, because a
+// key alone cannot say whether the card finished: an issue is complete when
+// its status id is in the last board column's status ids, the same mapping
+// the board itself draws with.
 //
-// A ceremony that reached Jira and then failed is reported in the Completion
-// and not as an error, so what did happen travels with the sentence about
-// it: the keys a half-finished push left behind, and the counts a refused
-// close has to be read against. An error is kept for the refusals that
-// happen before anything moves, which have nothing to report but themselves.
-func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (Completion, error) {
+// A push that reached Jira and then failed is reported in the Completion and
+// not as an error, so what did happen travels with the sentence about it.
+// Calling it again is safe: a retry after a failed move or a failed close
+// moves whatever is still unfinished and closes the sprint, and a retry
+// after a close whose journal row could not be cleared finds the sprint
+// closed in the refreshed cache and moves nothing.
+//
+// ponytail: that last case leans on the refresh after the close; if the
+// refresh failed too, the retry asks Jira to close a closed sprint and
+// reports Jira's refusal, which the user discards.
+func (c Committed) Complete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (Completion, error) {
+	s := c.s
 	if sprintID < 0 {
-		return Completion{Failed: []string{}}, errDraftSprint
+		return Completion{Failed: []string{}}, ErrDraftSprint
 	}
 	sid := strconv.Itoa(sprintID)
 	done := Completion{Failed: []string{}}
@@ -276,7 +261,7 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 	if err != nil {
 		return done, err
 	}
-	moveTo, err = destinationID(moveTo, sprintID)
+	moveTo, err = DestinationID(moveTo, sprintID)
 	if err != nil {
 		return done, err
 	}
@@ -290,8 +275,11 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 	if err != nil {
 		return done, err
 	}
-	if err := s.requireCompletable(ctx, profileID, boardID, sid); err != nil {
+	if closed, err := s.requireCompletable(ctx, profileID, boardID, sid); err != nil {
 		return done, err
+	} else if closed {
+		done.Note = fmt.Sprintf("sprint %d was already closed, so nothing was moved", sprintID)
+		return done, nil
 	}
 	incomplete, err := s.sprintIssues(ctx, sid, complete)
 	if err != nil {
@@ -311,11 +299,9 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 			// open sprint with nothing recording where they went.
 			done.Failed = append(done.Failed, incomplete[start:]...)
 			done.Moved = len(moved)
-			done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s, so the sprint was left open: %s",
-				done.Moved, len(incomplete), done.MovedTo, errtext.Line(err))
+			done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s%s, so the sprint was left open: %s",
+				done.Moved, len(incomplete), done.MovedTo, keyList(moved), errtext.Line(err))
 			s.refreshMembership(ctx, profileID, boardID, sid, moveTo, moved)
-			// No Go error: the keys in Failed are what the dialog has to
-			// name, and Wails drops the value when an error goes with it.
 			return done, nil
 		}
 		moved = append(moved, incomplete[start:end]...)
@@ -324,25 +310,26 @@ func (s *Service) Complete(ctx context.Context, profileID string, boardID, sprin
 
 	if err := b.CompleteSprint(ctx, sprintID); err != nil {
 		// The worst state this feature reaches: every unfinished card has
-		// left a sprint that is still open. The move path says so and this
-		// one has to say it too, or the sentence the user reads is Jira's
-		// bare refusal with no word about where their cards went.
-		//
-		// It travels in Message rather than as a Go error for the same
-		// reason the failed push does, and for one more. The dialog renders
-		// a Completion carrying a Message as an outcome and a Go error as a
-		// refusal, so an error printed this accurate sentence directly above
-		// a list still headed "47 cards are not finished and will move out
-		// of the sprint" and a footer still promising the move: both future
-		// tense, both already false, on the one state nobody can undo.
-		done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s, but the sprint could not be closed and is open with none of them in it: %s",
-			done.Moved, len(incomplete), done.MovedTo, errtext.Line(err))
+		// left a sprint that is still open. The message names where they
+		// went and which they were, or the sentence the user reads is Jira's
+		// bare refusal with no word about their cards.
+		done.Message = fmt.Sprintf("%d of %d unfinished issues moved to %s%s, but the sprint could not be closed and is open with none of them in it: %s",
+			done.Moved, len(incomplete), done.MovedTo, keyList(moved), errtext.Line(err))
 		s.refreshMembership(ctx, profileID, boardID, sid, moveTo, moved)
 		return done, nil
 	}
 	s.refreshMembership(ctx, profileID, boardID, sid, moveTo, moved)
 	done.Note = note(s.refreshSprints(ctx, b, profileID, boardID))
 	return done, nil
+}
+
+// keyList is " (PLAT-1, PLAT-2)" for the keys a stopped completion moved,
+// and nothing when it moved none.
+func keyList(keys []string) string {
+	if len(keys) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(keys, ", ") + ")"
 }
 
 // board is the Agile capability behind this profile's backend.
