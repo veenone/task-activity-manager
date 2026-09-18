@@ -26,6 +26,7 @@ vi.mock("../api", async () => {
     CommitPendingChanges: vi.fn(),
     ResolveConflictOverride: vi.fn(),
     ResolveConflictKeepRemote: vi.fn(),
+    ListUnpushableEdits: vi.fn(),
   };
 });
 
@@ -67,6 +68,7 @@ beforeEach(() => {
   vi.mocked(api.ListPendingChanges).mockResolvedValue(rows);
   vi.mocked(api.DiscardPendingChange).mockResolvedValue();
   vi.mocked(api.DiscardAllPendingChanges).mockResolvedValue(3);
+  vi.mocked(api.ListUnpushableEdits).mockResolvedValue([]);
 });
 
 describe("PendingChangesModal", () => {
@@ -85,6 +87,23 @@ describe("PendingChangesModal", () => {
     expect(rowsOfCard[0]).toHaveTextContent("Priority Medium to High");
     expect(rowsOfCard[1]).toHaveTextContent("Assignee (none) to M. Ortiz");
     expect(within(dialog).getByRole("button", { name: "Commit (2)" })).toBeEnabled();
+  });
+
+  // Issue #52: an edit journalled for a field Jira will not take is named
+  // here and kept. Discarding it stays the user's own act.
+  it("names an edit Jira will not take and leaves the row alone", async () => {
+    vi.mocked(api.ListUnpushableEdits).mockResolvedValue([{ id: 2, key: "PLAT-409", field: "priority" }]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const card = (await within(dialog).findAllByRole("group"))[1];
+    expect(await within(card).findByText(/Jira will not take Priority on PLAT-409/)).toBeInTheDocument();
+    // The row is still there, with the value the user typed, and still only
+    // theirs to discard.
+    expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("Priority Medium to High");
+    expect(within(card).getByRole("button", { name: "Discard priority on PLAT-409" })).toBeEnabled();
+    expect(api.DiscardPendingChange).not.toHaveBeenCalled();
+    // The other row says nothing: Jira takes it.
+    expect(within(card).queryByText(/Jira will not take Assignee/)).not.toBeInTheDocument();
   });
 
   it("discards one row and all rows", async () => {

@@ -3,7 +3,7 @@ import { Modal, errMsg, useConfirm, useNotice, useProfile } from "@agile-suite/c
 import { ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_EDIT, ENTITY_SPRINT_START, fieldLabel } from "../api";
 import type { DraftBoard, DraftSprint, IssueDraft, PendingChange, Profile, Settings, SprintComplete, SprintEdit, SprintStart } from "../api";
 import { ISSUE_TYPES } from "../api";
-import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges } from "../queries/pending";
+import { groupPending, useDiscardAll, useDiscardById, useDiscardChange, usePendingChanges, useUnpushableEdits } from "../queries/pending";
 import type { PendingGroup } from "../queries/pending";
 import { useSync } from "../contexts/SyncContext";
 import { dayInput, plural } from "../lib/format";
@@ -128,6 +128,7 @@ function draftLine(d: IssueDraft, project: string): string {
 export function PendingChangesModal({ onClose }: Props) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const pending = usePendingChanges(activeId);
+  const unpushable = useUnpushableEdits(activeId);
   const discardOne = useDiscardChange(activeId);
   const discardRow = useDiscardById(activeId);
   const discardAll = useDiscardAll(activeId);
@@ -150,6 +151,11 @@ export function PendingChangesModal({ onClose }: Props) {
     }
     return byKey;
   }, [lastCommit]);
+
+  // The journal rows Jira's own edit screens say a Commit would refuse,
+  // by row id. They are named on their row and kept: the value is what the
+  // user typed, and only the user throws it away.
+  const unpushableIds = new Set((unpushable.data ?? []).map((e) => e.id));
 
   const pushable = groups.filter((g) => !conflictKeys.has(g.key)).length;
 
@@ -308,6 +314,11 @@ export function PendingChangesModal({ onClose }: Props) {
                           <span className="b">{row.afterVal || "(none)"}</span>{" "}
                           <button type="button" className="btn btn-discard btn-discard-row" disabled={busy} aria-label={`Discard ${row.field} on ${g.key}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
                           </button>
+                          {unpushableIds.has(row.id) && (
+                            <p className="small pending-held">
+                              {`Jira will not take ${fieldLabel(row.field)} on ${g.key}: the field is not on that issue's edit screen. The change is kept here until you discard it.`}
+                            </p>
+                          )}
                         </li>
                       ))}
                     </ul>
