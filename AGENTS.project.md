@@ -61,7 +61,6 @@ Gate: the ratchet holds bespoke_modals; four fixes have been spent on modal laye
 - Release tags carry the app name: `xtm/v1.10.0`, `tam/v0.1.0`. The release workflow filters `xtm/v*`. Gate: review.
 - `origin` pushes to GitHub and the Gitea mirror together. After a PR merges on GitHub, run `.\scripts\sync-remotes.ps1`. Gate: review.
 - A `feat` PR links its spec or says in its `## Spec` section why it needs none. Gate: the `pr-acceptance` CI job.
-- GitHub comments by an agent end with `Posted by <agent>, assisting @<login>.` where `<login>` comes from `gh api user --jq .login`.
 
 ## Verification
 
