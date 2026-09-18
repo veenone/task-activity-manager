@@ -204,6 +204,16 @@ type FieldSpec struct {
 	AllowedValues []FieldOption `json:"allowedValues"`
 }
 
+// CreateFieldSet is one type's create fields and whether the instance could
+// say which fields its create screen carries. ScreenKnown is false when the
+// answer came from Jira's classic create-meta call, which on some Data
+// Center versions lists fields the screen does not carry: only the fields
+// Jira marks required are offered and sent then, and the dialog says so.
+type CreateFieldSet struct {
+	Fields      []FieldSpec `json:"fields"`
+	ScreenKnown bool        `json:"screenKnown"`
+}
+
 // FieldOption is one allowed value of an option field.
 type FieldOption struct {
 	ID    string `json:"id"`
@@ -583,7 +593,8 @@ type IssueBackend interface {
 	// with FieldSpec.Required saying which. The form's own fields (summary,
 	// description, priority, labels, assignee, story points, Epic Link,
 	// Epic Name, parent, sprint) never come back, whatever createmeta says.
-	CreateFields(ctx context.Context, projectKey, logicalType string) ([]FieldSpec, error)
+	// ScreenKnown says whether the answer can be read as the create screen.
+	CreateFields(ctx context.Context, projectKey, logicalType string) (CreateFieldSet, error)
 	// LinkTypes lists the issue link types the instance defines.
 	LinkTypes(ctx context.Context) ([]LinkType, error)
 	// CreateLink links fromKey to the draft's target with the draft's type

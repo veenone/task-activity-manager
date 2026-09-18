@@ -81,8 +81,8 @@ func (f *fake) SearchIssuesPage(context.Context, string, string, string, []strin
 	return nil, 0, errors.New("not used")
 }
 func (f *fake) IssueTypes(context.Context, string) ([]backend.IssueType, error) { return nil, nil }
-func (f *fake) CreateFields(context.Context, string, string) ([]backend.FieldSpec, error) {
-	return []backend.FieldSpec{}, nil
+func (f *fake) CreateFields(context.Context, string, string) (backend.CreateFieldSet, error) {
+	return backend.CreateFieldSet{}, nil
 }
 func (f *fake) GetIssueDetail(_ context.Context, key string) (backend.IssueDetail, error) {
 	return backend.IssueDetail{Key: key, Description: f.desc[key], Links: []backend.Link{}, Fields: map[string]any{}}, nil

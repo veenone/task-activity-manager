@@ -303,12 +303,12 @@ func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 
 func TestCreateFieldsHidesEpicName(t *testing.T) {
 	b, _ := newBackend(t, fourFields)
-	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeEpic)
+	set, err := b.CreateFields(context.Background(), "PLAT", backend.TypeEpic)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
-	if len(specs) != 0 {
-		t.Errorf("Epic Name is hidden: %+v", specs)
+	if len(set.Fields) != 0 {
+		t.Errorf("Epic Name is hidden: %+v", set.Fields)
 	}
 }
 
@@ -320,10 +320,14 @@ func TestCreateFieldsHidesEpicName(t *testing.T) {
 // one optional field, Environment, which is what that rule leaves out.
 func TestCreateFieldsOffersOptionalFieldsOnlyFromAPerTypeAnswer(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeBug)
+	set, err := b.CreateFields(context.Background(), "PLAT", backend.TypeBug)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
+	if set.ScreenKnown {
+		t.Error("a classic answer cannot be read as the create screen")
+	}
+	specs := set.Fields
 	var seen []string
 	for _, s := range specs {
 		seen = append(seen, fmt.Sprintf("%s:%s:%v", s.ID, s.Type, s.Required))
@@ -347,14 +351,17 @@ func TestCreateFieldsOffersOptionalFieldsOnlyFromAPerTypeAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
+	if !perType.ScreenKnown {
+		t.Error("a per-type answer is the create screen")
+	}
 	optional := false
-	for _, s := range perType {
+	for _, s := range perType.Fields {
 		if s.ID == "customfield_10300" && !s.Required {
 			optional = true
 		}
 	}
 	if !optional {
-		t.Errorf("a per-type answer still offers its optional fields: %+v", perType)
+		t.Errorf("a per-type answer still offers its optional fields: %+v", perType.Fields)
 	}
 	found := false
 	for _, s := range f.searches {
@@ -373,12 +380,12 @@ func TestCreateFieldsOffersOptionalFieldsOnlyFromAPerTypeAnswer(t *testing.T) {
 // attachment is nothing a text form can fill.
 func TestCreateFieldsReadsTheScreenAndLeavesOutBaseAndUnfillableFields(t *testing.T) {
 	b, f := newBackend(t, threeFields)
-	specs, err := b.CreateFields(context.Background(), "TKT", backend.TypeStory)
+	set, err := b.CreateFields(context.Background(), "TKT", backend.TypeStory)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
 	var seen []string
-	for _, s := range specs {
+	for _, s := range set.Fields {
 		seen = append(seen, fmt.Sprintf("%s:%s:%v", s.ID, s.Type, s.Required))
 	}
 	if strings.Join(seen, ",") != "customfield_10300:textarea:false,customfield_10050:option:true" {
@@ -411,12 +418,12 @@ func TestCreateFieldsFailsWhenTheTypeListCannotBeRead(t *testing.T) {
 // its parent a second time, because createmeta lists parent as required.
 func TestCreateFieldsNeverOffersTheParentOfASubtask(t *testing.T) {
 	b, _ := newBackend(t, threeFields)
-	specs, err := b.CreateFields(context.Background(), "TKT", backend.TypeSubtask)
+	set, err := b.CreateFields(context.Background(), "TKT", backend.TypeSubtask)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
-	if len(specs) != 1 || specs[0].ID != "customfield_10300" {
-		t.Errorf("specs = %+v, want only Acceptance criteria", specs)
+	if len(set.Fields) != 1 || set.Fields[0].ID != "customfield_10300" {
+		t.Errorf("specs = %+v, want only Acceptance criteria", set.Fields)
 	}
 }
 

@@ -292,10 +292,10 @@ func (b *Backend) createMeta(ctx context.Context, projectKey, logicalType string
 // they have any. An optional field no text form can fill is left out; a
 // required one is still offered as text, because leaving it out would only
 // move the failure to a Jira 400 at Commit.
-func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType string) ([]backend.FieldSpec, error) {
+func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType string) (backend.CreateFieldSet, error) {
 	meta, err := b.createMeta(ctx, projectKey, logicalType)
 	if err != nil {
-		return nil, err
+		return backend.CreateFieldSet{}, err
 	}
 	ids := b.discover(ctx)
 	out := []backend.FieldSpec{}
@@ -331,5 +331,5 @@ func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType stri
 		}
 		return out[i].ID < out[j].ID
 	})
-	return out, nil
+	return backend.CreateFieldSet{Fields: out, ScreenKnown: meta.Source == corejira.MetaPerType}, nil
 }

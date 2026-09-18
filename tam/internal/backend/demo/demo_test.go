@@ -257,16 +257,17 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 		t.Errorf("staged conflict: base=%s first=%s second=%s", base.Updated, first.Updated, second.Updated)
 	}
 
-	specs, err := b.CreateFields(ctx, "ACME", backend.TypeBug)
-	if err != nil || len(specs) != 2 || specs[0].Type != "option" || !specs[0].Required || len(specs[0].AllowedValues) != 3 ||
+	set, err := b.CreateFields(ctx, "ACME", backend.TypeBug)
+	specs := set.Fields
+	if err != nil || !set.ScreenKnown || len(specs) != 2 || specs[0].Type != "option" || !specs[0].Required || len(specs[0].AllowedValues) != 3 ||
 		specs[1].ID != "environment" || specs[1].Required || specs[1].Type != "textarea" {
-		t.Errorf("bug create fields: %+v %v", specs, err)
+		t.Errorf("bug create fields: %+v %v", set, err)
 	}
-	if specs, _ := b.CreateFields(ctx, "ACME", backend.TypeTask); len(specs) != 0 {
-		t.Errorf("tasks need nothing extra: %+v", specs)
+	if set, _ := b.CreateFields(ctx, "ACME", backend.TypeTask); len(set.Fields) != 0 {
+		t.Errorf("tasks need nothing extra: %+v", set)
 	}
 	req, _ := b.CreateFields(ctx, "ACME", backend.TypeRequirement)
-	if len(req) != 1 || req[0].Name != "Source" || req[0].Type != "string" {
+	if len(req.Fields) != 1 || req.Fields[0].Name != "Source" || req.Fields[0].Type != "string" {
 		t.Errorf("requirement create fields: %+v", req)
 	}
 	withParent, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeStory, Summary: "Child", ParentKey: "ACME-350"})
@@ -950,7 +951,7 @@ func TestDemoRefusesAMarkedEpicOnceAndAPlaceholderParentAlways(t *testing.T) {
 		t.Error("a placeholder parent is refused the way Jira refuses it")
 	}
 	story, _ := b.CreateFields(ctx, "ACME", backend.TypeStory)
-	if len(story) != 2 || story[0].Required || story[1].Required {
+	if len(story.Fields) != 2 || story.Fields[0].Required || story.Fields[1].Required {
 		t.Errorf("story offers two optional fields: %+v", story)
 	}
 }

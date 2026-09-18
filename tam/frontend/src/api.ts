@@ -797,6 +797,16 @@ export interface FieldSpec {
   allowedValues: FieldOption[];
 }
 
+// CreateFieldSet is one type's create fields plus whether the instance could
+// say what its create screen carries. screenKnown is false when the answer
+// came from Jira's classic create-meta call, which on some Data Center
+// versions lists fields the screen does not carry: only required fields are
+// offered and sent then, and the dialog says why.
+export interface CreateFieldSet {
+  fields: FieldSpec[];
+  screenKnown: boolean;
+}
+
 export interface FieldConflict {
   field: string;
   base: string;
@@ -1193,7 +1203,7 @@ export const EditIssue: (profileId: string, key: string, field: string, value: s
   App.EditIssue;
 export const CreateIssue = (profileId: string, draft: IssueDraft): Promise<string> =>
   App.CreateIssue(profileId, backend.IssueDraft.createFrom(draft));
-export const GetCreateFields: (profileId: string, typeName: string) => Promise<FieldSpec[]> =
+export const GetCreateFields: (profileId: string, typeName: string) => Promise<CreateFieldSet> =
   App.GetCreateFields;
 export const ListPendingChanges: (profileId: string) => Promise<PendingChange[]> = App.ListPendingChanges;
 export const DiscardPendingChange: (profileId: string, id: number) => Promise<void> =

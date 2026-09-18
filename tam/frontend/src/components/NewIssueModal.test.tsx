@@ -88,11 +88,13 @@ beforeEach(() => {
     { id: "p1", name: "Acme", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
   ]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
-  vi.mocked(api.GetCreateFields).mockImplementation(async (_p, type) =>
-    type === "bug"
-      ? [{ id: "customfield_10050", name: "Severity", type: "option", required: true, allowedValues: [{ id: "1", value: "Minor" }, { id: "3", value: "Critical" }] }]
-      : [],
-  );
+  vi.mocked(api.GetCreateFields).mockImplementation(async (_p, type) => ({
+    screenKnown: true,
+    fields:
+      type === "bug"
+        ? [{ id: "customfield_10050", name: "Severity", type: "option", required: true, allowedValues: [{ id: "1", value: "Minor" }, { id: "3", value: "Critical" }] }]
+        : [],
+  }));
   vi.mocked(api.ListEpics).mockResolvedValue([
     epic("PLAT-350", "Promotions and discounts"),
     epic("PLAT-360", "Checkout revamp"),
@@ -247,7 +249,7 @@ describe("NewIssueModal", () => {
   // Submitting before the required fields are known skipped them entirely and
   // deferred the failure to a Jira 400 at Commit.
   it("will not submit until it knows which fields Jira requires", async () => {
-    let release: (specs: api.FieldSpec[]) => void = () => {};
+    let release: (set: api.CreateFieldSet) => void = () => {};
     vi.mocked(api.GetCreateFields).mockImplementation(
       () => new Promise((resolve) => { release = resolve; }),
     );
@@ -258,7 +260,7 @@ describe("NewIssueModal", () => {
     // The query only starts once the profile has loaded, so release is not
     // assigned until then; releasing before that would resolve nothing.
     await waitFor(() => expect(api.GetCreateFields).toHaveBeenCalled());
-    release([]);
+    release({ fields: [], screenKnown: true });
     await waitFor(() => expect(within(dialog).getByRole("button", { name: "Create draft" })).toBeEnabled());
   });
 
@@ -286,11 +288,11 @@ describe("NewIssueModal", () => {
   // Item 2 of the ticket: a technical task drafted from a story was asked
   // for its parent a second time, under the parent it already stated.
   it("never renders the parent or the form's own fields from create-meta", async () => {
-    vi.mocked(api.GetCreateFields).mockResolvedValue([
+    vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: true, fields: [
       { id: "parent", name: "Parent", type: "string", required: true, allowedValues: [] },
       { id: "summary", name: "Summary", type: "string", required: true, allowedValues: [] },
       { id: "customfield_10300", name: "Acceptance criteria", type: "textarea", required: false, allowedValues: [] },
-    ]);
+    ] });
     renderModal(vi.fn(), vi.fn(), "subtask", true, "PLAT-412");
     const dialog = await screen.findByRole("dialog", { name: "New technical task" });
     await submitButton(dialog);
@@ -302,11 +304,11 @@ describe("NewIssueModal", () => {
 
   it("keeps optional fields behind More fields and sends what was filled there", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetCreateFields).mockResolvedValue([
+    vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: true, fields: [
       { id: "customfield_10050", name: "Severity", type: "option", required: true, allowedValues: [{ id: "3", value: "Critical" }] },
       { id: "customfield_10300", name: "Acceptance criteria", type: "textarea", required: false, allowedValues: [] },
       { id: "duedate", name: "Due date", type: "date", required: false, allowedValues: [] },
-    ]);
+    ] });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
     const more = await within(dialog).findByRole("button", { name: "More fields (2)" });
@@ -331,9 +333,9 @@ describe("NewIssueModal", () => {
   // same act(), so this proves both the reopen and the actual focus.
   it("opens More fields when an optional number there is not a number, and focuses it once it renders", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetCreateFields).mockResolvedValue([
+    vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: true, fields: [
       { id: "customfield_10099", name: "Effort", type: "number", required: false, allowedValues: [] },
-    ]);
+    ] });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
     await user.click(await within(dialog).findByRole("button", { name: "More fields (1)" }));
@@ -354,10 +356,10 @@ describe("NewIssueModal", () => {
   // right back from the button the user had just clicked.
   it("does not refocus a field when More fields is toggled after an unrelated required-field error", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetCreateFields).mockResolvedValue([
+    vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: true, fields: [
       { id: "customfield_10050", name: "Severity", type: "option", required: true, allowedValues: [{ id: "3", value: "Critical" }] },
       { id: "customfield_10300", name: "Acceptance criteria", type: "textarea", required: false, allowedValues: [] },
-    ]);
+    ] });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
     const severity = await within(dialog).findByLabelText("Severity *");
@@ -373,11 +375,11 @@ describe("NewIssueModal", () => {
 
   it("takes more than one value for an array field", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetCreateFields).mockResolvedValue([
+    vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: true, fields: [
       { id: "components", name: "Components", type: "array", required: true, allowedValues: [
         { id: "10", value: "Frontend" }, { id: "11", value: "Backend" }, { id: "12", value: "API" },
       ] },
-    ]);
+    ] });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
     const components = await within(dialog).findByLabelText("Components *");
@@ -392,9 +394,9 @@ describe("NewIssueModal", () => {
 
   it("checks a required number field the same way it checks story points", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetCreateFields).mockResolvedValue([
+    vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: true, fields: [
       { id: "customfield_10099", name: "Effort", type: "number", required: true, allowedValues: [] },
-    ]);
+    ] });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
     const effort = await within(dialog).findByLabelText("Effort *");
@@ -403,6 +405,46 @@ describe("NewIssueModal", () => {
     await user.click(await submitButton(dialog));
     expect(await within(dialog).findByText("Effort must be a number.")).toBeInTheDocument();
     expect(api.CreateIssue).not.toHaveBeenCalled();
+  });
+
+  // An instance whose create metadata only comes from the classic call
+  // cannot say what is on the create screen, so TAM offers only the fields
+  // Jira marks required. Without a line saying so, More fields is short or
+  // missing for no visible reason.
+  it("says why only required fields are offered when the screen is unknown", async () => {
+    vi.mocked(api.GetCreateFields).mockResolvedValue({
+      screenKnown: false,
+      fields: [{ id: "customfield_10050", name: "Severity", type: "option", required: true, allowedValues: [{ id: "3", value: "Critical" }] }],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    expect(
+      await within(dialog).findByText(
+        "This Jira version does not report which fields are on the create screen, so only required ones are offered.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /More fields/ })).not.toBeInTheDocument();
+  });
+
+  // The same instance with nothing required at all: the dialog still has to
+  // account for an empty More fields section.
+  it("says so even when the unknown screen leaves no field to offer", async () => {
+    vi.mocked(api.GetCreateFields).mockResolvedValue({ screenKnown: false, fields: [] });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    expect(await within(dialog).findByText(/does not report which fields are on the create screen/)).toBeInTheDocument();
+  });
+
+  // A per-type answer is the create screen, so there is nothing to explain.
+  it("says nothing about the screen when the per-type answer is trusted", async () => {
+    vi.mocked(api.GetCreateFields).mockResolvedValue({
+      screenKnown: true,
+      fields: [{ id: "customfield_10300", name: "Acceptance criteria", type: "textarea", required: false, allowedValues: [] }],
+    });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "New task" });
+    expect(await within(dialog).findByRole("button", { name: "More fields (1)" })).toBeInTheDocument();
+    expect(within(dialog).queryByText(/does not report which fields are on the create screen/)).not.toBeInTheDocument();
   });
 
   it("degrades to the minimal form when create-meta cannot be read", async () => {

@@ -331,24 +331,30 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 // field on requirements, and two optional fields on stories, so the New issue
 // dialog's required section and its More fields section can both be seen
 // offline, for an option, a text, a long text and a date field.
-func (b *Backend) CreateFields(_ context.Context, _, logicalType string) ([]backend.FieldSpec, error) {
+func (b *Backend) CreateFields(_ context.Context, _, logicalType string) (backend.CreateFieldSet, error) {
 	switch logicalType {
 	case backend.TypeBug:
-		return []backend.FieldSpec{{
+		return demoFields([]backend.FieldSpec{{
 			ID: "customfield_10050", Name: "Severity", Type: "option", Required: true,
 			AllowedValues: []backend.FieldOption{{ID: "1", Value: "Minor"}, {ID: "2", Value: "Major"}, {ID: "3", Value: "Critical"}},
 		}, {
 			ID: "environment", Name: "Environment", Type: "textarea", Required: false, AllowedValues: []backend.FieldOption{},
-		}}, nil
+		}})
 	case backend.TypeRequirement:
-		return []backend.FieldSpec{{ID: "customfield_10060", Name: "Source", Type: "string", Required: true, AllowedValues: []backend.FieldOption{}}}, nil
+		return demoFields([]backend.FieldSpec{{ID: "customfield_10060", Name: "Source", Type: "string", Required: true, AllowedValues: []backend.FieldOption{}}})
 	case backend.TypeStory:
-		return []backend.FieldSpec{
+		return demoFields([]backend.FieldSpec{
 			{ID: "customfield_10300", Name: "Acceptance criteria", Type: "textarea", Required: false, AllowedValues: []backend.FieldOption{}},
 			{ID: "duedate", Name: "Due date", Type: "date", Required: false, AllowedValues: []backend.FieldOption{}},
-		}, nil
+		})
 	}
-	return []backend.FieldSpec{}, nil
+	return demoFields([]backend.FieldSpec{})
+}
+
+// demoFields wraps a fixed list. The demo instance always knows its create
+// screen, so More fields never has to be explained away offline.
+func demoFields(specs []backend.FieldSpec) (backend.CreateFieldSet, error) {
+	return backend.CreateFieldSet{Fields: specs, ScreenKnown: true}, nil
 }
 
 // demoLinkTypes are the three link types the demo defines.
