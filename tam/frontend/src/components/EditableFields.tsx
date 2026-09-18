@@ -4,7 +4,7 @@ import { RichText, RichTextField, SyntaxToggle, detectFormat, errMsg, toPlainTex
 import type { RichFormat } from "@agile-suite/core";
 import { EDITABLE_FIELDS } from "../api";
 import type { EditableField, Issue } from "../api";
-import { useEditIssue } from "../queries/pending";
+import { useEditIssue, useEditableFields } from "../queries/pending";
 import { useEpics } from "../queries/tree";
 import { AssigneePicker } from "./AssigneePicker";
 import { PriorityPicker } from "./PriorityPicker";
@@ -93,6 +93,16 @@ export function EditableFields({ profileId, issue, description, descriptionReady
   const [, bumpFormat] = useState(0);
   const edit = useEditIssue(profileId);
   const epics = useEpics(profileId);
+  const screen = useEditableFields(profileId, issue.type, issue.key);
+
+  // A field Jira does not list is shown, and disabled, rather than hidden.
+  // The user can see Story points on the issue in Jira and reads it here in
+  // the grid, so a field that quietly vanished from this form would read as
+  // a bug in TAM; disabled with the reason beside it says who has to change
+  // what. An empty answer means nothing is known, not that nothing may be
+  // edited, so a never-synced profile keeps the whole list.
+  const listed = screen.data && screen.data.length > 0 ? new Set<EditableField>(screen.data) : null;
+  const offScreen = (field: EditableField) => listed !== null && !listed.has(field);
 
   const editing = editingKey === issue.key;
   const picked = pickedFormats.get(memoryKey(profileId, issue.key));
@@ -163,7 +173,9 @@ export function EditableFields({ profileId, issue, description, descriptionReady
 
   return (
     <form className="edit-form" onSubmit={(e) => void onSubmit(e)} aria-label="Edit fields">
-      {EDITABLE_FIELDS.filter((f) => f.id !== "parentKey" || issue.type !== "epic").map((f) => (
+      {EDITABLE_FIELDS.filter((f) => f.id !== "parentKey" || issue.type !== "epic").map((f) => {
+        const off = offScreen(f.id);
+        return (
         <div key={f.id} className="edit-row">
           {f.id === "description" ? (
             // The label keeps pointing at the textarea's id, which is what
@@ -175,7 +187,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               <button
                 type="button"
                 className="btn btn-ghost edit-description-action"
-                disabled={!descriptionReady}
+                disabled={!descriptionReady || off}
                 onClick={editing ? cancelEdit : () => setEditingKey(issue.key)}
               >
                 {editing ? "Cancel" : "Edit"}
@@ -221,7 +233,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               value={values.assignee}
               fallbackLabel={issue.assignee}
               onChange={(v) => set("assignee", v)}
-              disabled={busy}
+              disabled={busy || off}
             />
           ) : f.id === "priority" ? (
             <PriorityPicker
@@ -229,7 +241,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               id={`edit-${f.id}`}
               value={values.priority}
               onChange={(v) => set("priority", v)}
-              disabled={busy}
+              disabled={busy || off}
               emptyLabel="(none)"
             />
           ) : f.id === "parentKey" ? (
@@ -245,6 +257,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
                 id={`edit-${f.id}`}
                 className="detail-input"
                 value={values.parentKey}
+                disabled={off}
                 onChange={(e) => set("parentKey", e.target.value)}
               >
                 <option value="">(none)</option>
@@ -260,11 +273,18 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               type="text"
               inputMode={f.id === "storyPoints" ? "decimal" : undefined}
               value={values[f.id]}
+              disabled={off}
               onChange={(e) => set(f.id, e.target.value)}
             />
           )}
+          {off && (
+            <p className="muted small">
+              {`Jira does not have ${f.label} on this issue's edit screen, so TAM cannot change it here. A Jira administrator has to put the field on that screen.`}
+            </p>
+          )}
         </div>
-      ))}
+        );
+      })}
       <div className="edit-actions">
         <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || edit.isPending || busy}>
           {edit.isPending ? "Saving" : "Save edit"}

@@ -12,7 +12,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn(), BrowserOpenURL: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), GetEditableFields: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn(), BrowserOpenURL: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -114,6 +114,9 @@ beforeEach(() => {
   vi.mocked(api.SearchUsers).mockResolvedValue([{ name: "ranand", displayName: "R. Anand" }]);
   vi.mocked(api.ListPriorities).mockResolvedValue(["Highest", "High", "Medium", "Low"]);
   vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
+  // Nothing known about the edit screen is the default, which is what a
+  // profile that has never reached Jira has: every field stays editable.
+  vi.mocked(api.GetEditableFields).mockResolvedValue([]);
   vi.mocked(api.ListActivity).mockResolvedValue([
     { id: 5, occurredAt: "2026-09-06T10:10:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "commit", field: "create", beforeVal: "", afterVal: "{\"summary\":\"x\"}", note: "" },
     { id: 4, occurredAt: "2026-09-06T10:07:00Z", actor: "araha", entityType: "issue_create", entityKey: "PLAT-412", action: "discard", field: "create", beforeVal: "{\"summary\":\"x\"}", afterVal: "", note: "" },
@@ -293,6 +296,38 @@ describe("IssueDetailPanel write path", () => {
     await user.type(summary, "Checkout: promo code at payment");
     expect(screen.getByRole("button", { name: "Save edit" })).toBeDisabled();
     expect(api.EditIssue).not.toHaveBeenCalled();
+  });
+
+  // Issue #52: a real instance puts six fields on every edit screen of one
+  // project, Story points among neither them nor the Epic Link, and TAM
+  // offered both until Commit said otherwise, every time.
+  it("disables a field Jira does not have on the issue's edit screen and says why", async () => {
+    vi.mocked(api.GetEditableFields).mockResolvedValue(["summary", "description", "priority", "labels", "assignee"]);
+    renderPanel();
+    const points = await screen.findByLabelText("Story points");
+    await waitFor(() => expect(points).toBeDisabled());
+    // The value stays readable: a user who can see it in Jira must not be
+    // left wondering where TAM put it.
+    expect(points).toHaveValue("5");
+    expect(screen.getByText(/Jira does not have Story points on this issue's edit screen/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Epic")).toBeDisabled();
+    // What Jira does list stays editable.
+    expect(screen.getByLabelText("Summary")).toBeEnabled();
+    expect(screen.getByLabelText("Labels")).toBeEnabled();
+  });
+
+  it("edits every field when the profile has never read an edit screen", async () => {
+    // The default mock answers with nothing known, which is a profile that
+    // has never reached Jira. Refusing to edit then would make the app
+    // useless offline, so the fixed list is what it falls back to.
+    const user = userEvent.setup();
+    renderPanel();
+    const points = await screen.findByLabelText("Story points");
+    expect(points).toBeEnabled();
+    await user.clear(points);
+    await user.type(points, "8");
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    await waitFor(() => expect(api.EditIssue).toHaveBeenCalledWith("p1", "PLAT-412", "storyPoints", "8"));
   });
 
   it("refuses a blank summary and non-numeric points before calling the backend", async () => {

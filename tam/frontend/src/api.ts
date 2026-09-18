@@ -648,6 +648,16 @@ export function fieldLabel(field: string): string {
   return EDITABLE_FIELDS.find((f) => f.id === field)?.label ?? MOVE_LABELS[MOVE_FIELDS[field]] ?? field;
 }
 
+// UnpushableEdit mirrors issuerepo.UnpushableEdit: one journalled edit whose
+// field is not on the edit screen Jira reports for its issue. Commit would be
+// refused for it. It is named where the pending work is shown and never
+// discarded on the user's behalf.
+export interface UnpushableEdit {
+  id: number;
+  key: string;
+  field: string;
+}
+
 export interface PendingChange {
   id: number;
   entityType: string;
@@ -1210,6 +1220,14 @@ export const CreateIssue = (profileId: string, draft: IssueDraft): Promise<strin
   App.CreateIssue(profileId, backend.IssueDraft.createFrom(draft));
 export const GetCreateFields: (profileId: string, typeName: string) => Promise<CreateFieldSet> =
   App.GetCreateFields;
+// The fields Jira says this issue's edit screen carries, by the same names
+// EDITABLE_FIELDS uses. An empty array means nothing is known, which is what
+// a profile that has never reached Jira gets; the panel falls back to
+// EDITABLE_FIELDS then rather than refusing every field.
+export const GetEditableFields: (profileId: string, key: string) => Promise<EditableField[]> =
+  App.GetEditableFields as (profileId: string, key: string) => Promise<EditableField[]>;
+export const ListUnpushableEdits: (profileId: string) => Promise<UnpushableEdit[]> =
+  App.ListUnpushableEdits;
 export const ListPendingChanges: (profileId: string) => Promise<PendingChange[]> = App.ListPendingChanges;
 export const DiscardPendingChange: (profileId: string, id: number) => Promise<void> =
   App.DiscardPendingChange;
