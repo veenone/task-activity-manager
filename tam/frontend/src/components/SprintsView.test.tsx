@@ -133,6 +133,17 @@ function renderView() {
 
 const banner = () => screen.getByRole("status", { name: "Sprint outcome" });
 
+// New sprint is disabled until the board query answers, and findByRole matches
+// a disabled button, so clicking the moment it appears is a no-op that leaves
+// the dialog closed. Waiting for it to be enabled is what makes these tests
+// survive a loaded machine, where the query resolves later than the render.
+async function openNewSprint(user: ReturnType<typeof userEvent.setup>) {
+  const button = await screen.findByRole("button", { name: "New sprint" });
+  await waitFor(() => expect(button).toBeEnabled());
+  await user.click(button);
+  return screen.findByRole("dialog", { name: "New sprint" });
+}
+
 async function openMenu(user: ReturnType<typeof userEvent.setup>, sprint: string) {
   await user.click(await screen.findByRole("button", { name: `Actions on ${sprint}` }));
   return screen.getByRole("menu");
@@ -510,8 +521,7 @@ describe("SprintsView", () => {
   it("creates a sprint, announces it, and points at the row it landed on", async () => {
     const user = userEvent.setup();
     renderView();
-    await user.click(await screen.findByRole("button", { name: "New sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    const dialog = await openNewSprint(user);
     await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
     await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
     await waitFor(() => expect(api.CreateSprint).toHaveBeenCalled());
@@ -526,8 +536,7 @@ describe("SprintsView", () => {
   it("says the new sprint is drafted locally and created on Commit", async () => {
     const user = userEvent.setup();
     renderView();
-    await user.click(await screen.findByRole("button", { name: "New sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    const dialog = await openNewSprint(user);
     expect(within(dialog).getByText("Drafted locally. Commit creates it in Jira.")).toBeInTheDocument();
     expect(within(dialog).queryByText("Sends to Jira now")).not.toBeInTheDocument();
   });
@@ -539,8 +548,7 @@ describe("SprintsView", () => {
       note: "The board's sprints could not be re-read. Press Refresh.",
     });
     renderView();
-    await user.click(await screen.findByRole("button", { name: "New sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    const dialog = await openNewSprint(user);
     await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
     await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
     await waitFor(() => expect(banner()).toHaveTextContent("Press Refresh."));
