@@ -27,6 +27,7 @@ type fakeJira struct {
 	writes     []string // "METHOD path body" for every PUT and POST
 	createKey  string   // key the POST /issue answers with
 	createFail bool     // POST /issue answers 400
+	writeFail  string   // when set, the 400 body every write answers with
 	linkTypes  string   // the /rest/api/2/issueLinkType body
 
 	// The comment endpoint. commentTotal is how many comments the issue has;
@@ -99,6 +100,11 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 		case r.Method == http.MethodPut || r.Method == http.MethodPost:
 			body, _ := io.ReadAll(r.Body)
 			f.writes = append(f.writes, r.Method+" "+r.URL.Path+" "+string(body))
+			if f.writeFail != "" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(f.writeFail))
+				return
+			}
 			if r.URL.Path == "/rest/api/2/issue" {
 				if f.createFail {
 					w.WriteHeader(http.StatusBadRequest)

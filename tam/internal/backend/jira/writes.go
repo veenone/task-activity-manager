@@ -86,7 +86,10 @@ func (b *Backend) UpdateIssue(ctx context.Context, key string, fields map[string
 	if err != nil {
 		return err
 	}
-	return b.c.Put(ctx, "/rest/api/2/issue/"+url.PathEscape(key), map[string]any{"fields": jf})
+	if err := b.c.Put(ctx, "/rest/api/2/issue/"+url.PathEscape(key), map[string]any{"fields": jf}); err != nil {
+		return b.humanizeFieldError(ctx, err, false)
+	}
+	return nil
 }
 
 // projectOf is the project key an issue key belongs to: everything before the
@@ -156,7 +159,7 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 		Key string `json:"key"`
 	}
 	if err := b.c.WriteJSONReturning(ctx, http.MethodPost, "/rest/api/2/issue", map[string]any{"fields": fields}, &resp); err != nil {
-		return "", err
+		return "", b.humanizeFieldError(ctx, err, true)
 	}
 	if resp.Key == "" {
 		return "", errors.New("Jira created the issue but returned no key")
