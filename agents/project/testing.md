@@ -38,6 +38,15 @@ checks is worse than a smaller honest one.
   that query's data, so there is a window where it is enabled and empty. It
   never opens on a developer's machine and opens on a loaded CI runner. Wait
   for the option, not the control.
+- A query matches a disabled button, so `await user.click(await findByRole(
+  "button", ...))` on a control that starts disabled is a no-op that leaves
+  the dialog closed and fails later, at the timeout, somewhere else. The
+  sibling of the trap above: there, the control was enabled and empty; here,
+  it is present and disabled. Wait for `toBeEnabled()` before the click.
+- A sentence shown in a banner and announced through `LiveRegion` is in the
+  DOM twice once the region's timer fires, so an unscoped `findByText` throws
+  "found multiple elements" only when the suite runs slowly enough. Scope the
+  query to the banner.
 - `getByText` finds content inside a collapsed `<details>`. "In the DOM" and
   "visible to a user" are different assertions; use the one you mean.
 - A `<dd>` takes no accessible name from its `<dt>`, so
