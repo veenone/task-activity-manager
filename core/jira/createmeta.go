@@ -88,22 +88,30 @@ type MetaField struct {
 	AllowedValues   []MetaOption `json:"allowedValues"`
 }
 
-// CreateMeta is one issue type's create fields and the endpoint that
-// answered, since only the per-type answer can be read as the screen.
-type CreateMeta struct {
-	Source string
-	Fields []MetaField
-}
+// MetaFields is a screen's fields, whichever endpoint reported them. Both
+// create metadata and editmeta answer with the same MetaField, so the lookup
+// over them is written once.
+type MetaFields []MetaField
 
 // Field finds a field by id.
-func (m CreateMeta) Field(id string) (MetaField, bool) {
-	for _, f := range m.Fields {
+func (m MetaFields) Field(id string) (MetaField, bool) {
+	for _, f := range m {
 		if f.ID == id {
 			return f, true
 		}
 	}
 	return MetaField{}, false
 }
+
+// CreateMeta is one issue type's create fields and the endpoint that
+// answered, since only the per-type answer can be read as the screen.
+type CreateMeta struct {
+	Source string
+	Fields MetaFields
+}
+
+// Field finds a field by id.
+func (m CreateMeta) Field(id string) (MetaField, bool) { return m.Fields.Field(id) }
 
 // Kind is how the field is rendered and shaped.
 func (f MetaField) Kind() string {
