@@ -41,6 +41,7 @@ type Client struct {
 	// lower-cased name, filled from one /rest/api/2/field fetch.
 	fieldMu      sync.Mutex
 	fieldIDs     map[string]string
+	fieldNames   map[string]string
 	fieldsLoaded bool
 }
 
@@ -342,15 +343,33 @@ func (c *Client) WriteJSONReturning(ctx context.Context, method, path string, bo
 // and what the UI renders, so a pathological errorMessages array must not
 // go into either one whole.
 func writeStatusError(method, path string, resp WriteResponse) error {
-	msg := jiraErrorMessage(resp.Body)
+	msg, messages, fields := parseJiraError(resp.Body)
 	if msg == "" {
 		msg = bodyExcerpt(resp.Body)
 	}
 	msg = snippet([]byte(msg), 1024)
-	return fmt.Errorf(
-		"jira: %s %s -> %s: %s",
-		method, path, resp.Status, msg,
-	)
+	return &WriteError{
+		Method: method, Path: path, Status: resp.Status,
+		Message: msg, Messages: messages, Fields: fields,
+	}
+}
+
+// WriteError is a write Jira refused. Message is the flattened sentence this
+// package has always produced and Error still reads; Messages and Fields are
+// the same body kept apart, so a caller that knows the instance's field names
+// can name the field a refusal is about instead of showing a raw id. Fields
+// is keyed by field id and is nil when Jira named no field.
+type WriteError struct {
+	Method   string
+	Path     string
+	Status   string
+	Message  string
+	Messages []string
+	Fields   map[string]string
+}
+
+func (e *WriteError) Error() string {
+	return fmt.Sprintf("jira: %s %s -> %s: %s", e.Method, e.Path, e.Status, e.Message)
 }
 
 // bodyExcerpt is as much of a failed write's body as belongs in an error

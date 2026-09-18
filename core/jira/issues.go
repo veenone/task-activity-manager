@@ -84,6 +84,20 @@ type IssueType struct {
 // custom field with the requested name.
 var ErrFieldNotFound = errors.New("jira: custom field not found")
 
+// FieldName is the name the instance gives a field id, for turning an error
+// that names ids into one that names fields. It reads the same cached field
+// list CustomFieldID loads, so the first of the two to be called pays for
+// both. An id the instance does not list, or a list that cannot be read,
+// gives "": the caller shows the id rather than inventing a name.
+func (c *Client) FieldName(ctx context.Context, id string) string {
+	if err := c.loadFields(ctx); err != nil {
+		return ""
+	}
+	c.fieldMu.Lock()
+	defer c.fieldMu.Unlock()
+	return c.fieldNames[id]
+}
+
 // SearchIssues runs one page of /rest/api/2/search. fields names the fields
 // to return, an empty list asking Jira for its default set; expand names
 // what to expand beyond fields ("changelog" is the one this package uses),
@@ -132,6 +146,41 @@ func (c *Client) IssueTypes(ctx context.Context, projectKey string) ([]IssueType
 	return project.IssueTypes, nil
 }
 
+// loadFields fetches the instance's field list once per client and keeps it
+// both ways round: custom field ids by lowercased name, and every field's
+// name by id. Names are kept for system fields too, because an error names
+// whatever id it likes and "duedate" needs a name as much as a custom one.
+func (c *Client) loadFields(ctx context.Context) error {
+	c.fieldMu.Lock()
+	loaded := c.fieldsLoaded
+	c.fieldMu.Unlock()
+	if loaded {
+		return nil
+	}
+	var fields []struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Custom bool   `json:"custom"`
+	}
+	if err := c.Get(ctx, "/rest/api/2/field", &fields); err != nil {
+		return err
+	}
+	ids := make(map[string]string, len(fields))
+	names := make(map[string]string, len(fields))
+	for _, f := range fields {
+		if f.Custom {
+			ids[strings.ToLower(strings.TrimSpace(f.Name))] = f.ID
+		}
+		names[f.ID] = strings.TrimSpace(f.Name)
+	}
+	c.fieldMu.Lock()
+	c.fieldIDs = ids
+	c.fieldNames = names
+	c.fieldsLoaded = true
+	c.fieldMu.Unlock()
+	return nil
+}
+
 // CustomFieldID returns the customfield_NNNNN id for a custom field name,
 // compared case-insensitively. The instance's field list is fetched once per
 // client and cached, so resolving several names costs one request.
@@ -140,28 +189,8 @@ func (c *Client) CustomFieldID(ctx context.Context, name string) (string, error)
 	if want == "" {
 		return "", fmt.Errorf("jira: custom field name is empty")
 	}
-	c.fieldMu.Lock()
-	loaded := c.fieldsLoaded
-	c.fieldMu.Unlock()
-	if !loaded {
-		var fields []struct {
-			ID     string `json:"id"`
-			Name   string `json:"name"`
-			Custom bool   `json:"custom"`
-		}
-		if err := c.Get(ctx, "/rest/api/2/field", &fields); err != nil {
-			return "", err
-		}
-		ids := make(map[string]string, len(fields))
-		for _, f := range fields {
-			if f.Custom {
-				ids[strings.ToLower(strings.TrimSpace(f.Name))] = f.ID
-			}
-		}
-		c.fieldMu.Lock()
-		c.fieldIDs = ids
-		c.fieldsLoaded = true
-		c.fieldMu.Unlock()
+	if err := c.loadFields(ctx); err != nil {
+		return "", err
 	}
 	c.fieldMu.Lock()
 	id, ok := c.fieldIDs[want]
