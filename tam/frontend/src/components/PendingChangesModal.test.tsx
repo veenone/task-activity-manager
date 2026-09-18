@@ -116,6 +116,42 @@ describe("PendingChangesModal", () => {
     expect(within(dialog).getByRole("button", { name: "Commit (0)" })).toBeDisabled();
   });
 
+  // A create that could not confirm one of the draft's extra fields leaves it
+  // out. The user typed that value, so the banner has to say which field did
+  // not go: the issue exists in Jira without it, and nothing else on screen
+  // would ever show that.
+  it("names the fields a create left out", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501", leftOut: ["Team (customfield_10253)", "Squad (customfield_10777)"] }],
+      linked: [], conflicts: [], failures: [], remaining: 0,
+    });
+    vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
+    expect(
+      await within(dialog).findByText(
+        "PLAT-501 was created without Team (customfield_10253) and Squad (customfield_10777). TAM could not confirm they are on the create screen, so it left them out. Set them in Jira if the issue needs them.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about left out fields when a create sent everything", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({
+      committed: [], created: [{ tempKey: "TAM-NEW-1", key: "PLAT-501", leftOut: [] }],
+      linked: [], conflicts: [], failures: [], remaining: 0,
+    });
+    vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
+    await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
+    expect(within(dialog).queryByText(/was created without/)).not.toBeInTheDocument();
+  });
+
   it("names failures in the banner and keeps their rows", async () => {
     const user = userEvent.setup();
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({

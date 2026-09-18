@@ -876,7 +876,12 @@ export interface CommitHeld {
 
 export interface CommitResult {
   committed: string[];
-  created: { tempKey: string; key: string }[];
+  // leftOut names the draft's extra fields the create did not send. TAM
+  // leaves out a field nothing could confirm is on the issue type's create
+  // screen, rather than letting Jira refuse the whole create over it, and
+  // the banner is where that stops being silent. Optional for the reason
+  // Issue.pending is: fixtures written before it do not carry it.
+  created: { tempKey: string; key: string; leftOut?: string[] }[];
   // createdSprints and held are optional for the same reason CommitFailure's
   // fields are: fixtures written before phased Commit do not spell them out.
   createdSprints?: { draftId: number; id: number; name: string }[];

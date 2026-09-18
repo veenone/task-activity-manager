@@ -586,8 +586,11 @@ type IssueBackend interface {
 	// the issue sits now, and what it can reach instead. It is the check a
 	// drop makes while the app is online; it never writes.
 	CanTransition(ctx context.Context, key string, targetStatusIDs []string) (TransitionCheck, error)
-	// CreateIssue creates the draft and returns the key Jira assigned.
-	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, error)
+	// CreateIssue creates the draft and returns the key Jira assigned, plus
+	// the extra fields it left out of the payload, named for a person: a
+	// field nothing could confirm belongs on the create screen is not sent,
+	// and Commit says so rather than dropping a typed value in silence.
+	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, []string, error)
 	// CreateFields lists the create-screen fields of a logical type that
 	// the New issue form does not already carry, required and optional,
 	// with FieldSpec.Required saying which. The form's own fields (summary,

@@ -291,17 +291,19 @@ func (b *Backend) UpdateIssue(_ context.Context, key string, fields map[string]s
 	return nil
 }
 
-func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.IssueDraft) (string, error) {
+// CreateIssue creates the issue. The demo leaves nothing out: it knows its
+// own create screens, so the second result is always empty.
+func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.IssueDraft) (string, []string, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	// Jira answers a parent it does not know with a 400. Commit should never
 	// send one; if it does, the demo says so the way the real thing would.
 	if strings.HasPrefix(d.ParentKey, "TAM-NEW-") {
-		return "", fmt.Errorf("demo: %s is not an issue, so it cannot be a parent", d.ParentKey)
+		return "", nil, fmt.Errorf("demo: %s is not an issue, so it cannot be a parent", d.ParentKey)
 	}
 	if d.Type == backend.TypeEpic && !b.refusedEpic && strings.Contains(strings.ToLower(d.Summary), RefusedEpicMarker) {
 		b.refusedEpic = true
-		return "", errors.New("demo: Jira refused this epic once, so the drafts waiting for it are held; Commit again to create it")
+		return "", nil, errors.New("demo: Jira refused this epic once, so the drafts waiting for it are held; Commit again to create it")
 	}
 	key := fmt.Sprintf("%s-%d", projectKey, b.nextKey)
 	b.nextKey++
@@ -324,7 +326,7 @@ func (b *Backend) CreateIssue(_ context.Context, projectKey string, d backend.Is
 		ParentKey: parentKey, StoryPoints: d.StoryPoints, Created: now, Updated: now,
 	}
 	b.desc[key] = d.Description
-	return key, nil
+	return key, nil, nil
 }
 
 // CreateFields offers a required and an optional field on bugs, one required

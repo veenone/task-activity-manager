@@ -662,6 +662,7 @@ export namespace committer {
 	export class Created {
 	    tempKey: string;
 	    key: string;
+	    leftOut: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Created(source);
@@ -671,6 +672,7 @@ export namespace committer {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tempKey = source["tempKey"];
 	        this.key = source["key"];
+	        this.leftOut = source["leftOut"];
 	    }
 	}
 	export class CreatedSprint {

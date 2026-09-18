@@ -62,7 +62,7 @@ func TestUpdateIssueMapsTheSixFields(t *testing.T) {
 func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	f.createKey = "PLAT-501"
-	key, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	key, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeBug, Summary: "Promo field accepts spaces", Description: "Steps", Priority: "Low",
 		Labels: []string{"promo"}, Assignee: "jdoe", StoryPoints: pts(1),
 		Extra: map[string]string{"customfield_10050": "3", "components": "100", "customfield_10060": "free text"},
@@ -92,7 +92,7 @@ func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 		t.Errorf("an extra the classic answer does not list must stay out: %s", post)
 	}
 	f.createFail = true
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeBug, Summary: "x"}); err == nil || !strings.Contains(err.Error(), "Severity is required") {
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeBug, Summary: "x"}); err == nil || !strings.Contains(err.Error(), "Severity is required") {
 		t.Errorf("Jira's message must surface: %v", err)
 	}
 }
@@ -103,7 +103,7 @@ func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 func TestCreateIssueShapesExtraFromCreateMeta(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	f.createKey = "PLAT-502"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeBug, Summary: "Promo field accepts spaces",
 		Extra: map[string]string{
 			"components":        "100,101",
@@ -145,7 +145,7 @@ func TestCreateIssueShapesExtraFromCreateMeta(t *testing.T) {
 func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "TKT-10"
-	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeStory, Summary: "Promo input",
 		Extra:        map[string]string{"customfield_10253": "Platform", "customfield_10050": "3"},
 		ScreenFields: []string{"customfield_10050"},
@@ -162,7 +162,7 @@ func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 
 	// A draft from before the set existed: the live per-type answer decides.
 	f.createKey = "TKT-11"
-	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeStory, Summary: "Legacy draft",
 		Extra: map[string]string{"customfield_10253": "Platform"},
 	}); err != nil {
@@ -182,7 +182,7 @@ func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 func TestCreateIssueSendsOnlyRequiredExtrasFromAClassicAnswer(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	f.createKey = "PLAT-520"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeBug, Summary: "Promo input",
 		Extra:        map[string]string{"customfield_10050": "3", "environment": "staging", "customfield_10600": "typed anyway"},
 		ScreenFields: []string{"customfield_10050", "environment", "customfield_10600"},
@@ -211,7 +211,7 @@ func TestCreateIssueSendsOnlyRequiredExtrasFromAClassicAnswer(t *testing.T) {
 func TestCreateIssueDropsABaseFieldDiscoveryDidNotName(t *testing.T) {
 	b, f := newBackend(t, `[]`)
 	f.createKey = "TKT-30"
-	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeStory, Summary: "Legacy draft",
 		Extra: map[string]string{
 			"customfield_10020": "Sprint 15",
@@ -236,7 +236,7 @@ func TestCreateIssueDropsABaseFieldDiscoveryDidNotName(t *testing.T) {
 func TestCreateIssueNeverLetsAnExtraOverwriteABaseField(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "TKT-12"
-	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeStory, Summary: "Real summary", ParentKey: "TKT-2",
 		Extra: map[string]string{"summary": "Fake summary", "customfield_10014": "TKT-99", "customfield_10016": "40"},
 	}); err != nil {
@@ -277,7 +277,7 @@ func TestUpdateIssuePushesTheEpicLink(t *testing.T) {
 func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 	b, f := newBackend(t, fourFields)
 	f.createKey = "PLAT-600"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "PLAT-350"}); err != nil {
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "PLAT-350"}); err != nil {
 		t.Fatal(err)
 	}
 	post := f.writes[len(f.writes)-1]
@@ -290,7 +290,7 @@ func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 	// Epic Name is one of TAM's own fields: an extra naming it is ignored
 	// and the summary is what Jira gets, the same as with no extra at all.
 	f.createKey = "PLAT-601"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeEpic, Summary: "Another epic", Extra: map[string]string{"customfield_10011": "Custom name"},
 	}); err != nil {
 		t.Fatal(err)
@@ -430,7 +430,7 @@ func TestCreateFieldsNeverOffersTheParentOfASubtask(t *testing.T) {
 func TestCreateIssueSendsTheParentThroughEpicLinkWhenItExists(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "PLAT-502"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Under an epic", ParentKey: "PLAT-350"}); err != nil {
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Under an epic", ParentKey: "PLAT-350"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(f.writes[len(f.writes)-1], `"customfield_10014":"PLAT-350"`) {
@@ -438,7 +438,7 @@ func TestCreateIssueSendsTheParentThroughEpicLinkWhenItExists(t *testing.T) {
 	}
 	noEpic, f2 := newBackend(t, twoFields)
 	f2.createKey = "PLAT-503"
-	if _, err := noEpic.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "No field", ParentKey: "PLAT-350"}); err != nil {
+	if _, _, err := noEpic.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "No field", ParentKey: "PLAT-350"}); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(f2.writes[len(f2.writes)-1], "PLAT-350") {

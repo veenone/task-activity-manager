@@ -105,8 +105,8 @@ func (f *fake) GetIssue(context.Context, string) (backend.Issue, error) {
 func (f *fake) UpdateIssue(context.Context, string, map[string]string) error {
 	return errors.New("not used")
 }
-func (f *fake) CreateIssue(context.Context, string, backend.IssueDraft) (string, error) {
-	return "", errors.New("not used")
+func (f *fake) CreateIssue(context.Context, string, backend.IssueDraft) (string, []string, error) {
+	return "", nil, errors.New("not used")
 }
 func (f *fake) CreateFields(context.Context, string, string) (backend.CreateFieldSet, error) {
 	return backend.CreateFieldSet{}, errors.New("not used")
@@ -375,8 +375,8 @@ func (c *cancelOnSearch) GetIssue(context.Context, string) (backend.Issue, error
 func (c *cancelOnSearch) UpdateIssue(context.Context, string, map[string]string) error {
 	return errors.New("not used")
 }
-func (c *cancelOnSearch) CreateIssue(context.Context, string, backend.IssueDraft) (string, error) {
-	return "", errors.New("not used")
+func (c *cancelOnSearch) CreateIssue(context.Context, string, backend.IssueDraft) (string, []string, error) {
+	return "", nil, errors.New("not used")
 }
 func (c *cancelOnSearch) CreateFields(context.Context, string, string) (backend.CreateFieldSet, error) {
 	return backend.CreateFieldSet{}, errors.New("not used")

@@ -104,14 +104,15 @@ func projectOf(issueKey string) string {
 // CreateIssue POSTs the draft. TAM's own fields are set first and are never
 // overwritten; extras are then shaped from the type's create metadata and
 // filtered by applyExtras, so a field off the create screen is never sent.
-func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.IssueDraft) (string, error) {
+// The second result names the extras left out, for Commit to report.
+func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.IssueDraft) (string, []string, error) {
 	ids := b.discover(ctx)
 	names := jiraTypeNames([]string{d.Type}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
 	if len(names) == 0 {
 		if d.Type == backend.TypeSubtask {
-			return "", fmt.Errorf("%s has no sub-task issue type", projectKey)
+			return "", nil, fmt.Errorf("%s has no sub-task issue type", projectKey)
 		}
-		return "", fmt.Errorf("unknown issue type %q", d.Type)
+		return "", nil, fmt.Errorf("unknown issue type %q", d.Type)
 	}
 	fields := map[string]any{
 		"project":   map[string]string{"key": projectKey},
@@ -137,7 +138,7 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	// through the Epic Link, and cannot exist without one.
 	if d.Type == backend.TypeSubtask {
 		if d.ParentKey == "" {
-			return "", errors.New("a sub-task needs a parent issue")
+			return "", nil, errors.New("a sub-task needs a parent issue")
 		}
 		fields["parent"] = map[string]string{"key": d.ParentKey}
 	} else if d.ParentKey != "" && d.Type != backend.TypeEpic {
@@ -147,8 +148,9 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 			log.Printf("tam: %s has no Epic Link field; parent %s dropped from the create of %q", b.c.BaseURL(), d.ParentKey, d.Summary)
 		}
 	}
+	var leftOut []string
 	if len(d.Extra) > 0 {
-		b.applyExtras(ctx, projectKey, names[0], d, ids, fields)
+		leftOut = b.applyExtras(ctx, projectKey, names[0], d, ids, fields)
 	}
 	if d.Type == backend.TypeEpic && ids.EpicName != "" {
 		if _, set := fields[ids.EpicName]; !set {
@@ -159,16 +161,16 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 		Key string `json:"key"`
 	}
 	if err := b.c.WriteJSONReturning(ctx, http.MethodPost, "/rest/api/2/issue", map[string]any{"fields": fields}, &resp); err != nil {
-		return "", b.humanizeFieldError(ctx, err, true)
+		return "", nil, b.humanizeFieldError(ctx, err, true)
 	}
 	if resp.Key == "" {
-		return "", errors.New("Jira created the issue but returned no key")
+		return "", nil, errors.New("Jira created the issue but returned no key")
 	}
-	return resp.Key, nil
+	return resp.Key, leftOut, nil
 }
 
 // applyExtras writes the draft's extra fields into the payload, shaped from
-// the type's create metadata. Four rules keep an extra out, each logged:
+// the type's create metadata. Five rules keep an extra out, each logged:
 //
 //   - the payload already holds the id: what the form set is never
 //     overwritten, which is how Extra["parent"] once replaced the
@@ -180,11 +182,17 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 //   - the draft carries the ids its dialog offered and this one is not
 //     among them, which is the screen check Commit makes with no network;
 //   - the metadata read now came from the per-type endpoint and no longer
-//     lists the id, so the field is not on the screen today.
+//     lists the id, so the field is not on the screen today;
+//   - the metadata cannot be read at all, so nothing can say the field
+//     belongs on the screen. A draft's own ScreenFields is not an answer
+//     here: it records a screen read from an earlier session, and a create
+//     refused today is exactly the case where that reading went stale.
 //
-// An unreadable metadata read shapes every surviving extra as text, and
-// Jira's own validation decides.
-func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, d backend.IssueDraft, ids fieldIDs, fields map[string]any) {
+// It returns the fields it left out, named, so Commit can say what did not
+// go rather than dropping a typed value in silence. A field TAM sets itself
+// is not among them: the form's own value is what Jira gets, so nothing the
+// user typed is lost.
+func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, d backend.IssueDraft, ids fieldIDs, fields map[string]any) []string {
 	meta, metaErr := b.createMeta(ctx, projectKey, d.Type)
 	var screen map[string]bool
 	if d.ScreenFields != nil {
@@ -198,6 +206,7 @@ func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, 
 		extraIDs = append(extraIDs, id)
 	}
 	sort.Strings(extraIDs)
+	leftOut := []string{}
 	for _, id := range extraIDs {
 		v := d.Extra[id]
 		if strings.TrimSpace(v) == "" {
@@ -216,18 +225,27 @@ func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, 
 		}
 		if screen != nil && !screen[id] {
 			log.Printf("tam: the %s create of %q leaves out %s, which was not on the screen it was drafted against", typeName, d.Summary, id)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
-		if metaErr == nil && meta.Source == corejira.MetaPerType && !known {
+		if metaErr != nil {
+			log.Printf("tam: the %s create of %q leaves out %s: the create fields of %s could not be read, so nothing can say the field is on the screen (%v)", typeName, d.Summary, id, projectKey, metaErr)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
+			continue
+		}
+		if meta.Source == corejira.MetaPerType && !known {
 			log.Printf("tam: the %s create of %q leaves out %s, which is not on the %s create screen", typeName, d.Summary, id, typeName)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
-		if metaErr == nil && meta.Source == corejira.MetaClassic && !(known && f.Required) {
+		if meta.Source == corejira.MetaClassic && !(known && f.Required) {
 			log.Printf("tam: the %s create of %q leaves out %s, because this Jira only reports its create fields through the classic call, which does not say what is on the screen", typeName, d.Summary, id)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
 		fields[id] = corejira.ShapeValue(f, v)
 	}
+	return leftOut
 }
 
 // baseFieldIDs are the create-meta ids TAM's own form carries or sets itself.

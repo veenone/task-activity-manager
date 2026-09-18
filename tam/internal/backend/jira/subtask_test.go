@@ -35,7 +35,7 @@ func TestSubtaskTypeNameComesFromTheProject(t *testing.T) {
 func TestCreateSubtaskSendsTheParentField(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "PLAT-700"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeSubtask, Summary: "Wire the promo input", ParentKey: "PLAT-412",
 	}); err != nil {
 		t.Fatalf("CreateIssue: %v", err)
@@ -61,7 +61,7 @@ func TestCreateSubtaskSendsTheParentField(t *testing.T) {
 // than in a Jira 400 at Commit.
 func TestCreateSubtaskRefusesAMissingParent(t *testing.T) {
 	b, f := newBackend(t, threeFields)
-	_, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	_, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeSubtask, Summary: "Orphan",
 	})
 	if err == nil || !strings.Contains(err.Error(), "needs a parent") {
@@ -92,7 +92,7 @@ func TestScopeUsesTheProjectsOwnTaskName(t *testing.T) {
 func TestCreateSubtaskKeepsTheParentObjectWhateverExtraSays(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "TKT-9"
-	_, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	_, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeSubtask, Summary: "Wire the input", ParentKey: "TKT-7",
 		Extra:        map[string]string{"parent": "TKT-7", "customfield_10300": "Given a promo"},
 		ScreenFields: []string{"customfield_10300"},
