@@ -170,7 +170,10 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 //   - the payload already holds the id: what the form set is never
 //     overwritten, which is how Extra["parent"] once replaced the
 //     {"key": ...} object with a string;
-//   - the id is one of TAM's own fields, set by the form or by nothing;
+//   - the field is one of TAM's own, set by the form or by nothing. This is
+//     the same isBaseField the dialog filters with, so it also catches a
+//     parent Jira reports under a custom id and an Agile field discovery
+//     missed, neither of which the id alone would name;
 //   - the draft carries the ids its dialog offered and this one is not
 //     among them, which is the screen check Commit makes with no network;
 //   - the metadata read now came from the per-type endpoint and no longer
@@ -197,7 +200,14 @@ func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, 
 		if strings.TrimSpace(v) == "" {
 			continue
 		}
-		if _, set := fields[id]; set || isBaseFieldID(id, ids) {
+		// The metadata is read before the base-field check, not after it,
+		// because the schema is half of what says a field is TAM's own: a
+		// metadata read that failed leaves the id to answer on its own.
+		f, known := meta.Field(id)
+		if !known {
+			f = corejira.MetaField{ID: id, Schema: corejira.MetaSchema{Type: "string"}}
+		}
+		if _, set := fields[id]; set || isBaseField(f, ids) {
 			log.Printf("tam: the %s create of %q ignores extra %s, which is one of TAM's own fields", typeName, d.Summary, id)
 			continue
 		}
@@ -205,13 +215,9 @@ func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, 
 			log.Printf("tam: the %s create of %q leaves out %s, which was not on the screen it was drafted against", typeName, d.Summary, id)
 			continue
 		}
-		f, known := meta.Field(id)
 		if metaErr == nil && meta.Source == corejira.MetaPerType && !known {
 			log.Printf("tam: the %s create of %q leaves out %s, which is not on the %s create screen", typeName, d.Summary, id, typeName)
 			continue
-		}
-		if metaErr != nil || !known {
-			f = corejira.MetaField{ID: id, Schema: corejira.MetaSchema{Type: "string"}}
 		}
 		fields[id] = corejira.ShapeValue(f, v)
 	}

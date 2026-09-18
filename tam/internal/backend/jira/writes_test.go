@@ -167,6 +167,38 @@ func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 	}
 }
 
+// A base field is TAM's own whether or not discovery found its id, and
+// whether or not Jira reports it under the id TAM expects: the create screen
+// of this Story carries Sprint and Epic Link by their greenhopper type and a
+// parent under a custom id. A draft made before the dialog stopped offering
+// them (nil ScreenFields, so no screen check) still names them, and sending
+// any of the three is what Jira answers "cannot be set" or "data was not an
+// object" to.
+func TestCreateIssueDropsABaseFieldDiscoveryDidNotName(t *testing.T) {
+	b, f := newBackend(t, `[]`)
+	f.createKey = "TKT-30"
+	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+		Type: backend.TypeStory, Summary: "Legacy draft",
+		Extra: map[string]string{
+			"customfield_10020": "Sprint 15",
+			"customfield_10014": "TKT-3",
+			"customfield_10500": "TKT-7",
+			"customfield_10300": "Given a promo",
+		},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	post := f.writes[len(f.writes)-1]
+	for _, bad := range []string{"customfield_10020", "customfield_10014", "customfield_10500"} {
+		if strings.Contains(post, bad) {
+			t.Errorf("a base field reached the payload (%s): %s", bad, post)
+		}
+	}
+	if !strings.Contains(post, `"customfield_10300":"Given a promo"`) {
+		t.Errorf("an ordinary screen field is still sent: %s", post)
+	}
+}
+
 func TestCreateIssueNeverLetsAnExtraOverwriteABaseField(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "TKT-12"
