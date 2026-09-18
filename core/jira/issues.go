@@ -91,6 +91,19 @@ var ErrFieldNotFound = errors.New("jira: custom field not found")
 // every read and every write on a field nobody chose.
 var ErrFieldAmbiguous = errors.New("jira: more than one custom field has that name")
 
+// AmbiguousFieldError is the ErrFieldAmbiguous case with the ids attached,
+// so a caller can say which fields collided rather than only that some did.
+type AmbiguousFieldError struct {
+	Name string
+	IDs  []string
+}
+
+func (e *AmbiguousFieldError) Error() string {
+	return fmt.Sprintf("%s: %q is %s", ErrFieldAmbiguous.Error(), e.Name, strings.Join(e.IDs, " and "))
+}
+
+func (e *AmbiguousFieldError) Is(target error) bool { return target == ErrFieldAmbiguous }
+
 // FieldName is the name the instance gives a field id, for turning an error
 // that names ids into one that names fields. It reads the same cached field
 // list CustomFieldID loads, so the first of the two to be called pays for
@@ -211,5 +224,5 @@ func (c *Client) CustomFieldID(ctx context.Context, name string) (string, error)
 	case 1:
 		return found[0], nil
 	}
-	return "", fmt.Errorf("%w: %q is %s", ErrFieldAmbiguous, name, strings.Join(found, " and "))
+	return "", &AmbiguousFieldError{Name: name, IDs: append([]string{}, found...)}
 }

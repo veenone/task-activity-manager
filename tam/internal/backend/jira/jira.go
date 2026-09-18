@@ -95,24 +95,32 @@ func (b *Backend) discover(ctx context.Context) fieldIDs {
 	if b.discovered {
 		return b.ids
 	}
-	var ids fieldIDs
+	ids := fieldIDs{ambiguous: map[string][]string{}}
 	ok := true
 	for _, want := range []struct {
 		name string
 		dst  *string
 	}{
 		{"Sprint", &ids.Sprint},
-		{"Story Points", &ids.Points},
+		{pointsFieldName, &ids.Points},
 		{"Epic Link", &ids.EpicLink},
 		{"Rank", &ids.Rank},
 		{"Epic Name", &ids.EpicName},
 	} {
 		id, err := b.c.CustomFieldID(ctx, want.name)
+		var amb *corejira.AmbiguousFieldError
 		switch {
 		case err == nil:
 			*want.dst = id
 		case errors.Is(err, corejira.ErrFieldNotFound):
 			log.Printf("tam: %s has no %q custom field; that column stays empty", b.c.BaseURL(), want.name)
+		case errors.As(err, &amb):
+			// Two fields of the same name identify neither, so the id stays
+			// empty rather than being guessed. Cached like a missing field:
+			// the instance will not stop having two of them while the app
+			// runs, and re-asking would only repeat this line.
+			ids.ambiguous[want.name] = amb.IDs
+			log.Printf("tam: %s has more than one %q custom field (%s); TAM will not guess which one it means", b.c.BaseURL(), want.name, strings.Join(amb.IDs, " and "))
 		default:
 			log.Printf("tam: custom field discovery failed, syncing without custom columns this time: %v", err)
 			ok = false

@@ -28,7 +28,7 @@ func (b *Backend) GetIssue(ctx context.Context, key string) (backend.Issue, erro
 
 // jiraFields turns the journal's text values into Jira's field shapes. An
 // empty priority, assignee, or points clears the field with null.
-func jiraFields(fields map[string]string, ids fieldIDs) (map[string]any, error) {
+func jiraFields(fields map[string]string, ids fieldIDs, pointsID string) (map[string]any, error) {
 	out := map[string]any{}
 	for name, v := range fields {
 		switch name {
@@ -43,17 +43,14 @@ func jiraFields(fields map[string]string, ids fieldIDs) (map[string]any, error) 
 		case "labels":
 			out["labels"] = backend.SplitLabels(v)
 		case "storyPoints":
-			if ids.Points == "" {
-				return nil, errors.New("this Jira has no Story Points field, so points cannot be pushed")
-			}
 			p, err := backend.ParsePoints(v)
 			if err != nil {
 				return nil, err
 			}
 			if p == nil {
-				out[ids.Points] = nil
+				out[pointsID] = nil
 			} else {
-				out[ids.Points] = *p
+				out[pointsID] = *p
 			}
 		case "parentKey":
 			if ids.EpicLink == "" {
@@ -82,7 +79,16 @@ func nameOrNull(v string) any {
 // 400 with a per-field message otherwise; the client's error carries it.
 func (b *Backend) UpdateIssue(ctx context.Context, key string, fields map[string]string) error {
 	ids := b.discover(ctx)
-	jf, err := jiraFields(fields, ids)
+	// Resolved only when the edit carries an estimate: an unresolvable
+	// points field is no reason to refuse an edit that never mentions it.
+	pointsID := ""
+	if _, edited := fields["storyPoints"]; edited {
+		var err error
+		if pointsID, err = b.pointsField(projectOf(key), ids); err != nil {
+			return err
+		}
+	}
+	jf, err := jiraFields(fields, ids, pointsID)
 	if err != nil {
 		return err
 	}
@@ -131,8 +137,12 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	if len(d.Labels) > 0 {
 		fields["labels"] = d.Labels
 	}
-	if d.StoryPoints != nil && ids.Points != "" {
-		fields[ids.Points] = *d.StoryPoints
+	if d.StoryPoints != nil {
+		pointsID, err := b.pointsField(projectKey, ids)
+		if err != nil {
+			return "", nil, err
+		}
+		fields[pointsID] = *d.StoryPoints
 	}
 	// A sub-task hangs off its parent through Jira's own parent field, not
 	// through the Epic Link, and cannot exist without one.
