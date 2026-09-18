@@ -147,8 +147,12 @@ describe("NewIssueModal", () => {
     const user = userEvent.setup();
     renderModal(vi.fn(), vi.fn(), "story");
     const dialog = await screen.findByRole("dialog", { name: "New story" });
-    await waitFor(() => expect(within(dialog).getByLabelText("Epic")).toBeEnabled());
-    await user.selectOptions(within(dialog).getByLabelText("Epic"), "PLAT-350");
+    // Wait for the option, not the control: the select enables on the epic
+    // query's loading flag while the options come from its data, so there is
+    // a window where it is enabled and empty (agents/project/testing.md).
+    const epic = within(dialog).getByLabelText("Epic");
+    await within(epic).findByRole("option", { name: /PLAT-350/ });
+    await user.selectOptions(epic, "PLAT-350");
     await user.type(within(dialog).getByLabelText("Summary *"), "Apply a promo code");
     await user.click(await submitButton(dialog));
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
