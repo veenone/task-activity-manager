@@ -255,6 +255,14 @@ func (b *Backend) GetIssue(_ context.Context, key string) (backend.Issue, error)
 
 func pts(v float64) *float64 { return &v }
 
+// EditableFields is every field TAM edits: the demo instance puts them all
+// on every screen, so a demo profile edits the same way it always has. It is
+// a fixed answer rather than demo data because a screen is a Jira
+// configuration, not something a demo dataset can pretend to have.
+func (b *Backend) EditableFields(context.Context, string) ([]string, error) {
+	return []string{"assignee", "description", "labels", "parentKey", "priority", "storyPoints", "summary"}, nil
+}
+
 func (b *Backend) UpdateIssue(_ context.Context, key string, fields map[string]string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()

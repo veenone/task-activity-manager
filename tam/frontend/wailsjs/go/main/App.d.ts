@@ -70,6 +70,8 @@ export function GetCreateFields(arg1:string,arg2:string):Promise<backend.CreateF
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
+export function GetEditableFields(arg1:string,arg2:string):Promise<Array<string>>;
+
 export function GetEpicTree(arg1:string,arg2:issuerepo.TreeQuery):Promise<issuerepo.Tree>;
 
 export function GetIssueDetail(arg1:string,arg2:string):Promise<backend.IssueDetail>;
@@ -121,6 +123,8 @@ export function ListProfiles():Promise<Array<profile.Profile>>;
 export function ListRitualDocuments(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
 
 export function ListSprints(arg1:string):Promise<Array<issuerepo.SprintRef>>;
+
+export function ListUnpushableEdits(arg1:string):Promise<Array<issuerepo.UnpushableEdit>>;
 
 export function LookupIssue(arg1:string,arg2:string):Promise<backend.Issue>;
 
