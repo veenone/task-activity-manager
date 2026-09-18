@@ -219,6 +219,10 @@ func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, 
 			log.Printf("tam: the %s create of %q leaves out %s, which is not on the %s create screen", typeName, d.Summary, id, typeName)
 			continue
 		}
+		if metaErr == nil && meta.Source == corejira.MetaClassic && !(known && f.Required) {
+			log.Printf("tam: the %s create of %q leaves out %s, because this Jira only reports its create fields through the classic call, which does not say what is on the screen", typeName, d.Summary, id)
+			continue
+		}
 		fields[id] = corejira.ShapeValue(f, v)
 	}
 }
@@ -297,6 +301,15 @@ func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType stri
 	out := []backend.FieldSpec{}
 	for _, f := range meta.Fields {
 		if isBaseField(f, ids) {
+			continue
+		}
+		// A classic answer is not the create screen: on some Data Center
+		// versions it lists fields the screen does not carry, and sending one
+		// of those fails the whole create. Only what Jira marks required is
+		// offered there, for the same reason an unfillable required field
+		// still is: leaving a required field out would only move the failure
+		// to a Jira 400 at Commit.
+		if meta.Source == corejira.MetaClassic && !f.Required {
 			continue
 		}
 		kind := f.Kind()

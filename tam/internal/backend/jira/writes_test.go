@@ -79,11 +79,17 @@ func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 	for _, want := range []string{
 		`"project":{"key":"PLAT"}`, `"issuetype":{"name":"Bug"}`, `"summary":"Promo field accepts spaces"`,
 		`"description":"Steps"`, `"priority":{"name":"Low"}`, `"labels":["promo"]`, `"assignee":{"name":"jdoe"}`,
-		`"customfield_10016":1`, `"customfield_10050":{"id":"3"}`, `"components":[{"id":"100"}]`, `"customfield_10060":"free text"`,
+		`"customfield_10016":1`, `"customfield_10050":{"id":"3"}`, `"components":[{"id":"100"}]`,
 	} {
 		if !strings.Contains(post, want) {
 			t.Errorf("POST lacks %s: %s", want, post)
 		}
+	}
+	// customfield_10060 is in no answer this Bug's classic create metadata
+	// gives, so it is not one of the required fields a classic answer is
+	// trusted for. See TestCreateIssueSendsOnlyRequiredExtrasFromAClassicAnswer.
+	if strings.Contains(post, "customfield_10060") {
+		t.Errorf("an extra the classic answer does not list must stay out: %s", post)
 	}
 	f.createFail = true
 	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeBug, Summary: "x"}); err == nil || !strings.Contains(err.Error(), "Severity is required") {
@@ -164,6 +170,34 @@ func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 	}
 	if post := f.writes[len(f.writes)-1]; strings.Contains(post, "customfield_10253") {
 		t.Errorf("the per-type answer does not list the field, so it is not sent: %s", post)
+	}
+}
+
+// Half one of the ticket, the half the screen check could not reach: a
+// classic answer is not the create screen, so a field it lists as optional
+// may not be on the screen at all, and sending one is what Jira answers
+// "Field cannot be set. It is not on the appropriate screen" to. The draft's
+// own ScreenFields cannot catch it, because the dialog built that list from
+// the same classic answer.
+func TestCreateIssueSendsOnlyRequiredExtrasFromAClassicAnswer(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.createKey = "PLAT-520"
+	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+		Type: backend.TypeBug, Summary: "Promo input",
+		Extra:        map[string]string{"customfield_10050": "3", "environment": "staging", "customfield_10600": "typed anyway"},
+		ScreenFields: []string{"customfield_10050", "environment", "customfield_10600"},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	post := f.writes[len(f.writes)-1]
+	if !strings.Contains(post, `"customfield_10050":{"id":"3"}`) {
+		t.Errorf("a required field is still sent: %s", post)
+	}
+	if strings.Contains(post, "environment") {
+		t.Errorf("an optional field a classic answer cannot vouch for must stay out: %s", post)
+	}
+	if strings.Contains(post, "customfield_10600") {
+		t.Errorf("a field the classic answer does not list at all must stay out: %s", post)
 	}
 }
 
@@ -278,9 +312,13 @@ func TestCreateFieldsHidesEpicName(t *testing.T) {
 	}
 }
 
-// The classic answer this fake gives for a Bug carries one optional field,
-// Environment, which the dialog now offers under More fields.
-func TestCreateFieldsOffersRequiredAndOptionalFieldsBeyondTheForm(t *testing.T) {
+// The two metadata sources differ in what they can be read as. A per-type
+// answer is the create screen, so an optional field on it is offered; a
+// classic answer is not, because on some Data Center versions it lists
+// fields the screen does not carry, so only the fields Jira marks required
+// are offered there. The classic answer this fake gives for a Bug carries
+// one optional field, Environment, which is what that rule leaves out.
+func TestCreateFieldsOffersOptionalFieldsOnlyFromAPerTypeAnswer(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeBug)
 	if err != nil {
@@ -290,17 +328,33 @@ func TestCreateFieldsOffersRequiredAndOptionalFieldsBeyondTheForm(t *testing.T) 
 	for _, s := range specs {
 		seen = append(seen, fmt.Sprintf("%s:%s:%v", s.ID, s.Type, s.Required))
 	}
-	// Sorted by name: Component/s, Environment, Keywords, Release Note,
-	// Severity. Story Points and Summary are the form's own.
-	want := "components:array:true,environment:string:false,customfield_10071:array:true,customfield_10070:option:true,customfield_10050:option:true"
+	// Sorted by name: Component/s, Keywords, Release Note, Severity. Story
+	// Points and Summary are the form's own, and Environment is the optional
+	// field a classic answer cannot vouch for.
+	want := "components:array:true,customfield_10071:array:true,customfield_10070:option:true,customfield_10050:option:true"
 	if strings.Join(seen, ",") != want {
 		t.Errorf("specs = %v", seen)
 	}
-	if specs[4].Name != "Severity" || len(specs[4].AllowedValues) != 2 || specs[4].AllowedValues[1].Value != "Critical" {
-		t.Errorf("severity = %+v", specs[4])
+	if specs[3].Name != "Severity" || len(specs[3].AllowedValues) != 2 || specs[3].AllowedValues[1].Value != "Critical" {
+		t.Errorf("severity = %+v", specs[3])
 	}
 	if specs[0].AllowedValues[0].Value != "Checkout" {
 		t.Errorf("array options take name when value is empty: %+v", specs[0])
+	}
+	// The other direction: a Story on TKT is read through the per-type
+	// endpoint, so its optional Acceptance criteria is still offered.
+	perType, err := b.CreateFields(context.Background(), "TKT", backend.TypeStory)
+	if err != nil {
+		t.Fatalf("CreateFields: %v", err)
+	}
+	optional := false
+	for _, s := range perType {
+		if s.ID == "customfield_10300" && !s.Required {
+			optional = true
+		}
+	}
+	if !optional {
+		t.Errorf("a per-type answer still offers its optional fields: %+v", perType)
 	}
 	found := false
 	for _, s := range f.searches {
