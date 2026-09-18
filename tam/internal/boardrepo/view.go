@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"agile-suite/tam/internal/backend"
@@ -166,17 +167,23 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 	if err != nil {
 		return BoardView{}, err
 	}
-	cards, err := issues.IssuesByKeys(ctx, q, profileID, withMovedIn(boardKeys, moves, sprintID))
+	cards, err := issues.IssuesByKeys(ctx, q, profileID, withMovedIn(boardKeys, moves, boardID, sprintID))
 	if err != nil {
 		return BoardView{}, err
 	}
 	view.NotSynced = countNotSynced(boardKeys, cards)
 	view.NeedsStatusSync = needsStatusSync(cards)
 
+	sprintIDs, err := boardSprintIDs(ctx, q, profileID, boardID)
+	if err != nil {
+		return BoardView{}, err
+	}
+	byKey := movesByKey(moves)
+
 	// The drafts come from the cache rather than from the board's key list,
-	// which is Jira's and can never name one. They are project-level, so
-	// every board and every sprint of the profile draws the same ones and
-	// the Draft chip on the card is what says so.
+	// which is Jira's and can never name one. A draft exists on no board in
+	// Jira, so it is drawn only when tiedToBoard finds one of the three ties
+	// that says it belongs here; with none of them it is drawn nowhere.
 	drafts, err := issues.DraftIssues(ctx, q, profileID)
 	if err != nil {
 		return BoardView{}, err
@@ -184,7 +191,7 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 	all := make([]backend.Issue, 0, len(cards)+len(drafts))
 	all = append(all, cards...)
 	for _, d := range drafts {
-		if d.Type != backend.TypeSubtask {
+		if d.Type != backend.TypeSubtask && tiedToBoard(d, boardID, sprintIDs, byKey) {
 			all = append(all, d)
 		}
 	}
@@ -281,6 +288,27 @@ func columnIndex(cols []backend.BoardColumn) (byStatus map[string]int, draftColu
 		}
 	}
 	return byStatus, draftColumn
+}
+
+// boardSprintIDs is the set of sprint ids, real or drafted, that belong to
+// this board, read on the same snapshot as the rest of the board: a draft
+// ties to a board through an id like these (backend.Issue.SprintID) since
+// Jira's own board key list can never name a draft directly.
+func boardSprintIDs(ctx context.Context, q dbtx.Querier, profileID string, boardID int) (map[string]bool, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id FROM sprint WHERE profile_id = ? AND board_id = ?`, profileID, boardID)
+	if err != nil {
+		return nil, fmt.Errorf("board %d sprint ids: %w", boardID, err)
+	}
+	defer rows.Close()
+	ids := map[string]bool{}
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids[strconv.Itoa(id)] = true
+	}
+	return ids, rows.Err()
 }
 
 // placeCard picks the column a card belongs in. A draft is the one card

@@ -97,9 +97,23 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		if err := discardDraftSprint(ctx, tx, profileID, p.EntityKey); err != nil {
 			return err
 		}
+	case p.EntityType == EntityBoardCreate:
+		if err := discardDraftBoard(ctx, tx, profileID, p.EntityKey); err != nil {
+			return err
+		}
+	case p.EntityType == EntitySprintEdit:
+		if err := discardSprintEdit(ctx, tx, profileID, p); err != nil {
+			return err
+		}
+	case p.EntityType == EntitySprintDelete, p.EntityType == EntitySprintStart, p.EntityType == EntitySprintComplete:
+		// Nothing local changed when these were queued.
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
-	case p.EntityType == EntityTransition, p.EntityType == EntitySprintMove, p.EntityType == EntityRank:
+	case p.EntityType == EntityTransition, p.EntityType == EntitySprintMove, p.EntityType == EntityRank, p.EntityType == EntityIssueBoard:
+		// A board add has no column to put back either, the way a rank has
+		// none: revertMove asks holdsMove first, which is false for both,
+		// so this only ever takes the journal row itself, which the delete
+		// below does.
 		if err := revertMove(ctx, tx, profileID, p); err != nil {
 			return err
 		}

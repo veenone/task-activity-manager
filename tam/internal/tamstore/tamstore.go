@@ -22,6 +22,9 @@
 // Version 14 adds the issue's assignee_name: the assignee column holds a
 // display name, which is neither unique nor stable, so matching an issue to
 // the connected user needs the username instead.
+// Version 15 adds the same draft flag to board, for a board drafted the same
+// way; unlike version 13 it backfills nothing, since a draft board is
+// something the user makes and not something a sync discovers.
 package tamstore
 
 import (
@@ -222,6 +225,17 @@ var Schema = store.Schema{
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 			return err
 		},
+	}, {
+		Version: 15,
+		// A board drafted in TAM is a row here under a negative id, flagged
+		// draft, beside a board_create journal row, until Commit creates it
+		// in Jira and rewrites the id. The same column-add shape as version
+		// 13: a fresh database has it from baseDDL already, which
+		// AddColumnIfMissing treats as success, and every cached board Jira
+		// sent is not a draft, which is what the default says.
+		Apply: func(db *sql.DB) error {
+			return store.AddColumnIfMissing(db, "board", "draft INTEGER NOT NULL DEFAULT 0")
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -356,6 +370,7 @@ CREATE TABLE IF NOT EXISTS board (
 	name       TEXT NOT NULL DEFAULT '',
 	type       TEXT NOT NULL DEFAULT '',
 	synced_at  TEXT NOT NULL DEFAULT '',
+	draft      INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (profile_id, id)
 );
 CREATE TABLE IF NOT EXISTS board_column (

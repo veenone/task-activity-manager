@@ -17,6 +17,10 @@ export function bannerLine(r: CommitResult): string {
   if (sprints.length) {
     parts.push(`${plural(sprints.length, "sprint created", "sprints created")} (${sprints.map((s) => `${s.name} is sprint ${s.id}`).join(", ")})`);
   }
+  const sprintsChanged = r.sprintsChanged ?? [];
+  if (sprintsChanged.length) {
+    parts.push(`${plural(sprintsChanged.length, "sprint change", "sprint changes")} pushed (${sprintsChanged.join(", ")})`);
+  }
   if (r.committed.length) parts.push(plural(r.committed.length, "issue pushed", "issues pushed"));
   if (r.created.length) {
     const mapping = r.created.map((c) => `${c.tempKey} is now ${c.key}`).join(", ");
@@ -37,7 +41,7 @@ export function bannerLine(r: CommitResult): string {
   const held = r.held ?? [];
   if (held.length) parts.push(`${held.length} waiting`);
   if (parts.length === 0) return "Last commit: nothing to push.";
-  if (!sprints.length && !r.committed.length && !r.created.length && !r.linked.length && !pushed.length) {
+  if (!sprints.length && !sprintsChanged.length && !r.committed.length && !r.created.length && !r.linked.length && !pushed.length) {
     return `Last commit: nothing pushed, ${parts.join(", ")}.`;
   }
   return `Last commit: ${parts.join(", ")}.`;

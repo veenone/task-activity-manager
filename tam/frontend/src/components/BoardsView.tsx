@@ -11,6 +11,8 @@ import { BoardBody } from "./BoardBody";
 import { BoardCeremonies, useCompleteGuard } from "./BoardCeremonies";
 import type { Ceremony } from "./BoardCeremonies";
 import { CreateSprintModal } from "./CreateSprintModal";
+import { NewBoardModal } from "./NewBoardModal";
+import { AddIssuesModal } from "./AddIssuesModal";
 import { BoardSelectionBar } from "./BoardSelectionBar";
 import { useBoardSelection } from "./useBoardSelection";
 import { useBoardKeys } from "./useBoardKeys";
@@ -49,6 +51,11 @@ export function BoardsView() {
   // when no sprint is on screen, and a create needs no sprint already
   // picked, so it cannot share that component's early return.
   const [creatingSprint, setCreatingSprint] = useState(false);
+  // Whether the New board and Add issues dialogs are open, the same kind of
+  // flag as creatingSprint and for the same reason: neither needs a sprint,
+  // and New board does not even need a board, already picked.
+  const [creatingBoard, setCreatingBoard] = useState(false);
+  const [addingIssues, setAddingIssues] = useState(false);
 
   // The board, sprint, and swimlane choices belong to the profile they were
   // made for, so a switch clears them in the render that first sees the new
@@ -67,6 +74,8 @@ export function BoardsView() {
     setCeremony("");
     setCeremonyLine("");
     setCreatingSprint(false);
+    setCreatingBoard(false);
+    setAddingIssues(false);
   }
 
   const boards = useBoards(activeId);
@@ -176,6 +185,23 @@ export function BoardsView() {
     if (nextSprintId) setSprintId(nextSprintId);
   }
 
+  // pickBoard switches to a board from the picker, starting it clean.
+  function pickBoard(id: number) {
+    setBoardId(id);
+    setSprintId("");
+    setSelectedKey("");
+    setFocusId("");
+    selection.reset();
+    setCeremonyLine("");
+  }
+
+  // afterBoardCreated switches the picker to the board just drafted, the way
+  // choosing one from the picker itself does.
+  function afterBoardCreated(newBoardId: number, line: string) {
+    pickBoard(newBoardId);
+    setCeremonyLine(line);
+  }
+
   const refreshing = sync.isPending || (view.isFetching && !view.isLoading);
   // Two passes can have written these boards: this view's own Refresh and
   // the boards half of an ordinary sync. The banner reports whichever ran
@@ -190,14 +216,7 @@ export function BoardsView() {
       <BoardsToolbar
         boards={boardList}
         board={board}
-        onBoard={(id) => {
-          setBoardId(id);
-          setSprintId("");
-          setSelectedKey("");
-          setFocusId("");
-          selection.reset();
-          setCeremonyLine("");
-        }}
+        onBoard={pickBoard}
         sprints={openSprints}
         sprint={sprint}
         onSprint={(id) => {
@@ -226,6 +245,8 @@ export function BoardsView() {
           });
         }}
         onCreate={() => setCreatingSprint(true)}
+        onNewBoard={() => setCreatingBoard(true)}
+        onAddIssues={() => setAddingIssues(true)}
       />
 
       <BoardsBanner
@@ -333,6 +354,25 @@ export function BoardsView() {
           boardId={board?.id ?? 0}
           onClose={() => setCreatingSprint(false)}
           onCreated={afterCeremony}
+        />
+      )}
+
+      {creatingBoard && (
+        <NewBoardModal
+          profileId={activeId}
+          onClose={() => setCreatingBoard(false)}
+          onCreated={afterBoardCreated}
+        />
+      )}
+
+      {addingIssues && board && (
+        <AddIssuesModal
+          profileId={activeId}
+          boardId={board.id}
+          boardName={board.name}
+          sprints={openSprints}
+          onClose={() => setAddingIssues(false)}
+          onAdded={setCeremonyLine}
         />
       )}
     </section>

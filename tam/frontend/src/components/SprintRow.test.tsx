@@ -14,7 +14,7 @@ function detail(over: Partial<SprintDetail> = {}): SprintDetail {
   };
 }
 
-function renderRow(over: Partial<SprintDetail> = {}, busy = false) {
+function renderRow(over: Partial<SprintDetail> = {}, busy = false, waiting = "") {
   const actions = { onStart: vi.fn(), onComplete: vi.fn(), onEdit: vi.fn(), onDelete: vi.fn() };
   const onToggle = vi.fn();
   render(
@@ -26,6 +26,7 @@ function renderRow(over: Partial<SprintDetail> = {}, busy = false) {
       focused
       flashed={false}
       busy={busy}
+      waiting={waiting}
       onToggle={onToggle}
       onKeyDown={() => {}}
       actions={actions}
@@ -45,6 +46,16 @@ describe("SprintRow", () => {
     // The goal is a sentence and every cell here clips, so it is rendered
     // under the sprint when the sprint is open rather than in a cell.
     expect(screen.queryByText("Ship checkout")).not.toBeInTheDocument();
+  });
+
+  it("says what Commit will do to the sprint", () => {
+    renderRow({ state: "future" }, false, "Starting on Commit");
+    expect(screen.getByText("Starting on Commit")).toHaveClass("chip-draft");
+  });
+
+  it("says nothing when nothing waits for Commit", () => {
+    renderRow({ state: "future" });
+    expect(screen.queryByText(/on Commit/)).not.toBeInTheDocument();
   });
 
   it("says nothing about progress in a sprint that holds nothing", () => {
@@ -113,19 +124,23 @@ describe("SprintRow", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
-  it("marks a draft sprint and holds back Start and Complete until Commit", async () => {
+  it("marks a draft sprint, offers to start it, and holds back Complete until Commit", async () => {
     const user = userEvent.setup();
-    renderRow({ id: -1, name: "Sprint 15", state: "future", draft: true, total: 0, done: 0, points: 0, donePoints: 0 });
+    const { actions } = renderRow({ id: -1, name: "Sprint 15", state: "future", draft: true, total: 0, done: 0, points: 0, donePoints: 0 });
     expect(screen.getByRole("treeitem", { name: "Sprint 15, Draft" })).toBeInTheDocument();
     expect(screen.getByText("Draft")).toHaveClass("chip-draft");
     await user.click(screen.getByRole("button", { name: "Actions on Sprint 15" }));
     const menu = await screen.findByRole("menu");
-    for (const name of ["Start sprint…", "Complete sprint…"]) {
-      const item = within(menu).getByRole("menuitem", { name });
-      expect(item).toBeDisabled();
-      expect(item).toHaveAttribute("title", "Commit this sprint first");
-    }
-    expect(within(menu).getByRole("menuitem", { name: "Edit sprint…" })).toBeEnabled();
-    expect(within(menu).getByRole("menuitem", { name: "Delete sprint…" })).toBeEnabled();
+    const complete = within(menu).getByRole("menuitem", { name: "Complete sprint…" });
+    expect(complete).toBeDisabled();
+    expect(complete).toHaveAttribute("title", "Commit this sprint first");
+    const start = within(menu).getByRole("menuitem", { name: "Start sprint…" });
+    expect(start).toBeEnabled();
+    await user.click(start);
+    expect(actions.onStart).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Actions on Sprint 15" }));
+    const again = await screen.findByRole("menu");
+    expect(within(again).getByRole("menuitem", { name: "Edit sprint…" })).toBeEnabled();
+    expect(within(again).getByRole("menuitem", { name: "Delete sprint…" })).toBeEnabled();
   });
 });

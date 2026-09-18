@@ -30,8 +30,9 @@ func rewriteParentKey(ctx context.Context, tx *sql.Tx, profileID, from, to strin
 // RekeySprint turns a draft sprint into the sprint Jira just created, in one
 // transaction: the draft row takes Jira's id and values and stops being a
 // draft, every card, journaled move and draft issue naming the negative id
-// names the real one, and the sprint_create row goes. The board pass of the
-// same Commit then pushes the moves into it.
+// names the real one, a pending start moves to the real id and board, and
+// the sprint_create row goes. The later phases of the same Commit then start
+// it and push the moves into it.
 //
 // A row Jira's id already has on the draft's own board, which a boards
 // refresh between the create and this call would leave, is replaced rather
@@ -62,6 +63,9 @@ func (r *Repository) RekeySprint(ctx context.Context, profileID string, draftID 
 			return fmt.Errorf("rekey sprint %s to %s: %w", from, to, err)
 		}
 		if err := rewriteSprintID(ctx, tx, profileID, from, to, made.Name); err != nil {
+			return err
+		}
+		if err := rekeySprintStart(ctx, tx, profileID, from, to); err != nil {
 			return err
 		}
 		if err := deleteDraftSprintRow(ctx, tx, profileID, from); err != nil {

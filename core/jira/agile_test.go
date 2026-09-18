@@ -290,6 +290,48 @@ func TestBoardIssueKeysEscapesSprintID(t *testing.T) {
 	}
 }
 
+// TestBoardFilterCheckSendsKeyInJQL pins the jql this call is built for: the
+// committer's courtesy read after an issue_board push, narrowed to exactly
+// the keys it just pushed rather than the whole board BoardIssueKeys reads.
+func TestBoardFilterCheckSendsKeyInJQL(t *testing.T) {
+	var gotJQL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/agile/1.0/board/7/issue" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		gotJQL = r.URL.Query().Get("jql")
+		_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":1,"issues":[{"key":"PLAT-1"}]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	keys, err := c.BoardFilterCheck(context.Background(), 7, []string{"PLAT-1", "PLAT-2"})
+	if err != nil {
+		t.Fatalf("board filter check: %v", err)
+	}
+	if want := []string{"PLAT-1"}; !reflect.DeepEqual(keys, want) {
+		t.Fatalf("keys = %v, want %v", keys, want)
+	}
+	if want := `key in ("PLAT-1", "PLAT-2")`; gotJQL != want {
+		t.Errorf("jql = %q, want %q", gotJQL, want)
+	}
+}
+
+// TestBoardFilterCheckOfNoKeysAsksJiraNothing mirrors AddToBoardBacklog's
+// own empty-batch rule (boardwrite.go).
+func TestBoardFilterCheckOfNoKeysAsksJiraNothing(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no request expected, got %s", r.URL.String())
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	keys, err := c.BoardFilterCheck(context.Background(), 7, nil)
+	if err != nil || len(keys) != 0 {
+		t.Fatalf("keys = %v, err = %v", keys, err)
+	}
+}
+
 func TestRankIssueSendsRankBeforeAndAfter(t *testing.T) {
 	var gotBodies []map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

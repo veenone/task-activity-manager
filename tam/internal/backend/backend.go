@@ -131,6 +131,17 @@ type PendingMove struct {
 	RankNeighbour string `json:"rankNeighbour"`
 	RankBefore    bool   `json:"rankBefore"`
 
+	// BoardID and BoardScope are what AddToBoard queued for this issue: the
+	// destination board and where on it, BoardScopeBacklog or a sprint id.
+	// AddToBoard refuses an empty scope, so a non-empty BoardScope is what
+	// says an add is pending.
+	//
+	// ponytail: an issue queued onto two boards at once keeps only the last
+	// one this fold saw, the way every other field here holds one value per
+	// issue; a per-board list would be needed to draw both at once.
+	BoardID    int    `json:"boardId"`
+	BoardScope string `json:"boardScope"`
+
 	HasTransition bool `json:"hasTransition"`
 	HasSprint     bool `json:"hasSprint"`
 	HasRank       bool `json:"hasRank"`
@@ -424,6 +435,54 @@ type BoardBackend interface {
 	// TAM's own cache, which is the caller's job. It reaches Jira
 	// immediately, the same as CreateSprint.
 	DeleteSprint(ctx context.Context, sprintID int) error
+}
+
+// BoardDraft is a new board's fields as the create dialog captured them:
+// the name and type it should have, and the filter that will back it, built
+// from a name and the JQL that scopes it.
+type BoardDraft struct {
+	Name       string
+	Type       string // "scrum" or "kanban"
+	FilterName string
+	JQL        string
+}
+
+// BoardScopeBacklog is the scope AddToBoard takes for a card queued onto a
+// board's backlog rather than one of its sprints.
+const BoardScopeBacklog = "backlog"
+
+// DraftPrefix starts the temporary key of an issue created locally and not
+// yet committed. Commit swaps it for Jira's key.
+const DraftPrefix = "TAM-NEW-"
+
+// BoardCreator is the board-creating half of BoardBackend, kept off it on
+// purpose: BoardBackend's own doc says it never writes, and a board create
+// is exactly that, a write. It is a separate optional interface the
+// committer type-asserts for, the same way it already type-asserts
+// boardWriter at committer/boards.go:125, so a backend that cannot create
+// boards simply does not answer for it rather than forcing every
+// BoardBackend to grow a method it may not support.
+type BoardCreator interface {
+	// CreateBoard creates a board from the draft and returns its id. The
+	// Jira implementation makes it in two Jira calls, a filter then the
+	// board on it, and rolls the filter back when the board create fails,
+	// so a failed attempt never leaves an orphaned filter behind. projectKey
+	// is the project the board and its filter belong to.
+	CreateBoard(ctx context.Context, projectKey string, d BoardDraft) (int, error)
+	// AddToBoardBacklog adds keys to boardID's backlog.
+	AddToBoardBacklog(ctx context.Context, boardID int, keys []string) error
+}
+
+// BoardFilterChecker is the courtesy read the committer makes once per board
+// after it pushes issue_board adds: of the keys just pushed, which ones
+// Jira's own board filter actually kept. Kept optional, the same as
+// BoardCreator and for the same reason, so a backend that cannot answer it
+// simply skips the check rather than the push it followed failing over it.
+type BoardFilterChecker interface {
+	// BoardFilterCheck reads which of keys are on boardID now. It is a read
+	// made after a write that already landed, so its own failure is never
+	// the commit's to report.
+	BoardFilterCheck(ctx context.Context, boardID int, keys []string) ([]string, error)
 }
 
 // ErrNoTransition is what Transition returns when no workflow transition of

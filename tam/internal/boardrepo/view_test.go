@@ -200,10 +200,12 @@ func TestADraftLandsInTheFirstColumnThatHasStatusIDs(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
 	// The scrum board's sprint and the kanban board's whole-board list are
-	// two different key lists, and neither of them names the draft: the
-	// draft is project-level and must appear on both.
+	// two different key lists, and neither of them names the draft: it is
+	// tied to board 1 itself (a pending board add), not to either scope, and
+	// must appear under both.
 	seedScopes(t, r, sampleColumns(), map[string][]string{"12": {"PLAT-409"}, "": {"PLAT-409"}})
-	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(draftCard("TAM-NEW-1"))
+	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(draftCard("TAM-NEW-1")).
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"})
 
 	for _, tc := range []struct {
 		name     string
@@ -238,7 +240,8 @@ func TestADraftLandsInTheFirstColumnThatHasStatusIDs(t *testing.T) {
 func TestADraftDoesNotArriveThroughIssuesByKeys(t *testing.T) {
 	r, _ := newRepo(t)
 	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
-		withDrafts(draftCard("TAM-NEW-1"))
+		withDrafts(draftCard("TAM-NEW-1")).
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"})
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
@@ -259,10 +262,33 @@ func TestADraftDoesNotArriveThroughIssuesByKeys(t *testing.T) {
 	}
 }
 
+// A draft queued onto the board's backlog carries the real "backlog" scope,
+// which withMovedIn matches on the backlog view. It must still arrive only
+// through DraftIssues, once.
+func TestADraftQueuedOntoTheBacklogIsNotLookedUpByKey(t *testing.T) {
+	r, _ := newRepo(t)
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
+		withDrafts(draftCard("TAM-NEW-1")).
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: backend.BoardScopeBacklog})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Fatalf("To Do = %v, want the card and the draft once each", got)
+	}
+	for _, k := range *src.asked {
+		if strings.HasPrefix(k, "TAM-NEW-") {
+			t.Errorf("the board asked IssuesByKeys for %s; drafts come from DraftIssues", k)
+		}
+	}
+}
+
 func TestADraftIsUnmappedWhenNoColumnHasAStatus(t *testing.T) {
 	r, _ := newRepo(t)
 	cols := []backend.BoardColumn{{Name: "Backlog", StatusIDs: []string{}}, {Name: "Later", StatusIDs: []string{}}}
-	src := seedBoard(t, r, cols, nil).withDrafts(draftCard("TAM-NEW-1"))
+	src := seedBoard(t, r, cols, nil).withDrafts(draftCard("TAM-NEW-1")).
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"})
 	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
 		t.Fatalf("board: %v", err)
@@ -825,7 +851,11 @@ func TestADraggedDraftIsDrawnInTheColumnItsStatusIDNames(t *testing.T) {
 	unknown := draftCard("TAM-NEW-2")
 	unknown.StatusID = "99999"
 	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
-		withDrafts(dragged, unknown)
+		withDrafts(dragged, unknown).
+		withMoves(
+			backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "13"},
+			backend.PendingMove{Key: "TAM-NEW-2", BoardID: 1, BoardScope: "13"},
+		)
 
 	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
 	if err != nil {
@@ -866,5 +896,147 @@ func TestAPendingTransitionOverridesTheStatusNameWithTheID(t *testing.T) {
 	// total disagreeing with the column it drew.
 	if view.DonePoints != 5 {
 		t.Errorf("done points = %v, want the moved card counted where it is drawn", view.DonePoints)
+	}
+}
+
+// A draft exists on no board in Jira, so composeBoard must not draw one
+// anywhere it finds no tie to the board being viewed. The four tests below
+// prove the other half: each of the four ties, on its own, is enough.
+
+func TestADraftWithNoTieToTheBoardIsNotDrawn(t *testing.T) {
+	r, _ := newRepo(t)
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
+		withDrafts(draftCard("TAM-NEW-1"))
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	// A one-sided test that only checked "not in To Do" would pass on code
+	// that draws nothing at all, so this checks the draft is not drawn AND
+	// not even counted as unmapped: it never reaches placeCard.
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 1 || got[0] != "PLAT-409" {
+		t.Errorf("To Do = %v, want only the real card", got)
+	}
+	if view.Lanes[0].Count != 1 {
+		t.Errorf("lane count = %d, want the untied draft left out entirely", view.Lanes[0].Count)
+	}
+	if view.Unmapped != 0 {
+		t.Errorf("unmapped = %d, want the untied draft counted nowhere, not even there", view.Unmapped)
+	}
+}
+
+func TestADraftTiedByAPendingBoardAddIsDrawn(t *testing.T) {
+	r, _ := newRepo(t)
+	src := seedBoard(t, r, sampleColumns(), []backend.Issue{card("PLAT-409", "To Do", "1")}).
+		withDrafts(draftCard("TAM-NEW-1")).
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", BoardID: 1, BoardScope: "backlog"})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Errorf("To Do = %v, want the draft drawn: it has a pending issue_board row for this board", got)
+	}
+}
+
+func TestADraftTiedByAPendingSprintMoveToTheBoardsSprintIsDrawn(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), sampleSprints(), map[string][]string{"": {"PLAT-409"}}); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	// Sprint 12 is one of board 1's own sprints (sampleSprints); the draft
+	// carries no sprint id of its own, only a pending move to it.
+	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(draftCard("TAM-NEW-1")).
+		withMoves(backend.PendingMove{Key: "TAM-NEW-1", HasSprint: true, SprintID: "12"})
+	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Errorf("To Do = %v, want the draft drawn: its pending move targets one of this board's sprints", got)
+	}
+}
+
+func TestADraftTiedByASprintIDOfTheBoardIsDrawn(t *testing.T) {
+	r, _ := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), sampleSprints(), map[string][]string{"": {"PLAT-409"}}); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	// Sprint 11 is a real, already-synced sprint of board 1. The draft
+	// already carries that id, with no pending move at all.
+	tied := draftCard("TAM-NEW-1")
+	tied.SprintID = "11"
+	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(tied)
+	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Errorf("To Do = %v, want the draft drawn: its sprint id belongs to this board", got)
+	}
+}
+
+func TestADraftTiedByADraftSprintOfTheBoardIsDrawn(t *testing.T) {
+	r, db := newRepo(t)
+	ctx := context.Background()
+	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), nil, map[string][]string{"": {"PLAT-409"}}); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	// A sprint drafted in TAM (CreateDraftSprint) is a row in this same
+	// sprint table, under a negative id, with draft = 1.
+	if _, err := db.Exec(`INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, goal, draft)
+		VALUES ('p1', -5, 1, 'Sprint (draft)', 'future', '', '', '', 1)`); err != nil {
+		t.Fatalf("seed draft sprint: %v", err)
+	}
+	tied := draftCard("TAM-NEW-1")
+	tied.SprintID = "-5"
+	src := newIssues(card("PLAT-409", "To Do", "1")).withDrafts(tied)
+	view, err := r.Board(ctx, src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Errorf("To Do = %v, want the draft drawn: its sprint is a draft sprint of this board", got)
+	}
+}
+
+// A pending add is not only for drafts: a real issue queued onto a board it
+// is not yet a synced member of (AddIssuesToBoard) draws there too, in the
+// first column its own status names, and only in the scope it was added to.
+
+func TestAPendingBoardAddDrawsARealIssueOnItsTargetBoard(t *testing.T) {
+	r, _ := newRepo(t)
+	seedScopes(t, r, sampleColumns(), map[string][]string{"": {"PLAT-409"}})
+	src := newIssues(card("PLAT-409", "To Do", "1"), card("PLAT-500", "To Do", "1")).
+		withMoves(backend.PendingMove{Key: "PLAT-500", BoardID: 1, BoardScope: "backlog"})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 2 {
+		t.Errorf("To Do = %v, want the real issue queued onto this board's backlog", got)
+	}
+	if view.NotSynced != 0 {
+		t.Errorf("not synced = %d, want a pending add not mistaken for a board key with no row", view.NotSynced)
+	}
+}
+
+func TestAPendingBoardAddOnlyDrawsInItsOwnScope(t *testing.T) {
+	r, _ := newRepo(t)
+	seedScopes(t, r, sampleColumns(), map[string][]string{"": {"PLAT-409"}})
+	// Queued onto sprint 12, not the backlog being viewed here.
+	src := newIssues(card("PLAT-409", "To Do", "1"), card("PLAT-500", "To Do", "1")).
+		withMoves(backend.PendingMove{Key: "PLAT-500", BoardID: 1, BoardScope: "12"})
+	view, err := r.Board(context.Background(), src, "p1", 1, "", boardrepo.SwimlaneNone)
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if got := cellKeys(view.Lanes[0].Cells[1]); len(got) != 1 || got[0] != "PLAT-409" {
+		t.Errorf("backlog = %v, want the add scoped to sprint 12 left out of the backlog view", got)
 	}
 }

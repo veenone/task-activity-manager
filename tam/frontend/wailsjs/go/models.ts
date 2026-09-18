@@ -334,6 +334,7 @@ export namespace boardrepo {
 	    id: number;
 	    name: string;
 	    type: string;
+	    draft: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Board(source);
@@ -344,6 +345,7 @@ export namespace boardrepo {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.type = source["type"];
+	        this.draft = source["draft"];
 	    }
 	}
 	export class LaneView {
@@ -736,6 +738,7 @@ export namespace committer {
 	    committed: string[];
 	    created: Created[];
 	    createdSprints: CreatedSprint[];
+	    sprintsChanged: string[];
 	    linked: Linked[];
 	    moved: Moved[];
 	    conflicts: Conflict[];
@@ -752,6 +755,7 @@ export namespace committer {
 	        this.committed = source["committed"];
 	        this.created = this.convertValues(source["created"], Created);
 	        this.createdSprints = this.convertValues(source["createdSprints"], CreatedSprint);
+	        this.sprintsChanged = source["sprintsChanged"];
 	        this.linked = this.convertValues(source["linked"], Linked);
 	        this.moved = this.convertValues(source["moved"], Moved);
 	        this.conflicts = this.convertValues(source["conflicts"], Conflict);
@@ -1701,26 +1705,6 @@ export namespace sprintreport {
 
 export namespace sprints {
 	
-	export class Completion {
-	    moved: number;
-	    movedTo: string;
-	    failed: string[];
-	    note: string;
-	    message: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Completion(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.moved = source["moved"];
-	        this.movedTo = source["movedTo"];
-	        this.failed = source["failed"];
-	        this.note = source["note"];
-	        this.message = source["message"];
-	    }
-	}
 	export class Suggestion {
 	    name: string;
 	    start: string;

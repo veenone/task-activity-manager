@@ -48,7 +48,6 @@ vi.mock("../contexts/SyncContext", () => ({
   useSync: () => ({
     status: "idle",
     runQuietLock: async <T,>(action: () => Promise<T>) => action(),
-    runSprintCeremony: async <T,>(action: () => Promise<T>) => action(),
   }),
 }));
 
@@ -134,6 +133,17 @@ function renderView() {
 
 const banner = () => screen.getByRole("status", { name: "Sprint outcome" });
 
+// New sprint is disabled until the board query answers, and findByRole matches
+// a disabled button, so clicking the moment it appears is a no-op that leaves
+// the dialog closed. Waiting for it to be enabled is what makes these tests
+// survive a loaded machine, where the query resolves later than the render.
+async function openNewSprint(user: ReturnType<typeof userEvent.setup>) {
+  const button = await screen.findByRole("button", { name: "New sprint" });
+  await waitFor(() => expect(button).toBeEnabled());
+  await user.click(button);
+  return screen.findByRole("dialog", { name: "New sprint" });
+}
+
 async function openMenu(user: ReturnType<typeof userEvent.setup>, sprint: string) {
   await user.click(await screen.findByRole("button", { name: `Actions on ${sprint}` }));
   return screen.getByRole("menu");
@@ -156,10 +166,10 @@ beforeEach(() => {
     sprint: { id: 14, boardId: 1, name: "Sprint 14", state: "future", startDate: "", endDate: "", goal: "" },
     note: "",
   });
-  vi.mocked(api.EditSprint).mockResolvedValue("");
-  vi.mocked(api.DeleteSprint).mockResolvedValue("");
-  vi.mocked(api.StartSprint).mockResolvedValue("");
-  vi.mocked(api.CompleteSprint).mockResolvedValue({ moved: 2, movedTo: "the backlog", failed: [], note: "", message: "" });
+  vi.mocked(api.EditSprint).mockResolvedValue(undefined);
+  vi.mocked(api.DeleteSprint).mockResolvedValue(undefined);
+  vi.mocked(api.StartSprint).mockResolvedValue(undefined);
+  vi.mocked(api.CompleteSprint).mockResolvedValue(undefined);
   vi.mocked(api.SuggestSprintDates).mockResolvedValue({
     name: "Sprint 14", start: "2026-09-14", end: "2026-09-28", length: 14, fromHistory: true,
   });
@@ -351,16 +361,16 @@ describe("SprintsView", () => {
     release(1);
   });
 
-  it("says by name what a delete destroys, where its issues go, and that it cannot be undone", async () => {
+  it("says by name what a delete destroys on Commit, where its issues go, and until when it can be taken back", async () => {
     const user = userEvent.setup();
     renderView();
     const menu = await openMenu(user, "Sprint 12");
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
     const ask = await screen.findByRole("alertdialog", { name: "Delete Sprint 12?" });
-    expect(within(ask).getByText("Jira deletes Sprint 12.")).toBeInTheDocument();
-    expect(within(ask).getByText("Jira moves its 3 issues back to the backlog. The issues themselves are not deleted.")).toBeInTheDocument();
-    expect(within(ask).getByText("This cannot be undone, from TAM or from Jira.")).toBeInTheDocument();
-    expect(within(ask).getByText("Sends to Jira now")).toBeInTheDocument();
+    expect(within(ask).getByText("Commit deletes Sprint 12 in Jira.")).toBeInTheDocument();
+    expect(within(ask).getByText("Jira then moves its 3 issues back to the backlog. The issues themselves are not deleted.")).toBeInTheDocument();
+    expect(within(ask).getByText("Until then you can discard the delete in Pending changes. Once Commit sends it, it cannot be undone.")).toBeInTheDocument();
+    expect(within(ask).queryByText("Sends to Jira now")).not.toBeInTheDocument();
     expect(within(ask).getByRole("button", { name: "Delete sprint" })).toBeInTheDocument();
     expect(within(ask).getByRole("button", { name: "Keep it" })).toBeInTheDocument();
     await user.click(within(ask).getByRole("button", { name: "Keep it" }));
@@ -378,7 +388,7 @@ describe("SprintsView", () => {
     const ask = await screen.findByRole("alertdialog", { name: "Delete Sprint 12?" });
     // A wrong number in the one confirmation nobody can undo is worse than
     // an admitted floor.
-    expect(within(ask).getByText(/Jira moves at least 1 issue back to the backlog/)).toBeInTheDocument();
+    expect(within(ask).getByText(/Jira then moves at least 1 issue back to the backlog/)).toBeInTheDocument();
     expect(within(ask).getByText(/Some of this sprint's issues are not in this cache/)).toBeInTheDocument();
   });
 
@@ -397,11 +407,11 @@ describe("SprintsView", () => {
     const menu = await openMenu(user, "Sprint 12");
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
     const ask = await screen.findByRole("alertdialog", { name: "Delete Sprint 12?" });
-    expect(within(ask).getByText(/Jira moves at least 3 issues back to the backlog/)).toBeInTheDocument();
+    expect(within(ask).getByText(/Jira then moves at least 3 issues back to the backlog/)).toBeInTheDocument();
     expect(within(ask).getByText(/Cards are waiting for Commit to move in or out of this sprint/)).toBeInTheDocument();
   });
 
-  it("reports a refused delete, which arrives after the confirmation has closed", async () => {
+  it("reports a refused delete once the confirmation has closed", async () => {
     const user = userEvent.setup();
     vi.mocked(api.DeleteSprint).mockRejectedValue(new Error("403 Forbidden: Manage Sprints"));
     renderView();
@@ -420,14 +430,37 @@ describe("SprintsView", () => {
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete sprint" }));
     await waitFor(() => expect(api.DeleteSprint).toHaveBeenCalledWith("p1", 1, 12));
-    await waitFor(() => expect(banner()).toHaveTextContent("Sprint 12 was deleted."));
+    await waitFor(() => expect(banner()).toHaveTextContent("Sprint 12 will be deleted on Commit."));
+  });
+
+  it("marks a sprint waiting to be deleted on Commit", async () => {
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 5, entityType: "sprint_delete", entityKey: "13", field: "delete", beforeVal: "Sprint 13", afterVal: '{"boardId":1,"name":"Sprint 13"}', baseVersion: "", createdAt: "" },
+    ]);
+    renderView();
+    const row = await screen.findByRole("treeitem", { name: /^Sprint 13,/ });
+    expect(await within(row).findByText("Deleting on Commit")).toBeInTheDocument();
+    expect(within(screen.getByRole("treeitem", { name: /^Sprint 12,/ })).queryByText("Deleting on Commit")).not.toBeInTheDocument();
+  });
+
+  it("marks a sprint waiting to be started or completed on Commit", async () => {
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 6, entityType: "sprint_start", entityKey: "13", field: "start", beforeVal: "", afterVal: "{}", baseVersion: "", createdAt: "" },
+      { id: 7, entityType: "sprint_complete", entityKey: "12", field: "complete", beforeVal: "", afterVal: "{}", baseVersion: "", createdAt: "" },
+    ]);
+    renderView();
+    const future = await screen.findByRole("treeitem", { name: /^Sprint 13,/ });
+    expect(await within(future).findByText("Starting on Commit")).toBeInTheDocument();
+    const active = screen.getByRole("treeitem", { name: /^Sprint 12,/ });
+    expect(within(active).getByText("Completing on Commit")).toBeInTheDocument();
+    expect(within(active).queryByText("Starting on Commit")).not.toBeInTheDocument();
   });
 
   it("deletes a draft sprint without claiming Jira deletes anything", async () => {
     const user = userEvent.setup();
     const DRAFT = detail({ id: -1, name: "Sprint 15", state: "future", draft: true, goal: "", startDate: "", endDate: "", issues: [] });
     vi.mocked(api.ListBoardSprintDetails).mockResolvedValue([ACTIVE, DRAFT, FUTURE, CLOSED, BACKLOG]);
-    vi.mocked(api.DeleteSprint).mockResolvedValue("");
+    vi.mocked(api.DeleteSprint).mockResolvedValue(undefined);
     renderView();
     const menu = await openMenu(user, "Sprint 15");
     await user.click(within(menu).getByRole("menuitem", { name: "Delete sprint…" }));
@@ -477,7 +510,7 @@ describe("SprintsView", () => {
     const menu = await openMenu(user, "Sprint 12");
     await user.click(within(menu).getByRole("menuitem", { name: "Complete sprint…" }));
     const dialog = await screen.findByRole("dialog", { name: "Complete Sprint 12" });
-    expect(within(dialog).getByText("2 cards are not finished and will move out of the sprint:")).toBeInTheDocument();
+    expect(within(dialog).getByText(/^About 2 cards are not finished./)).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-412")).toBeInTheDocument();
     // PLAT-347 sits in a status the board's Done column collects, so it is
     // finished and does not move.
@@ -488,8 +521,7 @@ describe("SprintsView", () => {
   it("creates a sprint, announces it, and points at the row it landed on", async () => {
     const user = userEvent.setup();
     renderView();
-    await user.click(await screen.findByRole("button", { name: "New sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    const dialog = await openNewSprint(user);
     await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
     await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
     await waitFor(() => expect(api.CreateSprint).toHaveBeenCalled());
@@ -504,8 +536,7 @@ describe("SprintsView", () => {
   it("says the new sprint is drafted locally and created on Commit", async () => {
     const user = userEvent.setup();
     renderView();
-    await user.click(await screen.findByRole("button", { name: "New sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    const dialog = await openNewSprint(user);
     expect(within(dialog).getByText("Drafted locally. Commit creates it in Jira.")).toBeInTheDocument();
     expect(within(dialog).queryByText("Sends to Jira now")).not.toBeInTheDocument();
   });
@@ -517,8 +548,7 @@ describe("SprintsView", () => {
       note: "The board's sprints could not be re-read. Press Refresh.",
     });
     renderView();
-    await user.click(await screen.findByRole("button", { name: "New sprint" }));
-    const dialog = await screen.findByRole("dialog", { name: "New sprint" });
+    const dialog = await openNewSprint(user);
     await waitFor(() => expect(within(dialog).getByLabelText("Start")).toHaveValue("2026-09-14"));
     await user.click(within(dialog).getByRole("button", { name: "Create sprint" }));
     await waitFor(() => expect(banner()).toHaveTextContent("Press Refresh."));

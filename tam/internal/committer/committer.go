@@ -94,6 +94,7 @@ type Result struct {
 	Committed      []string        `json:"committed"`
 	Created        []Created       `json:"created"`
 	CreatedSprints []CreatedSprint `json:"createdSprints"`
+	SprintsChanged []string        `json:"sprintsChanged"`
 	Linked         []Linked        `json:"linked"`
 	Moved          []Moved         `json:"moved"`
 	Conflicts      []Conflict      `json:"conflicts"`
@@ -110,6 +111,9 @@ type Engine struct {
 	b     backend.IssueBackend
 	repo  *issuerepo.Repository
 	order BoardOrder
+	// Sprints pushes sprint edits, starts, completions and deletes; nil fails
+	// each one.
+	Sprints SprintWriter
 }
 
 // New returns an engine over the backend, the store, and the board order.
@@ -126,7 +130,7 @@ func New(b backend.IssueBackend, repo *issuerepo.Repository, order BoardOrder) *
 // rows left that cannot be read keeps the last count that could.
 func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Result, error) {
 	res := Result{
-		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, Linked: []Linked{},
+		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, Linked: []Linked{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
 	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies()}
@@ -154,10 +158,10 @@ func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Resu
 }
 
 // boardRow is true for the three board move entity types, which the board
-// pass owns. pushEdits takes only EntityIssue rows, which is what keeps them
-// out of the edits phase: sorting one into it would have commitEdit send
-// "statusId" to Jira as a field, fail on it, and take the issue's genuine
-// edits down with it.
+// moves pass (boards.go) owns. pushEdits takes only EntityIssue rows, which
+// is what keeps them out of the edits phase: sorting one into it would have
+// commitEdit send "statusId" to Jira as a field, fail on it, and take the
+// issue's genuine edits down with it.
 func boardRow(entityType string) bool {
 	switch entityType {
 	case issuerepo.EntityTransition, issuerepo.EntityRank, issuerepo.EntitySprintMove:
@@ -168,7 +172,9 @@ func boardRow(entityType string) bool {
 
 // heldBoardRow says whether any of the rows is a board move that the board
 // pass can hold back as a conflict. A rank is not one: it has no before_val
-// to compare and is never held.
+// to compare and is never held. Neither is an issue_board add: it has no
+// remote scalar to check it against the way a status or a sprint id does,
+// so the board pass pushes it straight, the same as a rank.
 func heldBoardRow(rows []journal.PendingChange) bool {
 	for _, p := range rows {
 		if p.EntityType == issuerepo.EntityTransition || p.EntityType == issuerepo.EntitySprintMove {

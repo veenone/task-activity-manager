@@ -3,7 +3,7 @@ import { announce, errMsg, useConfirm, useNotice, useProfile } from "@agile-suit
 import type { Issue, Profile, Settings, SprintDetail } from "../api";
 import { UNASSIGNED_SPRINT_STATE } from "../api";
 import { useBoard, useBoards, useJournalSprintMoves } from "../queries/boards";
-import { usePendingChanges } from "../queries/pending";
+import { sprintWaiting, usePendingChanges } from "../queries/pending";
 import { useBoardSprintDetails, useDeleteSprint } from "../queries/sprints";
 import { useSync } from "../contexts/SyncContext";
 import { MOVED_FLASH_MS } from "../lib/flash";
@@ -14,7 +14,6 @@ import { useCompleteGuard } from "./BoardCeremonies";
 import { CompleteSprintModal } from "./CompleteSprintModal";
 import { CreateSprintModal } from "./CreateSprintModal";
 import { EditSprintModal } from "./EditSprintModal";
-import { ImmediateWriteChip } from "./ImmediateWriteChip";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { SprintFillBar } from "./SprintFillBar";
 import { SprintList, issueOrder, rowIdOf } from "./SprintList";
@@ -34,9 +33,8 @@ export function SprintsView() {
   const [showClosed, setShowClosed] = useState(false);
   const [selectedKey, setSelectedKey] = useState("");
   const [collapsedIssues, setCollapsedIssues] = useState(new Set<string>());
-  // The sentence the last sprint write left behind. A write here reaches
-  // Jira at once and the dialog that made it closes on success, so the
-  // banner is where the outcome, and any note riding with it, is read.
+  // The sentence the last sprint write left behind. The dialog that made it
+  // closes on success, so the banner is where the outcome is read.
   const [line, setLine] = useState("");
   const [movedRowId, setMovedRowId] = useState("");
   // Which dialog is open. Each one holds the sprint it was opened on rather
@@ -105,11 +103,13 @@ export function SprintsView() {
   const order = useMemo(() => issueOrder(visible, collapsedIssues), [visible, collapsedIssues]);
   const selection = useSprintSelection(order, activeId);
   const fill = useJournalSprintMoves(activeId);
-  // The profile's journal, read here for one sentence: the delete
+  // The profile's journal, read here for two things: the delete
   // confirmation has to know whether a pending move has moved the count it
-  // is about to quote. It is the same query the shell's pending badge runs,
-  // so this view joins a read that is already in the cache.
+  // is about to quote, and a sprint waiting to be started, completed or
+  // deleted wears a chip. It is the same query the shell's pending badge
+  // runs, so this view joins a read that is already in the cache.
   const pending = usePendingChanges(activeId);
+  const waiting = useMemo(() => sprintWaiting(pending.data ?? []), [pending.data]);
   const del = useDeleteSprint(activeId, runQuietLock);
   const askBeforeCompleting = useCompleteGuard(activeId);
 
@@ -212,8 +212,8 @@ export function SprintsView() {
       title: `Delete ${detail.name}?`,
       message: (
         <>
-          <p>{`Jira deletes ${detail.name}.`}</p>
-          <p>{`Jira moves ${floor ? `at least ${issues}` : `its ${issues}`} back to the backlog. The issues themselves are not deleted.`}</p>
+          <p>{`Commit deletes ${detail.name} in Jira.`}</p>
+          <p>{`Jira then moves ${floor ? `at least ${issues}` : `its ${issues}`} back to the backlog. The issues themselves are not deleted.`}</p>
           {floor && (
             <p className="muted small">
               {moving
@@ -223,8 +223,7 @@ export function SprintsView() {
                   : "This view stopped short of drawing all of this sprint's issues, so the number above cannot be checked against the list."}
             </p>
           )}
-          <p>This cannot be undone, from TAM or from Jira.</p>
-          <p><ImmediateWriteChip /></p>
+          <p>Until then you can discard the delete in Pending changes. Once Commit sends it, it cannot be undone.</p>
         </>
       ),
       confirmLabel: "Delete sprint",
@@ -237,16 +236,14 @@ export function SprintsView() {
     del.mutate(
       { boardId: board?.id ?? 0, sprintId: detail.id },
       {
-        onSuccess: (note) => {
-          const deleted = `${detail.name} was deleted.`;
-          const sentence = note ? `${deleted} ${note}` : deleted;
+        onSuccess: () => {
+          const sentence = `${detail.name} will be deleted on Commit.`;
           announce(sentence);
-          // Nothing to flash: the row the write was about is gone.
-          afterWrite("", sentence);
+          afterWrite(rowId, sentence);
         },
         // The refusals that arrive after the confirmation has closed have no
-        // dialog left to live in. A missing Manage Sprints permission is the
-        // common one, and it comes back long after the button was pressed.
+        // dialog left to live in: a started sprint, or pending changes on
+        // cards in it.
         onError: (e) => void notice({ title: "The sprint was not deleted", message: errMsg(e), tone: "error" }),
         onSettled: () => setBusyRowId(""),
       },
@@ -320,6 +317,7 @@ export function SprintsView() {
         onClearTo={selection.clearTo}
         movedRowId={movedRowId}
         busyRowId={busyRowId}
+        waiting={waiting}
         onStart={setStarting}
         onComplete={(d) => void askComplete(d)}
         onEdit={setEditing}

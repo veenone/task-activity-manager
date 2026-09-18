@@ -45,6 +45,22 @@ type fake struct {
 	sprintsMade     []string
 	sprintCreateErr error
 	nextSprint      int
+
+	// The boards phase's own writes and read: boardsMade records "name type
+	// filterName jql" for every board created, board ids count up from 900;
+	// backlogAdds records "boardId key,key,..." for every backlog push;
+	// filterChecks records "boardId key,key,..." for every filter-check
+	// call, once per board. filterMissing names, per board id, the keys a
+	// filter check answers as outside the board's filter; filterCheckErr
+	// fails the check for one board id without failing its push.
+	boardCreateErr error
+	nextBoard      int
+	boardsMade     []string
+	backlogErr     error
+	backlogAdds    []string
+	filterChecks   []string
+	filterMissing  map[int][]string
+	filterCheckErr map[int]error
 }
 
 func newFake() *fake {
@@ -52,7 +68,8 @@ func newFake() *fake {
 		rows: map[string]backend.Issue{}, desc: map[string]string{}, nextKey: 501,
 		updateErr: map[string]error{}, getErr: map[string]error{},
 		transitionErr: map[string]error{}, rankErr: map[string]error{},
-		createErrFor: map[string]error{},
+		createErrFor:  map[string]error{},
+		filterMissing: map[int][]string{}, filterCheckErr: map[int]error{},
 	}
 }
 

@@ -17,6 +17,46 @@ import (
 // they refuse. Every one of them exists because the bound method is
 // reachable without the dialog that would have asked the same question.
 
+// CheckComplete makes the refusals a completion can make without Jira: a
+// draft sprint, a destination that is not another real sprint, a sprint the
+// cache holds as never started, and pending changes on cards staying in it.
+// The app asks it before it journals a completion, and Complete asks again
+// at Commit. It answers with the destination id as it is to be sent.
+//
+// A never-started sprint is refused because a completion moves the cards out
+// before it finds out Jira will not close the sprint: aimed at one, it
+// empties that sprint in Jira and then fails, and TAM cannot undo either
+// half. Only "future" is refused, and deliberately not "anything that is not
+// active". A sprint someone started on the web an hour ago still reads as
+// future in a cache nobody has refreshed since, and refusing that costs a
+// Refresh, where emptying it costs the sprint. A state the cache does not
+// recognise is left to Jira to answer for.
+//
+// Pending changes are refused because committing them first is what makes
+// the board and Jira agree about which cards finished.
+func (s *Service) CheckComplete(ctx context.Context, profileID string, boardID, sprintID int, moveTo string) (string, error) {
+	if sprintID < 0 {
+		return "", errDraftSprint
+	}
+	moveTo, err := destinationID(moveTo, sprintID)
+	if err != nil {
+		return "", err
+	}
+	if state, _, err := s.store.BoardSprintState(ctx, profileID, boardID, strconv.Itoa(sprintID)); err != nil {
+		return "", err
+	} else if state == "future" {
+		return "", refusal{fmt.Errorf("sprint %d has not been started, and completing it would move its cards out and then fail to close it; start it first, or press Refresh if it was started somewhere else", sprintID)}
+	}
+	n, err := s.pendingInSprint(ctx, profileID, sprintID)
+	if err != nil {
+		return "", err
+	}
+	if n > 0 {
+		return "", refusal{fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before completing it, or Jira will be asked which cards finished before it has been told", n)}
+	}
+	return moveTo, nil
+}
+
 // destinationID reads the destination the dialog sent: a sprint id, or the
 // empty string for the backlog, which is a destination and not an absence.
 //
@@ -45,38 +85,23 @@ func destinationID(moveTo string, sprintID int) (string, error) {
 }
 
 // requireCompletable is what the cache has to say about the sprint before a
-// completion touches Jira: the board holds it, and it is not one that has
-// never been started.
+// completion touches Jira: the board holds it, and whether it holds it as
+// closed, which is a completion that already happened. CheckComplete has
+// already refused one that never started.
 //
-// The pair first. The completion judges "finished" against the board's last
-// column while the cards come from the sprint, so a mismatched pair would
-// decide where somebody's work goes on a definition borrowed from a board
-// the sprint was never on, and close the sprint anyway.
-//
-// Then the state, because a completion moves the cards out before it finds
-// out Jira will not close the sprint. Aimed at a sprint that never started,
-// it empties that sprint in Jira and then fails, and TAM cannot undo either
-// half. The toolbar only offers Complete on the active sprint, which is the
-// same argument the other guards here already refuse to rest on: the bound
-// method is reachable without the dialog.
-//
-// Only "future" is refused, and deliberately not "anything that is not
-// active". A sprint someone started on the web an hour ago still reads as
-// future in a cache nobody has refreshed since, and refusing that costs a
-// Refresh, where emptying it costs the sprint. A state the cache does not
-// recognise is left to Jira to answer for.
-func (s *Service) requireCompletable(ctx context.Context, profileID string, boardID int, sprintID string) error {
+// The pair matters. The completion judges "finished" against the board's
+// last column while the cards come from the sprint, so a mismatched pair
+// would decide where somebody's work goes on a definition borrowed from a
+// board the sprint was never on, and close the sprint anyway.
+func (s *Service) requireCompletable(ctx context.Context, profileID string, boardID int, sprintID string) (bool, error) {
 	state, ok, err := s.store.BoardSprintState(ctx, profileID, boardID, sprintID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !ok {
-		return fmt.Errorf("sprint %s is not on board %d, so that board's last column cannot say which of the sprint's cards finished; complete the sprint from the board it belongs to", sprintID, boardID)
+		return false, refusal{fmt.Errorf("sprint %s is not on board %d, so that board's last column cannot say which of the sprint's cards finished; complete the sprint from the board it belongs to", sprintID, boardID)}
 	}
-	if state == "future" {
-		return fmt.Errorf("sprint %s has not been started, and completing it would move its cards out and then fail to close it; start it first, or press Refresh if it was started somewhere else", sprintID)
-	}
-	return nil
+	return state == "closed", nil
 }
 
 // destination is what the completion reports as the place the cards went.
@@ -92,17 +117,6 @@ func (s *Service) destination(ctx context.Context, profileID, sprintID string) (
 		return "sprint " + sprintID, nil
 	}
 	return name, nil
-}
-
-// refusePending stops a completion while the journal still holds changes for
-// cards staying in this sprint. Committing them first is what makes the
-// board and Jira agree about which cards finished.
-func (s *Service) refusePending(ctx context.Context, profileID string, sprintID int) error {
-	n, err := s.pendingInSprint(ctx, profileID, sprintID)
-	if err != nil || n == 0 {
-		return err
-	}
-	return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before completing it, or Jira will be asked which cards finished before it has been told", n)
 }
 
 // completeStatuses is what counts as finished for this completion: the rule
@@ -213,7 +227,7 @@ func (s *Service) requireEditable(ctx context.Context, b lifecycle, boardID, spr
 		return backend.Sprint{}, fmt.Errorf("board %d no longer lists sprint %d, so TAM cannot tell whether it is closed and did not change it; press Refresh", boardID, sprintID)
 	}
 	if sprintState(sp) == "closed" {
-		return backend.Sprint{}, fmt.Errorf("sprint %d is closed, and its dates are what velocity and burndown are computed from, so TAM does not edit it", sprintID)
+		return backend.Sprint{}, refusal{fmt.Errorf("sprint %d is closed, and its dates are what velocity and burndown are computed from, so TAM does not edit it", sprintID)}
 	}
 	return sp, nil
 }
@@ -262,7 +276,7 @@ func (s *Service) requireDeletable(ctx context.Context, b lifecycle, boardID, sp
 		return backend.Sprint{}, true, nil
 	}
 	if state := sprintState(sp); state != "future" {
-		return backend.Sprint{}, false, fmt.Errorf("sprint %d is %s, and only a sprint that has never been started can be deleted; complete it instead, or press Refresh if TAM still shows it as future", sprintID, statePhrase(state))
+		return backend.Sprint{}, false, refusal{fmt.Errorf("sprint %d is %s, and only a sprint that has never been started can be deleted; complete it instead, or press Refresh if TAM still shows it as future", sprintID, statePhrase(state))}
 	}
 	return sp, false, nil
 }
@@ -282,9 +296,11 @@ func statePhrase(state string) string {
 	return state
 }
 
-// refusePendingDelete stops a delete while the journal still holds changes
-// for cards in the sprint. Those rows point at a sprint that is about to
-// stop existing, and Commit is the one thing that resolves them either way.
+// CheckDelete makes the refusals a delete can make without Jira: a draft
+// sprint, and pending changes on cards in the sprint. Those rows point at a
+// sprint that is about to stop existing, and Commit is the one thing that
+// resolves them either way. The app asks it before it journals a delete, and
+// Delete asks again at Commit.
 //
 // It is a check and not a lock, and it cannot be made into one: the board's
 // own writes are journaled and deliberately take no lock, so a card can be
@@ -292,17 +308,23 @@ func statePhrase(state string) string {
 // later. That is rare and it is recoverable: the stranded row is pushed at a
 // sprint Jira no longer has, the next Commit reports exactly that, and the
 // user discards it from the Pending changes dialog.
-func (s *Service) refusePendingDelete(ctx context.Context, profileID string, sprintID int) error {
+func (s *Service) CheckDelete(ctx context.Context, profileID string, sprintID int) error {
+	if sprintID < 0 {
+		return errDraftSprint
+	}
 	n, err := s.pendingInSprint(ctx, profileID, sprintID)
-	if err != nil || n == 0 {
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before deleting it, or they will be pushed at a sprint that no longer exists", n)
+	if n > 0 {
+		return refusal{fmt.Errorf("%d pending change(s) belong to cards in this sprint; commit them before deleting it, or they will be pushed at a sprint that no longer exists", n)}
+	}
+	return nil
 }
 
 // pendingInSprint is how many journal rows belong to cards staying in the
-// sprint, and zero when nothing is wired to answer. Both refusals above ask
-// it the same question and word the answer for their own action.
+// sprint, and zero when nothing is wired to answer. Both checks above ask it
+// the same question and word the answer for their own action.
 func (s *Service) pendingInSprint(ctx context.Context, profileID string, sprintID int) (int, error) {
 	if s.Pending == nil {
 		return 0, nil

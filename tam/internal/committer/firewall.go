@@ -18,10 +18,10 @@ import (
 // internal error on that one write, and never as a 400 from Jira.
 //
 // It checks only the reference values each call site hands it (parentKey,
-// sprintId, the issue key, a link's from and to keys, a rank neighbour),
-// never free text such as a summary or a label, which may legitimately read
-// TAM-NEW-9. A new phase must pass its references the same way, not its
-// whole payload.
+// sprintId, boardId, the issue key, a link's from and to keys, a rank
+// neighbour), never free text such as a summary or a label, which may
+// legitimately read TAM-NEW-9. A new phase must pass its references the
+// same way, not its whole payload.
 func assertNoPlaceholders(payload any) error {
 	encoded, err := json.Marshal(payload)
 	if err != nil {
@@ -39,21 +39,22 @@ func assertNoPlaceholders(payload any) error {
 	return nil
 }
 
-// findPlaceholder walks a decoded payload. sprint says the value sits under a
-// key naming a sprint, where a negative whole number is a draft sprint's id.
-func findPlaceholder(v any, path string, sprint bool) (string, bool) {
+// findPlaceholder walks a decoded payload. negRef says the value sits under
+// a key naming a sprint or a board, where a negative whole number is a
+// draft sprint's or draft board's id.
+func findPlaceholder(v any, path string, negRef bool) (string, bool) {
 	switch t := v.(type) {
 	case string:
-		if strings.HasPrefix(t, issuerepo.DraftPrefix) || (sprint && negativeWhole(t)) {
+		if strings.HasPrefix(t, issuerepo.DraftPrefix) || (negRef && negativeWhole(t)) {
 			return fmt.Sprintf("%s (%s)", path, t), true
 		}
 	case json.Number:
-		if sprint && negativeWhole(t.String()) {
+		if negRef && negativeWhole(t.String()) {
 			return fmt.Sprintf("%s (%s)", path, t), true
 		}
 	case []any:
 		for i, e := range t {
-			if where, found := findPlaceholder(e, fmt.Sprintf("%s[%d]", path, i), sprint); found {
+			if where, found := findPlaceholder(e, fmt.Sprintf("%s[%d]", path, i), negRef); found {
 				return where, true
 			}
 		}
@@ -64,7 +65,8 @@ func findPlaceholder(v any, path string, sprint bool) (string, bool) {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			if where, found := findPlaceholder(t[k], path+"."+k, strings.Contains(strings.ToLower(k), "sprint")); found {
+			lower := strings.ToLower(k)
+			if where, found := findPlaceholder(t[k], path+"."+k, strings.Contains(lower, "sprint") || strings.Contains(lower, "board")); found {
 				return where, true
 			}
 		}

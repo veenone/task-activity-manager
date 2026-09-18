@@ -330,7 +330,7 @@ func TestStartPassesTheDraftThroughWithJiraSDates(t *testing.T) {
 	store := newStore()
 	draft := backend.SprintDraft{Name: "Sprint 13", Goal: "Ship the board", StartDate: "2026-09-09", EndDate: "2026-09-23"}
 
-	note, err := newService(b, store).Start(context.Background(), "p1", 1, 13, draft)
+	note, err := sprints.ForCommit(newService(b, store)).Start(context.Background(), "p1", 1, 13, draft)
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestStartReturnsJiraSRefusalWordForWord(t *testing.T) {
 	b := &fakeBackend{startErr: errors.New(refusal)}
 	store := newStore()
 
-	_, err := newService(b, store).Start(context.Background(), "p1", 1, 13,
+	_, err := sprints.ForCommit(newService(b, store)).Start(context.Background(), "p1", 1, 13,
 		backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-09", EndDate: "2026-09-23"})
 	if err == nil {
 		t.Fatal("start = nil error, want Jira's refusal")
@@ -390,7 +390,7 @@ func TestStartRefusesDatesItCannotUse(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			b := &fakeBackend{}
-			_, err := newService(b, newStore()).Start(context.Background(), "p1", 1, 13,
+			_, err := sprints.ForCommit(newService(b, newStore())).Start(context.Background(), "p1", 1, 13,
 				backend.SprintDraft{Name: "Sprint 13", StartDate: tc.start, EndDate: tc.end})
 			if err == nil {
 				t.Fatal("start = nil error, want a refusal")
@@ -415,11 +415,11 @@ func TestCompleteMovesTheUnfinishedCardsThenCloses(t *testing.T) {
 	store := newStore()
 	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3", "PLAT-4", "PLAT-5")
 
-	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
-	if done.Moved != 3 || done.MovedTo != "the backlog" || len(done.Failed) != 0 {
+	if done.Moved != 3 || done.MovedTo != "the backlog" || done.Message != "" {
 		t.Errorf("completion = %+v, want three cards moved to the backlog and nothing failed", done)
 	}
 	if len(b.moves) != 1 {
@@ -449,7 +449,7 @@ func TestCompleteMovesToTheNamedSprint(t *testing.T) {
 	b := &fakeBackend{issues: sprintOf("1", "5")}
 	store := newStore()
 
-	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "13")
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "13")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -468,11 +468,11 @@ func TestCompleteWithNothingUnfinishedClosesWithoutAMove(t *testing.T) {
 	b := &fakeBackend{issues: sprintOf("5", "6", "5")}
 	store := newStore()
 
-	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
-	if done.Moved != 0 || len(done.Failed) != 0 {
+	if done.Moved != 0 || done.Message != "" {
 		t.Errorf("completion = %+v, want nothing moved and nothing failed", done)
 	}
 	if len(b.moves) != 0 {
@@ -498,15 +498,15 @@ func TestCompleteWhoseMoveFailsLeavesTheSprintOpen(t *testing.T) {
 	}
 	store := newStore()
 
-	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete = %v, want the failed push carried in the completion instead", err)
 	}
 	if !strings.Contains(done.Message, "403 Forbidden") || !strings.Contains(done.Message, "left open") {
 		t.Errorf("message = %q, want Jira's reason and the fact the sprint is still open", done.Message)
 	}
-	if done.Moved != 0 || len(done.Failed) != 3 {
-		t.Errorf("completion = %+v, want nothing moved and all three named", done)
+	if done.Moved != 0 || !strings.Contains(done.Message, "0 of 3") {
+		t.Errorf("completion = %+v, want nothing moved out of three", done)
 	}
 	if len(b.completed) != 0 {
 		t.Errorf("sprint %v was closed after a move that failed", b.completed)
@@ -541,21 +541,15 @@ func TestAMiddleChunkThatFailsReportsWhatMovedAndCorrectsTheCache(t *testing.T) 
 	s := newService(b, store)
 	s.PushBatch = 3
 
-	done, err := s.Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(s).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete = %v, want the failed chunk carried in the completion instead", err)
 	}
 	if !strings.Contains(done.Message, "3 of 9") {
 		t.Errorf("message = %q, want it to say how many of the unfinished cards moved", done.Message)
 	}
-	if done.Moved != 3 || len(done.Failed) != 6 {
-		t.Errorf("completion = %+v, want three moved and the other six named", done)
-	}
-	// The chunk that failed and the chunk after it, which was never
-	// attempted: both are still in the sprint, and the failing chunk alone
-	// would be a report that loses three cards.
-	if strings.Join(done.Failed, ",") != "PLAT-4,PLAT-5,PLAT-6,PLAT-7,PLAT-8,PLAT-9" {
-		t.Errorf("failed = %v, want the failing chunk and everything after it", done.Failed)
+	if done.Moved != 3 || !strings.Contains(done.Message, "(PLAT-1, PLAT-2, PLAT-3)") {
+		t.Errorf("completion = %+v, want three moved and named", done)
 	}
 	if len(b.completed) != 0 {
 		t.Errorf("sprint %v was closed after a chunk that failed", b.completed)
@@ -583,7 +577,7 @@ func TestCompleteChunksAtTwenty(t *testing.T) {
 	}
 	b := &fakeBackend{issues: sprintOf(statuses...)}
 
-	done, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(newService(b, newStore())).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -608,7 +602,7 @@ func TestCompleteReadsEveryPageOfTheSprint(t *testing.T) {
 	s := newService(b, newStore())
 	s.PageSize = 3
 
-	done, err := s.Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(s).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -631,7 +625,7 @@ func TestCompleteRefusesWhileTheJournalHoldsCardsStayingInTheSprint(t *testing.T
 	s := newService(b, newStore())
 	s.Pending = func(context.Context, string, int) (int, error) { return 2, nil }
 
-	_, err := s.Complete(context.Background(), "p1", 1, 12, "")
+	_, err := sprints.ForCommit(s).Complete(context.Background(), "p1", 1, 12, "")
 	if err == nil {
 		t.Fatal("complete = nil error, want it refused while changes are pending")
 	}
@@ -649,7 +643,7 @@ func TestCompleteRefusesWhileTheJournalHoldsCardsStayingInTheSprint(t *testing.T
 func TestCompleteRefusesADestinationItCannotUse(t *testing.T) {
 	for _, moveTo := range []string{"fourteen", "12", "012", "+13", "-1", "0", "13.0"} {
 		b := &fakeBackend{issues: sprintOf("1")}
-		if _, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, moveTo); err == nil {
+		if _, err := sprints.ForCommit(newService(b, newStore())).Complete(context.Background(), "p1", 1, 12, moveTo); err == nil {
 			t.Errorf("complete into %q = nil error, want a refusal", moveTo)
 		}
 		if len(b.order) != 0 {
@@ -669,7 +663,7 @@ func TestCompleteRefusesABoardItCannotJudge(t *testing.T) {
 		b := &fakeBackend{issues: sprintOf("1")}
 		store := newStore()
 		store.columns = cols
-		if _, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, ""); err == nil {
+		if _, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, ""); err == nil {
 			t.Errorf("complete with columns %+v = nil error, want a refusal", cols)
 		}
 		if len(b.order) != 0 {
@@ -688,7 +682,7 @@ func TestCompleteLeavesACardThatIsNoLongerInTheSprintAlone(t *testing.T) {
 	elsewhere.SprintID = "13"
 	b := &fakeBackend{issues: append(sprintOf("1"), elsewhere), ignoreScope: true}
 
-	done, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(newService(b, newStore())).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -702,10 +696,10 @@ func TestCompleteLeavesACardThatIsNoLongerInTheSprintAlone(t *testing.T) {
 // does not guess at those before trying.
 func TestABackendWithNoAgileApiRefusesBothCeremonies(t *testing.T) {
 	s := sprints.New(searchOnly{}, newStore(), "PLAT")
-	if _, err := s.Start(context.Background(), "p1", 1, 13, backend.SprintDraft{StartDate: "2026-09-09", EndDate: "2026-09-23"}); err == nil {
+	if _, err := sprints.ForCommit(s).Start(context.Background(), "p1", 1, 13, backend.SprintDraft{StartDate: "2026-09-09", EndDate: "2026-09-23"}); err == nil {
 		t.Error("start = nil error, want a backend with no Agile API refused")
 	}
-	if _, err := s.Complete(context.Background(), "p1", 1, 12, ""); err == nil {
+	if _, err := sprints.ForCommit(s).Complete(context.Background(), "p1", 1, 12, ""); err == nil {
 		t.Error("complete = nil error, want a backend with no Agile API refused")
 	}
 }
@@ -723,7 +717,7 @@ func (searchOnly) SearchIssuesPage(context.Context, string, string, string, []st
 // brings the status back with the key instead of one call per card.
 func TestTheSearchIsScopedToTheSprintAndTheProject(t *testing.T) {
 	b := &fakeBackend{issues: sprintOf("1")}
-	if _, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
+	if _, err := sprints.ForCommit(newService(b, newStore())).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
 	if len(b.scopes) == 0 {
@@ -760,11 +754,11 @@ func TestARefreshThatComesBackEmptyLeavesTheBoardsSprintsAlone(t *testing.T) {
 		run  func(s *sprints.Service) (string, error)
 	}{
 		{"after a completion", func(s *sprints.Service) (string, error) {
-			done, err := s.Complete(context.Background(), "p1", 1, 12, "")
+			done, err := sprints.ForCommit(s).Complete(context.Background(), "p1", 1, 12, "")
 			return done.Note, err
 		}},
 		{"after a start", func(s *sprints.Service) (string, error) {
-			return s.Start(context.Background(), "p1", 1, 13,
+			return sprints.ForCommit(s).Start(context.Background(), "p1", 1, 13,
 				backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-09", EndDate: "2026-09-23"})
 		}},
 	} {
@@ -809,7 +803,7 @@ func TestTheMembershipRewriteKeepsTheBoardsOrderAndItsScope(t *testing.T) {
 	store := newStore()
 	store.inSprint("PLAT-3", "PLAT-2", "PLAT-1")
 
-	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -831,7 +825,7 @@ func TestCompleteRefusesASprintThatIsNotOnTheBoard(t *testing.T) {
 	b := &fakeBackend{issues: sprintOf("1")}
 	store := newStore()
 
-	_, err := newService(b, store).Complete(context.Background(), "p1", 7, 12, "")
+	_, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 7, 12, "")
 	if err == nil {
 		t.Fatal("complete = nil error, want a sprint that is not on the board refused")
 	}
@@ -858,7 +852,7 @@ func TestACloseThatFailsSaysWhereTheCardsWent(t *testing.T) {
 	store := newStore()
 	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3")
 
-	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "13")
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "13")
 	if err != nil {
 		t.Fatalf("complete = %v, want the refused close carried in the completion instead", err)
 	}
@@ -869,11 +863,6 @@ func TestACloseThatFailsSaysWhereTheCardsWent(t *testing.T) {
 	}
 	if done.Moved != 2 {
 		t.Errorf("completion = %+v, want the two cards it did move", done)
-	}
-	// Nothing failed to move, so nothing is named: the sprint is open and
-	// holds none of them, which is what the message says.
-	if len(done.Failed) != 0 {
-		t.Errorf("failed = %v, want it empty when every card moved", done.Failed)
 	}
 	if got := strings.Join(store.membership["12"], ","); got != "PLAT-3" {
 		t.Errorf("cached membership = %q, want the cards that are still in the sprint", got)
@@ -895,7 +884,7 @@ func TestAJiraRefusalReachesTheCompletionAsOneLine(t *testing.T) {
 		{"a close that failed", &fakeBackend{issues: sprintOf("1"), completeErr: errors.New(page)}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			done, err := newService(tc.b, newStore()).Complete(context.Background(), "p1", 1, 12, "")
+			done, err := sprints.ForCommit(newService(tc.b, newStore())).Complete(context.Background(), "p1", 1, 12, "")
 			if err != nil {
 				t.Fatalf("complete = %v, want the failure carried in the completion", err)
 			}
@@ -960,7 +949,7 @@ func TestCompleteOnTheDemoBackendMovesOnlyThatSprintsCards(t *testing.T) {
 	sort.Strings(inTwelve)
 	store.cached["12"] = inTwelve
 
-	done, err := sprints.New(b, store, "PLAT").Complete(context.Background(), "p1", 1, 12, "13")
+	done, err := sprints.ForCommit(sprints.New(b, store, "PLAT")).Complete(context.Background(), "p1", 1, 12, "13")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -1006,7 +995,7 @@ func TestTheDestinationLearnsWhatWasMovedIntoIt(t *testing.T) {
 	store.inSprint("PLAT-1", "PLAT-2", "PLAT-3")
 	store.holds("13", "PLAT-40")
 
-	done, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "13")
+	done, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "13")
 	if err != nil {
 		t.Fatalf("complete: %v", err)
 	}
@@ -1035,7 +1024,7 @@ func TestACompletionIntoTheBacklogWritesTheBoardsOwnList(t *testing.T) {
 	store.inSprint("PLAT-1", "PLAT-2")
 	store.holds("", "PLAT-1", "PLAT-2", "PLAT-7")
 
-	if _, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
+	if _, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
 		t.Fatalf("complete: %v", err)
 	}
 	if got := strings.Join(store.membership["12"], ","); got != "" {
@@ -1057,7 +1046,7 @@ func TestCompleteRefusesASprintThatWasNeverStarted(t *testing.T) {
 	store := newStore()
 	store.onBoard["1/12"] = "future"
 
-	_, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, "")
+	_, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, "")
 	if err == nil {
 		t.Fatal("complete = nil error, want a sprint that has not started refused")
 	}
@@ -1080,7 +1069,7 @@ func TestCompleteAllowsAStateItCannotVouchFor(t *testing.T) {
 		b := &fakeBackend{issues: sprintOf("1")}
 		store := newStore()
 		store.onBoard["1/12"] = state
-		if _, err := newService(b, store).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
+		if _, err := sprints.ForCommit(newService(b, store)).Complete(context.Background(), "p1", 1, 12, ""); err != nil {
 			t.Errorf("complete with the cached state %q = %v, want it attempted", state, err)
 		}
 	}
@@ -1095,7 +1084,7 @@ func TestCompleteAllowsAStateItCannotVouchFor(t *testing.T) {
 func TestASprintListThatCannotBeReReadIsANoteAndNotAFailure(t *testing.T) {
 	t.Run("after a start", func(t *testing.T) {
 		b := &fakeBackend{sprintErr: errors.New("<html><body>You must log in</body></html>")}
-		note, err := newService(b, newStore()).Start(context.Background(), "p1", 1, 13,
+		note, err := sprints.ForCommit(newService(b, newStore())).Start(context.Background(), "p1", 1, 13,
 			backend.SprintDraft{Name: "Sprint 13", StartDate: "2026-09-09", EndDate: "2026-09-23"})
 		if err != nil {
 			t.Fatalf("start = %v, want the sprint started and the refresh reported beside it", err)
@@ -1113,7 +1102,7 @@ func TestASprintListThatCannotBeReReadIsANoteAndNotAFailure(t *testing.T) {
 
 	t.Run("after a completion", func(t *testing.T) {
 		b := &fakeBackend{issues: sprintOf("5"), sprintErr: errors.New("503 Service Unavailable")}
-		done, err := newService(b, newStore()).Complete(context.Background(), "p1", 1, 12, "")
+		done, err := sprints.ForCommit(newService(b, newStore())).Complete(context.Background(), "p1", 1, 12, "")
 		if err != nil {
 			t.Fatalf("complete = %v, want the sprint closed and the refresh reported beside it", err)
 		}

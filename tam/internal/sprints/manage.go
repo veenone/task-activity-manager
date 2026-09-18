@@ -13,11 +13,32 @@ import (
 )
 
 // Managing a sprint rather than running one: changing it and destroying it.
-// Making one is journaled now, in issuerepo, and only Edit and Delete of a
-// sprint Jira already holds stay here; both refuse a draft sprint's negative
-// id first, before either does anything else. The package doc carries the
-// argument for why these two reach Jira immediately like the two ceremonies
-// beside them; what follows is what each of them refuses first.
+// Both are journaled now, in issuerepo, and the user's Edit and Delete of a
+// sprint Jira already holds reach Jira only when Commit pushes them. What
+// stays here is that push: Commit calls it through ForCommit, and it still
+// asks Jira for the sprint's state first, since the cache it was journaled
+// against may be hours old by then. Both refuse a draft sprint's negative id
+// first, before either does anything else; what follows is what each of them
+// refuses next.
+
+// Committed is the push half of an edit, a delete, a start or a completion,
+// for Commit alone: every write this package makes to Jira hangs off it.
+type Committed struct{ s *Service }
+
+// ForCommit is how Commit pushes a journaled sprint write.
+func ForCommit(s *Service) Committed { return Committed{s: s} }
+
+// ErrRefused marks a push the sprint's own state refused: a closed sprint's
+// edit, a started sprint's delete, a completion of a sprint that never
+// started, a delete or a completion while cards in the sprint have pending
+// changes. Committing again does not change any of those.
+var ErrRefused = errors.New("refused by the sprint's state")
+
+// refusal is an error that answers errors.Is(err, ErrRefused) and reads as
+// its own sentence.
+type refusal struct{ error }
+
+func (refusal) Is(target error) bool { return target == ErrRefused }
 
 // errNoIssueCache is what Delete refuses with when the issue cache seam is
 // not wired. Edit lets the same gap through and only logs it, because its
@@ -42,7 +63,8 @@ var errNoIssueCache = errors.New("the issue cache is not wired, so this delete c
 // cache, and requireEditable carries why. Nothing here confirms editing a
 // running sprint: a flag in the answer would arrive after the write, so the
 // dialog asks that question from the cached state before it calls.
-func (s *Service) Edit(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft, clearGoal bool) (string, error) {
+func (c Committed) Edit(ctx context.Context, profileID string, boardID, sprintID int, d backend.SprintDraft, clearGoal bool) (string, error) {
+	s := c.s
 	if sprintID < 0 {
 		return "", errDraftSprint
 	}
@@ -138,9 +160,10 @@ func datesChanged(wasStart, wasEnd, start, end string) bool {
 // which arrives beside a success. Jira has done the deleting in both cases;
 // what follows is local bookkeeping that may not fail the write it is
 // bookkeeping for.
-func (s *Service) Delete(ctx context.Context, profileID string, boardID, sprintID int) (string, error) {
-	if sprintID < 0 {
-		return "", errDraftSprint
+func (c Committed) Delete(ctx context.Context, profileID string, boardID, sprintID int) (string, error) {
+	s := c.s
+	if err := s.CheckDelete(ctx, profileID, sprintID); err != nil {
+		return "", err
 	}
 	if s.Issues == nil {
 		return "", errNoIssueCache
@@ -151,9 +174,6 @@ func (s *Service) Delete(ctx context.Context, profileID string, boardID, sprintI
 	}
 	doomed, gone, err := s.requireDeletable(ctx, b, boardID, sprintID)
 	if err != nil {
-		return "", err
-	}
-	if err := s.refusePendingDelete(ctx, profileID, sprintID); err != nil {
 		return "", err
 	}
 	if !gone {

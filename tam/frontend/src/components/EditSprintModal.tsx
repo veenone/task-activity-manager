@@ -5,7 +5,6 @@ import type { Sprint } from "../api";
 import { useEditSprint } from "../queries/sprints";
 import { useSync } from "../contexts/SyncContext";
 import { dayInput } from "../lib/format";
-import { ImmediateWriteChip } from "./ImmediateWriteChip";
 import { SprintDraftFields, useSprintDraft } from "./SprintDraftForm";
 
 interface Props {
@@ -28,8 +27,8 @@ interface Props {
 
 // EditSprintModal renames a sprint, rewrites its goal, or moves its dates.
 // It is the third dialog over SprintDraftForm's four fields, after starting
-// a sprint and creating one, and like both of those it reaches Jira the
-// moment it is submitted rather than waiting for Commit.
+// a sprint and creating one. Like creating one, it saves locally and Commit
+// sends the change to Jira.
 export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClose, onEdited }: Props) {
   const { runQuietLock } = useSync();
   const { confirm } = useConfirm();
@@ -73,14 +72,14 @@ export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClos
       if (!ok) return;
     }
     // Moving a running sprint's end date is the one edit here with a
-    // consequence outside this window: Jira takes the new date at once, and
-    // every burndown and every board reading that sprint moves with it. It
-    // is a question rather than a refusal, since moving the date is a real
-    // and ordinary thing for a team to decide.
+    // consequence outside this window: once Commit sends it, every burndown
+    // and every board reading that sprint moves with it. It is a question
+    // rather than a refusal, since moving the date is a real and ordinary
+    // thing for a team to decide.
     if (sprint.state === "active" && values.to !== originalEnd) {
       const ok = await confirm({
         title: "Move a running sprint's end date?",
-        message: `${sprint.name} is running. Jira takes the new end date immediately, so everyone reading this board sees the sprint end on ${values.to} instead of ${originalEnd}.`,
+        message: `${sprint.name} is running. Once Commit sends it, everyone reading this board sees the sprint end on ${values.to} instead of ${originalEnd}.`,
         confirmLabel: "Move the end date",
         cancelLabel: "Leave it",
         // Not a destructive confirm: nothing is thrown away, and the red
@@ -103,24 +102,20 @@ export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClos
         clearGoal: values.goal === "" && sprint.goal !== "",
       },
       {
-        // The note is the write's own postscript, empty almost always: Jira
-        // took the edit and the board's sprint list could not be re-read
-        // afterwards, so the list on screen still shows the old name. It
-        // rides with the sentence into the view's banner, since this dialog
-        // closes on success.
-        onSuccess: (note) => {
-          const changed = `${values.name} was updated.`;
-          const line = note ? `${changed} ${note}` : changed;
+        // The sentence rides into the view's banner, since this dialog closes
+        // on success.
+        onSuccess: () => {
+          const line = `${values.name} was updated. Commit sends the change to Jira.`;
           announce(line);
           onEdited(line);
           onClose();
         },
         // The dialog stays open with what the user typed still in it. The
-        // refusal is usually Jira's own sentence about a permission or a
-        // closed sprint, or the busy guard naming whichever operation is
-        // already running: that guard is Go's, and it refuses whether or not
-        // anything on screen is showing a banner, so this is the only place
-        // the user can read why nothing happened.
+        // refusal is a closed sprint, a sprint waiting to be deleted, or the
+        // busy guard naming whichever operation is already running: that
+        // guard is Go's, and it refuses whether or not anything on screen is
+        // showing a banner, so this is the only place the user can read why
+        // nothing happened.
         onError: (err) => draft.fail(errMsg(err)),
       },
     );
@@ -143,9 +138,8 @@ export function EditSprintModal({ profileId, boardId, sprint, otherNames, onClos
       <div className="pending-head">
         <div className="edit-sprint-title">
           <h2 id="edit-sprint-title">{`Edit ${sprint.name}`}</h2>
-          <p>{sprint.draft ? "A draft sprint. Changes stay local until Commit." : "Changes save to Jira immediately."}</p>
+          <p>{sprint.draft ? "A draft sprint. Changes stay local until Commit." : "Changes are saved locally and sent to Jira on Commit."}</p>
         </div>
-        {!sprint.draft && <ImmediateWriteChip />}
         <button type="button" className="btn btn-ghost detail-close" onClick={onClose} aria-label="Close">×</button>
       </div>
 

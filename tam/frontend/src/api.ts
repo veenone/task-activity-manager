@@ -267,6 +267,10 @@ export interface Board {
   name: string;
   // Jira's own board type: "scrum" or "kanban".
   type: string;
+  // draft marks a board drafted in TAM and not yet created in Jira, the way
+  // Sprint.draft does for a sprint. Absent on fixtures written before board
+  // drafts existed.
+  draft?: boolean;
 }
 
 export interface Sprint {
@@ -394,30 +398,6 @@ export interface SprintSuggestion {
   end: string;
   length: number;
   fromHistory: boolean;
-}
-
-// SprintCompletion is what a completion did, mirroring sprints.Completion.
-// It comes back with a failure as well as with a success: a push that fell
-// over partway has already taken cards out of the sprint, and the dialog has
-// to say how many went where before it says the sprint is still open.
-//
-// message is how that failure arrives, rather than as a rejected promise.
-// Wails hands the frontend either a bound method's value or its error and
-// never both, so a partial completion reported as an error would deliver the
-// sentence and drop failed, which is the list the user needs. A non-empty
-// message means the completion did not finish.
-//
-// note is the other way round: the sprint closed and the cards moved, and
-// something after that did not land. Today that is the board's sprint list,
-// which the ceremony re-reads so the picker stops calling a closed sprint
-// active, and which leaves the toolbar offering the wrong button when it
-// cannot be read. It is reported beside the success, never instead of it.
-export interface SprintCompletion {
-  moved: number;
-  movedTo: string;
-  failed: string[];
-  note: string;
-  message: string;
 }
 
 // SprintCreated is what CreateSprint answers with, mirroring the App-level
@@ -617,34 +597,41 @@ export const EDITABLE_FIELDS: { id: EditableField; label: string }[] = [
   { id: "parentKey", label: "Epic" },
 ];
 
-// The three journal entity types a board move writes, mirroring
-// issuerepo.EntityTransition, EntitySprintMove, and EntityRank. Both
-// dialogs that show pending work branch on them, and the board reads them
-// to know which of its cards carry a pending move.
+// The four journal entity types a board move writes, mirroring
+// issuerepo.EntityTransition, EntitySprintMove, EntityRank, and
+// EntityIssueBoard. Both dialogs that show pending work branch on them, and
+// the board reads them to know which of its cards carry a pending move.
 export const ENTITY_TRANSITION = "issue_transition";
 export const ENTITY_SPRINT_MOVE = "issue_sprint";
 export const ENTITY_RANK = "issue_rank";
-export const MOVE_ENTITIES: string[] = [ENTITY_TRANSITION, ENTITY_SPRINT_MOVE, ENTITY_RANK];
+export const ENTITY_ISSUE_BOARD = "issue_board";
+export const MOVE_ENTITIES: string[] = [ENTITY_TRANSITION, ENTITY_SPRINT_MOVE, ENTITY_RANK, ENTITY_ISSUE_BOARD];
 
 // The field each of those rows carries, mirroring issuerepo.FieldStatusID,
-// FieldSprintID, and FieldRank.
+// FieldSprintID, and FieldRank. An issue_board row has no field constant
+// here: unlike a status or a sprint, an issue can be queued onto more than
+// one board, so issuerepo.BoardField folds the board's id into the field
+// itself and there is no one fixed string for MOVE_FIELDS to name.
 export const FIELD_STATUS_ID = "statusId";
 export const FIELD_SPRINT_ID = "sprintId";
 export const FIELD_RANK = "rank";
 
 // MOVE_LABELS is the one word each board move goes by, in the Pending
 // changes dialog, the Activity tab, and the conflict table. One vocabulary
-// for the three moves: a surface that invented its own would have the same
+// for the four moves: a surface that invented its own would have the same
 // card read "Status" in one dialog and "statusId" in the next.
 export const MOVE_LABELS: Record<string, string> = {
   [ENTITY_TRANSITION]: "Status",
   [ENTITY_SPRINT_MOVE]: "Sprint",
   [ENTITY_RANK]: "Rank",
+  [ENTITY_ISSUE_BOARD]: "Board",
 };
 
 // MOVE_FIELDS names the entity behind a field, for the surfaces that hold
 // only the field: a held board write reaches the conflict card as
 // "statusId" or "sprintId" and has to read as Status or Sprint there too.
+// An issue_board row is never held (committer.heldBoardRow), so it never
+// reaches a surface that has only its field and needs this map.
 export const MOVE_FIELDS: Record<string, string> = {
   [FIELD_STATUS_ID]: ENTITY_TRANSITION,
   [FIELD_SPRINT_ID]: ENTITY_SPRINT_MOVE,
@@ -675,6 +662,64 @@ export interface PendingChange {
 // ENTITY_SPRINT_CREATE is the journal entity of a sprint drafted in TAM. Its
 // entityKey is the draft's negative id and its afterVal a DraftSprint.
 export const ENTITY_SPRINT_CREATE = "sprint_create";
+
+// ENTITY_BOARD_CREATE is the journal entity of a board drafted in TAM,
+// mirroring issuerepo.EntityBoardCreate. Its entityKey is the draft's
+// negative id and its afterVal a DraftBoard.
+export const ENTITY_BOARD_CREATE = "board_create";
+
+// DraftBoard mirrors issuerepo.DraftBoard: what a board_create row carries.
+export interface DraftBoard {
+  name: string;
+  type: string;
+  filterName: string;
+  jql: string;
+}
+
+// ENTITY_SPRINT_EDIT and ENTITY_SPRINT_DELETE are the journal entities of an
+// edit and a delete of a sprint Jira holds, mirroring issuerepo's. Their
+// entityKey is the sprint id. An edit's afterVal is a SprintEdit and its
+// beforeVal the cached name, goal and dates; a delete's afterVal is
+// { boardId, name } and its beforeVal the name.
+export const ENTITY_SPRINT_EDIT = "sprint_edit";
+export const ENTITY_SPRINT_DELETE = "sprint_delete";
+// ENTITY_SPRINT_START and ENTITY_SPRINT_COMPLETE are a start and a completion
+// waiting for Commit, keyed by the sprint id (a draft's negative id for a
+// start). A start's afterVal is a SprintStart, a completion's a
+// SprintComplete; neither has a beforeVal.
+export const ENTITY_SPRINT_START = "sprint_start";
+export const ENTITY_SPRINT_COMPLETE = "sprint_complete";
+export const SPRINT_ENTITIES: string[] = [
+  ENTITY_SPRINT_CREATE, ENTITY_SPRINT_EDIT, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, ENTITY_SPRINT_COMPLETE,
+];
+
+// SprintStart mirrors issuerepo.SprintStart: what a sprint_start row carries.
+export interface SprintStart {
+  boardId: number;
+  name: string;
+  goal: string;
+  startDate: string;
+  endDate: string;
+}
+
+// SprintComplete mirrors issuerepo.SprintComplete: what a sprint_complete row
+// carries. moveTo is empty for the backlog.
+export interface SprintComplete {
+  boardId: number;
+  name: string;
+  moveTo: string;
+  moveToName: string;
+}
+
+// SprintEdit mirrors issuerepo.SprintEdit: what a sprint_edit row carries.
+export interface SprintEdit {
+  boardId: number;
+  name: string;
+  goal: string;
+  startDate: string;
+  endDate: string;
+  clearGoal: boolean;
+}
 
 // DraftSprint mirrors issuerepo.DraftSprint: what a sprint_create row carries.
 export interface DraftSprint {
@@ -825,6 +870,9 @@ export interface CommitResult {
   // createdSprints and held are optional for the same reason CommitFailure's
   // fields are: fixtures written before phased Commit do not spell them out.
   createdSprints?: { draftId: number; id: number; name: string }[];
+  // sprintsChanged names each pushed sprint edit, start, completion or
+  // delete, "Sprint 12 edited"; optional for the same reason.
+  sprintsChanged?: string[];
   linked: { key: string; toKey: string; type: string }[];
   // moved is optional for the same reason CommitFailure's fields are.
   moved?: CommitMove[];
@@ -1007,13 +1055,11 @@ export const GetBoard = (
   App.GetBoard(profileId, boardId, sprintId, swimlane) as Promise<BoardView>;
 export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.SyncBoards;
 
-// The two sprint ceremonies and the two reads the dialogs open with. Unlike
-// every other write on this surface, the ceremonies push to Jira the moment
-// they are called and take the app's per-profile lock while they do, so both
-// go through SyncContext rather than being called from a component directly.
-// StartSprint answers with the note the ceremony left, empty when there is
-// none: the sprint started and the board's sprint list could not be re-read
-// afterwards, so the picker on screen is stale.
+// The two sprint ceremonies and the read the start dialog opens with. Both
+// ceremonies are journaled and sent on Commit, but take the app's
+// per-profile lock, so both go through SyncContext's runQuietLock rather
+// than being called from a component directly. Commit works a completion's
+// unfinished set out from Jira.
 export const StartSprint: (
   profileId: string,
   boardId: number,
@@ -1022,21 +1068,19 @@ export const StartSprint: (
   goal: string,
   start: string,
   end: string,
-) => Promise<string> = App.StartSprint;
-export const CompleteSprint = (
+) => Promise<void> = App.StartSprint;
+export const CompleteSprint: (
   profileId: string,
   boardId: number,
   sprintId: number,
   moveTo: string,
-): Promise<SprintCompletion> =>
-  App.CompleteSprint(profileId, boardId, sprintId, moveTo) as Promise<SprintCompletion>;
+) => Promise<void> = App.CompleteSprint;
 export const SuggestSprintDates = (profileId: string, boardId: number): Promise<SprintSuggestion> =>
   App.SuggestSprintDates(profileId, boardId) as Promise<SprintSuggestion>;
 // CreateSprint, EditSprint and DeleteSprint make, change and destroy a
-// sprint, the same immediate writes the two ceremonies are: none of the
-// three is journaled, and all three take the same per-profile lock, so a
-// caller reaches them through the lock SyncContext holds rather than calling
-// them directly. CreateSprint's four fields are the dialog's whole draft;
+// sprint. All three are journaled and sent on Commit, and take the same
+// per-profile lock the two ceremonies do, the same way. CreateSprint's four
+// fields are the dialog's whole draft;
 // EditSprint's clearGoal is the one argument the draft alone cannot carry,
 // since an empty goal box left alone and one asking to clear a goal that was
 // there are different requests.
@@ -1058,8 +1102,8 @@ export const EditSprint = (
   start: string,
   end: string,
   clearGoal: boolean,
-): Promise<string> => App.EditSprint(profileId, boardId, sprintId, name, goal, start, end, clearGoal);
-export const DeleteSprint: (profileId: string, boardId: number, sprintId: number) => Promise<string> =
+): Promise<void> => App.EditSprint(profileId, boardId, sprintId, name, goal, start, end, clearGoal);
+export const DeleteSprint: (profileId: string, boardId: number, sprintId: number) => Promise<void> =
   App.DeleteSprint;
 // ListBoardSprintDetails is the Sprints view's whole read: one board's
 // sprints in the order that view wants them, each with its cards and its
@@ -1126,6 +1170,19 @@ export const RankIssue: (
 ) => Promise<void> = App.RankIssue;
 export const CanTransition: (profileId: string, key: string, statusId: string) => Promise<TransitionCheck> =
   App.CanTransition;
+// CreateDraftBoard and AddIssuesToBoard are local writes too: no lock, no
+// Jira call, and they return as soon as the journal rows are written.
+// CreateDraftBoard answers with the board's negative placeholder id, which
+// the picker uses at once to add issues to it before it is real.
+export const CreateDraftBoard: (
+  profileId: string,
+  name: string,
+  boardType: string,
+  filterName: string,
+  jql: string,
+) => Promise<number> = App.CreateDraftBoard;
+export const AddIssuesToBoard: (profileId: string, keys: string[], boardId: number, scope: string) => Promise<void> =
+  App.AddIssuesToBoard;
 export const SetProfileSetting: (
   profileId: string,
   key: string,

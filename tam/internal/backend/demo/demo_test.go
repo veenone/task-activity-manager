@@ -774,6 +774,53 @@ func TestCreateSprintAddsAFutureSprintACardCanBeMovedInto(t *testing.T) {
 	}
 }
 
+// TestDemoCreateBoardMintsANewIDAndAKanbanBoardHasNoSprints pins the two
+// things Task 1's brief asks of the demo: a create mints an id above the
+// fixed pair, the same way CreateSprint mints one above the dataset's own
+// three, and a kanban board never gets sprints fabricated onto it.
+func TestDemoCreateBoardMintsANewIDAndAKanbanBoardHasNoSprints(t *testing.T) {
+	b := demobackend.New("ACME")
+	ctx := context.Background()
+
+	id, err := b.CreateBoard(ctx, "ACME", backend.BoardDraft{Name: "ACME Kanban 2", Type: backend.BoardTypeKanban})
+	if err != nil {
+		t.Fatalf("create board: %v", err)
+	}
+	if id <= 2 {
+		t.Errorf("id = %d, want a new id above the fixed pair (1, 2)", id)
+	}
+	sprints, err := b.BoardSprints(ctx, id)
+	if err != nil {
+		t.Fatalf("board sprints: %v", err)
+	}
+	if len(sprints) != 0 {
+		t.Errorf("sprints = %+v, want none for a kanban board", sprints)
+	}
+	boards, err := b.Boards(ctx, "ACME")
+	if err != nil {
+		t.Fatalf("boards: %v", err)
+	}
+	found := false
+	for _, board := range boards {
+		if board.ID == id {
+			found = true
+			if board.Type != backend.BoardTypeKanban || board.Name != "ACME Kanban 2" {
+				t.Errorf("listed board = %+v, want the draft's own name and type", board)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("board %d is not in Boards(): %+v", id, boards)
+	}
+
+	if err := b.AddToBoardBacklog(ctx, id, []string{"ACME-412"}); err != nil {
+		t.Errorf("add a real issue to the new board's backlog: %v", err)
+	}
+	if err := b.AddToBoardBacklog(ctx, id, []string{"ACME-9999"}); err == nil {
+		t.Error("adding an unknown issue to the backlog must be refused")
+	}
+}
+
 // TestEditSprintHonoursClearGoal is the partial update rule Jira's own
 // endpoint follows: an empty field in the draft is left alone, and
 // clearGoal is the one deliberate exception that takes the goal away even

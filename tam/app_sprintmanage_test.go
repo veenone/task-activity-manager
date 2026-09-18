@@ -28,6 +28,7 @@ type manageLifecycleBackend struct {
 	editedClearGoal bool
 
 	createCalls int
+	deletedID   int
 }
 
 func (b *manageLifecycleBackend) BoardSprints(context.Context, int) ([]backend.Sprint, error) {
@@ -46,6 +47,11 @@ func (b *manageLifecycleBackend) EditSprint(_ context.Context, sprintID int, d b
 	return nil
 }
 
+func (b *manageLifecycleBackend) DeleteSprint(_ context.Context, sprintID int) error {
+	b.deletedID = sprintID
+	return nil
+}
+
 var _ backend.BoardBackend = (*manageLifecycleBackend)(nil)
 
 // TestManagementBindingsRequireAProfile is requireProfile's own guard,
@@ -57,10 +63,10 @@ func TestManagementBindingsRequireAProfile(t *testing.T) {
 	if _, err := a.CreateSprint("", 1, "Sprint 14", "", "2026-09-09", "2026-09-23"); err == nil {
 		t.Error("CreateSprint with no profile = nil error, want a refusal")
 	}
-	if _, err := a.EditSprint("", 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23", false); err == nil {
+	if err := a.EditSprint("", 1, 13, "Sprint 13", "", "2026-09-09", "2026-09-23", false); err == nil {
 		t.Error("EditSprint with no profile = nil error, want a refusal")
 	}
-	if _, err := a.DeleteSprint("", 1, 13); err == nil {
+	if err := a.DeleteSprint("", 1, 13); err == nil {
 		t.Error("DeleteSprint with no profile = nil error, want a refusal")
 	}
 }
@@ -85,10 +91,10 @@ func TestManagementBindingsAreRefusedWhileABoardsRefreshHoldsTheLock(t *testing.
 	if _, err := a.CreateSprint(p.ID, 1, "Sprint 14", "", "2026-09-09", "2026-09-23"); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("CreateSprint err = %v, want it to name the operation that is running", err)
 	}
-	if _, err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", false); err == nil || !strings.Contains(err.Error(), "boards refresh") {
+	if err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", false); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("EditSprint err = %v, want it to name the operation that is running", err)
 	}
-	if _, err := a.DeleteSprint(p.ID, 1, 13); err == nil || !strings.Contains(err.Error(), "boards refresh") {
+	if err := a.DeleteSprint(p.ID, 1, 13); err == nil || !strings.Contains(err.Error(), "boards refresh") {
 		t.Errorf("DeleteSprint err = %v, want it to name the operation that is running", err)
 	}
 }
@@ -162,8 +168,8 @@ func TestEditAndDeleteOfADraftSprintStayLocal(t *testing.T) {
 		t.Fatalf("details = %+v, want the draft sprint holding the moved card", details)
 	}
 
-	if note, err := a.EditSprint(p.ID, 1, -1, "Sprint 15 promos", "", "2026-09-16", "2026-10-01", false); err != nil || note != "" {
-		t.Fatalf("EditSprint = %q, %v", note, err)
+	if err := a.EditSprint(p.ID, 1, -1, "Sprint 15 promos", "", "2026-09-16", "2026-10-01", false); err != nil {
+		t.Fatalf("EditSprint = %v", err)
 	}
 	if fake.editedID != 0 {
 		t.Errorf("the edit reached Jira for sprint %d", fake.editedID)
@@ -172,8 +178,8 @@ func TestEditAndDeleteOfADraftSprintStayLocal(t *testing.T) {
 		t.Errorf("board sprints = %+v", listed)
 	}
 
-	if note, err := a.DeleteSprint(p.ID, 1, -1); err != nil || note != "" {
-		t.Fatalf("DeleteSprint = %q, %v", note, err)
+	if err := a.DeleteSprint(p.ID, 1, -1); err != nil {
+		t.Fatalf("DeleteSprint = %v", err)
 	}
 	if listed, _ := a.ListBoardSprints(p.ID, 1); len(listed) != 0 {
 		t.Errorf("board sprints after delete = %+v", listed)
@@ -183,29 +189,61 @@ func TestEditAndDeleteOfADraftSprintStayLocal(t *testing.T) {
 	}
 }
 
-// TestEditSprintSendsTheClearGoalFlagThrough is the one argument this
-// binding carries that Start and Complete do not: an empty goal box left
-// that way, and one asking to clear a goal that was there, are different
-// requests to the backend, and the flag is what tells them apart on the
-// wire. requireEditable reads the sprint's state from the backend rather
-// than the cache, so the fixture's board has to answer BoardSprints with a
-// sprint that is not closed for the edit to reach the backend at all.
-func TestEditSprintSendsTheClearGoalFlagThrough(t *testing.T) {
+// An edit and a delete of a sprint Jira holds are journaled: the bindings
+// reach no backend, and Commit pushes them, clearGoal included.
+func TestEditAndDeleteOfARealSprintWaitForCommit(t *testing.T) {
 	a := newTestApp(t)
 	p := newTestProfile(t, a)
-	backendFake := &manageLifecycleBackend{
+	fake := &manageLifecycleBackend{
 		simpleBoardBackend: *twoBoards("PLAT Scrum", "PLAT Kanban", "To Do"),
-		sprints:            []backend.Sprint{{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active"}},
+		sprints: []backend.Sprint{
+			{ID: 13, BoardID: 1, Name: "Sprint 13", State: "active", Goal: "Old"},
+			{ID: 14, BoardID: 1, Name: "Sprint 14", State: "future"},
+		},
 	}
-	a.backends[p.ID] = backendFake
+	a.backends[p.ID] = fake
+	if err := a.repo.UpsertPage(a.ctx, p.ID, []backend.Issue{
+		{Key: "PLAT-1", ID: "1", Project: "PLAT", Type: backend.TypeTask, Summary: "one", Status: "To Do", StatusID: "1", SprintID: "14", SprintName: "Sprint 14", Updated: "2026-09-01T00:00:00Z"},
+	}, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.boards.ReplaceBoard(a.ctx, p.ID, backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}, nil, fake.sprints, nil); err != nil {
+		t.Fatal(err)
+	}
 
-	if _, err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", true); err != nil {
-		t.Fatalf("EditSprint: %v", err)
+	if err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", true); err != nil {
+		t.Fatalf("EditSprint = %v", err)
 	}
-	if backendFake.editedID != 13 || !backendFake.editedClearGoal {
-		t.Errorf("edit sent (id %d, clearGoal %v), want sprint 13 with the goal cleared", backendFake.editedID, backendFake.editedClearGoal)
+	if err := a.EditIssue(p.ID, "PLAT-1", "summary", "one, edited"); err != nil {
+		t.Fatal(err)
 	}
-	if backendFake.editedDraft.Name != "Sprint 13 renamed" {
-		t.Errorf("edited name = %q, want the one the dialog collected", backendFake.editedDraft.Name)
+	if err := a.DeleteSprint(p.ID, 1, 14); err == nil || !strings.Contains(err.Error(), "commit them") {
+		t.Errorf("a delete with a pending change on a card in the sprint = %v", err)
+	}
+	if _, err := a.DiscardAllPendingChanges(p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.EditSprint(p.ID, 1, 13, "Sprint 13 renamed", "", "2026-09-09", "2026-09-23", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.DeleteSprint(p.ID, 1, 14); err != nil {
+		t.Fatalf("DeleteSprint = %v", err)
+	}
+	if fake.editedID != 0 || fake.deletedID != 0 {
+		t.Fatalf("Jira was written before Commit: edit %d, delete %d", fake.editedID, fake.deletedID)
+	}
+	if listed, _ := a.ListBoardSprints(p.ID, 1); len(listed) != 2 || listed[0].Name != "Sprint 13 renamed" || listed[0].Goal != "" || listed[1].Name != "Sprint 14" {
+		t.Errorf("board sprints = %+v, want the rename at once and the delete not yet", listed)
+	}
+
+	res, err := a.CommitPendingChanges(p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fake.editedID != 13 || !fake.editedClearGoal || fake.editedDraft.Name != "Sprint 13 renamed" || fake.deletedID != 14 {
+		t.Errorf("pushed edit %d clear=%v %q, delete %d", fake.editedID, fake.editedClearGoal, fake.editedDraft.Name, fake.deletedID)
+	}
+	if strings.Join(res.SprintsChanged, ", ") != "Sprint 13 renamed edited, Sprint 14 deleted" || len(res.Failures) != 0 || res.Remaining != 0 {
+		t.Errorf("commit = %+v", res)
 	}
 }

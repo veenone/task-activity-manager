@@ -43,7 +43,7 @@ describe("useBoardSprintDetails", () => {
 
 describe("the sprint writes", () => {
   it("sends clearGoal beside the draft, since a blank goal box cannot say which blank it is", async () => {
-    vi.mocked(api.EditSprint).mockResolvedValue("");
+    vi.mocked(api.EditSprint).mockResolvedValue(undefined);
     const { result } = renderHook(() => useEditSprint("p1", run), { wrapper });
     result.current.mutate({
       boardId: 1, sprintId: 12, name: "Sprint 12", goal: "", start: "2026-09-01", end: "2026-09-14", clearGoal: true,

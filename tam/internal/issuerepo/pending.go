@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"agile-suite/core/journal"
+	"agile-suite/tam/internal/backend"
 )
 
 const (
-	// DraftPrefix starts the temporary key of an issue created locally and
-	// not yet committed. Commit swaps it for Jira's key.
-	DraftPrefix = "TAM-NEW-"
+	// DraftPrefix is backend.DraftPrefix, kept here for its many callers.
+	DraftPrefix = backend.DraftPrefix
 	// StatusDraft is the status a draft row shows until Commit creates it.
 	StatusDraft = "Draft"
 	// EntityIssue is the journal entity type of a field edit on an issue.
@@ -23,6 +23,20 @@ const (
 	// EntityLink is the journal entity type of a link to create. The row's
 	// field is LinkField(d) and its after_val the LinkDraft as JSON.
 	EntityLink = "link"
+	// EntityBoardCreate is the journal entity type of a drafted board, the
+	// board twin of EntitySprintCreate (sprintdrafts.go): its key is the
+	// negative id as text, its field FieldCreate, and its after_val the
+	// DraftBoard as JSON.
+	EntityBoardCreate = "board_create"
+
+	// EntityIssueBoard is the journal entity type of "put this issue on this
+	// board". Its key is the issue key, its field BoardField(boardID), and
+	// its after_val MoveValue(boardID, scope): the same "id|Name" packing a
+	// transition and a sprint move use, with scope standing in for the name.
+	// An issue can be queued onto more than one board at once, unlike a
+	// status or a sprint, so the field is not fixed the way FieldStatusID and
+	// FieldSprintID are; see FieldBoardID below.
+	EntityIssueBoard = "issue_board"
 
 	// The three board moves are three entity types and not one because they
 	// fail separately, are checked separately, and are pushed in a fixed
@@ -51,11 +65,20 @@ const (
 	FieldStatusID = "statusId"
 	FieldSprintID = "sprintId"
 	FieldRank     = "rank"
+
+	// FieldBoardID is not a fixed field like the three above: unlike a
+	// card's status or its sprint, an issue is not limited to one pending
+	// board, so a fixed field would let a second board's add silently
+	// replace the first's row instead of sitting beside it. BoardField
+	// (movevalue.go) folds the destination board's id into the field
+	// itself, so the journal's own uniqueness on (type, key, field) is what
+	// keeps one row per key per board.
+	FieldBoardID = "boardId"
 )
 
-// BoardEntities are the three board move entity types, for the reads that
+// BoardEntities are the four board move entity types, for the reads that
 // have to name all of them in one statement.
-var BoardEntities = []string{EntityTransition, EntityRank, EntitySprintMove}
+var BoardEntities = []string{EntityTransition, EntityRank, EntitySprintMove, EntityIssueBoard}
 
 // pendingFlag is the computed column every issue read carries.
 const pendingFlag = `EXISTS (SELECT 1 FROM pending_change p WHERE p.profile_id = issue.profile_id AND p.entity_key = issue.key)`

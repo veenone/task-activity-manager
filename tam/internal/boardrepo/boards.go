@@ -27,7 +27,7 @@ const insertIssueKeySQL = `
 	INSERT INTO board_issue (profile_id, board_id, sprint_id, key, position) VALUES (?, ?, ?, ?, ?)`
 
 const listBoardsSQL = `
-	SELECT id, name, type FROM board WHERE profile_id = ? ORDER BY name, id`
+	SELECT id, name, type, draft FROM board WHERE profile_id = ? ORDER BY name, id`
 
 const columnsSQL = `
 	SELECT name, status_ids FROM board_column WHERE profile_id = ? AND board_id = ? ORDER BY position`
@@ -87,7 +87,7 @@ func (r *Repository) ListBoards(ctx context.Context, profileID string) ([]Board,
 	out := []Board{}
 	for rows.Next() {
 		var b Board
-		if err := rows.Scan(&b.ID, &b.Name, &b.Type); err != nil {
+		if err := rows.Scan(&b.ID, &b.Name, &b.Type, &b.Draft); err != nil {
 			return nil, err
 		}
 		out = append(out, b)

@@ -816,3 +816,86 @@ func TestSchemaVersionThirteenAddsTheSprintDraftFlag(t *testing.T) {
 		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
 	}
 }
+
+// TestSchemaVersionFifteenAddsTheBoardDraftFlagToAnOlderDatabase seeds the
+// version 14 shape (board with no draft column, a row already in it),
+// rewinds the recorded version, and reopens, so the migration is what adds
+// the column and not baseDDL building it fresh. A fresh open runs every
+// migration from zero, which would let the new schema build the column and
+// prove nothing.
+func TestSchemaVersionFifteenAddsTheBoardDraftFlagToAnOlderDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE board DROP COLUMN draft`,
+		`INSERT INTO board (profile_id, id, name, type) VALUES ('p1', 1, 'PLAT board', 'scrum')`,
+		`UPDATE meta SET value = '14' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var draft int
+	var name string
+	if err := db.DB().QueryRow(`SELECT name, draft FROM board WHERE profile_id = 'p1' AND id = 1`).Scan(&name, &draft); err != nil {
+		t.Fatalf("read the kept board: %v", err)
+	}
+	if name != "PLAT board" || draft != 0 {
+		t.Errorf("board = %q draft %d, want the row kept and not a draft", name, draft)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}
+
+// TestFreshDatabaseHasTheBoardDraftColumn is TestFreshDatabaseHasTheSprintGoalColumn's
+// board twin: a database opened with meta.schema_version pre-stamped at
+// Schema.Version has every migration skip (each one already at or above
+// every Version in the list), so Base -- meaning baseDDL -- is the only
+// statement that could have built the column this insert relies on.
+func TestFreshDatabaseHasTheBoardDraftColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	raw, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open raw file: %v", err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+		fmt.Sprintf(`INSERT INTO meta (key, value) VALUES ('schema_version', '%d')`, tamstore.Schema.Version),
+	} {
+		if _, err := raw.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatalf("close raw file: %v", err)
+	}
+
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.DB().Exec(
+		`INSERT INTO board (profile_id, id, name, type, draft) VALUES ('p1', -1, 'Draft board', 'scrum', 1)`,
+	); err != nil {
+		t.Fatalf("insert with draft: %v", err)
+	}
+	var draft int
+	if err := db.DB().QueryRow(`SELECT draft FROM board WHERE profile_id = 'p1' AND id = -1`).Scan(&draft); err != nil {
+		t.Fatalf("read draft: %v", err)
+	}
+	if draft != 1 {
+		t.Errorf("draft = %d, want 1", draft)
+	}
+}

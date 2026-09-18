@@ -59,3 +59,19 @@ row that was locally edited before the migration, because that row's
 pending-edit overlay covers them.
 
 **Raised by:** bundle 03 planning, 2026-09-16.
+
+## A boards refresh shows a pending sprint edit as undone
+
+**What:** a journaled `sprint_edit` changes the cached `sprint` row at once.
+A boards refresh (or the re-read after a start or a completion) replaces
+every non-draft `sprint` row with what Jira sent, so the old name and dates
+come back on screen while the edit is still pending. Commit still pushes the
+edit, and Discard still restores the before value, so nothing is lost; only
+the display is stale until Commit.
+
+**When it would matter:** if users edit sprints and refresh before
+committing often enough to be confused by it. The fix is to re-apply
+pending `sprint_edit` rows after `boardrepo.writeSprints`, the way issue
+syncs keep pending field edits.
+
+**Raised by:** bundle 04 Task 7, 2026-09-17.

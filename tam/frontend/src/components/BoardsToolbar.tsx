@@ -1,6 +1,6 @@
 import type { Board, Sprint, Swimlane } from "../api";
 import { SWIMLANES } from "../api";
-import { DRAFT_SPRINT_HINT } from "../lib/sprintOptions";
+import { draftLabel } from "../lib/sprintOptions";
 
 interface Props {
   boards: Board[];
@@ -19,15 +19,21 @@ interface Props {
   canRefresh: boolean;
   onRefresh: () => void;
   // The two ceremonies, offered by the state of the sprint on screen: a
-  // future sprint can be started and the active one completed. Neither
-  // button is ever disabled for a connection TAM cannot see: the call is
-  // attempted and its dialog reports what Jira said.
+  // future sprint, a draft among them, can be started and the active one
+  // completed. Neither is ever disabled: each dialog saves locally and
+  // reports a refusal in its own words.
   onStart: () => void;
   onComplete: () => void;
   // onCreate opens the New sprint dialog, offered whenever a scrum board is
   // on screen: unlike Start and Complete it needs no sprint already picked,
   // so it is not gated on one.
   onCreate: () => void;
+  // onNewBoard opens the New board dialog. Unlike New sprint it needs no
+  // board already picked either, since a profile can start with none.
+  onNewBoard: () => void;
+  // onAddIssues opens the Add issues picker. Gated on a board being on
+  // screen: there is nowhere local for the add to name without one.
+  onAddIssues: () => void;
   // filter narrows the cards drawn, by key, assignee, or issue type.
   filter: string;
   onFilter: (v: string) => void;
@@ -37,7 +43,7 @@ interface Props {
 // Commit has not created yet. Jira sends the state lowercase, so it is
 // capitalised here for display only.
 export function sprintOption(s: Sprint): string {
-  if (s.draft) return `${s.name} (draft)`;
+  if (s.draft) return draftLabel(s.name, true);
   return `${s.name} (${s.state.charAt(0).toUpperCase()}${s.state.slice(1)})`;
 }
 
@@ -47,7 +53,7 @@ export function sprintOption(s: Sprint): string {
 // for a board name and absurd for three swimlane options.
 export function BoardsToolbar({
   boards, board, onBoard, sprints, sprint, onSprint, swimlane, onSwimlane,
-  refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete, onCreate,
+  refreshing, canRefresh, onRefresh, filter, onFilter, onStart, onComplete, onCreate, onNewBoard, onAddIssues,
 }: Props) {
   // A ceremony belongs to the sprint on screen: the one that has not begun
   // can be started, the one that is running can be completed, and a closed
@@ -64,7 +70,7 @@ export function BoardsToolbar({
           onChange={(e) => onBoard(Number(e.target.value))}
         >
           {boards.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
+            <option key={b.id} value={b.id}>{draftLabel(b.name, !!b.draft)}</option>
           ))}
         </select>
       </label>
@@ -113,19 +119,15 @@ export function BoardsToolbar({
 
       <div className="board-head-actions">
         {refreshing && <span className="muted small">Refreshing</span>}
+        <button type="button" className="btn" onClick={onNewBoard}>New board</button>
+        {board && (
+          <button type="button" className="btn" onClick={onAddIssues}>Add issues</button>
+        )}
         {board?.type === "scrum" && (
           <button type="button" className="btn" onClick={onCreate}>New sprint</button>
         )}
         {canStart && (
-          <button
-            type="button"
-            className="btn"
-            onClick={onStart}
-            disabled={!!sprint?.draft}
-            title={sprint?.draft ? DRAFT_SPRINT_HINT : undefined}
-          >
-            Start sprint
-          </button>
+          <button type="button" className="btn" onClick={onStart}>Start sprint</button>
         )}
         {canComplete && (
           <button type="button" className="btn" onClick={onComplete}>Complete sprint</button>

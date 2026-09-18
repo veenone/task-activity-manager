@@ -1,7 +1,7 @@
 import type { SprintOption } from "../api";
 
 // DRAFT_SPRINT_HINT is the tooltip on every action a draft sprint cannot
-// take yet: Start and Complete need a sprint Jira holds.
+// take yet: Complete needs a sprint Jira holds.
 export const DRAFT_SPRINT_HINT = "Commit this sprint first";
 
 // duplicateNameIds is which sprint ids share a name with another sprint in
@@ -31,11 +31,19 @@ export function duplicateNameIds(sprints: SprintOption[]): Set<number> {
   return dups;
 }
 
+// draftLabel appends "(draft)" to a name for anything TAM created locally
+// and Commit has not pushed to Jira yet: a sprint drafted on a board, or a
+// board drafted in the profile. Shared so a second picker never re-spells
+// the same suffix.
+export function draftLabel(name: string, draft: boolean): string {
+  return draft ? `${name} (draft)` : name;
+}
+
 // sprintOptionLabel is the text an option shows: the sprint's own name,
 // with its board name beside it only when another sprint in the same list
 // answers to the same name, and "(draft)" after a sprint Commit has not
 // created yet.
 export function sprintOptionLabel(s: SprintOption, dupIds: Set<number>): string {
   const base = dupIds.has(s.id) && s.boardName ? `${s.name} (${s.boardName})` : s.name;
-  return s.draft ? `${base} (draft)` : base;
+  return draftLabel(base, !!s.draft);
 }

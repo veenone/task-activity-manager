@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -405,6 +406,9 @@ func (r *Repository) PendingMoves(ctx context.Context, q dbtx.Querier, profileID
 			// neighbour and the side alone.
 			out[i].RankNeighbour, out[i].RankBefore, _ = ParseRank(value)
 			out[i].HasRank = true
+		case EntityIssueBoard:
+			boardID, _ := strconv.Atoi(MoveID(value))
+			out[i].BoardID, out[i].BoardScope = boardID, MoveRawName(value)
 		}
 	}
 	return out, rows.Err()

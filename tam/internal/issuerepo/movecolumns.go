@@ -45,6 +45,11 @@ func applyMoveColumns(ctx context.Context, q execer, profileID, key, entityType,
 	case EntityRank:
 		// Decision 4: a rank stays out of the cache.
 		return nil
+	case EntityIssueBoard:
+		// An issue can sit on more than one board, so there is no single
+		// column here for "on board X" the way status and sprint have one:
+		// the board read draws a pending add straight from PendingMoves.
+		return nil
 	}
 	return fmt.Errorf("%q is not a board move", entityType)
 }

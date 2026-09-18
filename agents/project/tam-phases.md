@@ -752,7 +752,7 @@ back to key, so whole batch fail together and smaller batch limit how much
 of completion one refusal can take down.
 
 Completion that reached Jira then failed reported inside `sprints.Completion`
-(`Moved`, `MovedTo`, `Failed`, `Note`, `Message`) not as Go error, because
+(`Moved`, `MovedTo`, `Note`, `Message`) not as Go error, because
 Wails discard bound method return value whenever method also return non-nil
 error: dispatcher fill in either result or error, never both. Error would
 therefore deliver sentence and drop counts and keys it is about, which is
@@ -889,26 +889,15 @@ since condition that would hide it read cache that profile has not filled
 yet. Project with no scrum board see empty state that say so and point at
 Boards view instead.
 
-**Edit and delete of sprint Jira hold reach Jira immediately; create does
-not any more.** Reason for immediate edit + delete = cost not principle: TAM
-journal is issue machinery (pending change keyed by issue key, conflict by
-`updated` stamp), and sprint have no cached version to rebase edit on and no
-conflict card. Create was same exception until bundle 01 paid its cost: plan
-starting with new sprint could not be drafted offline. Now sprint create =
-`sprint_create` journal row + draft row in `sprint` under negative id, and
-Commit phase 1 create it. Full argument for edit + delete still on
-`UpdateSprint` in `core/jira/sprintwrite.go`.
-
-Fence structural rather than sentence in spec, because previous version of
-this rule lived in one sentence in boards design and lasted one phase.
-`internal/sprints/exceptions_test.go` assert, by name, that `sprints.Service`
-exported method set is exactly `Complete`, `Delete`, `Edit`, `Start`;
-growing it mean editing failing test whose message say what list is
-for. Fence deliberately service's own methods and not `lifecycle` interface
-ceremony use internally: that interface also carry `BoardSprints`, a read,
-and `MoveIssuesToSprint`, whose other caller (multi-select move) journal it
-like every other membership change, so asserting `lifecycle` as
-immediate-write list would have been false day it was written. Membership
+**Every sprint write is journaled now.** Phase 3c made create, edit, delete,
+start and complete reach Jira at once, for cost reasons: TAM journal was
+issue machinery (pending change keyed by issue key, conflict by `updated`
+stamp), and sprint have no cached version to rebase edit on and no conflict
+card. Bundle 01 journaled create (`sprint_create` + draft row under negative
+id), bundle 04 Task 7 edit and delete, Task 8 start and complete (see Sprint
+writes, journaled). The fence test that named the writes reaching Jira at
+once went with the last two: an empty
+list is the point, and a fence guarding nothing is worse than none. Membership
 stay journaled everywhere in this view exactly as on board: detail panel
 Sprint field and tree's own multi-select move both go through same journaled
 `MoveManyToSprint` path board selection use, with same conflict story and
@@ -1195,16 +1184,119 @@ id; completion cannot move cards into draft. Edit + delete of draft local
 (`EditDraftSprint` rename everywhere through `rewriteSprintID`;
 `DiscardDraftSprint` = discard of `sprint_create` row: revert every move into
 it, clear it off draft issues, drop row). Bindings keep `"sprint"` lock,
-frontend keep `runQuietLock`. Rituals skip drafts. `RemoveBoards` unchanged:
+frontend keep `runQuietLock`. Edit + delete of a real sprint are journaled
+too; see Sprint writes, journaled. Rituals skip drafts. `RemoveBoards` unchanged:
 draft on board that leave cache go with it, journal row stay in Pending
 changes.
 
+## Sprint writes, journaled
+
+Bundle 04 Task 7. Edit and delete of a sprint Jira holds (positive id) used to
+reach Jira at once through `sprints.Service`. Now journal rows, pushed on
+Commit, and both bindings work offline.
+
+- **Entities** (`issuerepo/sprintwrites.go`): `sprint_edit` and
+  `sprint_delete`, key = sprint id text, one fixed field each (`edit`,
+  `delete`), so a second edit replaces the first and keeps its before value.
+  `sprint_edit` after_val = `SprintEdit{boardId, name, goal, startDate,
+  endDate, clearGoal}`, before_val = cached `{name, goal, startDate,
+  endDate}`. `sprint_delete` after_val = `{boardId, name}`, before_val = name.
+- **Local effect.** `JournalSprintEdit` updates the cached `sprint` row on
+  every board holding it and renames the cards (`rewriteSprintID`), in the
+  same transaction. Goal follows Jira's partial update: cleared with
+  `clearGoal`, kept when the new goal is empty, else replaced. A later edit
+  with an empty goal keeps an earlier `clearGoal`, because the dialog reopens
+  on the cleared goal and cannot ask again. `JournalSprintDelete` changes
+  nothing locally: Jira holds the sprint until Commit.
+- **Local refusals** (nothing journaled): edit of a closed sprint, of one the
+  cache does not hold, or of one with a pending delete; delete of anything
+  but a cached future sprint, or while cards in it have pending changes
+  (`sprints.Service.CheckDelete`, which the push runs too).
+- **Delete supersedes edit.** A pending edit of the sprint is reverted and
+  dropped (through `discardOne`) in the delete's transaction, so the delete
+  row names the sprint as Jira has it.
+- **Discard.** `discardOne` has a case for each: an edit restores the row and
+  card names from before_val, a delete just drops its row.
+- **Push.** Commit's `sprint changes` phase (its own phase after
+  `sprints`, so it reads the ids the creates rewrote) runs
+  `pushSprintWrites`: edits, then starts, then completions, then deletes,
+  oldest first within a kind (`sprintWriteOrder`), through `Engine.Sprints`
+  (`committer.SprintWriter`), which `app_writes.go` wires to
+  `sprints.ForCommit(a.sprintService(p, b))`. Every write to Jira in
+  `internal/sprints` hangs off `sprints.Committed`; `Service` exports none.
+  The push keeps the guards (`requireEditable`, `requireDeletable`,
+  `CheckDelete`, `CheckComplete`, `requireCompletable`), the audit
+  row and the cache work. A guard refusal wraps `sprints.ErrRefused` and
+  becomes a non-retryable `Failure` naming the row; any other error is
+  retryable; both keep the row. A nil seam fails each row with "this
+  connection cannot manage sprints". A pushed write is listed in
+  `Result.SprintsChanged` ("Sprint 12 edited"); a note is logged.
+- **Frontend.** `groupPending` keys groups by kind and key (`sprint:12`,
+  `board:-1`), so a draft sprint and a draft board with the same negative id
+  get separate cards; `PendingGroup.id` is that identity, `key` the entity
+  key. Pending changes reads an edit as "Edit sprint <name>: <what changed>"
+  and a delete as "Delete sprint <name>", each with Discard; a draft board
+  as "New board <name>". The Sprints view marks a sprint with a pending
+  delete "Deleting on Commit". Known edge: a boards refresh replaces the
+  edited sprint row with Jira's until Commit (TODOS.md).
+
+Bundle 04 Task 8 did the same for start and complete, the last two writes
+that reached Jira at once.
+
+- **Entities** (`issuerepo/sprintceremonies.go`): `sprint_start` (field
+  `start`, after_val `SprintStart{boardId, name, goal, startDate,
+  endDate}`, dates already in Agile format) and `sprint_complete` (field
+  `complete`, after_val `SprintComplete{boardId, name, moveTo, moveToName}`,
+  `moveTo` empty for the backlog). No before_val. Neither
+  changes the cache until Commit; the Sprints view shows "Starting on
+  Commit" / "Completing on Commit" through the chip the delete uses
+  (`sprintWaiting` in `queries/pending.ts`).
+- **Local refusals.** `JournalSprintStart`: a real sprint unless cached
+  `future`, or while its delete waits. `CompleteSprint` (the binding) runs
+  `sprints.Service.CheckComplete`, the check the push runs too: a draft, a
+  cached `future` sprint, a draft or self destination, pending changes on
+  cards staying in it;
+  `JournalSprintComplete` then refuses a sprint the cache does not hold and
+  one whose delete waits. `JournalSprintDelete` now also refuses while a
+  start or a completion waits (`refuseQueued`).
+- **Draft sprints can be started.** `sprint_start` on a negative id takes
+  the draft's own board, which is always real. `RekeySprint` moves the row
+  to the real id (`rekeySprintStart`); `discardDraftSprint` drops it. In the push, a
+  start still keyed negative is held (`deps.blockedBy` / `hold`) when its
+  create was blocked, and fails for good when the create row is gone.
+  Start is offered on a draft in the Sprints menu and the Boards toolbar;
+  Complete stays held back.
+- **Complete recomputes.** The row stores intent only. At push `Committed.Complete` reads the sprint from
+  Jira, moves what is unfinished by the board's last column, closes it, and
+  `SprintsChanged` reports the real count ("Sprint 12 completed, 45
+  unfinished cards moved to Sprint 13"). A completion that moved cards and
+  stopped (a failed chunk, a refused close) comes back with a `Message`
+  naming the moved keys; the committer turns that into a retryable failure
+  and keeps the row. A retry moves whatever is still unfinished and closes;
+  a sprint the refreshed cache holds as `closed` is treated as done and
+  moves nothing.
+- **Bindings.** `StartSprint` and `CompleteSprint(profileID, boardID,
+  sprintID, moveTo)` return only an error (as do `EditSprint` and
+  `DeleteSprint`), need no backend, and take
+  the `"sprint"` lock; the frontend calls both through `runQuietLock`
+  (`runSprintCeremony` and `ImmediateWriteChip` are gone).
+- **Dialogs.** Start says "Saved locally. Commit starts the sprint in
+  Jira." Complete lists the cached unfinished cards and says "About N cards
+  are not finished. The exact set is worked out again on Commit, and the
+  Commit result reports how many moved."; it never promises an exact count.
+- **Release note.** Starting and completing a sprint now wait for Commit,
+  like every other change in TAM. The sprint stays future or active on
+  screen, marked Starting or Completing on Commit, until you commit; a
+  completion moves the cards that are unfinished when Commit runs, which
+  can differ from the number the dialog showed, and the Commit result says
+  how many moved.
+
 ## Phased Commit
 
-`committer.Commit` = `phases()` in order: sprints, epics, issues (task,
-story, bug, requirement), sub-tasks, edits, board moves, links; journal
-re-read (`commitRun.reload`) after each, so next phase see ids last one
-rewrote. Inside create phase, drafts by `draftOrdinal` (n of TAM-NEW-n),
+`committer.Commit` = `phases()` in order: boards, board adds, sprints, sprint changes, epics, issues
+(task, story, bug, requirement), sub-tasks, edits, board moves, links;
+journal re-read (`commitRun.reload`) after each, so next phase see ids last
+one rewrote. Inside create phase, drafts by `draftOrdinal` (n of TAM-NEW-n),
 never string order (`TAM-NEW-10` used to go before `TAM-NEW-2`). Phase 1
 `CreateSprint` then `RekeySprint`: draft row real, `rewriteSprintID` across
 issue columns, both halves of `issue_sprint` rows, draft JSON; create row
@@ -1222,9 +1314,119 @@ neighbour), never free text: `TAM-NEW-` string, or negative whole number under
 key naming sprint, fail that one write with internal error, never 400 from
 Jira. New phase must pass references only, not whole payload. Pending changes dialog show draft sprint
 as own card first, held rows with Waiting chip + reason; banner count
-"n waiting". Later bundle add commit step = one entry in `phases()`.
-Demo: epic whose summary contain "refused" refused once per run; demo refuse
-placeholder parent.
+"n waiting". The boards and board adds phases, first in `phases()`, are that later addition;
+see Draft boards below. Demo: epic whose summary contain "refused" refused
+once per run; demo refuse placeholder parent.
+
+## Draft boards
+
+A board created in TAM is a draft, the same local-first shape as a draft
+sprint (Draft sprints, above). `issuerepo.CreateDraftBoard` writes, in one
+transaction, a `board` row under a negative id with `draft = 1` (schema
+version 15 adds the column, both to `baseDDL` and as a migration) and a
+`board_create` journal row (`EntityBoardCreate = "board_create"`) whose
+`after_val` is `DraftBoard{Name, Type, FilterName, JQL}` as JSON. The id
+comes from `nextDraftID`, one below the lowest of a stored
+`draft_board_seq` setting and any negative id already in the table, so a
+discarded or committed draft's id is never handed to a new one; draft
+sprints use the same function over their own table and setting. `assertNoPlaceholders` (the
+firewall that used to check only for a stray `sprintId`) now trips on a
+negative `boardId` too, string or number, under its renamed `negRef`
+parameter, so a board id that skipped a rekey fails loud, inside TAM, rather
+than reaching Jira as a nonsense number.
+
+This buys what every journaled create in TAM buys: a board can be made with
+no connection at all, it shows in Pending changes like any other pending
+write, and nothing about it has reached Jira until Commit runs. It costs an
+extra id to rekey: the negative id stands in for a board that does not exist
+yet, and everything that named it while it was still a draft (its own
+columns and membership once synced, any card queued onto it, any rank
+dropped on it) has to be rewritten the moment Jira hands back the real one.
+
+`RekeyBoard(profileID, draftID, realID)` is that rewrite, run inside the
+phase that creates the board (below), in one transaction: it clears any
+stale row Jira's id might already hold in `board` (a boards refresh between
+the create and the rekey could have cached one), moves the draft row onto
+the real id and turns off its `draft` flag, then repoints every table keyed
+by `board_id`: `board_column`, `board_issue`, `sprint`. It also repoints two
+things that are not tables, both through `repointRows`: an `issue_rank`
+journal row whose packed value names the draft board, and every
+`issue_board` journal row queued onto it.
+
+That last one is worth being exact about, because it was the fix-round-1
+defect that broke the bundle's own headline flow. `AddToBoard`
+(`boardwrites.go`) does not give a board add a fixed field the way a
+transition or a sprint move gets one; it packs the board id into the field
+itself, `BoardField(boardID) = "boardId:" + boardID`. An issue can be
+queued onto more than one board at once, unlike a status or a sprint move,
+which each have exactly one pending destination, and the journal is unique
+on `(profile_id, entity_type, entity_key, field)`: a fixed field would have
+let a second board's add silently collapse onto the first board's row
+instead of sitting beside it. So `RekeyBoard` has to rewrite the row's
+field, not just a value inside it, a different operation from every other
+rekey in this codebase, and was what `RekeyBoard`'s first version missed;
+its repoint rewrites both the field (`BoardField`) and the value's id half, leaving the scope half (backlog or a sprint id) exactly as queued.
+
+**Phase order.** The `boards` phase runs first in `phases()`, then `board
+adds`, because a card queued onto a board names the board by id before
+Commit ever runs, and cannot be sent while that id is still a negative
+placeholder. `createBoards` creates and rekeys every drafted board; the
+journal re-read between the two phases hands `pushBoardAdds` the rows
+`RekeyBoard` already rewrote, so an add queued onto a board created in the
+same Commit is pushed with the real id. A sprint is never drafted onto a
+draft board: `CreateDraftSprint` refuses `BoardID <= 0`.
+
+A board create Jira refuses (or a connection that cannot create boards, or a
+create Jira accepts but answers with no id, or a rekey that fails locally
+after Jira already made the board) blocks the draft's negative id
+(`r.deps.block`) rather than sending anything with a placeholder in it, so
+an add queued onto it is held with a reason naming the board. The
+`board_create` row survives the Commit, and since nothing about the failed
+attempt left a second row or a stray Jira board, the next Commit creates the
+board exactly once.
+
+**The filter check after Commit.** Once `pushBoardAdds` lands a board's
+queued issues (backlog scope batched through
+`BoardCreator.AddToBoardBacklog`, sprint scope through the same
+`MoveIssuesToSprint` a board move already uses, since putting a card on a
+sprint already puts it on that sprint's board), their journal rows are
+removed regardless of what happens next: Jira accepted the write, so
+retrying it would only repeat it. `checkBoardFilters` is a courtesy read
+after that, once per board that received at least one add this Commit:
+which of the pushed keys the board's own filter actually kept. A key it
+dropped becomes a non-retryable result line (`"PLAT-1 is outside board 1's
+filter, so it will not show on that board."`), naming the board by id (the
+committer owns no board-name lookup). A backend that cannot answer the check, or a read that fails,
+changes nothing about the Commit: it is a read after a write that already
+landed, logged and otherwise ignored, never a reason to fail it.
+
+**The drawing change, as a release note.** Boards used to draw every draft,
+on every board, all the time: `composeBoard` appended `DraftIssues`
+unfiltered. That was never true, a draft belongs to no board in Jira, and
+this bundle stops doing it. A non-subtask draft, or a real issue reached
+only through local state (a pending board add), now draws on a board only
+when one of four ties holds: a pending `issue_board` add naming this exact
+board, a pending sprint move whose target is one of this board's own
+sprints, a `SprintID` the card already carries that is one of this board's
+own real sprints, or one that is one of this board's own draft sprints.
+With none of the four, nothing is drawn. Users who currently see a draft
+sitting on every board they open will notice it disappear from boards it
+has no actual tie to; that is the fix, not a regression, but it will look
+like one at a glance.
+
+**Known edges.**
+
+- The add-issues search caps at 25 results with no pager. A large backlog
+  may need a narrower search text to surface the issue meant.
+- The "not already on this board" exclusion it filters against is itself
+  capped by the board read's shared per-view card limit; on a very large
+  board an issue past that cap is not known as a member and could be
+  offered again.
+- `withMovedIn`'s board-add branch, shared with the Sprints view's own read
+  (`sprintlist.go`), now also surfaces a pending board add in that view's
+  matching sprint node. This is additive and untested there; the Sprints
+  view's own test suite passed unchanged because none of its fixtures set a
+  board add.
 
 ## The grids' columns
 
@@ -1585,7 +1787,8 @@ entered. Kiwi profile file refused.
     app_boards.go        the board methods: list boards, list sprints, get a board's view, sync
                           boards, the three journaled board moves, CanTransition, and
                           JournalSprintMoves, the selection's bulk move, with its guarded lookup
-                          of the destination's name
+                          of the destination's name, plus CreateDraftBoard and AddIssuesToBoard,
+                          the two local board writes
     app_sprints.go       the two sprint ceremonies, SuggestSprintDates, and PendingInSprint
     app_sprintmanage.go  Create (a draft), Edit and Delete sprint (local for a draft), and
                           ListBoardSprintDetails for the Sprints view's tree, all under the
@@ -1596,18 +1799,24 @@ entered. Kiwi profile file refused.
     app_rituals.go       the ritual bindings: ensure, list, save, resolve, forget, delete, macro
                           preview, standup entry, last sync, Sync, CreateRitualRoot; all but Sync and
                           CreateRitualRoot under no lock, those two under the "rituals" lock name
-    internal/tamstore/   TAM's own SQLite file (schema version 14: issue (with status_id and,
+    internal/tamstore/   TAM's own SQLite file (schema version 15: issue (with status_id and,
                           added at version 14, assignee_name, whose migration clears every
                           profile's sync watermark the way version 5's did), issue_link,
-                          sync_state, profile_setting, jira_user, board, board_column, board_issue,
-                          sprint (with goal, added at version 7, and complete_date, added at
-                          version 8, and draft, added at version 13), sprint_report (a sprint's
-                          saved report, added at version 8), ritual_document (added at version 9,
-                          with base_body, conflict_body and conflict_version added at version 12),
-                          plus the shared journal tables pending_change and audit_log)
-    internal/backend/    IssueBackend and BoardBackend seams and DTOs; backend/jira on core/jira,
-                          backend/demo on internal/demo; core/jira/createmeta.go is the createmeta
-                          reader and value shaper backend/jira builds the create dialog's fields from
+                          sync_state, profile_setting, jira_user, board (with draft, added at
+                          version 15), board_column, board_issue, sprint (with goal, added at
+                          version 7, and complete_date, added at version 8, and draft, added at
+                          version 13), sprint_report (a sprint's saved report, added at version 8),
+                          ritual_document (added at version 9, with base_body, conflict_body and
+                          conflict_version added at version 12), plus the shared journal tables
+                          pending_change and audit_log)
+    internal/backend/    IssueBackend and BoardBackend seams and DTOs, plus BoardCreator
+                          (CreateBoard, AddToBoardBacklog) and BoardFilterChecker
+                          (BoardFilterCheck), the optional seams a board create and its
+                          post-Commit filter check go through; backend/jira on core/jira,
+                          backend/demo on internal/demo (BoardCreator only, no BoardFilterChecker:
+                          demo boards have no real filter to check against); core/jira/createmeta.go
+                          is the createmeta reader and value shaper backend/jira builds the create
+                          dialog's fields from
     internal/demo/       the Acme Platform (PLAT) dataset behind a "demo" profile;
                           confluence.go is the in-memory Confluence space rituals sync against
                           on a demo profile, rebuilt from stored pages after a restart and
@@ -1617,27 +1826,35 @@ entered. Kiwi profile file refused.
                           settings, the pending-change journal, and drafts; tree.go groups the
                           cache into the Epics view's tree; boardwrites.go, movevalue.go,
                           movecolumns.go, and rebasemoves.go are the three board moves, their
-                          before_val/after_val packing, and what Override does to a held one;
+                          before_val/after_val packing, and what Override does to a held one, plus
+                          boardwrites.go's fourth write, AddToBoard, packed onto BoardField(boardID)
+                          rather than a fixed field so one issue can queue onto more than one board
+                          at once; boarddrafts.go is the draft board's own CreateDraftBoard and
+                          RekeyBoard, the board twin of sprintdrafts.go/rekeysprint.go below;
                           sprintdrafts.go is the draft sprint's create, edit, discard and
                           rewriteSprintID, and rekeysprint.go RekeySprint,
                           MarkSprintCreatedWithoutRekey and rewriteParentKey
     internal/boardrepo/  the store layer over board, board_column, board_issue, and sprint; view.go
                           composes the Boards view's data over the issue cache through IssueSource,
-                          both in one deferred read transaction (tx.go); cellorder.go is the board's
-                          final local order the commit pass ranks against, on the same kind of
-                          transaction; sprintlength.go is the median-of-three-closed-sprints read
-                          the start dialog's date suggestion is built from; sprintlist.go is the
-                          Sprints view's own read, one board's sprints with their issues and the
-                          computed unassigned node; deletesprint.go is DeleteSprintEverywhere, the
-                          two-repository delete's first transaction, across every board that holds
-                          a copy of the sprint
-    internal/sprints/    the sprint writes that reach Jira outside a Commit: Start and Complete,
-                          the ceremonies, and Edit and Delete of a sprint Jira holds;
-                          exceptions_test.go fences the package's exported method set to
-                          exactly those four; draft.go is DraftSprint, the check a drafted
-                          sprint gets, and errDraftSprint; guards.go is what a write refuses before it reaches
-                          Jira, cache.go the board cache's bookkeeping after it has, manage.go
-                          Edit and Delete themselves, and suggest.go the start and create
+                          both in one deferred read transaction (tx.go); pendingmoves.go's
+                          tiedToBoard is the three ties that let a draft, or a real issue reached
+                          only through a pending board add, draw on a board Jira never put it on;
+                          cellorder.go is the board's final local order the commit pass ranks
+                          against, on the same kind of transaction; sprintlength.go is the
+                          median-of-three-closed-sprints read the start dialog's date suggestion is
+                          built from; sprintlist.go is the Sprints view's own read, one board's
+                          sprints with their issues and the computed unassigned node; boardrepo.go's
+                          Board.Draft labels a drafted board the way a drafted sprint already is;
+                          deletesprint.go is DeleteSprintEverywhere, the two-repository delete's
+                          first transaction, across every board that holds a copy of the sprint
+    internal/sprints/    the push half of every journaled sprint write, for Commit alone:
+                          ForCommit's Committed carries Edit, Delete (manage.go), Start and
+                          Complete (sprints.go), and Service exports no write; draft.go is
+                          DraftSprint, the check a drafted sprint gets, and errDraftSprint;
+                          guards.go is what a push refuses before it reaches Jira, with
+                          CheckComplete and CheckDelete, which the app also runs before it
+                          journals, cache.go the board
+                          cache's bookkeeping after it has, and suggest.go the start and create
                           dialogs' suggested name and dates
     internal/sprintdate/ the one place a sprint date is parsed and written in Jira's Agile
                           datetime format, shared by the ceremonies, the suggestion, and every
@@ -1661,8 +1878,13 @@ entered. Kiwi profile file refused.
     internal/committer/  pushes the journal to Jira in phases and resolves conflicts; phases.go is
                           the phase list, the draft sprint and draft issue creates, and the edits;
                           held.go is what a refused create blocks and the rows held for it;
-                          firewall.go is assertNoPlaceholders; boards.go, ranks.go, and
-                          boardvalues.go are the board pass, after the edits and before the links
+                          firewall.go is assertNoPlaceholders, which trips on a negative sprint or
+                          board id alike (negRef); boards.go, ranks.go, and boardvalues.go are the
+                          board pass, after the edits and before the links; boardcreate.go is the
+                          boards and board adds phases, first in phases(): createBoards and
+                          RekeyBoard, then pushBoardAdds (backlog batched through AddToBoardBacklog, sprint scope
+                          through the same MoveIssuesToSprint the board pass already uses), and
+                          checkBoardFilters, the post-Commit filter courtesy read
     internal/importer/   maps import columns to draft fields and validates rows
     internal/syncer/     the paging engine; emits tam:sync-progress through app_issues.go; boards.go
                           is the boards pass, reached through backend.BoardBackend
@@ -1716,6 +1938,9 @@ entered. Kiwi profile file refused.
                           read out of a pasted page address
       src/lib/standupLog.ts  finds where today's dated Yesterday/Today/Blockers section belongs
                           in a Standup page's Daily log, and whether it is already there
+      src/lib/sprintOptions.ts  draftLabel(name, draft) is the "(draft)" suffix a sprint or board
+                          picker option carries; sprintOptionLabel, sprintOption, and the new
+                          boardOption all call it
       src/components/    BacklogView (a thin wrapper), IssueListView (the extracted toolbar, grid,
                           pager and detail panel both it and AssignedToMeView mount),
                           AssignedToMeView, IssueTable, IssueDetailPanel, EditableFields, ActivityTab,
@@ -1725,7 +1950,11 @@ entered. Kiwi profile file refused.
                           ProfilesModal,
                           ProfileForm, AboutModal, ImportIssuesModal, AddLinkForm, EpicsView,
                           EpicTree, EpicRow, BoardsView, BoardsToolbar, BoardBody, BoardGrid,
-                          BoardCard, BoardNotes, useBoardMoves (the three writes, the drag state,
+                          BoardCard, BoardNotes, NewBoardModal (the four-field draft board create,
+                          reached from BoardsToolbar beside New sprint), AddIssuesModal (the
+                          board's own issue picker: search over useIssues, membership exclusion
+                          over useBoardSprintDetails, destination one of the board's open sprints
+                          or its backlog), useBoardMoves (the three writes, the drag state,
                           the keyboard moves), useMovedCard, CardMoveMenu, BoardMoveBanner,
                           PendingMoveRow, CommitBanner, BoardCeremonies (the two sprint dialogs'
                           shared context), StartSprintModal, CompleteSprintModal,
