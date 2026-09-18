@@ -84,6 +84,13 @@ type IssueType struct {
 // custom field with the requested name.
 var ErrFieldNotFound = errors.New("jira: custom field not found")
 
+// ErrFieldAmbiguous is returned by CustomFieldID when the instance has more
+// than one custom field with the requested name. Data Center collects these:
+// a legacy "Story Points" beside the Agile one is the common pair. A name
+// that identifies two fields identifies neither, and picking one would put
+// every read and every write on a field nobody chose.
+var ErrFieldAmbiguous = errors.New("jira: more than one custom field has that name")
+
 // FieldName is the name the instance gives a field id, for turning an error
 // that names ids into one that names fields. It reads the same cached field
 // list CustomFieldID loads, so the first of the two to be called pays for
@@ -148,7 +155,9 @@ func (c *Client) IssueTypes(ctx context.Context, projectKey string) ([]IssueType
 
 // loadFields fetches the instance's field list once per client and keeps it
 // both ways round: custom field ids by lowercased name, and every field's
-// name by id. Names are kept for system fields too, because an error names
+// name by id. The name side holds every id that answers to a name, because
+// Data Center lets two custom fields share one; collapsing them here is how
+// the wrong "Story Points" would be picked and never questioned. Names are kept for system fields too, because an error names
 // whatever id it likes and "duedate" needs a name as much as a custom one.
 func (c *Client) loadFields(ctx context.Context) error {
 	c.fieldMu.Lock()
@@ -165,11 +174,12 @@ func (c *Client) loadFields(ctx context.Context) error {
 	if err := c.Get(ctx, "/rest/api/2/field", &fields); err != nil {
 		return err
 	}
-	ids := make(map[string]string, len(fields))
+	ids := make(map[string][]string, len(fields))
 	names := make(map[string]string, len(fields))
 	for _, f := range fields {
 		if f.Custom {
-			ids[strings.ToLower(strings.TrimSpace(f.Name))] = f.ID
+			key := strings.ToLower(strings.TrimSpace(f.Name))
+			ids[key] = append(ids[key], f.ID)
 		}
 		names[f.ID] = strings.TrimSpace(f.Name)
 	}
@@ -193,10 +203,13 @@ func (c *Client) CustomFieldID(ctx context.Context, name string) (string, error)
 		return "", err
 	}
 	c.fieldMu.Lock()
-	id, ok := c.fieldIDs[want]
+	found := c.fieldIDs[want]
 	c.fieldMu.Unlock()
-	if !ok {
+	switch len(found) {
+	case 0:
 		return "", fmt.Errorf("%w: %q", ErrFieldNotFound, name)
+	case 1:
+		return found[0], nil
 	}
-	return id, nil
+	return "", fmt.Errorf("%w: %q is %s", ErrFieldAmbiguous, name, strings.Join(found, " and "))
 }

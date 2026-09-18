@@ -40,7 +40,7 @@ type Client struct {
 	// fieldMu guards fieldIDs, the per-instance cache of custom field ids by
 	// lower-cased name, filled from one /rest/api/2/field fetch.
 	fieldMu      sync.Mutex
-	fieldIDs     map[string]string
+	fieldIDs     map[string][]string
 	fieldNames   map[string]string
 	fieldsLoaded bool
 }
