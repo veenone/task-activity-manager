@@ -447,12 +447,24 @@ describe("NewIssueModal", () => {
     expect(within(dialog).queryByText(/does not report which fields are on the create screen/)).not.toBeInTheDocument();
   });
 
+  // A read that fails showed a line promising Jira would validate the rest on
+  // Commit. It no longer will: a field nothing can confirm is left out of the
+  // create, so the dialog has to say what the failure actually costs. The
+  // reason travels with it, since a 403 and a 404 are different problems and
+  // only the user can see which their instance gave.
   it("degrades to the minimal form when create-meta cannot be read", async () => {
     const user = userEvent.setup();
     vi.mocked(api.GetCreateFields).mockRejectedValue(new Error("GET failed: 403"));
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
-    expect(await within(dialog).findByText(/Jira's required fields could not be read/)).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText(
+        "Jira's create fields could not be read (GET failed: 403). TAM cannot offer the extra fields this issue type has, so a create will carry only the fields above.",
+      ),
+    ).toBeInTheDocument();
+    // The other unknown-screen line is a different state and must not show
+    // here: that one says TAM read the screen and could not trust it.
+    expect(within(dialog).queryByText(/does not report which fields are on the create screen/)).not.toBeInTheDocument();
     // A failed read still lets the user draft: that is the intended degrade,
     // unlike a read still in flight.
     await user.type(within(dialog).getByLabelText("Summary *"), "Still works");

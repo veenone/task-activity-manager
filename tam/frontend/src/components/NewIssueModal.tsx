@@ -474,9 +474,14 @@ export function NewIssueModal({
         {(meta.isError || checking || specs.length > 0 || screenUnknown) && (
           <div className="meta-fields">
             {meta.isError ? (
+              /* Not "Jira validates the rest on Commit" any more: a field
+                 nothing can confirm is on the create screen is left out of
+                 the payload, so a failed read costs the extra fields
+                 outright. The reason comes along because a 403 and a 404
+                 are different problems and only the user can see which. */
               <p className="muted small">
-                Jira&apos;s required fields could not be read ({meta.error.message}). The form stays minimal; Jira
-                validates the rest on Commit.
+                Jira&apos;s create fields could not be read ({meta.error.message}). TAM cannot offer the extra fields
+                this issue type has, so a create will carry only the fields above.
               </p>
             ) : checking ? (
               <p className="muted small" role="status">Checking which fields Jira requires.</p>
