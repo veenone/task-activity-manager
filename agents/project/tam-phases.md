@@ -1170,6 +1170,30 @@ fields are on the create screen, so only required ones are offered.").
 Required still offered and sent: leaving one out only move failure to Jira
 400. Per-type path unchanged, and must not narrow.
 
+**An unreadable answer is not a licence to send.** `metaErr != nil` used to
+skip both source checks, so every extra went as text and Jira refused the
+whole create; that was the path a real instance hit. Now nothing confirmed =
+not sent. A draft's own `screenFields` do not override it: they record a
+screen read from an earlier session, and a create refused today is exactly
+where that reading went stale. Create still go through: one unconfirmable
+field is not reason to refuse an issue. What it leave out come back from
+`CreateIssue` as second result, named for a person, ride `committer.Created.LeftOut`,
+and `CommitBanner` say which field the issue was created without. Dialog say
+the matching thing when read fail ("Jira's create fields could not be read
+(reason). TAM cannot offer the extra fields this issue type has, so a create
+will carry only the fields above."), which is different state from unknown
+screen line and stay apart from it.
+
+**Field error get named.** `core/jira` `writeStatusError` return `*WriteError`
+carrying `Messages` and `Fields` (Jira's errors map, by field id) beside the
+flattened `Message`; `Client.FieldName` answer id to name off the same cached
+`/rest/api/2/field` list `CustomFieldID` load. `backend/jira`
+`humanizeFieldError` (create and edit) rewrite a refusal that name field into
+one that name them, drop the REST prefix (this string is what commit failure
+line show verbatim), name every field in the map, keep `errorMessages` as
+they are, leave a fieldless error alone, and fall back to the bare id rather
+than invent a name. Create add one sentence saying why TAM sent the field.
+
 That = fix for `customfield_10253 ... not on the appropriate screen`.
 `parent: data was not an object` was the duplicate Parent input, fixed in
 1cbc847 by `baseFieldIDs` carrying `parent`; note Jira key its `errors` map
