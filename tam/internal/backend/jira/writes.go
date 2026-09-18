@@ -28,9 +28,27 @@ func (b *Backend) GetIssue(ctx context.Context, key string) (backend.Issue, erro
 
 // jiraFields turns the journal's text values into Jira's field shapes. An
 // empty priority, assignee, or points clears the field with null.
-func jiraFields(fields map[string]string, ids fieldIDs, pointsID string) (map[string]any, error) {
+//
+// screen is the set of TAM's names the issue's edit screen carries, and nil
+// when Jira could not be asked. A field the screen does not carry is refused
+// here, in words, rather than sent: Jira answers such a write with "Field
+// cannot be set. It is not on the appropriate screen, or unknown", which
+// names an id and leaves the user to guess why TAM sent it at all. The fields
+// are walked in name order so two refusals always read the same way.
+func jiraFields(fields map[string]string, ids fieldIDs, pointsID string, screen map[string]bool) (map[string]any, error) {
+	names := make([]string, 0, len(fields))
+	for name := range fields {
+		names = append(names, name)
+	}
+	sort.Strings(names)
 	out := map[string]any{}
-	for name, v := range fields {
+	for _, name := range names {
+		v := fields[name]
+		if label := editFieldLabels[name]; label != "" && screen != nil && !screen[name] {
+			return nil, fmt.Errorf(
+				"%s is not on the edit screen of this issue in Jira, so TAM will not send it. A Jira administrator has to put the field on that screen; until then the change stays here until you discard it.",
+				label)
+		}
 		switch name {
 		case "summary":
 			out["summary"] = v
@@ -88,7 +106,10 @@ func (b *Backend) UpdateIssue(ctx context.Context, key string, fields map[string
 			return err
 		}
 	}
-	jf, err := jiraFields(fields, ids, pointsID)
+	// Read now rather than trusting what the panel drew: the panel's answer
+	// is a cache, and a screen that changed between that read and this
+	// Commit is exactly the case this guard is here for.
+	jf, err := jiraFields(fields, ids, pointsID, b.editScreen(ctx, key))
 	if err != nil {
 		return err
 	}
