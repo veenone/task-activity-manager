@@ -1144,22 +1144,40 @@ Create fields come from `core/jira/createmeta.go` `CreateMeta`: per-type
 endpoint `GET /rest/api/2/issue/createmeta/{project}/issuetypes/{typeId}`,
 paged, classic expand call only on 404 (or when type has no id in project
 list). Field absent from per-type answer = not on screen. `CreateFields`
-return required and optional, never base field (`isBaseField`: summary,
-description, priority, labels, assignee, reporter, parent, project,
-issuetype, discovered Story Points / Epic Link / Epic Name / Sprint / Rank,
-and greenhopper custom types by suffix), never optional field no text form
-fill (`KindOther`). Value shape = `ShapeValue`: option id when Jira listed
-values, `{"value"}` when not, comma list to array (`{"id"}`, `{"value"}`,
-`{"name"}` by items), `{"name"}` for user, ISO day for date, midnight for
-datetime. Dialog show required at once, optional behind **More fields (n)**;
-`MetaField.tsx` `META_INPUTS` = per-type input table (bundle 06 replace
-`textarea` entry). Draft carry `screenFields`, ids dialog offered;
-`CreateIssue` `applyExtras` never let extra overwrite key already in payload
-or base field, drop extra outside `screenFields` (nil = legacy draft, no
-check), drop extra per-type metadata no longer list, log each drop. That =
-fix for `parent: data was not an object` (duplicate Parent input) and
-`customfield_10253 ... not on the appropriate screen` (classic answer
-listing off-screen field). Sub-task drafted from draft parent allowed:
+return `CreateFieldSet`: fields plus `ScreenKnown` (= answer came from
+per-type endpoint). Never base field (`isBaseField`: summary, description,
+priority, labels, assignee, reporter, parent, project, issuetype, discovered
+Story Points / Epic Link / Epic Name / Sprint / Rank, greenhopper custom
+types by suffix, and any field whose `schema.system` = `parent`), never
+optional field no text form fill (`KindOther`). Value shape = `ShapeValue`:
+option id when Jira listed values, `{"value"}` when not, comma list to array
+(`{"id"}`, `{"value"}`, `{"name"}` by items), `{"name"}` for user, ISO day
+for date, midnight for datetime. Dialog show required at once, optional
+behind **More fields (n)**; `MetaField.tsx` `META_INPUTS` = per-type input
+table (bundle 06 replace `textarea` entry). Draft carry `screenFields`, ids
+dialog offered; `CreateIssue` `applyExtras` never let extra overwrite key
+already in payload or base field, drop extra outside `screenFields` (nil =
+legacy draft, no check), drop extra per-type metadata no longer list, log
+each drop.
+
+**A classic answer is not the screen.** It list field the screen do not
+carry on some DC version, so `screenFields` built from one cannot catch
+anything: dialog build that list from the same answer. So when
+`Source == MetaClassic`, `CreateFields` offer only what Jira mark required
+and `applyExtras` send only those, logging each drop; **More fields** then
+short or empty, and dialog say so ("This Jira version does not report which
+fields are on the create screen, so only required ones are offered.").
+Required still offered and sent: leaving one out only move failure to Jira
+400. Per-type path unchanged, and must not narrow.
+
+That = fix for `customfield_10253 ... not on the appropriate screen`.
+`parent: data was not an object` was the duplicate Parent input, fixed in
+1cbc847 by `baseFieldIDs` carrying `parent`; note Jira key its `errors` map
+by **field id**, so a `parent:` key mean the payload key was literally
+`parent`, which no build since that commit can send. A parent reported under
+a custom id is a different failure, named by that id, and `applyExtras`
+filtering with `isBaseField` (not `isBaseFieldID`) is what stop it.
+Sub-task drafted from draft parent allowed:
 Commit create parent first. XTM stays on its own reader for now
 (`xtm/internal/jira.GetBugCreateFields`); moving it onto
 `core/jira/createmeta.go` is a separate change.
