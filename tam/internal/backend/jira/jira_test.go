@@ -56,24 +56,39 @@ type fakeJira struct {
 // Points nor the Epic Link among them, although Story Points reads fine on
 // the issue and exists in the instance's field list.
 const sixFieldScreen = `{"fields":{
+	"summary":{"required":true,"name":"Summary","operations":["set"],"schema":{"type":"string","system":"summary"}},
+	"priority":{"required":false,"name":"Priority","operations":["set"],"schema":{"type":"priority","system":"priority"}},
+	"reporter":{"required":true,"name":"Reporter","operations":["set"],"schema":{"type":"user","system":"reporter"}},
+	"description":{"required":false,"name":"Description","operations":["set"],"schema":{"type":"string","system":"description"}},
+	"labels":{"required":false,"name":"Labels","operations":["add","set","remove"],"schema":{"type":"array","items":"string","system":"labels"}},
+	"assignee":{"required":false,"name":"Assignee","operations":["set"],"schema":{"type":"user","system":"assignee"}}
+}}`
+
+// unsettableScreen lists every field TAM edits, but Story Points may only be
+// read and the Epic Link only added to and removed from. Neither takes the
+// set a TAM edit sends. Summary carries no operations array at all, the way
+// an older Data Center payload can: absent is not empty, and it stays
+// editable.
+const unsettableScreen = `{"fields":{
 	"summary":{"required":true,"name":"Summary","schema":{"type":"string","system":"summary"}},
-	"priority":{"required":false,"name":"Priority","schema":{"type":"priority","system":"priority"}},
-	"reporter":{"required":true,"name":"Reporter","schema":{"type":"user","system":"reporter"}},
-	"description":{"required":false,"name":"Description","schema":{"type":"string","system":"description"}},
-	"labels":{"required":false,"name":"Labels","schema":{"type":"array","items":"string","system":"labels"}},
-	"assignee":{"required":false,"name":"Assignee","schema":{"type":"user","system":"assignee"}}
+	"priority":{"required":false,"name":"Priority","operations":["set"],"schema":{"type":"priority","system":"priority"}},
+	"description":{"required":false,"name":"Description","operations":["set"],"schema":{"type":"string","system":"description"}},
+	"labels":{"required":false,"name":"Labels","operations":["add","set","remove"],"schema":{"type":"array","items":"string","system":"labels"}},
+	"assignee":{"required":false,"name":"Assignee","operations":["set"],"schema":{"type":"user","system":"assignee"}},
+	"customfield_10016":{"required":false,"name":"Story Points","operations":[],"schema":{"type":"number"}},
+	"customfield_10014":{"required":false,"name":"Epic Link","operations":["add","remove"],"schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}}
 }}`
 
 // fullScreen carries every field TAM edits, including the two custom ones
 // this fake's field list discovers.
 const fullScreen = `{"fields":{
-	"summary":{"required":true,"name":"Summary","schema":{"type":"string","system":"summary"}},
-	"priority":{"required":false,"name":"Priority","schema":{"type":"priority","system":"priority"}},
-	"description":{"required":false,"name":"Description","schema":{"type":"string","system":"description"}},
-	"labels":{"required":false,"name":"Labels","schema":{"type":"array","items":"string","system":"labels"}},
-	"assignee":{"required":false,"name":"Assignee","schema":{"type":"user","system":"assignee"}},
-	"customfield_10016":{"required":false,"name":"Story Points","schema":{"type":"number"}},
-	"customfield_10014":{"required":false,"name":"Epic Link","schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}}
+	"summary":{"required":true,"name":"Summary","operations":["set"],"schema":{"type":"string","system":"summary"}},
+	"priority":{"required":false,"name":"Priority","operations":["set"],"schema":{"type":"priority","system":"priority"}},
+	"description":{"required":false,"name":"Description","operations":["set"],"schema":{"type":"string","system":"description"}},
+	"labels":{"required":false,"name":"Labels","operations":["add","set","remove"],"schema":{"type":"array","items":"string","system":"labels"}},
+	"assignee":{"required":false,"name":"Assignee","operations":["set"],"schema":{"type":"user","system":"assignee"}},
+	"customfield_10016":{"required":false,"name":"Story Points","operations":["set"],"schema":{"type":"number"}},
+	"customfield_10014":{"required":false,"name":"Epic Link","operations":["set"],"schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}}
 }}`
 
 // comments answers /rest/api/2/issue/{key}/comment. Comment n has id n and

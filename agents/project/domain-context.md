@@ -53,6 +53,13 @@ commit hash behind it; the instruction gate checks the hash exists.
 - The edit screen and the create screen are separate configurations and a
   field can be on one and not the other, so neither answer stands in for the
   other.
+- Being on the screen is not the whole answer: each field carries an
+  `operations` array, and a field listing add and remove but not `set`
+  refuses the single value an edit sends. The instance behind #52 answers
+  `["set"]` for everything and `["add","set","remove"]` for labels, so it
+  does not hit this, but the array is the half of the payload that says what
+  a write may do. An absent array is not an empty one; some payloads omit it,
+  and that says nothing rather than no.
 - A screen that cannot be read is not an empty screen. Treating a failed
   editmeta read as "nothing is editable" would refuse every field on a 403;
   the write goes and Jira's own refusal decides (c294765).

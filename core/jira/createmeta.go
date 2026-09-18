@@ -71,13 +71,18 @@ func (o MetaOption) Label() string {
 	return o.Name
 }
 
-// MetaField is one field of a create screen. ID is fieldId on the per-type
-// answer and the map key on the classic one.
+// MetaField is one field of a create or edit screen. ID is fieldId on the
+// per-type answer and the map key on the classic and editmeta ones.
 //
-// Operations and HasDefaultValue are parsed but not read yet: the createmeta
-// probe (docs/superpowers/plans/assets/2026-09-15-createmeta-probe.md)
-// decides whether the screen check TAM builds on top of this reader uses
-// them.
+// Operations is what a write may do to the field: a field an edit screen
+// lists with add and remove but not set refuses the single value a TAM edit
+// sends, and the edit-screen reader drops it for that reason. An absent
+// array is not an empty one; some Data Center payloads omit it, and that
+// says nothing rather than no.
+//
+// HasDefaultValue is parsed but not read yet: the createmeta probe
+// (docs/superpowers/plans/assets/2026-09-15-createmeta-probe.md) decides
+// whether the create screen check uses it.
 type MetaField struct {
 	ID              string       `json:"fieldId"`
 	Name            string       `json:"name"`

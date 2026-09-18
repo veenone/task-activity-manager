@@ -35,6 +35,44 @@ func TestEditableFieldsNamesTheDiscoveredCustomFields(t *testing.T) {
 	}
 }
 
+// A field on the screen that Jira will not let a write set is not editable,
+// whatever else it says. The instance behind #52 does not do this today, but
+// editmeta is a server response and the operations array is the half of it
+// that says what a write may do (I1).
+func TestEditableFieldsSkipsAFieldThatTakesNoSet(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.editMeta = unsettableScreen
+	got, err := b.EditableFields(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("EditableFields: %v", err)
+	}
+	// Story Points takes no operation at all and the Epic Link takes add and
+	// remove but not set, so neither is editable. Summary carries no
+	// operations array at all, which is an older payload saying nothing
+	// rather than saying no, so it stays.
+	want := []string{"assignee", "description", "labels", "priority", "summary"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("editable = %v, want %v", got, want)
+	}
+}
+
+func TestUpdateIssueRefusesAFieldThatTakesNoSet(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.editMeta = unsettableScreen
+	err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"storyPoints": "8"})
+	if err == nil {
+		t.Fatal("a field Jira will not let a write set must be refused before the request")
+	}
+	if !strings.Contains(err.Error(), "Story points") {
+		t.Errorf("refusal = %q", err)
+	}
+	for _, w := range f.writes {
+		if strings.HasPrefix(w, "PUT ") {
+			t.Fatalf("nothing may be sent: %s", w)
+		}
+	}
+}
+
 func TestUpdateIssueRefusesAFieldTheEditScreenDoesNotCarry(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.editMeta = sixFieldScreen

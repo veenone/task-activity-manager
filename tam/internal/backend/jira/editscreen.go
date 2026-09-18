@@ -58,12 +58,36 @@ func editableNames(meta corejira.MetaFields, ids fieldIDs) []string {
 	}
 	out := []string{}
 	for _, f := range meta {
-		if name, ok := names[f.ID]; ok {
+		name, ok := names[f.ID]
+		if ok && settable(f) {
 			out = append(out, name)
 		}
 	}
 	sort.Strings(out)
 	return out
+}
+
+// settable says a write may set the field. Jira lists what each field on the
+// screen accepts, and a TAM edit always sets: it sends one value for the
+// whole field rather than adding to or removing from it. A field listing
+// only add and remove, or nothing at all, would refuse that write, so
+// offering it would be drawing an enabled control over a field Jira will not
+// take.
+//
+// No operations array at all is a different thing from an empty one. An
+// older Data Center payload can omit it, and reading silence as a refusal
+// would empty the form on those instances, so an absent array leaves the
+// field editable and Jira's own answer stays the backstop.
+func settable(f corejira.MetaField) bool {
+	if f.Operations == nil {
+		return true
+	}
+	for _, op := range f.Operations {
+		if op == "set" {
+			return true
+		}
+	}
+	return false
 }
 
 // editScreen is the set UpdateIssue guards a write with, nil when Jira could
