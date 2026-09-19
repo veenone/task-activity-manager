@@ -202,7 +202,10 @@ describe('instruction gate', () => {
     // M2: assert the gate actually read something.
     expect(scanned, 'grep gate scanned no files').toBeGreaterThan(0);
     expect(offenders, offenders.join(', ')).toEqual([]);
-  });
+    // Walks every Go file in three modules, so it outruns the default 5s when
+    // the whole workspace suite competes for the machine. Generous on purpose:
+    // a failure here means a real offender, not a busy machine.
+  }, 120_000);
 
   it('every profile-keyed table is swept by both purge lists', () => {
     const schema = read('tam/internal/tamstore/tamstore.go');
