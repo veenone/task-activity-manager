@@ -162,6 +162,12 @@ export function EditableFields({ profileId, issue, description, descriptionReady
   // about administrators is worth saying for. Per field it would repeat, and
   // the project this was found on leaves two of the seven off every screen.
   const anyOffScreen = EDITABLE_FIELDS.some((f) => offScreen(f.id));
+  // What a refused control points at: the line naming the field, and the one
+  // sentence saying who can change that. Painting them beside the control is
+  // not enough, because disabled takes it out of the tab order and a screen
+  // reader in focus mode then has no route to either.
+  const ADMIN_NOTE_ID = "edit-off-screen-note";
+  const reasonIDs = (field: EditableField) => `edit-${field}-off ${ADMIN_NOTE_ID}`;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -193,6 +199,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
       {EDITABLE_FIELDS.filter((f) => f.id !== "parentKey" || issue.type !== "epic").map((f) => {
         const off = offScreen(f.id);
         const shut = locked(f.id);
+        const describedBy = off ? reasonIDs(f.id) : undefined;
         return (
         <div key={f.id} className="edit-row">
           {f.id === "description" ? (
@@ -205,6 +212,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               <button
                 type="button"
                 className="btn btn-ghost edit-description-action"
+                aria-describedby={describedBy}
                 disabled={!descriptionReady || shut}
                 onClick={editing ? cancelEdit : () => setEditingKey(issue.key)}
               >
@@ -251,6 +259,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               value={values.assignee}
               fallbackLabel={issue.assignee}
               onChange={(v) => set("assignee", v)}
+              describedBy={describedBy}
               disabled={busy || shut}
             />
           ) : f.id === "priority" ? (
@@ -259,6 +268,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               id={`edit-${f.id}`}
               value={values.priority}
               onChange={(v) => set("priority", v)}
+              describedBy={describedBy}
               disabled={busy || shut}
               emptyLabel="(none)"
             />
@@ -275,6 +285,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
                 id={`edit-${f.id}`}
                 className="detail-input"
                 value={values.parentKey}
+                aria-describedby={describedBy}
                 disabled={shut}
                 onChange={(e) => set("parentKey", e.target.value)}
               >
@@ -291,12 +302,13 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               type="text"
               inputMode={f.id === "storyPoints" ? "decimal" : undefined}
               value={values[f.id]}
+              aria-describedby={describedBy}
               disabled={shut}
               onChange={(e) => set(f.id, e.target.value)}
             />
           )}
           {off && (
-            <p className="muted small">
+            <p className="muted small" id={`edit-${f.id}-off`}>
               {`${f.label} is not on this issue's edit screen in Jira.`}
             </p>
           )}
@@ -304,7 +316,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
         );
       })}
       {anyOffScreen && (
-        <p className="muted small">
+        <p className="muted small" id={ADMIN_NOTE_ID}>
           A Jira administrator has to add a field to the edit screen before TAM can change it here.
         </p>
       )}

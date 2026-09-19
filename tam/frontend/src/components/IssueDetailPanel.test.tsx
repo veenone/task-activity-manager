@@ -325,6 +325,35 @@ describe("IssueDetailPanel write path", () => {
     expect(screen.queryByText("Labels is not on this issue's edit screen in Jira.")).not.toBeInTheDocument();
   });
 
+  // The reason is the whole content of this feature, and painting it beside
+  // the control does not give it to anyone using a screen reader: disabled
+  // takes the control out of the tab order, so in focus mode there is no
+  // route to a paragraph that nothing points at (I3).
+  it("names the reason from the control it explains", async () => {
+    vi.mocked(api.GetEditableFields).mockResolvedValue(["summary", "description", "labels"]);
+    renderPanel();
+    const points = await screen.findByLabelText("Story points");
+    await waitFor(() => expect(points).toBeDisabled());
+
+    // Every control Jira will not take points at the line naming it and at
+    // the one sentence saying who can change that.
+    for (const [label, reason] of [
+      ["Story points", "Story points is not on this issue's edit screen in Jira."],
+      ["Epic", "Epic is not on this issue's edit screen in Jira."],
+      ["Assignee", "Assignee is not on this issue's edit screen in Jira."],
+      ["Priority", "Priority is not on this issue's edit screen in Jira."],
+    ] as const) {
+      const control = screen.getByLabelText(label);
+      const described = (control.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean);
+      expect(described.length, `${label} describes nothing`).toBeGreaterThan(0);
+      const text = described.map((id) => document.getElementById(id)?.textContent ?? "").join(" ");
+      expect(text).toContain(reason);
+      expect(text).toContain("A Jira administrator has to add a field to the edit screen");
+    }
+    // A field Jira does take explains nothing, so it points at nothing.
+    expect(screen.getByLabelText("Summary")).not.toHaveAttribute("aria-describedby");
+  });
+
   // The query cache is empty at every app start and the Go side asks Jira
   // before it reads its own store, so there is a real window where nothing is
   // known. Drawing an enabled control through it and disabling it a round
