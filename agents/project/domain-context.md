@@ -45,11 +45,11 @@ commit hash behind it; the instruction gate checks the hash exists.
   instance seen in the field answers six fields for every type of a project,
   story and sub-task alike: summary, priority, reporter, description, labels
   and assignee. Story Points is not among them, although it reads fine on the
-  issue and exists in the instance's field list (c294765). A field list is not
+  issue and exists in the instance's field list (a0672d1). A field list is not
   a screen.
 - The editmeta payload is the same `fields` map keyed by field id that the
   classic create-meta call returns, so `MetaField` and `MetaSchema` read both
-  (9c0f761).
+  (09ab90a).
 - The edit screen and the create screen are separate configurations and a
   field can be on one and not the other, so neither answer stands in for the
   other.
@@ -67,7 +67,7 @@ commit hash behind it; the instruction gate checks the hash exists.
   and that says nothing rather than no.
 - A screen that cannot be read is not an empty screen. Treating a failed
   editmeta read as "nothing is editable" would refuse every field on a 403;
-  the write goes and Jira's own refusal decides (c294765).
+  the write goes and Jira's own refusal decides (a0672d1).
 
 ## Modals
 
