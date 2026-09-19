@@ -3,6 +3,7 @@ package jira_test
 import (
 	"context"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -113,5 +114,59 @@ func TestUpdateIssueStillSendsWhenTheEditScreenCannotBeRead(t *testing.T) {
 	// Jira's own refusal stays the backstop.
 	if len(f.writes) != 1 || !strings.Contains(f.writes[0], `"customfield_10016":8`) {
 		t.Fatalf("writes = %v", f.writes)
+	}
+}
+
+// An id TAM could not work out is not a field Jira lacks, and reporting one
+// as the other is this branch's own thesis broken a layer down: the panel
+// would disable a control that is on the screen and blame an administrator
+// for it.
+func TestEditableFieldsKeepsAFieldWhoseIdIsAmbiguous(t *testing.T) {
+	// Two fields called Story Points identify neither, so discovery leaves
+	// the id empty. That says nothing about the screen.
+	b, f := newBackend(t, duplicatePointsFields)
+	f.editMeta = sixFieldScreen
+	got, err := b.EditableFields(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("EditableFields: %v", err)
+	}
+	if !slices.Contains(got, "storyPoints") {
+		t.Errorf("editable = %v, want storyPoints kept: TAM not knowing the id is not Jira saying the field is off the screen", got)
+	}
+}
+
+func TestEditableFieldsKeepsAFieldTheInstanceNeverNamed(t *testing.T) {
+	// twoFields has no Epic Link at all, so ids.EpicLink is empty and no id
+	// can be matched against the screen. The name stays, and the accurate
+	// refusal ("this Jira has no Epic Link field") is the one a push gives.
+	b, f := newBackend(t, twoFields)
+	f.editMeta = sixFieldScreen
+	got, err := b.EditableFields(context.Background(), "PLAT-412")
+	if err != nil {
+		t.Fatalf("EditableFields: %v", err)
+	}
+	if !slices.Contains(got, "parentKey") {
+		t.Errorf("editable = %v, want parentKey kept", got)
+	}
+	// And the push says the true thing rather than blaming the screen.
+	err = b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"parentKey": "PLAT-350"})
+	if err == nil || !strings.Contains(err.Error(), "no Epic Link field") {
+		t.Errorf("refusal = %v, want the instance's missing field named", err)
+	}
+}
+
+// A screen carrying none of TAM's own names is not an instruction to refuse
+// every field. Nothing downstream can tell that apart from an unread screen,
+// and the three surfaces reading it disagreed about which it was.
+func TestUpdateIssueTreatsAnEmptyScreenAsUnknown(t *testing.T) {
+	// Both custom ids resolve, so nothing is kept on the "TAM cannot tell"
+	// route above and the mapped answer really is empty.
+	b, f := newBackend(t, threeFields)
+	f.editMeta = `{"fields":{"reporter":{"required":true,"name":"Reporter","operations":["set"],"schema":{"type":"user","system":"reporter"}}}}`
+	if err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{"summary": "New title"}); err != nil {
+		t.Fatalf("UpdateIssue: %v", err)
+	}
+	if len(f.writes) != 1 || !strings.Contains(f.writes[0], `"summary":"New title"`) {
+		t.Fatalf("writes = %v, want the edit sent rather than refused wholesale", f.writes)
 	}
 }

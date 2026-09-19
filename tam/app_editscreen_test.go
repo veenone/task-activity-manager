@@ -132,3 +132,33 @@ func TestListUnpushableEditsNamesTheRowAndKeepsIt(t *testing.T) {
 	}
 	var _ journal.PendingChange = pending[0]
 }
+
+// An empty answer is one of the ways of not knowing, so it must not become
+// the cached truth: cached, UnpushableEdits would then read every pending
+// edit on that project and type as doomed.
+func TestGetEditableFieldsNeverCachesAnEmptyAnswer(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	seedStory(t, a, p.ID)
+	good := []string{"summary", "description", "priority", "labels", "assignee"}
+	b := &screenBackend{fields: good}
+	a.backends[p.ID] = b
+	if _, err := a.GetEditableFields(p.ID, "PLAT-412"); err != nil {
+		t.Fatalf("first read: %v", err)
+	}
+
+	// The instance now answers with nothing TAM edits. The good answer it
+	// gave a moment ago is the one that stands.
+	b.fields = []string{}
+	got, err := a.GetEditableFields(p.ID, "PLAT-412")
+	if err != nil {
+		t.Fatalf("second read: %v", err)
+	}
+	if !reflect.DeepEqual(got, good) {
+		t.Fatalf("fields = %v, want the cached answer rather than the empty one", got)
+	}
+	cached, ok, err := a.repo.EditScreen(a.ctx, p.ID, "PLAT", "story")
+	if err != nil || !ok || !reflect.DeepEqual(cached, good) {
+		t.Fatalf("cache = %v (ok %v), %v: an empty answer overwrote a real one", cached, ok, err)
+	}
+}

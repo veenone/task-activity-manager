@@ -39,9 +39,18 @@ func (b *Backend) EditableFields(ctx context.Context, key string) ([]string, err
 
 // editableNames maps the ids on a screen back to TAM's own names. The two
 // custom ones come from discovery, so an instance that numbers Story Points
-// differently still matches; an instance where discovery found neither
-// simply reports neither, which is the same answer a screen without them
-// gives.
+// differently still matches.
+//
+// A name whose id discovery could not work out is kept rather than dropped.
+// TAM not knowing which field a name means is not Jira saying the field is
+// off the screen, and discovery leaves an id empty for three reasons: the
+// instance has no such field, the lookup failed in transit, or two fields
+// answer to the name and neither identifies it (5a05384). Only the first is
+// about the instance at all, and none of the three is about this screen.
+// Reporting any of them as "not on the screen" would disable a control that
+// works and blame a Jira administrator for it. The accurate refusals already
+// exist a layer down, in pointsField and in jiraFields's own Epic Link
+// branch, and keeping the name here is what lets the user read them.
 func editableNames(meta corejira.MetaFields, ids fieldIDs) []string {
 	names := map[string]string{
 		"summary":     "summary",
@@ -62,6 +71,12 @@ func editableNames(meta corejira.MetaFields, ids fieldIDs) []string {
 		if ok && settable(f) {
 			out = append(out, name)
 		}
+	}
+	if ids.Points == "" {
+		out = append(out, "storyPoints")
+	}
+	if ids.EpicLink == "" {
+		out = append(out, "parentKey")
 	}
 	sort.Strings(out)
 	return out
@@ -90,14 +105,25 @@ func settable(f corejira.MetaField) bool {
 	return false
 }
 
-// editScreen is the set UpdateIssue guards a write with, nil when Jira could
-// not be asked. Nil means "unknown", never "empty": an empty set would refuse
-// every field, and a screen nothing could read says nothing about what is on
-// it, so the write goes and Jira's own refusal stays the backstop.
+// editScreen is the set UpdateIssue guards a write with, nil when nothing is
+// known. Nil means "unknown", and an empty answer is one of the ways of not
+// knowing, so this never returns an empty set: one would refuse every field,
+// summary included, over a payload that said nothing of the sort.
+//
+// Two things reach here as empty. A screen nothing could read says nothing
+// about what is on it. A screen carrying none of the seven names TAM edits
+// is not an instruction to refuse them all either: every edit screen seen in
+// the field carries summary, so an answer without it is a payload to
+// disbelieve rather than to act on. Both let the write go, and Jira's own
+// refusal stays the backstop.
 func (b *Backend) editScreen(ctx context.Context, key string) map[string]bool {
 	names, err := b.EditableFields(ctx, key)
 	if err != nil {
 		log.Printf("tam: the edit screen of %s could not be read, so the edit is sent and Jira's own answer decides: %v", key, err)
+		return nil
+	}
+	if len(names) == 0 {
+		log.Printf("tam: the edit screen of %s carries none of the fields TAM edits, which is read as nothing known rather than as everything refused", key)
 		return nil
 	}
 	set := make(map[string]bool, len(names))

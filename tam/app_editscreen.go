@@ -13,42 +13,52 @@ import (
 // Commit find out. See issue #52.
 
 // GetEditableFields is the fields the issue's edit screen carries, by TAM's
-// own names. Jira is asked and its answer cached against the issue's project
-// and type, the two things it decides a screen by, so every other issue of
-// that type answers from disk and the app keeps editing with no network.
+// own names. Jira is asked on every call and its answer written to the store
+// against the issue's project and type, the two things Jira decides a screen
+// by. The store is read when Jira cannot be, which is what keeps the panel
+// editing with no network; it is not a read-through cache, and the thing
+// that stops one call per issue is the caller's own staleness window
+// (queries/pending.ts keys this by issue type).
 //
-// An empty list means nothing is known, not that nothing may be edited: a
+// An empty list means nothing is known, not that nothing may be edited. A
 // profile that has never reached Jira has no screen to draw from, and the
 // panel falls back to its own fixed list rather than refusing every field.
-// A draft has no issue in Jira to ask about at all, so it is answered the
-// same way without a request.
+// An empty answer is never written to the store either: cached, it would
+// make ListUnpushableEdits read every pending edit on that project and type
+// as doomed.
+//
+// A draft has no issue in Jira to ask about, so it is answered as unknown
+// without a request, and without reading a row for a key Jira has never
+// seen.
 func (a *App) GetEditableFields(profileID, key string) ([]string, error) {
 	p, b, err := a.backendForProfile(profileID)
-	if err != nil {
-		return nil, err
-	}
-	iss, err := a.repo.GetIssue(a.ctx, profileID, key)
 	if err != nil {
 		return nil, err
 	}
 	if strings.HasPrefix(key, issuerepo.DraftPrefix) {
 		return []string{}, nil
 	}
-	fields, err := b.EditableFields(a.ctx, key)
+	iss, err := a.repo.GetIssue(a.ctx, profileID, key)
 	if err != nil {
-		cached, ok, cacheErr := a.repo.EditScreen(a.ctx, profileID, iss.Project, iss.Type)
-		if cacheErr != nil || !ok {
-			log.Printf("tam: the edit screen of %s on %s could not be read and none is cached: %v", key, p.Name, err)
-			return []string{}, nil
+		return nil, err
+	}
+	fields, err := b.EditableFields(a.ctx, key)
+	switch {
+	case err == nil && len(fields) > 0:
+		if err := a.repo.PutEditScreen(a.ctx, profileID, iss.Project, iss.Type, fields); err != nil {
+			// A store write failing only costs the next offline read.
+			log.Printf("tam: store the edit screen of %s %s: %v", iss.Project, iss.Type, err)
 		}
-		log.Printf("tam: the edit screen of %s on %s fell back to the cache: %v", key, p.Name, err)
+		return fields, nil
+	case err == nil:
+		log.Printf("tam: the edit screen of %s on %s carries none of the fields TAM edits, which is read as nothing known", key, p.Name)
+	default:
+		log.Printf("tam: the edit screen of %s on %s could not be read: %v", key, p.Name, err)
+	}
+	if cached, ok, cacheErr := a.repo.EditScreen(a.ctx, profileID, iss.Project, iss.Type); cacheErr == nil && ok {
 		return cached, nil
 	}
-	if err := a.repo.PutEditScreen(a.ctx, profileID, iss.Project, iss.Type, fields); err != nil {
-		// A cache write failing only costs the next offline read.
-		log.Printf("tam: cache the edit screen of %s %s: %v", iss.Project, iss.Type, err)
-	}
-	return fields, nil
+	return []string{}, nil
 }
 
 // ListUnpushableEdits names the journalled edits whose field is not on the

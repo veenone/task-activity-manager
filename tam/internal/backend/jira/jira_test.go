@@ -360,6 +360,11 @@ const transitionsBody = `{"transitions":[
 
 const twoFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true}]`
 
+// duplicatePointsFields is an instance with two fields called Story Points.
+// Discovery refuses to guess between them (5a05384), which leaves the id
+// empty for a reason that is not absence.
+const duplicatePointsFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_11900","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true}]`
+
 const threeFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true}]`
 
 const fourFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true},{"id":"customfield_10011","name":"Epic Name","custom":true}]`
