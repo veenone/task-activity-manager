@@ -62,7 +62,7 @@ func TestUpdateIssueMapsTheSixFields(t *testing.T) {
 func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	f.createKey = "PLAT-501"
-	key, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	key, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeBug, Summary: "Promo field accepts spaces", Description: "Steps", Priority: "Low",
 		Labels: []string{"promo"}, Assignee: "jdoe", StoryPoints: pts(1),
 		Extra: map[string]string{"customfield_10050": "3", "components": "100", "customfield_10060": "free text"},
@@ -79,14 +79,20 @@ func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 	for _, want := range []string{
 		`"project":{"key":"PLAT"}`, `"issuetype":{"name":"Bug"}`, `"summary":"Promo field accepts spaces"`,
 		`"description":"Steps"`, `"priority":{"name":"Low"}`, `"labels":["promo"]`, `"assignee":{"name":"jdoe"}`,
-		`"customfield_10016":1`, `"customfield_10050":{"id":"3"}`, `"components":[{"id":"100"}]`, `"customfield_10060":"free text"`,
+		`"customfield_10016":1`, `"customfield_10050":{"id":"3"}`, `"components":[{"id":"100"}]`,
 	} {
 		if !strings.Contains(post, want) {
 			t.Errorf("POST lacks %s: %s", want, post)
 		}
 	}
+	// customfield_10060 is in no answer this Bug's classic create metadata
+	// gives, so it is not one of the required fields a classic answer is
+	// trusted for. See TestCreateIssueSendsOnlyRequiredExtrasFromAClassicAnswer.
+	if strings.Contains(post, "customfield_10060") {
+		t.Errorf("an extra the classic answer does not list must stay out: %s", post)
+	}
 	f.createFail = true
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeBug, Summary: "x"}); err == nil || !strings.Contains(err.Error(), "Severity is required") {
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeBug, Summary: "x"}); err == nil || !strings.Contains(err.Error(), "Severity is required") {
 		t.Errorf("Jira's message must surface: %v", err)
 	}
 }
@@ -97,7 +103,7 @@ func TestCreateIssuePostsTheDraftAndReturnsTheKey(t *testing.T) {
 func TestCreateIssueShapesExtraFromCreateMeta(t *testing.T) {
 	b, f := newBackend(t, twoFields)
 	f.createKey = "PLAT-502"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeBug, Summary: "Promo field accepts spaces",
 		Extra: map[string]string{
 			"components":        "100,101",
@@ -139,7 +145,7 @@ func TestCreateIssueShapesExtraFromCreateMeta(t *testing.T) {
 func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "TKT-10"
-	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeStory, Summary: "Promo input",
 		Extra:        map[string]string{"customfield_10253": "Platform", "customfield_10050": "3"},
 		ScreenFields: []string{"customfield_10050"},
@@ -156,7 +162,7 @@ func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 
 	// A draft from before the set existed: the live per-type answer decides.
 	f.createKey = "TKT-11"
-	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeStory, Summary: "Legacy draft",
 		Extra: map[string]string{"customfield_10253": "Platform"},
 	}); err != nil {
@@ -167,10 +173,70 @@ func TestCreateIssueSendsNoFieldThatIsNotOnTheScreen(t *testing.T) {
 	}
 }
 
+// Half one of the ticket, the half the screen check could not reach: a
+// classic answer is not the create screen, so a field it lists as optional
+// may not be on the screen at all, and sending one is what Jira answers
+// "Field cannot be set. It is not on the appropriate screen" to. The draft's
+// own ScreenFields cannot catch it, because the dialog built that list from
+// the same classic answer.
+func TestCreateIssueSendsOnlyRequiredExtrasFromAClassicAnswer(t *testing.T) {
+	b, f := newBackend(t, twoFields)
+	f.createKey = "PLAT-520"
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+		Type: backend.TypeBug, Summary: "Promo input",
+		Extra:        map[string]string{"customfield_10050": "3", "environment": "staging", "customfield_10600": "typed anyway"},
+		ScreenFields: []string{"customfield_10050", "environment", "customfield_10600"},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	post := f.writes[len(f.writes)-1]
+	if !strings.Contains(post, `"customfield_10050":{"id":"3"}`) {
+		t.Errorf("a required field is still sent: %s", post)
+	}
+	if strings.Contains(post, "environment") {
+		t.Errorf("an optional field a classic answer cannot vouch for must stay out: %s", post)
+	}
+	if strings.Contains(post, "customfield_10600") {
+		t.Errorf("a field the classic answer does not list at all must stay out: %s", post)
+	}
+}
+
+// A base field is TAM's own whether or not discovery found its id, and
+// whether or not Jira reports it under the id TAM expects: the create screen
+// of this Story carries Sprint and Epic Link by their greenhopper type and a
+// parent under a custom id. A draft made before the dialog stopped offering
+// them (nil ScreenFields, so no screen check) still names them, and sending
+// any of the three is what Jira answers "cannot be set" or "data was not an
+// object" to.
+func TestCreateIssueDropsABaseFieldDiscoveryDidNotName(t *testing.T) {
+	b, f := newBackend(t, `[]`)
+	f.createKey = "TKT-30"
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+		Type: backend.TypeStory, Summary: "Legacy draft",
+		Extra: map[string]string{
+			"customfield_10020": "Sprint 15",
+			"customfield_10014": "TKT-3",
+			"customfield_10500": "TKT-7",
+			"customfield_10300": "Given a promo",
+		},
+	}); err != nil {
+		t.Fatalf("CreateIssue: %v", err)
+	}
+	post := f.writes[len(f.writes)-1]
+	for _, bad := range []string{"customfield_10020", "customfield_10014", "customfield_10500"} {
+		if strings.Contains(post, bad) {
+			t.Errorf("a base field reached the payload (%s): %s", bad, post)
+		}
+	}
+	if !strings.Contains(post, `"customfield_10300":"Given a promo"`) {
+		t.Errorf("an ordinary screen field is still sent: %s", post)
+	}
+}
+
 func TestCreateIssueNeverLetsAnExtraOverwriteABaseField(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "TKT-12"
-	if _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "TKT", backend.IssueDraft{
 		Type: backend.TypeStory, Summary: "Real summary", ParentKey: "TKT-2",
 		Extra: map[string]string{"summary": "Fake summary", "customfield_10014": "TKT-99", "customfield_10016": "40"},
 	}); err != nil {
@@ -211,7 +277,7 @@ func TestUpdateIssuePushesTheEpicLink(t *testing.T) {
 func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 	b, f := newBackend(t, fourFields)
 	f.createKey = "PLAT-600"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "PLAT-350"}); err != nil {
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "PLAT-350"}); err != nil {
 		t.Fatal(err)
 	}
 	post := f.writes[len(f.writes)-1]
@@ -224,7 +290,7 @@ func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 	// Epic Name is one of TAM's own fields: an extra naming it is ignored
 	// and the summary is what Jira gets, the same as with no extra at all.
 	f.createKey = "PLAT-601"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{
 		Type: backend.TypeEpic, Summary: "Another epic", Extra: map[string]string{"customfield_10011": "Custom name"},
 	}); err != nil {
 		t.Fatal(err)
@@ -237,38 +303,65 @@ func TestCreateEpicDefaultsEpicNameAndSendsNoEpicLink(t *testing.T) {
 
 func TestCreateFieldsHidesEpicName(t *testing.T) {
 	b, _ := newBackend(t, fourFields)
-	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeEpic)
+	set, err := b.CreateFields(context.Background(), "PLAT", backend.TypeEpic)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
-	if len(specs) != 0 {
-		t.Errorf("Epic Name is hidden: %+v", specs)
+	if len(set.Fields) != 0 {
+		t.Errorf("Epic Name is hidden: %+v", set.Fields)
 	}
 }
 
-// The classic answer this fake gives for a Bug carries one optional field,
-// Environment, which the dialog now offers under More fields.
-func TestCreateFieldsOffersRequiredAndOptionalFieldsBeyondTheForm(t *testing.T) {
+// The two metadata sources differ in what they can be read as. A per-type
+// answer is the create screen, so an optional field on it is offered; a
+// classic answer is not, because on some Data Center versions it lists
+// fields the screen does not carry, so only the fields Jira marks required
+// are offered there. The classic answer this fake gives for a Bug carries
+// one optional field, Environment, which is what that rule leaves out.
+func TestCreateFieldsOffersOptionalFieldsOnlyFromAPerTypeAnswer(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	specs, err := b.CreateFields(context.Background(), "PLAT", backend.TypeBug)
+	set, err := b.CreateFields(context.Background(), "PLAT", backend.TypeBug)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
+	if set.ScreenKnown {
+		t.Error("a classic answer cannot be read as the create screen")
+	}
+	specs := set.Fields
 	var seen []string
 	for _, s := range specs {
 		seen = append(seen, fmt.Sprintf("%s:%s:%v", s.ID, s.Type, s.Required))
 	}
-	// Sorted by name: Component/s, Environment, Keywords, Release Note,
-	// Severity. Story Points and Summary are the form's own.
-	want := "components:array:true,environment:string:false,customfield_10071:array:true,customfield_10070:option:true,customfield_10050:option:true"
+	// Sorted by name: Component/s, Keywords, Release Note, Severity. Story
+	// Points and Summary are the form's own, and Environment is the optional
+	// field a classic answer cannot vouch for.
+	want := "components:array:true,customfield_10071:array:true,customfield_10070:option:true,customfield_10050:option:true"
 	if strings.Join(seen, ",") != want {
 		t.Errorf("specs = %v", seen)
 	}
-	if specs[4].Name != "Severity" || len(specs[4].AllowedValues) != 2 || specs[4].AllowedValues[1].Value != "Critical" {
-		t.Errorf("severity = %+v", specs[4])
+	if specs[3].Name != "Severity" || len(specs[3].AllowedValues) != 2 || specs[3].AllowedValues[1].Value != "Critical" {
+		t.Errorf("severity = %+v", specs[3])
 	}
 	if specs[0].AllowedValues[0].Value != "Checkout" {
 		t.Errorf("array options take name when value is empty: %+v", specs[0])
+	}
+	// The other direction: a Story on TKT is read through the per-type
+	// endpoint, so its optional Acceptance criteria is still offered.
+	perType, err := b.CreateFields(context.Background(), "TKT", backend.TypeStory)
+	if err != nil {
+		t.Fatalf("CreateFields: %v", err)
+	}
+	if !perType.ScreenKnown {
+		t.Error("a per-type answer is the create screen")
+	}
+	optional := false
+	for _, s := range perType.Fields {
+		if s.ID == "customfield_10300" && !s.Required {
+			optional = true
+		}
+	}
+	if !optional {
+		t.Errorf("a per-type answer still offers its optional fields: %+v", perType.Fields)
 	}
 	found := false
 	for _, s := range f.searches {
@@ -287,12 +380,12 @@ func TestCreateFieldsOffersRequiredAndOptionalFieldsBeyondTheForm(t *testing.T) 
 // attachment is nothing a text form can fill.
 func TestCreateFieldsReadsTheScreenAndLeavesOutBaseAndUnfillableFields(t *testing.T) {
 	b, f := newBackend(t, threeFields)
-	specs, err := b.CreateFields(context.Background(), "TKT", backend.TypeStory)
+	set, err := b.CreateFields(context.Background(), "TKT", backend.TypeStory)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
 	var seen []string
-	for _, s := range specs {
+	for _, s := range set.Fields {
 		seen = append(seen, fmt.Sprintf("%s:%s:%v", s.ID, s.Type, s.Required))
 	}
 	if strings.Join(seen, ",") != "customfield_10300:textarea:false,customfield_10050:option:true" {
@@ -325,19 +418,19 @@ func TestCreateFieldsFailsWhenTheTypeListCannotBeRead(t *testing.T) {
 // its parent a second time, because createmeta lists parent as required.
 func TestCreateFieldsNeverOffersTheParentOfASubtask(t *testing.T) {
 	b, _ := newBackend(t, threeFields)
-	specs, err := b.CreateFields(context.Background(), "TKT", backend.TypeSubtask)
+	set, err := b.CreateFields(context.Background(), "TKT", backend.TypeSubtask)
 	if err != nil {
 		t.Fatalf("CreateFields: %v", err)
 	}
-	if len(specs) != 1 || specs[0].ID != "customfield_10300" {
-		t.Errorf("specs = %+v, want only Acceptance criteria", specs)
+	if len(set.Fields) != 1 || set.Fields[0].ID != "customfield_10300" {
+		t.Errorf("specs = %+v, want only Acceptance criteria", set.Fields)
 	}
 }
 
 func TestCreateIssueSendsTheParentThroughEpicLinkWhenItExists(t *testing.T) {
 	b, f := newBackend(t, threeFields)
 	f.createKey = "PLAT-502"
-	if _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Under an epic", ParentKey: "PLAT-350"}); err != nil {
+	if _, _, err := b.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "Under an epic", ParentKey: "PLAT-350"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(f.writes[len(f.writes)-1], `"customfield_10014":"PLAT-350"`) {
@@ -345,7 +438,7 @@ func TestCreateIssueSendsTheParentThroughEpicLinkWhenItExists(t *testing.T) {
 	}
 	noEpic, f2 := newBackend(t, twoFields)
 	f2.createKey = "PLAT-503"
-	if _, err := noEpic.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "No field", ParentKey: "PLAT-350"}); err != nil {
+	if _, _, err := noEpic.CreateIssue(context.Background(), "PLAT", backend.IssueDraft{Type: backend.TypeStory, Summary: "No field", ParentKey: "PLAT-350"}); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(f2.writes[len(f2.writes)-1], "PLAT-350") {

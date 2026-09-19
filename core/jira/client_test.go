@@ -167,3 +167,41 @@ func TestNilHTTPClientUsesDefaultTimeout(t *testing.T) {
 		t.Fatalf("expected a default http client with a timeout, got %+v", c.http)
 	}
 }
+
+// A failed write carries Jira's per-field messages by field id, not only the
+// flattened sentence. Only a caller that knows the instance's field names can
+// say which field "customfield_10253" was, so the ids have to survive the
+// transport layer for it to do that.
+func TestWriteErrorCarriesJirasPerFieldMessages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"errorMessages":["the issue could not be created"],"errors":{` +
+			`"customfield_10253":"Field 'customfield_10253' cannot be set. It is not on the appropriate screen, or unknown.",` +
+			`"customfield_10050":"Severity is required."}}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	err := c.Post(context.Background(), "/rest/api/2/issue", map[string]string{})
+	var we *WriteError
+	if !errors.As(err, &we) {
+		t.Fatalf("err = %T %v, want a *WriteError", err, err)
+	}
+	if len(we.Fields) != 2 || we.Fields["customfield_10050"] != "Severity is required." {
+		t.Errorf("field errors = %+v", we.Fields)
+	}
+	if !strings.Contains(we.Fields["customfield_10253"], "not on the appropriate screen") {
+		t.Errorf("field errors = %+v", we.Fields)
+	}
+	if len(we.Messages) != 1 || we.Messages[0] != "the issue could not be created" {
+		t.Errorf("errorMessages = %+v", we.Messages)
+	}
+	// The string a caller that does nothing with the parts still reads is
+	// what it has always been.
+	want := "jira: POST /rest/api/2/issue -> 400 Bad Request: the issue could not be created; " +
+		"customfield_10050: Severity is required.; " +
+		"customfield_10253: Field 'customfield_10253' cannot be set. It is not on the appropriate screen, or unknown."
+	if err.Error() != want {
+		t.Errorf("Error() = %q\nwant       %q", err.Error(), want)
+	}
+}

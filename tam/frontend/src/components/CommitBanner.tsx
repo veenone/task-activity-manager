@@ -10,6 +10,14 @@ export function movedPhrase(m: CommitMove): string {
   return m.side ? `${m.key} ${m.side} ${m.target}` : `${m.key} to ${m.target}`;
 }
 
+// listPhrase joins names the way a sentence does: "A", "A and B", or
+// "A, B and C". Field names run together with commas read as one field with
+// a comma in it, which is exactly the confusion this line exists to clear up.
+export function listPhrase(names: string[]): string {
+  if (names.length < 2) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 // bannerLine renders a commit result as one sentence.
 export function bannerLine(r: CommitResult): string {
   const parts: string[] = [];
@@ -112,6 +120,15 @@ export function CommitBanner({ result, heldKeys, pendingRowIds, busy, onUndo }: 
               Undo this move
             </button>
           )}
+        </p>
+      ))}
+      {/* A created issue Jira has, minus a field the draft asked for. It is
+          not a failure and not a held row, so it has nowhere else to be
+          said, and the value only exists in the draft the Commit just
+          cleared. */}
+      {result.created.filter((c) => (c.leftOut ?? []).length > 0).map((c) => (
+        <p key={`leftout-${c.key}`} className="small">
+          {`${c.key} was created without ${listPhrase(c.leftOut ?? [])}. TAM could not confirm ${(c.leftOut ?? []).length === 1 ? "it is" : "they are"} on the create screen, so it left ${(c.leftOut ?? []).length === 1 ? "it" : "them"} out. Set ${(c.leftOut ?? []).length === 1 ? "it" : "them"} in Jira if the issue needs ${(c.leftOut ?? []).length === 1 ? "it" : "them"}.`}
         </p>
       ))}
       {held.map((h) => (

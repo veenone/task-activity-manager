@@ -204,6 +204,16 @@ type FieldSpec struct {
 	AllowedValues []FieldOption `json:"allowedValues"`
 }
 
+// CreateFieldSet is one type's create fields and whether the instance could
+// say which fields its create screen carries. ScreenKnown is false when the
+// answer came from Jira's classic create-meta call, which on some Data
+// Center versions lists fields the screen does not carry: only the fields
+// Jira marks required are offered and sent then, and the dialog says so.
+type CreateFieldSet struct {
+	Fields      []FieldSpec `json:"fields"`
+	ScreenKnown bool        `json:"screenKnown"`
+}
+
 // FieldOption is one allowed value of an option field.
 type FieldOption struct {
 	ID    string `json:"id"`
@@ -576,14 +586,18 @@ type IssueBackend interface {
 	// the issue sits now, and what it can reach instead. It is the check a
 	// drop makes while the app is online; it never writes.
 	CanTransition(ctx context.Context, key string, targetStatusIDs []string) (TransitionCheck, error)
-	// CreateIssue creates the draft and returns the key Jira assigned.
-	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, error)
+	// CreateIssue creates the draft and returns the key Jira assigned, plus
+	// the extra fields it left out of the payload, named for a person: a
+	// field nothing could confirm belongs on the create screen is not sent,
+	// and Commit says so rather than dropping a typed value in silence.
+	CreateIssue(ctx context.Context, projectKey string, d IssueDraft) (string, []string, error)
 	// CreateFields lists the create-screen fields of a logical type that
 	// the New issue form does not already carry, required and optional,
 	// with FieldSpec.Required saying which. The form's own fields (summary,
 	// description, priority, labels, assignee, story points, Epic Link,
 	// Epic Name, parent, sprint) never come back, whatever createmeta says.
-	CreateFields(ctx context.Context, projectKey, logicalType string) ([]FieldSpec, error)
+	// ScreenKnown says whether the answer can be read as the create screen.
+	CreateFields(ctx context.Context, projectKey, logicalType string) (CreateFieldSet, error)
 	// LinkTypes lists the issue link types the instance defines.
 	LinkTypes(ctx context.Context) ([]LinkType, error)
 	// CreateLink links fromKey to the draft's target with the draft's type

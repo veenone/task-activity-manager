@@ -66,7 +66,7 @@ export function GetBoard(arg1:string,arg2:number,arg3:string,arg4:string):Promis
 
 export function GetConfluenceConfig(arg1:string):Promise<profile.ConfluenceConfig>;
 
-export function GetCreateFields(arg1:string,arg2:string):Promise<Array<backend.FieldSpec>>;
+export function GetCreateFields(arg1:string,arg2:string):Promise<backend.CreateFieldSet>;
 
 export function GetDiagnostics():Promise<main.Diagnostics>;
 

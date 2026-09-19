@@ -28,7 +28,7 @@ func (b *Backend) GetIssue(ctx context.Context, key string) (backend.Issue, erro
 
 // jiraFields turns the journal's text values into Jira's field shapes. An
 // empty priority, assignee, or points clears the field with null.
-func jiraFields(fields map[string]string, ids fieldIDs) (map[string]any, error) {
+func jiraFields(fields map[string]string, ids fieldIDs, pointsID string) (map[string]any, error) {
 	out := map[string]any{}
 	for name, v := range fields {
 		switch name {
@@ -43,17 +43,14 @@ func jiraFields(fields map[string]string, ids fieldIDs) (map[string]any, error) 
 		case "labels":
 			out["labels"] = backend.SplitLabels(v)
 		case "storyPoints":
-			if ids.Points == "" {
-				return nil, errors.New("this Jira has no Story Points field, so points cannot be pushed")
-			}
 			p, err := backend.ParsePoints(v)
 			if err != nil {
 				return nil, err
 			}
 			if p == nil {
-				out[ids.Points] = nil
+				out[pointsID] = nil
 			} else {
-				out[ids.Points] = *p
+				out[pointsID] = *p
 			}
 		case "parentKey":
 			if ids.EpicLink == "" {
@@ -82,11 +79,23 @@ func nameOrNull(v string) any {
 // 400 with a per-field message otherwise; the client's error carries it.
 func (b *Backend) UpdateIssue(ctx context.Context, key string, fields map[string]string) error {
 	ids := b.discover(ctx)
-	jf, err := jiraFields(fields, ids)
+	// Resolved only when the edit carries an estimate: an unresolvable
+	// points field is no reason to refuse an edit that never mentions it.
+	pointsID := ""
+	if _, edited := fields["storyPoints"]; edited {
+		var err error
+		if pointsID, err = b.pointsField(projectOf(key), ids); err != nil {
+			return err
+		}
+	}
+	jf, err := jiraFields(fields, ids, pointsID)
 	if err != nil {
 		return err
 	}
-	return b.c.Put(ctx, "/rest/api/2/issue/"+url.PathEscape(key), map[string]any{"fields": jf})
+	if err := b.c.Put(ctx, "/rest/api/2/issue/"+url.PathEscape(key), map[string]any{"fields": jf}); err != nil {
+		return b.humanizeFieldError(ctx, err, false)
+	}
+	return nil
 }
 
 // projectOf is the project key an issue key belongs to: everything before the
@@ -101,14 +110,15 @@ func projectOf(issueKey string) string {
 // CreateIssue POSTs the draft. TAM's own fields are set first and are never
 // overwritten; extras are then shaped from the type's create metadata and
 // filtered by applyExtras, so a field off the create screen is never sent.
-func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.IssueDraft) (string, error) {
+// The second result names the extras left out, for Commit to report.
+func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.IssueDraft) (string, []string, error) {
 	ids := b.discover(ctx)
 	names := jiraTypeNames([]string{d.Type}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
 	if len(names) == 0 {
 		if d.Type == backend.TypeSubtask {
-			return "", fmt.Errorf("%s has no sub-task issue type", projectKey)
+			return "", nil, fmt.Errorf("%s has no sub-task issue type", projectKey)
 		}
-		return "", fmt.Errorf("unknown issue type %q", d.Type)
+		return "", nil, fmt.Errorf("unknown issue type %q", d.Type)
 	}
 	fields := map[string]any{
 		"project":   map[string]string{"key": projectKey},
@@ -127,14 +137,18 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	if len(d.Labels) > 0 {
 		fields["labels"] = d.Labels
 	}
-	if d.StoryPoints != nil && ids.Points != "" {
-		fields[ids.Points] = *d.StoryPoints
+	if d.StoryPoints != nil {
+		pointsID, err := b.pointsField(projectKey, ids)
+		if err != nil {
+			return "", nil, err
+		}
+		fields[pointsID] = *d.StoryPoints
 	}
 	// A sub-task hangs off its parent through Jira's own parent field, not
 	// through the Epic Link, and cannot exist without one.
 	if d.Type == backend.TypeSubtask {
 		if d.ParentKey == "" {
-			return "", errors.New("a sub-task needs a parent issue")
+			return "", nil, errors.New("a sub-task needs a parent issue")
 		}
 		fields["parent"] = map[string]string{"key": d.ParentKey}
 	} else if d.ParentKey != "" && d.Type != backend.TypeEpic {
@@ -144,8 +158,9 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 			log.Printf("tam: %s has no Epic Link field; parent %s dropped from the create of %q", b.c.BaseURL(), d.ParentKey, d.Summary)
 		}
 	}
+	var leftOut []string
 	if len(d.Extra) > 0 {
-		b.applyExtras(ctx, projectKey, names[0], d, ids, fields)
+		leftOut = b.applyExtras(ctx, projectKey, names[0], d, ids, fields)
 	}
 	if d.Type == backend.TypeEpic && ids.EpicName != "" {
 		if _, set := fields[ids.EpicName]; !set {
@@ -156,29 +171,38 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 		Key string `json:"key"`
 	}
 	if err := b.c.WriteJSONReturning(ctx, http.MethodPost, "/rest/api/2/issue", map[string]any{"fields": fields}, &resp); err != nil {
-		return "", err
+		return "", nil, b.humanizeFieldError(ctx, err, true)
 	}
 	if resp.Key == "" {
-		return "", errors.New("Jira created the issue but returned no key")
+		return "", nil, errors.New("Jira created the issue but returned no key")
 	}
-	return resp.Key, nil
+	return resp.Key, leftOut, nil
 }
 
 // applyExtras writes the draft's extra fields into the payload, shaped from
-// the type's create metadata. Four rules keep an extra out, each logged:
+// the type's create metadata. Five rules keep an extra out, each logged:
 //
 //   - the payload already holds the id: what the form set is never
 //     overwritten, which is how Extra["parent"] once replaced the
 //     {"key": ...} object with a string;
-//   - the id is one of TAM's own fields, set by the form or by nothing;
+//   - the field is one of TAM's own, set by the form or by nothing. This is
+//     the same isBaseField the dialog filters with, so it also catches a
+//     parent Jira reports under a custom id and an Agile field discovery
+//     missed, neither of which the id alone would name;
 //   - the draft carries the ids its dialog offered and this one is not
 //     among them, which is the screen check Commit makes with no network;
 //   - the metadata read now came from the per-type endpoint and no longer
-//     lists the id, so the field is not on the screen today.
+//     lists the id, so the field is not on the screen today;
+//   - the metadata cannot be read at all, so nothing can say the field
+//     belongs on the screen. A draft's own ScreenFields is not an answer
+//     here: it records a screen read from an earlier session, and a create
+//     refused today is exactly the case where that reading went stale.
 //
-// An unreadable metadata read shapes every surviving extra as text, and
-// Jira's own validation decides.
-func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, d backend.IssueDraft, ids fieldIDs, fields map[string]any) {
+// It returns the fields it left out, named, so Commit can say what did not
+// go rather than dropping a typed value in silence. A field TAM sets itself
+// is not among them: the form's own value is what Jira gets, so nothing the
+// user typed is lost.
+func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, d backend.IssueDraft, ids fieldIDs, fields map[string]any) []string {
 	meta, metaErr := b.createMeta(ctx, projectKey, d.Type)
 	var screen map[string]bool
 	if d.ScreenFields != nil {
@@ -192,29 +216,46 @@ func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, 
 		extraIDs = append(extraIDs, id)
 	}
 	sort.Strings(extraIDs)
+	leftOut := []string{}
 	for _, id := range extraIDs {
 		v := d.Extra[id]
 		if strings.TrimSpace(v) == "" {
 			continue
 		}
-		if _, set := fields[id]; set || isBaseFieldID(id, ids) {
+		// The metadata is read before the base-field check, not after it,
+		// because the schema is half of what says a field is TAM's own: a
+		// metadata read that failed leaves the id to answer on its own.
+		f, known := meta.Field(id)
+		if !known {
+			f = corejira.MetaField{ID: id, Schema: corejira.MetaSchema{Type: "string"}}
+		}
+		if _, set := fields[id]; set || isBaseField(f, ids) {
 			log.Printf("tam: the %s create of %q ignores extra %s, which is one of TAM's own fields", typeName, d.Summary, id)
 			continue
 		}
 		if screen != nil && !screen[id] {
 			log.Printf("tam: the %s create of %q leaves out %s, which was not on the screen it was drafted against", typeName, d.Summary, id)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
-		f, known := meta.Field(id)
-		if metaErr == nil && meta.Source == corejira.MetaPerType && !known {
+		if metaErr != nil {
+			log.Printf("tam: the %s create of %q leaves out %s: the create fields of %s could not be read, so nothing can say the field is on the screen (%v)", typeName, d.Summary, id, projectKey, metaErr)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
+			continue
+		}
+		if meta.Source == corejira.MetaPerType && !known {
 			log.Printf("tam: the %s create of %q leaves out %s, which is not on the %s create screen", typeName, d.Summary, id, typeName)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
-		if metaErr != nil || !known {
-			f = corejira.MetaField{ID: id, Schema: corejira.MetaSchema{Type: "string"}}
+		if meta.Source == corejira.MetaClassic && !(known && f.Required) {
+			log.Printf("tam: the %s create of %q leaves out %s, because this Jira only reports its create fields through the classic call, which does not say what is on the screen", typeName, d.Summary, id)
+			leftOut = append(leftOut, b.fieldLabel(ctx, id))
+			continue
 		}
 		fields[id] = corejira.ShapeValue(f, v)
 	}
+	return leftOut
 }
 
 // baseFieldIDs are the create-meta ids TAM's own form carries or sets itself.
@@ -282,15 +323,24 @@ func (b *Backend) createMeta(ctx context.Context, projectKey, logicalType string
 // they have any. An optional field no text form can fill is left out; a
 // required one is still offered as text, because leaving it out would only
 // move the failure to a Jira 400 at Commit.
-func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType string) ([]backend.FieldSpec, error) {
+func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType string) (backend.CreateFieldSet, error) {
 	meta, err := b.createMeta(ctx, projectKey, logicalType)
 	if err != nil {
-		return nil, err
+		return backend.CreateFieldSet{}, err
 	}
 	ids := b.discover(ctx)
 	out := []backend.FieldSpec{}
 	for _, f := range meta.Fields {
 		if isBaseField(f, ids) {
+			continue
+		}
+		// A classic answer is not the create screen: on some Data Center
+		// versions it lists fields the screen does not carry, and sending one
+		// of those fails the whole create. Only what Jira marks required is
+		// offered there, for the same reason an unfillable required field
+		// still is: leaving a required field out would only move the failure
+		// to a Jira 400 at Commit.
+		if meta.Source == corejira.MetaClassic && !f.Required {
 			continue
 		}
 		kind := f.Kind()
@@ -312,5 +362,5 @@ func (b *Backend) CreateFields(ctx context.Context, projectKey, logicalType stri
 		}
 		return out[i].ID < out[j].ID
 	})
-	return out, nil
+	return backend.CreateFieldSet{Fields: out, ScreenKnown: meta.Source == corejira.MetaPerType}, nil
 }

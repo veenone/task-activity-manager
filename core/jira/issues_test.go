@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -159,5 +160,60 @@ func TestCustomFieldIDRejectsEmptyName(t *testing.T) {
 	c := NewClientWithHTTP("https://jira.example", "t", nil)
 	if _, err := c.CustomFieldID(context.Background(), "  "); err == nil {
 		t.Fatal("want an error for an empty field name")
+	}
+}
+
+// Data Center instances collect duplicate custom field names: a legacy
+// "Story Points" beside the Agile one is the common pair. Keying the cache
+// by name meant the last one Jira listed silently won, forever, for that
+// client, and everything TAM read and wrote for points went to whichever
+// that was. A name that does not identify one field is not an answer.
+func TestCustomFieldIDRefusesADuplicateName(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"id":"customfield_10016","name":"Story Points","custom":true},
+			{"id":"customfield_10253","name":"Story Points","custom":true},
+			{"id":"customfield_10020","name":"Sprint","custom":true}
+		]`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	ctx := context.Background()
+	_, err := c.CustomFieldID(ctx, "Story Points")
+	if !errors.Is(err, ErrFieldAmbiguous) {
+		t.Fatalf("err = %v, want ErrFieldAmbiguous", err)
+	}
+	// Both ids belong in the message: which one is right is a question only
+	// someone looking at the instance can answer.
+	for _, id := range []string{"customfield_10016", "customfield_10253"} {
+		if !strings.Contains(err.Error(), id) {
+			t.Errorf("err = %q, want it to name %s", err, id)
+		}
+	}
+	// A name that identifies exactly one field still answers.
+	if id, err := c.CustomFieldID(ctx, "Sprint"); err != nil || id != "customfield_10020" {
+		t.Errorf("Sprint = %q, %v", id, err)
+	}
+}
+
+// Two fields with the same name are still two fields, and an error that
+// names one of them has to say which it means.
+func TestFieldNameAnswersPerIdWhateverTheDuplicates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"id":"customfield_10016","name":"Story Points","custom":true},
+			{"id":"customfield_10253","name":"Story Points","custom":true}
+		]`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	ctx := context.Background()
+	if n := c.FieldName(ctx, "customfield_10253"); n != "Story Points" {
+		t.Errorf("FieldName = %q", n)
+	}
+	if n := c.FieldName(ctx, "customfield_99999"); n != "" {
+		t.Errorf("an unknown id has no name: %q", n)
 	}
 }

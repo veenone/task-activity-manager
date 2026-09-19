@@ -26,6 +26,12 @@ import (
 type Created struct {
 	TempKey string `json:"tempKey"`
 	Key     string `json:"key"`
+	// LeftOut names the draft's extra fields the create did not send, for a
+	// person: a field nothing could confirm belongs on the issue type's
+	// create screen is left out rather than refused by Jira, and this is
+	// what keeps that from happening in silence. Empty on almost every
+	// create.
+	LeftOut []string `json:"leftOut"`
 }
 
 // CreatedSprint pairs a draft sprint's negative id with the id Jira gave it.
@@ -192,7 +198,7 @@ func isDraftKey(key string) bool { return strings.HasPrefix(key, issuerepo.Draft
 // key, so every draft, edit, move and link naming it is held this Commit.
 func (e *Engine) commitCreate(ctx context.Context, r *commitRun, createRow journal.PendingChange, d backend.IssueDraft) {
 	tempKey := createRow.EntityKey
-	realKey, err := e.b.CreateIssue(ctx, r.projectKey, d)
+	realKey, leftOut, err := e.b.CreateIssue(ctx, r.projectKey, d)
 	if err != nil {
 		r.res.Failures = append(r.res.Failures, failure(tempKey, issuerepo.EntityIssueCreate, err.Error(), true))
 		r.deps.block(tempKey, tempKey, "which Jira refused")
@@ -224,7 +230,7 @@ func (e *Engine) commitCreate(ctx context.Context, r *commitRun, createRow journ
 		return
 	}
 	e.refresh(ctx, r.profileID, realKey)
-	r.res.Created = append(r.res.Created, Created{TempKey: tempKey, Key: realKey})
+	r.res.Created = append(r.res.Created, Created{TempKey: tempKey, Key: realKey, LeftOut: leftOut})
 }
 
 func (e *Engine) commitEdit(ctx context.Context, profileID, key string, rows []journal.PendingChange, res *Result) {

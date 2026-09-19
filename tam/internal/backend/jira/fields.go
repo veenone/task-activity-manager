@@ -25,9 +25,20 @@ type fieldIDs struct {
 	Sprint   string
 	Points   string
 	EpicLink string
-	Rank     string
 	EpicName string
+	Rank     string
+
+	// ambiguous holds the ids of every field answering to a name more than
+	// one field carries, keyed by the name TAM asked for. The id is left
+	// empty in that case, because picking one of two fields with the same
+	// name is how an estimate ends up on a field nobody chose; this is what
+	// lets a failure say which two.
+	ambiguous map[string][]string
 }
+
+// pointsFieldName is the name TAM looks for when no board says which field a
+// project estimates in.
+const pointsFieldName = "Story Points"
 
 func (f fieldIDs) list() []string {
 	var out []string

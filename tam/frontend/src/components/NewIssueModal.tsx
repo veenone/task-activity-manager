@@ -126,8 +126,11 @@ export function NewIssueModal({
   const epics = useEpics(activeId);
   const openSprints = useOpenSprints(activeId);
   const subtaskType = useSubtaskType(activeId);
-  const { required: requiredSpecs, optional: optionalSpecs } = splitMetaFields(meta.data ?? []);
+  const { required: requiredSpecs, optional: optionalSpecs } = splitMetaFields(meta.data?.fields ?? []);
   const specs = [...requiredSpecs, ...optionalSpecs];
+  // False only once the read has landed and said so: a read still in flight
+  // has nothing to explain yet, and a failed one has its own message.
+  const screenUnknown = meta.isSuccess && !meta.data.screenKnown;
   // More fields opens only on request, or on a validation failure inside it,
   // so the dialog stays as short as the fields Jira insists on.
   const [moreOpen, setMoreOpen] = useState(false);
@@ -468,17 +471,30 @@ export function NewIssueModal({
         {/* Rendered only when it has something in it: an unconditional
             wrapper drew its border-top above the buttons, attached to
             nothing, on every type that needs no extra fields. */}
-        {(meta.isError || checking || specs.length > 0) && (
+        {(meta.isError || checking || specs.length > 0 || screenUnknown) && (
           <div className="meta-fields">
             {meta.isError ? (
+              /* Not "Jira validates the rest on Commit" any more: a field
+                 nothing can confirm is on the create screen is left out of
+                 the payload, so a failed read costs the extra fields
+                 outright. The reason comes along because a 403 and a 404
+                 are different problems and only the user can see which. */
               <p className="muted small">
-                Jira&apos;s required fields could not be read ({meta.error.message}). The form stays minimal; Jira
-                validates the rest on Commit.
+                Jira&apos;s create fields could not be read ({meta.error.message}). TAM cannot offer the extra fields
+                this issue type has, so a create will carry only the fields above.
               </p>
             ) : checking ? (
               <p className="muted small" role="status">Checking which fields Jira requires.</p>
             ) : (
               <>
+                {/* Otherwise More fields is short or absent for no visible
+                    reason on an instance whose create metadata only comes
+                    from the classic call. */}
+                {screenUnknown && (
+                  <p className="muted small">
+                    This Jira version does not report which fields are on the create screen, so only required ones are offered.
+                  </p>
+                )}
                 {requiredSpecs.length > 0 && (
                   <>
                     <p className="muted small">Jira requires these for a {typeLabel(type).toLowerCase()}:</p>

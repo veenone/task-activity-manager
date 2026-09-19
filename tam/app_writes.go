@@ -63,20 +63,21 @@ func (a *App) CreateIssue(profileID string, draft backend.IssueDraft) (string, e
 }
 
 // GetCreateFields asks the backend which fields, required and optional, the
-// New issue form adds for the type beyond its own.
-func (a *App) GetCreateFields(profileID, typeName string) ([]backend.FieldSpec, error) {
+// New issue form adds for the type beyond its own, and whether the instance
+// could say what its create screen carries.
+func (a *App) GetCreateFields(profileID, typeName string) (backend.CreateFieldSet, error) {
 	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
-		return nil, err
+		return backend.CreateFieldSet{}, err
 	}
-	specs, err := b.CreateFields(a.ctx, p.ProjectKey, typeName)
+	set, err := b.CreateFields(a.ctx, p.ProjectKey, typeName)
 	if err != nil {
-		return nil, err
+		return backend.CreateFieldSet{}, err
 	}
-	if specs == nil {
-		specs = []backend.FieldSpec{}
+	if set.Fields == nil {
+		set.Fields = []backend.FieldSpec{}
 	}
-	return specs, nil
+	return set, nil
 }
 
 // ListPendingChanges returns the profile's journal, newest first.

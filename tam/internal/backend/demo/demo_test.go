@@ -229,11 +229,11 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 		t.Error("unknown key must fail")
 	}
 
-	key, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeTask, Summary: "New one", Labels: []string{"x"}, StoryPoints: pts(2)})
+	key, _, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeTask, Summary: "New one", Labels: []string{"x"}, StoryPoints: pts(2)})
 	if err != nil || key != "ACME-500" {
 		t.Fatalf("CreateIssue: %q %v", key, err)
 	}
-	key2, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeBug, Summary: "Second"})
+	key2, _, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeBug, Summary: "Second"})
 	if key2 != "ACME-501" {
 		t.Errorf("keys count up: %s", key2)
 	}
@@ -257,23 +257,24 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 		t.Errorf("staged conflict: base=%s first=%s second=%s", base.Updated, first.Updated, second.Updated)
 	}
 
-	specs, err := b.CreateFields(ctx, "ACME", backend.TypeBug)
-	if err != nil || len(specs) != 2 || specs[0].Type != "option" || !specs[0].Required || len(specs[0].AllowedValues) != 3 ||
+	set, err := b.CreateFields(ctx, "ACME", backend.TypeBug)
+	specs := set.Fields
+	if err != nil || !set.ScreenKnown || len(specs) != 2 || specs[0].Type != "option" || !specs[0].Required || len(specs[0].AllowedValues) != 3 ||
 		specs[1].ID != "environment" || specs[1].Required || specs[1].Type != "textarea" {
-		t.Errorf("bug create fields: %+v %v", specs, err)
+		t.Errorf("bug create fields: %+v %v", set, err)
 	}
-	if specs, _ := b.CreateFields(ctx, "ACME", backend.TypeTask); len(specs) != 0 {
-		t.Errorf("tasks need nothing extra: %+v", specs)
+	if set, _ := b.CreateFields(ctx, "ACME", backend.TypeTask); len(set.Fields) != 0 {
+		t.Errorf("tasks need nothing extra: %+v", set)
 	}
 	req, _ := b.CreateFields(ctx, "ACME", backend.TypeRequirement)
-	if len(req) != 1 || req[0].Name != "Source" || req[0].Type != "string" {
+	if len(req.Fields) != 1 || req.Fields[0].Name != "Source" || req.Fields[0].Type != "string" {
 		t.Errorf("requirement create fields: %+v", req)
 	}
-	withParent, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeStory, Summary: "Child", ParentKey: "ACME-350"})
+	withParent, _, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeStory, Summary: "Child", ParentKey: "ACME-350"})
 	if got, _ := b.GetIssue(ctx, withParent); got.ParentKey != "ACME-350" {
 		t.Errorf("parent stored: %+v", got)
 	}
-	epic, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "ACME-320"})
+	epic, _, _ := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeEpic, Summary: "New epic", ParentKey: "ACME-320"})
 	if got, _ := b.GetIssue(ctx, epic); got.ParentKey != "" {
 		t.Errorf("an epic ignores a parent on create: %+v", got)
 	}
@@ -936,21 +937,21 @@ func TestDeleteSprintRemovesItAndReturnsItsIssuesToTheBoard(t *testing.T) {
 func TestDemoRefusesAMarkedEpicOnceAndAPlaceholderParentAlways(t *testing.T) {
 	b := demobackend.New("ACME")
 	ctx := context.Background()
-	if _, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeEpic, Summary: "Plain epic"}); err != nil {
+	if _, _, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeEpic, Summary: "Plain epic"}); err != nil {
 		t.Fatalf("an ordinary epic is created: %v", err)
 	}
 	marked := backend.IssueDraft{Type: backend.TypeEpic, Summary: "Refused promotions epic"}
-	if _, err := b.CreateIssue(ctx, "ACME", marked); err == nil || !strings.Contains(err.Error(), "Commit again") {
+	if _, _, err := b.CreateIssue(ctx, "ACME", marked); err == nil || !strings.Contains(err.Error(), "Commit again") {
 		t.Fatalf("the marked epic is refused the first time: %v", err)
 	}
-	if key, err := b.CreateIssue(ctx, "ACME", marked); err != nil || key == "" {
+	if key, _, err := b.CreateIssue(ctx, "ACME", marked); err != nil || key == "" {
 		t.Fatalf("and created the second time: %q %v", key, err)
 	}
-	if _, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeStory, Summary: "Leaky", ParentKey: "TAM-NEW-2"}); err == nil {
+	if _, _, err := b.CreateIssue(ctx, "ACME", backend.IssueDraft{Type: backend.TypeStory, Summary: "Leaky", ParentKey: "TAM-NEW-2"}); err == nil {
 		t.Error("a placeholder parent is refused the way Jira refuses it")
 	}
 	story, _ := b.CreateFields(ctx, "ACME", backend.TypeStory)
-	if len(story) != 2 || story[0].Required || story[1].Required {
+	if len(story.Fields) != 2 || story.Fields[0].Required || story.Fields[1].Required {
 		t.Errorf("story offers two optional fields: %+v", story)
 	}
 }

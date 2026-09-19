@@ -16,10 +16,13 @@ import (
 // fake is a Jira that remembers its rows and every write. The board writes
 // it answers are in boards_test.go.
 type fake struct {
-	rows      map[string]backend.Issue
-	desc      map[string]string
-	updates   []string // "KEY field=value,..." in field order
-	creates   []backend.IssueDraft
+	rows    map[string]backend.Issue
+	desc    map[string]string
+	updates []string // "KEY field=value,..." in field order
+	creates []backend.IssueDraft
+	// leftOut is what a create says it did not send, by draft summary, so a
+	// test can drive the Commit result's own reporting of it.
+	leftOut   map[string][]string
 	nextKey   int
 	updateErr map[string]error
 	createErr error
@@ -81,8 +84,8 @@ func (f *fake) SearchIssuesPage(context.Context, string, string, string, []strin
 	return nil, 0, errors.New("not used")
 }
 func (f *fake) IssueTypes(context.Context, string) ([]backend.IssueType, error) { return nil, nil }
-func (f *fake) CreateFields(context.Context, string, string) ([]backend.FieldSpec, error) {
-	return []backend.FieldSpec{}, nil
+func (f *fake) CreateFields(context.Context, string, string) (backend.CreateFieldSet, error) {
+	return backend.CreateFieldSet{}, nil
 }
 func (f *fake) GetIssueDetail(_ context.Context, key string) (backend.IssueDetail, error) {
 	return backend.IssueDetail{Key: key, Description: f.desc[key], Links: []backend.Link{}, Fields: map[string]any{}}, nil
@@ -131,18 +134,18 @@ func (f *fake) UpdateIssue(_ context.Context, key string, fields map[string]stri
 	f.updates = append(f.updates, key+" "+strings.Join(parts, ","))
 	return nil
 }
-func (f *fake) CreateIssue(_ context.Context, projectKey string, d backend.IssueDraft) (string, error) {
+func (f *fake) CreateIssue(_ context.Context, projectKey string, d backend.IssueDraft) (string, []string, error) {
 	if f.createErr != nil {
-		return "", f.createErr
+		return "", nil, f.createErr
 	}
 	if err := f.createErrFor[d.Summary]; err != nil {
-		return "", err
+		return "", nil, err
 	}
 	f.creates = append(f.creates, d)
 	key := fmt.Sprintf("%s-%d", projectKey, f.nextKey)
 	f.nextKey++
 	f.rows[key] = backend.Issue{Key: key, ID: "9", Project: projectKey, Type: d.Type, Summary: d.Summary, Status: "To Do", Labels: d.Labels, StoryPoints: d.StoryPoints, Updated: "2026-09-07T00:00:00Z"}
-	return key, nil
+	return key, f.leftOut[d.Summary], nil
 }
 func (f *fake) LinkTypes(context.Context) ([]backend.LinkType, error) {
 	return []backend.LinkType{{Name: "Relates", Inward: "relates to", Outward: "relates to"}}, nil
@@ -551,3 +554,32 @@ func (f *fake) SearchUsers(context.Context, string, string) ([]backend.User, err
 func (f *fake) Priorities(context.Context) ([]string, error) { return nil, nil }
 
 func (f *fake) SubtaskTypeName(context.Context, string) (string, error) { return "Technical task", nil }
+
+// A create that could not confirm one of the draft's extra fields leaves it
+// out rather than letting Jira refuse the whole create. The user typed that
+// value, so the Commit result carries what did not go: dropping it in
+// silence would be the create quietly disagreeing with the draft.
+func TestCommitReportsTheFieldsACreateLeftOut(t *testing.T) {
+	eng, repo, f := setup(t)
+	ctx := context.Background()
+	f.leftOut = map[string][]string{"New bug": {"Team (customfield_10253)"}}
+	temp, err := repo.CreateDraft(ctx, "p1", "PLAT", backend.IssueDraft{Type: backend.TypeBug, Summary: "New bug"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := eng.Commit(ctx, "p1", "PLAT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Created) != 1 || res.Created[0].TempKey != temp {
+		t.Fatalf("result: %+v", res)
+	}
+	// The create still counted as a success: a field TAM could not confirm
+	// is not a reason to fail the issue.
+	if len(res.Failures) != 0 {
+		t.Errorf("the create is not a failure: %+v", res.Failures)
+	}
+	if got := res.Created[0].LeftOut; len(got) != 1 || got[0] != "Team (customfield_10253)" {
+		t.Errorf("leftOut = %+v, want the field the create did not send", got)
+	}
+}

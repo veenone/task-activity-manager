@@ -27,6 +27,7 @@ type fakeJira struct {
 	writes     []string // "METHOD path body" for every PUT and POST
 	createKey  string   // key the POST /issue answers with
 	createFail bool     // POST /issue answers 400
+	writeFail  string   // when set, the 400 body every write answers with
 	linkTypes  string   // the /rest/api/2/issueLinkType body
 
 	// The comment endpoint. commentTotal is how many comments the issue has;
@@ -99,6 +100,11 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 		case r.Method == http.MethodPut || r.Method == http.MethodPost:
 			body, _ := io.ReadAll(r.Body)
 			f.writes = append(f.writes, r.Method+" "+r.URL.Path+" "+string(body))
+			if f.writeFail != "" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(f.writeFail))
+				return
+			}
 			if r.URL.Path == "/rest/api/2/issue" {
 				if f.createFail {
 					w.WriteHeader(http.StatusBadRequest)
@@ -113,10 +119,11 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			f.searches = append(f.searches, "createmeta-type "+r.URL.Path)
 			switch r.URL.Path {
 			case "/rest/api/2/issue/createmeta/TKT/issuetypes/10001":
-				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":7,"isLast":true,"values":[
+				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":8,"isLast":true,"values":[
 					{"fieldId":"summary","name":"Summary","required":true,"schema":{"type":"string","system":"summary"}},
 					{"fieldId":"issuetype","name":"Issue Type","required":true,"schema":{"type":"issuetype","system":"issuetype"}},
 					{"fieldId":"customfield_10014","name":"Epic Link","required":false,"schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}},
+					{"fieldId":"customfield_10500","name":"Parent","required":false,"schema":{"type":"issuelink","system":"parent"}},
 					{"fieldId":"customfield_10020","name":"Sprint","required":false,"schema":{"type":"array","items":"string","custom":"com.pyxis.greenhopper.jira:gh-sprint"}},
 					{"fieldId":"customfield_10050","name":"Severity","required":true,"schema":{"type":"option"},"allowedValues":[{"id":"1","value":"Minor"},{"id":"3","value":"Critical"}]},
 					{"fieldId":"customfield_10300","name":"Acceptance criteria","required":false,"schema":{"type":"string","custom":"com.atlassian.jira.plugin.system.customfieldtypes:textarea"}},
