@@ -30,6 +30,15 @@ import (
 // A draft has no issue in Jira to ask about, so it is answered as unknown
 // without a request, and without reading a row for a key Jira has never
 // seen.
+//
+// Jira is asked before the store is read, so a cold open has a window with
+// no answer in hand and the panel holds every field closed through it. That
+// was chosen deliberately: it is one round trip, and a field drawn enabled
+// and disabled a moment later is how a value gets typed into a field Jira
+// will refuse. If the wait ever reads as sluggish, the fix is to serve the
+// stored answer first and refresh behind it, which would empty the window
+// for any profile that has synced once. It is a change to this read path,
+// not to the panel.
 func (a *App) GetEditableFields(profileID, key string) ([]string, error) {
 	p, b, err := a.backendForProfile(profileID)
 	if err != nil {
