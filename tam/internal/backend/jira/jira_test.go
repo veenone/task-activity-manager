@@ -49,6 +49,9 @@ type fakeJira struct {
 	// holds.
 	editMeta     string
 	editMetaFail bool
+	// editMetaCalls counts the reads, for the tests that pin when the
+	// screen is asked for at all.
+	editMetaCalls int32
 
 	// The per-type create metadata, for the create-screen checks. Each is
 	// the body that endpoint answers with, empty meaning the fake's own
@@ -249,6 +252,7 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				"environment":{"required":false,"name":"Environment","schema":{"type":"string"}}
 			}}]}]}`))
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/") && strings.HasSuffix(r.URL.Path, "/editmeta"):
+			atomic.AddInt32(&f.editMetaCalls, 1)
 			if f.editMetaFail {
 				w.WriteHeader(http.StatusForbidden)
 				_, _ = w.Write([]byte(`{"errorMessages":["no permission"]}`))

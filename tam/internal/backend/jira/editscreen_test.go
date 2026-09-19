@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -168,5 +169,39 @@ func TestUpdateIssueTreatsAnEmptyScreenAsUnknown(t *testing.T) {
 	}
 	if len(f.writes) != 1 || !strings.Contains(f.writes[0], `"summary":"New title"`) {
 		t.Fatalf("writes = %v, want the edit sent rather than refused wholesale", f.writes)
+	}
+}
+
+// The create path skips the screen read when the draft carries nothing the
+// screen could refuse, and a Commit of N edits must not pay N GETs for the
+// same reason: the five fixed-id fields are on every edit screen seen in the
+// field, and the two custom ones are the only fields an instance was ever
+// found to leave off.
+func TestUpdateIssueAsksForNoEditScreenWhenNothingCouldBeRefused(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.editMeta = sixFieldScreen
+	if err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{
+		"summary": "New title", "assignee": "jdoe", "labels": "promo",
+	}); err != nil {
+		t.Fatalf("UpdateIssue: %v", err)
+	}
+	if n := atomic.LoadInt32(&f.editMetaCalls); n != 0 {
+		t.Errorf("edit screen read %d times for an edit it could not refuse", n)
+	}
+	if len(f.writes) != 1 {
+		t.Fatalf("writes = %v", f.writes)
+	}
+}
+
+func TestUpdateIssueReadsTheEditScreenForAnEstimate(t *testing.T) {
+	b, f := newBackend(t, threeFields)
+	f.editMeta = sixFieldScreen
+	if err := b.UpdateIssue(context.Background(), "PLAT-412", map[string]string{
+		"summary": "New title", "storyPoints": "8",
+	}); err == nil {
+		t.Fatal("the estimate is off this screen and must be refused")
+	}
+	if n := atomic.LoadInt32(&f.editMetaCalls); n != 1 {
+		t.Errorf("edit screen read %d times, want once", n)
 	}
 }
