@@ -35,6 +35,33 @@ export function summaryLine(groups: PendingGroup[], rowCount: number): string {
   return line;
 }
 
+// countPushable is the number on the Commit button: the groups Commit will
+// actually deliver. Two things take a group out of it.
+//
+// A conflict holds its issue back, which it always has. And an issue
+// carrying a journal row Jira will refuse delivers nothing at all: an
+// edit's fields go in one update, so one refused field fails the whole of
+// it, and counting that issue would promise something Commit cannot do.
+// Nothing here changes what a push does, and nothing hides the work: the
+// card and its Discard stay exactly as they are, this is only the number.
+//
+// refusedKeys comes from the same rows the note on the row is drawn from,
+// so the number and the explanation beside it can never disagree. It only
+// ever holds issues whose edit screen TAM has actually read, which is what
+// keeps the empty-is-unknown rule here too: an issue nothing is known about
+// is absent from it and stays in the count, because it may well push.
+//
+// Only an issue group is matched by issue key. A sprint group's key is its
+// numeric id and a draft board's is a negative one, and neither is an issue
+// key Jira could refuse a field on.
+export function countPushable(
+  groups: PendingGroup[],
+  conflictKeys: Set<string>,
+  refusedKeys: Set<string>,
+): number {
+  return groups.filter((g) => !conflictKeys.has(g.key) && !(g.kind === "issue" && refusedKeys.has(g.key))).length;
+}
+
 // boardDraftLine says what kind of board a draft is and what it collects.
 function boardDraftLine(b: DraftBoard | null): string {
   if (!b) return "A draft board that could not be read. Discard it and draft it again.";
@@ -156,8 +183,11 @@ export function PendingChangesModal({ onClose }: Props) {
   // by row id. They are named on their row and kept: the value is what the
   // user typed, and only the user throws it away.
   const unpushableIds = new Set((unpushable.data ?? []).map((e) => e.id));
+  // The same rows by issue key, which is what the Commit count is short by.
+  const refusedKeys = new Set((unpushable.data ?? []).map((e) => e.key));
+  const refusedCount = groups.filter((g) => g.kind === "issue" && refusedKeys.has(g.key)).length;
 
-  const pushable = groups.filter((g) => !conflictKeys.has(g.key)).length;
+  const pushable = countPushable(groups, conflictKeys, refusedKeys);
 
   // The held-back issue sits above everything: it is what blocks a clean
   // commit, so it belongs where the eye lands first. The rest keep
@@ -333,6 +363,7 @@ export function PendingChangesModal({ onClose }: Props) {
       <div className="pending-actions">
         <span className="muted small">
           Edits are pushed with Jira's own field update, a move with the transition, sprint, and rank endpoints. A conflict holds only that issue back.
+          {refusedCount > 0 && ` ${plural(refusedCount, "issue is", "issues are")} not in that count: a field Jira will not take fails that issue's whole update. Discard the row, or ask a Jira administrator to add the field to the edit screen.`}
         </span>
         <span className="pending-footer-buttons">
           <button type="button" className="btn btn-discard" disabled={busy || rows.length === 0} onClick={() => void onDiscardAll()}>
