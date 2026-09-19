@@ -49,6 +49,16 @@ type fakeJira struct {
 	// holds.
 	editMeta     string
 	editMetaFail bool
+
+	// The per-type create metadata, for the create-screen checks. Each is
+	// the body that endpoint answers with, empty meaning the fake's own
+	// default. perTypeEpicID, when set, is the id TKT gives its Epic type,
+	// which is what makes the per-type endpoint answerable for an epic at
+	// all: without it the backend falls back to the classic call, which is
+	// not the create screen.
+	perTypeStory  string
+	perTypeEpic   string
+	perTypeEpicID string
 }
 
 // sixFieldScreen is what a real Data Center answered for every issue type of
@@ -165,7 +175,18 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/createmeta/"):
 			f.searches = append(f.searches, "createmeta-type "+r.URL.Path)
 			switch r.URL.Path {
+			case "/rest/api/2/issue/createmeta/TKT/issuetypes/" + f.perTypeEpicID:
+				if f.perTypeEpicID == "" {
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(`{"errorMessages":["not found"]}`))
+					return
+				}
+				_, _ = w.Write([]byte(f.perTypeEpic))
 			case "/rest/api/2/issue/createmeta/TKT/issuetypes/10001":
+				if f.perTypeStory != "" {
+					_, _ = w.Write([]byte(f.perTypeStory))
+					return
+				}
 				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":8,"isLast":true,"values":[
 					{"fieldId":"summary","name":"Summary","required":true,"schema":{"type":"string","system":"summary"}},
 					{"fieldId":"issuetype","name":"Issue Type","required":true,"schema":{"type":"issuetype","system":"issuetype"}},
@@ -193,7 +214,11 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(`{"errorMessages":["down"]}`))
 		case r.URL.Path == "/rest/api/2/project/TKT":
-			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10001","name":"Story"},{"id":"10003","name":"Technical task","subtask":true}]}`))
+			epic := ""
+			if f.perTypeEpicID != "" {
+				epic = `,{"id":"` + f.perTypeEpicID + `","name":"Epic"}`
+			}
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10001","name":"Story"},{"id":"10003","name":"Technical task","subtask":true}` + epic + `]}`))
 		case r.URL.Path == "/rest/api/2/issue/createmeta":
 			f.searches = append(f.searches, "createmeta "+r.URL.RawQuery)
 			if r.URL.Query().Get("projectKeys") == "TKT" {

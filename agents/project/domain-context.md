@@ -53,6 +53,11 @@ commit hash behind it; the instruction gate checks the hash exists.
 - The edit screen and the create screen are separate configurations and a
   field can be on one and not the other, so neither answer stands in for the
   other.
+- TAM's own fields are the ones a screen check forgets. Story Points, the
+  Epic Link and an Epic Name are set by the form rather than by the extras,
+  so the create-meta filter in `applyExtras` never saw them and Jira refused
+  the whole create when a screen lacked one. Both write paths now check them
+  (bcbb486 for the edit, and the create beside it).
 - Being on the screen is not the whole answer: each field carries an
   `operations` array, and a field listing add and remove but not `set`
   refuses the single value an edit sends. The instance behind #52 answers

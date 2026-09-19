@@ -158,12 +158,15 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	if len(d.Labels) > 0 {
 		fields["labels"] = d.Labels
 	}
+	// An estimate TAM cannot place is refused rather than guessed at or
+	// dropped, which is a different thing from one the screen does not
+	// carry: there the user has nothing to decide.
+	pointsID := ""
 	if d.StoryPoints != nil {
-		pointsID, err := b.pointsField(projectKey, ids)
-		if err != nil {
+		var err error
+		if pointsID, err = b.pointsField(projectKey, ids); err != nil {
 			return "", nil, err
 		}
-		fields[pointsID] = *d.StoryPoints
 	}
 	// A sub-task hangs off its parent through Jira's own parent field, not
 	// through the Epic Link, and cannot exist without one.
@@ -172,22 +175,22 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 			return "", nil, errors.New("a sub-task needs a parent issue")
 		}
 		fields["parent"] = map[string]string{"key": d.ParentKey}
-	} else if d.ParentKey != "" && d.Type != backend.TypeEpic {
-		if ids.EpicLink != "" {
-			fields[ids.EpicLink] = d.ParentKey
-		} else {
-			log.Printf("tam: %s has no Epic Link field; parent %s dropped from the create of %q", b.c.BaseURL(), d.ParentKey, d.Summary)
-		}
 	}
-	var leftOut []string
+	// The create screen is read once, and only when the create carries
+	// something it could refuse: one of the three fields TAM sets itself
+	// that an instance can leave off, or an extra. Everything else on the
+	// form is on every create screen there is, so a plain create still makes
+	// the requests it always made, which is what a long import notices.
+	screen := createScreen{}
+	if len(d.Extra) > 0 || d.StoryPoints != nil || d.Type == backend.TypeEpic ||
+		(d.ParentKey != "" && d.Type != backend.TypeSubtask) {
+		screen.meta, screen.err = b.createMeta(ctx, projectKey, d.Type)
+	}
+	leftOut := b.applyOwnFields(ctx, d, ids, pointsID, screen, fields)
 	if len(d.Extra) > 0 {
-		leftOut = b.applyExtras(ctx, projectKey, names[0], d, ids, fields)
+		leftOut = append(leftOut, b.applyExtras(ctx, names[0], d, ids, screen, fields)...)
 	}
-	if d.Type == backend.TypeEpic && ids.EpicName != "" {
-		if _, set := fields[ids.EpicName]; !set {
-			fields[ids.EpicName] = d.Summary
-		}
-	}
+	b.applyEpicName(d, ids, screen, fields)
 	var resp struct {
 		Key string `json:"key"`
 	}
@@ -223,8 +226,8 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 // go rather than dropping a typed value in silence. A field TAM sets itself
 // is not among them: the form's own value is what Jira gets, so nothing the
 // user typed is lost.
-func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, d backend.IssueDraft, ids fieldIDs, fields map[string]any) []string {
-	meta, metaErr := b.createMeta(ctx, projectKey, d.Type)
+func (b *Backend) applyExtras(ctx context.Context, typeName string, d backend.IssueDraft, ids fieldIDs, cs createScreen, fields map[string]any) []string {
+	meta, metaErr := cs.meta, cs.err
 	var screen map[string]bool
 	if d.ScreenFields != nil {
 		screen = make(map[string]bool, len(d.ScreenFields))
@@ -260,12 +263,12 @@ func (b *Backend) applyExtras(ctx context.Context, projectKey, typeName string, 
 			continue
 		}
 		if metaErr != nil {
-			log.Printf("tam: the %s create of %q leaves out %s: the create fields of %s could not be read, so nothing can say the field is on the screen (%v)", typeName, d.Summary, id, projectKey, metaErr)
+			log.Printf("tam: the %s create of %q leaves out %s: the create fields could not be read, so nothing can say the field is on the screen (%v)", typeName, d.Summary, id, metaErr)
 			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
-		if meta.Source == corejira.MetaPerType && !known {
-			log.Printf("tam: the %s create of %q leaves out %s, which is not on the %s create screen", typeName, d.Summary, id, typeName)
+		if meta.Source == corejira.MetaPerType && !(known && settable(f)) {
+			log.Printf("tam: the %s create of %q leaves out %s, which the %s create screen does not carry or will not let a create set", typeName, d.Summary, id, typeName)
 			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
