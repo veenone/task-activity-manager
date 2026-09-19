@@ -71,13 +71,18 @@ func (o MetaOption) Label() string {
 	return o.Name
 }
 
-// MetaField is one field of a create screen. ID is fieldId on the per-type
-// answer and the map key on the classic one.
+// MetaField is one field of a create or edit screen. ID is fieldId on the
+// per-type answer and the map key on the classic and editmeta ones.
 //
-// Operations and HasDefaultValue are parsed but not read yet: the createmeta
-// probe (docs/superpowers/plans/assets/2026-09-15-createmeta-probe.md)
-// decides whether the screen check TAM builds on top of this reader uses
-// them.
+// Operations is what a write may do to the field: a field an edit screen
+// lists with add and remove but not set refuses the single value a TAM edit
+// sends, and the edit-screen reader drops it for that reason. An absent
+// array is not an empty one; some Data Center payloads omit it, and that
+// says nothing rather than no.
+//
+// HasDefaultValue is parsed but not read yet: the createmeta probe
+// (docs/superpowers/plans/assets/2026-09-15-createmeta-probe.md) decides
+// whether the create screen check uses it.
 type MetaField struct {
 	ID              string       `json:"fieldId"`
 	Name            string       `json:"name"`
@@ -88,22 +93,30 @@ type MetaField struct {
 	AllowedValues   []MetaOption `json:"allowedValues"`
 }
 
-// CreateMeta is one issue type's create fields and the endpoint that
-// answered, since only the per-type answer can be read as the screen.
-type CreateMeta struct {
-	Source string
-	Fields []MetaField
-}
+// MetaFields is a screen's fields, whichever endpoint reported them. Both
+// create metadata and editmeta answer with the same MetaField, so the lookup
+// over them is written once.
+type MetaFields []MetaField
 
 // Field finds a field by id.
-func (m CreateMeta) Field(id string) (MetaField, bool) {
-	for _, f := range m.Fields {
+func (m MetaFields) Field(id string) (MetaField, bool) {
+	for _, f := range m {
 		if f.ID == id {
 			return f, true
 		}
 	}
 	return MetaField{}, false
 }
+
+// CreateMeta is one issue type's create fields and the endpoint that
+// answered, since only the per-type answer can be read as the screen.
+type CreateMeta struct {
+	Source string
+	Fields MetaFields
+}
+
+// Field finds a field by id.
+func (m CreateMeta) Field(id string) (MetaField, bool) { return m.Fields.Field(id) }
 
 // Kind is how the field is rendered and shaped.
 func (f MetaField) Kind() string {

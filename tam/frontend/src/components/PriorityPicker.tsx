@@ -6,6 +6,10 @@ interface Props {
   onChange: (priority: string) => void;
   id: string;
   disabled?: boolean;
+  // Ids of the text explaining why this control is as it is, passed through
+  // to the control itself: a caller's paragraph beside the picker reaches
+  // nobody using a screen reader unless the control points at it.
+  describedBy?: string;
   // What an empty value means to this form: a create leaves Jira's default,
   // an edit leaves the issue's current priority alone.
   emptyLabel: string;
@@ -19,7 +23,7 @@ interface Props {
 // When the list cannot be read the control degrades to the text input it used
 // to be, rather than blocking the form: the same shape the create dialog uses
 // for a failed create-meta read.
-export function PriorityPicker({ profileId, value, onChange, id, disabled, emptyLabel }: Props) {
+export function PriorityPicker({ profileId, value, onChange, id, disabled, describedBy, emptyLabel }: Props) {
   const priorities = usePriorities(profileId);
 
   if (priorities.isError) {
@@ -30,6 +34,7 @@ export function PriorityPicker({ profileId, value, onChange, id, disabled, empty
           className="detail-input"
           type="text"
           disabled={disabled}
+          aria-describedby={describedBy}
           placeholder={emptyLabel}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -51,6 +56,7 @@ export function PriorityPicker({ profileId, value, onChange, id, disabled, empty
       id={id}
       className="detail-input"
       disabled={disabled || priorities.isPending}
+      aria-describedby={describedBy}
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >

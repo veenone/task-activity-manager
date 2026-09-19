@@ -37,6 +37,38 @@ commit hash behind it; the instruction gate checks the hash exists.
   reads as "tested by" from one side and something else from the other, so a
   link is resolved by direction, never by type name alone (6ef4b6d, 0218fca).
 
+## Jira create and edit screens
+
+- Jira decides which fields an issue may be edited with per project and issue
+  type, through the edit screen they carry, and
+  `GET /rest/api/2/issue/{key}/editmeta` is the only call that says so. One
+  instance seen in the field answers six fields for every type of a project,
+  story and sub-task alike: summary, priority, reporter, description, labels
+  and assignee. Story Points is not among them, although it reads fine on the
+  issue and exists in the instance's field list (a0672d1). A field list is not
+  a screen.
+- The editmeta payload is the same `fields` map keyed by field id that the
+  classic create-meta call returns, so `MetaField` and `MetaSchema` read both
+  (09ab90a).
+- The edit screen and the create screen are separate configurations and a
+  field can be on one and not the other, so neither answer stands in for the
+  other.
+- TAM's own fields are the ones a screen check forgets. Story Points, the
+  Epic Link and an Epic Name are set by the form rather than by the extras,
+  so the create-meta filter in `applyExtras` never saw them and Jira refused
+  the whole create when a screen lacked one. Both write paths now check them
+  (bcbb486 for the edit, and the create beside it).
+- Being on the screen is not the whole answer: each field carries an
+  `operations` array, and a field listing add and remove but not `set`
+  refuses the single value an edit sends. The instance behind #52 answers
+  `["set"]` for everything and `["add","set","remove"]` for labels, so it
+  does not hit this, but the array is the half of the payload that says what
+  a write may do. An absent array is not an empty one; some payloads omit it,
+  and that says nothing rather than no.
+- A screen that cannot be read is not an empty screen. Treating a failed
+  editmeta read as "nothing is editable" would refuse every field on a 403;
+  the write goes and Jira's own refusal decides (a0672d1).
+
 ## Modals
 
 - Modal layering and backgrounds have cost four separate fixes: the grid header

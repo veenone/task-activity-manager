@@ -100,6 +100,9 @@ func (f *fake) GetIssue(_ context.Context, key string) (backend.Issue, error) {
 	}
 	return iss, nil
 }
+func (f *fake) EditableFields(context.Context, string) ([]string, error) {
+	return issuerepo.EditableFields, nil
+}
 func (f *fake) UpdateIssue(_ context.Context, key string, fields map[string]string) error {
 	if err := f.updateErr[key]; err != nil {
 		return err

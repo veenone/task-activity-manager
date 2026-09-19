@@ -42,7 +42,67 @@ type fakeJira struct {
 	commentFailFrom int
 	commentStarts   []int
 	detailQuery     string // the query string of the last GET /issue/PLAT-412
+
+	// The editmeta endpoint. editMeta is the body it answers with, empty
+	// meaning a screen carrying everything TAM edits; editMetaFail makes it
+	// answer 403, the shape of an instance that will not say what the screen
+	// holds.
+	editMeta     string
+	editMetaFail bool
+	// editMetaCalls counts the reads, for the tests that pin when the
+	// screen is asked for at all.
+	editMetaCalls int32
+
+	// The per-type create metadata, for the create-screen checks. Each is
+	// the body that endpoint answers with, empty meaning the fake's own
+	// default. perTypeEpicID, when set, is the id TKT gives its Epic type,
+	// which is what makes the per-type endpoint answerable for an epic at
+	// all: without it the backend falls back to the classic call, which is
+	// not the create screen.
+	perTypeStory  string
+	perTypeEpic   string
+	perTypeEpicID string
 }
+
+// sixFieldScreen is what a real Data Center answered for every issue type of
+// one project, story and sub-task alike: six fields, with neither Story
+// Points nor the Epic Link among them, although Story Points reads fine on
+// the issue and exists in the instance's field list.
+const sixFieldScreen = `{"fields":{
+	"summary":{"required":true,"name":"Summary","operations":["set"],"schema":{"type":"string","system":"summary"}},
+	"priority":{"required":false,"name":"Priority","operations":["set"],"schema":{"type":"priority","system":"priority"}},
+	"reporter":{"required":true,"name":"Reporter","operations":["set"],"schema":{"type":"user","system":"reporter"}},
+	"description":{"required":false,"name":"Description","operations":["set"],"schema":{"type":"string","system":"description"}},
+	"labels":{"required":false,"name":"Labels","operations":["add","set","remove"],"schema":{"type":"array","items":"string","system":"labels"}},
+	"assignee":{"required":false,"name":"Assignee","operations":["set"],"schema":{"type":"user","system":"assignee"}}
+}}`
+
+// unsettableScreen lists every field TAM edits, but Story Points may only be
+// read and the Epic Link only added to and removed from. Neither takes the
+// set a TAM edit sends. Summary carries no operations array at all, the way
+// an older Data Center payload can: absent is not empty, and it stays
+// editable.
+const unsettableScreen = `{"fields":{
+	"summary":{"required":true,"name":"Summary","schema":{"type":"string","system":"summary"}},
+	"priority":{"required":false,"name":"Priority","operations":["set"],"schema":{"type":"priority","system":"priority"}},
+	"description":{"required":false,"name":"Description","operations":["set"],"schema":{"type":"string","system":"description"}},
+	"labels":{"required":false,"name":"Labels","operations":["add","set","remove"],"schema":{"type":"array","items":"string","system":"labels"}},
+	"assignee":{"required":false,"name":"Assignee","operations":["set"],"schema":{"type":"user","system":"assignee"}},
+	"customfield_10016":{"required":false,"name":"Story Points","operations":[],"schema":{"type":"number"}},
+	"customfield_10014":{"required":false,"name":"Epic Link","operations":["add","remove"],"schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}}
+}}`
+
+// fullScreen carries every field TAM edits, including the two custom ones
+// this fake's field list discovers.
+const fullScreen = `{"fields":{
+	"summary":{"required":true,"name":"Summary","operations":["set"],"schema":{"type":"string","system":"summary"}},
+	"priority":{"required":false,"name":"Priority","operations":["set"],"schema":{"type":"priority","system":"priority"}},
+	"description":{"required":false,"name":"Description","operations":["set"],"schema":{"type":"string","system":"description"}},
+	"labels":{"required":false,"name":"Labels","operations":["add","set","remove"],"schema":{"type":"array","items":"string","system":"labels"}},
+	"assignee":{"required":false,"name":"Assignee","operations":["set"],"schema":{"type":"user","system":"assignee"}},
+	"customfield_10016":{"required":false,"name":"Story Points","operations":["set"],"schema":{"type":"number"}},
+	"customfield_10014":{"required":false,"name":"Epic Link","operations":["set"],"schema":{"type":"any","custom":"com.pyxis.greenhopper.jira:gh-epic-link"}}
+}}`
 
 // comments answers /rest/api/2/issue/{key}/comment. Comment n has id n and
 // body "comment n", with comment 1 the oldest, so a newest-first page
@@ -118,7 +178,18 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/createmeta/"):
 			f.searches = append(f.searches, "createmeta-type "+r.URL.Path)
 			switch r.URL.Path {
+			case "/rest/api/2/issue/createmeta/TKT/issuetypes/" + f.perTypeEpicID:
+				if f.perTypeEpicID == "" {
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(`{"errorMessages":["not found"]}`))
+					return
+				}
+				_, _ = w.Write([]byte(f.perTypeEpic))
 			case "/rest/api/2/issue/createmeta/TKT/issuetypes/10001":
+				if f.perTypeStory != "" {
+					_, _ = w.Write([]byte(f.perTypeStory))
+					return
+				}
 				_, _ = w.Write([]byte(`{"startAt":0,"maxResults":50,"total":8,"isLast":true,"values":[
 					{"fieldId":"summary","name":"Summary","required":true,"schema":{"type":"string","system":"summary"}},
 					{"fieldId":"issuetype","name":"Issue Type","required":true,"schema":{"type":"issuetype","system":"issuetype"}},
@@ -146,7 +217,11 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(`{"errorMessages":["down"]}`))
 		case r.URL.Path == "/rest/api/2/project/TKT":
-			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10001","name":"Story"},{"id":"10003","name":"Technical task","subtask":true}]}`))
+			epic := ""
+			if f.perTypeEpicID != "" {
+				epic = `,{"id":"` + f.perTypeEpicID + `","name":"Epic"}`
+			}
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"10001","name":"Story"},{"id":"10003","name":"Technical task","subtask":true}` + epic + `]}`))
 		case r.URL.Path == "/rest/api/2/issue/createmeta":
 			f.searches = append(f.searches, "createmeta "+r.URL.RawQuery)
 			if r.URL.Query().Get("projectKeys") == "TKT" {
@@ -176,6 +251,18 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 				"customfield_10071":{"required":true,"name":"Keywords","schema":{"type":"array","items":"string"}},
 				"environment":{"required":false,"name":"Environment","schema":{"type":"string"}}
 			}}]}]}`))
+		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/") && strings.HasSuffix(r.URL.Path, "/editmeta"):
+			atomic.AddInt32(&f.editMetaCalls, 1)
+			if f.editMetaFail {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"errorMessages":["no permission"]}`))
+				return
+			}
+			body := f.editMeta
+			if body == "" {
+				body = fullScreen
+			}
+			_, _ = w.Write([]byte(body))
 		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/") && strings.HasSuffix(r.URL.Path, "/comment"):
 			f.comments(w, r)
 		case r.URL.Path == "/rest/api/2/issue/PLAT-412/transitions":
@@ -276,6 +363,11 @@ const transitionsBody = `{"transitions":[
 ]}`
 
 const twoFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true}]`
+
+// duplicatePointsFields is an instance with two fields called Story Points.
+// Discovery refuses to guess between them (5a05384), which leaves the id
+// empty for a reason that is not absence.
+const duplicatePointsFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_11900","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true}]`
 
 const threeFields = `[{"id":"customfield_10020","name":"Sprint","custom":true},{"id":"customfield_10016","name":"Story Points","custom":true},{"id":"customfield_10014","name":"Epic Link","custom":true}]`
 

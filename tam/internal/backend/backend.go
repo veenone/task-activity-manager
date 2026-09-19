@@ -576,6 +576,11 @@ type IssueBackend interface {
 	// (summary, description, priority, labels, storyPoints, assignee) with
 	// the text form the journal holds.
 	UpdateIssue(ctx context.Context, key string, fields map[string]string) error
+	// EditableFields is the part of that same logical set the issue's edit
+	// screen carries, sorted. The instance decides it per project and issue
+	// type, so the answer holds for every issue sharing those two and the
+	// caller caches it against them.
+	EditableFields(ctx context.Context, key string) ([]string, error)
 	// Transition moves the issue into targetStatusID by firing the workflow
 	// transition that reaches it, resolved at push time from what Jira
 	// offers for that issue at that moment. It returns ErrNoTransition when

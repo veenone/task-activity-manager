@@ -6,9 +6,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import * as api from "../api";
 import type { PendingChange } from "../api";
+import { groupPending } from "../queries/pending";
 import { profileBackend } from "../profileBackend";
 import { SyncProvider } from "../contexts/SyncContext";
-import { PendingChangesModal, sprintChangeLine } from "./PendingChangesModal";
+import { PendingChangesModal, countPushable, sprintChangeLine } from "./PendingChangesModal";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
@@ -26,6 +27,7 @@ vi.mock("../api", async () => {
     CommitPendingChanges: vi.fn(),
     ResolveConflictOverride: vi.fn(),
     ResolveConflictKeepRemote: vi.fn(),
+    ListUnpushableEdits: vi.fn(),
   };
 });
 
@@ -67,6 +69,7 @@ beforeEach(() => {
   vi.mocked(api.ListPendingChanges).mockResolvedValue(rows);
   vi.mocked(api.DiscardPendingChange).mockResolvedValue();
   vi.mocked(api.DiscardAllPendingChanges).mockResolvedValue(3);
+  vi.mocked(api.ListUnpushableEdits).mockResolvedValue([]);
 });
 
 describe("PendingChangesModal", () => {
@@ -85,6 +88,31 @@ describe("PendingChangesModal", () => {
     expect(rowsOfCard[0]).toHaveTextContent("Priority Medium to High");
     expect(rowsOfCard[1]).toHaveTextContent("Assignee (none) to M. Ortiz");
     expect(within(dialog).getByRole("button", { name: "Commit (2)" })).toBeEnabled();
+  });
+
+  // Issue #52: an edit journalled for a field Jira will not take is named
+  // here and kept. Discarding it stays the user's own act.
+  it("names an edit Jira will not take and leaves the row alone", async () => {
+    vi.mocked(api.ListUnpushableEdits).mockResolvedValue([{ id: 2, key: "PLAT-409", field: "priority" }]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const card = (await within(dialog).findAllByRole("group"))[1];
+    const note = await within(card).findByText(/Jira will not take Priority on PLAT-409/);
+    // The explanation comes before the action it qualifies, in the order a
+    // screen reader walks the row rather than only where the eye lands.
+    const discard = within(card).getByRole("button", { name: "Discard priority on PLAT-409" });
+    expect(note.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Not the held treatment: an unpushable row wears no Waiting chip, and
+    // borrowing the colour that always comes with one would say it does.
+    expect(note).not.toHaveClass("pending-held");
+    expect(within(card).queryByText("Waiting")).not.toBeInTheDocument();
+    // The row is still there, with the value the user typed, and still only
+    // theirs to discard.
+    expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("Priority Medium to High");
+    expect(within(card).getByRole("button", { name: "Discard priority on PLAT-409" })).toBeEnabled();
+    expect(api.DiscardPendingChange).not.toHaveBeenCalled();
+    // The other row says nothing: Jira takes it.
+    expect(within(card).queryByText(/Jira will not take Assignee/)).not.toBeInTheDocument();
   });
 
   it("discards one row and all rows", async () => {
@@ -353,6 +381,67 @@ describe("PendingChangesModal", () => {
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 42));
     await user.click(within(dialog).getByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText("Last commit: 1 sprint change pushed (Sprint 12 completed, 45 unfinished cards moved to Sprint 13).")).toBeInTheDocument();
+  });
+
+  // The number on the button is what Commit will deliver. A refused field
+  // fails that issue's whole update, so an issue carrying one delivers
+  // nothing and must not be counted. Tested where the number is worked out.
+  describe("countPushable", () => {
+    const groups = groupPending(rows);
+
+    it("counts every group when nothing is known to be refused", () => {
+      expect(countPushable(groups, new Set(), new Set())).toBe(2);
+    });
+
+    it("leaves out an issue carrying a row Jira will refuse", () => {
+      expect(countPushable(groups, new Set(), new Set(["PLAT-409"]))).toBe(1);
+    });
+
+    it("still counts an issue nothing is known about", () => {
+      // The refusal set only ever holds issues whose screen TAM has read.
+      // An issue missing from it is unknown, not known to be fine, and an
+      // unknown issue may well push, so it stays in the number.
+      expect(countPushable(groups, new Set(), new Set(["OTHER-1"]))).toBe(2);
+    });
+
+    it("does not count a conflicted issue twice out", () => {
+      expect(countPushable(groups, new Set(["PLAT-409"]), new Set(["PLAT-409"]))).toBe(1);
+    });
+
+    it("leaves a sprint or board alone when an issue shares its key", () => {
+      // A sprint group's key is its numeric id and a draft board's is a
+      // negative one, so only an issue group may be matched by issue key.
+      const sprintRows: PendingChange[] = [
+        { id: 9, entityType: "sprint_start", entityKey: "12", field: "start", beforeVal: "", baseVersion: "", createdAt: "",
+          afterVal: JSON.stringify({ boardId: 1, name: "Sprint 12", startDate: "2026-09-14T09:00:00.000+0000", endDate: "2026-09-28T09:00:00.000+0000" }) },
+      ];
+      expect(countPushable(groupPending(sprintRows), new Set(), new Set(["12"]))).toBe(1);
+    });
+  });
+
+  it("drops a refused issue out of the Commit count and says why", async () => {
+    vi.mocked(api.ListUnpushableEdits).mockResolvedValue([{ id: 2, key: "PLAT-409", field: "priority" }]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    // Three rows on two issues, one of which Jira will refuse: the draft is
+    // all Commit can deliver.
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Commit (1)" })).toBeInTheDocument());
+    expect(await within(dialog).findByText(/1 issue is not in that count/)).toBeInTheDocument();
+    // The work itself is untouched: both cards are still there, and the
+    // refused row is still the user's to discard.
+    expect(within(dialog).getAllByRole("group")).toHaveLength(2);
+    expect(within(dialog).getByRole("button", { name: "Discard priority on PLAT-409" })).toBeEnabled();
+  });
+
+  it("accounts for a Commit count of zero rather than leaving an inert button", async () => {
+    vi.mocked(api.ListPendingChanges).mockResolvedValue(rows.filter((r) => r.entityKey === "PLAT-409"));
+    vi.mocked(api.ListUnpushableEdits).mockResolvedValue([{ id: 2, key: "PLAT-409", field: "priority" }]);
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const commit = await within(dialog).findByRole("button", { name: "Commit (0)" });
+    expect(commit).toBeDisabled();
+    // A disabled button with no account of why is the thing to avoid.
+    expect(await within(dialog).findByText(/1 issue is not in that count/)).toBeInTheDocument();
   });
 
   it("reads a completion into the backlog as such", () => {

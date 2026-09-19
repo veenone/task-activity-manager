@@ -899,3 +899,64 @@ func TestFreshDatabaseHasTheBoardDraftColumn(t *testing.T) {
 		t.Errorf("draft = %d, want 1", draft)
 	}
 }
+
+// Every other version assertion in this file compares the recorded stamp
+// against Schema.Version, which is the value that wrote it, so none of them
+// can fail and none of them noticed that the stamp sat at 14 while migration
+// 15 existed. A migration above the stamp never completes: it re-runs on
+// every open of a database at that version, forever. This is the assertion
+// that bites, and it fails on the commit before the stamp moved to 16.
+func TestSchemaVersionIsNotBehindItsMigrations(t *testing.T) {
+	if len(tamstore.Schema.Migrations) == 0 {
+		t.Fatal("no migrations to check, so this gate is measuring nothing")
+	}
+	for _, m := range tamstore.Schema.Migrations {
+		if m.Version > tamstore.Schema.Version {
+			t.Errorf("migration v%d is above the recorded schema version %d, so it re-runs on every open of a database at that version instead of once",
+				m.Version, tamstore.Schema.Version)
+		}
+	}
+}
+
+// edit_screen is a whole new table, so Base creates it and no migration
+// entry exists for it. Nothing covered that path, which is the one that
+// decides whether a database written before version 16 gains the table at
+// all.
+func TestSchemaVersionSixteenAddsTheEditScreenTableToAnOlderDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`DROP TABLE edit_screen`,
+		`UPDATE meta SET value = '15' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	// The table is back, and it is usable rather than merely present: a row
+	// written through the real key round-trips.
+	if _, err := db.DB().Exec(
+		`INSERT INTO edit_screen (profile_id, project, issue_type, fields_json, cached_at) VALUES ('p1','PLAT','story','["summary"]','2026-09-19T00:00:00Z')`,
+	); err != nil {
+		t.Fatalf("write to the upgraded table: %v", err)
+	}
+	var fields string
+	if err := db.DB().QueryRow(
+		`SELECT fields_json FROM edit_screen WHERE profile_id = 'p1' AND project = 'PLAT' AND issue_type = 'story'`,
+	).Scan(&fields); err != nil {
+		t.Fatalf("read it back: %v", err)
+	}
+	if fields != `["summary"]` {
+		t.Errorf("fields_json = %s", fields)
+	}
+}

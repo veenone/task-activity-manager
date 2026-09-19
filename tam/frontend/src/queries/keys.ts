@@ -12,6 +12,14 @@ export const keys = {
   pending: (profileId: string) => [profileId, "pending"] as const,
   activity: (profileId: string, key: string) => [profileId, "issue", key, "activity"] as const,
   createFields: (profileId: string, type: string) => [profileId, "createFields", type] as const,
+  // The fields Jira lets an issue of this type be edited with. Jira decides
+  // that per project and issue type, and a profile has one project, so the
+  // type is the whole key: every issue of it shares the answer and asking
+  // again per issue would be the same question.
+  editableFields: (profileId: string, type: string) => [profileId, "editableFields", type] as const,
+  // The journalled edits Jira would refuse, for the whole profile at once,
+  // because the dialog that shows them spans every issue with pending work.
+  unpushableEdits: (profileId: string) => [profileId, "unpushableEdits"] as const,
   linkTypes: (profileId: string) => [profileId, "linkTypes"] as const,
   tree: (profileId: string, q: TreeQuery) => [profileId, "tree", q] as const,
   epics: (profileId: string) => [profileId, "epics"] as const,

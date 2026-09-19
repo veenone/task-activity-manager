@@ -102,6 +102,9 @@ func (f *fake) IssueTypes(context.Context, string) ([]backend.IssueType, error) 
 func (f *fake) GetIssue(context.Context, string) (backend.Issue, error) {
 	return backend.Issue{}, errors.New("not used")
 }
+func (f *fake) EditableFields(context.Context, string) ([]string, error) {
+	return nil, errors.New("not used")
+}
 func (f *fake) UpdateIssue(context.Context, string, map[string]string) error {
 	return errors.New("not used")
 }
@@ -371,6 +374,9 @@ func (c *cancelOnSearch) IssueTypes(context.Context, string) ([]backend.IssueTyp
 }
 func (c *cancelOnSearch) GetIssue(context.Context, string) (backend.Issue, error) {
 	return backend.Issue{}, errors.New("not used")
+}
+func (c *cancelOnSearch) EditableFields(context.Context, string) ([]string, error) {
+	return nil, errors.New("not used")
 }
 func (c *cancelOnSearch) UpdateIssue(context.Context, string, map[string]string) error {
 	return errors.New("not used")

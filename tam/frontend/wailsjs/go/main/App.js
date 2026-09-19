@@ -110,6 +110,10 @@ export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
 
+export function GetEditableFields(arg1, arg2) {
+  return window['go']['main']['App']['GetEditableFields'](arg1, arg2);
+}
+
 export function GetEpicTree(arg1, arg2) {
   return window['go']['main']['App']['GetEpicTree'](arg1, arg2);
 }
@@ -212,6 +216,10 @@ export function ListRitualDocuments(arg1, arg2, arg3) {
 
 export function ListSprints(arg1) {
   return window['go']['main']['App']['ListSprints'](arg1);
+}
+
+export function ListUnpushableEdits(arg1) {
+  return window['go']['main']['App']['ListUnpushableEdits'](arg1);
 }
 
 export function LookupIssue(arg1, arg2) {

@@ -158,6 +158,9 @@ func (stubIssueBackend) EditSprint(context.Context, int, backend.SprintDraft, bo
 func (stubIssueBackend) DeleteSprint(context.Context, int) error {
 	return errors.New("not used")
 }
+func (stubIssueBackend) EditableFields(context.Context, string) ([]string, error) {
+	return nil, errors.New("not used")
+}
 func (stubIssueBackend) CanTransition(context.Context, string, []string) (backend.TransitionCheck, error) {
 	return backend.TransitionCheck{}, errors.New("not used")
 }
