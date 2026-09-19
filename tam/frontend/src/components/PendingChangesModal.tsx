@@ -307,18 +307,18 @@ export function PendingChangesModal({ onClose }: Props) {
                         />
                       ))}
                       {g.edits.map((row) => (
-                        <li key={row.id} className="pending-row">
+                        <li key={row.id} className={`pending-row${unpushableIds.has(row.id) ? " pending-row-unpushable" : ""}`}>
                           <span className="muted">{fieldLabel(row.field)}</span>{" "}
                           <span>{row.beforeVal || "(none)"}</span>{" "}
                           <span className="muted">to</span>{" "}
                           <span className="b">{row.afterVal || "(none)"}</span>{" "}
-                          <button type="button" className="btn btn-discard btn-discard-row" disabled={busy} aria-label={`Discard ${row.field} on ${g.key}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
-                          </button>
                           {unpushableIds.has(row.id) && (
-                            <p className="small pending-held">
+                            <p className="small pending-unpushable">
                               {`Jira will not take ${fieldLabel(row.field)} on ${g.key}: the field is not on that issue's edit screen. The change is kept here until you discard it.`}
                             </p>
                           )}
+                          <button type="button" className="btn btn-discard btn-discard-row" disabled={busy} aria-label={`Discard ${row.field} on ${g.key}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
+                          </button>
                         </li>
                       ))}
                     </ul>

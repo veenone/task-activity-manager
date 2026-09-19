@@ -96,7 +96,15 @@ describe("PendingChangesModal", () => {
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
     const card = (await within(dialog).findAllByRole("group"))[1];
-    expect(await within(card).findByText(/Jira will not take Priority on PLAT-409/)).toBeInTheDocument();
+    const note = await within(card).findByText(/Jira will not take Priority on PLAT-409/);
+    // The explanation comes before the action it qualifies, in the order a
+    // screen reader walks the row rather than only where the eye lands.
+    const discard = within(card).getByRole("button", { name: "Discard priority on PLAT-409" });
+    expect(note.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Not the held treatment: an unpushable row wears no Waiting chip, and
+    // borrowing the colour that always comes with one would say it does.
+    expect(note).not.toHaveClass("pending-held");
+    expect(within(card).queryByText("Waiting")).not.toBeInTheDocument();
     // The row is still there, with the value the user typed, and still only
     // theirs to discard.
     expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("Priority Medium to High");
