@@ -101,8 +101,21 @@ export function EditableFields({ profileId, issue, description, descriptionReady
   // a bug in TAM; disabled with the reason beside it says who has to change
   // what. An empty answer means nothing is known, not that nothing may be
   // edited, so a never-synced profile keeps the whole list.
-  const listed = screen.data && screen.data.length > 0 ? new Set<EditableField>(screen.data) : null;
+  //
+  // Resolved only once the read has landed and said so, the same shape the
+  // create dialog uses for its own screen answer. The query cache is empty
+  // at every app start and the backend asks Jira before it reads its own
+  // store, so there is a real window with no answer in hand; drawing an
+  // enabled control through it and disabling it a round trip later is how a
+  // value gets typed into a field Jira will refuse.
+  const listed = screen.isSuccess && screen.data.length > 0 ? new Set<EditableField>(screen.data) : null;
   const offScreen = (field: EditableField) => listed !== null && !listed.has(field);
+  // locked covers both: a field Jira will not take, and every field while
+  // nothing is known yet. Nothing locked can be typed into, and nothing
+  // locked can be saved, because disabled is a control state and not a write
+  // guard: a value can still reach the form from the issue shown before this
+  // one, which the reset effect keeps on purpose.
+  const locked = (field: EditableField) => screen.isLoading || offScreen(field);
 
   const editing = editingKey === issue.key;
   const picked = pickedFormats.get(memoryKey(profileId, issue.key));
@@ -144,7 +157,11 @@ export function EditableFields({ profileId, issue, description, descriptionReady
     setError("");
   }
 
-  const changed = EDITABLE_FIELDS.map((f) => f.id).filter((f) => values[f] !== base[f]);
+  const changed = EDITABLE_FIELDS.map((f) => f.id).filter((f) => values[f] !== base[f] && !locked(f));
+  // Whether anything on this form is refused, which is what the one sentence
+  // about administrators is worth saying for. Per field it would repeat, and
+  // the project this was found on leaves two of the seven off every screen.
+  const anyOffScreen = EDITABLE_FIELDS.some((f) => offScreen(f.id));
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -175,6 +192,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
     <form className="edit-form" onSubmit={(e) => void onSubmit(e)} aria-label="Edit fields">
       {EDITABLE_FIELDS.filter((f) => f.id !== "parentKey" || issue.type !== "epic").map((f) => {
         const off = offScreen(f.id);
+        const shut = locked(f.id);
         return (
         <div key={f.id} className="edit-row">
           {f.id === "description" ? (
@@ -187,7 +205,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               <button
                 type="button"
                 className="btn btn-ghost edit-description-action"
-                disabled={!descriptionReady || off}
+                disabled={!descriptionReady || shut}
                 onClick={editing ? cancelEdit : () => setEditingKey(issue.key)}
               >
                 {editing ? "Cancel" : "Edit"}
@@ -233,7 +251,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               value={values.assignee}
               fallbackLabel={issue.assignee}
               onChange={(v) => set("assignee", v)}
-              disabled={busy || off}
+              disabled={busy || shut}
             />
           ) : f.id === "priority" ? (
             <PriorityPicker
@@ -241,7 +259,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               id={`edit-${f.id}`}
               value={values.priority}
               onChange={(v) => set("priority", v)}
-              disabled={busy || off}
+              disabled={busy || shut}
               emptyLabel="(none)"
             />
           ) : f.id === "parentKey" ? (
@@ -257,7 +275,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
                 id={`edit-${f.id}`}
                 className="detail-input"
                 value={values.parentKey}
-                disabled={off}
+                disabled={shut}
                 onChange={(e) => set("parentKey", e.target.value)}
               >
                 <option value="">(none)</option>
@@ -273,18 +291,23 @@ export function EditableFields({ profileId, issue, description, descriptionReady
               type="text"
               inputMode={f.id === "storyPoints" ? "decimal" : undefined}
               value={values[f.id]}
-              disabled={off}
+              disabled={shut}
               onChange={(e) => set(f.id, e.target.value)}
             />
           )}
           {off && (
             <p className="muted small">
-              {`Jira does not have ${f.label} on this issue's edit screen, so TAM cannot change it here. A Jira administrator has to put the field on that screen.`}
+              {`${f.label} is not on this issue's edit screen in Jira.`}
             </p>
           )}
         </div>
         );
       })}
+      {anyOffScreen && (
+        <p className="muted small">
+          A Jira administrator has to add a field to the edit screen before TAM can change it here.
+        </p>
+      )}
       <div className="edit-actions">
         <button type="submit" className="btn btn-primary" disabled={changed.length === 0 || edit.isPending || busy}>
           {edit.isPending ? "Saving" : "Save edit"}

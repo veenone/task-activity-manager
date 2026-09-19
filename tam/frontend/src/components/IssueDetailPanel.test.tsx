@@ -292,6 +292,9 @@ describe("IssueDetailPanel write path", () => {
     const user = userEvent.setup();
     renderPanel();
     const summary = await screen.findByLabelText("Summary");
+    // Wait for the edit screen answer: every field is held closed until it
+    // lands, so clearing before that is a no-op that fails somewhere else.
+    await waitFor(() => expect(summary).toBeEnabled());
     await user.clear(summary);
     await user.type(summary, "Checkout: promo code at payment");
     expect(screen.getByRole("button", { name: "Save edit" })).toBeDisabled();
@@ -309,11 +312,92 @@ describe("IssueDetailPanel write path", () => {
     // The value stays readable: a user who can see it in Jira must not be
     // left wondering where TAM put it.
     expect(points).toHaveValue("5");
-    expect(screen.getByText(/Jira does not have Story points on this issue's edit screen/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Epic")).toBeDisabled();
-    // What Jira does list stays editable.
+    expect(screen.getByText("Story points is not on this issue's edit screen in Jira.")).toBeInTheDocument();
+    // The Epic select is disabled by its own loading branch too, so the
+    // assertion that means anything is its reason, not its disabled state.
+    expect(screen.getByText("Epic is not on this issue's edit screen in Jira.")).toBeInTheDocument();
+    // The sentence about administrators is worth saying once, not once per
+    // refused field: this project leaves two of the seven off every screen.
+    expect(screen.getAllByText(/A Jira administrator has to add a field/)).toHaveLength(1);
+    // What Jira does list stays editable, and says nothing.
     expect(screen.getByLabelText("Summary")).toBeEnabled();
     expect(screen.getByLabelText("Labels")).toBeEnabled();
+    expect(screen.queryByText("Labels is not on this issue's edit screen in Jira.")).not.toBeInTheDocument();
+  });
+
+  // The query cache is empty at every app start and the Go side asks Jira
+  // before it reads its own store, so there is a real window where nothing is
+  // known. Drawing an enabled control through it and disabling it a round
+  // trip later is how a value gets typed into a field Jira will refuse.
+  it("disables the fields until Jira's answer lands, and will not save a value typed first", async () => {
+    let answer: (fields: api.EditableField[]) => void = () => {};
+    vi.mocked(api.GetEditableFields).mockReturnValue(
+      new Promise<api.EditableField[]>((resolve) => { answer = resolve; }),
+    );
+    const user = userEvent.setup();
+    renderPanel();
+
+    const points = await screen.findByLabelText("Story points");
+    expect(points).toBeDisabled();
+    // Nothing is known yet, so nothing is explained yet either.
+    expect(screen.queryByText(/is not on this issue's edit screen/)).not.toBeInTheDocument();
+
+    // A value that reached the form some other way (a dirty value carried
+    // over from the issue shown before this one) must not be saveable while
+    // the answer is outstanding.
+    expect(screen.getByRole("button", { name: "Save edit" })).toBeDisabled();
+
+    answer(["summary", "description", "priority", "labels", "assignee"]);
+    await waitFor(() => expect(screen.getByText(/Story points is not on this issue's edit screen/)).toBeInTheDocument());
+    expect(screen.getByLabelText("Story points")).toBeDisabled();
+    // A field the answer does list becomes editable, so the gate lifted.
+    const summary = screen.getByLabelText("Summary");
+    expect(summary).toBeEnabled();
+    await user.clear(summary);
+    await user.type(summary, "Checkout: promo code at payment");
+    expect(screen.getByRole("button", { name: "Save edit" })).toBeEnabled();
+  });
+
+  // Finding 2: disabled is a control state, not a write guard. A dirty value
+  // in an off-screen field must not reach the journal, or the push-time
+  // refusal blocks that issue's every Commit until the row is discarded by
+  // hand, which is the failure #52 exists to end.
+  it("never saves an off-screen field, even holding a dirty value", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetEditableFields).mockResolvedValue(["summary", "description", "priority", "labels", "assignee", "storyPoints", "parentKey"]);
+    // One client across both renders, so moving to the other issue refetches
+    // the one query whose key changed instead of every query on the panel.
+    const client = createQueryClient();
+    const panel = (issue: Issue) => (
+      <QueryClientProvider client={client}>
+        <DialogProvider>
+          <ProfileProvider backend={profileBackend}>
+            <IssueDetailPanel profileId="p1" issue={issue} onClose={vi.fn()} />
+          </ProfileProvider>
+        </DialogProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(panel(story));
+    const points = await screen.findByLabelText("Story points");
+    await waitFor(() => expect(points).toBeEnabled());
+    await user.clear(points);
+    await user.type(points, "8");
+    expect(screen.getByRole("button", { name: "Save edit" })).toBeEnabled();
+
+    // The same component now shows a sub-task whose screen has no estimate,
+    // and the dirty value rides along (IssueDetailPanel renders EditableFields
+    // without a key, and the reset effect keeps dirty fields on purpose).
+    vi.mocked(api.GetEditableFields).mockResolvedValue(["summary", "description", "priority", "labels", "assignee"]);
+    rerender(panel({ ...story, key: "PLAT-500", id: "9", type: "subtask", parentKey: "PLAT-412" }));
+    // Wait for the answer itself, not for the control: every field is
+    // disabled while the read is in flight, so a disabled box proves nothing
+    // until the reason is beside it.
+    await screen.findByText("Story points is not on this issue's edit screen in Jira.");
+
+    // Whatever the box holds, Save must not journal it.
+    expect(screen.getByLabelText("Story points")).toHaveValue("8");
+    expect(screen.getByRole("button", { name: "Save edit" })).toBeDisabled();
+    expect(api.EditIssue).not.toHaveBeenCalled();
   });
 
   it("edits every field when the profile has never read an edit screen", async () => {
@@ -323,7 +407,7 @@ describe("IssueDetailPanel write path", () => {
     const user = userEvent.setup();
     renderPanel();
     const points = await screen.findByLabelText("Story points");
-    expect(points).toBeEnabled();
+    await waitFor(() => expect(points).toBeEnabled());
     await user.clear(points);
     await user.type(points, "8");
     await user.click(screen.getByRole("button", { name: "Save edit" }));
@@ -334,6 +418,7 @@ describe("IssueDetailPanel write path", () => {
     const user = userEvent.setup();
     renderPanel();
     const summary = await screen.findByLabelText("Summary");
+    await waitFor(() => expect(summary).toBeEnabled());
     await user.clear(summary);
     await user.click(screen.getByRole("button", { name: "Save edit" }));
     expect(await screen.findByText("Summary cannot be empty.")).toBeInTheDocument();
