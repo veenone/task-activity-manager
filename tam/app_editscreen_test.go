@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"agile-suite/core/journal"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/issuerepo"
 )
@@ -120,17 +119,16 @@ func TestListUnpushableEditsNamesTheRowAndKeepsIt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListUnpushableEdits: %v", err)
 	}
-	want := []issuerepo.UnpushableEdit{{ID: rows[0].ID, Key: "PLAT-412", Field: "storyPoints"}}
-	if !reflect.DeepEqual(rows, want) {
-		t.Fatalf("rows = %+v", rows)
-	}
 	// Naming it is not discarding it: the value stays in the journal until
-	// the user says otherwise.
+	// the user says otherwise, and the row named is the journal row itself.
 	pending, err := a.ListPendingChanges(p.ID)
 	if err != nil || len(pending) != 1 || pending[0].AfterVal != "8" {
 		t.Fatalf("journal = %+v, %v", pending, err)
 	}
-	var _ journal.PendingChange = pending[0]
+	want := []issuerepo.UnpushableEdit{{ID: pending[0].ID, Key: "PLAT-412", Field: "storyPoints"}}
+	if !reflect.DeepEqual(rows, want) {
+		t.Fatalf("rows = %+v, want %+v", rows, want)
+	}
 }
 
 // An empty answer is one of the ways of not knowing, so it must not become

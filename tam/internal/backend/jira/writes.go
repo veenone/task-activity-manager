@@ -173,7 +173,7 @@ func (b *Backend) applyExtras(ctx context.Context, typeName string, d backend.Is
 			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue
 		}
-		if meta.Source == corejira.MetaPerType && !(known && settable(f)) {
+		if cs.known() && !cs.carries(id) {
 			log.Printf("tam: the %s create of %q leaves out %s, which the %s create screen does not carry or will not let a create set", typeName, d.Summary, id, typeName)
 			leftOut = append(leftOut, b.fieldLabel(ctx, id))
 			continue

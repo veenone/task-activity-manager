@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -95,18 +96,9 @@ func (r *Repository) UnpushableEdits(ctx context.Context, profileID string) ([]U
 		if err := json.Unmarshal([]byte(raw), &fields); err != nil {
 			continue
 		}
-		if !contains(fields, e.Field) {
+		if !slices.Contains(fields, e.Field) {
 			out = append(out, e)
 		}
 	}
 	return out, rows.Err()
-}
-
-func contains(fields []string, field string) bool {
-	for _, f := range fields {
-		if f == field {
-			return true
-		}
-	}
-	return false
 }

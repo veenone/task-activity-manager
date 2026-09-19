@@ -3,6 +3,7 @@ package jira
 import (
 	"context"
 	"log"
+	"slices"
 	"sort"
 
 	corejira "agile-suite/core/jira"
@@ -97,12 +98,7 @@ func settable(f corejira.MetaField) bool {
 	if f.Operations == nil {
 		return true
 	}
-	for _, op := range f.Operations {
-		if op == "set" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(f.Operations, "set")
 }
 
 // editScreen is the set UpdateIssue guards a write with, nil when nothing is
