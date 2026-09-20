@@ -164,8 +164,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-type-subtask { background: var(--chip-sky-bg); color: var(--chip-sky-text); }
 .chip-type-none { background: var(--surface-3); color: var(--text-muted); }
 .chip-toggle { cursor: pointer; opacity: 0.55; padding: 4px 10px; border-radius: 12px; }
-.chip-toggle.chip-on, .chip-toggle:hover { opacity: 1; }
-.chip-toggle.chip-on { border-color: currentColor; }
+/* Hover lifts a chip part way; only a selected one is fully opaque, and it
+   also fills. One rule used to give both states the same opacity, so
+   hovering an unselected type filter made it look selected. */
+.chip-toggle:hover { opacity: 0.8; }
+.chip-toggle.chip-on { opacity: 1; border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; font-weight: 600; }
 .chip-status { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
 .chip-status-todo { background: var(--surface-3); color: var(--text); }
 .chip-status-active { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
@@ -745,7 +748,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 
 /* The ritual editor: a toolbar, one scroller, and a status line. */
-.ritual-page { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+/* Framed the way .report-frame is: the two main panes of the app read as
+   the same kind of surface. */
+.ritual-page { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .ritual-page-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .ritual-page-head h3 { margin: 0; font-size: 15px; }
 .ritual-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
