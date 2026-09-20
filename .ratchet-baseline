@@ -5,4 +5,6 @@ bespoke_modals 39
 eslint_a11y 95
 eslint_max_lines 23
 eslint_no_console 23
-eslint_problems 198
+eslint_problems 196
+hardcoded_hex 441
+hardcoded_px_font 61
