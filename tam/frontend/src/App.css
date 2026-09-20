@@ -20,29 +20,29 @@ input, button, select { font-family: inherit; font-size: inherit; }
   display: flex;
   justify-content: center;
   padding: 6px 14px;
-  background: #1b2638;
-  border-bottom: 1px solid #0f1722;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
   overflow-x: auto;
 }
 .view-tabs {
   display: flex;
   gap: 2px;
-  background: #2a3850;
+  background: var(--chrome-raised);
   border-radius: 5px;
   padding: 2px;
 }
 .view-tab {
   background: transparent;
   border: none;
-  color: #9aa7bd;
+  color: var(--chrome-text-muted);
   padding: 4px 12px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
 }
-.view-tab:hover { color: #e8eaed; }
-.view-tab-active { background: var(--accent); color: #fff; }
+.view-tab:hover { color: var(--chrome-text); }
+.view-tab-active { background: var(--accent); color: var(--on-accent); }
 .view-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .app-body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
@@ -80,7 +80,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .nav-item:disabled { color: var(--text-muted); cursor: default; }
 /* Active-item fill matches XTM's .view-tab-active token treatment (solid
    accent, white text) so the rail's selection state reads like XTM's tabs. */
-.nav-item-active { background: var(--accent); color: #fff; font-weight: 600; }
+.nav-item-active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .nav-divider { height: 1px; margin: 12px 8px; background: var(--border); }
 .nav-section { padding: 0 14px 4px; font-size: 11px; color: var(--text-muted); }
 .nav-hint { padding: 0 14px; font-size: 10px; color: var(--text-muted); }
@@ -137,7 +137,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    @agile-suite/core's primitives.css now, so TAM adds nothing to it. */
 .check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
 .sprints-show-closed { margin: 0; }
-.topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.topbar-btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .topbar-btn-primary:hover { background: var(--accent-hover); }
 /* Sync progress bar, mirrored from XTM's App.css. The track's dark fill is
    literal there because XTM's status bar is dark; TAM's is the surface, so
@@ -153,20 +153,23 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-sprint { width: 140px; }
 .type-filter { display: flex; gap: 6px; }
 .chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip-type-task { background: #dbeafe; color: #1e40af; }
-.chip-type-story { background: #dcfce7; color: #166534; }
-.chip-type-bug { background: #fee2e2; color: #991b1b; }
-.chip-type-epic { background: #ede9fe; color: #5b21b6; }
-.chip-type-requirement { background: #fef3c7; color: #92400e; }
-.chip-type-subtask { background: #e0f2fe; color: #075985; }
+/* The chip palette lives in tokens.css: these fills were literals, so a chip
+   kept its pastel ground when the window went dark and the text on it was
+   the only thing that moved. */
+.chip-type-task { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
+.chip-type-story { background: var(--chip-green-bg); color: var(--chip-green-text); }
+.chip-type-bug { background: var(--chip-red-bg); color: var(--chip-red-text); }
+.chip-type-epic { background: var(--chip-purple-bg); color: var(--chip-purple-text); }
+.chip-type-requirement { background: var(--warning-bg); color: var(--warning-text); }
+.chip-type-subtask { background: var(--chip-sky-bg); color: var(--chip-sky-text); }
 .chip-type-none { background: var(--surface-3); color: var(--text-muted); }
 .chip-toggle { cursor: pointer; opacity: 0.55; padding: 4px 10px; border-radius: 12px; }
 .chip-toggle.chip-on, .chip-toggle:hover { opacity: 1; }
 .chip-toggle.chip-on { border-color: currentColor; }
 .chip-status { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
 .chip-status-todo { background: var(--surface-3); color: var(--text); }
-.chip-status-active { background: #dbeafe; color: #1e40af; }
-.chip-status-done { background: #dcfce7; color: #166534; }
+.chip-status-active { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
+.chip-status-done { background: var(--chip-green-bg); color: var(--chip-green-text); }
 
 /* Both views are a fixed toolbar over a body that takes the rest. */
 .backlog { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -271,8 +274,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-key-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
 .issue-key-ext { font-size: 9px; opacity: 0.75; flex: none; }
 /* On the panel's dark head the link reads light, not accent-blue. */
-.detail-head .issue-key-link { color: #e8eaed; }
-.detail-head .issue-key-link:hover { color: #fff; }
+.detail-head .issue-key-link { color: var(--chrome-text); }
+.detail-head .issue-key-link:hover { color: var(--chrome-text-strong); }
 /* Pinned to the floor of the card, the way the reference's is, so the page
    controls are in the same place whatever the row count. */
 .pager { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-top: 1px solid var(--border); background: var(--surface-2); flex-wrap: wrap; }
@@ -303,27 +306,27 @@ input, button, select { font-family: inherit; font-size: inherit; }
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  background: #1b2638;
-  color: #e8eaed;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
 }
 .detail-head-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .detail-head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.detail-key { font-size: 13px; font-weight: 600; color: #e8eaed; }
+.detail-key { font-size: 13px; font-weight: 600; color: var(--chrome-text); }
 /* The status reads as a chip on the bar rather than as a row in the grid,
    which is what makes the key and its state one statement. */
 .detail-head-status {
   font-size: 11px;
-  background: #2a3850;
-  color: #c7d0e0;
-  border: 1px solid #3a4a66;
+  background: var(--chrome-raised);
+  color: var(--chrome-chip-text);
+  border: 1px solid var(--chrome-chip-border);
   border-radius: 4px;
   padding: 2px 7px;
   white-space: nowrap;
 }
 .detail-actions { display: flex; gap: 8px; margin-top: 14px; }
 .new-issue-parent { font-weight: 600; color: var(--text); padding-top: 6px; min-width: 0; overflow-wrap: anywhere; }
-.detail-close { color: #9aa7bd; flex-shrink: 0; }
-.detail-close:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.detail-close { color: var(--chrome-text-muted); flex-shrink: 0; }
+.detail-close:hover:not(:disabled) { background: var(--chrome-hover); color: var(--chrome-text-strong); }
 .detail-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 18px; }
 .detail-summary { font-size: 14px; margin: 0 0 12px; }
 /* The label/value grid XTM uses for the read-only facts above the editor. */
@@ -420,10 +423,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .link-group-title { font-size: 12px; margin-bottom: 6px; }
 
 /* Plan 1b: pending changes */
-.chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
-.chip-held { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
-.pending-held { margin: 4px 0 0; color: var(--warn-fg, #92400e); }
-.chip-conflict { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); text-transform: uppercase; font-size: 10px; }
+/* --warn-bg and --warn-fg were defined nowhere, so every rule below drew
+   its fallback and nothing else, in both themes. --warning-bg and
+   --warning-text are the real tokens and hold the same light values. */
+.chip-draft { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
+.chip-held { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
+.pending-held { margin: 4px 0 0; color: var(--warning-text); }
+.chip-conflict { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); text-transform: uppercase; font-size: 10px; }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }
 /* --warn-soft is the token; the --warn-bg this used to name is defined
@@ -431,7 +437,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .pending-banner-warn { background: var(--warn-soft); border-color: var(--warn-border); }
 .pending-list { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
 .pending-card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
-.pending-card-conflict { background: #fff7ed; border-color: #f59e0b; }
+/* A pending change in conflict is the most consequential card in the app.
+   It used to set a near-white fill and no colour at all, so in dark mode the
+   inherited text token landed on it at 1.15 to 1 and the card could not be
+   read. Both ends are stated now, and both themes clear 4.5 to 1. */
+.pending-card-conflict { background: var(--warning-bg); border-color: var(--warn-border); color: var(--text); }
 .pending-card-head { display: flex; align-items: center; gap: 10px; }
 .pending-card-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Discard throws local work away. It is not the dangerous button on this
@@ -470,7 +480,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .b { font-weight: 600; }
 
 /* Plan 1b: editable details, activity, grid markers */
-.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: 6px; vertical-align: middle; }
+.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warning); margin-left: 6px; vertical-align: middle; }
 /* .detail-input carries margin-bottom for the detail panel's stacked fields;
    inside a gap-spaced form that margin doubled the rhythm and left dead space
    under the last row. */
@@ -524,9 +534,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* Plan 1b: conflicts */
 .conflict-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-.conflict-table th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
+.conflict-table th { text-align: left; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
 .conflict-table td { padding: 4px 8px 4px 0; vertical-align: top; }
-.danger-text { color: #b42318; }
+.danger-text { color: var(--danger-text); }
 
 /* Plan 1c: import */
 .filter-import { margin-left: auto; }
