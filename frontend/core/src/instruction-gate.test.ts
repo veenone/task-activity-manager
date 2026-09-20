@@ -42,6 +42,11 @@ const KNOWLEDGE_FILES = [
   'agents/generic/claude-workflows.md',
 ];
 /**
+ * Class names a stylesheet in this repo never defines, and should not.
+ * ProseMirror and its plugins set their own classes on nodes we render.
+ */
+const VENDOR_CLASSES = /^(ProseMirror|tiptap)/;
+/**
  * One entry per contract Never clause a grep settles AND that is clean today.
  * A clause with a backlog belongs in the ratchet, not here.
  */
@@ -242,4 +247,55 @@ describe('instruction gate', () => {
     }
     expect(missing, missing.join('; ')).toEqual([]);
   });
+
+  // A class a component sets and no stylesheet defines fails silently: the
+  // element renders unstyled and nothing reports it. Two shipped that way
+  // here. `.row` left the rituals conflict buttons touching each other, and
+  // `.ritual-page-body` left the fallback for an unparseable Confluence page
+  // as bare HTML under this app's own margin reset.
+  it('every class a component sets is defined in a stylesheet', () => {
+    const sheets = SRC_DIRS.concat(['frontend/core/styles'])
+      .flatMap((d) => walk(path.join(repoRoot, d), /\.css$/))
+      .map((f) => fs.readFileSync(f, 'utf8'))
+      .join('\n');
+    const defined = new Set([...sheets.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]));
+
+    const used = new Map<string, string>();
+    // The two trees this gate is clean over. xtm/frontend has its own backlog
+    // of orphans and is heading out of this repo; adding it here would mean
+    // an allowed number, which belongs in the ratchet, not in this file.
+    for (const dir of ['frontend/core/src', 'tam/frontend/src']) {
+      for (const file of walk(path.join(repoRoot, dir), SOURCE_EXT)) {
+        const rel = path.relative(repoRoot, file).replace(/\\/g, '/');
+        if (rel.includes('.test.')) continue;
+        const src = stripComments(fs.readFileSync(file, 'utf8'));
+        // A plain literal attribute only. A class name assembled from a
+        // variable names nothing a text search can resolve, and a literal
+        // inside a braced expression is as often a comparison as a class.
+        for (const m of src.matchAll(/className="([^"{}]*)"/g)) {
+          for (const name of m[1].trim().split(/\s+/)) {
+            if (name && !used.has(name)) used.set(name, rel);
+          }
+        }
+      }
+    }
+    expect(used.size, 'found no class names to check').toBeGreaterThan(50);
+
+    // Each of these is a second class beside one that carries the styling,
+    // or a wrapper the markup names for structure. They are the backlog this
+    // gate started with: each one is either given a rule or taken off the
+    // element, and the list only shrinks.
+    const HOOKS = new Set([
+      'confirm-modal', 'richfield', 'detail-section', 'link-groups', 'folder-node',
+      'epic-cell-summary', 'epic-cell-status', 'issue-summary', 'sprint-tree',
+      'sprint-cell-state',
+    ]);
+    const orphans = [...used]
+      .filter(([name]) => !defined.has(name) && !VENDOR_CLASSES.test(name) && !HOOKS.has(name))
+      .map(([name, rel]) => `${name} (${rel})`);
+    // A hook that gained a rule leaves the list, so the list cannot rot.
+    const stale = [...HOOKS].filter((name) => defined.has(name));
+    expect(stale, `these are defined now and can leave HOOKS: ${stale.join(', ')}`).toEqual([]);
+    expect(orphans, `classes no stylesheet defines: ${orphans.join(', ')}`).toEqual([]);
+  }, 120_000);
 });

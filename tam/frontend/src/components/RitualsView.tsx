@@ -362,7 +362,7 @@ export function RitualsView() {
                       aria-current={effectiveSelected === type ? "page" : undefined}
                       onClick={() => { setSelected(type); setViewTheirs(false); }}
                     >
-                      <span className="ritual-doc-label">{RITUAL_LABEL[type]}</span>
+                      <span>{RITUAL_LABEL[type]}</span>
                       <span className={`ritual-chip ritual-chip-${d.status}`}>{STATUS_LABEL[d.status]}</span>
                     </button>
                   </li>
