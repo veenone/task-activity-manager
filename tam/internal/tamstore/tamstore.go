@@ -25,6 +25,11 @@
 // Version 15 adds the same draft flag to board, for a board drafted the same
 // way; unlike version 13 it backfills nothing, since a draft board is
 // something the user makes and not something a sync discovers.
+// Version 16 adds edit_screen, the fields Jira says an issue of one project
+// and type may be edited with. A whole new table, so it needs no migration
+// entry for the same reason sprint_report and ritual_document needed none:
+// CREATE TABLE IF NOT EXISTS in Base picks it up on an older file's next
+// open.
 package tamstore
 
 import (
@@ -53,9 +58,13 @@ import (
 // complete_date, a column add in version 7's own shape.
 // Version 9 adds ritual_document through the same idempotent base DDL path
 // as sprint_report.
+// The recorded version was left at 14 when migration 15 was added, so
+// migration 15 re-ran on every open of a version 14 file instead of once.
+// It is idempotent, so nothing broke, but the stamp has to move with the
+// migrations it gates.
 var Schema = store.Schema{
-	Version: 14,
-	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + journal.DDL,
+	Version: 16,
+	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -452,6 +461,23 @@ CREATE TABLE IF NOT EXISTS ritual_document (
 	updated_at        TEXT NOT NULL DEFAULT '',
 	published_at      TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, board_id, sprint_id, ritual_type)
+);`
+
+// editScreenDDL holds what Jira says an issue of one project and issue type
+// may be edited with, by TAM's own field names, so the panel draws the right
+// controls with no network and a Commit is not the first thing to find out.
+// The key is the project and the issue type because that is what Jira
+// decides an edit screen by: every issue sharing the two shares the screen.
+// fields_json is TAM's names, not Jira's ids, since a re-read resolves the
+// ids again anyway and the surfaces reading this all speak TAM's names.
+const editScreenDDL = `
+CREATE TABLE IF NOT EXISTS edit_screen (
+	profile_id  TEXT NOT NULL,
+	project     TEXT NOT NULL,
+	issue_type  TEXT NOT NULL,
+	fields_json TEXT NOT NULL DEFAULT '[]',
+	cached_at   TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, project, issue_type)
 );`
 
 const indexDDL = `

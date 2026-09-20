@@ -14,6 +14,9 @@ interface Props {
   // person yet, e.g. the display name a sync left on the issue.
   fallbackLabel?: string;
   disabled?: boolean;
+  // Ids of the text explaining why this control is as it is, passed through
+  // to the input for the same reason the priority picker takes one.
+  describedBy?: string;
 }
 
 // AssigneePicker finds a person the way Jira's own field does: type part of a
@@ -26,7 +29,7 @@ interface Props {
 // The list is served by App.SearchUsers, which asks Jira, caches the answer in
 // tam.db, and falls back to that cache when Jira cannot be reached, so this
 // keeps working offline and on a demo profile.
-export function AssigneePicker({ profileId, value, onChange, id, fallbackLabel, disabled }: Props) {
+export function AssigneePicker({ profileId, value, onChange, id, fallbackLabel, disabled, describedBy }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -98,6 +101,7 @@ export function AssigneePicker({ profileId, value, onChange, id, fallbackLabel, 
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"
+          aria-describedby={describedBy}
           disabled={disabled}
           placeholder={value ? label : "Unassigned"}
           value={open ? query : value ? label : ""}

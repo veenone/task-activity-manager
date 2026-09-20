@@ -7,9 +7,11 @@ import {
   EditIssue,
   ENTITY_SPRINT_CREATE,
   GetCreateFields,
+  GetEditableFields,
   GetLinkTypes,
   ListActivity,
   ListPendingChanges,
+  ListUnpushableEdits,
 } from "../api";
 import { ENTITY_BOARD_CREATE, ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, SPRINT_ENTITIES, isMoveEntity } from "../api";
 import type { DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange } from "../api";
@@ -49,6 +51,32 @@ export function useCreateFields(profileId: string, type: string) {
     queryFn: () => call(() => GetCreateFields(profileId, type)),
     enabled: !!profileId && !!type,
     staleTime: CREATE_FIELDS_FRESH_FOR,
+    retry: false,
+  });
+}
+
+// useEditableFields is what Jira says an issue of this type may be edited
+// with. It is keyed by the type, not by the issue, because that is what Jira
+// decides an edit screen by, and held as fresh as the create fields for the
+// same reason: the answer only changes when someone edits the project's
+// screens, and the panel would otherwise wait on a round trip per issue.
+export function useEditableFields(profileId: string, type: string, key: string) {
+  return useQuery({
+    queryKey: keys.editableFields(profileId, type),
+    queryFn: () => call(() => GetEditableFields(profileId, key)),
+    enabled: !!profileId && !!type && !!key,
+    staleTime: CREATE_FIELDS_FRESH_FOR,
+    retry: false,
+  });
+}
+
+// useUnpushableEdits is the journal rows Jira's screens say a Commit would
+// refuse. The rows are kept; this only names them.
+export function useUnpushableEdits(profileId: string) {
+  return useQuery({
+    queryKey: keys.unpushableEdits(profileId),
+    queryFn: () => call(() => ListUnpushableEdits(profileId)),
+    enabled: !!profileId,
     retry: false,
   });
 }

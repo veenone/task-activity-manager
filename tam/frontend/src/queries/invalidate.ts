@@ -41,6 +41,9 @@ export function invalidateWrites(qc: QueryClient, profileId: string, key?: strin
   if (!profileId) return;
   qc.invalidateQueries({ queryKey: [profileId, "issues"] });
   qc.invalidateQueries({ queryKey: keys.pending(profileId) });
+  // Which rows Jira would refuse is read off the journal, so it moves
+  // whenever the journal does: a new edit, a discard, a commit.
+  qc.invalidateQueries({ queryKey: keys.unpushableEdits(profileId) });
   qc.invalidateQueries({ queryKey: key ? [profileId, "issue", key] : [profileId, "issue"] });
   qc.invalidateQueries({ queryKey: [profileId, "tree"] });
   qc.invalidateQueries({ queryKey: keys.epics(profileId) });

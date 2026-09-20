@@ -450,6 +450,14 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .pending-discard { margin-left: auto; }
 .pending-rows { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .pending-row { display: grid; grid-template-columns: 110px 1fr auto 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+/* An unpushable row explains itself under its values, with the Discard it
+   qualifies still on the first line. The note comes first in the markup, so
+   a reader meets the reason before the action; the grid puts each where it
+   belongs whatever the source order. Deliberately not .pending-held: that
+   amber always comes with a Waiting chip, and this row wears none. */
+.pending-row-unpushable { grid-template-rows: auto auto; }
+.pending-row-unpushable .btn-discard-row { grid-row: 1; grid-column: 5; }
+.pending-unpushable { grid-column: 1 / -1; grid-row: 2; margin: 2px 0 0; padding-left: 8px; border-left: 2px solid var(--warn-border); color: var(--text-muted); }
 .pending-empty { padding: 24px 0; text-align: center; }
 .pending-footer-buttons { margin-left: auto; display: flex; gap: 8px; }
 .b { font-weight: 600; }
