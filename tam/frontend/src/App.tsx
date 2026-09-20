@@ -5,7 +5,6 @@ import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
 import type { View } from "./nav";
 import { useModal } from "./modals";
-import { Placeholder } from "./components/Placeholder";
 import { BacklogView } from "./components/BacklogView";
 import { AssignedToMeView } from "./components/AssignedToMeView";
 import { EpicsView } from "./components/EpicsView";
@@ -277,10 +276,8 @@ export default function App() {
               <SprintsView />
             ) : current.id === "reports" ? (
               <ReportsView onOpenBoards={() => setView("boards")} />
-            ) : current.id === "rituals" ? (
-              <RitualsView />
             ) : (
-              <Placeholder view={current} />
+              <RitualsView />
             )
           )}
         </main>
