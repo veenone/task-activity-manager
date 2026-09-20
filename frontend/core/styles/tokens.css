@@ -41,6 +41,13 @@
   --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   --ghost-hover: rgba(0, 0, 0, 0.08);
   --on-accent: #fff;
+  /* Family rows. --subtask-indent is the one step a child is drawn to the
+     right of its parent by, and --row-lead-slot the width every row of a
+     family reserves for its expand toggle whether or not it has one. Both
+     are read by .row-lead in primitives.css and nowhere else, so the four
+     tables that each invented their own indent cannot drift apart again. */
+  --subtask-indent: 18px;
+  --row-lead-slot: 32px;
 }
 
 :root[data-theme="dark"] {

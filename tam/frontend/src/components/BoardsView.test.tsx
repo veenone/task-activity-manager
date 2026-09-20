@@ -329,11 +329,26 @@ describe("BoardsView board", () => {
     const subtask = screen.getByRole("gridcell", { name: /PLAT-500 Wire input/ });
     expect(parent.parentElement?.nextElementSibling).toBe(subtask.parentElement);
     expect(subtask).toHaveClass("board-card-subtask");
-    expect(within(subtask).getByText(`↳ Subtask of ${KEYS.key}`)).toBeInTheDocument();
+    // The glyph is the shared one and carries aria-hidden, so the sentence
+    // beside it is what a reader and a screen reader both get.
+    expect(within(subtask).getByText(`Subtask of ${KEYS.key}`)).toBeInTheDocument();
+    expect(subtask.querySelector(".row-lead")?.textContent).toBe("↳");
     await user.click(within(subtask).getByRole("button", { name: `Actions on ${child.key}` }));
     expect(await screen.findByRole("menuitem", { name: "Move to In Progress" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Move to Sprint 13" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Move to the backlog" })).not.toBeInTheDocument();
+  });
+  it("says on the card when a subtask's parent is not on the board", async () => {
+    // The read stops at a card budget, so a cell can hold a subtask whose
+    // parent never got drawn. Without the parent above it the card is just
+    // an inset card, which reads as a story nobody indented on purpose.
+    const stray = issue({ key: "PLAT-501", type: "subtask", parentKey: "PLAT-901", summary: "Retire the gateway" });
+    vi.mocked(api.GetBoard).mockResolvedValue(oneLane([[stray], [PROMO], []]));
+    renderView();
+    const card = await screen.findByRole("gridcell", { name: /PLAT-501 Retire the gateway/ });
+    expect(card).toHaveClass("board-card-subtask");
+    expect(within(card).getByText("Parent not shown")).toBeInTheDocument();
+    expect(within(card).getByText(/Subtask of PLAT-901/)).toBeInTheDocument();
   });
   it("renders the columns with their card counts and point sums", async () => {
     renderView();

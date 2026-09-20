@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Issue, SprintDetail } from "../api";
-import { SprintList, issueOrder, rowIdOf } from "./SprintList";
+import { SprintList } from "./SprintList";
+import { issueOrder, rowIdOf } from "../lib/sprintRows";
+import { leadDepth, leadSlotText } from "../test/rowLead";
 
 function issue(over: Partial<Issue>): Issue {
   return {
@@ -81,6 +83,29 @@ describe("SprintList", () => {
     expect(screen.getByRole("treeitem", { name: "TAM-NEW-1 Wire input" })).toHaveFocus();
     expect(issueOrder([detail({ issues: [child, KEYS, PROMO] })], new Set([PROMO.key])).get(rowIdOf(ACTIVE))).not.toContain(child.key);
   });
+  it("leads every card of a family the same way and keeps the subtask's owner out of the clip", async () => {
+    const child = issue({ key: "TAM-NEW-1", type: "subtask", parentKey: PROMO.key, assignee: "Other owner", summary: "Wire input" });
+    const stray = issue({ key: "TAM-NEW-2", type: "subtask", parentKey: "PLAT-901", summary: "Retire the gateway" });
+    renderList([detail({ issues: [PROMO, child, KEYS, stray] })]);
+    const rowOf = async (name: string) => await screen.findByRole("treeitem", { name });
+    const parent = await rowOf(`${PROMO.key} ${PROMO.summary}`);
+    const childless = await rowOf(`${KEYS.key} ${KEYS.summary}`);
+    const subtask = await rowOf("TAM-NEW-1 Wire input");
+    const strayRow = await rowOf("TAM-NEW-2 Retire the gateway");
+    expect(leadSlotText(parent)).toBe("▾ 1");
+    expect(leadSlotText(childless)).toBe("");
+    expect(leadDepth(childless)).toBe(leadDepth(parent));
+    expect(leadDepth(subtask)).toBeGreaterThan(leadDepth(parent));
+    // The owner used to sit inside the cell that clips, after a summary
+    // long enough to fill it, so it was never on screen. It is a sibling of
+    // the text now: the summary is the only part that clips.
+    const owner = within(subtask).getByText("Other owner");
+    expect(owner.closest(".row-summary-text")).toBeNull();
+    expect(within(subtask).getByText("Wire input")).toHaveClass("row-summary-text");
+    expect(within(strayRow).getByText("Parent not shown")).toBeInTheDocument();
+    expect(strayRow).toHaveAttribute("aria-level", "3");
+  });
+
   it("opens the active sprint and leaves every other one closed", async () => {
     renderList();
     // A board carries every sprint it has ever run, so opening what has not

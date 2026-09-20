@@ -237,15 +237,17 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-row-selected, .issue-row-selected:hover { background: var(--accent-soft); }
 .issue-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .issue-key { font-weight: 600; font-variant-numeric: tabular-nums; }
-.issue-row-subtask .issue-summary { padding-inline-start: 18px; }
-.issue-child-branch { display: inline-block; margin-inline-end: 8px; color: var(--text-muted); }
-.nested-subtask .epic-cell-summary { padding-inline-start: 18px; }
-.subtask-assignee { margin-inline-start: 10px; color: var(--text-muted); }
-.subtask-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 24px; margin-inline-end: 6px; padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; vertical-align: middle; }
+/* Every family row starts with core's .row-lead, which owns the indent and
+   the branch glyph for all four of these lists; see primitives.css. What is
+   left here is what each list adds on top of it. The toggle fills the slot
+   the lead reserves rather than sizing itself, which is what used to make a
+   parent's summary start further right than its own subtask's. */
+.subtask-assignee { flex: none; color: var(--text-muted); }
+.subtask-toggle { display: inline-flex; align-items: center; justify-content: center; inline-size: 100%; min-height: 24px; padding: 0 2px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; vertical-align: middle; }
 .subtask-toggle:hover { background: var(--surface-2); color: var(--text); }
 .subtask-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.board-card-subtask { margin-inline-start: 16px; border-inline-start: 2px solid var(--border); }
-.board-card-parent { color: var(--text-muted); font-size: 11px; margin-top: 6px; }
+.board-card-subtask { margin-inline-start: var(--subtask-indent); border-inline-start: 2px solid var(--border); }
+.board-card-parent { display: flex; align-items: center; color: var(--text-muted); font-size: 11px; margin-top: 6px; }
 /* The detail panel's title is the one key that links out to the instance:
    in a grid the row already owns the click. */
 .issue-key-link {

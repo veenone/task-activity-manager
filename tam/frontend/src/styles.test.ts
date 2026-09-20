@@ -8,11 +8,10 @@ import { describe, expect, it } from "vitest";
 
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
 const appCss = fs.readFileSync(path.join(here, "App.css"), "utf8");
-const primitives = fs.readFileSync(
-  path.join(here, "..", "..", "..", "frontend", "core", "styles", "primitives.css"),
-  "utf8",
-);
-const allCss = `${appCss}\n${primitives}`;
+const coreStyle = (name: string) =>
+  fs.readFileSync(path.join(here, "..", "..", "..", "frontend", "core", "styles", name), "utf8");
+const primitives = coreStyle("primitives.css");
+const allCss = `${appCss}\n${primitives}\n${coreStyle("tokens.css")}`;
 
 /** The declarations of every rule whose selector mentions `selector`. */
 function rulesFor(css: string, selector: string): string[] {
@@ -67,6 +66,30 @@ describe("ritual prose", () => {
 
   it("removing the editor outline leaves a visible focus indicator behind", () => {
     expect(prose).toMatch(/:focus-within/);
+  });
+});
+
+describe("family row indentation", () => {
+  it("the step a child is indented by is written once, as a custom property", () => {
+    expect(rulesFor(allCss, ":root").join(" ")).toMatch(/--subtask-indent:\s*\d+px/);
+    expect(rulesFor(allCss, ".row-lead").join(" ")).toMatch(
+      /padding-inline-start:\s*calc\(\s*var\(--subtask-indent\)/,
+    );
+  });
+
+  it("the toggle fills the slot the lead reserves rather than sizing itself", () => {
+    // Its own 32px min-width plus a 6px margin is what made a parent's
+    // summary start further right than its own subtask's.
+    const toggle = rulesFor(appCss, ".subtask-toggle").join(" ");
+    expect(toggle).not.toMatch(/min-width:/);
+    expect(toggle).not.toMatch(/margin-inline-end:/);
+  });
+
+  it("no table indents a subtask with a literal of its own", () => {
+    for (const selector of [".issue-row-subtask", ".nested-subtask", ".board-card-subtask"]) {
+      const rules = rulesFor(appCss, selector).join(" ");
+      expect(rules).not.toMatch(/(padding|margin)-inline-start:\s*\d+px/);
+    }
   });
 });
 

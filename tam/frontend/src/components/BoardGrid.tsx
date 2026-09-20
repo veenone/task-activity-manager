@@ -2,6 +2,7 @@ import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent } from "react"
 import type { BoardView, Issue, Sprint } from "../api";
 import { posId } from "../lib/boardCells";
 import { plural } from "../lib/format";
+import { drawnParents, familyPlace } from "../lib/issueFamilies";
 import { BoardCard } from "./BoardCard";
 import { CardMoveMenu } from "./CardMoveMenu";
 import type { BoardMoves } from "./useBoardMoves";
@@ -124,7 +125,7 @@ export function BoardGrid({
                         {line === index && <div className="board-drop-line" />}
                         <BoardCard
                           issue={issue}
-                          nested={issue.type === "subtask" && (lane.cells[col] ?? []).some((p) => p.key === issue.parentKey)}
+                          place={familyPlace(issue, drawnParents(lane.cells[col] ?? []))}
                           selected={issue.key === selectedKey}
                           checked={checked.has(issue.key)}
                           focused={id === focusId}

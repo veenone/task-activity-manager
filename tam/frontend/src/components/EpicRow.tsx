@@ -1,5 +1,6 @@
 import type { KeyboardEvent, ReactNode } from "react";
-import { toPlainText } from "@agile-suite/core";
+import { RowLead, toPlainText } from "@agile-suite/core";
+import type { RowPlace } from "@agile-suite/core";
 import type { EpicNode, Issue } from "../api";
 import { TypeChip } from "./TypeChip";
 import { SubtaskToggle } from "./SubtaskToggle";
@@ -71,7 +72,7 @@ interface EpicChildRowProps {
   child: Issue;
   subtaskLabel?: string;
   ownerKey: string;
-  nested?: boolean;
+  place?: RowPlace;
   index: number | undefined;
   selected: boolean;
   focused: boolean;
@@ -82,9 +83,10 @@ interface EpicChildRowProps {
 
 // EpicChildRow renders one leaf row, whether it hangs off an epic or off
 // the orphans group; ownerKey tells the keyboard model which it is.
-export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true, onToggleSubtasks, subtaskLabel, ownerKey, nested, index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
+export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true, onToggleSubtasks, subtaskLabel, ownerKey, place = "root", index, selected, focused, flashed, onActivate, onKeyDown }: EpicChildRowProps) {
   const row: Row = { id: child.key, kind: "child", ownerKey };
   const summary = toPlainText(child.summary, "summary");
+  const nested = place !== "root";
   return (
     <div
       role="treeitem"
@@ -98,12 +100,18 @@ export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true,
       onClick={() => onActivate(child.key)}
       onKeyDown={(e) => onKeyDown(e, row)}
     >
-      <span className="folder-caret" aria-hidden="true">{nested ? "↳" : ""}</span>
+      {/* The caret track stays, empty: it is the column the epic rows above
+          put their own caret in, and the branch belongs beside the summary
+          it marks rather than a column to its left. */}
+      <span className="folder-caret" aria-hidden="true" />
       <TypeChip type={child.type} subtaskLabel={subtaskLabel} />
       <span className="epic-cell epic-cell-key" title={child.key}>{child.key}</span>
-      <span className="epic-cell epic-cell-summary" title={summary}>
-        {onToggleSubtasks && <SubtaskToggle issueKey={child.key} count={subtaskCount} expanded={subtasksExpanded} onToggle={onToggleSubtasks} />}
-        {summary}
+      <span className="epic-cell epic-cell-summary row-summary">
+        <RowLead
+          place={place}
+          toggle={onToggleSubtasks ? <SubtaskToggle issueKey={child.key} count={subtaskCount} expanded={subtasksExpanded} onToggle={onToggleSubtasks} /> : undefined}
+        />
+        <span className="row-summary-text" title={summary}>{summary}</span>
       </span>
       <span className="epic-cell epic-cell-status">
         <span className={`chip chip-status chip-status-${statusClass(child.status)}`} title={child.status}>{child.status}</span>

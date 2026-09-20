@@ -89,7 +89,7 @@ describe("AssignedToMeView", () => {
     renderView();
 
     expect(await screen.findByText("Assigned to rahmad (R. Anand) · 2 issues")).toBeInTheDocument();
-    const grid = screen.getByRole("grid", { name: "Issues" });
+    const grid = screen.getByRole("treegrid", { name: "Issues" });
     expect(within(grid).getByRole("row", { name: /PLAT-412/ })).toBeInTheDocument();
     expect(within(grid).getByRole("row", { name: /PLAT-409/ })).toBeInTheDocument();
     // The filter narrows by username: prove it reached the binding.
@@ -127,7 +127,7 @@ describe("AssignedToMeView", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sync" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Test connection" })).toBeEnabled();
-    expect(screen.queryByRole("grid", { name: "Issues" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("treegrid", { name: "Issues" })).not.toBeInTheDocument();
     expect(api.ListIssues).not.toHaveBeenCalled();
   });
 

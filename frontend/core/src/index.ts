@@ -9,6 +9,8 @@ export { Modal } from "./components/Modal";
 export { Menu } from "./components/Menu";
 export type { MenuItem } from "./components/Menu";
 export { LiveRegion, announce } from "./components/LiveRegion";
+export { RowLead, BRANCH_GLYPH, DETACHED_TEXT } from "./components/RowLead";
+export type { RowPlace } from "./components/RowLead";
 export { useNotice } from "./components/useNotice";
 export type { NoticeOptions } from "./components/useNotice";
 export { useConfirm } from "./components/useConfirm";

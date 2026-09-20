@@ -1,12 +1,16 @@
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
-import { toPlainText } from "@agile-suite/core";
+import { RowLead, toPlainText } from "@agile-suite/core";
+import type { RowPlace } from "@agile-suite/core";
 import type { Issue } from "../api";
 import type { CardMove } from "../lib/cardMoveState";
 import { TypeChip } from "./TypeChip";
 
 interface Props {
   issue: Issue;
-  nested?: boolean;
+  // Where the card sits in its family: under the parent card above it, or
+  // on its own because the cell's share of the card budget ran out before
+  // the parent was drawn.
+  place?: RowPlace;
   // selected is the one card the detail panel is about; checked is one card
   // of the multi-selection a bulk action will touch. They are two models on
   // one surface, so they paint differently, the way XTM's row-selected and
@@ -60,7 +64,7 @@ const MOVE_CLASS: Record<string, string> = {
 // grid's own semantics rather than a button's. It is the surface the user
 // made a move on, so it is the surface that reports what became of it.
 export function BoardCard({
-  issue, nested, selected, checked, focused, columnName, colIndex, posId, move, flashed, dragging, draggable, menu,
+  issue, place = "root", selected, checked, focused, columnName, colIndex, posId, move, flashed, dragging, draggable, menu,
   onSelect, onFocus, onKeyDown, onDragStart, onDragEnd,
 }: Props) {
   const points = issue.storyPoints ?? null;
@@ -73,7 +77,7 @@ export function BoardCard({
   const label = [`${issue.key} ${summary} ${columnName}`, move.reason].filter(Boolean).join(". ");
   const className = [
     "board-card",
-    nested ? "board-card-subtask" : "",
+    place === "root" ? "" : "board-card-subtask",
     selected ? "board-card-selected" : "",
     checked ? "board-card-checked" : "",
     MOVE_CLASS[move.state] ?? "",
@@ -114,7 +118,14 @@ export function BoardCard({
         {menu}
       </div>
       <div>{summary}</div>
-      {issue.type === "subtask" && issue.parentKey && <div className="board-card-parent">↳ Subtask of {issue.parentKey}</div>}
+      {issue.type === "subtask" && issue.parentKey && (
+        <div className="board-card-parent">
+          {/* No toggles anywhere on a board, so the lead reserves no slot
+              for one: the branch and the step are all a card needs. */}
+          <RowLead place={place} slot={false} />
+          {`Subtask of ${issue.parentKey}`}
+        </div>
+      )}
       <div className="board-card-foot">
         <span>{assignee}</span>
         {points !== null && <span>{`${points} pts`}</span>}
