@@ -38,9 +38,26 @@ describe("ritual prose", () => {
     expect(rulesFor(allCss, "ritual-editor-content h2")).toMatch(/margin/);
   });
 
-  it("the measure is capped and the text has a line height", () => {
-    expect(prose).toMatch(/max-width:\s*\d+ch/);
+  it("the text has a line height", () => {
     expect(prose).toMatch(/line-height:/);
+  });
+
+  // Issue #63 finding 3. #56 capped every prose surface at 72 characters,
+  // the editor included, so a wide pane drew the text in a column with a
+  // band of empty pane beside it and nothing to say where the field ended.
+  // The cap belongs to prose someone reads, not to the box they type in.
+  it("the editor is an outlined box whose text uses the width of the pane", () => {
+    // The exact selector: .ritual-editor-content th sets a border of its
+    // own, so mentioning the name would pass on the table's rule.
+    const box = declarationsOf(appCss, ".ritual-editor-content");
+    expect(box).toMatch(/border:\s*1px solid var\(--border-strong\)/);
+    expect(prose).not.toMatch(/max-width:\s*\d+ch/);
+    expect(prose).not.toMatch(/margin-inline:\s*auto/);
+  });
+
+  it("keeps the measure on the prose that is only read", () => {
+    expect(rulesFor(allCss, ".rich-text")).toMatch(/max-width:\s*\d+ch/);
+    expect(rulesFor(allCss, ".ritual-page-body")).toMatch(/max-width:\s*\d+ch/);
   });
 
   it("removing the editor outline leaves a visible focus indicator behind", () => {

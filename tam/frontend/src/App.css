@@ -814,7 +814,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-page-head h3 { margin: 0; font-size: 15px; }
 .ritual-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .ritual-editor .editor-toolbar-group[data-group="ritual"] { margin-left: auto; border-right: 0; }
-.ritual-editor-content { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
+/* An outlined box, the way every other field the app takes text in is drawn,
+   inset from the pane so its rule does not sit on the pane's own. Without it
+   the editor was a bare area: no edge, and #56's 72 character measure left a
+   band of empty pane beside the text that read as a huge left indent. */
+.ritual-editor-content { flex: 1; min-height: 0; overflow: auto; margin: 8px 12px; padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: 4px; }
 .ritual-editor-content .ProseMirror { outline: none; min-height: 100%; }
 .ritual-editor-content table { border-collapse: collapse; margin: 8px 0; }
 .ritual-editor-content th, .ritual-editor-content td { border: 1px solid var(--border); padding: 4px 8px; min-width: 64px; vertical-align: top; }
@@ -827,11 +831,15 @@ input, button, select { font-family: inherit; font-size: inherit; }
    padding that authored text depends on, and the shared .rich-text primitive
    only neutralises the first and last child margin, so it cannot put them
    back. Without these, bullets render outside the content box and are clipped
-   by the scroller, and paragraphs and headings run together. */
-.ritual-editor-content .ProseMirror,
+   by the scroller, and paragraphs and headings run together.
+
+   The 72 character measure is for prose that is only read. The editor keeps
+   the line height and takes the width of its box: a field someone types into
+   has to look the size it is, and a centred column inside a wide pane looks
+   like an indent nobody asked for. */
 .ritual-page-body,
 .rich-text { line-height: 1.55; max-width: 72ch; }
-.ritual-editor-content .ProseMirror { margin-inline: auto; }
+.ritual-editor-content .ProseMirror { line-height: 1.55; }
 .ritual-editor-content ul, .ritual-editor-content ol,
 .ritual-page-body ul, .ritual-page-body ol,
 .rich-text ul, .rich-text ol { padding-inline-start: 1.4em; }
