@@ -49,7 +49,11 @@ export function calendarDay(date: string): string {
 }
 
 // civilDay is the local midnight of the day a stamp names, and the one place
-// in this file that turns a date into a Date. Everything about a sprint that
+// in this file that turns a date into a Date. It reads the literal date off
+// the stamp, which is right for a team in the zone Jira stamped it in and a
+// day early for one east of that; see "civilDay reads the literal date" in
+// agents/project/tam-phases.md, which is a decision nobody has taken rather
+// than an oversight. Everything about a sprint that
 // is counted in days is counted from these rather than from the instants
 // Jira sent: a sprint starting at 09:00 UTC and one starting at 23:00 UTC on
 // the same day are the same day to the team planning around it, and reading
