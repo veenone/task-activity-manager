@@ -50,6 +50,12 @@ describe("SprintTimeline", () => {
     // A closed sprint has no today inside it, so a line saying "you are
     // here" would be pointing at nothing.
     expect(finished.querySelector(".progress-bar-marker")).toBeNull();
+    // And its bar is greyed rather than drawn in the running sprint's
+    // accent. The class is the assertion because vite.config.ts sets
+    // css: false, so no test here can read a computed colour; what the
+    // class resolves to is theme.test.ts's business.
+    expect(finished.querySelector(".progress-bar")).toHaveClass("progress-bar-muted");
+    expect(running.querySelector(".progress-bar")).toHaveClass("progress-bar-time");
   });
 
   it("shows a future sprint an empty points bar rather than a full one", () => {

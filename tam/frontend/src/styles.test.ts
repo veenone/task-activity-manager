@@ -173,3 +173,28 @@ describe("classes the components already reference", () => {
     expect(rulesFor(allCss, selector)).not.toBe("");
   });
 });
+
+// The sprint row's narrow layout is a cascade rule too: jsdom applies no
+// stylesheet and has no viewport, so nothing a render test can see says
+// whether the timeline stacks or stays in a 170px track that no bar can say
+// anything in.
+describe("the sprint row below 900px", () => {
+  it("gives the timeline the width under the sprint name rather than a track of its own", () => {
+    const timeline = declarationsOf(appCss, ".sprint-cell-timeline");
+    // valueOf takes the last declaration, and the narrow block comes after
+    // the wide one, so this is what a 900px reader gets.
+    expect(timeline).toMatch(/grid-column:\s*2\s*\/\s*-1/);
+    expect(timeline).toMatch(/grid-row:\s*2/);
+  });
+
+  it("drops the timeline's own track from the row template at that width", () => {
+    const row = declarationsOf(appCss, ".sprint-row");
+    const templates = [...row.matchAll(/grid-template-columns: *([^;]+)/g)].map((m) => m[1].trim());
+    expect(templates.length).toBe(2);
+    // Five tracks at the narrow width against six at the wide one: the
+    // timeline's is the one that goes.
+    expect(templates[1].split(/(?<=\))\s+|\s+(?![^(]*\))/).length).toBeLessThan(
+      templates[0].split(/(?<=\))\s+|\s+(?![^(]*\))/).length,
+    );
+  });
+});
