@@ -795,6 +795,22 @@ describe("IssueDetailPanel description", () => {
     expect(await within(fields).findByText("What I typed.")).toBeInTheDocument();
   });
 
+  // Issue #65 item 4. The syntax toggle decides how text is rendered, so
+  // with no text it is two buttons that change nothing, sitting between the
+  // field's name and the sentence saying there is nothing there. It is the
+  // widest thing in the head, which is what put it over the label.
+  it("offers no syntax toggle for a description that has no text", async () => {
+    renderPanel(vi.fn(), undefined, { ...story, description: "   " });
+    expect(await screen.findByText("No description.")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Syntax" })).not.toBeInTheDocument();
+  });
+
+  it("offers the syntax toggle once there is text to render", async () => {
+    renderPanel();
+    const syntax = await screen.findByRole("group", { name: "Syntax" });
+    await waitFor(() => expect(within(syntax).getByRole("button", { name: "Jira markup" })).toBeEnabled());
+  });
+
   // D5: the summary is one line Jira never wiki-renders, so marks stay
   // exactly as typed and only inline code and links are unwrapped.
   it("renders inline code in the summary heading and leaves marks alone", async () => {
