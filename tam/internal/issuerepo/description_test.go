@@ -151,3 +151,42 @@ func TestADescriptionEditJournalsTheSyncedTextAsItsBase(t *testing.T) {
 		t.Fatal("no description row in the journal")
 	}
 }
+
+// ReadDetail's description comes off the column, which the sync and every
+// edit write. A row whose column is still NULL is one the version 17
+// backfill could not reach, and the description it holds in the detail JSON
+// is the only one anything has; throwing it away would strand it.
+func TestReadDetailPrefersTheColumnAndFallsBackToTheCachedJSON(t *testing.T) {
+	r, db := newRepoWithDB(t)
+	ctx := context.Background()
+	if err := r.UpsertPage(ctx, "p1", sample()[:2], time.Now(), false); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	for _, stmt := range []struct {
+		key, detail string
+		column      any
+	}{
+		{"PLAT-412", `{"key":"PLAT-412","description":"stranded in the JSON","fields":{}}`, nil},
+		{"PLAT-409", `{"key":"PLAT-409","description":"the old JSON copy","fields":{}}`, "the column the sync wrote"},
+	} {
+		if _, err := db.ExecContext(ctx,
+			`UPDATE issue SET detail_json = ?, detail_fetched_at = '2026-09-05T10:00:00Z', description = ? WHERE profile_id = 'p1' AND key = ?`,
+			stmt.detail, stmt.column, stmt.key); err != nil {
+			t.Fatalf("seed %s: %v", stmt.key, err)
+		}
+	}
+	stranded, _, ok, err := r.ReadDetail(ctx, "p1", "PLAT-412")
+	if err != nil || !ok {
+		t.Fatalf("read PLAT-412: ok=%v err=%v", ok, err)
+	}
+	if stranded.Description != "stranded in the JSON" {
+		t.Errorf("description = %q, want the cached JSON's when the column is NULL", stranded.Description)
+	}
+	synced, _, ok, err := r.ReadDetail(ctx, "p1", "PLAT-409")
+	if err != nil || !ok {
+		t.Fatalf("read PLAT-409: ok=%v err=%v", ok, err)
+	}
+	if synced.Description != "the column the sync wrote" {
+		t.Errorf("description = %q, want the column to win over the JSON", synced.Description)
+	}
+}

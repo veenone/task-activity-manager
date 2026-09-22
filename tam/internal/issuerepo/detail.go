@@ -59,7 +59,15 @@ func (r *Repository) ReadDetail(ctx context.Context, profileID, key string) (bac
 	}
 	links = append(links, pending...)
 	d.Key = key
-	d.Description = description.String
+	// The column is where the description lives from schema 17 on: the sync
+	// writes it, an edit writes it, and reapplyPending puts a pending edit
+	// back on it after every sync. NULL means the version 17 backfill could
+	// not reach this row, and then the copy in the JSON below is the only
+	// description anything has, so it stands rather than being overwritten
+	// with the empty string.
+	if description.Valid {
+		d.Description = description.String
+	}
 	d.Links = links
 	// A detail cached before comments existed has no comments key, and null
 	// is what the panel would otherwise have to tell apart from "none".
