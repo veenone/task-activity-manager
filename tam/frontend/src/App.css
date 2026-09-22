@@ -714,7 +714,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; max-width: 70ch; }
 .report-unavailable, .report-loading { max-width: 70ch; line-height: 1.45; }
 .report-loading p { margin: 0 0 6px; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+/* .sr-only lives in primitives.css. The copy that stood here repeated its
+   declarations and, being imported after it, was the one that ran, so the
+   fix for the window scrollbar would have landed in a rule nothing read. */
 /* The velocity rows, on the same rules .conflict-table draws with: a table
    in this app is a header rule and padded cells, not a box. */
 .report-table-wrap { max-width: 100%; overflow-x: auto; }

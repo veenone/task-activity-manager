@@ -3,9 +3,10 @@
 // pin the rules whose absence caused each one. They fail against the code
 // before the fix, which is what makes them worth keeping.
 import { describe, expect, it } from "vitest";
-import { appCss as readApp, coreStyle, declarationsMentioning, declarationsOf } from "./test/cssRules";
+import { appCss as readApp, coreStyle, declarationsMentioning, declarationsOf, valueOf } from "./test/cssRules";
 
 const appCss = readApp();
+const primitivesCss = coreStyle("primitives.css");
 const allCss = [appCss, coreStyle("primitives.css"), coreStyle("tokens.css")].join("\n");
 
 /** Declarations of every rule whose selector mentions `selector`, joined. */
@@ -89,6 +90,36 @@ describe("family row indentation", () => {
 
 // The chip states are pinned in appearance.test.ts, which compares the two
 // opacity values rather than matching one of them by pattern.
+
+// Issue #63 finding 1. The Reports view put a scrollbar on the window even
+// though .main clips and .report-body scrolls inside it. The escapee was
+// visually hidden content: .sr-only positions absolutely, nothing between it
+// and the page is positioned, so its containing block is the page itself.
+// ChartFrame's screen-reader data table is 300px tall whatever .sr-only says
+// (width, height and overflow do not constrain a table box), so laid out at
+// the foot of a scrolled report it grew the document's own scroll area, and
+// the velocity table's 1px caption kept it alive after that.
+describe("the app frame", () => {
+  it("defines the visually hidden helper in one stylesheet", () => {
+    const defining = [
+      [".sr-only in App.css", declarationsOf(appCss, ".sr-only")],
+      [".sr-only in primitives.css", declarationsOf(primitivesCss, ".sr-only")],
+    ].filter(([, body]) => body !== "");
+    expect(defining.map(([where]) => where)).toEqual([".sr-only in primitives.css"]);
+  });
+
+  it("takes visually hidden content out of every scroll container", () => {
+    // The app's sheet is imported last, so its copy is the one that runs.
+    const effective = declarationsOf(appCss, ".sr-only") || declarationsOf(primitivesCss, ".sr-only");
+    expect(valueOf(effective, "position")).toBe("fixed");
+  });
+
+  it("clips the main pane rather than letting it scroll", () => {
+    const main = declarationsOf(appCss, ".main");
+    expect(valueOf(main, "overflow")).toBe("hidden");
+    expect(valueOf(main, "min-height")).toBe("0");
+  });
+});
 
 describe("the two main panes", () => {
   it("frame the rituals page the way the report frame is framed", () => {
