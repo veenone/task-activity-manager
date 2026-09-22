@@ -20,18 +20,16 @@ interface Props {
   // would be spelled out letter by letter by a screen reader, and any
   // accessible name built from the same string would shout too.
   label: string;
-  // A glyph the caller has a better one for than the tone's default.
-  glyph?: string;
 }
 
 // StatusBadge is the one chip that says what state something is in. It takes
 // a tone and a label and knows nothing about sprints, issues or boards; what
 // each tone looks like is one token pair in tokens.css and one rule in
 // primitives.css.
-export function StatusBadge({ tone, label, glyph }: Props) {
+export function StatusBadge({ tone, label }: Props) {
   return (
     <span className={`status-badge status-badge-${tone}`}>
-      <span className="status-badge-glyph" aria-hidden="true">{glyph ?? GLYPH[tone]}</span>
+      <span className="status-badge-glyph" aria-hidden="true">{GLYPH[tone]}</span>
       <span className="status-badge-label">{label}</span>
     </span>
   );

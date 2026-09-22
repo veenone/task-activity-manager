@@ -1524,7 +1524,9 @@
   border-radius: 3px;
   overflow: hidden;
 }
-.progress-bar-fill { display: block; height: 100%; background: var(--bar-time); }
+/* The fill takes its colour from the tone below, never from here: a
+   default here and a tone rule too is one of them dead. */
+.progress-bar-fill { display: block; height: 100%; }
 .progress-bar-time .progress-bar-fill { background: var(--bar-time); }
 .progress-bar-points .progress-bar-fill { background: var(--bar-points); }
 .progress-bar-muted .progress-bar-fill { background: var(--text-muted); }

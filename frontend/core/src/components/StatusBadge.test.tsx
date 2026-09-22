@@ -32,11 +32,6 @@ describe("StatusBadge", () => {
     expect(screen.queryByText("ACTIVE")).not.toBeInTheDocument();
   });
 
-  it("takes a glyph of its own when the caller has a better one", () => {
-    const { container } = render(<StatusBadge tone="closed" label="Closed" glyph="!" />);
-    expect(glyphOf(container)).toBe("!");
-  });
-
   it("keeps the glyph out of the accessible name, so the name is the label", () => {
     render(<StatusBadge tone="future" label="Future" />);
     const glyph = screen.getByText("Future").parentElement?.querySelector(".status-badge-glyph");
