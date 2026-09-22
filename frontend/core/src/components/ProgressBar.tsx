@@ -33,8 +33,10 @@ export function ProgressBar({ value, max, label, valueText, marker, tone = "time
   const now = span > 0 && Number.isFinite(value) ? Math.min(Math.max(value, 0), span) : 0;
   const filled = span > 0 ? (now / span) * 100 : 0;
   const at = marker !== undefined && marker >= 0 && marker <= 1 ? marker : undefined;
+  // A span, not a div: a bar sits inside the row cells that draw it, and
+  // those are spans. The rule gives it display: block.
   return (
-    <div
+    <span
       className={`progress-bar progress-bar-${tone}`}
       role="progressbar"
       aria-label={label}
@@ -47,6 +49,6 @@ export function ProgressBar({ value, max, label, valueText, marker, tone = "time
       {at !== undefined && (
         <span className="progress-bar-marker" aria-hidden="true" style={{ left: `${at * 100}%` }} />
       )}
-    </div>
+    </span>
   );
 }

@@ -612,7 +612,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-row, .sprint-issue-row { width: 100%; gap: 8px; align-items: center; }
 .sprint-row {
   display: grid;
-  grid-template-columns: 12px minmax(120px, 1fr) 72px 150px 190px 76px;
+  grid-template-columns: 12px minmax(140px, 1.2fr) 150px minmax(170px, 1.4fr) 104px 76px;
+  align-items: start;
+  padding-block: 4px;
 }
 .sprint-issue-row {
   display: grid;
@@ -620,9 +622,23 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 /* Every cell clips to its track, so no cell can paint over its neighbour. */
 .sprint-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sprint-cell-name { font-weight: 600; }
-.sprint-cell-dates, .sprint-cell-progress { color: var(--text-muted); font-size: 11px; }
-.sprint-cell-progress { font-variant-numeric: tabular-nums; margin-left: 0; }
+.sprint-cell-title { font-weight: 600; }
+/* Three of the row's cells are two lines: the sprint over its goal, the
+   state badge over the dates, and the count over the one fact about it
+   worth a second line. Each line still clips to the track on its own, so a
+   long goal ellipses rather than widening the column or wrapping the row. */
+.sprint-cell-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
+.sprint-cell-stack > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sprint-cell-badges { display: flex; align-items: center; gap: 4px; }
+.sprint-cell-dates, .sprint-cell-secondary, .sprint-goal-line { color: var(--text-muted); font-size: 11px; }
+.sprint-cell-scope { font-variant-numeric: tabular-nums; margin-left: 0; }
+/* The timeline cell owns its own two lines and two bars, so it is the one
+   cell that does not clip: a bar has to reach the end of its track. */
+.sprint-cell-timeline { overflow: visible; }
+.sprint-timeline { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; }
+.sprint-timeline-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.sprint-timeline-label, .sprint-timeline-trailing, .sprint-timeline-scope { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sprint-timeline-trailing { flex: none; }
 .sprint-cell-actions { display: flex; justify-content: flex-end; overflow: visible; }
 .sprint-check { margin: 0; cursor: pointer; }
 /* The goal is a sentence, so it gets a line of its own under the sprint
@@ -803,6 +819,18 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-metric-group dl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin: 0; }
 @media (max-width: 900px) {
   .report-charts, .report-velocity { grid-template-columns: minmax(0, 1fr); }
+  /* The timeline takes the whole width under the sprint name rather than a
+     track of its own, which at this width was narrower than a bar can say
+     anything in. The caret keeps its column so the tree still reads as a
+     tree, and the actions stay on the first line with the name. */
+  .sprint-row {
+    grid-template-columns: 12px minmax(0, 1fr) 150px 104px 76px;
+  }
+  .sprint-cell-timeline {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    padding-top: 4px;
+  }
 }
 @media (max-width: 720px) {
   .report-metrics { grid-template-columns: minmax(0, 1fr); }

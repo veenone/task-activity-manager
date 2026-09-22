@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SprintDetail } from "../api";
@@ -35,22 +35,56 @@ function renderRow(over: Partial<SprintDetail> = {}, busy = false, waiting = "")
   return { actions, onToggle };
 }
 
+// The row draws a relative timeline now, so its wording depends on the
+// clock. toFake: ["Date"] and nothing else: faking every timer breaks
+// userEvent, and this file clicks.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-03T10:00:00Z"));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("SprintRow", () => {
-  it("draws the sprint's name, state, dates and progress, and leaves the goal off the row", () => {
+  it("draws the sprint's name, goal, state, dates, timeline and scope", () => {
     renderRow();
     expect(screen.getByRole("treeitem", { name: "Sprint 12, Active" })).toBeInTheDocument();
-    // "Active", not shouting: a list where one row of twenty is running does
-    // not need capitals to say which.
+    // "Active" in the accessible name and in the badge, both mixed case:
+    // the badge's shout is text-transform in the stylesheet, so a screen
+    // reader is not made to spell the state out.
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("8 of 14 done, 21 of 34 pts")).toBeInTheDocument();
-    // The goal is a sentence and every cell here clips, so it is rendered
-    // under the sprint when the sprint is open rather than in a cell.
-    expect(screen.queryByText("Ship checkout")).not.toBeInTheDocument();
+    expect(screen.getByText("Day 6 of 15")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Time elapsed in Sprint 12" })).toBeInTheDocument();
+    // The goal used to be kept off the row, because every cell clips and
+    // the detail panel narrows the pane. The redesign gives the name column
+    // the widest track and lets the goal clip with a title the way the name
+    // already does, so a reader can see what a sprint is for without
+    // opening it. It is still drawn under an expanded sprint too, where the
+    // empty case has wording of its own.
+    expect(screen.getByText("Ship checkout")).toHaveAttribute("title", "Ship checkout");
   });
 
-  it("says what Commit will do to the sprint", () => {
+  it("says what a draft sprint is waiting for instead of a goal", () => {
+    renderRow({ id: -1, name: "Sprint 15", state: "future", draft: true, goal: "", total: 0, done: 0, points: 0, donePoints: 0 });
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByText("not created in Jira yet")).toBeInTheDocument();
+  });
+
+  it("shows the state badge and the waiting chip together", () => {
+    // Bundle 04's pending Commit chip has to survive the redesign: a sprint
+    // that is future and is about to be started says both things.
     renderRow({ state: "future" }, false, "Starting on Commit");
+    expect(screen.getByText("Future")).toBeInTheDocument();
     expect(screen.getByText("Starting on Commit")).toHaveClass("chip-draft");
+  });
+
+  it("says a closed sprint has not been read rather than counting it as empty", () => {
+    renderRow({ state: "closed", membershipCached: false, total: 0, done: 0, points: 0, donePoints: 0 });
+    expect(screen.getByText("Cards not read yet")).toBeInTheDocument();
+    expect(screen.getByText("Not counted yet")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar", { name: /Points done/ })).not.toBeInTheDocument();
   });
 
   it("says nothing when nothing waits for Commit", () => {
@@ -68,6 +102,13 @@ describe("SprintRow", () => {
     // sprint whose share ran out draws no cards and still holds all of them.
     renderRow({ issues: [], total: 14, truncated: true });
     expect(screen.getByText("8 of 14 done, 21 of 34 pts")).toBeInTheDocument();
+    expect(screen.getByText("14 cards")).toBeInTheDocument();
+    expect(screen.getByText("8 done")).toBeInTheDocument();
+  });
+
+  it("says what a closed sprint carried over rather than what is left to do in it", () => {
+    renderRow({ state: "closed", completeDate: "2026-08-30T09:00:00Z" });
+    expect(screen.getByText("6 carried over")).toBeInTheDocument();
   });
 
   it("offers Complete on a running sprint and Start on one that has not begun", async () => {
@@ -105,14 +146,17 @@ describe("SprintRow", () => {
     expect(trigger).toHaveClass("board-card-menu");
   });
 
-  it("gives the board's own unassigned work no state, no dates and no actions", () => {
+  it("gives the board's own unassigned work no state, no dates, no timeline and no actions", () => {
     renderRow({ id: 0, name: "Board backlog", state: "unassigned", startDate: "", endDate: "", goal: "" });
     expect(screen.getByRole("treeitem", { name: "Board backlog" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Actions on/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Unassigned")).not.toBeInTheDocument();
+    expect(screen.getByText("no dates")).toBeInTheDocument();
+    expect(screen.getByText("no timeline")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     // It still counts its work, which is the one thing it has in common
     // with the sprints above it.
-    expect(screen.getByText("8 of 14 done, 21 of 34 pts")).toBeInTheDocument();
+    expect(screen.getByText("14 cards")).toBeInTheDocument();
   });
 
   it("toggles from the caret without the menu's own clicks reaching the row", async () => {
@@ -128,7 +172,7 @@ describe("SprintRow", () => {
     const user = userEvent.setup();
     const { actions } = renderRow({ id: -1, name: "Sprint 15", state: "future", draft: true, total: 0, done: 0, points: 0, donePoints: 0 });
     expect(screen.getByRole("treeitem", { name: "Sprint 15, Draft" })).toBeInTheDocument();
-    expect(screen.getByText("Draft")).toHaveClass("chip-draft");
+    expect(screen.getByText("Draft").closest(".status-badge")).toHaveClass("status-badge-draft");
     await user.click(screen.getByRole("button", { name: "Actions on Sprint 15" }));
     const menu = await screen.findByRole("menu");
     const complete = within(menu).getByRole("menuitem", { name: "Complete sprint…" });

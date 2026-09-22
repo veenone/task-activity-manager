@@ -118,7 +118,12 @@ describe("SprintList", () => {
   it("renders the goal under the sprint, and says so when the column is still empty", async () => {
     const user = userEvent.setup();
     renderList();
-    expect(await screen.findByText("Ship checkout")).toBeInTheDocument();
+    // The goal is on the row as well as under the expanded sprint now, so
+    // an unscoped query finds it twice once a sprint is open. The row's
+    // copy is the clipped one; the group's is the one with a line to
+    // itself and with wording for a sprint that has no goal at all.
+    const group = await screen.findByRole("group");
+    expect(within(group).getByText("Ship checkout")).toBeInTheDocument();
     await user.click(screen.getByRole("treeitem", { name: "Sprint 13, Future" }));
     // A sprint cached before the goal column existed reads as having no
     // goal, and a refresh is what tells the two apart.
