@@ -169,6 +169,27 @@ assignee name. An edit writes the column and `reapplyPending` puts it back
 after every sync, so a pending local edit still wins; `WriteDetail` keeps no
 second copy of the description in its JSON.
 
+**The size cost of that was accepted rather than bounded.** A description
+now rides in the search payload, in a column on every row, and across the
+Wails bridge in every list the frontend reads. A page of 50 issues carrying
+2KB descriptions is about 100KB on top of roughly 25KB of row fields, so a
+2000-issue project pays a few megabytes on a full sync and the same again in
+SQLite, once; incremental syncs pay it only for what changed. Some of that is
+not new, because the description was already stored for every issue whose
+panel had been opened, in `detail_json`, and that copy is gone. What is new
+is paying for issues nobody opens, and the Epics tree, which carries up to
+`treeCap` (5000) rows in one call for a panel that reads one of them.
+
+Truncating the stored value was considered and refused: the editor would open
+on a prefix, Save would journal that prefix as the whole field, and Commit
+would delete the rest in Jira (I2). A "truncated" flag that disabled editing
+would put back exactly the unknown/empty ambiguity the nullable column exists
+to remove. The levers, if a payload ever justifies one, are `syncer.PageSize`
+and `treeCap`, and dropping the column from the tree and board reads only:
+the panel already falls back to the detail read's description when the row it
+is given carries none, so those two views would go back to a round trip per
+selection while the Backlog kept its local read.
+
 **The raw string is always what is saved.** Nothing anywhere in this
 feature converts wiki markup to Markdown or back; the journal, `EditField`,
 `CreateDraft` and Commit all see exactly the characters typed, the same
