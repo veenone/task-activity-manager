@@ -198,3 +198,42 @@ describe("the sprint row below 900px", () => {
     );
   });
 });
+
+// Issue #65 item 1. The bar is the same flex row in the Backlog, Assigned to
+// me and Epics views, and the critique found three things that stopped it
+// reading as one strip: the controls sat on different centre lines, they
+// were four different heights, and the search field's fixed width wrapped
+// the bar long before the pane ran out of room.
+describe("the filter bar", () => {
+  it("drops the stacked-field margin the detail panel's inputs carry", () => {
+    // .detail-input carries margin-bottom: 12px for the panel's stacked
+    // fields. In a centred flex row that margin is counted in the item's
+    // outer size, so the search box and the sprint select rode 6px above
+    // the chips and the buttons beside them.
+    expect(valueOf(declarationsOf(appCss, ".filter-bar .detail-input"), "margin-bottom")).toBe("0");
+  });
+
+  it.each([".filter-bar .detail-input", ".filter-bar .btn"])("gives %s the bar's one height", (selector) => {
+    expect(valueOf(declarationsOf(appCss, selector), "height")).toMatch(/^\d+px$/);
+  });
+
+  it("lets the search field give way before the bar wraps", () => {
+    // A fixed 300px search box plus the type chips plus the sprint select
+    // wrapped the Backlog bar at about 1000px, which is a normal window.
+    const search = declarationsOf(appCss, ".filter-search");
+    expect(valueOf(search, "width")).toBeUndefined();
+    expect(valueOf(search, "flex")).toBeTruthy();
+  });
+
+  it("ends every bar on its primary action", () => {
+    // The Backlog bar pushed Import and + New to the end; the Epics bar's
+    // + New epic sat wherever the buttons before it left it, so the two
+    // bars ended differently.
+    expect(valueOf(declarationsOf(appCss, ".filter-new"), "margin-left")).toBe("auto");
+  });
+
+  it("keeps its rows apart once it does wrap", () => {
+    const bar = declarationsOf(appCss, ".filter-bar");
+    expect(valueOf(bar, "row-gap")).toMatch(/^\d+px$/);
+  });
+});

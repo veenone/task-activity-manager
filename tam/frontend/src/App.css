@@ -132,10 +132,25 @@ input, button, select { font-family: inherit; font-size: inherit; }
 @media (prefers-reduced-motion: reduce) { .syncbar-fill { transition: none; } }
 
 /* Backlog: filter bar, grid, pager */
-.filter-bar { flex: none; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-.filter-search { width: 300px; }
+/* The bar is one control strip, so its controls share a centre line, a
+   height and a row gap (issue #65 item 1). row-gap is written out because a
+   wrapped bar is the case it exists for and `gap: 12px` alone left the two
+   rows reading as two bars. */
+.filter-bar { flex: none; display: flex; align-items: center; column-gap: 12px; row-gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+/* .detail-input carries margin-bottom: 12px for the detail panel's stacked
+   fields. A centred flex row counts that margin in the item's outer size, so
+   the search box and the sprint select rode 6px above the chips and the
+   buttons next to them. The .edit-form rule below cancels it for the same
+   reason; the bar needed its own. */
+.filter-bar .detail-input { margin-bottom: 0; }
+.filter-bar .detail-input, .filter-bar .btn { height: 30px; }
+/* The search field gives way instead of wrapping the bar: at a fixed 300px
+   the Backlog bar wrapped at about 1000px, which is an ordinary window. */
+.filter-search { flex: 1 1 180px; max-width: 300px; }
 .filter-sprint { width: 140px; }
-.type-filter { display: flex; gap: 6px; }
+/* The chips stay their own size. They are the grid's type chips, and a
+   reader matches them to the column, not to the controls either side. */
+.type-filter { display: flex; align-items: center; gap: 6px; }
 .chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The chip palette lives in tokens.css: these fills were literals, so a chip
    kept its pastel ground when the window went dark and the text on it was
@@ -531,6 +546,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .danger-text { color: var(--danger-text); }
 
 /* Plan 1c: import */
+/* Every bar ends on its primary action. The Epics bar's + New epic used to
+   sit wherever Expand all and Collapse all left it, so the two bars ended
+   differently (issue #65 item 1). Import takes the gap when it is there, and
+   the adjacent rule is the more specific of the two, so + New stays beside
+   it rather than being pushed away from it. */
+.filter-new { margin-left: auto; }
 .filter-import { margin-left: auto; }
 .filter-import + .filter-new { margin-left: 8px; }
 
