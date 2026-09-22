@@ -754,6 +754,38 @@ describe("IssueDetailPanel description", () => {
     await waitFor(() => expect(within(fields).getByRole("button", { name: "Edit" })).toBeEnabled());
   });
 
+  // Disabled is a control state, not a write guard. A sync or a purge can
+  // take the description back to unknown while the editor is open, and the
+  // typed text stays dirty across that; Save must refuse it rather than
+  // journal an edit whose base is the empty string, which Commit would then
+  // push to Jira as a deletion.
+  it("refuses to save a description that went unknown under the open editor", async () => {
+    const user = userEvent.setup();
+    // Nothing to fall back on either: a full sync reinserted the row without
+    // a description and dropped the detail cache with it.
+    vi.mocked(api.GetIssueDetail).mockReturnValue(new Promise(() => {}));
+    const client = createQueryClient();
+    const tree = (issue: Issue) => (
+      <QueryClientProvider client={client}>
+        <DialogProvider>
+          <ProfileProvider backend={profileBackend}>
+            <IssueDetailPanel profileId="p1" issue={issue} onClose={vi.fn()} />
+          </ProfileProvider>
+        </DialogProvider>
+      </QueryClientProvider>
+    );
+    const view = render(tree(story));
+    const box = await openDescriptionEditor(user);
+    await user.clear(box);
+    await user.type(box, "text typed against a description that is about to vanish");
+    expect(screen.getByRole("button", { name: "Save edit" })).toBeEnabled();
+
+    view.rerender(tree({ ...story, description: undefined }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save edit" })).toBeDisabled());
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(api.EditIssue).not.toHaveBeenCalled();
+  });
+
   // Local first. The row carries whatever the store holds, and the store
   // puts a pending edit back on the column after every sync, so the panel
   // shows the edit and marks the issue pending.

@@ -113,12 +113,17 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
   // value gets typed into a field Jira will refuse.
   const listed = screen.isSuccess && screen.data.length > 0 ? new Set<EditableField>(screen.data) : null;
   const offScreen = (field: EditableField) => listed !== null && !listed.has(field);
-  // locked covers both: a field Jira will not take, and every field while
-  // nothing is known yet. Nothing locked can be typed into, and nothing
-  // locked can be saved, because disabled is a control state and not a write
-  // guard: a value can still reach the form from the issue shown before this
-  // one, which the reset effect keeps on purpose.
-  const locked = (field: EditableField) => screen.isLoading || offScreen(field);
+  // locked covers three things: a field Jira will not take, every field while
+  // nothing is known yet, and a description no sync has carried. Nothing
+  // locked can be typed into, and nothing locked can be saved, because
+  // disabled is a control state and not a write guard: a value can still
+  // reach the form from the issue shown before this one, which the reset
+  // effect keeps on purpose, and a description can go back to unknown under
+  // an open editor, where the typed text stays dirty. Saving it would journal
+  // an edit whose base is the empty string, which Commit pushes as a
+  // deletion of whatever Jira actually holds.
+  const locked = (field: EditableField) =>
+    screen.isLoading || offScreen(field) || (field === "description" && !descriptionSynced);
 
   const editing = editingKey === issue.key;
   const picked = pickedFormats.get(memoryKey(profileId, issue.key));
@@ -216,7 +221,7 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
                 type="button"
                 className="btn btn-ghost edit-description-action"
                 aria-describedby={describedBy}
-                disabled={!descriptionSynced || shut}
+                disabled={shut}
                 onClick={editing ? cancelEdit : () => setEditingKey(issue.key)}
               >
                 {editing ? "Cancel" : "Edit"}
