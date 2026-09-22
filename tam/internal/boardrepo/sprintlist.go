@@ -67,15 +67,26 @@ type SprintDetail struct {
 	Points     float64 `json:"points"`
 	DonePoints float64 `json:"donePoints"`
 
-	// MembershipCached is derived from the sprint's own state, never from
-	// whether board_issue happens to hold a row for it: board_issue is
-	// equally empty for a closed sprint, whose membership the sync
-	// deliberately never fetches, and for a future sprint whose last sync
-	// attempt failed partway through. This field can only say whether the
-	// sync tries to fetch this scope's membership at all; it cannot say
-	// whether the last attempt actually landed. It is always true on the
-	// unassigned node, whose cards come from the board's own list rather
-	// than from a sprint's membership.
+	// MembershipCached says whether the four numbers above can be trusted
+	// as this scope's whole story, and it answers differently either side
+	// of the sprint's state.
+	//
+	// A closed sprint's membership cannot change, so the sync reads it once
+	// and re-supplies it for ever after; the field is read from board_issue
+	// for one of those, and means "this scope has been read and kept". An
+	// active or future sprint is asked for on every pass, so an empty
+	// board_issue there is as likely to be a sync that failed partway
+	// through as a sprint that is genuinely empty; the field is derived
+	// from state for those, and can only say that the sync tries. It is
+	// always true on the unassigned node, whose cards come from the board's
+	// own list rather than from a sprint's membership.
+	//
+	// The one thing it cannot tell apart is a closed sprint nobody has read
+	// from a closed sprint that genuinely holds nothing of this project.
+	// Both read false, so the row says the membership has not been read yet
+	// rather than drawing an empty bar, which is the honest answer for the
+	// first and an understatement for the second. Retiring that would cost
+	// a membership_synced column for one bit.
 	MembershipCached bool `json:"membershipCached"`
 
 	// NotSynced counts this node's own scope keys the issue cache does not
@@ -179,6 +190,13 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 			claimed[c.Key] = true
 		}
 		detail := newSprintDetail(s)
+		// scopeKeys is board_issue's own answer, before withMovedIn added
+		// anything the journal knows and board_issue does not: what is
+		// asked here is whether the sync has read this scope, and a
+		// journalled move is not a read.
+		if s.State == "closed" {
+			detail.MembershipCached = len(scopeKeys) > 0
+		}
 		detail.NotSynced = notSynced
 		fillDetail(&detail, cards, &rendered)
 		out = append(out, detail)
@@ -217,9 +235,11 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 }
 
 // newSprintDetail seeds one sprint's node with MembershipCached derived from
-// its state: the sync only ever asks Jira for an active or future sprint's
-// membership (internal/syncer/boards.go), so a closed sprint's board_issue
-// rows are absent because nobody asked, not because the sprint is empty.
+// its state, which is the right answer for the two states the sync asks
+// Jira about on every pass (internal/syncer/boards.go). A closed sprint is
+// read once and then re-supplied from the cache, so state says nothing
+// about whether that read has happened; sprintDetails overrides the field
+// for a closed sprint from the keys it has already read.
 func newSprintDetail(s Sprint) SprintDetail {
 	return SprintDetail{
 		Sprint:           s,

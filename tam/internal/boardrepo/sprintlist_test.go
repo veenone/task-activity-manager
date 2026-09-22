@@ -94,35 +94,58 @@ func TestSprintDetailsCountTotalsDoneAndPoints(t *testing.T) {
 	}
 }
 
-func TestAClosedSprintReportsMembershipUncachedButActiveAndFutureDo(t *testing.T) {
+func TestAClosedSprintsMembershipCachedSaysWhetherItHasBeenRead(t *testing.T) {
 	r, _ := newRepo(t)
 	ctx := context.Background()
 	board := backend.Board{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
 	sprints := []backend.Sprint{
+		{ID: 10, BoardID: 1, Name: "Sprint 10", State: "closed", StartDate: "2026-07-21T09:00:00Z", EndDate: "2026-08-04T09:00:00Z"},
 		{ID: 11, BoardID: 1, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z", EndDate: "2026-08-18T09:00:00Z"},
 		{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z", EndDate: "2026-09-01T09:00:00Z"},
 		{ID: 13, BoardID: 1, Name: "Sprint 13", State: "future", StartDate: "2026-09-01T09:00:00Z", EndDate: "2026-09-15T09:00:00Z"},
 	}
-	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), sprints, nil); err != nil {
+	done := card("PLAT-1", "Done", "5")
+	done.StoryPoints = pts(5)
+	todo := card("PLAT-2", "To Do", "1")
+	todo.StoryPoints = pts(3)
+	// Sprint 11 has been read and Sprint 10 has not, which is every board
+	// part way through its backfill.
+	keys := map[string][]string{"11": {"PLAT-1", "PLAT-2"}}
+	if err := r.ReplaceBoard(ctx, "p1", board, sampleColumns(), sprints, keys); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	details, err := r.BoardSprintDetails(ctx, newIssues(), "p1", 1)
+	details, err := r.BoardSprintDetails(ctx, newIssues(done, todo), "p1", 1)
 	if err != nil {
 		t.Fatalf("board sprint details: %v", err)
 	}
-	// board_issue is empty for every sprint here, since none of them was
-	// seeded any membership. A closed sprint's emptiness means the sync
-	// never asked; an active or future sprint's would as easily mean a
-	// failed sync as a genuinely empty one, which is exactly why
-	// MembershipCached is read from state and not from board_issue.
-	if sprintDetailByName(t, details, "Sprint 11").MembershipCached {
-		t.Error("a closed sprint's membership is never fetched and must read uncached")
+
+	// This case used to assert that a closed sprint always read uncached,
+	// because the sync never fetched one's membership and board_issue was
+	// as empty for a sprint nobody had read as for one that held nothing.
+	// The sync reads a closed sprint once now, so for a closed sprint the
+	// field says whether that read has happened. Active and future keep
+	// the derivation from state: the sync asks for them on every pass, so
+	// an empty scope there still cannot be told from a failed one.
+	read := sprintDetailByName(t, details, "Sprint 11")
+	if !read.MembershipCached {
+		t.Error("a closed sprint whose keys are cached has been read and must say so")
+	}
+	if read.Total != 2 || read.Done != 1 || read.Points != 8 || read.DonePoints != 5 {
+		t.Errorf("sprint 11 = %d total, %d done, %v points, %v done points; want 2, 1, 8, 5 counted from its cached keys",
+			read.Total, read.Done, read.Points, read.DonePoints)
+	}
+	unread := sprintDetailByName(t, details, "Sprint 10")
+	if unread.MembershipCached {
+		t.Error("a closed sprint with nothing cached has not been read and must not claim to be empty")
+	}
+	if unread.Total != 0 || unread.Points != 0 {
+		t.Errorf("sprint 10 = %d total, %v points; want zeroes, since nothing has been read for it", unread.Total, unread.Points)
 	}
 	if !sprintDetailByName(t, details, "Sprint 12").MembershipCached {
-		t.Error("an active sprint's membership is fetched and must read cached")
+		t.Error("an active sprint's membership is fetched every pass and must read cached")
 	}
 	if !sprintDetailByName(t, details, "Sprint 13").MembershipCached {
-		t.Error("a future sprint's membership is fetched and must read cached")
+		t.Error("a future sprint's membership is fetched every pass and must read cached")
 	}
 	if !sprintDetailByName(t, details, boardrepo.UnassignedSprintName).MembershipCached {
 		t.Error("the unassigned node's cards come from the board's own list, which is always cached")

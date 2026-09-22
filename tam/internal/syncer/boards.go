@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -69,8 +70,8 @@ type boardParts struct {
 // backend that cannot speak Jira's Agile API is simply skipped.
 //
 // Every board is read in full before anything is written for it: its
-// columns, its sprints, its own issue list, and its active and future
-// sprints' issue keys. A board whose read or write fails at any point is
+// columns, its sprints, its own issue list, and its sprints' issue keys.
+// A board whose read or write fails at any point is
 // recorded in Dropped with its name and one readable line of the reason,
 // the pass carries on with the next board, and whatever that board held
 // before this run is left exactly as it was. Once every read for a board
@@ -145,7 +146,7 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 	for i, b := range boards {
 		emit(Progress{Phase: "boards", Fetched: i, Total: len(boards), Stage: b.Name})
 		boardStart := e.Now()
-		parts, err := e.readBoard(ctx, bb, b, projectKey)
+		parts, err := e.readBoard(ctx, bb, b, profileID, projectKey)
 		// Per board, so a slow pass can be attributed to a board rather than
 		// guessed at: this walk is one request per column set, per sprint
 		// page, and per page of every scope's issue keys.
@@ -186,18 +187,39 @@ func (e *Engine) SyncBoards(ctx context.Context, profileID, projectKey string, o
 	return sum, nil
 }
 
+// closedMembershipBudget caps how many of a board's closed sprints one
+// pass reads membership for. A closed sprint's membership never changes,
+// so each is read once and re-supplied from the cache for ever after;
+// the cap only spreads the first pass on a board with years of history
+// across a few syncs instead of stalling one.
+const closedMembershipBudget = 12
+
 // readBoard gathers everything one board needs before any of it is
 // written: its columns, its sprints, its own issue list, and the issue
-// keys of its active and future sprints, every scope narrowed to the
-// project being synced. Only that project's issues are ever in the cache,
-// so a key outside it could not be drawn anyway, and reading the board
-// entire cost a minute on a board whose filter spans far more than the
-// project (8,485 cards against the project's 38). Closed sprints are kept in the
-// sprint list but their keys are never fetched: the picker only offers
-// what a sync actually pulled membership for. Any failure here means
-// nothing is written for this board and its previous copy, if it has one,
-// stays exactly as it was.
-func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backend.Board, projectKey string) (boardParts, error) {
+// keys of every scope, narrowed to the project being synced. Only that
+// project's issues are ever in the cache, so a key outside it could not be
+// drawn anyway, and reading the board entire cost a minute on a board whose
+// filter spans far more than the project (8,485 cards against the
+// project's 38). Any failure here means nothing is written for this board
+// and its previous copy, if it has one, stays exactly as it was.
+//
+// An active or future sprint's keys are fetched on every pass, because its
+// membership changes under the pass. A closed sprint's cannot change, so it
+// is read once: the cache is consulted first and what it holds is
+// re-supplied as this pass's answer, which is what carries it through
+// ReplaceBoard's wholesale delete of the board's rows. Only a closed sprint
+// nothing is cached for costs a request, and no more than
+// closedMembershipBudget of them per pass, newest first, so a board
+// backfills from the top of the Sprints view downward. Closed sprints used
+// to be kept in the sprint list with their keys never fetched at all, which
+// made the progress bar on the commonest row in that view structurally
+// empty.
+//
+// The one case this cannot tell apart is a closed sprint that genuinely
+// holds nothing of this project: board_issue is as empty for it as for one
+// nobody has read, so it is re-asked once per pass. That is one request,
+// and retiring it would cost a membership_synced column for one bit.
+func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backend.Board, profileID, projectKey string) (boardParts, error) {
 	cols, err := bb.BoardColumns(ctx, b.ID)
 	if err != nil {
 		return boardParts{}, err
@@ -222,7 +244,50 @@ func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backe
 		}
 		keys[sid] = sprintKeys
 	}
+	budget := closedMembershipBudget
+	for _, s := range closedNewestFirst(sprints) {
+		sid := strconv.Itoa(s.ID)
+		cached, err := e.Boards.SprintIssues(ctx, profileID, b.ID, sid)
+		if err != nil {
+			return boardParts{}, err
+		}
+		if len(cached) > 0 {
+			keys[sid] = cached
+			continue
+		}
+		if budget == 0 {
+			continue
+		}
+		budget--
+		sprintKeys, err := bb.BoardIssueKeys(ctx, b.ID, sid, projectKey)
+		if err != nil {
+			return boardParts{}, err
+		}
+		keys[sid] = sprintKeys
+	}
 	return boardParts{columns: cols, sprints: sprints, keys: keys}, nil
+}
+
+// closedNewestFirst picks the sprints that are neither active nor future
+// and orders them the way detailSprintsSQL reads them back, start date
+// descending with the id breaking a tie. Jira answers with a board's
+// sprints oldest first, so walking them as they came would spend the whole
+// budget on history nobody is looking at and leave the sprint that finished
+// last weekend with no numbers.
+func closedNewestFirst(sprints []backend.Sprint) []backend.Sprint {
+	out := make([]backend.Sprint, 0, len(sprints))
+	for _, s := range sprints {
+		if s.State != "active" && s.State != "future" {
+			out = append(out, s)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].StartDate != out[j].StartDate {
+			return out[i].StartDate > out[j].StartDate
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
 }
 
 // ownBoards splits the boards Jira answered with into this project's own and

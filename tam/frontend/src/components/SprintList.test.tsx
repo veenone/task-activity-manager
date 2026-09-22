@@ -183,11 +183,15 @@ describe("SprintList", () => {
     expect(await screen.findByText(/3 cards in this list have not been synced/)).toBeInTheDocument();
   });
 
-  it("explains an empty closed sprint rather than calling it empty", async () => {
+  it("says a closed sprint has not been read yet rather than calling it empty", async () => {
     const user = userEvent.setup();
     renderList([detail({ id: 11, name: "Sprint 11", state: "closed", issues: [], membershipCached: false })]);
     await user.click(await screen.findByRole("treeitem", { name: "Sprint 11, Closed" }));
-    expect(screen.getByText(/A closed sprint's cards are not synced/)).toBeInTheDocument();
+    // The cards are coming now: the sync reads a closed sprint's membership
+    // once and keeps it, so the empty list is a fact about this cache and
+    // not about the sprint.
+    expect(screen.getByText(/have not been read yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/whatever the sprint held/)).not.toBeInTheDocument();
   });
 
   it("keeps every sprint's row id out of the keys a fill can send", () => {
