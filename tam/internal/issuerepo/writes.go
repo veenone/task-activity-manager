@@ -34,17 +34,19 @@ type execer interface {
 }
 
 // FieldValue renders one editable field of an issue as the journal and the
-// conflict table show it: labels as a comma list, points as a plain number,
-// and the description the caller passes. The description stays an argument
-// rather than being read off iss, because the one caller left that does not
-// have a row in hand is the commit conflict, which reads the remote
-// description separately.
-func FieldValue(iss backend.Issue, description, field string) string {
+// conflict table show it: labels as a comma list, points as a plain number.
+// A description nothing has read is rendered as the empty string, which is
+// what a three-way conflict table has to put in the cell either way; the
+// pointer's own meaning is for the panel, which does not go through here.
+func FieldValue(iss backend.Issue, field string) string {
 	switch field {
 	case "summary":
 		return iss.Summary
 	case "description":
-		return description
+		if iss.Description == nil {
+			return ""
+		}
+		return *iss.Description
 	case "priority":
 		return iss.Priority
 	case "assignee":
@@ -103,7 +105,10 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (val
 	// A row whose description has never been synced reads as "" here. The
 	// panel does not offer an edit in that state, so nothing journals an
 	// edit against a base nobody has seen.
-	return FieldValue(iss, description.String, field), updated, iss.Type, nil
+	if description.Valid {
+		iss.Description = &description.String
+	}
+	return FieldValue(iss, field), updated, iss.Type, nil
 }
 
 // validateParent enforces the two-level hierarchy: an epic takes no parent,

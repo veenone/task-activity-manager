@@ -340,23 +340,16 @@ func linkFailure(p journal.PendingChange, message string, retryable bool) Failur
 	return Failure{Key: p.EntityKey, EntityType: issuerepo.EntityLink, RowID: p.ID, Error: message, Retryable: retryable, Reachable: []string{}}
 }
 
-// conflict builds the three-way view. The remote description is fetched
-// only when a description edit is pending.
-func (e *Engine) conflict(ctx context.Context, key string, remote backend.Issue, rows []journal.PendingChange) Conflict {
+// conflict builds the three-way view from the row the version check has
+// already read. The description used to cost a second round trip here,
+// because backend.Issue did not carry one; it does since the sync started
+// caching it, so a description conflict is one Jira call lighter.
+func (e *Engine) conflict(_ context.Context, key string, remote backend.Issue, rows []journal.PendingChange) Conflict {
 	c := Conflict{Key: key, Summary: remote.Summary, RemoteVersion: remote.Updated, Fields: []FieldConflict{}}
-	remoteDesc := ""
-	for _, p := range rows {
-		if p.Field == "description" {
-			if d, err := e.b.GetIssueDetail(ctx, key); err == nil {
-				remoteDesc = d.Description
-			}
-			break
-		}
-	}
 	for _, p := range rows {
 		c.Fields = append(c.Fields, FieldConflict{
 			Field: p.Field, Base: p.BeforeVal, Mine: p.AfterVal,
-			Remote: issuerepo.FieldValue(remote, remoteDesc, p.Field),
+			Remote: issuerepo.FieldValue(remote, p.Field),
 		})
 	}
 	return c

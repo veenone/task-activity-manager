@@ -667,14 +667,20 @@ func TestRekeyRepointsChildrenAndPendingParentEdits(t *testing.T) {
 }
 
 func TestFieldValueAndSplitLabels(t *testing.T) {
-	iss := backend.Issue{Summary: "s", Priority: "p", Assignee: "a", Labels: []string{"x", "y"}, StoryPoints: pts(2.5)}
+	text := "text"
+	iss := backend.Issue{Summary: "s", Priority: "p", Assignee: "a", Labels: []string{"x", "y"}, StoryPoints: pts(2.5), Description: &text}
 	for field, want := range map[string]string{"summary": "s", "priority": "p", "assignee": "a", "labels": "x, y", "storyPoints": "2.5", "description": "text"} {
-		if got := issuerepo.FieldValue(iss, "text", field); got != want {
+		if got := issuerepo.FieldValue(iss, field); got != want {
 			t.Errorf("FieldValue(%s) = %q, want %q", field, got, want)
 		}
 	}
-	if got := issuerepo.FieldValue(backend.Issue{}, "", "storyPoints"); got != "" {
+	if got := issuerepo.FieldValue(backend.Issue{}, "storyPoints"); got != "" {
 		t.Errorf("nil points = %q", got)
+	}
+	// A description nothing has read renders as empty rather than panicking
+	// on the nil pointer that says so.
+	if got := issuerepo.FieldValue(backend.Issue{}, "description"); got != "" {
+		t.Errorf("unread description = %q", got)
 	}
 	if got := backend.SplitLabels(" a ,, b,c "); strings.Join(got, "|") != "a|b|c" {
 		t.Errorf("SplitLabels = %v", got)
