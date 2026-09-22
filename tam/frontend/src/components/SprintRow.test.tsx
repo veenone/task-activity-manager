@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SprintDetail } from "../api";
+import { calendarDay } from "../lib/format";
 import { SprintRow } from "./SprintRow";
 
 function detail(over: Partial<SprintDetail> = {}): SprintDetail {
@@ -38,18 +39,23 @@ function renderRow(over: Partial<SprintDetail> = {}, busy = false, waiting = "")
 // The row draws a relative timeline now, so its wording depends on the
 // clock. toFake: ["Date"] and nothing else: faking every timer breaks
 // userEvent, and this file clicks.
+// Built with the local-time constructor, not from a UTC instant: a sprint's
+// dates are civil days, so the clock these fixtures pin has to be one too or
+// the row reads a day out for a runner far enough from UTC.
+const PINNED = new Date(2026, 8, 3, 12, 0, 0);
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-09-03T10:00:00Z"));
+  vi.setSystemTime(PINNED);
 });
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe("SprintRow", () => {
-  it("draws the sprint's name, goal, state, dates, timeline and scope", () => {
+  it("draws the sprint's name, goal, state, dates and timeline", () => {
     renderRow();
-    expect(screen.getByRole("treeitem", { name: "Sprint 12, Active" })).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: /^Sprint 12, Active/ })).toBeInTheDocument();
     // "Active" in the accessible name and in the badge, both mixed case:
     // the badge's shout is text-transform in the stylesheet, so a screen
     // reader is not made to spell the state out.
@@ -64,6 +70,25 @@ describe("SprintRow", () => {
     // opening it. It is still drawn under an expanded sprint too, where the
     // empty case has wording of its own.
     expect(screen.getByText("Ship checkout")).toHaveAttribute("title", "Ship checkout");
+  });
+
+  it("names the row with everything it draws, so the tree says it out loud", () => {
+    renderRow();
+    // A treeitem with an explicit name is announced by that name and
+    // nothing else: a reader arrowing down the tree hears the label and
+    // never reaches the cells inside it. Everything the row says about
+    // where the sprint is and how much is done has to be in the name, or
+    // the bars and the timing are decoration for sighted readers only (I3).
+    expect(screen.getByRole("treeitem", { name: /^Sprint 12/ })).toHaveAccessibleName(
+      "Sprint 12, Active, Day 6 of 15, 9 days left, 8 of 14 done, 21 of 34 pts",
+    );
+  });
+
+  it("says in the name that a closed sprint has not been read", () => {
+    renderRow({ state: "closed", membershipCached: false, total: 0, done: 0, points: 0, donePoints: 0 });
+    expect(screen.getByRole("treeitem", { name: /^Sprint 12/ })).toHaveAccessibleName(
+      `Sprint 12, Closed, Closed ${calendarDay("2026-09-12")}, 15 days, cards not read yet`,
+    );
   });
 
   it("says what a draft sprint is waiting for instead of a goal", () => {
@@ -82,8 +107,8 @@ describe("SprintRow", () => {
 
   it("says a closed sprint has not been read rather than counting it as empty", () => {
     renderRow({ state: "closed", membershipCached: false, total: 0, done: 0, points: 0, donePoints: 0 });
-    expect(screen.getByText("Cards not read yet")).toBeInTheDocument();
-    expect(screen.getByText("Not counted yet")).toBeInTheDocument();
+    expect(screen.getByText("cards not read yet")).toBeInTheDocument();
+    expect(screen.queryByText(/0 cards/)).not.toBeInTheDocument();
     expect(screen.queryByRole("progressbar", { name: /Points done/ })).not.toBeInTheDocument();
   });
 
@@ -102,13 +127,20 @@ describe("SprintRow", () => {
     // sprint whose share ran out draws no cards and still holds all of them.
     renderRow({ issues: [], total: 14, truncated: true });
     expect(screen.getByText("8 of 14 done, 21 of 34 pts")).toBeInTheDocument();
-    expect(screen.getByText("14 cards")).toBeInTheDocument();
-    expect(screen.getByText("8 done")).toBeInTheDocument();
   });
 
-  it("says what a closed sprint carried over rather than what is left to do in it", () => {
-    renderRow({ state: "closed", completeDate: "2026-08-30T09:00:00Z" });
-    expect(screen.getByText("6 carried over")).toBeInTheDocument();
+  it("counts a sprint's cards once, not once per cell", () => {
+    // The scope cell used to print "14 cards" and "8 done" an inch from the
+    // timeline's "8 of 14 done, 21 of 34 pts", which is the same two
+    // numbers twice. Its second line was also wrong: it called
+    // total - done "carried over" while done came from the card's status
+    // today, so work that was unfinished at close and got finished
+    // afterwards, which is the normal life of carried-over work, counted as
+    // done and the figure read 0. The close-time answer lives in the sprint
+    // report, which is built from the sprint's own history.
+    renderRow();
+    expect(screen.queryByText("14 cards")).not.toBeInTheDocument();
+    expect(screen.queryByText(/carried over/)).not.toBeInTheDocument();
   });
 
   it("offers Complete on a running sprint and Start on one that has not begun", async () => {
@@ -148,15 +180,18 @@ describe("SprintRow", () => {
 
   it("gives the board's own unassigned work no state, no dates, no timeline and no actions", () => {
     renderRow({ id: 0, name: "Board backlog", state: "unassigned", startDate: "", endDate: "", goal: "" });
-    expect(screen.getByRole("treeitem", { name: "Board backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: /^Board backlog/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Actions on/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Unassigned")).not.toBeInTheDocument();
     expect(screen.getByText("no dates")).toBeInTheDocument();
     expect(screen.getByText("no timeline")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     // It still counts its work, which is the one thing it has in common
-    // with the sprints above it.
-    expect(screen.getByText("14 cards")).toBeInTheDocument();
+    // with the sprints above it, and the name carries that count too.
+    expect(screen.getByText("8 of 14 done, 21 of 34 pts")).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: /^Board backlog/ })).toHaveAccessibleName(
+      "Board backlog, no timeline, 8 of 14 done, 21 of 34 pts",
+    );
   });
 
   it("toggles from the caret without the menu's own clicks reaching the row", async () => {
@@ -171,7 +206,7 @@ describe("SprintRow", () => {
   it("marks a draft sprint, offers to start it, and holds back Complete until Commit", async () => {
     const user = userEvent.setup();
     const { actions } = renderRow({ id: -1, name: "Sprint 15", state: "future", draft: true, total: 0, done: 0, points: 0, donePoints: 0 });
-    expect(screen.getByRole("treeitem", { name: "Sprint 15, Draft" })).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: /^Sprint 15, Draft/ })).toBeInTheDocument();
     expect(screen.getByText("Draft").closest(".status-badge")).toHaveClass("status-badge-draft");
     await user.click(screen.getByRole("button", { name: "Actions on Sprint 15" }));
     const menu = await screen.findByRole("menu");

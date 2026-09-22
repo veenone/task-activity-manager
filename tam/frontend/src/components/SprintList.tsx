@@ -329,7 +329,7 @@ export function SprintList({
                 ? "Every card on this board is in a sprint."
                 : detail.membershipCached
                   ? "Nothing is in this sprint."
-                  : "This sprint's cards have not been read yet. A closed sprint's membership is read once and kept, so the next board sync fills this in."}
+                  : "This sprint's cards have not been read yet. A closed sprint's membership is read once and kept, and a board with a long history is filled in over several syncs."}
           </p>
         )}
         {notDrawn > 0 && (

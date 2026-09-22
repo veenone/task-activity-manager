@@ -1,13 +1,35 @@
 import { ProgressBar } from "@agile-suite/core";
 import type { SprintDetail } from "../api";
-import { points, progressText, sprintRelative } from "../lib/format";
+import { plural, points, progressText, sprintRelative } from "../lib/format";
 
 // UNREAD is what a closed sprint says before the backfill has reached it.
-// Every closed sprint on every board is in this state the first time the
-// board is synced, and the twelve a pass reads is a cap, not a promise, so
-// this is a row people see rather than a corner case. A bar at zero would
-// say the sprint held nothing, which is a different claim.
-const UNREAD = "Cards not read yet";
+// A bar at zero would say the sprint held nothing, which is a different
+// claim, and one the row would have no way to take back.
+const UNREAD = "cards not read yet";
+
+// NO_TIMELINE is the row with no calendar to draw: the board's own
+// unassigned work, and a sprint Jira has not scheduled.
+const NO_TIMELINE = "no timeline";
+
+// scopeLine is the one line under the bars saying what the sprint holds.
+// A sprint with cards in it says how many are done and how many points have
+// landed, which is also the points bar's caption; a sprint with none, and a
+// row with no calendar at all, says the bare count, because there is no "of
+// 14" in the sentence above to carry it.
+function scopeLine(detail: SprintDetail): string {
+  if (detail.state === "closed" && !detail.membershipCached) return UNREAD;
+  if (detail.total > 0) return progressText(detail.done, detail.total, detail.donePoints, detail.points);
+  return plural(detail.total, "card", "cards");
+}
+
+// sprintTimelineText is everything this cell says, as one sentence, for the
+// row's accessible name. A treeitem with an explicit label is announced by
+// that label alone, so a reader arrowing the tree never reaches the bars or
+// the timing unless they are in it.
+export function sprintTimelineText(detail: SprintDetail): string {
+  const timing = sprintRelative(detail);
+  return [timing.label || NO_TIMELINE, timing.trailing, scopeLine(detail)].filter(Boolean).join(", ");
+}
 
 // SprintTimeline owns the row's whole timeline and progress cell: where the
 // sprint is in its calendar, how much calendar is left, and how much of its
@@ -21,33 +43,33 @@ export function SprintTimeline({ detail }: { detail: SprintDetail }) {
   const timing = sprintRelative(detail);
   // -1 is a sprint with no readable range, which is the board's own
   // unassigned node and any sprint Jira has not scheduled. There is no
-  // calendar to draw, and a bar at zero would invent one.
-  if (timing.elapsed < 0) return <span className="sprint-timeline muted small">no timeline</span>;
-
+  // calendar to draw, and a bar at zero would invent one; the count is what
+  // the row has left to say.
+  const drawable = timing.elapsed >= 0;
   const closed = detail.state === "closed";
   const unread = closed && !detail.membershipCached;
   const planned = detail.state === "future";
   return (
     <span className="sprint-timeline">
       <span className="sprint-timeline-head">
-        <span className="sprint-timeline-label">{timing.label}</span>
-        <span className="sprint-timeline-trailing muted small">{timing.trailing}</span>
+        <span className="sprint-timeline-label">{drawable ? timing.label : NO_TIMELINE}</span>
+        {timing.trailing && <span className="sprint-timeline-trailing muted small">{timing.trailing}</span>}
       </span>
-      <ProgressBar
-        value={Math.round(timing.elapsed * 100)}
-        max={100}
-        label={`Time elapsed in ${detail.name}`}
-        valueText={timing.label}
-        // Today's line, and only where there is a today inside the range:
-        // a finished sprint has none, and a sprint that has not started has
-        // nothing to mark on an empty bar.
-        marker={detail.state === "active" ? timing.elapsed : undefined}
-        tone={closed ? "muted" : "time"}
-      />
-      <span className="sprint-timeline-scope muted small">
-        {unread ? UNREAD : detail.total > 0 ? progressText(detail.done, detail.total, detail.donePoints, detail.points) : ""}
-      </span>
-      {!unread && detail.points > 0 && (
+      {drawable && (
+        <ProgressBar
+          value={Math.round(timing.elapsed * 100)}
+          max={100}
+          label={`Time elapsed in ${detail.name}`}
+          valueText={timing.label}
+          // Today's line, and only where there is a today inside the range:
+          // a finished sprint has none, and a sprint that has not started
+          // has nothing to mark on an empty bar.
+          marker={detail.state === "active" ? timing.elapsed : undefined}
+          tone={closed ? "muted" : "time"}
+        />
+      )}
+      <span className="sprint-timeline-scope muted small">{scopeLine(detail)}</span>
+      {drawable && !unread && detail.points > 0 && (
         <ProgressBar
           value={detail.donePoints}
           max={detail.points}

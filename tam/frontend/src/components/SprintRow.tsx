@@ -3,10 +3,10 @@ import { Menu, StatusBadge } from "@agile-suite/core";
 import type { BadgeTone, MenuItem } from "@agile-suite/core";
 import type { SprintDetail } from "../api";
 import { UNASSIGNED_SPRINT_STATE } from "../api";
-import { plural, sprintDates } from "../lib/format";
+import { sprintDates } from "../lib/format";
 import { DRAFT_SPRINT_HINT } from "../lib/sprintOptions";
 import { CARD_MENU_CLASS } from "./CardMoveMenu";
-import { SprintTimeline } from "./SprintTimeline";
+import { SprintTimeline, sprintTimelineText } from "./SprintTimeline";
 
 // The four things a sprint row can open, each of them a dialog. The row
 // itself performs none of them.
@@ -45,10 +45,6 @@ interface Props {
 // otherwise leave says nothing about why.
 const DRAFT_GOAL = "not created in Jira yet";
 
-// UNCOUNTED is the scope cell for a closed sprint the backfill has not
-// reached. "0 cards" would be a count, and this is the absence of one.
-const UNCOUNTED = "Not counted yet";
-
 // stateLabel prints Jira's lowercase state as a word rather than a shout.
 // The badge's capitals are text-transform in the stylesheet: this string is
 // also the row's accessible name, and a screen reader spells an uppercased
@@ -67,7 +63,16 @@ function badgeTone(state: string): BadgeTone {
 
 // SprintRow is one sprint's header: a caret, its name and goal, its state
 // over its dates, where it is in its calendar and how much of it has landed,
-// what it holds, and the menu its actions live in.
+// and the menu its actions live in.
+//
+// There is no separate cell counting what the sprint holds. It printed the
+// same two numbers the timeline's own line prints, an inch away, and its
+// second line called total - done "carried over" while done came from each
+// card's status today, so work that was unfinished at close and got
+// finished afterwards read as done and the figure came out 0 for almost
+// every closed sprint. The close-time answer is the sprint report's, which
+// is built from the sprint's own history rather than from the cache as it
+// stands now.
 //
 // The goal is drawn here as well as under an expanded sprint. The name
 // column has the widest track and the goal clips with a title attribute the
@@ -83,11 +88,6 @@ export function SprintRow({
   // print, and nothing that can be started, edited or deleted.
   const isSprint = detail.state !== UNASSIGNED_SPRINT_STATE;
   const dates = isSprint ? sprintDates(detail) || "no dates" : "no dates";
-  const closed = detail.state === "closed";
-  // A closed sprint whose membership has not been read yet is every closed
-  // sprint on a board's first sync. Its numbers are all zero because nobody
-  // has asked, not because the sprint was empty, so the cell says which.
-  const uncounted = closed && !detail.membershipCached;
 
   const items: MenuItem[] = [];
   // A draft can be started, since Commit creates it before it starts it,
@@ -108,12 +108,17 @@ export function SprintRow({
   // amber every other thing waiting for Commit wears.
   const label = detail.draft ? "Draft" : stateLabel(detail.state);
   const goal = detail.draft ? DRAFT_GOAL : detail.goal;
+  // A treeitem with an explicit label is announced by that label and
+  // nothing else, so everything the row draws about where the sprint is and
+  // how much of it is done has to be in the name or it is decoration for
+  // sighted readers only (I3).
+  const name = [detail.name, isSprint ? label : "", sprintTimelineText(detail)].filter(Boolean).join(", ");
 
   return (
     <div
       role="treeitem"
       aria-expanded={open}
-      aria-label={isSprint ? `${detail.name}, ${label}` : detail.name}
+      aria-label={name}
       tabIndex={focused ? 0 : -1}
       data-tree-index={index}
       data-tree-key={rowId}
@@ -142,20 +147,6 @@ export function SprintRow({
       </span>
       <span className="sprint-cell sprint-cell-timeline">
         <SprintTimeline detail={detail} />
-      </span>
-      <span className="sprint-cell sprint-cell-stack sprint-cell-scope">
-        {uncounted ? (
-          <span className="sprint-cell-secondary">{UNCOUNTED}</span>
-        ) : (
-          <>
-            <span>{plural(detail.total, "card", "cards")}</span>
-            {detail.total > 0 && (
-              <span className="sprint-cell-secondary">
-                {closed ? `${detail.total - detail.done} carried over` : `${detail.done} done`}
-              </span>
-            )}
-          </>
-        )}
       </span>
       <span className="sprint-cell sprint-cell-actions">
         {isSprint && (

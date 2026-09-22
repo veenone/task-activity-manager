@@ -612,7 +612,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-row, .sprint-issue-row { width: 100%; gap: 8px; align-items: center; }
 .sprint-row {
   display: grid;
-  grid-template-columns: 12px minmax(140px, 1.2fr) 150px minmax(170px, 1.4fr) 104px 76px;
+  grid-template-columns: 12px minmax(140px, 1.2fr) 150px minmax(190px, 1.6fr) 76px;
   align-items: start;
   padding-block: 4px;
 }
@@ -630,8 +630,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-cell-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
 .sprint-cell-stack > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sprint-cell-badges { display: flex; align-items: center; gap: 4px; }
-.sprint-cell-dates, .sprint-cell-secondary, .sprint-goal-line { color: var(--text-muted); font-size: 11px; }
-.sprint-cell-scope { font-variant-numeric: tabular-nums; margin-left: 0; }
+.sprint-cell-dates, .sprint-goal-line { color: var(--text-muted); font-size: 11px; }
+.sprint-timeline-scope { font-variant-numeric: tabular-nums; }
 /* The timeline cell owns its own two lines and two bars, so it is the one
    cell that does not clip: a bar has to reach the end of its track. */
 .sprint-cell-timeline { overflow: visible; }
@@ -824,7 +824,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
      anything in. The caret keeps its column so the tree still reads as a
      tree, and the actions stay on the first line with the name. */
   .sprint-row {
-    grid-template-columns: 12px minmax(0, 1fr) 150px 104px 76px;
+    grid-template-columns: 12px minmax(0, 1fr) 150px 76px;
   }
   .sprint-cell-timeline {
     grid-column: 2 / -1;
