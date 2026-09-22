@@ -2,7 +2,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-15-tam-05-sprints-reports-visuals-design.md`
 (approved 2026-09-15), section D1 and implementation tasks 1, 2, 3 and part of 8.
-**Issue:** TBD. No issue exists for this bundle yet; open one before the first
+**Issue:** #62.
 commit (P1) and put its number here.
 **Branch:** `feat/tam-05a-sprint-rows`, cut from `main` at `329f428` (PR #61).
 **Method:** ponytail agents per task, scoped gates, one review scoped to this
