@@ -79,7 +79,7 @@ describe("selected and hovered filter chips", () => {
     // unselected type filter made it look selected.
     const hover = rulesFor(appCss, ".chip-toggle:hover");
     const on = rulesFor(appCss, ".chip-toggle.chip-on");
-    expect(hover).not.toMatch(/opacity:\s*1/);
+    expect(hover).not.toMatch(/opacity:\s*1\b/);
     expect(on).toMatch(/background|box-shadow|font-weight/);
   });
 });

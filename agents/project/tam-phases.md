@@ -386,11 +386,14 @@ sprint report under whatever heading happened to be on screen. Heading drawn
 from `series.sprintName`, the sprint backend answered about, never from
 picker state = second line of defence for same failure.
 
-**Charts not here, are next plan.** `Series.Days` carry day by day line and
-nothing draw it. No SVG anywhere in this frontend, so axis ticks, label
-collision, empty ranges, single day sprints, colour tokens, screen reader
-access all new surface, and splitting mean numbers get trusted before
-anything drawn from them.
+**Charts came after, in their own change.** Phase 4 shipped the numbers and
+left `Series.Days` undrawn, so the figures got trusted before anything drawn
+from them. The charts landed later in `tam/frontend/src/components/charts`,
+hand built in SVG the way XTM draws its Sankey, with the scale maths in
+`lib/chartScale.ts`. Every chart states its numbers in text beside the marks
+and ships a hidden data table, except where a visible table already carries
+the same rows: the velocity chart drops its table beside `VelocityTable` so
+a screen reader reads the figures once.
 
 ## Rituals, local first
 

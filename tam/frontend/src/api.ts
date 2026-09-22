@@ -466,8 +466,7 @@ export interface ReportSeries {
   removed: number;
   completed: number;
   carriedOver: number;
-  // The day by day line behind the totals. Phase 4 prints the totals and
-  // does not draw this; the charts are the next plan.
+  // The day by day line behind the totals, which the burndown draws.
   days: ReportDay[];
   // The keys of the issues whose changelog came back cut short, so the
   // numbers above rest in part on a partial history.

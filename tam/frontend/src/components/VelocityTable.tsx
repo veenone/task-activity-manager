@@ -2,9 +2,10 @@ import type { VelocityRow } from "../api";
 import { amount, velocityFloorLine } from "../lib/reportText";
 
 // VelocityTable is the board's last closed sprints as rows, oldest first,
-// which is the order the bar chart a later plan draws would be read in. The
-// backend sends them in that order and nothing here re-sorts them, so the
-// table and the chart can never disagree about it.
+// which is the order VelocityChart reads them in beside it. The backend
+// sends them in that order and nothing here re-sorts them, so the table and
+// the chart can never disagree about it. The chart drops its own hidden
+// table when this one is on screen, so the figures are read once.
 //
 // The unit is printed in every figure rather than once in a header, because
 // it belongs to the row. A board that moved from story points to counting

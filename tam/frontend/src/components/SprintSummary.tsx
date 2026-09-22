@@ -33,13 +33,18 @@ export function SprintSummary({ series, builtAt, live = false }: { series: Repor
       <p className={`report-mode ${live ? "report-mode-live" : "report-mode-closed"}`} role={live ? "status" : undefined}>
         {live ? "In progress: these figures are provisional. They may change as work moves." : "Closed sprint · final results"}
       </p>
-      <p className="report-sentence">{summarySentence(series, live)}</p>
       <p className="report-outcome"><span className="report-outcome-label">Sprint outcome</span>{completionLine(series, live)}</p>
       <ReportMetrics series={series} live={live} />
+      {/* The caveat governs two of the figures directly above it, so it is
+          read with them or it is not read at all. It used to sit inside the
+          details below, which meant the numbers were read without it. */}
+      <p className="muted small report-caveats">{floorLine()}</p>
       {truncation && <p className="warn-text small">{truncation}</p>}
       <details className="report-details">
         <summary>How this report is calculated</summary>
-        <p className="muted small">{floorLine()}</p>
+        {/* The sentence says what the tiles say. It stays for anyone who
+            wants the figures in prose, below the surface that is scanned. */}
+        <p className="report-sentence">{summarySentence(series, live)}</p>
         {unit && <p className="muted small">{unit}</p>}
         <p className="muted small">{methodLine()}</p>
       </details>
