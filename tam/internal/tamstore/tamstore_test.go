@@ -960,3 +960,114 @@ func TestSchemaVersionSixteenAddsTheEditScreenTableToAnOlderDatabase(t *testing.
 		t.Errorf("fields_json = %s", fields)
 	}
 }
+
+// Version 17 puts the description on the issue row so the detail panel draws
+// it from disk. The column is nullable on purpose: NULL is "this row has
+// never been synced with a description", which the panel has to tell apart
+// from an issue that genuinely has none. A row cached before the migration
+// must therefore come out NULL, not empty, and the watermark has to clear so
+// the next sync fills it in (an incremental sync only re-reads what Jira
+// says changed, so a quiet issue would otherwise stay blank forever).
+func TestVersionSeventeenMigrationAddsDescriptionAndClearsEveryWatermark(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE issue DROP COLUMN description`,
+		// PLAT-412 has never had its detail opened, so nothing anywhere
+		// holds a description for it.
+		`INSERT INTO issue (profile_id, key, summary, status) VALUES ('p1', 'PLAT-412', 'Promo code', 'In Progress')`,
+		// PLAT-409's detail was fetched and cached before version 17, so
+		// its description is sitting in the JSON the panel used to read.
+		`INSERT INTO issue (profile_id, key, summary, status, detail_json, detail_fetched_at)
+		 VALUES ('p1', 'PLAT-409', 'Rotate keys', 'To Do', '{"key":"PLAT-409","description":"Rotate them quarterly.","fields":{}}', '2026-09-05T10:00:00Z')`,
+		// PLAT-350 carries an uncommitted description edit. Before version
+		// 17 an edit had nowhere else to go, so writeField wrote it into
+		// this same JSON, against a backdated stamp.
+		`INSERT INTO issue (profile_id, key, summary, status, detail_json, detail_fetched_at)
+		 VALUES ('p1', 'PLAT-350', 'Promotions', 'In Progress', '{"key":"PLAT-350","description":"What I typed and have not committed.","fields":{}}', '1970-01-01T00:00:00Z')`,
+		`INSERT INTO pending_change (profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
+		 VALUES ('p1', 'issue', 'PLAT-350', 'description', 'What Jira had.', 'What I typed and have not committed.', '2026-09-01T09:00:00Z', '2026-09-05T10:00:00Z')`,
+		// An issue whose detail says Jira gave it no description at all:
+		// that is a fact, and it backfills as the empty string, not NULL.
+		`INSERT INTO issue (profile_id, key, summary, status, detail_json, detail_fetched_at)
+		 VALUES ('p1', 'PLAT-347', 'Retro notes', 'To Do', '{"key":"PLAT-347","description":"","fields":{}}', '2026-09-05T10:00:00Z')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p1', '2026-09-05T10:42:00Z', '2026-09-01T09:00:00Z', '')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p2', '2026-09-06T11:00:00Z', '2026-09-02T09:00:00Z', '')`,
+		`UPDATE meta SET value = '16' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var description sql.NullString
+	if err := db.DB().QueryRow(`SELECT description FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-412'`).Scan(&description); err != nil {
+		t.Fatalf("read description: %v", err)
+	}
+	if description.Valid {
+		t.Errorf("description = %q, want NULL: nothing has ever read this issue's description", description.String)
+	}
+	// The three rows that do hold one are backfilled from the JSON the old
+	// panel read, so the first launch after upgrading shows what TAM already
+	// had rather than claiming nothing was ever synced. The row carrying an
+	// uncommitted edit keeps that edit, which is the local-first rule and is
+	// the one the user would otherwise watch disappear offline.
+	for _, want := range []struct {
+		key, text string
+	}{
+		{"PLAT-409", "Rotate them quarterly."},
+		{"PLAT-350", "What I typed and have not committed."},
+		{"PLAT-347", ""},
+	} {
+		var got sql.NullString
+		if err := db.DB().QueryRow(`SELECT description FROM issue WHERE profile_id = 'p1' AND key = ?`, want.key).Scan(&got); err != nil {
+			t.Fatalf("read %s description: %v", want.key, err)
+		}
+		if !got.Valid {
+			t.Errorf("%s description is NULL, want %q backfilled from its cached detail", want.key, want.text)
+			continue
+		}
+		if got.String != want.text {
+			t.Errorf("%s description = %q, want %q", want.key, got.String, want.text)
+		}
+	}
+	// The journal row the edit lives in is untouched, so Commit still pushes
+	// it against the version it was made on.
+	var before, after string
+	if err := db.DB().QueryRow(
+		`SELECT before_val, after_val FROM pending_change WHERE profile_id = 'p1' AND entity_key = 'PLAT-350' AND field = 'description'`,
+	).Scan(&before, &after); err != nil {
+		t.Fatalf("read the pending edit: %v", err)
+	}
+	if before != "What Jira had." || after != "What I typed and have not committed." {
+		t.Errorf("pending edit = %q -> %q, want the migration to leave it alone", before, after)
+	}
+	for _, profile := range []string{"p1", "p2"} {
+		var lastSynced string
+		if err := db.DB().QueryRow(`SELECT last_synced FROM sync_state WHERE profile_id = ?`, profile).Scan(&lastSynced); err != nil {
+			t.Fatalf("read %s sync_state: %v", profile, err)
+		}
+		if lastSynced != "" {
+			t.Errorf("%s last_synced = %q, want empty so the next sync backfills the column", profile, lastSynced)
+		}
+	}
+	var lastFull string
+	if err := db.DB().QueryRow(`SELECT last_full FROM sync_state WHERE profile_id = 'p1'`).Scan(&lastFull); err != nil {
+		t.Fatalf("read last_full: %v", err)
+	}
+	if lastFull != "2026-09-01T09:00:00Z" {
+		t.Errorf("last_full = %q, want the migration to leave it alone", lastFull)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}

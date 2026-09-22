@@ -3,9 +3,10 @@
 // pin the rules whose absence caused each one. They fail against the code
 // before the fix, which is what makes them worth keeping.
 import { describe, expect, it } from "vitest";
-import { appCss as readApp, coreStyle, declarationsMentioning, declarationsOf } from "./test/cssRules";
+import { appCss as readApp, coreStyle, declarationsMentioning, declarationsOf, valueOf } from "./test/cssRules";
 
 const appCss = readApp();
+const primitivesCss = coreStyle("primitives.css");
 const allCss = [appCss, coreStyle("primitives.css"), coreStyle("tokens.css")].join("\n");
 
 /** Declarations of every rule whose selector mentions `selector`, joined. */
@@ -37,9 +38,26 @@ describe("ritual prose", () => {
     expect(rulesFor(allCss, "ritual-editor-content h2")).toMatch(/margin/);
   });
 
-  it("the measure is capped and the text has a line height", () => {
-    expect(prose).toMatch(/max-width:\s*\d+ch/);
+  it("the text has a line height", () => {
     expect(prose).toMatch(/line-height:/);
+  });
+
+  // Issue #63 finding 3. #56 capped every prose surface at 72 characters,
+  // the editor included, so a wide pane drew the text in a column with a
+  // band of empty pane beside it and nothing to say where the field ended.
+  // The cap belongs to prose someone reads, not to the box they type in.
+  it("the editor is an outlined box whose text uses the width of the pane", () => {
+    // The exact selector: .ritual-editor-content th sets a border of its
+    // own, so mentioning the name would pass on the table's rule.
+    const box = declarationsOf(appCss, ".ritual-editor-content");
+    expect(box).toMatch(/border:\s*1px solid var\(--border-strong\)/);
+    expect(prose).not.toMatch(/max-width:\s*\d+ch/);
+    expect(prose).not.toMatch(/margin-inline:\s*auto/);
+  });
+
+  it("keeps the measure on the prose that is only read", () => {
+    expect(rulesFor(allCss, ".rich-text")).toMatch(/max-width:\s*\d+ch/);
+    expect(rulesFor(allCss, ".ritual-page-body")).toMatch(/max-width:\s*\d+ch/);
   });
 
   it("removing the editor outline leaves a visible focus indicator behind", () => {
@@ -90,6 +108,36 @@ describe("family row indentation", () => {
 // The chip states are pinned in appearance.test.ts, which compares the two
 // opacity values rather than matching one of them by pattern.
 
+// Issue #63 finding 1. The Reports view put a scrollbar on the window even
+// though .main clips and .report-body scrolls inside it. The escapee was
+// visually hidden content: .sr-only positions absolutely, nothing between it
+// and the page is positioned, so its containing block is the page itself.
+// ChartFrame's screen-reader data table is 300px tall whatever .sr-only says
+// (width, height and overflow do not constrain a table box), so laid out at
+// the foot of a scrolled report it grew the document's own scroll area, and
+// the velocity table's 1px caption kept it alive after that.
+describe("the app frame", () => {
+  it("defines the visually hidden helper in one stylesheet", () => {
+    const defining = [
+      [".sr-only in App.css", declarationsOf(appCss, ".sr-only")],
+      [".sr-only in primitives.css", declarationsOf(primitivesCss, ".sr-only")],
+    ].filter(([, body]) => body !== "");
+    expect(defining.map(([where]) => where)).toEqual([".sr-only in primitives.css"]);
+  });
+
+  it("takes visually hidden content out of every scroll container", () => {
+    // The app's sheet is imported last, so its copy is the one that runs.
+    const effective = declarationsOf(appCss, ".sr-only") || declarationsOf(primitivesCss, ".sr-only");
+    expect(valueOf(effective, "position")).toBe("fixed");
+  });
+
+  it("clips the main pane rather than letting it scroll", () => {
+    const main = declarationsOf(appCss, ".main");
+    expect(valueOf(main, "overflow")).toBe("hidden");
+    expect(valueOf(main, "min-height")).toBe("0");
+  });
+});
+
 describe("the two main panes", () => {
   it("frame the rituals page the way the report frame is framed", () => {
     // Exact selector: mentioning .ritual-page also collects .ritual-page-body
@@ -101,6 +149,21 @@ describe("the two main panes", () => {
       const want = new RegExp(`(?:^|[; ])${prop}: *([^;]+)`).exec(frame)?.[1];
       expect(want, `.report-frame sets no ${prop}`).toBeTruthy();
       expect(page, `.ritual-page ${prop}`).toContain(`${prop}: ${want}`);
+    }
+  });
+});
+
+// Issue #63 finding 2. The description read as bare text in a panel where
+// every other field is a bordered box, so nothing said where it began or
+// that it was a field at all.
+describe("the description in the detail panel", () => {
+  it("is drawn as a bordered field, the way the panel's other fields are", () => {
+    const box = declarationsOf(appCss, ".detail-description");
+    const field = declarationsOf(primitivesCss, ".detail-input");
+    for (const prop of ["border", "border-radius", "background"]) {
+      const want = new RegExp(`(?:^|[; ])${prop}: *([^;]+)`).exec(field)?.[1];
+      expect(want, `.detail-input sets no ${prop}`).toBeTruthy();
+      expect(box, `.detail-description ${prop}`).toContain(`${prop}: ${want}`);
     }
   });
 });

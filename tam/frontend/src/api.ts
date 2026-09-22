@@ -104,6 +104,13 @@ export interface Issue {
   rank: string;
   created: string;
   updated: string;
+  // The description the sync caches on the row (schema 17), so the panel
+  // draws it from the local store. null and undefined both mean nothing has
+  // read this issue's description yet: a row cached before schema 17, or a
+  // fixture written before this field existed. An empty string means Jira
+  // says the issue has none. The panel words the two differently, so no
+  // reader is told an issue has no description when TAM has never looked.
+  description?: string | null;
   // Computed by the store on every read. Optional so fixtures that predate
   // plan 1b still type-check; the backend always sends both.
   pending?: boolean;

@@ -57,6 +57,19 @@ type Issue struct {
 	Created      string   `json:"created"`
 	Updated      string   `json:"updated"`
 
+	// Description is the issue's description, read with the rest of the row
+	// by the sync and kept on it, so the detail panel draws it from the
+	// local store instead of a round trip per selection.
+	//
+	// A pointer because nil and "" are different facts and the panel words
+	// them differently. nil is "nothing has read this issue's description":
+	// a row cached before schema 17, or a response that did not carry the
+	// field. A pointer to "" is "Jira says this issue has no description",
+	// which is what its null decodes to. Collapsing the two would have the
+	// panel tell a reader an issue has no description when the truth is
+	// that TAM has never looked.
+	Description *string `json:"description"`
+
 	// Pending and Draft are computed by the repository's reads, never
 	// stored: Pending says the journal holds a change for this key, Draft
 	// says the key is a local placeholder Commit has not yet created.

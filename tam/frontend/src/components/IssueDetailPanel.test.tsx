@@ -25,6 +25,9 @@ const story: Issue = {
   status: "In Progress", assignee: "R. Anand", reporter: "PO", priority: "High", labels: ["checkout", "promo"],
   sprintId: "12", sprintName: "Sprint 12 - Checkout polish", parentKey: "PLAT-350", storyPoints: 5, rank: "",
   created: "2026-08-01T09:00:00Z", updated: "2026-09-05T09:58:00Z",
+  // Cached on the row by the sync, which is where the panel reads it. A
+  // fixture without it is a row synced before the column existed.
+  description: "As a shopper I can enter a promo code on the payment step.",
 };
 
 const longEpicSummary = "Modernize the checkout experience across web, mobile, and every partner integration";
@@ -176,7 +179,7 @@ describe("IssueDetailPanel", () => {
     expect(grip).toBeInTheDocument();
   });
 
-  it("shows the cached fields at once and the description once fetched", async () => {
+  it("shows the cached fields and the description at once, neither waiting on a fetch", async () => {
     renderPanel();
     expect(screen.getByRole("heading", { name: "PLAT-412" })).toBeInTheDocument();
     expect(screen.getByText("Checkout: apply promo code at payment step")).toBeInTheDocument();
@@ -191,9 +194,11 @@ describe("IssueDetailPanel", () => {
     expect(within(details).getByLabelText("Assignee")).toHaveValue("R. Anand");
     expect(within(details).getByLabelText("Story points")).toHaveValue("5");
     expect(within(details).getByLabelText("Labels")).toHaveValue("checkout, promo");
-    // The description reads as rendered markup now, not as a textarea.
-    await waitFor(() => expect(within(details).getByText("As a shopper I can enter a promo code on the payment step.")).toBeInTheDocument());
-    expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412");
+    // The description reads as rendered markup now, not as a textarea, and
+    // it is on screen before anything is waited for: it came off the row.
+    expect(within(details).getByText("As a shopper I can enter a promo code on the payment step.")).toBeInTheDocument();
+    // The detail read still happens, for the links and the comments.
+    await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412"));
   });
 
   // Fix round 3, Minor: D6 chose one Refresh for the whole view. The Fields
@@ -650,11 +655,11 @@ describe("IssueDetailPanel description", () => {
   // The picked syntax lives for the app run, so this test works on its own
   // two issues: picking Markdown for PLAT-412 here would reach every later
   // test in this file, which is exactly the memory being asserted.
-  const picky: Issue = { ...story, key: "PLAT-500" };
+  const marked = "h3. Acceptance criteria\n* one";
+  const picky: Issue = { ...story, key: "PLAT-500", description: marked };
 
   it("renders the markup, and remembers a picked syntax for that issue alone", async () => {
     const user = userEvent.setup();
-    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ description: "h3. Acceptance criteria\n* one" }));
     const first = renderPanel(vi.fn(), undefined, picky);
     const fields = section("Fields");
     await waitFor(() => expect(within(fields).getByRole("heading", { name: "Acceptance criteria" })).toBeInTheDocument());
@@ -673,7 +678,7 @@ describe("IssueDetailPanel description", () => {
     const second = renderPanel(vi.fn(), undefined, picky);
     await waitFor(() => expect(within(section("Fields")).getByRole("button", { name: "Markdown" })).toHaveAttribute("aria-pressed", "true"));
     second.unmount();
-    renderPanel(vi.fn(), undefined, { ...story, key: "PLAT-501" });
+    renderPanel(vi.fn(), undefined, { ...story, key: "PLAT-501", description: marked });
     await waitFor(() => expect(within(section("Fields")).getByRole("heading", { name: "Acceptance criteria" })).toBeInTheDocument());
   });
 
@@ -709,9 +714,85 @@ describe("IssueDetailPanel description", () => {
   });
 
   it("says so when an issue has no description", async () => {
-    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ description: "" }));
-    renderPanel();
+    renderPanel(vi.fn(), undefined, { ...story, description: "" });
     expect(await screen.findByText("No description.")).toBeInTheDocument();
+  });
+
+  // Issue #63. The description rides on the row the sync cached, so the
+  // panel draws it without waiting for, or needing, a call to Jira.
+  it("draws the description off the row while the detail read is still in flight", async () => {
+    vi.mocked(api.GetIssueDetail).mockReturnValue(new Promise(() => {}));
+    renderPanel(vi.fn(), undefined, { ...story, description: "From the local store." });
+    const fields = section("Fields");
+    expect(await within(fields).findByText("From the local store.")).toBeInTheDocument();
+    await waitFor(() => expect(within(fields).getByRole("button", { name: "Edit" })).toBeEnabled());
+  });
+
+  // The trap: a row cached before the description was stored knows nothing
+  // about it, and "nothing was read" must not be drawn as "there is none".
+  // Every user meets this state on the first run after the change ships.
+  it("says a description has not been synced rather than calling it empty", async () => {
+    renderPanel(vi.fn(), undefined, { ...story, description: undefined });
+    const fields = section("Fields");
+    expect(await within(fields).findByText(/not been synced/)).toBeInTheDocument();
+    expect(within(fields).queryByText("No description.")).not.toBeInTheDocument();
+    // Nothing is offered to edit either: an edit journalled over a value
+    // nobody has seen would push that erasure to Jira on the next Commit.
+    expect(within(fields).getByRole("button", { name: "Edit" })).toBeDisabled();
+  });
+
+  // A row the version 17 backfill could not reach has no description on it,
+  // but opening it fetches and caches one. Saying "not synced yet" about a
+  // description sitting in the answer that just arrived would be the same
+  // wrong sentence the unknown state exists to avoid.
+  it("takes the fetched description for a row that carries none", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ description: "Read from Jira just now." }));
+    renderPanel(vi.fn(), undefined, { ...story, description: undefined });
+    const fields = section("Fields");
+    expect(await within(fields).findByText("Read from Jira just now.")).toBeInTheDocument();
+    expect(within(fields).queryByText(/not been synced/)).not.toBeInTheDocument();
+    await waitFor(() => expect(within(fields).getByRole("button", { name: "Edit" })).toBeEnabled());
+  });
+
+  // Disabled is a control state, not a write guard. A sync or a purge can
+  // take the description back to unknown while the editor is open, and the
+  // typed text stays dirty across that; Save must refuse it rather than
+  // journal an edit whose base is the empty string, which Commit would then
+  // push to Jira as a deletion.
+  it("refuses to save a description that went unknown under the open editor", async () => {
+    const user = userEvent.setup();
+    // Nothing to fall back on either: a full sync reinserted the row without
+    // a description and dropped the detail cache with it.
+    vi.mocked(api.GetIssueDetail).mockReturnValue(new Promise(() => {}));
+    const client = createQueryClient();
+    const tree = (issue: Issue) => (
+      <QueryClientProvider client={client}>
+        <DialogProvider>
+          <ProfileProvider backend={profileBackend}>
+            <IssueDetailPanel profileId="p1" issue={issue} onClose={vi.fn()} />
+          </ProfileProvider>
+        </DialogProvider>
+      </QueryClientProvider>
+    );
+    const view = render(tree(story));
+    const box = await openDescriptionEditor(user);
+    await user.clear(box);
+    await user.type(box, "text typed against a description that is about to vanish");
+    expect(screen.getByRole("button", { name: "Save edit" })).toBeEnabled();
+
+    view.rerender(tree({ ...story, description: undefined }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save edit" })).toBeDisabled());
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(api.EditIssue).not.toHaveBeenCalled();
+  });
+
+  // Local first. The row carries whatever the store holds, and the store
+  // puts a pending edit back on the column after every sync, so the panel
+  // shows the edit and marks the issue pending.
+  it("shows a pending local edit rather than the synced text", async () => {
+    renderPanel(vi.fn(), undefined, { ...story, description: "What I typed.", pending: true });
+    const fields = section("Fields");
+    expect(await within(fields).findByText("What I typed.")).toBeInTheDocument();
   });
 
   // D5: the summary is one line Jira never wiki-renders, so marks stay

@@ -7,4 +7,4 @@ eslint_max_lines 23
 eslint_no_console 23
 eslint_problems 196
 hardcoded_hex 441
-hardcoded_px_font 60
+hardcoded_px_font 59

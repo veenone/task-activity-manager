@@ -253,15 +253,16 @@ func TestSyncKeepsPendingColumnsAndADraft(t *testing.T) {
 			t.Errorf("a sync never moves the base: %+v", p)
 		}
 	}
-	// A full sync deletes and reinserts the row, dropping its detail cache;
-	// the pending description must survive, and the fabricated stub detail
-	// must look stale so the panel refetches instead of serving it as fresh.
-	det, fetchedAt, ok, err := repo.ReadDetail(ctx, "p1", "PLAT-1")
-	if err != nil || !ok || det.Description != "mine desc" {
-		t.Fatalf("pending description survives the full sync: %+v %v %v", det, ok, err)
+	// A full sync deletes and reinserts the row, dropping its detail cache.
+	// The pending description rides on the row's own column, so it survives
+	// that; the detail cache does not, and must report itself missing rather
+	// than serving a stub, so the panel refetches the links and comments.
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
+	if iss.Description == nil || *iss.Description != "mine desc" {
+		t.Errorf("pending description survives the full sync: %v", iss.Description)
 	}
-	if time.Since(fetchedAt) < 10*time.Minute {
-		t.Errorf("a stub detail must not read as freshly fetched: %v", fetchedAt)
+	if _, _, ok, err := repo.ReadDetail(ctx, "p1", "PLAT-1"); ok || err != nil {
+		t.Errorf("the detail cache reports itself present after a full sync dropped it: ok=%v err=%v", ok, err)
 	}
 }
 
@@ -666,14 +667,20 @@ func TestRekeyRepointsChildrenAndPendingParentEdits(t *testing.T) {
 }
 
 func TestFieldValueAndSplitLabels(t *testing.T) {
-	iss := backend.Issue{Summary: "s", Priority: "p", Assignee: "a", Labels: []string{"x", "y"}, StoryPoints: pts(2.5)}
+	text := "text"
+	iss := backend.Issue{Summary: "s", Priority: "p", Assignee: "a", Labels: []string{"x", "y"}, StoryPoints: pts(2.5), Description: &text}
 	for field, want := range map[string]string{"summary": "s", "priority": "p", "assignee": "a", "labels": "x, y", "storyPoints": "2.5", "description": "text"} {
-		if got := issuerepo.FieldValue(iss, "text", field); got != want {
+		if got := issuerepo.FieldValue(iss, field); got != want {
 			t.Errorf("FieldValue(%s) = %q, want %q", field, got, want)
 		}
 	}
-	if got := issuerepo.FieldValue(backend.Issue{}, "", "storyPoints"); got != "" {
+	if got := issuerepo.FieldValue(backend.Issue{}, "storyPoints"); got != "" {
 		t.Errorf("nil points = %q", got)
+	}
+	// A description nothing has read renders as empty rather than panicking
+	// on the nil pointer that says so.
+	if got := issuerepo.FieldValue(backend.Issue{}, "description"); got != "" {
+		t.Errorf("unread description = %q", got)
 	}
 	if got := backend.SplitLabels(" a ,, b,c "); strings.Join(got, "|") != "a|b|c" {
 		t.Errorf("SplitLabels = %v", got)

@@ -152,6 +152,44 @@ or a deleted user), read as "Unknown user"; a comment carrying a
 or group name), never labelled "role" or "group", since only the value is
 known.
 
+**The description is on the issue row, the links and the comments are in
+the detail cache** (issue #63, schema 17). The sync asks Jira for
+`description` with the rest of the row, so the panel reads
+`issue.description` and draws it with no call of its own, online or off.
+The links and the comments stay in the detail cache, because they are a
+round trip per issue and have no business in a search payload, so
+`GetIssueDetail` is still what the panel opens with, just not for the
+description. `issue.description` is the one nullable column on `issue` and
+`backend.Issue.Description` the one pointer: NULL is "no sync has carried a
+description for this row", which is a different fact from an issue that has
+none, and the panel says so in its own words rather than drawing a blank.
+Migration 17 clears every sync watermark so the next sync fills in the rows
+already cached, the way migrations 5 and 14 did for the status id and the
+assignee name. An edit writes the column and `reapplyPending` puts it back
+after every sync, so a pending local edit still wins; `WriteDetail` keeps no
+second copy of the description in its JSON.
+
+**The size cost of that was accepted rather than bounded.** A description
+now rides in the search payload, in a column on every row, and across the
+Wails bridge in every list the frontend reads. A page of 50 issues carrying
+2KB descriptions is about 100KB on top of roughly 25KB of row fields, so a
+2000-issue project pays a few megabytes on a full sync and the same again in
+SQLite, once; incremental syncs pay it only for what changed. Some of that is
+not new, because the description was already stored for every issue whose
+panel had been opened, in `detail_json`, and that copy is gone. What is new
+is paying for issues nobody opens, and the Epics tree, which carries up to
+`treeCap` (5000) rows in one call for a panel that reads one of them.
+
+Truncating the stored value was considered and refused: the editor would open
+on a prefix, Save would journal that prefix as the whole field, and Commit
+would delete the rest in Jira (I2). A "truncated" flag that disabled editing
+would put back exactly the unknown/empty ambiguity the nullable column exists
+to remove. The levers, if a payload ever justifies one, are `syncer.PageSize`
+and `treeCap`, and dropping the column from the tree and board reads only:
+the panel already falls back to the detail read's description when the row it
+is given carries none, so those two views would go back to a round trip per
+selection while the Backlog kept its local read.
+
 **The raw string is always what is saved.** Nothing anywhere in this
 feature converts wiki markup to Markdown or back; the journal, `EditField`,
 `CreateDraft` and Commit all see exactly the characters typed, the same
@@ -162,7 +200,8 @@ guarantee every other TAM edit already gives.
 the backend read failed, so a panel open past `detail_cache_minutes` with
 no connection showed an error instead of the description, links and
 comments it already had a moment before; it now serves the cached detail
-with a logged line and a nil error whenever one exists, and the panel
+with a logged line and a nil error whenever one exists (the description no
+longer depends on any of this: it is on the row), and the panel
 prints `cached <when>` beside the Comments heading so a stale offline read
 never passes as current. `detail_cache_minutes` is a per-profile setting,
 default 10, where 0 does not mean "always stale" but "never expires": a

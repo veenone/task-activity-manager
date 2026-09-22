@@ -56,6 +56,9 @@ type fake struct {
 	// call, once per board. filterMissing names, per board id, the keys a
 	// filter check answers as outside the board's filter; filterCheckErr
 	// fails the check for one board id without failing its push.
+	// detailCalls counts GetIssueDetail reads, so a test can pin that a
+	// conflict is built from the row rather than a second round trip.
+	detailCalls    int
 	boardCreateErr error
 	nextBoard      int
 	boardsMade     []string
@@ -88,8 +91,12 @@ func (f *fake) CreateFields(context.Context, string, string) (backend.CreateFiel
 	return backend.CreateFieldSet{}, nil
 }
 func (f *fake) GetIssueDetail(_ context.Context, key string) (backend.IssueDetail, error) {
+	f.detailCalls++
 	return backend.IssueDetail{Key: key, Description: f.desc[key], Links: []backend.Link{}, Fields: map[string]any{}}, nil
 }
+
+// GetIssue carries the description, the way both real backends do since it
+// joined the search fields: the row and the search parse the same shape.
 func (f *fake) GetIssue(_ context.Context, key string) (backend.Issue, error) {
 	if err := f.getErr[key]; err != nil {
 		return backend.Issue{}, err
@@ -98,6 +105,8 @@ func (f *fake) GetIssue(_ context.Context, key string) (backend.Issue, error) {
 	if !ok {
 		return backend.Issue{}, fmt.Errorf("no issue %s", key)
 	}
+	text := f.desc[key]
+	iss.Description = &text
 	return iss, nil
 }
 func (f *fake) EditableFields(context.Context, string) ([]string, error) {
@@ -230,6 +239,9 @@ func TestCommitHoldsBackAConflictWithBaseMineRemote(t *testing.T) {
 	}
 	if p := byField["storyPoints"]; p.Base != "3" || p.Mine != "8" || p.Remote != "13" {
 		t.Errorf("points: %+v", p)
+	}
+	if f.detailCalls != 0 {
+		t.Errorf("GetIssueDetail called %d times: the remote description is on the row the version check already read", f.detailCalls)
 	}
 	if d := byField["description"]; d.Base != "" || d.Mine != "mine text" || d.Remote != "remote text" {
 		t.Errorf("description base is what the cache held when edited: %+v", d)

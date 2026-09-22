@@ -248,6 +248,36 @@ describe('instruction gate', () => {
     expect(missing, missing.join('; ')).toEqual([]);
   });
 
+  // Visually hidden is not the same as out of the way. `.sr-only` positions
+  // absolutely, and in an app whose panes are all static that puts the box in
+  // the page's own scrollable area, where it escapes every overflow: hidden
+  // between it and the window. Its width, height and overflow do not shrink
+  // every box either: they do nothing to a table, which sizes to its rows, so
+  // TAM's report drew a 300px screen-reader table at the foot of a scrolled
+  // view and put a scrollbar on the window. A fixed box contributes to no
+  // scrollable overflow at all. Every sheet is checked because the two apps
+  // keep their own copies of this rule: xtm/frontend loads no stylesheet from
+  // frontend/core, so a fix in the primitive cannot reach it.
+  it('no stylesheet hides content by taking it out of flow into the page', () => {
+    const offenders: string[] = [];
+    for (const dir of SRC_DIRS.concat(['frontend/core/styles'])) {
+      for (const file of walk(path.join(repoRoot, dir), /\.css$/)) {
+        const rules = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' ').split('}');
+        for (const rule of rules) {
+          const at = rule.lastIndexOf('{');
+          if (at < 0) continue;
+          const head = rule.slice(0, at);
+          if (!head.split(',').some((part) => part.trim() === '.sr-only')) continue;
+          const position = /(?:^|[;{\s])position\s*:\s*([\w-]+)/.exec(rule.slice(at + 1))?.[1];
+          if (position !== 'fixed') {
+            offenders.push(`${path.relative(repoRoot, file).replace(/\\/g, '/')}: position: ${position ?? 'unset'}`);
+          }
+        }
+      }
+    }
+    expect(offenders, offenders.join(' | ')).toEqual([]);
+  });
+
   // A class a component sets and no stylesheet defines fails silently: the
   // element renders unstyled and nothing reports it. Two shipped that way
   // here. `.row` left the rituals conflict buttons touching each other, and

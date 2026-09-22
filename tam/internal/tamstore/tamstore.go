@@ -30,6 +30,14 @@
 // entry for the same reason sprint_report and ritual_document needed none:
 // CREATE TABLE IF NOT EXISTS in Base picks it up on an older file's next
 // open.
+// Version 17 adds the issue's description, so the detail panel reads it off
+// the row instead of fetching it the first time an issue is opened. It is
+// the one nullable column on issue: NULL means no sync has ever carried a
+// description for that row, which is a different fact from an issue that has
+// none, and the panel says so rather than drawing a blank. It backfills from
+// detail_json, where the description (and any uncommitted edit to it) lived
+// before this version, so the first launch after upgrading shows what TAM
+// already held rather than waiting on a sync.
 package tamstore
 
 import (
@@ -63,7 +71,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 16,
+	Version: 17,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -245,6 +253,42 @@ var Schema = store.Schema{
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "board", "draft INTEGER NOT NULL DEFAULT 0")
 		},
+	}, {
+		Version: 17,
+		// The description moves onto the row so the detail panel reads it
+		// from disk. The shape of version 5's status id and version 14's
+		// assignee name: a column add, then a watermark clear so the next
+		// sync fills in every row already cached, since an incremental sync
+		// only re-reads what Jira reports changed and an issue nobody
+		// touches again would otherwise never gain one.
+		//
+		// The one difference from those two is the absent NOT NULL DEFAULT.
+		// A row nothing knows a description for must read as "not read yet"
+		// rather than as an issue with none, and only NULL says that.
+		//
+		// Which is why the backfill comes first. Before this version the
+		// description lived in detail_json: every issue whose panel had been
+		// opened holds one there, and so does every uncommitted description
+		// edit, because the old writeField had nowhere else to put one. Left
+		// behind, the first launch after upgrading would draw "not synced
+		// yet" over the user's own pending text, and offline it would stay
+		// that way, which is the one thing local-first has to not do.
+		// json_extract answers NULL for a missing key and for a JSON null,
+		// so a row whose detail says the issue has no description backfills
+		// as the empty string (a fact) and a row with no detail at all stays
+		// NULL (not a fact).
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "issue", "description TEXT"); err != nil {
+				return err
+			}
+			if _, err := db.Exec(`UPDATE issue SET description = json_extract(detail_json, '$.description')
+				WHERE description IS NULL AND detail_json IS NOT NULL AND detail_json <> ''
+				AND json_valid(detail_json) AND json_extract(detail_json, '$.description') IS NOT NULL`); err != nil {
+				return fmt.Errorf("backfill descriptions from the detail cache: %w", err)
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -321,6 +365,10 @@ CREATE TABLE IF NOT EXISTS issue (
 	project           TEXT NOT NULL DEFAULT '',
 	type              TEXT NOT NULL DEFAULT '',
 	summary           TEXT NOT NULL DEFAULT '',
+	-- Nullable on purpose, alone among these columns: NULL is "no sync has
+	-- carried a description for this row", which the detail panel has to
+	-- tell apart from an issue that genuinely has none.
+	description       TEXT,
 	status            TEXT NOT NULL DEFAULT '',
 	status_id         TEXT NOT NULL DEFAULT '',
 	assignee          TEXT NOT NULL DEFAULT '',

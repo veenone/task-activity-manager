@@ -25,12 +25,13 @@ type LinkedTest struct {
 // ok=false and no error.
 func (r *Repository) ReadDetail(ctx context.Context, profileID, key string) (backend.IssueDetail, time.Time, bool, error) {
 	var (
-		raw       sql.NullString
-		fetchedAt sql.NullString
+		raw         sql.NullString
+		fetchedAt   sql.NullString
+		description sql.NullString
 	)
 	err := r.db.QueryRowContext(ctx,
-		`SELECT detail_json, detail_fetched_at FROM issue WHERE profile_id = ? AND key = ?`, profileID, key,
-	).Scan(&raw, &fetchedAt)
+		`SELECT detail_json, detail_fetched_at, description FROM issue WHERE profile_id = ? AND key = ?`, profileID, key,
+	).Scan(&raw, &fetchedAt, &description)
 	if errors.Is(err, sql.ErrNoRows) {
 		return backend.IssueDetail{}, time.Time{}, false, ErrNotFound
 	}
@@ -58,6 +59,15 @@ func (r *Repository) ReadDetail(ctx context.Context, profileID, key string) (bac
 	}
 	links = append(links, pending...)
 	d.Key = key
+	// The column is where the description lives from schema 17 on: the sync
+	// writes it, an edit writes it, and reapplyPending puts a pending edit
+	// back on it after every sync. NULL means the version 17 backfill could
+	// not reach this row, and then the copy in the JSON below is the only
+	// description anything has, so it stands rather than being overwritten
+	// with the empty string.
+	if description.Valid {
+		d.Description = description.String
+	}
 	d.Links = links
 	// A detail cached before comments existed has no comments key, and null
 	// is what the panel would otherwise have to tell apart from "none".
@@ -96,6 +106,10 @@ func (r *Repository) WriteDetail(ctx context.Context, profileID, key string, d b
 	stored := d
 	stored.Key = key
 	stored.Links = nil
+	// The description belongs to the row's own column, which the sync fills
+	// and a pending edit overrides; keeping a second copy in this JSON is
+	// how the two would come to disagree.
+	stored.Description = ""
 	// The fetch time is the column's, not the JSON's; storing it twice is
 	// how the two would come to disagree.
 	stored.FetchedAt = ""
@@ -110,8 +124,8 @@ func (r *Repository) WriteDetail(ctx context.Context, profileID, key string, d b
 	defer tx.Rollback()
 
 	res, err := tx.ExecContext(ctx,
-		`UPDATE issue SET detail_json = ?, detail_fetched_at = ? WHERE profile_id = ? AND key = ?`,
-		string(raw), fetchedAt.UTC().Format(time.RFC3339), profileID, key)
+		`UPDATE issue SET detail_json = ?, detail_fetched_at = ?, description = ? WHERE profile_id = ? AND key = ?`,
+		string(raw), fetchedAt.UTC().Format(time.RFC3339), d.Description, profileID, key)
 	if err != nil {
 		return fmt.Errorf("write detail for %s: %w", key, err)
 	}
