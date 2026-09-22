@@ -125,7 +125,7 @@ func (b *Backend) issues() []backend.Issue {
 		}
 	}
 	for i := range all {
-		all[i] = statusIDFor(all[i])
+		all[i] = b.withDescription(statusIDFor(all[i]))
 	}
 	return all
 }
@@ -227,7 +227,7 @@ func (b *Backend) find(key string) (backend.Issue, bool) {
 	}
 	for _, iss := range demo.ForeignIssues(b.project) {
 		if iss.Key == key {
-			return statusIDFor(iss), true
+			return b.withDescription(statusIDFor(iss)), true
 		}
 	}
 	return backend.Issue{}, false

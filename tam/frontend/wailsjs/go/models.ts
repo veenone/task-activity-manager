@@ -130,6 +130,7 @@ export namespace backend {
 	    rank: string;
 	    created: string;
 	    updated: string;
+	    description?: string;
 	    pending: boolean;
 	    draft: boolean;
 	
@@ -158,6 +159,7 @@ export namespace backend {
 	        this.rank = source["rank"];
 	        this.created = source["created"];
 	        this.updated = source["updated"];
+	        this.description = source["description"];
 	        this.pending = source["pending"];
 	        this.draft = source["draft"];
 	    }

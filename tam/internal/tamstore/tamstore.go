@@ -30,6 +30,11 @@
 // entry for the same reason sprint_report and ritual_document needed none:
 // CREATE TABLE IF NOT EXISTS in Base picks it up on an older file's next
 // open.
+// Version 17 adds the issue's description, so the detail panel reads it off
+// the row instead of fetching it the first time an issue is opened. It is
+// the one nullable column on issue: NULL means no sync has ever carried a
+// description for that row, which is a different fact from an issue that has
+// none, and the panel says so rather than drawing a blank.
 package tamstore
 
 import (
@@ -63,7 +68,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 16,
+	Version: 17,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -245,6 +250,27 @@ var Schema = store.Schema{
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "board", "draft INTEGER NOT NULL DEFAULT 0")
 		},
+	}, {
+		Version: 17,
+		// The description moves onto the row so the detail panel reads it
+		// from disk. The shape of version 5's status id and version 14's
+		// assignee name: a column add, then a watermark clear so the next
+		// sync fills in every row already cached, since an incremental sync
+		// only re-reads what Jira reports changed and an issue nobody
+		// touches again would otherwise never gain one.
+		//
+		// The one difference from those two is the absent NOT NULL DEFAULT.
+		// A row that reaches here has no description and nothing knows what
+		// it should be; defaulting it to the empty string would have the
+		// panel tell a reader the issue has none. NULL says "not read yet"
+		// and the panel words it that way until the sync above lands.
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "issue", "description TEXT"); err != nil {
+				return err
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -321,6 +347,10 @@ CREATE TABLE IF NOT EXISTS issue (
 	project           TEXT NOT NULL DEFAULT '',
 	type              TEXT NOT NULL DEFAULT '',
 	summary           TEXT NOT NULL DEFAULT '',
+	-- Nullable on purpose, alone among these columns: NULL is "no sync has
+	-- carried a description for this row", which the detail panel has to
+	-- tell apart from an issue that genuinely has none.
+	description       TEXT,
 	status            TEXT NOT NULL DEFAULT '',
 	status_id         TEXT NOT NULL DEFAULT '',
 	assignee          TEXT NOT NULL DEFAULT '',

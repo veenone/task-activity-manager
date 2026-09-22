@@ -17,7 +17,9 @@ import (
 const DefaultRequirementType = "Requirement"
 
 // baseFields are the search fields the grid needs, before the custom ones.
-var baseFields = []string{"summary", "status", "assignee", "reporter", "priority", "labels", "issuetype", "project", "parent", "created", "updated"}
+// description is among them so the sync caches it on the row: it is the one
+// field the detail panel used to pay a round trip for on every selection.
+var baseFields = []string{"summary", "description", "status", "assignee", "reporter", "priority", "labels", "issuetype", "project", "parent", "created", "updated"}
 
 // fieldIDs are the discovered custom field ids. Any may be empty when the
 // instance lacks the field.
@@ -175,6 +177,15 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 	iss := backend.Issue{Key: raw.Key, ID: raw.ID, Labels: []string{}}
 	f := raw.Fields
 	_ = json.Unmarshal(f["summary"], &iss.Summary)
+	// Present and null is an issue with no description, which decodes to the
+	// empty string and is a fact. Absent is a response that did not carry the
+	// field at all, which is not: the pointer stays nil so nothing downstream
+	// reports "no description" about an issue nobody has read.
+	if raw, ok := f["description"]; ok {
+		var text string
+		_ = json.Unmarshal(raw, &text)
+		iss.Description = &text
+	}
 	_ = json.Unmarshal(f["created"], &iss.Created)
 	_ = json.Unmarshal(f["updated"], &iss.Updated)
 	var labels []string

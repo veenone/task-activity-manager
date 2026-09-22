@@ -960,3 +960,62 @@ func TestSchemaVersionSixteenAddsTheEditScreenTableToAnOlderDatabase(t *testing.
 		t.Errorf("fields_json = %s", fields)
 	}
 }
+
+// Version 17 puts the description on the issue row so the detail panel draws
+// it from disk. The column is nullable on purpose: NULL is "this row has
+// never been synced with a description", which the panel has to tell apart
+// from an issue that genuinely has none. A row cached before the migration
+// must therefore come out NULL, not empty, and the watermark has to clear so
+// the next sync fills it in (an incremental sync only re-reads what Jira
+// says changed, so a quiet issue would otherwise stay blank forever).
+func TestVersionSeventeenMigrationAddsDescriptionAndClearsEveryWatermark(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE issue DROP COLUMN description`,
+		`INSERT INTO issue (profile_id, key, summary, status) VALUES ('p1', 'PLAT-412', 'Promo code', 'In Progress')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p1', '2026-09-05T10:42:00Z', '2026-09-01T09:00:00Z', '')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p2', '2026-09-06T11:00:00Z', '2026-09-02T09:00:00Z', '')`,
+		`UPDATE meta SET value = '16' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var description sql.NullString
+	if err := db.DB().QueryRow(`SELECT description FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-412'`).Scan(&description); err != nil {
+		t.Fatalf("read description: %v", err)
+	}
+	if description.Valid {
+		t.Errorf("description = %q, want NULL: nothing has ever read this issue's description", description.String)
+	}
+	for _, profile := range []string{"p1", "p2"} {
+		var lastSynced string
+		if err := db.DB().QueryRow(`SELECT last_synced FROM sync_state WHERE profile_id = ?`, profile).Scan(&lastSynced); err != nil {
+			t.Fatalf("read %s sync_state: %v", profile, err)
+		}
+		if lastSynced != "" {
+			t.Errorf("%s last_synced = %q, want empty so the next sync backfills the column", profile, lastSynced)
+		}
+	}
+	var lastFull string
+	if err := db.DB().QueryRow(`SELECT last_full FROM sync_state WHERE profile_id = 'p1'`).Scan(&lastFull); err != nil {
+		t.Fatalf("read last_full: %v", err)
+	}
+	if lastFull != "2026-09-01T09:00:00Z" {
+		t.Errorf("last_full = %q, want the migration to leave it alone", lastFull)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}

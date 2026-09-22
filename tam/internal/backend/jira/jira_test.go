@@ -23,6 +23,7 @@ type fakeJira struct {
 	fieldCalls int32
 	searches   []string
 	rawSearch  []string // the raw query string of every /rest/api/2/search request, in order
+	searchBody string   // when set, the body /rest/api/2/search answers with instead of the default page
 	fields     string   // the /rest/api/2/field body
 	writes     []string // "METHOD path body" for every PUT and POST
 	createKey  string   // key the POST /issue answers with
@@ -151,9 +152,16 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			}
 			f.rawSearch = append(f.rawSearch, r.URL.RawQuery)
 			f.searches = append(f.searches, r.URL.Query().Get("jql")+" | fields="+r.URL.Query().Get("fields"))
+			if f.searchBody != "" {
+				_, _ = w.Write([]byte(f.searchBody))
+				break
+			}
+			// PLAT-412 has a description and PLAT-388 has none, which Jira
+			// answers as null: the two shapes the field arrives in once the
+			// sync asks for it.
 			_, _ = w.Write([]byte(`{"total":2,"issues":[
-				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5}},
-				{"id":"2","key":"PLAT-388","fields":{"summary":"Single use","status":{"name":"Approved"},"issuetype":{"name":"Business Requirement"},"project":{"key":"PLAT"},"labels":["promo"]}}
+				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","description":"Apply the code at the payment step.","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5}},
+				{"id":"2","key":"PLAT-388","fields":{"summary":"Single use","description":null,"status":{"name":"Approved"},"issuetype":{"name":"Business Requirement"},"project":{"key":"PLAT"},"labels":["promo"]}}
 			]}`))
 		case r.URL.Path == "/rest/api/2/issueLinkType" && r.Method == http.MethodGet:
 			_, _ = w.Write([]byte(f.linkTypes))

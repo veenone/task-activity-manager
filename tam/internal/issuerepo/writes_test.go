@@ -253,15 +253,16 @@ func TestSyncKeepsPendingColumnsAndADraft(t *testing.T) {
 			t.Errorf("a sync never moves the base: %+v", p)
 		}
 	}
-	// A full sync deletes and reinserts the row, dropping its detail cache;
-	// the pending description must survive, and the fabricated stub detail
-	// must look stale so the panel refetches instead of serving it as fresh.
-	det, fetchedAt, ok, err := repo.ReadDetail(ctx, "p1", "PLAT-1")
-	if err != nil || !ok || det.Description != "mine desc" {
-		t.Fatalf("pending description survives the full sync: %+v %v %v", det, ok, err)
+	// A full sync deletes and reinserts the row, dropping its detail cache.
+	// The pending description rides on the row's own column, so it survives
+	// that; the detail cache does not, and must report itself missing rather
+	// than serving a stub, so the panel refetches the links and comments.
+	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
+	if iss.Description == nil || *iss.Description != "mine desc" {
+		t.Errorf("pending description survives the full sync: %v", iss.Description)
 	}
-	if time.Since(fetchedAt) < 10*time.Minute {
-		t.Errorf("a stub detail must not read as freshly fetched: %v", fetchedAt)
+	if _, _, ok, err := repo.ReadDetail(ctx, "p1", "PLAT-1"); ok || err != nil {
+		t.Errorf("the detail cache reports itself present after a full sync dropped it: ok=%v err=%v", ok, err)
 	}
 }
 

@@ -14,22 +14,17 @@ import (
 )
 
 // EditableFields are the fields EditField accepts, in the order the panel
-// shows them. Their names are the JSON names on backend.Issue, plus
-// description, which lives in the detail cache.
+// shows them. Their names are the JSON names on backend.Issue.
 var EditableFields = []string{"summary", "description", "priority", "labels", "storyPoints", "assignee", "parentKey"}
 
-// fieldColumns maps a field name to its issue column; description has none.
+// fieldColumns maps a field name to its issue column.
 var fieldColumns = map[string]string{
-	"summary": "summary", "description": "", "priority": "priority",
+	"summary": "summary", "description": "description", "priority": "priority",
 	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee", "parentKey": "parent_key",
 }
 
 // draftTypes are the logical types a draft may have.
 var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true, backend.TypeEpic: true, backend.TypeSubtask: true}
-
-// staleDetailStamp backdates a fabricated detail cache (one writeField built
-// from nothing, rather than a real fetch) so it reads as stale at once.
-const staleDetailStamp = "1970-01-01T00:00:00Z"
 
 // execer is the subset of *sql.Tx and *sql.DB the field helpers use.
 type execer interface {
@@ -39,8 +34,11 @@ type execer interface {
 }
 
 // FieldValue renders one editable field of an issue as the journal and the
-// conflict table show it: labels as a comma list, points as a plain
-// number, description from the detail cache the caller passes.
+// conflict table show it: labels as a comma list, points as a plain number,
+// and the description the caller passes. The description stays an argument
+// rather than being read off iss, because the one caller left that does not
+// have a row in hand is the commit conflict, which reads the remote
+// description separately.
 func FieldValue(iss backend.Issue, description, field string) string {
 	switch field {
 	case "summary":
@@ -83,14 +81,14 @@ func validateField(field, value string) error {
 // which a parentKey edit needs to enforce the hierarchy.
 func readField(ctx context.Context, q execer, profileID, key, field string) (value, updated, ownType string, err error) {
 	var (
-		iss    backend.Issue
-		labels string
-		points sql.NullFloat64
-		detail sql.NullString
+		iss         backend.Issue
+		labels      string
+		points      sql.NullFloat64
+		description sql.NullString
 	)
 	err = q.QueryRowContext(ctx,
-		`SELECT summary, priority, assignee, assignee_name, labels, story_points, detail_json, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
-		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &iss.AssigneeName, &labels, &points, &detail, &updated, &iss.ParentKey, &iss.Type)
+		`SELECT summary, priority, assignee, assignee_name, labels, story_points, description, updated, parent_key, type FROM issue WHERE profile_id = ? AND key = ?`,
+		profileID, key).Scan(&iss.Summary, &iss.Priority, &iss.Assignee, &iss.AssigneeName, &labels, &points, &description, &updated, &iss.ParentKey, &iss.Type)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", "", ErrNotFound
 	}
@@ -102,14 +100,10 @@ func readField(ctx context.Context, q execer, profileID, key, field string) (val
 		v := points.Float64
 		iss.StoryPoints = &v
 	}
-	description := ""
-	if detail.Valid && detail.String != "" {
-		var d backend.IssueDetail
-		if err := json.Unmarshal([]byte(detail.String), &d); err == nil {
-			description = d.Description
-		}
-	}
-	return FieldValue(iss, description, field), updated, iss.Type, nil
+	// A row whose description has never been synced reads as "" here. The
+	// panel does not offer an edit in that state, so nothing journals an
+	// edit against a base nobody has seen.
+	return FieldValue(iss, description.String, field), updated, iss.Type, nil
 }
 
 // validateParent enforces the two-level hierarchy: an epic takes no parent,
@@ -164,41 +158,9 @@ func validateParent(ctx context.Context, q execer, profileID, key, ownType, valu
 	return nil
 }
 
-// writeField stores the text form of a field on the row. Description goes
-// into the detail cache, creating a minimal one when none exists so the
-// panel can show the edit.
+// writeField stores the text form of a field on the row.
 func writeField(ctx context.Context, q execer, profileID, key, field, value string) error {
 	switch field {
-	case "description":
-		var (
-			raw       sql.NullString
-			fetchedAt sql.NullString
-		)
-		if err := q.QueryRowContext(ctx, `SELECT detail_json, detail_fetched_at FROM issue WHERE profile_id = ? AND key = ?`, profileID, key).Scan(&raw, &fetchedAt); err != nil {
-			return fmt.Errorf("read detail for %s: %w", key, err)
-		}
-		d := backend.IssueDetail{Key: key, Fields: map[string]any{}}
-		if raw.Valid && raw.String != "" {
-			_ = json.Unmarshal([]byte(raw.String), &d)
-		}
-		d.Description = value
-		d.Links = nil
-		encoded, err := json.Marshal(d)
-		if err != nil {
-			return fmt.Errorf("encode detail for %s: %w", key, err)
-		}
-		// No detail was ever fetched for this row (a fresh row, or one a full
-		// sync just deleted and reinserted), so this is a fabricated stub, not
-		// a real read of Jira. Stamp it old rather than now, or the detail
-		// cache looks fresh and the panel serves the stub for ten minutes
-		// instead of refetching and picking up the links. A draft's detail
-		// already has a stamp from CreateDraft, so it never hits this branch.
-		at := fetchedAt.String
-		if at == "" {
-			at = staleDetailStamp
-		}
-		_, err = q.ExecContext(ctx, `UPDATE issue SET detail_json = ?, detail_fetched_at = ? WHERE profile_id = ? AND key = ?`, string(encoded), at, profileID, key)
-		return err
 	case "labels":
 		encoded, _ := json.Marshal(backend.SplitLabels(value))
 		_, err := q.ExecContext(ctx, `UPDATE issue SET labels = ? WHERE profile_id = ? AND key = ?`, string(encoded), profileID, key)
@@ -512,7 +474,10 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 		if d.StoryPoints != nil {
 			points = sql.NullFloat64{Float64: *d.StoryPoints, Valid: true}
 		}
-		detail, _ := json.Marshal(backend.IssueDetail{Key: key, Description: d.Description, Fields: map[string]any{}})
+		// The draft's own detail row exists so the panel has something to
+		// read for links and comments; the description travels in its own
+		// column, the same as a synced issue's.
+		detail, _ := json.Marshal(backend.IssueDetail{Key: key, Fields: map[string]any{}})
 		// status_id is left at its default: a draft has no Jira status, and
 		// an empty status id is what puts it in the board's first real
 		// column instead of nowhere.
@@ -527,10 +492,10 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 		// where sync would have written a display name), so assignee_name
 		// carries that same value rather than a fabricated display name.
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO issue (profile_id, key, id, project, type, summary, status, assignee, assignee_name, reporter, priority, labels,
+			INSERT INTO issue (profile_id, key, id, project, type, summary, description, status, assignee, assignee_name, reporter, priority, labels,
 				sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at, detail_json, detail_fetched_at)
-			VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, '', '', ?, ?)`,
-			profileID, key, projectKey, d.Type, d.Summary, StatusDraft, d.Assignee, d.Assignee, d.Priority, string(labels),
+			VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, '', ?, '', '', ?, ?)`,
+			profileID, key, projectKey, d.Type, d.Summary, d.Description, StatusDraft, d.Assignee, d.Assignee, d.Priority, string(labels),
 			d.SprintID, d.SprintName, d.ParentKey, points, now, string(detail), now); err != nil {
 			return nil, fmt.Errorf("insert draft: %w", err)
 		}

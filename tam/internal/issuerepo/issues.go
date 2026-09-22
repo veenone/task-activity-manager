@@ -21,7 +21,7 @@ const (
 )
 
 // issueColumns is the SELECT list every row read uses, in scan order.
-const issueColumns = `key, id, project, type, summary, status, status_id, assignee, assignee_name, reporter, priority, labels,
+const issueColumns = `key, id, project, type, summary, description, status, status_id, assignee, assignee_name, reporter, priority, labels,
 	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
 // issueOrder puts drafts first, then ranked rows by rank with unranked rows
@@ -89,12 +89,18 @@ func orderFor(q IssueQuery) string {
 		strings.Join(ordered, ", ") + `, key`
 }
 
+// COALESCE on the description and nowhere else: a write that did not read one
+// (the row refresh after a commit on a backend that cannot answer for it, an
+// importer write) must not turn a description the store already holds back
+// into "never synced". Every other column is overwritten, because every other
+// column is always carried.
 const upsertIssueSQL = `
-	INSERT INTO issue (profile_id, key, id, project, type, summary, status, status_id, assignee, assignee_name, reporter, priority, labels,
+	INSERT INTO issue (profile_id, key, id, project, type, summary, description, status, status_id, assignee, assignee_name, reporter, priority, labels,
 		sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, key) DO UPDATE SET
 		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
+		description = COALESCE(excluded.description, issue.description),
 		status = excluded.status, status_id = excluded.status_id, assignee = excluded.assignee, assignee_name = excluded.assignee_name, reporter = excluded.reporter,
 		priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
 		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
@@ -110,7 +116,11 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 	if iss.StoryPoints != nil {
 		points = sql.NullFloat64{Float64: *iss.StoryPoints, Valid: true}
 	}
-	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, iss.Status, iss.StatusID,
+	var description sql.NullString
+	if iss.Description != nil {
+		description = sql.NullString{String: *iss.Description, Valid: true}
+	}
+	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, description, iss.Status, iss.StatusID,
 		iss.Assignee, iss.AssigneeName, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
 		points, iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
 		return fmt.Errorf("upsert %s: %w", iss.Key, err)
@@ -489,15 +499,23 @@ type scanner interface {
 
 func scanIssue(s scanner) (backend.Issue, error) {
 	var (
-		iss     backend.Issue
-		labels  string
-		points  sql.NullFloat64
-		pending int
+		iss         backend.Issue
+		description sql.NullString
+		labels      string
+		points      sql.NullFloat64
+		pending     int
 	)
-	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &iss.Status, &iss.StatusID, &iss.Assignee, &iss.AssigneeName,
+	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &description, &iss.Status, &iss.StatusID, &iss.Assignee, &iss.AssigneeName,
 		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
 		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err
+	}
+	// NULL stays nil: the row has never been synced with a description, and
+	// the panel says so rather than drawing the empty string it would get
+	// from an issue that really has none.
+	if description.Valid {
+		v := description.String
+		iss.Description = &v
 	}
 	if err := json.Unmarshal([]byte(labels), &iss.Labels); err != nil {
 		return backend.Issue{}, fmt.Errorf("labels for %s: %w", iss.Key, err)
