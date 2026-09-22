@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dayInput, dayOfSprint, formatWhen, progressText, sprintDates } from "./format";
+import { calendarDay, dayInput, dayOfSprint, formatWhen, progressText, sprintDates } from "./format";
 
 describe("formatWhen", () => {
   const now = new Date("2026-09-05T14:00:00Z");
@@ -88,5 +88,19 @@ describe("dayOfSprint", () => {
     expect(dayOfSprint(start, "")).toBe("");
     expect(dayOfSprint("never", "either")).toBe("");
     expect(dayOfSprint(end, start)).toBe("");
+  });
+});
+
+describe("calendarDay", () => {
+  it("prints a bare report date as the day it names, whatever zone the reader is in", () => {
+    // A bare date read through new Date() is UTC midnight, which is the day
+    // before for a reader west of Greenwich. The report's days are local
+    // calendar days and print as the day written.
+    expect(calendarDay("2026-09-12")).toBe(new Date(2026, 8, 12).toLocaleDateString(undefined, { day: "numeric", month: "short" }));
+  });
+
+  it("prints nothing for a date it cannot read", () => {
+    expect(calendarDay("")).toBe("");
+    expect(calendarDay("soon")).toBe("");
   });
 });

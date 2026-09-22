@@ -77,6 +77,25 @@
      tables that each invented their own indent cannot drift apart again. */
   --subtask-indent: 18px;
   --row-lead-slot: 32px;
+  /* The report charts. One token per series role, so a line, its legend
+     swatch and its end label read from the same place and the SVG carries
+     no colour of its own. Remaining is the accent and completed the success
+     colour; committed is the accent softened, since it is the floor the
+     other bars are read against rather than a result. Added, removed and
+     carried over take the chip hues, so an outcome bar means what the chips
+     mean elsewhere in the app. */
+  --chart-remaining: var(--accent);
+  --chart-ideal: var(--text-muted);
+  --chart-scope: var(--warning);
+  --chart-committed: #aab7ee;
+  --chart-completed: #1f7a52;
+  --chart-added: #0369a1;
+  --chart-removed: #b91c1c;
+  --chart-carried: #6d28d9;
+  --chart-grid: var(--border-subtle);
+  --chart-axis: var(--border-strong);
+  --chart-label: var(--text-muted);
+  --chart-hit: rgba(0, 0, 0, 0.06);
 }
 
 :root[data-theme="dark"] {
@@ -134,4 +153,18 @@
   --chip-purple-text: #ddd6fe;
   --chip-sky-bg: #0c4a6e;
   --chip-sky-text: #bae6fd;
+  /* The chart roles on a dark ground: the same hues, lifted so a bar reads
+     against the surface rather than sinking into it. */
+  --chart-remaining: var(--accent);
+  --chart-ideal: var(--text-muted);
+  --chart-scope: var(--warning);
+  --chart-committed: #46579a;
+  --chart-completed: #4fc490;
+  --chart-added: #38bdf8;
+  --chart-removed: #f87171;
+  --chart-carried: #a78bfa;
+  --chart-grid: var(--border-subtle);
+  --chart-axis: var(--border-strong);
+  --chart-label: var(--text-muted);
+  --chart-hit: rgba(255, 255, 255, 0.08);
 }

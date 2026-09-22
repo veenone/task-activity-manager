@@ -1,5 +1,5 @@
-import type { ReportProgress, ReportSeries } from "../api";
-import { formatWhen, points as trimPoints } from "./format";
+import type { ReportDay, ReportProgress, ReportSeries, VelocityRow } from "../api";
+import { calendarDay, formatWhen, points as trimPoints } from "./format";
 
 // reportText is every sentence the sprint report puts on screen.
 //
@@ -86,6 +86,47 @@ export function unitLine(unit: string, unitReason: string): string {
 // beside them to borrow the qualification from.
 export function velocityFloorLine(): string {
   return "Committed is a minimum estimate in every row. Cards removed for good are not visible in the table.";
+}
+
+// The chart sentences. A chart states its numbers in text beside each mark
+// and again in a tooltip, and those are numbers read with words, so the
+// words are here with the rest and not in the components.
+
+// dayLine is one day of the burndown as the tooltip and the hidden table
+// read it: the day, then scope, completed, remaining and the guide.
+export function dayLine(d: ReportDay, unit: string): string {
+  return (
+    `${calendarDay(d.date)}: ${amount(d.scope, unit)} in scope, ${trimPoints(d.completed)} completed, ` +
+    `${trimPoints(d.remaining)} remaining, ideal ${trimPoints(d.ideal)}.`
+  );
+}
+
+// velocityLine is one velocity bar pair, in the row's own unit.
+export function velocityLine(r: VelocityRow): string {
+  return `${r.sprintName}: committed ${amount(r.committed, r.unit)}, completed ${trimPoints(r.completed)}.`;
+}
+
+// outcomeLine is one outcome bar: the figure's label and its amount.
+export function outcomeLine(label: string, n: number, unit: string): string {
+  return `${label}: ${amount(n, unit)}.`;
+}
+
+// emptyDaysLine is a burndown with no day to draw, which a sprint whose
+// walk has not reached its first day yet can produce.
+export function emptyDaysLine(): string {
+  return "No days to draw yet.";
+}
+
+// mixedUnitsLine explains a velocity chart split into one panel per unit.
+// One axis over points and cards would read a card as a point.
+export function mixedUnitsLine(): string {
+  return "These sprints were estimated in different units, so each unit has a chart of its own rather than one axis that would read cards as points.";
+}
+
+// singleSprintLine is under a velocity chart with one bar pair: it is a
+// figure, not yet a trend.
+export function singleSprintLine(): string {
+  return "Only one closed sprint has dates TAM can read, so there is no trend to compare it against yet.";
 }
 
 // methodLine is printed with the numbers rather than kept in a document,

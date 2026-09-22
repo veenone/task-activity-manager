@@ -719,7 +719,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-mode-closed { color: var(--text-muted); }
 .report-outcome { margin: 0 0 10px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); font-weight: 600; }
 .report-outcome-label { display: block; margin-bottom: 3px; color: var(--text-muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
-.report-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 14px 0 12px; }
 .report-metric { min-width: 0; border-top: 2px solid var(--border); padding-top: 6px; }
 .report-metric dt { color: var(--text-muted); font-size: 11px; font-weight: 600; }
 .report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
@@ -740,8 +739,85 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
 .report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
 .report-row-note { display: block; font-weight: 400; }
+/* The report charts. Every colour is a --chart-* token, and the SVG marks
+   are styled here by class rather than by attribute, so a theme change
+   reaches the picture. Text in the SVG inherits the body font and takes
+   its size relative to it. */
+.report-charts { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
+.report-caveats { margin: 6px 0 0; max-width: 78ch; }
+.report-velocity { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.chart-multiples { display: grid; gap: 8px; }
+.chart-figure { margin: 0; min-width: 0; }
+.chart-figure[aria-busy="true"] .chart-box { opacity: .5; }
+.chart-title { margin: 0 0 4px; font-weight: 600; color: var(--text-strong); }
+.chart-box { position: relative; width: 100%; }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-empty { margin: 4px 0; }
+.chart-note { margin: 4px 0 0; line-height: 1.45; max-width: 60ch; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--text-muted); }
+.chart-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.chart-swatch { display: inline-block; width: 12px; height: 3px; border-radius: 2px; background: currentColor; }
+.chart-swatch-remaining { color: var(--chart-remaining); }
+.chart-swatch-ideal { color: var(--chart-ideal); background: repeating-linear-gradient(90deg, currentColor 0 3px, transparent 3px 5px); }
+.chart-swatch-scope { color: var(--chart-scope); }
+.chart-swatch-committed { color: var(--chart-committed); height: 8px; }
+.chart-swatch-completed { color: var(--chart-completed); height: 8px; }
+.chart-grid { stroke: var(--chart-grid); stroke-width: 1; }
+.chart-axis { stroke: var(--chart-axis); stroke-width: 1; }
+.chart-x-label, .chart-y-label, .chart-value { fill: var(--chart-label); font-size: .85em; font-variant-numeric: tabular-nums; }
+.chart-x-label { text-anchor: middle; }
+.chart-y-label { text-anchor: end; dominant-baseline: middle; }
+.chart-row-label { fill: var(--text); }
+.chart-value { fill: var(--text); dominant-baseline: middle; }
+.chart-value-up { text-anchor: middle; dominant-baseline: auto; }
+.chart-value-remaining { fill: var(--chart-remaining); font-weight: 600; }
+.chart-value-scope { fill: var(--chart-scope); }
+.chart-line { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.chart-line-remaining { stroke: var(--chart-remaining); stroke-width: 2.5; }
+.chart-line-ideal { stroke: var(--chart-ideal); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart-line-scope { stroke: var(--chart-scope); stroke-width: 1.5; }
+.chart-point { fill: var(--surface); stroke: var(--chart-remaining); stroke-width: 2; }
+.chart-point-final { fill: var(--chart-remaining); }
+.chart-bar { stroke: none; }
+.chart-bar-committed { fill: var(--chart-committed); }
+.chart-bar-completed { fill: var(--chart-completed); }
+.chart-bar-added { fill: var(--chart-added); }
+.chart-bar-removed { fill: var(--chart-removed); }
+.chart-bar-carried { fill: var(--chart-carried); }
+/* The hit target takes the hover and the focus for a mark too small to aim
+   at. It is invisible until it has one of them. */
+.chart-hit { fill: transparent; cursor: default; outline: none; }
+.chart-hit:hover { fill: var(--chart-hit); }
+.chart-hit:focus-visible { fill: var(--chart-hit); stroke: var(--accent); stroke-width: 2; }
+.chart-tooltip {
+  position: absolute;
+  z-index: 5;
+  max-width: 34ch;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--modal-shadow);
+  line-height: 1.4;
+  pointer-events: none;
+}
+/* The three groups of tiles: the baseline a sprint started from, the
+   changes made to it, and what came of it. A group is a labelled block, so
+   the five figures read as three facts and not as five equal columns. */
+.report-metrics { display: grid; grid-template-columns: 1fr 2fr 2fr; gap: 14px; margin: 10px 0 12px; }
+.report-metric-group { min-width: 0; }
+.report-metric-group-label { display: block; margin-bottom: 4px; color: var(--text-muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.report-metric-group dl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin: 0; }
+/* The floor line sits under the tiles, in the open, at the weight the
+   tiles' units already use. */
+.report-floor { margin: 0 0 8px; }
+@media (max-width: 900px) {
+  .report-charts, .report-velocity { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 720px) {
-  .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-metrics { grid-template-columns: minmax(0, 1fr); }
   .report-frame .board-picker { width: 100%; }
   .report-frame .board-picker select { min-width: 0; width: 100%; }
   .report-actions .btn { min-height: 44px; }

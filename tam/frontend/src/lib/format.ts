@@ -29,6 +29,17 @@ export function day(iso: string): string {
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+// calendarDay renders one of the report's bare 2006-01-02 days. It is read
+// as a local day rather than through new Date(iso), which takes a bare date
+// as UTC midnight and so prints the day before for a reader west of
+// Greenwich; the backend bucketed these days in the local zone already.
+export function calendarDay(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return "";
+  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
 // sprintDates is a sprint's range in one phrase. A sprint missing one of its
 // dates still says what it knows rather than nothing: Jira leaves both empty
 // on a future sprint nobody has scheduled yet, and either one can be missing
