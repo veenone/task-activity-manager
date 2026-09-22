@@ -77,6 +77,27 @@
      tables that each invented their own indent cannot drift apart again. */
   --subtask-indent: 18px;
   --row-lead-slot: 32px;
+  /* State badges and progress bars (StatusBadge.tsx, ProgressBar.tsx).
+     Eleven of these twelve are a semantic name over a pair the chip palette
+     above already carries and already measured for both themes: a state
+     token that invented a thirteenth blue would be a second answer to a
+     question that is answered, and it would put a colour literal in an app
+     stylesheet where there is no room for one. Only --today-marker is a
+     value of its own, because nothing else in the suite draws a line across
+     a bar. --bar-points is the chart's completed green, so a points bar and
+     the completed line on a burndown beside it read as the same fact. */
+  --state-active: var(--chip-blue-text);
+  --state-active-soft: var(--chip-blue-bg);
+  --state-future: var(--text);
+  --state-future-soft: var(--surface-3);
+  --state-closed: var(--chip-green-text);
+  --state-closed-soft: var(--chip-green-bg);
+  --state-draft: var(--warning-text);
+  --state-draft-soft: var(--warning-bg);
+  --bar-track: var(--surface-sunken);
+  --bar-time: var(--accent);
+  --bar-points: var(--chart-completed);
+  --today-marker: #c2410c;
   /* The report charts. One token per series role, so a line, its legend
      swatch and its end label read from the same place and the SVG carries
      no colour of its own. Remaining is the accent and completed the success
@@ -153,6 +174,23 @@
   --chip-purple-text: #ddd6fe;
   --chip-sky-bg: #0c4a6e;
   --chip-sky-text: #bae6fd;
+  /* The state and bar tokens, repeated rather than inherited: each alias
+     re-points on its own because the chip pair behind it does, and a reader
+     of this block sees the whole palette instead of half of it. Only
+     --today-marker has a value to change, and it changes: the light orange
+     sinks into a dark track. */
+  --state-active: var(--chip-blue-text);
+  --state-active-soft: var(--chip-blue-bg);
+  --state-future: var(--text);
+  --state-future-soft: var(--surface-3);
+  --state-closed: var(--chip-green-text);
+  --state-closed-soft: var(--chip-green-bg);
+  --state-draft: var(--warning-text);
+  --state-draft-soft: var(--warning-bg);
+  --bar-track: var(--surface-sunken);
+  --bar-time: var(--accent);
+  --bar-points: var(--chart-completed);
+  --today-marker: #fb923c;
   /* The chart roles on a dark ground: the same hues, lifted so a bar reads
      against the surface rather than sinking into it. */
   --chart-remaining: var(--accent);

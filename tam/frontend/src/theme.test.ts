@@ -44,6 +44,21 @@ describe("the tokens App.css names", () => {
   });
 });
 
+// The block above reads the tokens App.css names, which leaves out every
+// token only frontend/core/styles/primitives.css reads: the shared
+// primitives' own colours, including the state badge's four pairs and the
+// bars'. This covers the table itself instead, so a colour added to :root
+// and forgotten in the dark block is caught wherever it is read from.
+describe("every colour in tokens.css", () => {
+  const darkBlock = tokenTable(tokensCss, ':root[data-theme="dark"]');
+  it.each([...light.keys()].filter((token) => isColour(resolve(light.get(token) as string, light))))(
+    "%s re-points in the dark block rather than being inherited from the light one",
+    (token) => {
+      expect(darkBlock.get(token)).toBeDefined();
+    },
+  );
+});
+
 describe("App.css leaves colour to the tokens", () => {
   it("names no colour of its own, so every colour it sets re-points with the theme", () => {
     const literals: string[] = [];
