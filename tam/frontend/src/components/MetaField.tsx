@@ -103,7 +103,7 @@ function MultiSelect({ spec, value, onChange, shared }: MetaInputProps) {
           onClick={() => setOpen((o) => !o)}
           onKeyDown={onKeyDown}
         >
-          {chosen.length === 0 ? `Select a ${spec.name.toLowerCase()}` : `${chosen.length} chosen`}
+          {chosen.length === 0 ? `Select ${spec.name.toLowerCase()}` : `${chosen.length} chosen`}
           <span className="multi-select-caret" aria-hidden="true">&#9662;</span>
         </button>
         {open && (
