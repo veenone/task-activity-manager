@@ -13,7 +13,7 @@ Read before writing tests, UI work, or platform checks.
 
 ## Counts to beat, never lower
 
-262 in `frontend/core`, 159 in `xtm/frontend`, 1070 in `tam/frontend`. A
+262 in `frontend/core`, 159 in `xtm/frontend`, 1072 in `tam/frontend`. A
 change that lowers one has deleted coverage; say so in the commit message or
 put it back. This line read 46, 159 and 507 until issue #62 refreshed it:
 #60 and #61 landed the report charts, the family rows and three
