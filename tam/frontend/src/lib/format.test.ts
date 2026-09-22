@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calendarDay, day, dayInput, dayOfSprint, formatWhen, progressText, sprintDates, sprintRelative } from "./format";
+import { calendarDay, day, dayInput, formatWhen, progressText, sprintDates, sprintRelative } from "./format";
 
 describe("formatWhen", () => {
   const now = new Date("2026-09-05T14:00:00Z");
@@ -84,42 +84,6 @@ describe("day", () => {
   });
 });
 
-describe("dayOfSprint", () => {
-  const start = "2026-08-29T09:00:00Z";
-  const end = "2026-09-12T09:00:00Z";
-
-  it("counts the first day as day one", () => {
-    expect(dayOfSprint(start, end, new Date("2026-08-29T10:00:00Z"))).toBe("day 1 of 15");
-  });
-
-  it("counts both end days, so a fortnight is fifteen days and not thirteen", () => {
-    // The length used to be the difference between the two dates, which
-    // counted neither the first day nor the last: a 29 Aug to 12 Sep sprint
-    // read "day 13 of 13" on the day it ended. The row and the view's own
-    // summary line draw this on one screen, so an exclusive count here
-    // would have printed two lengths for one sprint.
-    expect(dayOfSprint(start, end, new Date("2026-09-03T10:00:00Z"))).toBe("day 6 of 15");
-    expect(dayOfSprint(start, end, new Date("2026-09-12T10:00:00Z"))).toBe("day 15 of 15");
-  });
-
-  it("can say what day a one-day sprint is on", () => {
-    expect(dayOfSprint(start, start, new Date("2026-08-29T15:00:00Z"))).toBe("day 1 of 1");
-  });
-
-  it("stops at the last day of a sprint running late", () => {
-    // Day 19 of 14 is a fact about the sprint being late, and this line is
-    // drawing a calendar.
-    expect(dayOfSprint(start, end, new Date("2026-09-19T10:00:00Z"))).toBe("day 15 of 15");
-  });
-
-  it("says nothing about a sprint it cannot measure", () => {
-    expect(dayOfSprint("", end)).toBe("");
-    expect(dayOfSprint(start, "")).toBe("");
-    expect(dayOfSprint("never", "either")).toBe("");
-    expect(dayOfSprint(end, start)).toBe("");
-  });
-});
-
 describe("sprintRelative", () => {
   const start = "2026-08-29T09:00:00Z";
   const end = "2026-09-12T09:00:00Z";
@@ -156,6 +120,18 @@ describe("sprintRelative", () => {
   it("counts a future sprint down to its start and says how long it will run", () => {
     const t = sprintRelative(sprint({ state: "future" }), new Date("2026-08-18T10:00:00Z"));
     expect(t.label).toBe("Starts in 11 days");
+    expect(t.trailing).toBe("15 days");
+    expect(t.elapsed).toBe(0);
+    expect(sprintRelative(sprint({ state: "future" }), new Date("2026-08-29T10:00:00Z")).label).toBe("Starts today");
+  });
+
+  it("says how late a future sprint nobody started is", () => {
+    // A sprint stays future until somebody starts it, so its planned start
+    // slides into the past and stays there. "Starts today" for ever was the
+    // one shape of this the first version had; the active branch already
+    // says "2 days over" for its mirror image.
+    const t = sprintRelative(sprint({ state: "future" }), new Date("2026-09-01T10:00:00Z"));
+    expect(t.label).toBe("3 days late");
     expect(t.trailing).toBe("15 days");
     expect(t.elapsed).toBe(0);
   });

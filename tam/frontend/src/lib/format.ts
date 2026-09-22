@@ -116,9 +116,10 @@ const days = (from: Date, to: Date) => Math.round((to.getTime() - from.getTime()
 // days. It is null for a sprint that cannot be measured, which is either date
 // missing or unreadable, or a range that ends before it starts.
 //
-// Both dayOfSprint and sprintRelative read it, so the row and the Sprints
-// view's own summary line cannot print two lengths for one sprint, which is
-// what happened while the length was the bare difference between the dates.
+// sprintRelative is its one reader, and the row and the Sprints view's own
+// summary line both go through that, so they cannot print two lengths for
+// one sprint, which is what happened while the length was the bare
+// difference between the dates and each surface counted it itself.
 function sprintSpan(startIso: string, endIso: string, now: Date): { day: number; length: number; over: number } | null {
   const start = civilDay(startIso);
   const end = civilDay(endIso);
@@ -129,16 +130,6 @@ function sprintSpan(startIso: string, endIso: string, now: Date): { day: number;
   const today = startOfDay(now);
   const elapsed = days(start, today) + 1;
   return { day: Math.min(Math.max(elapsed, 1), length), length, over: Math.max(days(end, today), 0) };
-}
-
-// dayOfSprint answers "day 6 of 15" for a sprint that is running, and ""
-// for one that cannot be measured. The day is clamped to the range, so a
-// sprint running past its end date reads as its last day rather than as day
-// 19 of 15, which is a fact about the sprint being late and not about the
-// calendar this line is drawing; sprintRelative is what says the late part.
-export function dayOfSprint(startIso: string, endIso: string, now: Date = new Date()): string {
-  const span = sprintSpan(startIso, endIso, now);
-  return span ? `day ${span.day} of ${span.length}` : "";
 }
 
 // SprintTiming is the whole of what a row says about where a sprint is in
@@ -174,12 +165,15 @@ export function sprintRelative(
     return { label: `Closed ${day(s.completeDate || s.endDate)}`, trailing: length, elapsed: 1 };
   }
   if (s.state === "future") {
+    // A sprint stays future until somebody starts it, so a planned start
+    // can be in the past and stay there. Saying "Starts today" about it for
+    // ever is the mirror of the "2 days over" case below, and just as
+    // wrong.
     const until = days(startOfDay(now), civilDay(s.startDate) as Date);
-    return {
-      label: until > 0 ? `Starts in ${plural(until, "day", "days")}` : "Starts today",
-      trailing: length,
-      elapsed: 0,
-    };
+    let label = "Starts today";
+    if (until > 0) label = `Starts in ${plural(until, "day", "days")}`;
+    if (until < 0) label = `${plural(-until, "day", "days")} late`;
+    return { label, trailing: length, elapsed: 0 };
   }
   if (span.over > 0) {
     return { label: `${plural(span.over, "day", "days")} over`, trailing: length, elapsed: 1 };

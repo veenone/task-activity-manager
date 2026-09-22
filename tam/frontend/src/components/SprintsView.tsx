@@ -7,7 +7,7 @@ import { sprintWaiting, usePendingChanges } from "../queries/pending";
 import { useBoardSprintDetails, useDeleteSprint } from "../queries/sprints";
 import { useSync } from "../contexts/SyncContext";
 import { MOVED_FLASH_MS } from "../lib/flash";
-import { dayOfSprint, plural, progressText } from "../lib/format";
+import { plural, progressText, sprintRelative } from "../lib/format";
 import { journalTouchesSprint } from "../lib/moveValue";
 import { unfinished } from "../lib/unfinished";
 import { useCompleteGuard } from "./BoardCeremonies";
@@ -268,7 +268,7 @@ export function SprintsView() {
   const summary = active
     ? [
         active.name,
-        dayOfSprint(active.startDate, active.endDate),
+        sprintRelative(active).label,
         active.total > 0 ? progressText(active.done, active.total, active.donePoints, active.points) : "",
         active.notSynced > 0
           ? `plus ${plural(active.notSynced, "card", "cards")} this cache does not hold`
