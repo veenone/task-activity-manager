@@ -690,12 +690,14 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* Assignee combobox: an input with a clear button and a floating result
    list, so a person is picked rather than a username remembered. */
-.assignee-picker { position: relative; min-width: 0; }
+.assignee-picker,
+.multi-select { position: relative; min-width: 0; }
 .assignee-field { display: flex; align-items: stretch; gap: 0; }
 .assignee-field .detail-input { flex: 1; min-width: 0; margin-bottom: 0; }
 .assignee-clear { padding: 2px 7px; font-size: 11px; color: var(--text-muted); flex: none; }
 .assignee-clear:hover:not(:disabled) { color: var(--text); }
-.assignee-list {
+.assignee-list,
+.multi-select-list {
   position: absolute;
   z-index: 70;
   top: calc(100% + 2px);
@@ -712,7 +714,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
   box-shadow: var(--modal-shadow);
 }
 .assignee-note { display: block; padding: 6px 8px; line-height: 1.45; }
-.assignee-option {
+.assignee-option,
+.multi-select-option {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -727,7 +730,21 @@ input, button, select { font-family: inherit; font-size: inherit; }
   text-align: left;
   cursor: pointer;
 }
-.assignee-option-active { background: var(--accent-soft); }
+.assignee-option-active,
+.multi-select-option-active { background: var(--accent-soft); }
+/* A field taking several values (issue #65 item 3). The trigger is drawn
+   as the field it stands in for; the chosen values sit under it as chips a
+   reader can read and remove without opening the list. */
+.multi-select-trigger { display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
+.multi-select-caret { color: var(--text-muted); }
+.multi-select-option { justify-content: flex-start; }
+.multi-select-mark { flex: none; width: 12px; color: var(--accent); }
+.multi-select-values { display: flex; flex-wrap: wrap; gap: 4px; }
+.multi-select-value { display: inline-flex; align-items: center; gap: 2px; padding-right: 2px; background: var(--surface-3); color: var(--text); border: 1px solid var(--border); }
+/* No font-size: input, button, select inherit it, so the button takes
+   the chip's own size and the ratchet gains no pixel literal. */
+.multi-select-remove { padding: 0 4px; color: var(--text-muted); }
+.multi-select-remove:hover:not(:disabled) { color: var(--text); }
 .detail-activity-head { display: flex; justify-content: flex-end; margin-bottom: 6px; }
 
 /* Phase 4: the sprint report. The frame fills the available workspace while

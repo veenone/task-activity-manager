@@ -386,8 +386,15 @@ describe("NewIssueModal", () => {
     ] });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
+    // A field taking several values is a listbox, not a native multi-select
+    // (issue #65 item 3), so the values are picked one at a time and stay
+    // named outside the list.
     const components = await within(dialog).findByLabelText("Components *");
-    await user.selectOptions(components, ["10", "12"]);
+    await user.click(components);
+    const options = within(dialog).getByRole("listbox", { name: "Components" });
+    await user.click(within(options).getByRole("option", { name: "Frontend" }));
+    await user.click(within(options).getByRole("option", { name: "API" }));
+    expect(within(dialog).getByRole("button", { name: "Remove Frontend" })).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Summary *"), "Split the checkout bundle");
     await user.click(await submitButton(dialog));
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
