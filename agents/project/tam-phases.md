@@ -152,6 +152,23 @@ or a deleted user), read as "Unknown user"; a comment carrying a
 or group name), never labelled "role" or "group", since only the value is
 known.
 
+**The description is on the issue row, the links and the comments are in
+the detail cache** (issue #63, schema 17). The sync asks Jira for
+`description` with the rest of the row, so the panel reads
+`issue.description` and draws it with no call of its own, online or off.
+The links and the comments stay in the detail cache, because they are a
+round trip per issue and have no business in a search payload, so
+`GetIssueDetail` is still what the panel opens with, just not for the
+description. `issue.description` is the one nullable column on `issue` and
+`backend.Issue.Description` the one pointer: NULL is "no sync has carried a
+description for this row", which is a different fact from an issue that has
+none, and the panel says so in its own words rather than drawing a blank.
+Migration 17 clears every sync watermark so the next sync fills in the rows
+already cached, the way migrations 5 and 14 did for the status id and the
+assignee name. An edit writes the column and `reapplyPending` puts it back
+after every sync, so a pending local edit still wins; `WriteDetail` keeps no
+second copy of the description in its JSON.
+
 **The raw string is always what is saved.** Nothing anywhere in this
 feature converts wiki markup to Markdown or back; the journal, `EditField`,
 `CreateDraft` and Commit all see exactly the characters typed, the same
@@ -162,7 +179,8 @@ guarantee every other TAM edit already gives.
 the backend read failed, so a panel open past `detail_cache_minutes` with
 no connection showed an error instead of the description, links and
 comments it already had a moment before; it now serves the cached detail
-with a logged line and a nil error whenever one exists, and the panel
+with a logged line and a nil error whenever one exists (the description no
+longer depends on any of this: it is on the row), and the panel
 prints `cached <when>` beside the Comments heading so a stale offline read
 never passes as current. `detail_cache_minutes` is a per-profile setting,
 default 10, where 0 does not mean "always stale" but "never expires": a
