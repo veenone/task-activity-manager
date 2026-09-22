@@ -658,9 +658,18 @@ Two facts worth knowing before they cost you debugging session:
   TAM not compute board membership from status; it cache key list
   `/board/{id}/issue` and `/board/{id}/sprint/{id}/issue` answered with. Card
   moved on web board move in TAM only after next sync, boards sync included.
-- **Only active and future sprints have cards fetched.** Closed sprint stay
-  in sprint list, for history, but membership never pulled, so sprint picker
-  offer only active and future sprints and no others.
+- **Active and future sprints have cards fetched every pass; a closed sprint
+  once.** This used to read "only active and future sprints have cards
+  fetched", and issue #62 reversed it. A closed sprint's membership cannot
+  change, so `readBoard` asks `boardrepo.SprintIssues` for it first and
+  re-supplies what the cache holds as this pass's answer, which is what
+  carries it through `ReplaceBoard`'s wholesale delete of the board's rows.
+  Only a closed sprint nothing is cached for costs a request, at most
+  `closedMembershipBudget` (12) of them per pass, walked newest first by
+  start date so a board backfills from the top of the Sprints view downward.
+  The sprint picker is unchanged and still offers active and future sprints
+  only: what a sprint holds and what a card can be moved into are different
+  questions.
 
 ## Phase 3b: board writes
 
@@ -919,6 +928,62 @@ change instead = Backlog sprint filter, Backlog grid and detail panel, and
 `ListSprints`, whose `DISTINCT sprint_id` over cached rows can now surface
 sprint id contributed only by draft.
 
+## The sprint row
+
+Issue #62 redesigned it. Six cells: the caret, the sprint's name over its
+goal, the state badge over the sprint's dates, the timeline and its bars, the
+scope, and the actions menu.
+
+- **The badge shouts in CSS.** `StatusBadge` in `@agile-suite/core` takes a
+  tone and a mixed-case label; the capitals are `text-transform: uppercase`
+  in `primitives.css`, the way `.chip-conflict` already does it. The same
+  string is the row's `aria-label`, so an uppercased one would make a screen
+  reader spell the state out and would need a second field to keep the
+  accessible name readable. The badge also carries a glyph per tone, so the
+  four states are never told apart by colour alone.
+- **Two bars, each naming itself.** `ProgressBar` is a track, a fill and an
+  optional marker. The time bar is named "Time elapsed in <sprint>" and its
+  `aria-valuetext` is the relative label, "Day 6 of 15" or "Closed 11 Sep";
+  it carries a today marker on a running sprint only, since a finished one
+  has no today inside it, and it is greyed for a closed sprint. The points
+  bar is named "Points done in <sprint>", counts `donePoints` of `points`,
+  and reads "0 of 21 pts planned" on a future sprint. Neither takes a colour:
+  the twelve `--state-*` and `--bar-*` tokens in `tokens.css` are aliases
+  over the chip palette #61 measured, except `--today-marker`.
+- **The goal is on the row now.** It was kept off it because every cell clips
+  and the detail panel narrows the pane; the name column has the widest track
+  and the goal clips with a `title` the way the name already does. It is
+  still drawn under an expanded sprint, because that copy handles the sprint
+  with no goal at all and the row does not. A test querying the goal after a
+  sprint is expanded finds it twice, so scope with `within`.
+- **`sprintRelative` is the one place the relative wording lives**
+  (`lib/format.ts`). It takes `now` as a defaulted parameter, the way
+  `formatWhen` and `dayOfSprint` do, so no clock is threaded through the
+  tree; component tests pin it with `vi.useFakeTimers({ toFake: ["Date"] })`,
+  and `toFake: ["Date"]` is not decoration, faking every timer breaks
+  `userEvent`.
+- **Below 900px the timeline stacks under the sprint name**, in the media
+  block #61 opened for the report charts rather than a second one at the same
+  width.
+
+Two `lib/format.ts` bugs the row would have drawn, both fixed with it and
+both the kind that come back:
+
+- **`dayOfSprint` counted its length exclusively.** It measured the bare
+  difference between the two dates, so a 12 Sep to 25 Sep sprint read "day 13
+  of 13" on the day it ended, could not express a one-day sprint at all, and
+  disagreed with the row on the same screen, since the Sprints view prints
+  `dayOfSprint` in its own summary line. It counts both end days now.
+- **`day()` moved a sprint by a day.** It put Jira's stamp through
+  `new Date()` and `toLocaleDateString`, which is the bug `dayInput`'s own
+  comment warns about: a sprint starting at 09:00 UTC read as the day before
+  for a reader west of it. It reads the leading date and renders it through
+  the `calendarDay` reader #61 added for the report's bare days. One function
+  in that file turns a date into a `Date` afterwards, `civilDay`, and
+  everything counted in days is counted from those rather than from the
+  instants Jira sent. The countdown to a future sprint was measured in
+  instants and its own boundary test caught it.
+
 ## The Sprints view
 
 Phase 3c gave TAM sprints on board: draw one, drag cards through it, start
@@ -947,13 +1012,39 @@ Sprint field and tree's own multi-select move both go through same journaled
 same Discard case, because reaching sprint without first picking its board is
 whole reason this view exist, not reason to grow second write path.
 
-Closed sprint carry no cached membership, by design not accident: boards sync
-never fetch closed sprint issue keys, on reasoning that chart Phase 4 draw
-from it should not depend on mostly-idle poll of history nobody asked for.
-`SprintDetail.Issues` therefore empty for closed sprint for same reason it
-would be empty right after version 5 migration and before next sync, and view
-show closed sprint contents as unavailable, with reason, not as empty sprint,
-which would be lie row cannot tell apart from truth.
+**Closed sprint membership is read once and kept.** This entry used to say
+the opposite, and #62 reversed it. The old reasoning was that a chart drawing
+from closed sprints should not depend on a mostly-idle poll of history nobody
+asked for, and that reasoning was sound about a *poll*. It is wrong about a
+*row*: the redesigned row promises a progress bar, most rows in any real
+Sprints view are closed, and a bar drawn from structurally zero numbers is a
+lie the row cannot tell apart from an empty sprint. The reversal is narrow.
+A closed sprint's membership cannot change, so it is read once and then
+re-supplied from the cache for ever after, which is not a poll.
+
+A lazy fetch on expand was considered and rejected: `ReplaceBoard` deletes
+every `board_issue` row of a board before it writes what the pass read, so a
+scope written through `ReplaceSprintIssues` outside the pass would be wiped by
+the next boards sync and re-fetched after every one. The lazy option therefore
+cost a new binding, a second holder of the per-profile lock for a read, a
+frontend query with its own loading, error and offline states, *and* a change
+to that delete, for a worse bound.
+
+The ceiling, so nobody rediscovers it: rows in `board_issue` cannot tell a
+closed sprint nobody has read from one that genuinely holds nothing of this
+project. Both read `MembershipCached` false, and the second is re-asked once
+per boards pass. That is one request, and it is the only case that is. The
+upgrade, when it shows up in the field, is a `membership_synced` stamp on the
+`sprint` row, which is a migration this deliberately did not spend.
+
+`MembershipCached` keeps its name, its type and its place on the wire, and
+changes meaning for a closed sprint only: from "the sync tries to fetch this
+scope" to "this scope has been read and kept". Active and future sprints keep
+the derivation from state, because the sync asks for them on every pass, so an
+empty scope there is as likely to be a sync that failed partway through. Until
+a closed sprint has been read the row says so, in two places: the timeline
+cell says "Cards not read yet" and draws no points bar, and the scope cell
+says "Not counted yet" rather than "0 cards".
 
 **Delete span two repositories in two transactions, board rows first.**
 `sprints.Service.Delete` call Jira, then `boardrepo.DeleteSprintEverywhere`

@@ -13,9 +13,12 @@ Read before writing tests, UI work, or platform checks.
 
 ## Counts to beat, never lower
 
-46 in `frontend/core`, 159 in `xtm/frontend`, 507 in `tam/frontend`. A change
-that lowers one has deleted coverage; say so in the commit message or put it
-back. C6 forbids assertions that cannot fail, so a count kept up by existence
+262 in `frontend/core`, 159 in `xtm/frontend`, 1070 in `tam/frontend`. A
+change that lowers one has deleted coverage; say so in the commit message or
+put it back. This line read 46, 159 and 507 until issue #62 refreshed it:
+#60 and #61 landed the report charts, the family rows and three
+stylesheet-reading suites without touching it, and a counter nobody can
+trust is worse than none. C6 forbids assertions that cannot fail, so a count kept up by existence
 checks is worse than a smaller honest one.
 
 ## What has actually caught bugs here
