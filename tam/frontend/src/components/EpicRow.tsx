@@ -96,7 +96,7 @@ export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true,
       tabIndex={focused ? 0 : -1}
       data-tree-index={index}
       data-tree-key={child.key}
-      className={`folder-item epic-row${nested ? " nested-subtask" : ""}${selected ? " folder-selected" : ""}${flashed ? " epic-row-moved" : ""}`}
+      className={`folder-item epic-row${selected ? " folder-selected" : ""}${flashed ? " epic-row-moved" : ""}`}
       onClick={() => onActivate(child.key)}
       onKeyDown={(e) => onKeyDown(e, row)}
     >

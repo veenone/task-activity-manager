@@ -136,7 +136,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               aria-expanded={counts.has(iss.key) ? !collapsed.has(iss.key) : undefined}
               aria-label={`${iss.key} ${summary}${iss.type === "subtask" && iss.parentKey ? `, subtask of ${iss.parentKey}` : ""}`}
               data-row-index={index}
-              className={`issue-row${place === "root" ? "" : " issue-row-subtask"}${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
+              className={`issue-row${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
               onClick={() => onSelect(iss.key)}
               onKeyDown={(e) => {
                 if (e.key === "ArrowRight" && counts.has(iss.key)) {

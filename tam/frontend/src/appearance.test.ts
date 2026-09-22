@@ -1,6 +1,6 @@
-// A control's states and a view's frame are drawn by the stylesheet alone,
-// and jsdom applies no stylesheet, so a render test cannot see either. These
-// read the rules instead.
+// A control's states are drawn by the stylesheet alone, and jsdom applies no
+// stylesheet, so a render test cannot see them. These read the rules instead.
+// The frames and the family indent are pinned the same way in styles.test.ts.
 import { describe, expect, it } from "vitest";
 import { appCss, declarationsMentioning, declarationsOf, valueOf } from "./test/cssRules";
 

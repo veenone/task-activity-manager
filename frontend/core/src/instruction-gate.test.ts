@@ -269,12 +269,51 @@ describe('instruction gate', () => {
         const rel = path.relative(repoRoot, file).replace(/\\/g, '/');
         if (rel.includes('.test.')) continue;
         const src = stripComments(fs.readFileSync(file, 'utf8'));
-        // A plain literal attribute only. A class name assembled from a
-        // variable names nothing a text search can resolve, and a literal
-        // inside a braced expression is as often a comparison as a class.
-        for (const m of src.matchAll(/className="([^"{}]*)"/g)) {
-          for (const name of m[1].trim().split(/\s+/)) {
-            if (name && !used.has(name)) used.set(name, rel);
+        // Plain attributes, and the literal parts of an assembled one. Most
+        // rows in this app name their state through a template, so reading
+        // only `className="..."` left the majority of the tree unchecked:
+        // three classes with no rule sat in templates while this gate passed.
+        //
+        // Inside a braced expression, a string is a class unless it is the
+        // operand of a comparison (`f.id === "description"`), which is the
+        // one shape that produced false names.
+        for (const m of src.matchAll(/className=(?:"([^"{}]*)"|\{((?:[^{}]|\{[^{}]*\})*)\})/g)) {
+          const literal = m[1];
+          const expr = m[2];
+          const names: string[] = [];
+          if (literal !== undefined) names.push(literal);
+          if (expr !== undefined) {
+            for (const t of expr.matchAll(/`([^`]*)`/g)) {
+              // The static text between the ${} holes.
+              names.push(t[1].replace(/\$\{[^}]*\}/g, ' '));
+              // And the classes a hole appends. One that appends to the list
+              // carries its own leading space (`${n ? " nested-subtask" : ""}`),
+              // which is what separates it from a fragment completing the
+              // name before it (`chip-type-${type || "none"}`).
+              for (const hole of t[1].matchAll(/\$\{([^}]*)\}/g)) {
+                // Every quoted token in order, so a pattern cannot pair the
+                // closing quote of one string with the opening quote of the
+                // next and read the gap between them as a name.
+                for (const q of hole[1].matchAll(/"([^"]*)"/g)) {
+                  if (/^\s/.test(q[1])) names.push(q[1]);
+                }
+              }
+            }
+            // A braced ternary names its classes outright. The operand of a
+            // comparison is not one of them.
+            const branches = expr.replace(/`[^`]*`/g, ' ');
+            for (const q of branches.matchAll(/([=!]==?)?\s*"([^"]*)"/g)) {
+              if (!q[1]) names.push(q[2]);
+            }
+          }
+          for (const chunk of names) {
+            for (const name of chunk.trim().split(/\s+/)) {
+              // A trailing hyphen is the head of a name an expression
+              // completes (`chart-bar-${f.key}`), so the whole name is not
+              // in the source to check.
+              if (!name || name.endsWith('-') || used.has(name)) continue;
+              used.set(name, rel);
+            }
           }
         }
       }

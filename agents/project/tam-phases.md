@@ -42,8 +42,9 @@ removed, completed, carried over, rebuilt from Jira's own changelog not its
 internal chart endpoints, with last six closed sprints as velocity table
 beside them. Schema version 8 add `sprint_report`, where closed sprint's
 reconstruction kept so view readable offline, and `complete_date` on
-`sprint`. Charts those numbers would draw into = deliberately next plan;
-here ship figures, method printed under them, plain statement of what
+`sprint`. Charts those numbers would draw into came later, in their own change;
+see the Phase 4 section below. Here ship figures, method printed under
+them, plain statement of what
 reconstruction cannot see.
 
 ## Rich text: descriptions, summaries, comments

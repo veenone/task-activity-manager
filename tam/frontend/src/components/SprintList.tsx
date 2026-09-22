@@ -247,7 +247,7 @@ export function SprintList({
         tabIndex={focusId === issue.key ? 0 : -1}
         data-tree-index={indexOf.get(issue.key)}
         data-tree-key={issue.key}
-        className={`folder-item sprint-issue-row${nested ? " nested-subtask" : ""}${issue.key === selectedKey ? " folder-selected" : ""}`}
+        className={`folder-item sprint-issue-row${issue.key === selectedKey ? " folder-selected" : ""}`}
         onClick={(e) => clickIssue(e, row)}
         onKeyDown={(e) => onKeyDown(e, row)}
       >

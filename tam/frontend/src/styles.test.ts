@@ -65,24 +65,30 @@ describe("family row indentation", () => {
     expect(toggle).not.toMatch(/margin-inline-end:/);
   });
 
-  it("no table indents a subtask with a literal of its own", () => {
-    for (const selector of [".issue-row-subtask", ".nested-subtask", ".board-card-subtask"]) {
-      const rules = rulesFor(appCss, selector);
-      expect(rules).not.toMatch(/(padding|margin)-inline-start:\s*\d+px/);
-    }
+  // Naming the selectors to check was the wrong shape: two of the three were
+  // deleted along with their rules, so the assertion ran against an empty
+  // string and passed whatever the stylesheet said. This reads every rule in
+  // the app's own sheet instead, so a literal indent fails wherever it lands
+  // and under whatever new name.
+  it("no rule in the app indents anything with a pixel literal", () => {
+    // Pixels only. The prose lists set their padding in em, which scales
+    // with the text rather than standing in for the family indent.
+    const offenders = appCss
+      .split("}")
+      .filter((rule) => /(padding|margin)-inline-start:\s*[\d.]+px/.test(rule))
+      .map((rule) => rule.trim().split("\n").pop()?.trim());
+    expect(offenders, `indent literals: ${offenders.join(" | ")}`).toEqual([]);
+  });
+
+  it("the shared token is what the family indent is spelled with", () => {
+    expect(rulesFor(appCss, ".board-card-subtask")).toMatch(
+      /margin-inline-start:\s*var\(--subtask-indent\)/,
+    );
   });
 });
 
-describe("selected and hovered filter chips", () => {
-  it("are told apart by more than a 1px border colour", () => {
-    // One rule gave .chip-on and :hover the same opacity, so hovering an
-    // unselected type filter made it look selected.
-    const hover = rulesFor(appCss, ".chip-toggle:hover");
-    const on = rulesFor(appCss, ".chip-toggle.chip-on");
-    expect(hover).not.toMatch(/opacity:\s*1\b/);
-    expect(on).toMatch(/background|box-shadow|font-weight/);
-  });
-});
+// The chip states are pinned in appearance.test.ts, which compares the two
+// opacity values rather than matching one of them by pattern.
 
 describe("the two main panes", () => {
   it("frame the rituals page the way the report frame is framed", () => {

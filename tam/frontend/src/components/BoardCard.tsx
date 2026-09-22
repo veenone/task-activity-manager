@@ -121,8 +121,11 @@ export function BoardCard({
       {issue.type === "subtask" && issue.parentKey && (
         <div className="board-card-parent">
           {/* No toggles anywhere on a board, so the lead reserves no slot
-              for one: the branch and the step are all a card needs. */}
-          <RowLead place={place} slot={false} />
+              for one: the branch and the step are all a card needs. And the
+              line beside it already names the parent, so a detached card
+              draws the branch rather than the badge, which would have read
+              "Parent not shown" straight into "Subtask of PLAT-901". */}
+          <RowLead place={place === "detached" ? "child" : place} slot={false} />
           {`Subtask of ${issue.parentKey}`}
         </div>
       )}

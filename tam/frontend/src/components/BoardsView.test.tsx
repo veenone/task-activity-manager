@@ -347,7 +347,9 @@ describe("BoardsView board", () => {
     renderView();
     const card = await screen.findByRole("gridcell", { name: /PLAT-501 Retire the gateway/ });
     expect(card).toHaveClass("board-card-subtask");
-    expect(within(card).getByText("Parent not shown")).toBeInTheDocument();
+    // The card names the parent itself, so it does not also carry the badge
+    // saying the parent is not shown; together the two contradicted.
+    expect(within(card).queryByText("Parent not shown")).not.toBeInTheDocument();
     expect(within(card).getByText(/Subtask of PLAT-901/)).toBeInTheDocument();
   });
   it("renders the columns with their card counts and point sums", async () => {
