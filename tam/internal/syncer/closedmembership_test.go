@@ -2,11 +2,13 @@ package syncer_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/dbtx"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/syncer"
 )
@@ -126,12 +128,20 @@ func TestASprintThatClosesKeepsTheMembershipItsLastActivePassCached(t *testing.T
 	}
 }
 
-func TestABoardWithMoreHistoryThanOnePassCanReadBackfillsNewestFirst(t *testing.T) {
+func TestTheBackfillReachesTheTailOfABoardWhoseHistoryIsMostlyAnotherProjects(t *testing.T) {
 	repo, boards := newBoardRepos(t)
-	// Thirteen closed sprints against a budget of twelve, named so that a
-	// higher id is a later sprint. Jira hands them back oldest first, which
-	// is the order that would leave the newest unread if the pass walked
-	// the list as it came.
+	// Thirteen closed sprints against a budget of twelve, and the twelve
+	// newest hold nothing of this project, which is the ordinary shape of a
+	// board whose filter spans several projects: ownBoards' own comment
+	// describes one holding 8,485 cards while the project being synced had
+	// 38. Only the oldest has anything here.
+	//
+	// This is the case that caught the first version of the backfill. It
+	// counted a sprint as read when board_issue held a row for it, so a
+	// sprint that answered empty looked unread for ever, spent a unit of
+	// every pass, and the tail was never reached at all. Jira hands the
+	// sprints back oldest first, which is also the order that would leave
+	// the newest unread if the pass walked them as they came.
 	var sprints []backend.Sprint
 	keys := map[string][]string{"": {"PLAT-1"}}
 	for id := 1; id <= 13; id++ {
@@ -139,62 +149,141 @@ func TestABoardWithMoreHistoryThanOnePassCanReadBackfillsNewestFirst(t *testing.
 			ID: id, BoardID: 1, Name: fmt.Sprintf("Sprint %d", id), State: "closed",
 			StartDate: fmt.Sprintf("2026-%02d-01T09:00:00Z", id),
 		})
-		keys[fmt.Sprint(id)] = []string{fmt.Sprintf("PLAT-%d", id)}
 	}
+	keys["1"] = []string{"PLAT-1"}
 	fb := closedBoardFake(sprints, keys)
 	e := engineFor(fb, repo, boards)
 	ctx := context.Background()
+
 	if _, err := e.SyncBoards(ctx, "p1", "PLAT", nil); err != nil {
 		t.Fatalf("first pass: %v", err)
 	}
-
 	// The budget spends itself from the top of the Sprints view downward,
-	// so the sprint that finished most recently is the one a reader sees
-	// numbers for first.
+	// so the sprint that finished most recently gets its numbers first.
 	if n := asksFor(fb, "13"); n != 1 {
 		t.Errorf("the newest closed sprint was asked for %d times on the first pass, want 1", n)
 	}
 	if n := asksFor(fb, "1"); n != 0 {
-		t.Errorf("the oldest closed sprint was asked for %d times on the first pass, want 0", n)
-	}
-	oldest, err := boards.SprintIssues(ctx, "p1", 1, "1")
-	if err != nil || len(oldest) != 0 {
-		t.Fatalf("oldest sprint membership = %v, %v, want none yet", oldest, err)
+		t.Errorf("the oldest closed sprint was asked for %d times on the first pass, want 0: the budget is twelve", n)
 	}
 
 	if _, err := e.SyncBoards(ctx, "p1", "PLAT", nil); err != nil {
 		t.Fatalf("second pass: %v", err)
 	}
+	// The twelve that answered empty are read, so they do not spend a unit
+	// again and the second pass reaches the tail.
 	if n := asksFor(fb, "1"); n != 1 {
 		t.Errorf("the oldest closed sprint was asked for %d times in total, want 1 on the second pass", n)
 	}
-	oldest, err = boards.SprintIssues(ctx, "p1", 1, "1")
+	oldest, err := boards.SprintIssues(ctx, "p1", 1, "1")
 	if err != nil || len(oldest) != 1 || oldest[0] != "PLAT-1" {
 		t.Fatalf("oldest sprint membership = %v, %v, want PLAT-1 after the second pass", oldest, err)
 	}
-	// And the twelve the first pass read are not read again to pay for it.
-	if n := asksFor(fb, "13"); n != 1 {
-		t.Errorf("the newest closed sprint was asked for %d times in total, want 1", n)
+
+	// And then it settles: three more passes ask for nothing at all, which
+	// is what "read once and kept" has to mean for a sprint that answered
+	// empty as much as for one that answered with cards.
+	for pass := 3; pass <= 5; pass++ {
+		if _, err := e.SyncBoards(ctx, "p1", "PLAT", nil); err != nil {
+			t.Fatalf("pass %d: %v", pass, err)
+		}
+	}
+	for id := 1; id <= 13; id++ {
+		if n := asksFor(fb, fmt.Sprint(id)); n != 1 {
+			t.Errorf("closed sprint %d was asked for %d times across five passes, want exactly 1", id, n)
+		}
 	}
 }
 
-func TestAClosedSprintThatHoldsNothingIsAskedAboutAgain(t *testing.T) {
+func TestAnEmptyClosedSprintReportsItselfReadRatherThanUnread(t *testing.T) {
 	repo, boards := newBoardRepos(t)
-	// The stated ceiling: board_issue cannot tell a closed sprint nobody
-	// has read from one that genuinely holds nothing of this project, so
-	// the second is re-read once per pass. One request, and the row stays
-	// honest about it rather than claiming an empty sprint is a read one.
+	// board_issue cannot tell a sprint nobody has read from one that holds
+	// nothing, so the sprint row carries the bit instead. Without it the
+	// row would say "Cards not read yet" for ever about a sprint that was
+	// read and was genuinely empty.
 	fb := closedBoardFake(
 		[]backend.Sprint{{ID: 11, BoardID: 1, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z"}},
 		map[string][]string{"": {"PLAT-1"}},
 	)
 	syncTwice(t, engineFor(fb, repo, boards))
 
-	if n := asksFor(fb, "11"); n != 2 {
-		t.Errorf("an empty closed sprint was asked for %d times across two passes, want one per pass", n)
+	details, err := boards.BoardSprintDetails(context.Background(), noIssues{}, "p1", 1)
+	if err != nil {
+		t.Fatalf("board sprint details: %v", err)
 	}
-	got, err := boards.SprintIssues(context.Background(), "p1", 1, "11")
-	if err != nil || len(got) != 0 {
-		t.Fatalf("sprint 11 membership = %v, %v, want none", got, err)
+	for _, d := range details {
+		if d.Name != "Sprint 11" {
+			continue
+		}
+		if !d.MembershipCached {
+			t.Error("a closed sprint that was read and answered empty must report itself read")
+		}
+		if d.Total != 0 {
+			t.Errorf("sprint 11 total = %d, want 0: it was read and it holds nothing", d.Total)
+		}
+		return
+	}
+	t.Fatal("no Sprint 11 in the details")
+}
+
+// noIssues is an IssueSource with nothing in the cache. The membership
+// question these tests ask is about board_issue and the sprint row, not
+// about which cards the issue cache happens to hold.
+type noIssues struct{}
+
+func (noIssues) IssuesByKeys(context.Context, dbtx.Querier, string, []string) ([]backend.Issue, error) {
+	return nil, nil
+}
+func (noIssues) DraftIssues(context.Context, dbtx.Querier, string) ([]backend.Issue, error) {
+	return nil, nil
+}
+func (noIssues) PendingMoves(context.Context, dbtx.Querier, string) ([]backend.PendingMove, error) {
+	return nil, nil
+}
+
+func TestAFailedHistoricalReadDoesNotCostTheBoardItsSync(t *testing.T) {
+	repo, boards := newBoardRepos(t)
+	// The backfill is best-effort work about sprints nobody is waiting on.
+	// A 403 or a timeout on a sprint from years ago must not drop the board
+	// that carries the running sprint, which is what the view is for, and
+	// it must not do so silently on every pass for ever.
+	fb := closedBoardFake(
+		[]backend.Sprint{
+			{ID: 11, BoardID: 1, Name: "Sprint 11", State: "closed", StartDate: "2026-08-04T09:00:00Z"},
+			{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active", StartDate: "2026-08-18T09:00:00Z"},
+		},
+		map[string][]string{"": {"PLAT-1", "PLAT-2"}, "12": {"PLAT-2"}},
+	)
+	fb.issueKeysErr = map[int]map[string]error{1: {"11": errors.New("jira: 403 Forbidden")}}
+	e := engineFor(fb, repo, boards)
+	ctx := context.Background()
+
+	sum, err := e.SyncBoards(ctx, "p1", "PLAT", nil)
+	if err != nil {
+		t.Fatalf("sync boards: %v", err)
+	}
+	if sum.Boards != 1 || len(sum.Dropped) != 0 {
+		t.Errorf("summary = %d boards, dropped %v; want the board landed and nothing dropped", sum.Boards, sum.Dropped)
+	}
+	// The mandatory work landed: the running sprint has its membership.
+	running, err := boards.SprintIssues(ctx, "p1", 1, "12")
+	if err != nil || len(running) != 1 || running[0] != "PLAT-2" {
+		t.Fatalf("active sprint membership = %v, %v, want PLAT-2", running, err)
+	}
+	// And the sprint that failed is not marked read, so it is tried again
+	// rather than passed off as a sprint that holds nothing.
+	syncedNow, err := boards.SyncedSprints(ctx, "p1", 1)
+	if err != nil {
+		t.Fatalf("synced sprints: %v", err)
+	}
+	if syncedNow["11"] {
+		t.Error("a sprint whose read failed must not be recorded as read")
+	}
+
+	if _, err := e.SyncBoards(ctx, "p1", "PLAT", nil); err != nil {
+		t.Fatalf("second pass: %v", err)
+	}
+	if n := asksFor(fb, "11"); n != 2 {
+		t.Errorf("the failing sprint was asked for %d times across two passes, want one per pass until it answers", n)
 	}
 }

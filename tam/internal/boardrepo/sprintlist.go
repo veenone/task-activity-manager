@@ -81,12 +81,11 @@ type SprintDetail struct {
 	// always true on the unassigned node, whose cards come from the board's
 	// own list rather than from a sprint's membership.
 	//
-	// The one thing it cannot tell apart is a closed sprint nobody has read
-	// from a closed sprint that genuinely holds nothing of this project.
-	// Both read false, so the row says the membership has not been read yet
-	// rather than drawing an empty bar, which is the honest answer for the
-	// first and an understatement for the second. Retiring that would cost
-	// a membership_synced column for one bit.
+	// For a closed sprint the answer comes from the sprint row's
+	// membership_synced column rather than from whether board_issue holds
+	// anything, because those two differ exactly where it matters: a closed
+	// sprint that was read and genuinely holds nothing of this project has
+	// no rows and has still been read.
 	MembershipCached bool `json:"membershipCached"`
 
 	// NotSynced counts this node's own scope keys the issue cache does not
@@ -143,6 +142,13 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 	if err != nil {
 		return nil, err
 	}
+	// Which closed sprints a boards pass has already asked Jira about. Read
+	// on the same querier as everything else here, so the flag and the
+	// membership it describes come from one snapshot.
+	synced, err := syncedSprints(ctx, q, profileID, boardID)
+	if err != nil {
+		return nil, err
+	}
 
 	rendered := 0
 	drafts, err := issues.DraftIssues(ctx, q, profileID)
@@ -190,12 +196,12 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 			claimed[c.Key] = true
 		}
 		detail := newSprintDetail(s)
-		// scopeKeys is board_issue's own answer, before withMovedIn added
-		// anything the journal knows and board_issue does not: what is
-		// asked here is whether the sync has read this scope, and a
-		// journalled move is not a read.
+		// The sprint row's own bit, not the presence of board_issue rows: a
+		// closed sprint that was read and holds nothing of this project has
+		// no rows and has still been read, and saying otherwise would leave
+		// the row promising numbers that are never coming.
 		if s.State == "closed" {
-			detail.MembershipCached = len(scopeKeys) > 0
+			detail.MembershipCached = synced[sprintID]
 		}
 		detail.NotSynced = notSynced
 		fillDetail(&detail, cards, &rendered)
@@ -239,7 +245,7 @@ func sprintDetails(ctx context.Context, q dbtx.Querier, issues IssueSource, prof
 // Jira about on every pass (internal/syncer/boards.go). A closed sprint is
 // read once and then re-supplied from the cache, so state says nothing
 // about whether that read has happened; sprintDetails overrides the field
-// for a closed sprint from the keys it has already read.
+// for a closed sprint from the sprint row's membership_synced column.
 func newSprintDetail(s Sprint) SprintDetail {
 	return SprintDetail{
 		Sprint:           s,

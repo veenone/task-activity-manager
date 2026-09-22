@@ -38,6 +38,15 @@
 // detail_json, where the description (and any uncommitted edit to it) lived
 // before this version, so the first launch after upgrading shows what TAM
 // already held rather than waiting on a sync.
+// Version 18 adds the sprint's membership_synced: whether a boards pass has
+// asked Jira what this sprint holds and got an answer. board_issue cannot
+// carry that, because it is equally empty for a sprint nobody has read and
+// for one that genuinely holds nothing of the project being synced, and the
+// closed-sprint backfill has to tell those apart or it spends a unit of
+// every pass on the same empty sprints and never reaches the tail of a
+// board whose filter spans several projects. A column add in version 15's
+// shape, and it backfills nothing: before this version no closed sprint's
+// membership was ever fetched, so 0 is the truth for every cached row.
 package tamstore
 
 import (
@@ -71,7 +80,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 17,
+	Version: 18,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -289,6 +298,17 @@ var Schema = store.Schema{
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 			return err
 		},
+	}, {
+		Version: 18,
+		// Whether a boards pass has asked Jira what this sprint holds. The
+		// same column-add shape as version 15, and nothing to backfill: no
+		// closed sprint's membership was ever fetched before this version,
+		// so every cached row starts unread, which is what the default
+		// says. An active or future sprint is fetched on every pass, so the
+		// flag is only ever read for a closed one.
+		Apply: func(db *sql.DB) error {
+			return store.AddColumnIfMissing(db, "sprint", "membership_synced INTEGER NOT NULL DEFAULT 0")
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -463,6 +483,7 @@ CREATE TABLE IF NOT EXISTS sprint (
 	goal          TEXT NOT NULL DEFAULT '',
 	complete_date TEXT NOT NULL DEFAULT '',
 	draft         INTEGER NOT NULL DEFAULT 0,
+	membership_synced INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (profile_id, board_id, id)
 );`
 

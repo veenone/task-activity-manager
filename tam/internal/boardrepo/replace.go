@@ -45,7 +45,18 @@ func (r *Repository) ReplaceBoard(ctx context.Context, profileID string, b backe
 				return fmt.Errorf("clear reports built with board %d's old done rule: %w", b.ID, err)
 			}
 		}
-		if err := writeSprints(ctx, tx, profileID, b.ID, sprints); err != nil {
+		// Every scope this pass has an answer for, whether it fetched it
+		// or re-supplied it from the cache. That is exactly the set whose
+		// membership has been asked for, which is what the sprint row's
+		// flag records; a sprint the per-pass budget never reached is not
+		// in keys and stays unread.
+		asked := make(map[int]bool, len(keys))
+		for sprintID := range keys {
+			if id, err := strconv.Atoi(sprintID); err == nil {
+				asked[id] = true
+			}
+		}
+		if err := writeSprints(ctx, tx, profileID, b.ID, sprints, asked); err != nil {
 			return err
 		}
 		if err := deleteBoardIssues(ctx, tx, profileID, b.ID); err != nil {
@@ -104,7 +115,10 @@ func sameDoneStatusSet(before, after []backend.BoardColumn) bool {
 // in Jira.
 func (r *Repository) ReplaceSprints(ctx context.Context, profileID string, boardID int, sprints []backend.Sprint) error {
 	return r.inTx(ctx, func(tx *sql.Tx) error {
-		if err := writeSprints(ctx, tx, profileID, boardID, sprints); err != nil {
+		// No scope was read here, so nothing becomes read: writeSprints
+		// carries every sprint's existing flag across. Clearing them would
+		// make one started sprint cost the whole board its backfill.
+		if err := writeSprints(ctx, tx, profileID, boardID, sprints, nil); err != nil {
 			return err
 		}
 		return deleteOrphanSprintIssues(ctx, tx, profileID, boardID, sprints)
@@ -178,8 +192,18 @@ func writeColumns(ctx context.Context, tx *sql.Tx, profileID string, boardID int
 }
 
 // writeSprints replaces one board's sprints, delete then insert.
-func writeSprints(ctx context.Context, tx *sql.Tx, profileID string, boardID int, sprints []backend.Sprint) error {
+// asked names the sprints this write has an answer for. A sprint's
+// membership_synced is set when it is in that set and otherwise carried over
+// from the row being replaced, so the flag only ever goes from unread to
+// read, and only a purge or the sprint leaving Jira's list resets it.
+func writeSprints(ctx context.Context, tx *sql.Tx, profileID string, boardID int, sprints []backend.Sprint, asked map[int]bool) error {
 	if err := invalidateChangedSprintReports(ctx, tx, profileID, boardID, sprints); err != nil {
+		return err
+	}
+	// Read before the delete below: the rows are replaced rather than
+	// updated, so a flag not carried across here is a flag lost.
+	wasRead, err := readSprintFlags(ctx, tx, profileID, boardID)
+	if err != nil {
 		return err
 	}
 	// Only the rows Jira reported are replaced. A draft sprint is TAM's own
@@ -190,11 +214,36 @@ func writeSprints(ctx context.Context, tx *sql.Tx, profileID string, boardID int
 		return fmt.Errorf("clear sprints of board %d: %w", boardID, err)
 	}
 	for _, s := range sprints {
-		if _, err := tx.ExecContext(ctx, insertSprintSQL, profileID, s.ID, boardID, s.Name, s.State, s.StartDate, s.EndDate, s.Goal, s.CompleteDate); err != nil {
+		synced := 0
+		if asked[s.ID] || wasRead[s.ID] {
+			synced = 1
+		}
+		if _, err := tx.ExecContext(ctx, insertSprintSQL, profileID, s.ID, boardID, s.Name, s.State, s.StartDate, s.EndDate, s.Goal, s.CompleteDate, synced); err != nil {
 			return fmt.Errorf("insert sprint %d: %w", s.ID, err)
 		}
 	}
 	return nil
+}
+
+// readSprintFlags reads which of a board's sprints are already marked as
+// having had their membership asked for.
+func readSprintFlags(ctx context.Context, tx *sql.Tx, profileID string, boardID int) (map[int]bool, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id FROM sprint WHERE profile_id = ? AND board_id = ? AND membership_synced = 1`,
+		profileID, boardID)
+	if err != nil {
+		return nil, fmt.Errorf("read board %d sprint flags: %w", boardID, err)
+	}
+	defer rows.Close()
+	out := map[int]bool{}
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
 }
 
 // writeIssueKeys inserts one scope's membership in board order, keeping the

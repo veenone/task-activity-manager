@@ -215,10 +215,19 @@ const closedMembershipBudget = 12
 // made the progress bar on the commonest row in that view structurally
 // empty.
 //
-// The one case this cannot tell apart is a closed sprint that genuinely
-// holds nothing of this project: board_issue is as empty for it as for one
-// nobody has read, so it is re-asked once per pass. That is one request,
-// and retiring it would cost a membership_synced column for one bit.
+// "Read" is a bit on the sprint row, not the presence of board_issue rows.
+// A closed sprint that genuinely holds nothing of this project answers
+// empty, and board_issue is as empty for that as for a sprint nobody has
+// asked about; counting the first as unread spent a unit of every pass on
+// it for ever and never reached the older sprints behind it, which is the
+// ordinary shape of a board whose filter spans several projects.
+//
+// A historical read that fails is not allowed to cost the board its sync.
+// The backfill is best-effort work about sprints nobody is waiting on, and
+// one 403 on a sprint from 2023 would otherwise drop the running sprint's
+// refresh, silently, on every pass for ever. That sprint is skipped, stays
+// unread, and is tried again next pass; the active and future loop above
+// keeps its hard failure, because that work is what the view is for.
 func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backend.Board, profileID, projectKey string) (boardParts, error) {
 	cols, err := bb.BoardColumns(ctx, b.ID)
 	if err != nil {
@@ -244,14 +253,20 @@ func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backe
 		}
 		keys[sid] = sprintKeys
 	}
+	synced, err := e.Boards.SyncedSprints(ctx, profileID, b.ID)
+	if err != nil {
+		return boardParts{}, err
+	}
 	budget := closedMembershipBudget
 	for _, s := range closedNewestFirst(sprints) {
 		sid := strconv.Itoa(s.ID)
-		cached, err := e.Boards.SprintIssues(ctx, profileID, b.ID, sid)
-		if err != nil {
-			return boardParts{}, err
-		}
-		if len(cached) > 0 {
+		if synced[sid] {
+			// Read already, so the cache is the answer, and an empty one is
+			// an answer too: this sprint holds nothing of this project.
+			cached, err := e.Boards.SprintIssues(ctx, profileID, b.ID, sid)
+			if err != nil {
+				return boardParts{}, err
+			}
 			keys[sid] = cached
 			continue
 		}
@@ -261,7 +276,11 @@ func (e *Engine) readBoard(ctx context.Context, bb backend.BoardBackend, b backe
 		budget--
 		sprintKeys, err := bb.BoardIssueKeys(ctx, b.ID, sid, projectKey)
 		if err != nil {
-			return boardParts{}, err
+			// Skipped, not fatal. It stays unread and the next pass tries
+			// it again; the board's own list and its running sprint are
+			// what the view needs and they are already in hand.
+			log.Printf("tam: board %q closed sprint %s membership: %v", b.Name, sid, err)
+			continue
 		}
 		keys[sid] = sprintKeys
 	}
