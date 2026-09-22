@@ -63,9 +63,21 @@
 }
 
 /* Visually-hidden but screen-reader-available. Used by the aria-live region
-   (audit X4) and any label that should be announced but not shown. */
+   (audit X4) and any label that should be announced but not shown.
+
+   Fixed rather than absolute, and kept in step with the copy in
+   frontend/core/styles/primitives.css by hand, because this app loads no
+   stylesheet from there. Absolute put the box in its nearest positioned
+   ancestor, and in an app whose panes are all static that is the page, so a
+   hidden element inside an inner scroller landed in the document's own
+   scrollable area and escaped every overflow: hidden between the two. The
+   width, height and overflow below cannot shrink every box either: they do
+   nothing to a table, which sizes to its rows. TAM's report drew a 300px
+   screen-reader table at the foot of a scrolled view and put a scrollbar on
+   the window over exactly this. A fixed box contributes to no scrollable
+   overflow at all, which is what visually hidden has to mean. */
 .sr-only {
-  position: absolute;
+  position: fixed;
   width: 1px;
   height: 1px;
   padding: 0;
