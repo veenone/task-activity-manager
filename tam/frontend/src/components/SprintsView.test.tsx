@@ -199,7 +199,7 @@ describe("SprintsView", () => {
 
   it("orients the reader with one line about the sprint that is running", async () => {
     renderView();
-    expect(await screen.findByText(/^Sprint 12, day \d+ of 14, 1 of 3 done, 3 of 13 pts$/)).toBeInTheDocument();
+    expect(await screen.findByText(/^Sprint 12, day \d+ of 15, 1 of 3 done, 3 of 13 pts$/)).toBeInTheDocument();
   });
 
   it("says in the summary line what the running sprint's progress does not count", async () => {
