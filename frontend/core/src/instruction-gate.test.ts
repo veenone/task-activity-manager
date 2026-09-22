@@ -42,6 +42,11 @@ const KNOWLEDGE_FILES = [
   'agents/generic/claude-workflows.md',
 ];
 /**
+ * Class names a stylesheet in this repo never defines, and should not.
+ * ProseMirror and its plugins set their own classes on nodes we render.
+ */
+const VENDOR_CLASSES = /^(ProseMirror|tiptap)/;
+/**
  * One entry per contract Never clause a grep settles AND that is clean today.
  * A clause with a backlog belongs in the ratchet, not here.
  */
@@ -202,7 +207,10 @@ describe('instruction gate', () => {
     // M2: assert the gate actually read something.
     expect(scanned, 'grep gate scanned no files').toBeGreaterThan(0);
     expect(offenders, offenders.join(', ')).toEqual([]);
-  });
+    // Walks every Go file in three modules, so it outruns the default 5s when
+    // the whole workspace suite competes for the machine. Generous on purpose:
+    // a failure here means a real offender, not a busy machine.
+  }, 120_000);
 
   it('every profile-keyed table is swept by both purge lists', () => {
     const schema = read('tam/internal/tamstore/tamstore.go');
@@ -239,4 +247,94 @@ describe('instruction gate', () => {
     }
     expect(missing, missing.join('; ')).toEqual([]);
   });
+
+  // A class a component sets and no stylesheet defines fails silently: the
+  // element renders unstyled and nothing reports it. Two shipped that way
+  // here. `.row` left the rituals conflict buttons touching each other, and
+  // `.ritual-page-body` left the fallback for an unparseable Confluence page
+  // as bare HTML under this app's own margin reset.
+  it('every class a component sets is defined in a stylesheet', () => {
+    const sheets = SRC_DIRS.concat(['frontend/core/styles'])
+      .flatMap((d) => walk(path.join(repoRoot, d), /\.css$/))
+      .map((f) => fs.readFileSync(f, 'utf8'))
+      .join('\n');
+    const defined = new Set([...sheets.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((m) => m[1]));
+
+    const used = new Map<string, string>();
+    // The two trees this gate is clean over. xtm/frontend has its own backlog
+    // of orphans and is heading out of this repo; adding it here would mean
+    // an allowed number, which belongs in the ratchet, not in this file.
+    for (const dir of ['frontend/core/src', 'tam/frontend/src']) {
+      for (const file of walk(path.join(repoRoot, dir), SOURCE_EXT)) {
+        const rel = path.relative(repoRoot, file).replace(/\\/g, '/');
+        if (rel.includes('.test.')) continue;
+        const src = stripComments(fs.readFileSync(file, 'utf8'));
+        // Plain attributes, and the literal parts of an assembled one. Most
+        // rows in this app name their state through a template, so reading
+        // only `className="..."` left the majority of the tree unchecked:
+        // three classes with no rule sat in templates while this gate passed.
+        //
+        // Inside a braced expression, a string is a class unless it is the
+        // operand of a comparison (`f.id === "description"`), which is the
+        // one shape that produced false names.
+        for (const m of src.matchAll(/className=(?:"([^"{}]*)"|\{((?:[^{}]|\{[^{}]*\})*)\})/g)) {
+          const literal = m[1];
+          const expr = m[2];
+          const names: string[] = [];
+          if (literal !== undefined) names.push(literal);
+          if (expr !== undefined) {
+            for (const t of expr.matchAll(/`([^`]*)`/g)) {
+              // The static text between the ${} holes.
+              names.push(t[1].replace(/\$\{[^}]*\}/g, ' '));
+              // And the classes a hole appends. One that appends to the list
+              // carries its own leading space (`${n ? " nested-subtask" : ""}`),
+              // which is what separates it from a fragment completing the
+              // name before it (`chip-type-${type || "none"}`).
+              for (const hole of t[1].matchAll(/\$\{([^}]*)\}/g)) {
+                // Every quoted token in order, so a pattern cannot pair the
+                // closing quote of one string with the opening quote of the
+                // next and read the gap between them as a name.
+                for (const q of hole[1].matchAll(/"([^"]*)"/g)) {
+                  if (/^\s/.test(q[1])) names.push(q[1]);
+                }
+              }
+            }
+            // A braced ternary names its classes outright. The operand of a
+            // comparison is not one of them.
+            const branches = expr.replace(/`[^`]*`/g, ' ');
+            for (const q of branches.matchAll(/([=!]==?)?\s*"([^"]*)"/g)) {
+              if (!q[1]) names.push(q[2]);
+            }
+          }
+          for (const chunk of names) {
+            for (const name of chunk.trim().split(/\s+/)) {
+              // A trailing hyphen is the head of a name an expression
+              // completes (`chart-bar-${f.key}`), so the whole name is not
+              // in the source to check.
+              if (!name || name.endsWith('-') || used.has(name)) continue;
+              used.set(name, rel);
+            }
+          }
+        }
+      }
+    }
+    expect(used.size, 'found no class names to check').toBeGreaterThan(50);
+
+    // Each of these is a second class beside one that carries the styling,
+    // or a wrapper the markup names for structure. They are the backlog this
+    // gate started with: each one is either given a rule or taken off the
+    // element, and the list only shrinks.
+    const HOOKS = new Set([
+      'confirm-modal', 'richfield', 'detail-section', 'link-groups', 'folder-node',
+      'epic-cell-summary', 'epic-cell-status', 'issue-summary', 'sprint-tree',
+      'sprint-cell-state',
+    ]);
+    const orphans = [...used]
+      .filter(([name]) => !defined.has(name) && !VENDOR_CLASSES.test(name) && !HOOKS.has(name))
+      .map(([name, rel]) => `${name} (${rel})`);
+    // A hook that gained a rule leaves the list, so the list cannot rot.
+    const stale = [...HOOKS].filter((name) => defined.has(name));
+    expect(stale, `these are defined now and can leave HOOKS: ${stale.join(', ')}`).toEqual([]);
+    expect(orphans, `classes no stylesheet defines: ${orphans.join(', ')}`).toEqual([]);
+  }, 120_000);
 });

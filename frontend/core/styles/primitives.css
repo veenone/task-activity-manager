@@ -1431,3 +1431,45 @@
 .richfield-panel .rich-text { padding: 8px; }
 .richfield-textarea { display: block; width: 100%; box-sizing: border-box; border: 0; padding: 8px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px; resize: vertical; }
 .richfield-textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Row lead (RowLead.tsx): the fixed start of every row that belongs to a
+   family, in the tables and trees that draw parents and their subtasks.
+   The slot holds the expand toggle, or stands empty on a row with nothing
+   to expand, so every summary in a list starts at the same place. The step
+   under it is the one indent in the suite, and it is multiplied by the
+   row's own depth rather than written out per table.
+   .row-summary is the cell the lead lives in: the lead and anything that
+   must stay legible keep their width, and the summary text is the one part
+   that clips, which is what an ellipsis is supposed to mean. */
+.row-lead {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding-inline-start: calc(var(--subtask-indent) * var(--row-lead-depth, 0));
+}
+.row-lead-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  inline-size: var(--row-lead-slot);
+}
+.row-lead-branch {
+  display: inline-flex;
+  justify-content: center;
+  flex: none;
+  inline-size: var(--subtask-indent);
+  color: var(--text-muted);
+}
+.row-lead-detached {
+  flex: none;
+  margin-inline-start: 4px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.row-summary { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+.row-summary-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

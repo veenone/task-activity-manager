@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export type IconName =
   | "bold" | "italic" | "underline" | "strike"
-  | "heading2" | "heading3"
+  | "paragraph" | "heading2" | "heading3"
   | "bulletList" | "orderedList" | "taskList"
   | "table" | "link"
   | "undo" | "redo";
@@ -24,6 +24,7 @@ const SHAPES: Record<IconName, ReactNode> = {
       <circle cx="3" cy="12" r="0.75" fill="currentColor" />
     </>
   ),
+  paragraph: <path d="M2.5 3.5h11M2.5 7h11M2.5 10.5h11M2.5 14h6" />,
   orderedList: <path d="M6.5 4h7M6.5 8h7M6.5 12h7M2.5 2.75l1-.5v3.5M2.25 10.25a.9.9 0 0 1 1.5-.25c.3.45-1.75 1.75-1.75 1.75h1.75" />,
   taskList: (
     <>
@@ -45,7 +46,6 @@ const SHAPES: Record<IconName, ReactNode> = {
 export function ToolbarIcon({ name }: { name: IconName }) {
   return (
     <svg
-      className="editor-toolbar-icon"
       width="16"
       height="16"
       viewBox="0 0 16 16"

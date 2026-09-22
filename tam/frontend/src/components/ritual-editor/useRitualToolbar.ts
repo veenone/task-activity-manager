@@ -26,6 +26,7 @@ const TOGGLES: ToggleSpec[] = [
   { id: "italic", group: "marks", label: "Italic", icon: "italic", shortcut: "Ctrl+I", requires: "italic", active: (e) => e.isActive("italic"), run: (c) => c.toggleItalic() },
   { id: "underline", group: "marks", label: "Underline", icon: "underline", shortcut: "Ctrl+U", requires: "underline", active: (e) => e.isActive("underline"), run: (c) => c.toggleUnderline() },
   { id: "strike", group: "marks", label: "Strikethrough", icon: "strike", shortcut: "Ctrl+Shift+S", requires: "strike", active: (e) => e.isActive("strike"), run: (c) => c.toggleStrike() },
+  { id: "paragraph", group: "headings", label: "Paragraph", icon: "paragraph", shortcut: "Ctrl+Alt+0", requires: "paragraph", active: (e) => e.isActive("paragraph"), run: (c) => c.setParagraph() },
   { id: "h2", group: "headings", label: "Heading 2", icon: "heading2", shortcut: "Ctrl+Alt+2", requires: "heading", active: (e) => e.isActive("heading", { level: 2 }), run: (c) => c.toggleHeading({ level: 2 }) },
   { id: "h3", group: "headings", label: "Heading 3", icon: "heading3", shortcut: "Ctrl+Alt+3", requires: "heading", active: (e) => e.isActive("heading", { level: 3 }), run: (c) => c.toggleHeading({ level: 3 }) },
   { id: "bullet", group: "lists", label: "Bullet list", icon: "bulletList", shortcut: "Ctrl+Shift+8", requires: "bulletList", active: (e) => e.isActive("bulletList"), run: (c) => c.toggleBulletList() },

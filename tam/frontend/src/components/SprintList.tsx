@@ -1,73 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, MouseEvent } from "react";
-import { toPlainText } from "@agile-suite/core";
+import { RowLead, toPlainText } from "@agile-suite/core";
+import type { RowPlace } from "@agile-suite/core";
 import type { Issue, SprintDetail } from "../api";
 import { MAX_CARDS_PER_VIEW, UNASSIGNED_SPRINT_STATE } from "../api";
-import { groupByAssignee } from "../lib/sprintGroups";
+import { UNASSIGNED_LABEL, groupByAssignee } from "../lib/sprintGroups";
+import { rowIdOf, visibleRows } from "../lib/sprintRows";
+import type { TreeRow } from "../lib/sprintRows";
 import { plural, points } from "../lib/format";
 import { keyColumnWidth } from "../lib/keyColumn";
 import { statusClass } from "../lib/statusClass";
 import { MOVED_FLASH_MS } from "../lib/flash";
 import { TypeChip } from "./TypeChip";
 import { SubtaskToggle } from "./SubtaskToggle";
-import { subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
+import { drawnParents, familyPlace, subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
 import { SprintRow } from "./SprintRow";
 import { CARD_MENU_CLASS } from "./CardMoveMenu";
-
-// SCOPE_PREFIX namespaces a sprint's row id so it can never collide with an
-// issue key, which matters more here than it looks: the selection's order
-// array holds issue keys only, and lib/boardSelection's extend slices that
-// array blindly, so an id that could pass for a key would end up checked and
-// then in a bulk move.
-const SCOPE_PREFIX = "sprint:";
-const UNASSIGNED_ROW_ID = `${SCOPE_PREFIX}unassigned`;
-
-// rowIdOf names one node of the list. The board's own unassigned work has no
-// sprint id to be named by, so it gets a name of its own.
-export function rowIdOf(detail: SprintDetail): string {
-  return detail.state === UNASSIGNED_SPRINT_STATE ? UNASSIGNED_ROW_ID : `${SCOPE_PREFIX}${detail.id}`;
-}
-
-interface TreeRow {
-  id: string;
-  kind: "sprint" | "issue";
-  // scope is the sprint row the row belongs to, and its own id for a sprint
-  // row. A shift gesture is measured inside one scope and nowhere else.
-  scope: string;
-  parentKey?: string;
-}
-
-// visibleRows flattens the list into the order it is drawn in, which is the
-// keyboard model: each sprint, then its cards when it is open. The assignee
-// separators are not rows here because they are not tree items: they are
-// labels drawn between cards, so the tree stays two levels deep and nothing
-// lands focus on a band heading that does nothing when activated.
-function visibleRows(details: SprintDetail[], expanded: ReadonlySet<string>, collapsed: ReadonlySet<string>): TreeRow[] {
-  const rows: TreeRow[] = [];
-  for (const detail of details) {
-    const id = rowIdOf(detail);
-    rows.push({ id, kind: "sprint", scope: id });
-    if (!expanded.has(id)) continue;
-    for (const group of groupByAssignee(detail.issues)) {
-      for (const issue of visibleFamilyIssues(group.issues, collapsed)) rows.push({ id: issue.key, kind: "issue", scope: id, parentKey: issue.type === "subtask" && group.issues.some((p) => p.key === issue.parentKey) ? issue.parentKey : undefined });
-    }
-  }
-  return rows;
-}
-
-// issueOrder is the selection's reading order, per scope: the cards of one
-// sprint in the order they are drawn. A shift gesture extends inside one of
-// these lists, which is what keeps a drag from the top of Sprint 12 to the
-// bottom of Sprint 14 from checking three sprints' work at once. It cannot
-// happen on a board, which draws one sprint at a time, and it is one drag
-// away here.
-export function issueOrder(details: SprintDetail[], collapsed: ReadonlySet<string> = new Set()): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  for (const detail of details) {
-    out.set(rowIdOf(detail), groupByAssignee(detail.issues).flatMap((g) => visibleFamilyIssues(g.issues, collapsed).map((i) => i.key)));
-  }
-  return out;
-}
 
 interface Props {
   collapsedIssues?: Set<string>;
@@ -283,8 +231,9 @@ export function SprintList({
     setFocusId(row.id);
   }
 
-  function issueRow(issue: Issue, scope: string, nested: boolean) {
-    const row: TreeRow = { id: issue.key, kind: "issue", scope, parentKey: nested ? issue.parentKey : undefined };
+  function issueRow(issue: Issue, scope: string, place: RowPlace) {
+    const nested = place !== "root";
+    const row: TreeRow = { id: issue.key, kind: "issue", scope, parentKey: place === "child" ? issue.parentKey : undefined };
     const isChecked = checked.has(issue.key);
     const summary = toPlainText(issue.summary, "summary");
     return (
@@ -298,7 +247,7 @@ export function SprintList({
         tabIndex={focusId === issue.key ? 0 : -1}
         data-tree-index={indexOf.get(issue.key)}
         data-tree-key={issue.key}
-        className={`folder-item sprint-issue-row${nested ? " nested-subtask" : ""}${issue.key === selectedKey ? " folder-selected" : ""}`}
+        className={`folder-item sprint-issue-row${issue.key === selectedKey ? " folder-selected" : ""}`}
         onClick={(e) => clickIssue(e, row)}
         onKeyDown={(e) => onKeyDown(e, row)}
       >
@@ -316,10 +265,17 @@ export function SprintList({
         />
         <TypeChip type={issue.type} />
         <span className="sprint-cell epic-cell-key accent-text" title={issue.key}>{issue.key}</span>
-        <span className="sprint-cell epic-cell-summary" title={summary}>
-          <SubtaskToggle issueKey={issue.key} count={counts.get(issue.key) ?? 0} expanded={!collapsed.has(issue.key)} onToggle={() => toggleChildren(issue.key)} />
-          {nested && <span aria-hidden="true">↳ </span>}{summary}
-          {nested && <small className="subtask-assignee">{issue.assignee || "Unassigned"}</small>}
+        <span className="sprint-cell epic-cell-summary row-summary">
+          <RowLead
+            place={place}
+            toggle={<SubtaskToggle issueKey={issue.key} count={counts.get(issue.key) ?? 0} expanded={!collapsed.has(issue.key)} onToggle={() => toggleChildren(issue.key)} />}
+          />
+          <span className="row-summary-text" title={summary}>{summary}</span>
+          {/* The band above names one person and a subtask lands in its
+              parent's band whoever owns it, so this is the one row whose
+              owner the band gets wrong. It sits outside the text now: the
+              summary is the only part that clips. */}
+          {nested && <small className="subtask-assignee">{issue.assignee || UNASSIGNED_LABEL}</small>}
         </span>
         <span className="sprint-cell">
           <span className={`chip chip-status chip-status-${statusClass(issue.status)}`} title={issue.status}>
@@ -347,7 +303,9 @@ export function SprintList({
             {detail.goal || "No goal recorded yet; refresh the board."}
           </p>
         )}
-        {groupByAssignee(detail.issues).map((group) => (
+        {groupByAssignee(detail.issues).map((group) => {
+          const parents = drawnParents(group.issues);
+          return (
           <div key={group.id || "sprint-unassigned"}>
             {/* A band heading, and not a tree item: it labels the cards
                 under it and does nothing when clicked, so putting it in the
@@ -359,9 +317,10 @@ export function SprintList({
                 {group.points > 0 ? `, ${points(group.points)} pts` : ""}
               </span>
             </div>
-            {visibleFamilyIssues(group.issues, collapsed).map((issue) => issueRow(issue, id, issue.type === "subtask" && group.issues.some((p) => p.key === issue.parentKey)))}
+            {visibleFamilyIssues(group.issues, collapsed).map((issue) => issueRow(issue, id, familyPlace(issue, parents)))}
           </div>
-        ))}
+          );
+        })}
         {detail.total === 0 && (
           <p className="muted small">
             {detail.notSynced > 0

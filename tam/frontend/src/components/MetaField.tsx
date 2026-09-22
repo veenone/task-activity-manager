@@ -132,7 +132,7 @@ export function MetaField({
   };
   const Input = spec.allowedValues.length > 0 ? OptionInput : META_INPUTS[spec.type] ?? TextInput;
   return (
-    <div className="edit-row">
+    <div className={Input === LongTextInput ? "edit-row edit-row-stacked" : "edit-row"}>
       <label className="muted small" htmlFor={id}>
         {spec.name}
         {spec.required && <span className="field-required" aria-hidden="true"> *</span>}

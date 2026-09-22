@@ -20,29 +20,29 @@ input, button, select { font-family: inherit; font-size: inherit; }
   display: flex;
   justify-content: center;
   padding: 6px 14px;
-  background: #1b2638;
-  border-bottom: 1px solid #0f1722;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
   overflow-x: auto;
 }
 .view-tabs {
   display: flex;
   gap: 2px;
-  background: #2a3850;
+  background: var(--chrome-raised);
   border-radius: 5px;
   padding: 2px;
 }
 .view-tab {
   background: transparent;
   border: none;
-  color: #9aa7bd;
+  color: var(--chrome-text-muted);
   padding: 4px 12px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
 }
-.view-tab:hover { color: #e8eaed; }
-.view-tab-active { background: var(--accent); color: #fff; }
+.view-tab:hover { color: var(--chrome-text); }
+.view-tab-active { background: var(--accent); color: var(--on-accent); }
 .view-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .app-body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
@@ -80,7 +80,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .nav-item:disabled { color: var(--text-muted); cursor: default; }
 /* Active-item fill matches XTM's .view-tab-active token treatment (solid
    accent, white text) so the rail's selection state reads like XTM's tabs. */
-.nav-item-active { background: var(--accent); color: #fff; font-weight: 600; }
+.nav-item-active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .nav-divider { height: 1px; margin: 12px 8px; background: var(--border); }
 .nav-section { padding: 0 14px 4px; font-size: 11px; color: var(--text-muted); }
 .nav-hint { padding: 0 14px; font-size: 10px; color: var(--text-muted); }
@@ -97,22 +97,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
    the chain lets the table push the pager off the bottom of the window. */
 .main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
 .small { font-size: 11px; }
-
-.placeholder { flex: 1; min-height: 0; overflow: auto; display: grid; place-content: center; }
-.placeholder-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 48px 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  text-align: center;
-}
-.placeholder-glyph { width: 60px; height: 44px; border-radius: 6px; background: var(--accent-soft); margin-bottom: 16px; }
-.placeholder-title { font-size: 15px; }
-.placeholder-blurb { color: var(--text-muted); }
 
 /* .app-statusbar's frame (height, background, border, font-size) comes from
    core; TAM's footer holds several children, so it adds the gap XTM's single-
@@ -137,7 +121,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    @agile-suite/core's primitives.css now, so TAM adds nothing to it. */
 .check-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; }
 .sprints-show-closed { margin: 0; }
-.topbar-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.topbar-btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .topbar-btn-primary:hover { background: var(--accent-hover); }
 /* Sync progress bar, mirrored from XTM's App.css. The track's dark fill is
    literal there because XTM's status bar is dark; TAM's is the surface, so
@@ -153,20 +137,26 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-sprint { width: 140px; }
 .type-filter { display: flex; gap: 6px; }
 .chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip-type-task { background: #dbeafe; color: #1e40af; }
-.chip-type-story { background: #dcfce7; color: #166534; }
-.chip-type-bug { background: #fee2e2; color: #991b1b; }
-.chip-type-epic { background: #ede9fe; color: #5b21b6; }
-.chip-type-requirement { background: #fef3c7; color: #92400e; }
-.chip-type-subtask { background: #e0f2fe; color: #075985; }
+/* The chip palette lives in tokens.css: these fills were literals, so a chip
+   kept its pastel ground when the window went dark and the text on it was
+   the only thing that moved. */
+.chip-type-task { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
+.chip-type-story { background: var(--chip-green-bg); color: var(--chip-green-text); }
+.chip-type-bug { background: var(--chip-red-bg); color: var(--chip-red-text); }
+.chip-type-epic { background: var(--chip-purple-bg); color: var(--chip-purple-text); }
+.chip-type-requirement { background: var(--warning-bg); color: var(--warning-text); }
+.chip-type-subtask { background: var(--chip-sky-bg); color: var(--chip-sky-text); }
 .chip-type-none { background: var(--surface-3); color: var(--text-muted); }
 .chip-toggle { cursor: pointer; opacity: 0.55; padding: 4px 10px; border-radius: 12px; }
-.chip-toggle.chip-on, .chip-toggle:hover { opacity: 1; }
-.chip-toggle.chip-on { border-color: currentColor; }
+/* Hover lifts a chip part way; only a selected one is fully opaque, and it
+   also fills. One rule used to give both states the same opacity, so
+   hovering an unselected type filter made it look selected. */
+.chip-toggle:hover { opacity: 0.8; }
+.chip-toggle.chip-on { opacity: 1; border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; font-weight: 600; }
 .chip-status { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
 .chip-status-todo { background: var(--surface-3); color: var(--text); }
-.chip-status-active { background: #dbeafe; color: #1e40af; }
-.chip-status-done { background: #dcfce7; color: #166534; }
+.chip-status-active { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
+.chip-status-done { background: var(--chip-green-bg); color: var(--chip-green-text); }
 
 /* Both views are a fixed toolbar over a body that takes the rest. */
 .backlog { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -237,15 +227,17 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-row-selected, .issue-row-selected:hover { background: var(--accent-soft); }
 .issue-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .issue-key { font-weight: 600; font-variant-numeric: tabular-nums; }
-.issue-row-subtask .issue-summary { padding-inline-start: 18px; }
-.issue-child-branch { display: inline-block; margin-inline-end: 8px; color: var(--text-muted); }
-.nested-subtask .epic-cell-summary { padding-inline-start: 18px; }
-.subtask-assignee { margin-inline-start: 10px; color: var(--text-muted); }
-.subtask-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 24px; margin-inline-end: 6px; padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; vertical-align: middle; }
+/* Every family row starts with core's .row-lead, which owns the indent and
+   the branch glyph for all four of these lists; see primitives.css. What is
+   left here is what each list adds on top of it. The toggle fills the slot
+   the lead reserves rather than sizing itself, which is what used to make a
+   parent's summary start further right than its own subtask's. */
+.subtask-assignee { flex: none; color: var(--text-muted); }
+.subtask-toggle { display: inline-flex; align-items: center; justify-content: center; inline-size: 100%; min-height: 24px; padding: 0 2px; border: 1px solid var(--border); border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; vertical-align: middle; }
 .subtask-toggle:hover { background: var(--surface-2); color: var(--text); }
 .subtask-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.board-card-subtask { margin-inline-start: 16px; border-inline-start: 2px solid var(--border); }
-.board-card-parent { color: var(--text-muted); font-size: 11px; margin-top: 6px; }
+.board-card-subtask { margin-inline-start: var(--subtask-indent); border-inline-start: 2px solid var(--border); }
+.board-card-parent { display: flex; align-items: center; color: var(--text-muted); font-size: 11px; margin-top: 6px; }
 /* The detail panel's title is the one key that links out to the instance:
    in a grid the row already owns the click. */
 .issue-key-link {
@@ -269,8 +261,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-key-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
 .issue-key-ext { font-size: 9px; opacity: 0.75; flex: none; }
 /* On the panel's dark head the link reads light, not accent-blue. */
-.detail-head .issue-key-link { color: #e8eaed; }
-.detail-head .issue-key-link:hover { color: #fff; }
+.detail-head .issue-key-link { color: var(--chrome-text); }
+.detail-head .issue-key-link:hover { color: var(--chrome-text-strong); }
 /* Pinned to the floor of the card, the way the reference's is, so the page
    controls are in the same place whatever the row count. */
 .pager { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-top: 1px solid var(--border); background: var(--surface-2); flex-wrap: wrap; }
@@ -301,27 +293,27 @@ input, button, select { font-family: inherit; font-size: inherit; }
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  background: #1b2638;
-  color: #e8eaed;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
 }
 .detail-head-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .detail-head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.detail-key { font-size: 13px; font-weight: 600; color: #e8eaed; }
+.detail-key { font-size: 13px; font-weight: 600; color: var(--chrome-text); }
 /* The status reads as a chip on the bar rather than as a row in the grid,
    which is what makes the key and its state one statement. */
 .detail-head-status {
   font-size: 11px;
-  background: #2a3850;
-  color: #c7d0e0;
-  border: 1px solid #3a4a66;
+  background: var(--chrome-raised);
+  color: var(--chrome-chip-text);
+  border: 1px solid var(--chrome-chip-border);
   border-radius: 4px;
   padding: 2px 7px;
   white-space: nowrap;
 }
 .detail-actions { display: flex; gap: 8px; margin-top: 14px; }
 .new-issue-parent { font-weight: 600; color: var(--text); padding-top: 6px; min-width: 0; overflow-wrap: anywhere; }
-.detail-close { color: #9aa7bd; flex-shrink: 0; }
-.detail-close:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.detail-close { color: var(--chrome-text-muted); flex-shrink: 0; }
+.detail-close:hover:not(:disabled) { background: var(--chrome-hover); color: var(--chrome-text-strong); }
 .detail-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 18px; }
 .detail-summary { font-size: 14px; margin: 0 0 12px; }
 /* The label/value grid XTM uses for the read-only facts above the editor. */
@@ -379,7 +371,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .detail-section-note { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
 /* The description's label, syntax toggle and Edit share one line above the
    rendered text, the way the mockup heads the section. */
-.edit-row-head { display: flex; align-items: center; gap: 8px; }
+/* The head holds the label, the syntax toggle and the Edit button, about
+   290px together. The label track is 96px and a grid item never shrinks
+   below its min-content, so in that track it painted over the editor
+   beside it. It spans the whole row instead. */
+.edit-row-head { display: flex; align-items: center; gap: 8px; grid-column: 1 / -1; flex-wrap: wrap; min-width: 0; }
+.edit-row-head > label.muted { padding-top: 0; }
 .edit-description-action { margin-left: auto; font-size: 11px; }
 /* One comment: an initials avatar, the author, then the time on the right,
    over the rendered body. */
@@ -413,10 +410,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .link-group-title { font-size: 12px; margin-bottom: 6px; }
 
 /* Plan 1b: pending changes */
-.chip-draft { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
-.chip-held { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); }
-.pending-held { margin: 4px 0 0; color: var(--warn-fg, #92400e); }
-.chip-conflict { background: var(--warn-bg, #fef3c7); color: var(--warn-fg, #92400e); border: 1px solid var(--warn-border, #f59e0b); text-transform: uppercase; font-size: 10px; }
+/* --warn-bg and --warn-fg were defined nowhere, so every rule below drew
+   its fallback and nothing else, in both themes. --warning-bg and
+   --warning-text are the real tokens and hold the same light values. */
+.chip-draft { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
+.chip-held { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
+.pending-held { margin: 4px 0 0; color: var(--warning-text); }
+.chip-conflict { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); text-transform: uppercase; font-size: 10px; }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }
 /* --warn-soft is the token; the --warn-bg this used to name is defined
@@ -424,7 +424,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .pending-banner-warn { background: var(--warn-soft); border-color: var(--warn-border); }
 .pending-list { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
 .pending-card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
-.pending-card-conflict { background: #fff7ed; border-color: #f59e0b; }
+/* A pending change in conflict is the most consequential card in the app.
+   It used to set a near-white fill and no colour at all, so in dark mode the
+   inherited text token landed on it at 1.15 to 1 and the card could not be
+   read. Both ends are stated now, and both themes clear 4.5 to 1. */
+.pending-card-conflict { background: var(--warning-bg); border-color: var(--warn-border); color: var(--text); }
 .pending-card-head { display: flex; align-items: center; gap: 10px; }
 .pending-card-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Discard throws local work away. It is not the dangerous button on this
@@ -463,7 +467,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .b { font-weight: 600; }
 
 /* Plan 1b: editable details, activity, grid markers */
-.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: 6px; vertical-align: middle; }
+.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warning); margin-left: 6px; vertical-align: middle; }
 /* .detail-input carries margin-bottom for the detail panel's stacked fields;
    inside a gap-spaced form that margin doubled the rhythm and left dead space
    under the last row. */
@@ -473,6 +477,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .edit-sprint-title { min-width: 0; }
 .edit-sprint-title p { margin: 2px 0 0; color: var(--text-muted); font-size: 11px; }
 .edit-row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: start; }
+/* A row whose control is an editor stacks. A 96px label beside a tabbed
+   editor leaves the editor about 214px wide in the default panel. */
+.edit-row-stacked { grid-template-columns: 1fr; }
 /* A row whose hint sits beside the control uses a real <label> for the name
    rather than a wrapping one, so the hint does not become part of the field's
    label text. It has to line up with the wrapping rows either way. */
@@ -514,9 +521,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* Plan 1b: conflicts */
 .conflict-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-.conflict-table th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
+.conflict-table th { text-align: left; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
 .conflict-table td { padding: 4px 8px 4px 0; vertical-align: top; }
-.danger-text { color: #b42318; }
+.danger-text { color: var(--danger-text); }
 
 /* Plan 1c: import */
 .filter-import { margin-left: auto; }
@@ -696,7 +703,6 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-mode-closed { color: var(--text-muted); }
 .report-outcome { margin: 0 0 10px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); font-weight: 600; }
 .report-outcome-label { display: block; margin-bottom: 3px; color: var(--text-muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
-.report-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 14px 0 12px; }
 .report-metric { min-width: 0; border-top: 2px solid var(--border); padding-top: 6px; }
 .report-metric dt { color: var(--text-muted); font-size: 11px; font-weight: 600; }
 .report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
@@ -717,15 +723,91 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
 .report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
 .report-row-note { display: block; font-weight: 400; }
+/* The report charts. Every colour is a --chart-* token, and the SVG marks
+   are styled here by class rather than by attribute, so a theme change
+   reaches the picture. Text in the SVG inherits the body font and takes
+   its size relative to it. */
+.report-charts { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
+.report-caveats { margin: 6px 0 0; max-width: 78ch; }
+.report-velocity { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.chart-multiples { display: grid; gap: 8px; }
+.chart-figure { margin: 0; min-width: 0; }
+.chart-figure[aria-busy="true"] .chart-box { opacity: .5; }
+.chart-title { margin: 0 0 4px; font-weight: 600; color: var(--text-strong); }
+.chart-box { position: relative; width: 100%; }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-empty { margin: 4px 0; }
+.chart-note { margin: 4px 0 0; line-height: 1.45; max-width: 60ch; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--text-muted); }
+.chart-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.chart-swatch { display: inline-block; width: 12px; height: 3px; border-radius: 2px; background: currentColor; }
+.chart-swatch-remaining { color: var(--chart-remaining); }
+.chart-swatch-ideal { color: var(--chart-ideal); background: repeating-linear-gradient(90deg, currentColor 0 3px, transparent 3px 5px); }
+.chart-swatch-scope { color: var(--chart-scope); }
+.chart-swatch-committed { color: var(--chart-committed); height: 8px; }
+.chart-swatch-completed { color: var(--chart-completed); height: 8px; }
+.chart-grid { stroke: var(--chart-grid); stroke-width: 1; }
+.chart-axis { stroke: var(--chart-axis); stroke-width: 1; }
+.chart-x-label, .chart-y-label, .chart-value { fill: var(--chart-label); font-size: .85em; font-variant-numeric: tabular-nums; }
+.chart-x-label { text-anchor: middle; }
+.chart-y-label { text-anchor: end; dominant-baseline: middle; }
+.chart-row-label { fill: var(--text); }
+.chart-value { fill: var(--text); dominant-baseline: middle; }
+.chart-value-up { text-anchor: middle; dominant-baseline: auto; }
+.chart-value-remaining { fill: var(--chart-remaining); font-weight: 600; }
+.chart-value-scope { fill: var(--chart-scope); }
+.chart-line { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.chart-line-remaining { stroke: var(--chart-remaining); stroke-width: 2.5; }
+.chart-line-ideal { stroke: var(--chart-ideal); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart-line-scope { stroke: var(--chart-scope); stroke-width: 1.5; }
+.chart-point { fill: var(--surface); stroke: var(--chart-remaining); stroke-width: 2; }
+.chart-point-final { fill: var(--chart-remaining); }
+.chart-bar { stroke: none; }
+.chart-bar-committed { fill: var(--chart-committed); }
+.chart-bar-completed { fill: var(--chart-completed); }
+.chart-bar-added { fill: var(--chart-added); }
+.chart-bar-removed { fill: var(--chart-removed); }
+.chart-bar-carried { fill: var(--chart-carried); }
+/* The hit target takes the hover and the focus for a mark too small to aim
+   at. It is invisible until it has one of them. */
+.chart-hit { fill: transparent; cursor: default; outline: none; }
+.chart-hit:hover { fill: var(--chart-hit); }
+.chart-hit:focus-visible { fill: var(--chart-hit); stroke: var(--accent); stroke-width: 2; }
+.chart-tooltip {
+  position: absolute;
+  z-index: 5;
+  max-width: 34ch;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--modal-shadow);
+  line-height: 1.4;
+  pointer-events: none;
+}
+/* The three groups of tiles: the baseline a sprint started from, the
+   changes made to it, and what came of it. A group is a labelled block, so
+   the five figures read as three facts and not as five equal columns. */
+.report-metrics { display: grid; grid-template-columns: 1fr 2fr 2fr; gap: 14px; margin: 10px 0 12px; }
+.report-metric-group { min-width: 0; }
+.report-metric-group-label { display: block; margin-bottom: 4px; color: var(--text-muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.report-metric-group dl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin: 0; }
+@media (max-width: 900px) {
+  .report-charts, .report-velocity { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 720px) {
-  .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-metrics { grid-template-columns: minmax(0, 1fr); }
   .report-frame .board-picker { width: 100%; }
   .report-frame .board-picker select { min-width: 0; width: 100%; }
   .report-actions .btn { min-height: 44px; }
 }
 
 /* The ritual editor: a toolbar, one scroller, and a status line. */
-.ritual-page { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+/* Framed the way .report-frame is: the two main panes of the app read as
+   the same kind of surface. */
+.ritual-page { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .ritual-page-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .ritual-page-head h3 { margin: 0; font-size: 15px; }
 .ritual-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -738,6 +820,33 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-editor-content ul[data-type="taskList"] { list-style: none; padding-left: 2px; }
 .ritual-editor-content ul[data-type="taskList"] li { display: flex; gap: 6px; align-items: flex-start; }
 .ritual-editor-content ul[data-type="taskList"] li > div { flex: 1; }
+
+/* Prose. The reset at the top of this file zeroes the UA margins and the list
+   padding that authored text depends on, and the shared .rich-text primitive
+   only neutralises the first and last child margin, so it cannot put them
+   back. Without these, bullets render outside the content box and are clipped
+   by the scroller, and paragraphs and headings run together. */
+.ritual-editor-content .ProseMirror,
+.ritual-page-body,
+.rich-text { line-height: 1.55; max-width: 72ch; }
+.ritual-editor-content .ProseMirror { margin-inline: auto; }
+.ritual-editor-content ul, .ritual-editor-content ol,
+.ritual-page-body ul, .ritual-page-body ol,
+.rich-text ul, .rich-text ol { padding-inline-start: 1.4em; }
+.ritual-editor-content p, .ritual-page-body p, .rich-text p { margin-block: 0.6em; }
+.ritual-editor-content li, .ritual-page-body li, .rich-text li { margin-block: 0.2em; }
+.ritual-editor-content h2, .ritual-page-body h2, .rich-text h2 { font-size: 17px; margin: 1.2em 0 0.4em; }
+.ritual-editor-content h3, .ritual-page-body h3, .rich-text h3 { font-size: 15px; margin: 1em 0 0.35em; }
+.ritual-editor-content blockquote, .ritual-page-body blockquote { margin: 0.6em 0; padding-left: 10px; border-left: 3px solid var(--border-strong); color: var(--text-muted); }
+.ritual-editor-content pre, .ritual-page-body pre { margin: 0.6em 0; padding: 8px 10px; border-radius: 4px; background: var(--surface-sunken); overflow-x: auto; }
+.ritual-editor-content hr, .ritual-page-body hr { margin: 1em 0; border: 0; border-top: 1px solid var(--border); }
+.ritual-editor-content > :first-child, .ritual-page-body > :first-child { margin-top: 0; }
+.ritual-page-body table { border-collapse: collapse; margin: 8px 0; }
+.ritual-page-body th, .ritual-page-body td { border: 1px solid var(--border); padding: 4px 8px; vertical-align: top; }
+.ritual-page-body th { background: var(--surface-2); }
+/* The ProseMirror outline is removed because it traced the whole document.
+   The scroller carries the focus indicator in its place. */
+.ritual-editor-content:focus-within { box-shadow: inset 0 0 0 2px var(--accent); }
 .ritual-opaque { display: block; border: 1px dashed var(--border-strong); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--surface-sunken); }
 .ritual-opaque.is-selected { outline: 2px solid var(--accent); }
 .ritual-opaque-label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 4px; color: var(--text-strong); }
@@ -761,6 +870,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-chip-conflict, .ritual-chip-gone { color: var(--warn-text); border-color: var(--warn-border); background: var(--warn-soft); }
 .ritual-banner { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--warn-border); background: var(--warn-soft); color: var(--warn-text); }
 .ritual-banner p { margin: 0 0 6px; }
+.ritual-banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* The missing-root dialog: a title box, where the page goes, what Sync does next. */
 .ritual-root-modal { max-width: 480px; }

@@ -362,7 +362,7 @@ export function RitualsView() {
                       aria-current={effectiveSelected === type ? "page" : undefined}
                       onClick={() => { setSelected(type); setViewTheirs(false); }}
                     >
-                      <span className="ritual-doc-label">{RITUAL_LABEL[type]}</span>
+                      <span>{RITUAL_LABEL[type]}</span>
                       <span className={`ritual-chip ritual-chip-${d.status}`}>{STATUS_LABEL[d.status]}</span>
                     </button>
                   </li>
@@ -380,21 +380,21 @@ export function RitualsView() {
                 {doc.status === "conflict" && (
                   <div className="ritual-banner" role="alert">
                     <p>{conflictSentence(doc.conflictVersion)}</p>
-                    <div className="row">
+                    <div className="ritual-banner-actions">
                       <button className="btn btn-ghost" aria-pressed={viewTheirs} onClick={() => setViewTheirs((v) => !v)}>
                         {viewTheirs ? "View mine" : "View theirs"}
                       </button>
-                      <button className="btn" onClick={() => void resolve(doc, "mine")}>Keep mine</button>
-                      <button className="btn btn-ghost" onClick={() => void resolve(doc, "theirs")}>Take theirs</button>
+                      <button className="btn btn-primary" onClick={() => void resolve(doc, "mine")}>Keep mine</button>
+                      <button className="btn btn-discard" onClick={() => void resolve(doc, "theirs")}>Take theirs</button>
                     </div>
                   </div>
                 )}
                 {doc.status === "gone" && (
                   <div className="ritual-banner" role="alert">
                     <p>{GONE_SENTENCE}</p>
-                    <div className="row">
-                      <button className="btn" onClick={() => void forget(doc)}>Recreate on next Sync</button>
-                      <button className="btn btn-ghost" onClick={() => void removeLocal(doc)}>Remove local copy</button>
+                    <div className="ritual-banner-actions">
+                      <button className="btn btn-primary" onClick={() => void forget(doc)}>Recreate on next Sync</button>
+                      <button className="btn btn-discard" onClick={() => void removeLocal(doc)}>Remove local copy</button>
                     </div>
                   </div>
                 )}

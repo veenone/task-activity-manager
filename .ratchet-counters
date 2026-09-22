@@ -8,3 +8,5 @@ eslint_a11y	node scripts/lint-count.js jsx-a11y/
 eslint_max_lines	node scripts/lint-count.js max-lines
 eslint_no_console	node scripts/lint-count.js no-console
 eslint_problems	node scripts/lint-count.js
+hardcoded_hex	git ls-files "tam/frontend/src/*.css" "xtm/frontend/src/*.css" | xargs grep -ohE "#[0-9a-fA-F]{3,8}\b" 2>/dev/null | wc -l
+hardcoded_px_font	git ls-files "tam/frontend/src/*.css" | xargs grep -ohE "font-size: *[0-9.]+px" 2>/dev/null | wc -l

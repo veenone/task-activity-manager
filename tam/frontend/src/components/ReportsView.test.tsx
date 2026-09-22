@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
@@ -231,7 +231,9 @@ describe("ReportsView", () => {
     );
     renderView();
     await screen.findByText(SENTENCE);
-    const rows = screen.getAllByRole("row");
+    // Scoped to the velocity table: the outcome chart ships a data table of
+    // its own, and it comes first in the page's rows.
+    const rows = within(screen.getByRole("table", { name: /velocity/i })).getAllByRole("row");
     // The header row first, then the two sprints oldest first.
     expect(rows[1]).toHaveTextContent("Sprint 10");
     expect(rows[1]).toHaveTextContent("30 points");
@@ -472,5 +474,64 @@ describe("ReportsView's eight states", () => {
     expect(await screen.findByText("Building the sprint report")).toBeInTheDocument();
     expect(screen.queryByText(/Fetching issues/)).not.toBeInTheDocument();
     expect(screen.queryByText(/120 of 4000 issues/)).not.toBeInTheDocument();
+  });
+  // The charts draw ReportSeries.days and the velocity rows the view already
+  // receives. Before this they reached the frontend and nothing read them.
+  describe("charts", () => {
+    const DAYS = [
+      { date: "2026-08-22", scope: 34, completed: 0, remaining: 34, ideal: 34 },
+      { date: "2026-08-23", scope: 34, completed: 12, remaining: 22, ideal: 22 },
+      { date: "2026-08-24", scope: 39, completed: 29, remaining: 10, ideal: 0 },
+    ];
+
+    it("draws the burndown, the outcome and the velocity", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ days: DAYS }) }));
+      renderView();
+      expect(await screen.findByRole("figure", { name: "Burndown" })).toBeInTheDocument();
+      expect(screen.getByRole("figure", { name: "Sprint outcome" })).toBeInTheDocument();
+      expect(screen.getByRole("figure", { name: "Velocity" })).toBeInTheDocument();
+    });
+
+    // Colour cannot be the only carrier, so each chart ships the same numbers
+    // as a table a screen reader reads.
+    it("gives the burndown a data table carrying every day's figures", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ days: DAYS }) }));
+      renderView();
+      const table = await screen.findByRole("table", { name: /burndown/i });
+      const cells = within(table).getAllByRole("cell").map((c) => c.textContent);
+      expect(cells).toContain("22");
+      expect(cells).toContain("39");
+    });
+  });
+
+  describe("the summary above the charts", () => {
+    // The caveat governs two of the five figures printed above it. It used to
+    // sit inside the collapsed details, so the numbers were read without it.
+    it("shows the floor caveat without the reader opening anything", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+      renderView();
+      const caveat = await screen.findByText(/Committed is a minimum estimate\. Removed counts/);
+      expect(caveat.closest("details")).toBeNull();
+    });
+
+    // The tiles say the same thing and are scannable, so the sentence is the
+    // copy that moves rather than the one that stays.
+    it("keeps the restated sentence, inside the details", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+      renderView();
+      const sentence = await screen.findByText(SENTENCE);
+      expect(sentence.closest("details")).not.toBeNull();
+    });
+
+    // Five equal columns said the five figures were peers. They are a
+    // baseline, two changes to it, and what came of it.
+    it("groups the five figures as a baseline, its changes and the outcome", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+      renderView();
+      const baseline = await screen.findByRole("group", { name: "Baseline" });
+      expect(within(baseline).getByRole("definition")).toHaveTextContent("34");
+      expect(within(screen.getByRole("group", { name: "Changes" })).getAllByRole("definition")).toHaveLength(2);
+      expect(within(screen.getByRole("group", { name: "Outcome" })).getAllByRole("definition")).toHaveLength(2);
+    });
   });
 });

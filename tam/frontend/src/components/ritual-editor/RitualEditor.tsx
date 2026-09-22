@@ -266,7 +266,7 @@ export function RitualEditor({ profileId, doc, body = doc.body, readOnly = false
   return (
     <RitualEditorContext.Provider value={{ profileId }}>
       <div
-        className={`ritual-editor${readOnly ? " ritual-editor-readonly" : ""}`}
+        className="ritual-editor"
         onKeyDownCapture={onKeyDown}
         onClickCapture={(e) => openLinkOutside(e, !editable || locked || e.ctrlKey || e.metaKey)}
       >

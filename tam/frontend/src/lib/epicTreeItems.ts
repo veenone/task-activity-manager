@@ -1,5 +1,5 @@
 import type { EpicTreeData } from "../api";
-import { visibleFamilyIssues } from "./issueFamilies";
+import { drawnParents, familyPlace, visibleFamilyIssues } from "./issueFamilies";
 
 // NO_EPIC_KEY stands in for the orphans group in the expanded set and the
 // flat visible-item list: it is not a real issue key, so it can never
@@ -26,14 +26,16 @@ export function visibleRows(tree: EpicTreeData, expanded: Set<string>, collapsed
     const key = node.issue.key;
     rows.push({ id: key, kind: "epic", ownerKey: key });
     if (expanded.has(key)) {
-      for (const child of visibleFamilyIssues(node.children, collapsed)) rows.push({ id: child.key, kind: "child", ownerKey: child.type === "subtask" && node.children.some((p) => p.key === child.parentKey) ? child.parentKey : key });
+      const parents = drawnParents(node.children);
+      for (const child of visibleFamilyIssues(node.children, collapsed)) rows.push({ id: child.key, kind: "child", ownerKey: familyPlace(child, parents) === "child" ? child.parentKey : key });
     }
   }
   if (tree.orphans.length > 0) {
     rows.push({ id: NO_EPIC_KEY, kind: "noepic", ownerKey: NO_EPIC_KEY });
     if (expanded.has(NO_EPIC_KEY)) {
+      const parents = drawnParents(tree.orphans);
       for (const child of visibleFamilyIssues(tree.orphans.slice(0, MAX_ORPHAN_ROWS), collapsed)) {
-        rows.push({ id: child.key, kind: "child", ownerKey: child.type === "subtask" && tree.orphans.some((p) => p.key === child.parentKey) ? child.parentKey : NO_EPIC_KEY });
+        rows.push({ id: child.key, kind: "child", ownerKey: familyPlace(child, parents) === "child" ? child.parentKey : NO_EPIC_KEY });
       }
     }
   }

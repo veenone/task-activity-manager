@@ -4,18 +4,25 @@ import {
   amount,
   builtAtLine,
   busyLine,
+  dayLine,
+  emptyDaysLine,
   floorLine,
   isBusyRefusal,
   methodLine,
+  mixedUnitsLine,
   nameList,
+  outcomeLine,
   progressStage,
+  singleSprintLine,
   summarySentence,
   truncationLine,
   unavailableLine,
   unitLine,
   unitWord,
   velocityFloorLine,
+  velocityLine,
 } from "./reportText";
+import { calendarDay } from "./format";
 
 function series(over: Partial<ReportSeries> = {}): ReportSeries {
   return {
@@ -214,5 +221,31 @@ describe("progressStage", () => {
   });
   it("says a report is being built for a phase it does not know", () => {
     expect(progressStage({ ...frame, phase: "later" })).toBe("Building the sprint report");
+  });
+});
+
+describe("the chart sentences", () => {
+  it("reads one day of the burndown with every value the tooltip carries", () => {
+    const line = dayLine({ date: "2026-09-12", scope: 34, completed: 10, remaining: 24, ideal: 20.5 }, "points");
+    expect(line).toContain(calendarDay("2026-09-12"));
+    expect(line).toContain("34 points in scope");
+    expect(line).toContain("10 completed");
+    expect(line).toContain("24 remaining");
+    expect(line).toContain("ideal 20.5");
+  });
+
+  it("reads a velocity row in its own unit", () => {
+    expect(velocityLine({ sprintId: 1, sprintName: "Sprint 10", unit: "cards", unitReason: "", committed: 12, completed: 9, truncated: false }))
+      .toBe("Sprint 10: committed 12 cards, completed 9.");
+  });
+
+  it("reads one outcome bar as its label and amount", () => {
+    expect(outcomeLine("Carried over", 1, "points")).toBe("Carried over: 1 point.");
+  });
+
+  it("says why the velocity chart splits by unit, and why one sprint has no trend", () => {
+    expect(mixedUnitsLine()).toMatch(/different units/);
+    expect(singleSprintLine()).toMatch(/one closed sprint/i);
+    expect(emptyDaysLine()).toBe("No days to draw yet.");
   });
 });

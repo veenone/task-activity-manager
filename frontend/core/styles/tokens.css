@@ -41,6 +41,61 @@
   --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   --ghost-hover: rgba(0, 0, 0, 0.08);
   --on-accent: #fff;
+  /* The instrument chrome: the band the view tabs sit in and the detail
+     panel's head, with the raised fill, borders and text that ride on them.
+     It is the same dark blue in both themes, the way XTM's topbar is, so the
+     dark block repeats these values rather than leaving them to the light
+     one. --chrome-text-strong is the brightest text the chrome uses, for a
+     hover on a control that is already chrome-text; it is not --on-accent,
+     which is the text on an accent fill. */
+  --chrome-bg: #1b2638;
+  --chrome-raised: #2a3850;
+  --chrome-border: #0f1722;
+  --chrome-text: #e8eaed;
+  --chrome-text-strong: #fff;
+  --chrome-text-muted: #9aa7bd;
+  --chrome-chip-text: #c7d0e0;
+  --chrome-chip-border: #3a4a66;
+  --chrome-hover: rgba(255, 255, 255, 0.1);
+  /* The chip palette. The issue type chips and the status chips draw their
+     fills from one set, so a hue means the same thing wherever it appears.
+     Amber is not here: --warning-bg and --warning-text already hold it. */
+  --chip-blue-bg: #dbeafe;
+  --chip-blue-text: #1e40af;
+  --chip-green-bg: #dcfce7;
+  --chip-green-text: #166534;
+  --chip-red-bg: #fee2e2;
+  --chip-red-text: #991b1b;
+  --chip-purple-bg: #ede9fe;
+  --chip-purple-text: #5b21b6;
+  --chip-sky-bg: #e0f2fe;
+  --chip-sky-text: #075985;
+  /* Family rows. --subtask-indent is the one step a child is drawn to the
+     right of its parent by, and --row-lead-slot the width every row of a
+     family reserves for its expand toggle whether or not it has one. Both
+     are read by .row-lead in primitives.css and nowhere else, so the four
+     tables that each invented their own indent cannot drift apart again. */
+  --subtask-indent: 18px;
+  --row-lead-slot: 32px;
+  /* The report charts. One token per series role, so a line, its legend
+     swatch and its end label read from the same place and the SVG carries
+     no colour of its own. Remaining is the accent and completed the success
+     colour; committed is the accent softened, since it is the floor the
+     other bars are read against rather than a result. Added, removed and
+     carried over take the chip hues, so an outcome bar means what the chips
+     mean elsewhere in the app. */
+  --chart-remaining: var(--accent);
+  --chart-ideal: var(--text-muted);
+  --chart-scope: var(--warning);
+  --chart-committed: #aab7ee;
+  --chart-completed: #1f7a52;
+  --chart-added: #0369a1;
+  --chart-removed: #b91c1c;
+  --chart-carried: #6d28d9;
+  --chart-grid: var(--border-subtle);
+  --chart-axis: var(--border-strong);
+  --chart-label: var(--text-muted);
+  --chart-hit: rgba(0, 0, 0, 0.06);
 }
 
 :root[data-theme="dark"] {
@@ -74,4 +129,42 @@
   --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   --ghost-hover: rgba(255, 255, 255, 0.10);
   --on-accent: #fff;
+  /* The chrome band keeps its colour: it is the app's instrument panel, and
+     it is dark in both themes. Repeated here so a reader of the dark block
+     sees the whole palette the window draws with. */
+  --chrome-bg: #1b2638;
+  --chrome-raised: #2a3850;
+  --chrome-border: #0f1722;
+  --chrome-text: #e8eaed;
+  --chrome-text-strong: #fff;
+  --chrome-text-muted: #9aa7bd;
+  --chrome-chip-text: #c7d0e0;
+  --chrome-chip-border: #3a4a66;
+  --chrome-hover: rgba(255, 255, 255, 0.1);
+  /* What the pastel chips become on a dark ground: a deep fill and pale
+     text, each pair at 6.9 to 1 or better. */
+  --chip-blue-bg: #1e3a8a;
+  --chip-blue-text: #bfdbfe;
+  --chip-green-bg: #14532d;
+  --chip-green-text: #bbf7d0;
+  --chip-red-bg: #7f1d1d;
+  --chip-red-text: #fecaca;
+  --chip-purple-bg: #4c1d95;
+  --chip-purple-text: #ddd6fe;
+  --chip-sky-bg: #0c4a6e;
+  --chip-sky-text: #bae6fd;
+  /* The chart roles on a dark ground: the same hues, lifted so a bar reads
+     against the surface rather than sinking into it. */
+  --chart-remaining: var(--accent);
+  --chart-ideal: var(--text-muted);
+  --chart-scope: var(--warning);
+  --chart-committed: #46579a;
+  --chart-completed: #4fc490;
+  --chart-added: #38bdf8;
+  --chart-removed: #f87171;
+  --chart-carried: #a78bfa;
+  --chart-grid: var(--border-subtle);
+  --chart-axis: var(--border-strong);
+  --chart-label: var(--text-muted);
+  --chart-hit: rgba(255, 255, 255, 0.08);
 }

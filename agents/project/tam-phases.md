@@ -42,8 +42,9 @@ removed, completed, carried over, rebuilt from Jira's own changelog not its
 internal chart endpoints, with last six closed sprints as velocity table
 beside them. Schema version 8 add `sprint_report`, where closed sprint's
 reconstruction kept so view readable offline, and `complete_date` on
-`sprint`. Charts those numbers would draw into = deliberately next plan;
-here ship figures, method printed under them, plain statement of what
+`sprint`. Charts those numbers would draw into came later, in their own change;
+see the Phase 4 section below. Here ship figures, method printed under
+them, plain statement of what
 reconstruction cannot see.
 
 ## Rich text: descriptions, summaries, comments
@@ -386,11 +387,14 @@ sprint report under whatever heading happened to be on screen. Heading drawn
 from `series.sprintName`, the sprint backend answered about, never from
 picker state = second line of defence for same failure.
 
-**Charts not here, are next plan.** `Series.Days` carry day by day line and
-nothing draw it. No SVG anywhere in this frontend, so axis ticks, label
-collision, empty ranges, single day sprints, colour tokens, screen reader
-access all new surface, and splitting mean numbers get trusted before
-anything drawn from them.
+**Charts came after, in their own change.** Phase 4 shipped the numbers and
+left `Series.Days` undrawn, so the figures got trusted before anything drawn
+from them. The charts landed later in `tam/frontend/src/components/charts`,
+hand built in SVG the way XTM draws its Sankey, with the scale maths in
+`lib/chartScale.ts`. Every chart states its numbers in text beside the marks
+and ships a hidden data table, except where a visible table already carries
+the same rows: the velocity chart drops its table beside `VelocityTable` so
+a screen reader reads the figures once.
 
 ## Rituals, local first
 

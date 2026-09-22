@@ -45,7 +45,7 @@ export function MacroPreview({ xml }: { xml: string }) {
   }
   const shown = preview.issues.slice(0, PREVIEW_LIMIT);
   return (
-    <div className="ritual-macro-preview">
+    <div>
       <code className="small">{jql}</code>
       {shown.length === 0 ? (
         <p className="muted small">No cached issues match.</p>

@@ -1,17 +1,18 @@
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { toPlainText } from "@agile-suite/core";
+import { RowLead, toPlainText } from "@agile-suite/core";
 import { GRID_COLUMNS } from "../api";
 import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
 import { statusClass } from "../lib/statusClass";
 import { keyColumnWidth } from "../lib/keyColumn";
-import { subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
+import { drawnParents, familyPlace, subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
 import { SubtaskToggle } from "./SubtaskToggle";
 
 // The pending dot shares the key cell, so the key column has to be wide
 // enough for the longest key plus the dot and its margin.
 const PENDING_DOT_PX = 20;
+
 
 interface Props {
   issues: Issue[];
@@ -66,12 +67,15 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
 
   const keyWidth = keyColumnWidth(issues.map((i) => i.key), PENDING_DOT_PX);
   const sortedLabel = GRID_COLUMNS.find((c) => c.id === sort)?.label;
-  const parentKeys = new Set(issues.filter((i) => i.type !== "subtask" && i.type !== "epic").map((i) => i.key));
+  const parentKeys = drawnParents(issues);
 
   return (
     <div
       className="issue-table"
-      role="grid"
+      // A treegrid, not a grid: the rows are a hierarchy the arrow keys
+      // already walk and the toggles already open, and aria-level and
+      // aria-expanded on a row mean nothing in a plain grid.
+      role="treegrid"
       aria-label="Issues"
       aria-multiselectable="false"
       aria-rowcount={rows.length + 1}
@@ -119,7 +123,8 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
         </div>
         {rows.map((iss, index) => {
           const selected = iss.key === selectedKey;
-          const nested = iss.type === "subtask" && parentKeys.has(iss.parentKey);
+          const place = familyPlace(iss, parentKeys);
+          const nested = place === "child";
           const summary = toPlainText(iss.summary, "summary");
           return (
             <div
@@ -127,9 +132,11 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               role="row"
               aria-selected={selected}
               aria-rowindex={index + 2}
+              aria-level={place === "root" ? 1 : 2}
+              aria-expanded={counts.has(iss.key) ? !collapsed.has(iss.key) : undefined}
               aria-label={`${iss.key} ${summary}${iss.type === "subtask" && iss.parentKey ? `, subtask of ${iss.parentKey}` : ""}`}
               data-row-index={index}
-              className={`issue-row${nested ? " issue-row-subtask" : ""}${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
+              className={`issue-row${selected ? " issue-row-selected" : index % 2 ? " issue-row-alt" : ""}`}
               onClick={() => onSelect(iss.key)}
               onKeyDown={(e) => {
                 if (e.key === "ArrowRight" && counts.has(iss.key)) {
@@ -157,10 +164,12 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
                 {iss.pending && <span className="pending-dot" role="img" aria-label="Pending changes" title="Has pending changes" />}
               </span>
               <span role="gridcell"><TypeChip type={iss.type} subtaskLabel={subtaskLabel} /></span>
-              <span role="gridcell" className="issue-summary" title={summary}>
-                <SubtaskToggle issueKey={iss.key} count={counts.get(iss.key) ?? 0} expanded={!collapsed.has(iss.key)} onToggle={() => toggleChildren(iss.key)} />
-                {nested && <span className="issue-child-branch" aria-hidden="true">↳</span>}
-                {summary}
+              <span role="gridcell" className="issue-summary row-summary">
+                <RowLead
+                  place={place}
+                  toggle={<SubtaskToggle issueKey={iss.key} count={counts.get(iss.key) ?? 0} expanded={!collapsed.has(iss.key)} onToggle={() => toggleChildren(iss.key)} />}
+                />
+                <span className="row-summary-text" title={summary}>{summary}</span>
               </span>
               <span role="gridcell">
                 {iss.draft

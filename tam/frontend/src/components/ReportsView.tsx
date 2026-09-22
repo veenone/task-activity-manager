@@ -8,15 +8,17 @@ import { useSync } from "../contexts/SyncContext";
 import { busyLine, isBusyRefusal, unavailableLine } from "../lib/reportText";
 import { SprintSummary } from "./SprintSummary";
 import { VelocityTable } from "./VelocityTable";
+import { BurndownChart } from "./charts/BurndownChart";
+import { OutcomeChart } from "./charts/OutcomeChart";
+import { VelocityChart } from "./charts/VelocityChart";
 
 // ReportsView is the pickers, the states, and the wiring. The sentence and
 // the method line are SprintSummary's, the rows are VelocityTable's, and
 // every word either of them prints is in lib/reportText.
 //
-// It draws no chart. Series.Days carries the day by day line behind these
-// totals and drawing it is the next plan, for the reason section 1 of
-// docs/superpowers/specs/2026-09-09-tam-reports-design.md gives: a chart
-// adds no fact this screen does not already state.
+// The charts are in components/charts, drawn from Series.Days and the
+// velocity rows this view already receives. Each states its numbers in text
+// beside the marks, so none of them is the only way to read a figure.
 //
 // This view is the one place in TAM that takes the per-profile lock for a
 // read rather than a write, and it takes it through SyncContext.runReport
@@ -150,12 +152,21 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           </span>
         {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
         </div>
+        {/* The burndown is the wide one: it carries a point per sprint day,
+            while the outcome chart carries five bars. */}
+        <div className="report-charts">
+          <BurndownChart days={r.series.days} unit={r.series.unit} busy={report.isFetching} />
+          <OutcomeChart series={r.series} live={inProgress} busy={report.isFetching} />
+        </div>
         <h3 className="report-heading">Velocity</h3>
         <p className="muted small">
           Recent closed sprints on this board, oldest first. Each row shows its own unit so points and cards stay
           distinct when a board changes how it estimates work.
         </p>
-        <VelocityTable rows={r.velocity} />
+        <div className="report-velocity">
+          <VelocityChart rows={r.velocity} busy={report.isFetching} tabled />
+          <VelocityTable rows={r.velocity} />
+        </div>
       </>
     );
   }

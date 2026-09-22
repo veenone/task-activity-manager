@@ -9,6 +9,7 @@ import type { EpicNode, EpicTreeData, Issue } from "../api";
 import { profileBackend } from "../profileBackend";
 import { ModalProvider } from "../modals";
 import { EpicsView } from "./EpicsView";
+import { leadDepth, leadSlotText } from "../test/rowLead";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
@@ -117,6 +118,33 @@ describe("EpicsView", () => {
     expect(screen.queryByText("Child")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Expand subtasks of P-1" }));
     expect(screen.getByText("Child")).toBeInTheDocument();
+  });
+  it("leads every row of a family the same way and marks a subtask with no parent in the tree", async () => {
+    vi.mocked(api.GetEpicTree).mockResolvedValue({
+      epics: [epicNode({
+        issue: issue({ key: "P-EPIC", type: "epic" }),
+        children: [
+          issue({ key: "P-1", type: "story", summary: "Parent" }),
+          issue({ key: "P-2", type: "subtask", parentKey: "P-1", summary: "Child" }),
+          issue({ key: "P-3", type: "task", summary: "Loner" }),
+          issue({ key: "P-4", type: "subtask", parentKey: "P-9", summary: "Stray" }),
+        ],
+      })],
+      orphans: [],
+      truncated: false,
+    });
+    renderView();
+    await screen.findByText("Parent");
+    const rowOf = (text: string) => screen.getByText(text).closest('[role="treeitem"]') as HTMLElement;
+    expect(leadSlotText(rowOf("Parent"))).toBe("▾ 1");
+    expect(leadSlotText(rowOf("Loner"))).toBe("");
+    expect(leadDepth(rowOf("Loner"))).toBe(leadDepth(rowOf("Parent")));
+    expect(leadDepth(rowOf("Child"))).toBeGreaterThan(leadDepth(rowOf("Parent")));
+    // The branch belongs beside the summary it marks, not in the caret cell
+    // a column to its left, which is where this tree used to draw it.
+    expect(rowOf("Child").querySelector(".epic-cell-summary")?.textContent).toContain("↳");
+    expect(within(rowOf("Stray")).getByText("Parent not shown")).toBeInTheDocument();
+    expect(rowOf("Stray")).toHaveAttribute("aria-level", "3");
   });
   it("renders epics with their progress and children", async () => {
     vi.mocked(api.GetEpicTree).mockResolvedValue({

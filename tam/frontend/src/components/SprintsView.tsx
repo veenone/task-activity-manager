@@ -16,7 +16,8 @@ import { CreateSprintModal } from "./CreateSprintModal";
 import { EditSprintModal } from "./EditSprintModal";
 import { IssueDetailPanel } from "./IssueDetailPanel";
 import { SprintFillBar } from "./SprintFillBar";
-import { SprintList, issueOrder, rowIdOf } from "./SprintList";
+import { SprintList } from "./SprintList";
+import { issueOrder, rowIdOf } from "../lib/sprintRows";
 import { StartSprintModal } from "./StartSprintModal";
 import { useSprintSelection } from "./useSprintSelection";
 

@@ -201,7 +201,7 @@ export function EditableFields({ profileId, issue, description, descriptionReady
         const shut = locked(f.id);
         const describedBy = off ? reasonIDs(f.id) : undefined;
         return (
-        <div key={f.id} className="edit-row">
+        <div key={f.id} className={f.id === "description" ? "edit-row edit-row-stacked" : "edit-row"}>
           {f.id === "description" ? (
             // The label keeps pointing at the textarea's id, which is what
             // the editor renders it with; the read view beside it is markup,

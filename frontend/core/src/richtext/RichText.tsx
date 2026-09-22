@@ -164,7 +164,7 @@ function renderBlock(block: Block, opts: RenderOpts, key: string): ReactNode {
           {block.items.map((item, i) => (
             <li key={`${key}-${i}`}>
               {item.checked !== undefined && (
-                <input type="checkbox" className="rich-task-checkbox" checked={item.checked} disabled readOnly />
+                <input type="checkbox" checked={item.checked} disabled readOnly />
               )}
               {item.children.map((child, j) => renderBlock(child, opts, `${key}-${i}-${j}`))}
             </li>

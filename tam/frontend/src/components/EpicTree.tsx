@@ -6,7 +6,7 @@ import type { Row } from "../lib/epicTreeItems";
 import { EpicChildRow, EpicRow } from "./EpicRow";
 import { keyColumnWidth } from "../lib/keyColumn";
 import { MOVED_FLASH_MS } from "../lib/flash";
-import { subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
+import { drawnParents, familyPlace, subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
 
 interface Props {
   tree: EpicTreeData;
@@ -148,6 +148,7 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
   }
 
   function renderChildren(children: Issue[], ownerKey: string) {
+    const parents = drawnParents(children);
     return visibleFamilyIssues(children, collapsed).map((child) => (
       <EpicChildRow
         key={child.key}
@@ -156,8 +157,8 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
         subtasksExpanded={!collapsed.has(child.key)}
         onToggleSubtasks={() => toggleChildren(child.key)}
         subtaskLabel={subtaskLabel}
-        nested={child.type === "subtask" && children.some((p) => p.key === child.parentKey)}
-        ownerKey={child.type === "subtask" && children.some((p) => p.key === child.parentKey) ? child.parentKey : ownerKey}
+        place={familyPlace(child, parents)}
+        ownerKey={familyPlace(child, parents) === "child" ? child.parentKey : ownerKey}
         index={indexOf.get(child.key)}
         selected={child.key === selectedKey}
         focused={child.key === focusKey}

@@ -8,6 +8,7 @@ import * as api from "../api";
 import type { Issue } from "../api";
 import { profileBackend } from "../profileBackend";
 import { ModalProvider } from "../modals";
+import { leadDepth } from "../test/rowLead";
 import { BacklogView } from "./BacklogView";
 
 vi.mock("../api", async () => {
@@ -132,7 +133,10 @@ describe("BacklogView", () => {
     const childRow = await screen.findByRole("row", { name: /TAM-NEW-1.*subtask of PLAT-412/ });
     const parentRow = screen.getByRole("row", { name: /PLAT-412 Checkout/ });
     expect(parentRow.nextElementSibling).toBe(childRow);
-    expect(childRow).toHaveClass("issue-row-subtask");
+    // The lead's depth is what the stylesheet turns into the indent, so it
+    // is the thing worth asserting; the marker class it used to carry styled
+    // nothing.
+    expect(leadDepth(childRow)).toBe(1);
     expect(within(childRow).getByText("Technical task")).toBeInTheDocument();
     parentRow.focus();
     await user.keyboard("{ArrowDown}");

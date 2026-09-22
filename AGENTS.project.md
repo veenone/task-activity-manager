@@ -50,6 +50,18 @@ Path: the primitives in `frontend/core/src/components/Modal.tsx` and the `useCon
 Never: bespoke modal, overlay, or backdrop markup in an app workspace.
 Gate: the ratchet holds bespoke_modals; four fixes have been spent on modal layering and backgrounds.
 
+### Family rows
+Owns: how a row shows that it is a subtask of another row, in every table and tree.
+Path: `RowLead` in `frontend/core/src/components`, the `--subtask-indent` token, and `familyPlace` in `tam/frontend/src/lib/issueFamilies.ts` for deciding whether a row is a root, a child, or a child whose parent is not drawn.
+Never: an indent, a branch glyph, or a parent marker written into one table's own rules or markup.
+Gate: `tam/frontend/src/styles.test.ts` (no table indents a subtask with a literal of its own, and the toggle does not size itself). Four tables each invented an indent, and the toggle was wider than it, so a subtask rendered less indented than its parent.
+
+### Class names
+Owns: the classes components set on elements.
+Path: a rule in a stylesheet for every class, or no class.
+Never: a class name no stylesheet defines. It renders unstyled and nothing reports it.
+Gate: `frontend/core/src/instruction-gate.test.ts` (every class a component sets is defined in a stylesheet). `.row` left the rituals conflict buttons touching, and `.ritual-page-body` left an error fallback as bare HTML.
+
 ## Project rules
 
 - Run Go commands from the module directory (`core`, `tam`, `xtm`); run npm commands from the repo root. Run `git config core.hooksPath .githooks` once per clone so the pre-commit gates exist.

@@ -89,7 +89,7 @@ export function EditorToolbar({ label, groups, disabled = false }: Props) {
         return (
           <ToolbarButton key={item.id} {...common} shortcut={item.shortcut} unavailable={item.disabled} onPress={item.onRun}>
             {item.icon && <ToolbarIcon name={item.icon} />}
-            {item.text && <span className="editor-toolbar-text">{item.text}</span>}
+            {item.text && <span>{item.text}</span>}
           </ToolbarButton>
         );
       case "link": {
