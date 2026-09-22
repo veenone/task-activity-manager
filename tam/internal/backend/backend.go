@@ -325,10 +325,20 @@ type IssueDetail struct {
 	FetchedAt string `json:"fetchedAt"`
 }
 
-// IssueType is one issue type a project offers.
+// IssueType is one issue type a project offers, under the project's own
+// name for it.
 type IssueType struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// Subtask is Jira's own flag: a type at the sub-task level, which
+	// cannot exist without a parent. The New issue dialog leaves these out,
+	// because a sub-task is drafted from the issue it belongs to.
+	Subtask bool `json:"subtask"`
+	// Logical is TAM's own type for this one, "" when TAM has none. The
+	// empty string is the honest answer and is carried as such: a type
+	// nothing here recognises must not be drawn, stored or created as a
+	// task (issue #65 item 2).
+	Logical string `json:"logical"`
 }
 
 // User is the authenticated user, from the connection test.

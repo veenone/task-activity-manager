@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
-import { GetSubtaskTypeName, ListPriorities, SearchUsers } from "../api";
+import { GetSubtaskTypeName, ListProjectTypes, ListPriorities, SearchUsers } from "../api";
 
 // The instance's priority names change about as often as its workflow, and
 // both forms gate a control on this, so it is held for the session rather
@@ -14,6 +14,7 @@ export const peopleKeys = {
   users: (profileId: string, query: string) => ["users", profileId, query] as const,
   priorities: (profileId: string) => ["priorities", profileId] as const,
   subtaskType: (profileId: string) => ["subtaskType", profileId] as const,
+  projectTypes: (profileId: string) => ["projectTypes", profileId] as const,
 };
 
 // useUserSearch backs the assignee picker. The query is already debounced by
@@ -46,6 +47,20 @@ export function useSubtaskType(profileId: string) {
   return useQuery({
     queryKey: peopleKeys.subtaskType(profileId),
     queryFn: () => call(() => GetSubtaskTypeName(profileId)),
+    enabled: !!profileId,
+    staleTime: PRIORITIES_FRESH_FOR,
+    retry: false,
+  });
+}
+
+// useProjectTypes is the issue types the project offers, read from the local
+// store. It is held for the session for the same reason the sub-task name
+// is: it comes from the project's configuration, and a sync is what changes
+// it.
+export function useProjectTypes(profileId: string) {
+  return useQuery({
+    queryKey: peopleKeys.projectTypes(profileId),
+    queryFn: () => call(() => ListProjectTypes(profileId)),
     enabled: !!profileId,
     staleTime: PRIORITIES_FRESH_FOR,
     retry: false,

@@ -127,6 +127,17 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 		}
 	}
 
+	// The project's own issue types, cached for the New issue dialog, which
+	// must not reach Jira when the user presses New (issue #65 item 2). A
+	// failure here must not fail the sync and must not empty what is
+	// stored: PutProjectTypes ignores an empty list for the same reason the
+	// username write ignores an empty name.
+	if types, terr := e.b.IssueTypes(ctx, projectKey); terr != nil {
+		log.Printf("tam: read the issue types of %s for %s: %v", projectKey, profileID, terr)
+	} else if err := e.repo.PutProjectTypes(ctx, profileID, types); err != nil {
+		log.Printf("tam: store the issue types of %s for %s: %v", projectKey, profileID, err)
+	}
+
 	since := ""
 	if !full {
 		since = state.LastSynced

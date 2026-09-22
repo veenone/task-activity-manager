@@ -360,14 +360,27 @@ func (b *Backend) typesOrEmpty(ctx context.Context, projectKey string) projectTy
 	return pt
 }
 
+// IssueTypes is the project's own types, in the order Jira lists them, each
+// carrying the logical type TAM maps it onto. The mapping needs the
+// project's level names, which resolveTypes has already worked out, so this
+// is one read and not two.
 func (b *Backend) IssueTypes(ctx context.Context, projectKey string) ([]backend.IssueType, error) {
+	pt, err := b.resolveTypes(ctx, projectKey)
+	if err != nil {
+		return nil, err
+	}
 	types, err := b.c.IssueTypes(ctx, projectKey)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]backend.IssueType, 0, len(types))
 	for _, t := range types {
-		out = append(out, backend.IssueType{ID: t.ID, Name: t.Name})
+		out = append(out, backend.IssueType{
+			ID:      t.ID,
+			Name:    t.Name,
+			Subtask: t.Subtask,
+			Logical: logicalType(t.Name, b.requirementType, pt),
+		})
 	}
 	return out, nil
 }

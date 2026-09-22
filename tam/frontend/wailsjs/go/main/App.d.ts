@@ -120,6 +120,8 @@ export function ListPriorities(arg1:string):Promise<Array<string>>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;
 
+export function ListProjectTypes(arg1:string):Promise<Array<backend.IssueType>>;
+
 export function ListRitualDocuments(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
 
 export function ListSprints(arg1:string):Promise<Array<issuerepo.SprintRef>>;
