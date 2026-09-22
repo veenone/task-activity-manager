@@ -741,6 +741,19 @@ describe("IssueDetailPanel description", () => {
     expect(within(fields).getByRole("button", { name: "Edit" })).toBeDisabled();
   });
 
+  // A row the version 17 backfill could not reach has no description on it,
+  // but opening it fetches and caches one. Saying "not synced yet" about a
+  // description sitting in the answer that just arrived would be the same
+  // wrong sentence the unknown state exists to avoid.
+  it("takes the fetched description for a row that carries none", async () => {
+    vi.mocked(api.GetIssueDetail).mockResolvedValue(detailOf({ description: "Read from Jira just now." }));
+    renderPanel(vi.fn(), undefined, { ...story, description: undefined });
+    const fields = section("Fields");
+    expect(await within(fields).findByText("Read from Jira just now.")).toBeInTheDocument();
+    expect(within(fields).queryByText(/not been synced/)).not.toBeInTheDocument();
+    await waitFor(() => expect(within(fields).getByRole("button", { name: "Edit" })).toBeEnabled());
+  });
+
   // Local first. The row carries whatever the store holds, and the store
   // puts a pending edit back on the column after every sync, so the panel
   // shows the edit and marks the issue pending.

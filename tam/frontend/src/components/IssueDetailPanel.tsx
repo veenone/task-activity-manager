@@ -175,9 +175,12 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const openLink = (url: string) => BrowserOpenURL(url);
   // The description comes off the row, not the detail read: it is cached by
   // the sync, so it is there before the panel opens and it is there with no
-  // connection at all. null or undefined is a row nothing has synced one for,
-  // which the fields below say out loud rather than drawing as empty.
-  const description = issue.description ?? null;
+  // connection at all. A row that carries none is one the schema 17 backfill
+  // could not reach, and opening it fetches and caches one anyway, so the
+  // detail's own description stands in until the next sync writes the
+  // column. Only when neither has one is it unknown, which the fields below
+  // say out loud rather than drawing as empty.
+  const description = issue.description ?? detail.data?.description ?? null;
   const descFormat = descriptionFormat(profileId, issue.key, description ?? "");
 
   // Jira allows a sub-task under any standard issue, and under neither an
