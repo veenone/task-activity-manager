@@ -8,9 +8,17 @@ import { SprintTimeline } from "./SprintTimeline";
 // formatters take now as a defaulted parameter, the way formatWhen and
 // dayOfSprint already do, so nothing has to drill a prop down the tree.
 // toFake: ["Date"] is not decoration, faking every timer breaks userEvent.
+// PINNED is the clock every case here runs against, built with the
+// local-time constructor rather than from a UTC instant. That is what makes
+// these fixtures hold in any zone: a sprint's dates are read as civil days,
+// so "now" has to be a civil day too. An instant like
+// "2026-09-03T10:00:00Z" is a different calendar day either side of about
+// eleven hours from UTC, and the row would read a day out for anyone there.
+const PINNED = new Date(2026, 8, 3, 12, 0, 0);
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-09-03T10:00:00Z"));
+  vi.setSystemTime(PINNED);
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -76,20 +84,44 @@ describe("SprintTimeline", () => {
     render(<SprintTimeline detail={detail({
       state: "closed", membershipCached: false, total: 0, done: 0, points: 0, donePoints: 0,
     })} />);
-    expect(screen.getByText(/not read yet/)).toBeInTheDocument();
+    expect(screen.getByText("cards not read yet")).toBeInTheDocument();
     expect(pointsBar()).toBeNull();
     // The calendar is still known, so the time bar is still drawn.
     expect(timeBar()).toHaveAttribute("aria-valuetext", `Closed ${calendarDay("2026-09-12")}`);
   });
 
-  it("draws nothing at all for a sprint whose dates it cannot read", () => {
-    render(<SprintTimeline detail={detail({ startDate: "", endDate: "", total: 0, done: 0, points: 0, donePoints: 0 })} />);
+  it("draws no bars for a sprint whose dates it cannot read, and counts it instead", () => {
+    render(<SprintTimeline detail={detail({ startDate: "", endDate: "" })} />);
     expect(screen.getByText("no timeline")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).toBeNull();
+    // It still says what it holds. A bar needs a calendar; a count does
+    // not, and the row would otherwise say nothing at all about the board's
+    // own unassigned work.
+    expect(screen.getByText("8 of 14 done, 21 of 34 pts")).toBeInTheDocument();
+  });
+
+  it("counts a sprint that holds nothing rather than claiming progress in it", () => {
+    render(<SprintTimeline detail={detail({ total: 0, done: 0, points: 0, donePoints: 0 })} />);
+    expect(screen.getByText("0 cards")).toBeInTheDocument();
+    expect(screen.queryByText(/done/)).toBeNull();
+  });
+
+  it("reads the same at either end of the same local day", () => {
+    // The whole of the zone question, asserted rather than assumed: a zone
+    // only changes which wall-clock moment "now" is, so a row that reads
+    // the same one second after local midnight and one second before the
+    // next reads the same everywhere. TZ is not settable on every platform
+    // this suite runs on, so this is the guard that actually holds.
+    vi.setSystemTime(new Date(2026, 8, 3, 0, 0, 1));
+    const { container: justAfterMidnight } = render(<SprintTimeline detail={detail()} />);
+    vi.setSystemTime(new Date(2026, 8, 3, 23, 59, 59));
+    const { container: justBefore } = render(<SprintTimeline detail={detail()} />);
+    expect(justAfterMidnight.textContent).toBe("Day 6 of 159 days left8 of 14 done, 21 of 34 pts");
+    expect(justBefore.textContent).toBe(justAfterMidnight.textContent);
   });
 
   it("says how far past its end a sprint nobody closed has run", () => {
-    vi.setSystemTime(new Date("2026-09-14T10:00:00Z"));
+    vi.setSystemTime(new Date(2026, 8, 14, 12, 0, 0));
     render(<SprintTimeline detail={detail()} />);
     expect(screen.getByText("2 days over")).toBeInTheDocument();
     expect(timeBar()).toHaveAttribute("aria-valuenow", "100");
