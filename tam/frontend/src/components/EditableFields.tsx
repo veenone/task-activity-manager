@@ -40,10 +40,13 @@ function epicOptionLabel(key: string, summary: string): string {
 interface Props {
   profileId: string;
   issue: Issue;
-  // description is the cached detail's text; descriptionReady says the
-  // detail has loaded, so the textarea is enabled and its edit is genuine.
+  // description is the text the sync cached on the row, and
+  // descriptionSynced says a sync has actually carried one. False is a row
+  // from before the description was stored: the read view says so, and the
+  // editor stays shut, because an edit journalled over a value nobody has
+  // seen would erase the real one at the next Commit.
   description: string;
-  descriptionReady: boolean;
+  descriptionSynced: boolean;
   // busy says a sync or commit is running; Save stays disabled so an edit
   // made mid-commit is never lost to the row refresh that follows it.
   busy: boolean;
@@ -77,7 +80,7 @@ function valuesOf(issue: Issue, description: string): Values {
 // changes becomes one journal row when Save edit is pressed; unchanged
 // fields are not sent. Validation mirrors the store's so the common
 // mistakes never round-trip.
-export function EditableFields({ profileId, issue, description, descriptionReady, busy, projectKey, onOpenLink, onIssueKey, onSyntaxPicked }: Props) {
+export function EditableFields({ profileId, issue, description, descriptionSynced, busy, projectKey, onOpenLink, onIssueKey, onSyntaxPicked }: Props) {
   const base = valuesOf(issue, description);
   const [values, setValues] = useState<Values>(base);
   const [dirty, setDirty] = useState<Set<EditableField>>(new Set());
@@ -208,12 +211,12 @@ export function EditableFields({ profileId, issue, description, descriptionReady
             // not a control, and is reached by its own text.
             <div className="edit-row-head">
               <label className="muted small" htmlFor="edit-description">{f.label}</label>
-              {!editing && <SyntaxToggle value={picked ?? detected} onChange={pickFormat} disabled={!descriptionReady} />}
+              {!editing && <SyntaxToggle value={picked ?? detected} onChange={pickFormat} disabled={!descriptionSynced} />}
               <button
                 type="button"
                 className="btn btn-ghost edit-description-action"
                 aria-describedby={describedBy}
-                disabled={!descriptionReady || shut}
+                disabled={!descriptionSynced || shut}
                 onClick={editing ? cancelEdit : () => setEditingKey(issue.key)}
               >
                 {editing ? "Cancel" : "Edit"}
@@ -232,20 +235,27 @@ export function EditableFields({ profileId, issue, description, descriptionReady
                 projectKey={projectKey}
                 onOpenLink={onOpenLink}
                 onIssueKey={onIssueKey}
-                textarea={{ id: "edit-description", className: "detail-input", disabled: !descriptionReady }}
+                textarea={{ id: "edit-description", className: "detail-input", disabled: !descriptionSynced }}
               />
-            ) : !descriptionReady ? (
-              <p className="muted small">Loading the description</p>
-            ) : values.description.trim() === "" ? (
-              <p className="muted small">No description.</p>
             ) : (
-              <RichText
-                text={values.description}
-                format={picked ?? "auto"}
-                projectKey={projectKey}
-                onOpenLink={onOpenLink}
-                onIssueKey={onIssueKey}
-              />
+              <div className="detail-description">
+                {!descriptionSynced ? (
+                  // Not the same sentence as the one below it, and that is
+                  // the whole point: this issue was cached before TAM read
+                  // descriptions, so nothing here knows whether it has one.
+                  <p className="muted small">This description has not been synced yet. The next sync reads it.</p>
+                ) : values.description.trim() === "" ? (
+                  <p className="muted small">No description.</p>
+                ) : (
+                  <RichText
+                    text={values.description}
+                    format={picked ?? "auto"}
+                    projectKey={projectKey}
+                    onOpenLink={onOpenLink}
+                    onIssueKey={onIssueKey}
+                  />
+                )}
+              </div>
             )
           ) : f.id === "assignee" ? (
             // The grid holds the display name a sync wrote, but the write

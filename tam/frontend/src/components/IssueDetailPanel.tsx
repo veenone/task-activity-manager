@@ -106,8 +106,9 @@ interface Props {
 }
 
 // IssueDetailPanel shows one issue beside the grid. The grid row's fields
-// render at once; the description, links, and linked tests load through the
-// backend's detail cache. Nothing here writes; the actions arrive in plan 1b.
+// render at once, the description among them since the sync caches it on the
+// row; the links, comments and linked tests load through the backend's
+// detail cache, which is a round trip per issue and stays one.
 export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote, onClose }: Props) {
   // Fields open, everything else closed: the panel starts on what a reader
   // came for and lets them reach the rest without leaving the column.
@@ -172,7 +173,12 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   // A link never navigates the WebView: that would take the whole app away
   // from TAM, the same reason IssueKeyLink opens in the user's own browser.
   const openLink = (url: string) => BrowserOpenURL(url);
-  const descFormat = descriptionFormat(profileId, issue.key, detail.data?.description ?? "");
+  // The description comes off the row, not the detail read: it is cached by
+  // the sync, so it is there before the panel opens and it is there with no
+  // connection at all. null or undefined is a row nothing has synced one for,
+  // which the fields below say out loud rather than drawing as empty.
+  const description = issue.description ?? null;
+  const descFormat = descriptionFormat(profileId, issue.key, description ?? "");
 
   // Jira allows a sub-task under any standard issue, and under neither an
   // epic nor another sub-task. A draft parent is fine: Commit creates it
@@ -252,8 +258,8 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
         <EditableFields
           profileId={profileId}
           issue={issue}
-          description={detail.data?.description ?? ""}
-          descriptionReady={detail.isSuccess}
+          description={description ?? ""}
+          descriptionSynced={description !== null}
           busy={busy}
           projectKey={projectKey}
           onOpenLink={openLink}

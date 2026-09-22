@@ -401,7 +401,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-restricted { background: var(--warn-soft); color: var(--warn-text); border: 1px solid var(--warn-border); }
 .chip-label { background: var(--surface-3); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 8px; margin-right: 4px; }
 .accent-text { color: var(--accent); }
-.detail-description { white-space: pre-wrap; font-size: 12px; }
+/* The description is a field like the others in the panel, so it is drawn in
+   a box like the others: the border, radius and ground of .detail-input,
+   which is the control that takes its place under Edit. Without it the
+   description was bare text with no edge, and the sentence that stands in
+   for it when there is nothing to show had nowhere to sit. */
+.detail-description { padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); }
 .detail-note { margin-top: 16px; }
 .linked-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .linked-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }

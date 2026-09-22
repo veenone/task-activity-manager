@@ -153,6 +153,21 @@ describe("the two main panes", () => {
   });
 });
 
+// Issue #63 finding 2. The description read as bare text in a panel where
+// every other field is a bordered box, so nothing said where it began or
+// that it was a field at all.
+describe("the description in the detail panel", () => {
+  it("is drawn as a bordered field, the way the panel's other fields are", () => {
+    const box = declarationsOf(appCss, ".detail-description");
+    const field = declarationsOf(primitivesCss, ".detail-input");
+    for (const prop of ["border", "border-radius", "background"]) {
+      const want = new RegExp(`(?:^|[; ])${prop}: *([^;]+)`).exec(field)?.[1];
+      expect(want, `.detail-input sets no ${prop}`).toBeTruthy();
+      expect(box, `.detail-description ${prop}`).toContain(`${prop}: ${want}`);
+    }
+  });
+});
+
 describe("classes the components already reference", () => {
   it.each([".ritual-banner-actions", ".ritual-page-body"])("%s resolves to a rule", (selector) => {
     expect(rulesFor(allCss, selector)).not.toBe("");
