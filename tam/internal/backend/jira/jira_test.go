@@ -295,7 +295,7 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 		case strings.HasPrefix(r.URL.Path, "/rest/agile/1.0/"):
 			f.agile(w, r)
 		case r.URL.Path == "/rest/api/2/project/PLAT":
-			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"1","name":"Task"},{"id":"7","name":"Business Requirement"},{"id":"19","name":"Technical task","subtask":true}]}`))
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"1","name":"Task"},{"id":"4","name":"Improvement"},{"id":"7","name":"Business Requirement"},{"id":"19","name":"Technical task","subtask":true}]}`))
 		default:
 			t.Errorf("unexpected request %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -459,7 +459,7 @@ func TestGetIssueDetailAndIssueTypes(t *testing.T) {
 		t.Errorf("custom fields = %+v", d.Fields)
 	}
 	types, err := b.IssueTypes(ctx, "PLAT")
-	if err != nil || len(types) != 3 || types[1].Name != "Business Requirement" {
+	if err != nil || len(types) != 4 || types[2].Name != "Business Requirement" {
 		t.Errorf("types = %+v, %v", types, err)
 	}
 }

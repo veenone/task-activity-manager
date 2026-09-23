@@ -59,3 +59,16 @@ func (a *App) GetSubtaskTypeName(profileID string) (string, error) {
 	}
 	return b.SubtaskTypeName(a.ctx, p.ProjectKey)
 }
+
+// ListProjectTypes is the issue types the profile's project offers, as the
+// last sync recorded them, each under the project's own name and carrying
+// the logical type TAM maps it onto. It reads the local store and asks Jira
+// nothing: the New issue dialog opens on it, and this app is local-first
+// (issue #65 item 2). An empty list is a profile that has never synced, and
+// the dialog falls back to TAM's own types and says so.
+func (a *App) ListProjectTypes(profileID string) ([]backend.IssueType, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ProjectTypes(a.ctx, profileID)
+}

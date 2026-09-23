@@ -4,12 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Modal, RichTextField, announce, call, errMsg, toPlainText, useConfirm, useProfile } from "@agile-suite/core";
 import type { RichFormat } from "@agile-suite/core";
 import { BrowserOpenURL, CreateIssue, ISSUE_TYPES } from "../api";
-import type { FieldSpec, IssueDraft, IssueType, Profile, Settings } from "../api";
+import type { DraftType, FieldSpec, IssueDraft, IssueType, ProjectType, Profile, Settings } from "../api";
 import { MetaField, splitMetaFields } from "./MetaField";
 import { useCreateFields } from "../queries/pending";
 import { useEpics } from "../queries/tree";
 import { useOpenSprints } from "../queries/boards";
-import { useSubtaskType } from "../queries/people";
+import { useProjectTypes, useSubtaskType } from "../queries/people";
 import { AssigneePicker } from "./AssigneePicker";
 import { PriorityPicker } from "./PriorityPicker";
 import { invalidateWrites } from "../queries/invalidate";
@@ -47,6 +47,35 @@ interface Props {
 // issue, through lockType with that issue as the parent.
 const CREATABLE: IssueType[] = ["task", "epic", "story", "bug", "requirement"];
 
+// NO_PROJECT_TYPES is what the Type select says when it is on TAM's own list
+// rather than the project's. A profile that has never synced has nothing
+// recorded, and this app reads the store rather than Jira when the dialog
+// opens, so the honest thing is to offer something usable and say where it
+// came from (issue #65 item 2).
+const NO_PROJECT_TYPES = "These are TAM's own types. A sync reads the ones this project has.";
+
+// TypeOption is one entry in the Type select: the value a draft carries and
+// the name the reader sees, which is the project's own word for the type.
+interface TypeOption {
+  value: DraftType;
+  label: string;
+}
+
+// offeredTypes is what the Type select lists: the project's own types when a
+// sync has recorded them, minus the sub-task levels, since a sub-task is
+// drafted from the issue it belongs to and never chosen here. A type TAM
+// maps onto one of its own carries that logical type, so the grid chip, the
+// filter bar and the epic tree go on working; a type TAM has no concept of
+// carries the project's own name, which the Jira backend accepts because
+// the project's type list has it.
+function offeredTypes(types: ProjectType[] | undefined): TypeOption[] {
+  const own = (types ?? []).filter((t) => !t.subtask);
+  if (own.length === 0) {
+    return ISSUE_TYPES.filter((t) => CREATABLE.includes(t.id)).map((t) => ({ value: t.id, label: t.label }));
+  }
+  return own.map((t) => ({ value: t.logical || t.name, label: t.name }));
+}
+
 // EPIC_SUMMARY_MAX keeps a long epic summary from stretching the select, the
 // same cut EditableFields makes.
 const EPIC_SUMMARY_MAX = 48;
@@ -57,14 +86,16 @@ function epicOptionLabel(key: string, summary: string): string {
   return `${key} ${cut}`;
 }
 
-function typeLabel(type: IssueType): string {
-  return ISSUE_TYPES.find((t) => t.id === type)?.label ?? type;
+function typeLabel(type: DraftType, offered: TypeOption[]): string {
+  return offered.find((o) => o.value === type)?.label
+    ?? ISSUE_TYPES.find((t) => t.id === type)?.label
+    ?? type;
 }
 
 // hasParentPicker says whether the type chooses its own parent. A sub-task
 // is always drafted from the issue it belongs to, so it never picks one; an
 // epic has no parent at all.
-function hasParentPicker(type: IssueType): boolean {
+function hasParentPicker(type: DraftType): boolean {
   return type !== "epic" && type !== "subtask";
 }
 
@@ -73,14 +104,14 @@ function hasParentPicker(type: IssueType): boolean {
 // field on it. A sub-task cannot either: it has no sprint of its own in
 // Jira, it follows its parent's, and the Agile move endpoint refuses one
 // aimed at it.
-function hasSprintPicker(type: IssueType): boolean {
+function hasSprintPicker(type: DraftType): boolean {
   return type !== "epic" && type !== "subtask";
 }
 
 // hasPoints says whether a type carries story points. An epic is measured by
 // the sum of its children and a requirement is not estimated at all, so
 // neither shows the field, and neither sends a value.
-function hasPoints(type: IssueType): boolean {
+function hasPoints(type: DraftType): boolean {
   return type !== "requirement" && type !== "epic";
 }
 
@@ -101,7 +132,7 @@ export function NewIssueModal({
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
   const { confirm } = useConfirm();
   const qc = useQueryClient();
-  const [type, setType] = useState<IssueType>(initialType);
+  const [chosen, setChosen] = useState<DraftType>(initialType);
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   // The syntax picked for this draft's description, starting at "auto" the
@@ -122,6 +153,19 @@ export function NewIssueModal({
   // anchored to a field instead of only sitting in the footer.
   const [invalidField, setInvalidField] = useState("");
   const [saving, setSaving] = useState(false);
+  const projectTypes = useProjectTypes(activeId);
+  const offered = offeredTypes(projectTypes.data);
+  // fromProject says the list above is the project's own rather than TAM's
+  // fixed one, which is what the note under the select turns on.
+  const fromProject = (projectTypes.data ?? []).length > 0;
+  // The type the form is on. A locked type is the caller's statement and is
+  // never overruled. Otherwise a chosen type this project does not offer
+  // falls back to the first it does, so the select is never sitting on a
+  // value it cannot show: the list arrives after the first render, and on a
+  // project whose types are all its own, "task" is not among them.
+  const type: DraftType = lockType || offered.some((o) => o.value === chosen)
+    ? chosen
+    : offered[0]?.value ?? chosen;
   const meta = useCreateFields(activeId, type);
   const epics = useEpics(activeId);
   const openSprints = useOpenSprints(activeId);
@@ -193,8 +237,8 @@ export function NewIssueModal({
   // Changing the type changes which fields Jira requires and which of the
   // form's own apply, so everything type-specific is cleared rather than
   // silently carried into a shape it no longer fits.
-  function changeType(next: IssueType) {
-    setType(next);
+  function changeType(next: DraftType) {
+    setChosen(next);
     setExtra({});
     setError("");
     setInvalidField("");
@@ -274,7 +318,7 @@ export function NewIssueModal({
       // Creating used to close in silence, so the only evidence was a row the
       // active filters might hide. Naming the placeholder key also teaches the
       // TAM-NEW-n model at the one moment it means something.
-      announce(`${typeLabel(type)} drafted as ${key}. Commit creates it in Jira.`);
+      announce(`${typeLabel(type, offered)} drafted as ${key}. Commit creates it in Jira.`);
       onCreated(key);
       onClose();
     } catch (err) {
@@ -319,7 +363,7 @@ export function NewIssueModal({
       <div className="pending-head">
         <div className="new-issue-title">
           <h2 id="new-issue-title">
-            New {type === "subtask" ? (subtaskType.data || "sub-task").toLowerCase() : typeLabel(type).toLowerCase()}
+            New {type === "subtask" ? (subtaskType.data || "sub-task").toLowerCase() : typeLabel(type, offered).toLowerCase()}
           </h2>
           {/* The one thing a new user has to understand, at full strength and
               in a slot no error message can take. */}
@@ -334,14 +378,19 @@ export function NewIssueModal({
 
       <form id="new-issue-form" ref={formRef} className="bulk-body edit-form" onSubmit={(e) => void onSubmit(e)}>
         {!lockType && (
-          <label className="edit-row" htmlFor="new-type">
-            <span className="muted small">Type</span>
-            <select id="new-type" className="detail-input" value={type} onChange={(e) => changeType(e.target.value as IssueType)}>
-              {ISSUE_TYPES.filter((t) => CREATABLE.includes(t.id)).map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
-          </label>
+          // A real label rather than a wrapping one, so the note under the
+          // select does not become part of the field's label text.
+          <div className="edit-row">
+            <label className="muted small" htmlFor="new-type">Type</label>
+            <span className="edit-cell">
+              <select id="new-type" className="detail-input" value={type} onChange={(e) => changeType(e.target.value)}>
+                {offered.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              {!fromProject && <span className="muted small">{NO_PROJECT_TYPES}</span>}
+            </span>
+          </div>
         )}
         {type === "subtask" && (
           <div className="edit-row">
@@ -497,7 +546,7 @@ export function NewIssueModal({
                 )}
                 {requiredSpecs.length > 0 && (
                   <>
-                    <p className="muted small">Jira requires these for a {typeLabel(type).toLowerCase()}:</p>
+                    <p className="muted small">Jira requires these for a {typeLabel(type, offered).toLowerCase()}:</p>
                     {requiredSpecs.map(renderMetaField)}
                   </>
                 )}

@@ -40,16 +40,17 @@ func projectOf(issueKey string) string {
 // The second result names the extras left out, for Commit to report.
 func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.IssueDraft) (string, []string, error) {
 	ids := b.discover(ctx)
-	names := jiraTypeNames([]string{d.Type}, b.requirementType, b.typesOrEmpty(ctx, projectKey))
-	if len(names) == 0 {
+	pt := b.typesOrEmpty(ctx, projectKey)
+	typeName := typeNameIn(d.Type, b.requirementType, pt)
+	if typeName == "" {
 		if d.Type == backend.TypeSubtask {
 			return "", nil, fmt.Errorf("%s has no sub-task issue type", projectKey)
 		}
-		return "", nil, fmt.Errorf("unknown issue type %q", d.Type)
+		return "", nil, fmt.Errorf("%s has no issue type %q", projectKey, d.Type)
 	}
 	fields := map[string]any{
 		"project":   map[string]string{"key": projectKey},
-		"issuetype": map[string]string{"name": names[0]},
+		"issuetype": map[string]string{"name": typeName},
 		"summary":   d.Summary,
 	}
 	if d.Description != "" {
@@ -94,7 +95,7 @@ func (b *Backend) CreateIssue(ctx context.Context, projectKey string, d backend.
 	}
 	leftOut := b.applyOwnFields(ctx, d, ids, pointsID, screen, fields)
 	if len(d.Extra) > 0 {
-		leftOut = append(leftOut, b.applyExtras(ctx, names[0], d, ids, screen, fields)...)
+		leftOut = append(leftOut, b.applyExtras(ctx, typeName, d, ids, screen, fields)...)
 	}
 	b.applyEpicName(d, ids, screen, fields)
 	var resp struct {
@@ -241,11 +242,29 @@ func (b *Backend) createMeta(ctx context.Context, projectKey, logicalType string
 	if err != nil {
 		return corejira.CreateMeta{}, fmt.Errorf("read the issue types of %s: %w", projectKey, err)
 	}
-	names := jiraTypeNames([]string{logicalType}, b.requirementType, pt)
-	if len(names) == 0 {
-		return corejira.CreateMeta{}, fmt.Errorf("unknown issue type %q", logicalType)
+	name := typeNameIn(logicalType, b.requirementType, pt)
+	if name == "" {
+		return corejira.CreateMeta{}, fmt.Errorf("%s has no issue type %q", projectKey, logicalType)
 	}
-	return b.c.CreateMeta(ctx, projectKey, pt.ids[strings.ToLower(names[0])], names[0])
+	return b.c.CreateMeta(ctx, projectKey, pt.ids[strings.ToLower(name)], name)
+}
+
+// typeNameIn is the Jira name a draft's type means in this project: one of
+// TAM's own six mapped through jiraTypeNames, or, for a type TAM has no
+// logical type for, the project's own name for it carried verbatim. The
+// dialog offers the types the project really has, so a draft can name one
+// TAM has never heard of (issue #65 item 2); it is only accepted when this
+// project's type list carries that name, so an unknown one is refused by
+// name rather than falling back to the task level, which would create a
+// type nobody chose under a summary written for another. "" is no such type.
+func typeNameIn(draftType, requirementType string, pt projectTypes) string {
+	if names := jiraTypeNames([]string{draftType}, requirementType, pt); len(names) > 0 {
+		return names[0]
+	}
+	if _, ok := pt.ids[strings.ToLower(strings.TrimSpace(draftType))]; ok {
+		return draftType
+	}
+	return ""
 }
 
 // CreateFields returns the create-screen fields of the type beyond the

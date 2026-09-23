@@ -126,6 +126,11 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
     screen.isLoading || offScreen(field) || (field === "description" && !descriptionSynced);
 
   const editing = editingKey === issue.key;
+  // hasText is what the syntax toggle is for. A toggle over nothing renders
+  // nothing differently, and it is the widest thing in the head, so in the
+  // empty state two dead buttons crowded the field's name and the sentence
+  // under it (issue #65 item 4).
+  const hasText = descriptionSynced && values.description.trim() !== "";
   const picked = pickedFormats.get(memoryKey(profileId, issue.key));
   const detected = useMemo(() => detectFormat(values.description).format, [values.description]);
 
@@ -216,7 +221,7 @@ export function EditableFields({ profileId, issue, description, descriptionSynce
             // not a control, and is reached by its own text.
             <div className="edit-row-head">
               <label className="muted small" htmlFor="edit-description">{f.label}</label>
-              {!editing && <SyntaxToggle value={picked ?? detected} onChange={pickFormat} disabled={!descriptionSynced} />}
+              {!editing && hasText && <SyntaxToggle value={picked ?? detected} onChange={pickFormat} />}
               <button
                 type="button"
                 className="btn btn-ghost edit-description-action"

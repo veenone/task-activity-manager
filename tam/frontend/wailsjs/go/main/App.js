@@ -210,6 +210,10 @@ export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
 }
 
+export function ListProjectTypes(arg1) {
+  return window['go']['main']['App']['ListProjectTypes'](arg1);
+}
+
 export function ListRitualDocuments(arg1, arg2, arg3) {
   return window['go']['main']['App']['ListRitualDocuments'](arg1, arg2, arg3);
 }

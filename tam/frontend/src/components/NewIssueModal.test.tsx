@@ -22,6 +22,7 @@ vi.mock("../api", async () => {
     SearchUsers: vi.fn(),
     ListPriorities: vi.fn(),
     GetSubtaskTypeName: vi.fn(),
+    ListProjectTypes: vi.fn(),
     CreateIssue: vi.fn(),
   };
 });
@@ -106,6 +107,17 @@ beforeEach(() => {
   ]);
   vi.mocked(api.ListPriorities).mockResolvedValue(["Highest", "High", "Medium", "Low"]);
   vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
+  // The project's own types, as a sync recorded them. PLAT calls the plain
+  // task level "Task" and its requirement type "Business Requirement", so
+  // the logical ids the rest of this file selects by are unchanged.
+  vi.mocked(api.ListProjectTypes).mockResolvedValue([
+    { id: "1", name: "Task", subtask: false, logical: "task" },
+    { id: "2", name: "Epic", subtask: false, logical: "epic" },
+    { id: "3", name: "Story", subtask: false, logical: "story" },
+    { id: "4", name: "Bug", subtask: false, logical: "bug" },
+    { id: "7", name: "Business Requirement", subtask: false, logical: "requirement" },
+    { id: "19", name: "Technical task", subtask: true, logical: "subtask" },
+  ]);
   vi.mocked(api.CreateIssue).mockResolvedValue("TAM-NEW-1");
 });
 
@@ -386,8 +398,15 @@ describe("NewIssueModal", () => {
     ] });
     renderModal();
     const dialog = await screen.findByRole("dialog", { name: "New task" });
+    // A field taking several values is a listbox, not a native multi-select
+    // (issue #65 item 3), so the values are picked one at a time and stay
+    // named outside the list.
     const components = await within(dialog).findByLabelText("Components *");
-    await user.selectOptions(components, ["10", "12"]);
+    await user.click(components);
+    const options = within(dialog).getByRole("listbox", { name: "Components" });
+    await user.click(within(options).getByRole("option", { name: "Frontend" }));
+    await user.click(within(options).getByRole("option", { name: "API" }));
+    expect(within(dialog).getByRole("button", { name: "Remove Frontend" })).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Summary *"), "Split the checkout bundle");
     await user.click(await submitButton(dialog));
     await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
@@ -687,5 +706,59 @@ describe("NewIssueModal", () => {
       summary: "Add docs",
       description: "h2. Steps",
     }));
+  });
+});
+
+// Issue #65 item 2. The dialog offered six fixed types. The reporter's own
+// project has Todo, Improvement, Bug, Story, Epic and Technical task, so two
+// of TAM's were offered and do not exist there and two of the project's
+// could not be created at all.
+describe("NewIssueModal, the types the project actually has", () => {
+  const todop = [
+    { id: "10000", name: "Todo", subtask: false, logical: "task" as const },
+    { id: "4", name: "Improvement", subtask: false, logical: "" as const },
+    { id: "18", name: "Story", subtask: false, logical: "story" as const },
+    { id: "17", name: "Epic", subtask: false, logical: "epic" as const },
+    { id: "19", name: "Technical task", subtask: true, logical: "subtask" as const },
+  ];
+
+  it("offers the project's own type names and leaves out the ones it has not got", async () => {
+    vi.mocked(api.ListProjectTypes).mockResolvedValue(todop);
+    renderModal();
+    const select = await screen.findByLabelText("Type");
+    await waitFor(() =>
+      expect([...(select as HTMLSelectElement).options].map((o) => o.text)).toEqual([
+        "Todo", "Improvement", "Story", "Epic",
+      ]),
+    );
+  });
+
+  it("drafts a type TAM has no concept of under the project's own name for it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListProjectTypes).mockResolvedValue(todop);
+    renderModal();
+    const dialog = await screen.findByRole("dialog");
+    // Wait for the option, not the control: the select is enabled and on
+    // TAM's fallback list until the project's own types land.
+    await within(dialog).findByRole("option", { name: "Improvement" });
+    await user.selectOptions(within(dialog).getByLabelText("Type"), "Improvement");
+    await user.type(within(dialog).getByLabelText("Summary *"), "Trim the checkout bundle");
+    await user.click(await submitButton(dialog));
+    await waitFor(() => expect(api.CreateIssue).toHaveBeenCalled());
+    // Not "task". A type the store has never mapped keeps the project's own
+    // name all the way to the create.
+    expect(vi.mocked(api.CreateIssue).mock.calls[0][1].type).toBe("Improvement");
+  });
+
+  it("falls back to TAM's own types and says so when nothing has been recorded", async () => {
+    vi.mocked(api.ListProjectTypes).mockResolvedValue([]);
+    renderModal();
+    const select = await screen.findByLabelText("Type");
+    expect([...(select as HTMLSelectElement).options].map((o) => o.value)).toEqual([
+      "task", "epic", "story", "bug", "requirement",
+    ]);
+    expect(
+      screen.getByText("These are TAM's own types. A sync reads the ones this project has."),
+    ).toBeInTheDocument();
   });
 });

@@ -211,11 +211,11 @@ func (b *Backend) GetIssueDetail(_ context.Context, key string) (backend.IssueDe
 
 func (b *Backend) IssueTypes(context.Context, string) ([]backend.IssueType, error) {
 	return []backend.IssueType{
-		{ID: "1", Name: "Task"},
-		{ID: "2", Name: "Epic"},
-		{ID: "3", Name: "Story"},
-		{ID: "4", Name: "Bug"},
-		{ID: "5", Name: "Requirement"},
+		{ID: "1", Name: "Task", Logical: backend.TypeTask},
+		{ID: "2", Name: "Epic", Logical: backend.TypeEpic},
+		{ID: "3", Name: "Story", Logical: backend.TypeStory},
+		{ID: "4", Name: "Bug", Logical: backend.TypeBug},
+		{ID: "5", Name: "Requirement", Logical: backend.TypeRequirement},
 	}, nil
 }
 

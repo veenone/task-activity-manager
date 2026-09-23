@@ -13,7 +13,11 @@ export function TypeChip({ type, subtaskLabel }: { type: string; subtaskLabel?: 
   const t = ISSUE_TYPES.find((x) => x.id === type);
   const instanceName = type === "subtask" ? (subtaskLabel ?? "") : "";
   return (
-    <span className={`chip chip-type chip-type-${type || "none"}`} title={instanceName || t?.label || type}>
+    // The palette class only for a type that has one. A draft can carry the
+    // project's own name for a type TAM has no concept of (issue #65 item
+    // 2), and chip-type-Improvement is a class no stylesheet defines, which
+    // renders as unstyled text and reports nothing.
+    <span className={`chip chip-type chip-type-${t ? type : "none"}`} title={instanceName || t?.label || type}>
       {instanceName || t?.short || type}
     </span>
   );

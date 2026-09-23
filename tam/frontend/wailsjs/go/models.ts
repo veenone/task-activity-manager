@@ -268,6 +268,24 @@ export namespace backend {
 	        this.extra = source["extra"];
 	    }
 	}
+	export class IssueType {
+	    id: string;
+	    name: string;
+	    subtask: boolean;
+	    logical: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new IssueType(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.subtask = source["subtask"];
+	        this.logical = source["logical"];
+	    }
+	}
 	
 	export class LinkDraft {
 	    type: string;

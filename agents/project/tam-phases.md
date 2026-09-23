@@ -1311,6 +1311,30 @@ from issue it belong to, through detail panel "+ <sub-task type>" button,
 which open create dialog with type locked and parent stated rather than
 chosen.
 
+**New issue dialog offer project's own types (issue #65).** Six logical types
+stay: grid chip, filter bar, epic tree, sync scope all still key off them.
+What change is the dialog's list. Sync call `IssueBackend.IssueTypes` and
+leave answer in `profile_setting` key `project_types`, JSON of
+`backend.IssueType` where each carry project's own `name`, Jira's `subtask`
+flag, and `logical`, which `jira.logicalType` fill in and which is `""` for
+type TAM have no concept of. `App.ListProjectTypes` read that setting and
+nothing else: dialog must not reach Jira when user press New, and instance
+behind #65 answer per-type create-meta with error anyway (#51). Setting not
+new table on purpose: `profile_setting` already profile-keyed and already in
+both `PurgeProfile` list, so no migration and no new name to keep in step.
+
+Dialog list project's non-sub-task types under project's own names, value =
+`logical` when there is one else the Jira name. So project that call task
+level "Todo" show "Todo" and still draft `task`; "Improvement", which map to
+nothing, draft as `"Improvement"`. `jira.typeNameIn` is where draft type
+become Jira name: TAM's six through `jiraTypeNames`, else project's own name
+verbatim **only when project type list carry it**, else error naming the
+type. Type store never heard of must not become task. `TypeChip` draw such
+type with its own name on neutral `chip-type-none`, because
+`chip-type-Improvement` is class no stylesheet define. Profile that never
+sync have nothing recorded: dialog fall back to TAM's five creatable types
+and say so under the select, so create still work.
+
 ## The detail sidebar
 
 Panel = XTM's (`references/xtm-detail-sidebar.png`): dark instrument bar

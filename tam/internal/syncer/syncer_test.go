@@ -671,3 +671,40 @@ func TestNilBoardsFieldRunsNoBoardsPass(t *testing.T) {
 		t.Errorf("summary.Boards = %+v, want nil when the engine has no Boards repository", sum.Boards)
 	}
 }
+
+// Issue #65 item 2. The New issue dialog offers the types the project really
+// has, and it reads them from the store so that pressing New reaches no
+// network. The sync is what puts them there.
+func TestSyncStoresTheProjectsIssueTypes(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	if _, err := syncer.New(demobackend.New("DEMO"), repo).Sync(ctx, "p1", "DEMO", "", false, nil); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	types, err := repo.ProjectTypes(ctx, "p1")
+	if err != nil {
+		t.Fatalf("project types: %v", err)
+	}
+	if len(types) != 5 || types[0].Name != "Task" || types[0].Logical != backend.TypeTask {
+		t.Errorf("project types = %+v, want the demo project's five", types)
+	}
+}
+
+// A list that cannot be read leaves the stored one alone, the same way a
+// nameless user does. Emptying it would take the dialog back to TAM's own
+// six on a project whose types are already known.
+func TestSyncKeepsStoredIssueTypesWhenTheyCannotBeRead(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+	seeded := []backend.IssueType{{ID: "4", Name: "Improvement"}}
+	if err := repo.PutProjectTypes(ctx, "p1", seeded); err != nil {
+		t.Fatalf("seed types: %v", err)
+	}
+	if _, err := syncer.New(&fake{}, repo).Sync(ctx, "p1", "DEMO", "", false, nil); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	types, err := repo.ProjectTypes(ctx, "p1")
+	if err != nil || len(types) != 1 || types[0].Name != "Improvement" {
+		t.Errorf("project types = %+v, %v, want the seeded list kept", types, err)
+	}
+}

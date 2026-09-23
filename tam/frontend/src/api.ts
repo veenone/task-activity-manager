@@ -77,6 +77,25 @@ export const ISSUE_TYPES: { id: IssueType; label: string; short: string }[] = [
   { id: "subtask", label: "Sub-task", short: "Sub" },
 ];
 
+// DraftType is a logical type or an instance's own type name. The string
+// half keeps the six autocompleting where one is meant.
+export type DraftType = IssueType | (string & {});
+
+// ProjectType is one issue type a project offers, under the project's own
+// name for it. logical is TAM's type for it, "" when TAM has none, which is
+// the state the dialog carries rather than rounding to "task".
+export interface ProjectType {
+  id: string;
+  name: string;
+  subtask: boolean;
+  // TAM's logical type for this one, "" when TAM has none, which is the
+  // state the dialog carries rather than rounding to "task". Not narrowed
+  // to IssueType: this crosses the binding, so the value is whatever the Go
+  // side sent, and the dialog treats anything it does not recognise as the
+  // project's own type rather than trusting the string.
+  logical: string;
+}
+
 export interface Issue {
   key: string;
   id: string;
@@ -761,7 +780,12 @@ export interface AuditEntry {
 }
 
 export interface IssueDraft {
-  type: IssueType;
+  // One of TAM's six logical types, or the project's own name for a type
+  // TAM has none for. The New issue dialog offers the types the project
+  // really has, and some of them are neither of TAM's concepts nor a
+  // renaming of one (issue #65 item 2). The Jira backend accepts a name
+  // verbatim only when the project's type list carries it.
+  type: DraftType;
   summary: string;
   description: string;
   priority: string;
@@ -1269,6 +1293,12 @@ export const ListPriorities: (profileId: string) => Promise<string[]> = App.List
 // anything, and this is how the forms say which.
 export const GetSubtaskTypeName: (profileId: string) => Promise<string> =
   App.GetSubtaskTypeName;
+// The issue types this profile's project offers, as the last sync recorded
+// them. It reads the local store and asks Jira nothing, so the New issue
+// dialog opens on it without a round trip. Empty is a profile that has
+// never synced, not a project with no types.
+export const ListProjectTypes: (profileId: string) => Promise<ProjectType[]> =
+  App.ListProjectTypes;
 
 export const GetLinkTypes: (profileId: string) => Promise<LinkType[]> = App.GetLinkTypes;
 export const GetConfluenceConfig: (profileId: string) => Promise<ConfluenceConfig> = App.GetConfluenceConfig as any;
