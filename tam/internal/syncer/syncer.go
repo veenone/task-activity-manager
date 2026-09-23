@@ -26,17 +26,17 @@ type Progress struct {
 
 // Summary is what a finished sync reports.
 type Summary struct {
-	Fetched  int    `json:"fetched"`
-	Upserted int    `json:"upserted"`
-	Skipped  int    `json:"skipped"`
+	Fetched  int `json:"fetched"`
+	Upserted int `json:"upserted"`
+	Skipped  int `json:"skipped"`
 	// ProjectTotal is how many issues the project holds, counted with no
 	// scope and no cut-off, so the summary says what it fetched against
 	// what was there. Zero when the count could not be read. Without it
 	// "38 fetched, 38 upserted, 0 skipped" read as a project of 38 when
 	// the project held 2,943 (#68).
-	ProjectTotal int `json:"projectTotal"`
-	Full     bool   `json:"full"`
-	Elapsed  string `json:"elapsed"`
+	ProjectTotal int    `json:"projectTotal"`
+	Full         bool   `json:"full"`
+	Elapsed      string `json:"elapsed"`
 	// Boards is the boards pass's own summary. It is nil when the engine
 	// has no Boards repository, which is what "the pass did not run"
 	// means; a failed pass still fills it in, since the issues it landed

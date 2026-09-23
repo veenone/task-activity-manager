@@ -49,9 +49,9 @@ type fake struct {
 	// only part of. Zero means the pages are the whole project.
 	projectTotal int
 	failPage     int // 1-based page index that returns failErr; 0 for none
-	failErr   error
-	connErr   error
-	sinceSeen []string
+	failErr      error
+	connErr      error
+	sinceSeen    []string
 
 	boards       []backend.Board
 	boardsErr    error
