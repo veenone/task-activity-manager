@@ -73,11 +73,15 @@ type RawHistoryItem struct {
 	ToString   string `json:"toString"`
 }
 
-// IssueType is one entry of a project's issue type list.
+// IssueType is one entry of a project's issue type list. IconURL is the
+// avatar the instance serves for the type; it is the only field here that
+// says which plugin defined the type, because a plugin's types are drawn
+// from its own bundled resources.
 type IssueType struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Subtask bool   `json:"subtask"`
+	IconURL string `json:"iconUrl"`
 }
 
 // ErrFieldNotFound is returned by CustomFieldID when the instance has no

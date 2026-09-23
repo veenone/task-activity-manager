@@ -217,3 +217,20 @@ func TestFieldNameAnswersPerIdWhateverTheDuplicates(t *testing.T) {
 		t.Errorf("an unknown id has no name: %q", n)
 	}
 }
+
+// The icon a project's issue type carries is the only signal in this
+// response that says which plugin defined the type, so it is decoded.
+func TestIssueTypesKeepsTheIconURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"key":"PLAT","issueTypes":[{"id":"1","name":"Task","iconUrl":"https://jira/secure/viewavatar?avatarId=1"}]}`))
+	}))
+	defer srv.Close()
+
+	types, err := NewClientWithHTTP(srv.URL, "tok", srv.Client()).IssueTypes(context.Background(), "PLAT")
+	if err != nil {
+		t.Fatalf("types: %v", err)
+	}
+	if len(types) != 1 || types[0].IconURL != "https://jira/secure/viewavatar?avatarId=1" {
+		t.Errorf("types = %+v", types)
+	}
+}
