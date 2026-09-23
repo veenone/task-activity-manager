@@ -357,7 +357,6 @@ describe('instruction gate', () => {
     const HOOKS = new Set([
       'confirm-modal', 'richfield', 'detail-section', 'link-groups', 'folder-node',
       'epic-cell-summary', 'epic-cell-status', 'issue-summary', 'sprint-tree',
-      'sprint-cell-state',
     ]);
     const orphans = [...used]
       .filter(([name]) => !defined.has(name) && !VENDOR_CLASSES.test(name) && !HOOKS.has(name))

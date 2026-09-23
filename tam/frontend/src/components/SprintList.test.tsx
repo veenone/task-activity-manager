@@ -118,8 +118,13 @@ describe("SprintList", () => {
   it("renders the goal under the sprint, and says so when the column is still empty", async () => {
     const user = userEvent.setup();
     renderList();
-    expect(await screen.findByText("Ship checkout")).toBeInTheDocument();
-    await user.click(screen.getByRole("treeitem", { name: "Sprint 13, Future" }));
+    // The goal is on the row as well as under the expanded sprint now, so
+    // an unscoped query finds it twice once a sprint is open. The row's
+    // copy is the clipped one; the group's is the one with a line to
+    // itself and with wording for a sprint that has no goal at all.
+    const group = await screen.findByRole("group");
+    expect(within(group).getByText("Ship checkout")).toBeInTheDocument();
+    await user.click(screen.getByRole("treeitem", { name: /^Sprint 13, Future/ }));
     // A sprint cached before the goal column existed reads as having no
     // goal, and a refresh is what tells the two apart.
     expect(screen.getByText("No goal recorded yet; refresh the board.")).toBeInTheDocument();
@@ -183,11 +188,15 @@ describe("SprintList", () => {
     expect(await screen.findByText(/3 cards in this list have not been synced/)).toBeInTheDocument();
   });
 
-  it("explains an empty closed sprint rather than calling it empty", async () => {
+  it("says a closed sprint has not been read yet rather than calling it empty", async () => {
     const user = userEvent.setup();
     renderList([detail({ id: 11, name: "Sprint 11", state: "closed", issues: [], membershipCached: false })]);
-    await user.click(await screen.findByRole("treeitem", { name: "Sprint 11, Closed" }));
-    expect(screen.getByText(/A closed sprint's cards are not synced/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("treeitem", { name: /^Sprint 11, Closed/ }));
+    // The cards are coming now: the sync reads a closed sprint's membership
+    // once and keeps it, so the empty list is a fact about this cache and
+    // not about the sprint.
+    expect(screen.getByText(/have not been read yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/whatever the sprint held/)).not.toBeInTheDocument();
   });
 
   it("keeps every sprint's row id out of the keys a fill can send", () => {
@@ -203,8 +212,10 @@ describe("SprintList", () => {
   it("draws the board's own work last, as a node that is not a sprint", async () => {
     renderList();
     const items = screen.getAllByRole("treeitem").map((i) => i.getAttribute("aria-label"));
-    expect(items[items.length - 1]).toBe("Board backlog");
-    const backlog = screen.getByRole("treeitem", { name: "Board backlog" });
+    // The row's name carries what it draws, so this checks which node is
+    // last rather than the whole label.
+    expect(items[items.length - 1]).toMatch(/^Board backlog,/);
+    const backlog = screen.getByRole("treeitem", { name: /^Board backlog/ });
     expect(within(backlog).queryByRole("button")).not.toBeInTheDocument();
   });
 });

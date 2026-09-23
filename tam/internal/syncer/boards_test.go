@@ -80,7 +80,8 @@ func TestSyncBoardsLandsScrumAndKanbanBoardsWithColumnsSprintsAndKeys(t *testing
 	// Cards counts distinct keys per board: board 1 holds PLAT-1 and
 	// PLAT-2 whether they are counted from its own list or from sprints 12
 	// and 13, so it contributes 2, and board 2 contributes PLAT-3. Closed
-	// sprint 11 is never asked for.
+	// sprint 11 is asked for once and this fake holds nothing under it, so
+	// it adds none.
 	if sum.Cards != 3 {
 		t.Errorf("cards = %d, want 3 distinct keys", sum.Cards)
 	}
@@ -114,7 +115,7 @@ func TestSyncBoardsLandsScrumAndKanbanBoardsWithColumnsSprintsAndKeys(t *testing
 	}
 }
 
-func TestSyncBoardsOnlyFetchesActiveAndFutureSprintKeys(t *testing.T) {
+func TestSyncBoardsFetchesEveryScopeOnABoardNothingHasBeenReadFor(t *testing.T) {
 	repo, boards := newBoardRepos(t)
 	fb := &fake{
 		boards:  []backend.Board{{ID: 1, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}},
@@ -124,7 +125,7 @@ func TestSyncBoardsOnlyFetchesActiveAndFutureSprintKeys(t *testing.T) {
 			{ID: 12, BoardID: 1, Name: "Sprint 12", State: "active"},
 			{ID: 13, BoardID: 1, Name: "Sprint 13", State: "future"},
 		}},
-		issueKeys: map[int]map[string][]string{1: {"": {}, "12": {}, "13": {}}},
+		issueKeys: map[int]map[string][]string{1: {"": {}, "11": {}, "12": {}, "13": {}}},
 	}
 	e := syncer.New(fb, repo)
 	e.Boards = boards
@@ -136,11 +137,14 @@ func TestSyncBoardsOnlyFetchesActiveAndFutureSprintKeys(t *testing.T) {
 	for _, r := range fb.keysRequested {
 		seen[r.SprintID] = true
 	}
-	if !seen[""] || !seen["12"] || !seen["13"] {
-		t.Errorf("keys requested = %+v, want the board's own list plus sprints 12 and 13", fb.keysRequested)
-	}
-	if seen["11"] {
-		t.Error("sprint 11 is closed; its keys must not be fetched")
+	// This case used to assert the opposite about sprint 11: a closed
+	// sprint's keys were never fetched at all, so the Sprints view only
+	// ever had numbers for a sprint that was still running. That left the
+	// progress bar on the commonest row in the view structurally empty, so
+	// the rule was reversed. A closed sprint is read once now, and
+	// closedmembership_test.go holds the once.
+	if !seen[""] || !seen["11"] || !seen["12"] || !seen["13"] {
+		t.Errorf("keys requested = %+v, want the board's own list plus all three sprints", fb.keysRequested)
 	}
 }
 

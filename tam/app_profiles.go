@@ -132,6 +132,17 @@ func (a *App) UpdateProfile(id, name, jiraURL, projectKey, scopeJQL, token, caCe
 		if err := a.repo.PurgeProfile(a.ctx, id); err != nil {
 			return profile.Profile{}, fmt.Errorf("clear the cached rows of the old project: %w", err)
 		}
+		// The board tables are boardrepo's, not issuerepo's, so they are
+		// purged beside it rather than by it, exactly as DeleteProfile does.
+		// Leaving them was survivable while every boards sync deleted and
+		// rewrote a board's membership on the way past. It stopped being
+		// survivable when the sync started reading that membership back and
+		// treating it as an answer: the old project's keys would be
+		// re-supplied for ever and the sprint would report itself read while
+		// holding another project's cards.
+		if err := a.boards.PurgeProfile(a.ctx, id); err != nil {
+			return profile.Profile{}, fmt.Errorf("clear the cached boards of the old project: %w", err)
+		}
 	}
 	return a.profiles.Get(id)
 }

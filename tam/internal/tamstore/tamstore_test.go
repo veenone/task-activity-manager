@@ -1071,3 +1071,43 @@ func TestVersionSeventeenMigrationAddsDescriptionAndClearsEveryWatermark(t *test
 		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
 	}
 }
+
+func TestSchemaVersionEighteenAddsTheSprintMembershipFlagToAnOlderDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE sprint DROP COLUMN membership_synced`,
+		`INSERT INTO sprint (profile_id, id, board_id, name, state) VALUES ('p1', 11, 1, 'Sprint 11', 'closed')`,
+		`UPDATE meta SET value = '16' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var synced int
+	var name string
+	if err := db.DB().QueryRow(
+		`SELECT name, membership_synced FROM sprint WHERE profile_id = 'p1' AND board_id = 1 AND id = 11`,
+	).Scan(&name, &synced); err != nil {
+		t.Fatalf("read the kept sprint: %v", err)
+	}
+	// The row is kept and starts unread, which is the truth for every
+	// sprint cached before this version: no closed sprint's membership was
+	// ever fetched, so nothing is there to be marked as read.
+	if name != "Sprint 11" || synced != 0 {
+		t.Errorf("sprint = %q membership_synced %d, want the row kept and unread", name, synced)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}

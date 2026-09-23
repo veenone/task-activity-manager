@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -150,6 +150,14 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>, sprint: string
 }
 
 beforeEach(() => {
+  // The view prints a relative line about the running sprint, so its
+  // wording depends on the clock. toFake: ["Date"] and nothing else, since
+  // this suite clicks and faking every timer breaks userEvent.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  // A local civil day, not a UTC instant: the line under test counts
+  // days, and an instant is a different day either side of about eleven
+  // hours from UTC.
+  vi.setSystemTime(new Date(2026, 8, 3, 12, 0, 0));
   vi.clearAllMocks();
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Acme Platform", jiraUrl: "demo", projectKey: "PLAT", backend: "jira", createdAt: "" },
@@ -184,22 +192,29 @@ beforeEach(() => {
   vi.mocked(api.ListPriorities).mockResolvedValue(["High"]);
   vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Sub-task");
 });
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 
 describe("SprintsView", () => {
   it("draws every sprint on the board with its state, dates and progress", async () => {
     renderView();
-    expect(await screen.findByRole("treeitem", { name: "Sprint 12, Active" })).toBeInTheDocument();
-    expect(screen.getByRole("treeitem", { name: "Sprint 13, Future" })).toBeInTheDocument();
+    expect(await screen.findByRole("treeitem", { name: /^Sprint 12, Active/ })).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: /^Sprint 13, Future/ })).toBeInTheDocument();
     expect(screen.getByText("1 of 3 done, 3 of 13 pts")).toBeInTheDocument();
     // Closed sprints are behind the toggle, and the board's own work is not
     // a sprint and is never behind it.
     expect(screen.queryByRole("treeitem", { name: /Sprint 11/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("treeitem", { name: "Board backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("treeitem", { name: /^Board backlog/ })).toBeInTheDocument();
   });
 
   it("orients the reader with one line about the sprint that is running", async () => {
     renderView();
-    expect(await screen.findByText(/^Sprint 12, day \d+ of 14, 1 of 3 done, 3 of 13 pts$/)).toBeInTheDocument();
+    // The clock is pinned, so the day number is asserted rather than
+    // wildcarded: an off-by-one in the day count is exactly what a \d+
+    // would have waved through, and it is the bug this line had.
+    expect(await screen.findByText("Sprint 12, Day 6 of 15, 1 of 3 done, 3 of 13 pts")).toBeInTheDocument();
   });
 
   it("says in the summary line what the running sprint's progress does not count", async () => {
@@ -236,7 +251,7 @@ describe("SprintsView", () => {
     const user = userEvent.setup();
     renderView();
     await user.click(await screen.findByLabelText("Show closed sprints"));
-    expect(await screen.findByRole("treeitem", { name: "Sprint 11, Closed" })).toBeInTheDocument();
+    expect(await screen.findByRole("treeitem", { name: /^Sprint 11, Closed/ })).toBeInTheDocument();
   });
 
   it("says which empty it is when the profile has no scrum board", async () => {
@@ -309,7 +324,7 @@ describe("SprintsView", () => {
     renderView();
     // Only the active sprint opens by itself, so Sprint 13 is opened by
     // hand to put its card on screen under Sprint 12's three.
-    await user.click(await screen.findByRole("treeitem", { name: "Sprint 13, Future" }));
+    await user.click(await screen.findByRole("treeitem", { name: /^Sprint 13, Future/ }));
     await user.click(await screen.findByRole("treeitem", { name: "PLAT-412 Apply promo code" }));
     await user.keyboard("{Shift>}");
     await user.click(screen.getByRole("treeitem", { name: "PLAT-500 Draft the migration" }));

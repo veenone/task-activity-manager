@@ -1483,3 +1483,60 @@
 }
 .row-summary { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
 .row-summary-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* State badge (StatusBadge.tsx): the one chip that says what state a thing
+   is in. The uppercase look is here and not in the string, so the label a
+   row also builds its accessible name from stays a word rather than four
+   letters a screen reader spells out. The glyph is what carries the state
+   for a reader who cannot tell the fills apart. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.status-badge-glyph { font-size: 0.9em; line-height: 1; }
+.status-badge-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.status-badge-active { background: var(--state-active-soft); color: var(--state-active); }
+.status-badge-future { background: var(--state-future-soft); color: var(--state-future); }
+.status-badge-closed { background: var(--state-closed-soft); color: var(--state-closed); }
+.status-badge-draft { background: var(--state-draft-soft); color: var(--state-draft); }
+
+/* Progress bar (ProgressBar.tsx): a track, a fill, and an optional marker
+   across it. The element itself is the track, so there is one box and not
+   two, and the marker is absolutely positioned inside it, which is why the
+   track establishes a containing block. Its value is in aria-valuenow and
+   aria-valuetext, so the bar still says what it means where no stylesheet
+   applies. */
+.progress-bar {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 6px;
+  background: var(--bar-track);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+/* The fill takes its colour from the tone below, never from here: a
+   default here and a tone rule too is one of them dead. */
+.progress-bar-fill { display: block; height: 100%; }
+.progress-bar-time .progress-bar-fill { background: var(--bar-time); }
+.progress-bar-points .progress-bar-fill { background: var(--bar-points); }
+.progress-bar-muted .progress-bar-fill { background: var(--text-muted); }
+/* The marker rides on the fill rather than being clipped by it, so today's
+   line is visible whether the sprint is ahead of it or behind it. */
+.progress-bar-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--today-marker);
+}

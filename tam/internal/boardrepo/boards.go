@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"agile-suite/tam/internal/backend"
@@ -21,7 +22,15 @@ const insertColumnSQL = `
 	INSERT INTO board_column (profile_id, board_id, position, name, status_ids) VALUES (?, ?, ?, ?, ?)`
 
 const insertSprintSQL = `
-	INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, goal, complete_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, goal, complete_date, membership_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+// syncedSprintsSQL reads which of a board's sprints a boards pass has
+// already asked Jira the membership of. It is one query per board rather
+// than one per sprint: the backfill consults it for every closed sprint on
+// the board, and the Sprints view reads it again to answer whether a closed
+// sprint's zero is a count or the absence of one.
+const syncedSprintsSQL = `
+	SELECT id FROM sprint WHERE profile_id = ? AND board_id = ? AND membership_synced = 1`
 
 const insertIssueKeySQL = `
 	INSERT INTO board_issue (profile_id, board_id, sprint_id, key, position) VALUES (?, ?, ?, ?, ?)`
@@ -226,6 +235,38 @@ func issueKeys(ctx context.Context, q dbtx.Querier, profileID string, boardID in
 			return nil, err
 		}
 		out = append(out, key)
+	}
+	return out, rows.Err()
+}
+
+// SyncedSprints returns the ids, as the strings every scope is keyed by, of
+// the sprints of one board whose membership a pass has asked Jira for and
+// got an answer to, whether that answer held cards or nothing.
+//
+// It is the one bit board_issue cannot carry. A closed sprint that holds
+// nothing of this project has no rows there, and neither has one nobody has
+// read; without this the backfill counted the first as unread for ever,
+// spent a unit of its per-pass budget on it every time, and never reached
+// the older sprints behind it.
+func (r *Repository) SyncedSprints(ctx context.Context, profileID string, boardID int) (map[string]bool, error) {
+	return syncedSprints(ctx, r.db, profileID, boardID)
+}
+
+// syncedSprints is the read itself, on whichever querier the caller hands
+// it, so the Sprints view can take it from the same snapshot as the rest.
+func syncedSprints(ctx context.Context, q dbtx.Querier, profileID string, boardID int) (map[string]bool, error) {
+	rows, err := q.QueryContext(ctx, syncedSprintsSQL, profileID, boardID)
+	if err != nil {
+		return nil, fmt.Errorf("board %d synced sprints: %w", boardID, err)
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[strconv.Itoa(id)] = true
 	}
 	return out, rows.Err()
 }

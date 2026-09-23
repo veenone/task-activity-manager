@@ -24,6 +24,15 @@ export function plural(n: number, one: string, many: string): string {
 // dates are days a team plans around, and "today 09:14" is neither.
 export function day(iso: string): string {
   if (!iso) return "";
+  // The civil day off the stamp, the way dayInput reads it, rendered the
+  // way calendarDay renders one. Putting the stamp through new Date() and
+  // toLocaleDateString is the bug dayInput's own comment warns about: a
+  // sprint starting at 09:00 UTC read as the day before for a reader west
+  // of it, and the row moved the sprint by a day. A stamp that carries no
+  // leading date falls back to the old path, so day("not a date") is still
+  // "".
+  const bare = dayInput(iso);
+  if (bare) return calendarDay(bare);
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -34,11 +43,29 @@ export function day(iso: string): string {
 // as UTC midnight and so prints the day before for a reader west of
 // Greenwich; the backend bucketed these days in the local zone already.
 export function calendarDay(date: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!match) return "";
-  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return "";
+  const d = civilDay(date);
+  return d ? d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
 }
+
+// civilDay is the local midnight of the day a stamp names, and the one place
+// in this file that turns a date into a Date. It reads the literal date off
+// the stamp, which is right for a team in the zone Jira stamped it in and a
+// day early for one east of that; see "civilDay reads the literal date" in
+// agents/project/tam-phases.md, which is a decision nobody has taken rather
+// than an oversight. Everything about a sprint that
+// is counted in days is counted from these rather than from the instants
+// Jira sent: a sprint starting at 09:00 UTC and one starting at 23:00 UTC on
+// the same day are the same day to the team planning around it, and reading
+// them as instants made them a day apart for half the world.
+function civilDay(iso: string): Date | null {
+  const bare = dayInput(iso);
+  if (!bare) return null;
+  return new Date(Number(bare.slice(0, 4)), Number(bare.slice(5, 7)) - 1, Number(bare.slice(8, 10)));
+}
+
+// startOfDay is civilDay for a clock reading rather than a stamp.
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
 // sprintDates is a sprint's range in one phrase. A sprint missing one of its
 // dates still says what it knows rather than nothing: Jira leaves both empty
@@ -81,22 +108,83 @@ export function progressText(done: number, total: number, donePoints: number, al
   return `${done} of ${total} done` + (allPoints > 0 ? `, ${points(donePoints)} of ${points(allPoints)} pts` : "");
 }
 
-// MS_PER_DAY is the whole-day divisor dayOfSprint measures with.
+// MS_PER_DAY is the whole-day divisor every day count below measures with.
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-// dayOfSprint answers "day 6 of 14" for a sprint that is running, and ""
-// for one that cannot be measured: either date missing or unreadable, or a
-// range that ends before it starts. The day is clamped to the range, so a
-// sprint running past its end date reads as its last day rather than as day
-// 19 of 14, which is a fact about the sprint being late and not about the
-// calendar this line is drawing.
-export function dayOfSprint(startIso: string, endIso: string, now: Date = new Date()): string {
-  if (!startIso || !endIso) return "";
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "";
-  const length = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
-  if (length < 1) return "";
-  const elapsed = Math.round((now.getTime() - start.getTime()) / MS_PER_DAY) + 1;
-  return `day ${Math.min(Math.max(elapsed, 1), length)} of ${length}`;
+// days is the whole number of days from one instant to another, rounded, so
+// a stamp's time of day cannot turn a fortnight into 13.6 days.
+const days = (from: Date, to: Date) => Math.round((to.getTime() - from.getTime()) / MS_PER_DAY);
+
+// sprintSpan is where a sprint is in its own calendar: which day of it today
+// is, clamped to the range, and how many days it runs for, counting both end
+// days. It is null for a sprint that cannot be measured, which is either date
+// missing or unreadable, or a range that ends before it starts.
+//
+// sprintRelative is its one reader, and the row and the Sprints view's own
+// summary line both go through that, so they cannot print two lengths for
+// one sprint, which is what happened while the length was the bare
+// difference between the dates and each surface counted it itself.
+function sprintSpan(startIso: string, endIso: string, now: Date): { day: number; length: number; over: number } | null {
+  const start = civilDay(startIso);
+  const end = civilDay(endIso);
+  if (!start || !end) return null;
+  const between = days(start, end);
+  if (between < 0) return null;
+  const length = between + 1;
+  const today = startOfDay(now);
+  const elapsed = days(start, today) + 1;
+  return { day: Math.min(Math.max(elapsed, 1), length), length, over: Math.max(days(end, today), 0) };
+}
+
+// SprintTiming is the whole of what a row says about where a sprint is in
+// its calendar, in one call, so the wording lives in one place rather than
+// once per surface that draws a sprint.
+export interface SprintTiming {
+  // "Day 6 of 15", "Starts in 11 days", "Closed 11 Sep", "2 days over".
+  label: string;
+  // "8 days left", "15 days", or "" for a row with no length to state.
+  trailing: string;
+  // 0 to 1, how far through its calendar the sprint is. -1 when it has no
+  // readable range, which is what tells the row to draw no time bar at all:
+  // a bar at zero would say the sprint has not started, and this one is
+  // saying nothing is known.
+  elapsed: number;
+}
+
+const NO_TIMING: SprintTiming = { label: "", trailing: "", elapsed: -1 };
+
+// sprintRelative words one sprint's place in its calendar. It takes now as a
+// defaulted parameter, the way formatWhen and dayOfSprint do, so nothing has
+// to thread a clock down through the tree; a test pins the clock instead.
+export function sprintRelative(
+  s: { startDate: string; endDate: string; state: string; completeDate?: string },
+  now: Date = new Date(),
+): SprintTiming {
+  const span = sprintSpan(s.startDate, s.endDate, now);
+  if (!span) return NO_TIMING;
+  const length = `${plural(span.length, "day", "days")}`;
+  if (s.state === "closed") {
+    // The day it was actually completed when Jira recorded one, which is
+    // not always the day it was scheduled to end.
+    return { label: `Closed ${day(s.completeDate || s.endDate)}`, trailing: length, elapsed: 1 };
+  }
+  if (s.state === "future") {
+    // A sprint stays future until somebody starts it, so a planned start
+    // can be in the past and stay there. Saying "Starts today" about it for
+    // ever is the mirror of the "2 days over" case below, and just as
+    // wrong.
+    const until = days(startOfDay(now), civilDay(s.startDate) as Date);
+    let label = "Starts today";
+    if (until > 0) label = `Starts in ${plural(until, "day", "days")}`;
+    if (until < 0) label = `${plural(-until, "day", "days")} late`;
+    return { label, trailing: length, elapsed: 0 };
+  }
+  if (span.over > 0) {
+    return { label: `${plural(span.over, "day", "days")} over`, trailing: length, elapsed: 1 };
+  }
+  return {
+    label: `Day ${span.day} of ${span.length}`,
+    trailing: `${plural(span.length - span.day, "day", "days")} left`,
+    elapsed: span.day / span.length,
+  };
 }
