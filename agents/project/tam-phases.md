@@ -2223,7 +2223,10 @@ entered. Kiwi profile file refused.
                           PendingChangesModal, ConflictCard, NewIssueModal,
                           MetaField (a create-meta field's input, by type, through META_INPUTS),
                           ProfilesModal,
-                          ProfileForm, AboutModal, ImportIssuesModal, AddLinkForm, EpicsView,
+                          ProfileForm, AboutModal, DiagnosticsModal (the paths, the build, the tail
+                          of tam.log through ReadLog, and ExportDiagnostics, in the Help menu beside
+                          About; the status bar stopped naming tam.db and profiles.db when it
+                          landed), ImportIssuesModal, AddLinkForm, EpicsView,
                           EpicTree, EpicRow, BoardsView, BoardsToolbar, BoardBody, BoardGrid,
                           BoardCard, BoardNotes, NewBoardModal (the four-field draft board create,
                           reached from BoardsToolbar beside New sprint), AddIssuesModal (the
