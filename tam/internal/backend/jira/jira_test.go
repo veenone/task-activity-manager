@@ -295,7 +295,7 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 		case strings.HasPrefix(r.URL.Path, "/rest/agile/1.0/"):
 			f.agile(w, r)
 		case r.URL.Path == "/rest/api/2/project/PLAT":
-			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"1","name":"Task"},{"id":"4","name":"Improvement"},{"id":"7","name":"Business Requirement"},{"id":"19","name":"Technical task","subtask":true}]}`))
+			_, _ = w.Write([]byte(`{"issueTypes":[{"id":"1","name":"Task","iconUrl":"https://jira/secure/viewavatar?avatarId=1"},{"id":"4","name":"Improvement","iconUrl":"https://jira/secure/viewavatar?avatarId=4"},{"id":"7","name":"Business Requirement","iconUrl":"https://jira/secure/viewavatar?avatarId=7"},{"id":"11","name":"Test","iconUrl":"https://jira/download/resources/com.xpandit.plugins.xray:xray-issue-type-resources/images/test.png"},{"id":"19","name":"Technical task","subtask":true,"iconUrl":"https://jira/secure/viewavatar?avatarId=19"}]}`))
 		default:
 			t.Errorf("unexpected request %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
@@ -391,16 +391,17 @@ func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	if err != nil || u.DisplayName != "J. Doe" {
 		t.Fatalf("connection = %+v, %v", u, err)
 	}
-	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "labels = promo", "2026-09-05T10:42:00Z", backend.AllTypes, 0, 50)
+	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "labels = promo", "2026-09-05T10:42:00Z", 0, 50)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	if total != 2 || len(page) != 2 {
 		t.Fatalf("total %d rows %d", total, len(page))
 	}
-	// The sub-task type is in the scope under the name the project gives it,
-	// which is where "Technical task" comes from.
-	wantJQL := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Business Requirement", "Technical task") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
+	// The scope names only what it keeps out: Xray's Test, recognised by the
+	// plugin icon the project serves for it. Everything else the project has
+	// is in, including the types TAM has no concept of (#68).
+	wantJQL := `project = "PLAT" AND issuetype not in ("Test") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
 	if len(f.searches) != 1 || !strings.HasPrefix(f.searches[0], wantJQL+" | fields=") {
 		t.Errorf("search request = %q", f.searches)
 	}
@@ -413,7 +414,7 @@ func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 	if page[1].Type != "requirement" {
 		t.Errorf("row 1 type = %q, want requirement (the profile's name)", page[1].Type)
 	}
-	if _, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 50); err != nil {
+	if _, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", 0, 50); err != nil {
 		t.Fatal(err)
 	}
 	if n := atomic.LoadInt32(&f.fieldCalls); n != 1 {
@@ -423,7 +424,7 @@ func TestSearchBuildsTheScopeAndMapsDiscoveredFields(t *testing.T) {
 
 func TestTheSyncsSearchAsksForNoChangelog(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	if _, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 50); err != nil {
+	if _, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", 0, 50); err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	if len(f.searches) != 1 {
@@ -436,7 +437,7 @@ func TestTheSyncsSearchAsksForNoChangelog(t *testing.T) {
 
 func TestMissingCustomFieldsLeaveColumnsEmpty(t *testing.T) {
 	b, _ := newBackend(t, `[{"id":"summary","name":"Summary","custom":false}]`)
-	page, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 50)
+	page, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", 0, 50)
 	if err != nil {
 		t.Fatalf("search with no custom fields must not fail: %v", err)
 	}

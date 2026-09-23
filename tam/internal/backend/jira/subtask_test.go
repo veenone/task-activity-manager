@@ -74,15 +74,20 @@ func TestCreateSubtaskRefusesAMissingParent(t *testing.T) {
 	}
 }
 
-// The plain task level is read off the project too: this instance calls it
-// "Todo", and asking for "Task" would have found nothing.
-func TestScopeUsesTheProjectsOwnTaskName(t *testing.T) {
+// TODOP calls its task level "Todo" and has no Xray types. Its scope names
+// no issue type at all: asking for "Task" found nothing there, and asking
+// for the six types TAM models found only the work that happened to be one
+// of them (#68).
+func TestScopeOfAProjectWithNothingToExcludeNamesNoType(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	if _, _, err := b.SearchIssuesPage(context.Background(), "TODOP", "", "", []string{backend.TypeTask}, 0, 50); err != nil {
+	if _, _, err := b.SearchIssuesPage(context.Background(), "TODOP", "", "", 0, 50); err != nil {
 		t.Fatalf("search: %v", err)
 	}
-	if len(f.searches) == 0 || !strings.Contains(f.searches[len(f.searches)-1], `issuetype in ("Todo")`) {
-		t.Errorf("scope = %v", f.searches)
+	// The recorded request is the JQL, then the fields; issuetype is one of
+	// the fields every search asks for, so only the JQL half is examined.
+	jql, _, _ := strings.Cut(f.searches[len(f.searches)-1], " | fields=")
+	if jql != `project = "TODOP" ORDER BY key ASC` {
+		t.Errorf("scope = %q", jql)
 	}
 }
 

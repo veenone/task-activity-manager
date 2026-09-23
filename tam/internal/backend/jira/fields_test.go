@@ -57,26 +57,48 @@ func TestLogicalTypeIsCaseInsensitiveAndUsesTheRequirementName(t *testing.T) {
 	}
 }
 
-func TestBuildJQL(t *testing.T) {
-	names := jiraTypeNames(backend.AllTypes, "Requirement", projectTypes{task: "Task", subtask: "Technical task"})
-	got := buildJQL("PLAT", " labels = promo ", "2026-09-05T10:42:00Z", names)
-	want := `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement", "Technical task") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
-	if got != want {
-		t.Errorf("jql =\n%s\nwant\n%s", got, want)
+func TestBuildJQLExcludesRatherThanEnumerates(t *testing.T) {
+	// With nothing to exclude the project alone is the scope. A type the
+	// project gains tomorrow is in it without TAM being taught the name,
+	// which is the whole difference from the enumerated list that fetched
+	// 38 issues of 2,943 (#68).
+	if got := buildJQL("PLAT", "", "", nil); got != `project = "PLAT" ORDER BY key ASC` {
+		t.Errorf("bare jql = %s", got)
 	}
-	got = buildJQL("PLAT", "", "", jiraTypeNames([]string{backend.TypeBug}, "Requirement", projectTypes{task: "Task", subtask: "Technical task"}))
-	want = `project = "PLAT" AND issuetype in ("Bug") ORDER BY key ASC`
+	got := buildJQL("PLAT", " labels = promo ", "2026-09-05T10:42:00Z", []string{"Test", "Test Set"})
+	want := `project = "PLAT" AND issuetype not in ("Test", "Test Set") AND (labels = promo) AND updated >= "2026-09-05 09:42" ORDER BY key ASC`
 	if got != want {
-		t.Errorf("minimal jql = %s", got)
+		t.Errorf("jql = %s, want %s", got, want)
 	}
-	if got := buildJQL("PLAT", "", "not a time", names); got != `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement", "Technical task") ORDER BY key ASC` {
+	if got := buildJQL("PLAT", "", "not a time", nil); got != `project = "PLAT" ORDER BY key ASC` {
 		t.Errorf("an unparseable since is dropped: %s", got)
 	}
-	// Jira rejects a whole query naming an issuetype the instance lacks, so a
-	// project without sub-tasks must not have one quoted into its scope.
-	noSub := jiraTypeNames(backend.AllTypes, "Requirement", projectTypes{task: "Task"})
-	if got := buildJQL("PLAT", "", "", noSub); got != `project = "PLAT" AND issuetype in ("Task", "Epic", "Story", "Bug", "Requirement") ORDER BY key ASC` {
-		t.Errorf("a project without sub-tasks: %s", got)
+}
+
+// The ceiling of the icon heuristic, written as cases rather than as a
+// sentence nobody runs. Xray's types are drawn from the plugin's own
+// bundled resources, so their icon URL carries the plugin key; nothing else
+// in the project response says where a type came from.
+func TestXrayTypesAreRecognisedByTheirPluginIcon(t *testing.T) {
+	cases := map[string]bool{
+		"https://jira.example/download/resources/com.xpandit.plugins.xray:xray-issue-type-resources/images/test.png": true,
+		"https://jira.example/download/resources/com.xpandit.plugins.xray:xray-resources/images/precondition.png":    true,
+		"HTTPS://JIRA.EXAMPLE/DOWNLOAD/RESOURCES/COM.XPANDIT.PLUGINS.XRAY:XRAY-ISSUE-TYPE-RESOURCES/IMAGES/TEST.PNG": true,
+		"https://jira.example/secure/viewavatar?size=xsmall&avatarId=10318&avatarType=issuetype":                     false,
+		"": false,
+		// The ceiling. An instance that replaces an Xray type's icon with an
+		// uploaded avatar looks like any other type here, and its Tests are
+		// synced into TAM. There is no second signal in this response to
+		// check it against.
+		"https://jira.example/secure/viewavatar?size=xsmall&avatarId=10999&avatarType=issuetype#Test": false,
+		// The other half of the same ceiling: a type of the project's own
+		// that was given an Xray icon is excluded from the sync.
+		"https://jira.example/download/resources/com.xpandit.plugins.xray:xray-issue-type-resources/images/test.png?id=own": true,
+	}
+	for icon, want := range cases {
+		if got := isXrayType(icon); got != want {
+			t.Errorf("isXrayType(%q) = %v, want %v", icon, got, want)
+		}
 	}
 }
 
@@ -122,8 +144,10 @@ func TestParseIssuePrefersParentOverEpicLinkAndToleratesMissingFields(t *testing
 	if iss.ParentKey != "PLAT-412" {
 		t.Errorf("parent = %q, want the parent field to win", iss.ParentKey)
 	}
-	if iss.Type != "" {
-		t.Errorf("type = %q, want empty for an unknown Jira type", iss.Type)
+	// "Sub-task" is not this project's word for its sub-task level, so TAM
+	// has no logical type for it and the row keeps the name Jira gave it.
+	if iss.Type != "Sub-task" {
+		t.Errorf("type = %q, want the Jira name TAM does not model", iss.Type)
 	}
 	if iss.Assignee != "" || iss.Labels == nil || len(iss.Labels) != 0 || iss.StoryPoints != nil {
 		t.Errorf("issue = %+v", iss)
@@ -210,5 +234,19 @@ func TestParseIssueCarriesTheStatusNameAndItsID(t *testing.T) {
 	raw.Fields["status"] = json.RawMessage(`{"name":"In Progress"}`)
 	if iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{task: "Task", subtask: "Technical task"}); iss.StatusID != "" || iss.Status != "In Progress" {
 		t.Errorf("status without an id = %q, %q", iss.Status, iss.StatusID)
+	}
+}
+
+// A type TAM has no logical type for keeps the project's own name for it,
+// the rule #67 set for the New issue dialog, so the grid, the filter and
+// the tree all get a value they can show and filter on rather than the
+// empty string the sync used to drop the row for.
+func TestParseIssueKeepsATypeTAMDoesNotModel(t *testing.T) {
+	raw := corejira.RawIssue{ID: "1", Key: "PLAT-1", Fields: map[string]json.RawMessage{
+		"summary":   json.RawMessage(`"Trim the bundle"`),
+		"issuetype": json.RawMessage(`{"name":"Improvement"}`),
+	}}
+	if iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{task: "Task"}); iss.Type != "Improvement" {
+		t.Errorf("type = %q, want the project's own name", iss.Type)
 	}
 }

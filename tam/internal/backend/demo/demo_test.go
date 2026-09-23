@@ -15,7 +15,7 @@ func TestDemoDoneRefusalExplainsRestrictionAfterSubtasksAreDone(t *testing.T) {
 	b := demobackend.New("PRJ")
 	ctx := context.Background()
 	done := demobackend.StatusID("Done")
-	issues, _, err := b.SearchIssuesPage(ctx, "PRJ", "", "", backend.AllTypes, 0, 100)
+	issues, _, err := b.SearchIssuesPage(ctx, "PRJ", "", "", 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestDemoBackendPagesTheWholeDataset(t *testing.T) {
 	var got []backend.Issue
 	total := -1
 	for start := 0; total < 0 || start < total; {
-		page, n, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, start, 25)
+		page, n, err := b.SearchIssuesPage(ctx, "PLAT", "", "", start, 25)
 		if err != nil {
 			t.Fatalf("page at %d: %v", start, err)
 		}
@@ -93,7 +93,7 @@ func TestDemoIssuesIncludeSomeAssignedToTheDemoUser(t *testing.T) {
 	if err != nil || u.Name != "demo" {
 		t.Fatalf("connection = %+v, %v", u, err)
 	}
-	issues, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 100)
+	issues, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", 0, 100)
 	if err != nil {
 		t.Fatalf("page: %v", err)
 	}
@@ -112,24 +112,31 @@ func TestDemoIssuesIncludeSomeAssignedToTheDemoUser(t *testing.T) {
 	}
 }
 
-// TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer is the demo's
-// half of the sync's query: the issue types are honoured, and a scope JQL
-// this dataset has no engine for is ignored rather than guessed at. The one
-// scope it does honour is the sprint query below.
-func TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer(t *testing.T) {
+// TestDemoBackendIgnoresAScopeItCannotAnswer is the demo's half of the
+// sync's query: every type the dataset holds comes back (#68 took the type
+// list out of the search), and a scope JQL this dataset has no engine for
+// is ignored rather than guessed at. The one scope it does honour is the
+// sprint query below.
+func TestDemoBackendIgnoresAScopeItCannotAnswer(t *testing.T) {
 	b := demobackend.New("PLAT")
 	ctx := context.Background()
-	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "labels = nothing", "2030-01-01T00:00:00Z", []string{backend.TypeEpic}, 0, 100)
+	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "labels = nothing", "2030-01-01T00:00:00Z", 0, 500)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
-	if total != 4 || len(page) != 4 {
-		t.Errorf("epics: total %d, rows %d, want 4 (a scope it cannot answer, and since, are ignored)", total, len(page))
+	whole, wholeTotal, err := b.SearchIssuesPage(ctx, "PLAT", "", "", 0, 500)
+	if err != nil {
+		t.Fatalf("search: %v", err)
 	}
+	if total != wholeTotal || len(page) != len(whole) || total == 0 {
+		t.Errorf("scoped %d/%d rows, unscoped %d/%d; a scope it cannot answer, and since, are ignored", len(page), total, len(whole), wholeTotal)
+	}
+	types := map[string]int{}
 	for _, iss := range page {
-		if iss.Type != backend.TypeEpic {
-			t.Errorf("non-epic in result: %+v", iss)
-		}
+		types[iss.Type]++
+	}
+	if types[backend.TypeEpic] == 0 || types[backend.TypeSubtask] == 0 {
+		t.Errorf("types in the result = %v, want every type the dataset holds", types)
 	}
 }
 
@@ -141,12 +148,12 @@ func TestDemoBackendFiltersByTypeAndIgnoresAScopeItCannotAnswer(t *testing.T) {
 func TestDemoBackendNarrowsToTheSprintTheQueryNames(t *testing.T) {
 	b := demobackend.New("PLAT")
 	ctx := context.Background()
-	whole, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 500)
+	whole, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", 0, 500)
 	if err != nil {
 		t.Fatalf("whole project: %v", err)
 	}
 
-	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "sprint = 12", "", backend.AllTypes, 0, 500)
+	page, total, err := b.SearchIssuesPage(ctx, "PLAT", "sprint = 12", "", 0, 500)
 	if err != nil {
 		t.Fatalf("sprint 12: %v", err)
 	}
@@ -215,7 +222,7 @@ func TestDemoBackendWritesInMemoryAndStagesOneConflict(t *testing.T) {
 	if d.Description != "Body" {
 		t.Errorf("description overlay: %+v", d)
 	}
-	page, _, _ := b.SearchIssuesPage(ctx, "ACME", "", "", nil, 0, 100)
+	page, _, _ := b.SearchIssuesPage(ctx, "ACME", "", "", 0, 100)
 	seen := false
 	for _, iss := range page {
 		if iss.Key == "ACME-409" && iss.Summary == "Rotate keys" {
@@ -321,7 +328,7 @@ func TestDemoBackendLinks(t *testing.T) {
 
 func TestDemoIssuesAllCarryAStatusID(t *testing.T) {
 	b := demobackend.New("PLAT")
-	page, total, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 100)
+	page, total, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", 0, 100)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -454,7 +461,7 @@ func TestDemoBoardIssueKeys(t *testing.T) {
 	}
 	// Every whole-board key is a non-requirement issue, and every sprint 12
 	// key is one of them.
-	page, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", backend.AllTypes, 0, 100)
+	page, _, err := b.SearchIssuesPage(ctx, "PLAT", "", "", 0, 100)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}

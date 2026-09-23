@@ -23,7 +23,7 @@ func TestSearchIssuesWithHistoryFindsExactlyWhatSearchIssuesPageFinds(t *testing
 	if err != nil {
 		t.Fatalf("history search: %v", err)
 	}
-	page, pageTotal, err := b.SearchIssuesPage(context.Background(), "PLAT", "sprint = 11", "", nil, 0, 50)
+	page, pageTotal, err := b.SearchIssuesPage(context.Background(), "PLAT", "sprint = 11", "", 0, 50)
 	if err != nil {
 		t.Fatalf("page search: %v", err)
 	}

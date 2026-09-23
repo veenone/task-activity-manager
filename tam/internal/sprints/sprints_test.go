@@ -83,7 +83,7 @@ type fakeBackend struct {
 	order []string
 }
 
-func (f *fakeBackend) SearchIssuesPage(_ context.Context, projectKey, scopeJQL, _ string, _ []string, startAt, maxResults int) ([]backend.Issue, int, error) {
+func (f *fakeBackend) SearchIssuesPage(_ context.Context, projectKey, scopeJQL, _ string, startAt, maxResults int) ([]backend.Issue, int, error) {
 	if f.searchErr != nil {
 		return nil, 0, f.searchErr
 	}
@@ -708,7 +708,7 @@ func TestABackendWithNoAgileApiRefusesBothCeremonies(t *testing.T) {
 // cannot speak Jira's Agile API looks like from here.
 type searchOnly struct{}
 
-func (searchOnly) SearchIssuesPage(context.Context, string, string, string, []string, int, int) ([]backend.Issue, int, error) {
+func (searchOnly) SearchIssuesPage(context.Context, string, string, string, int, int) ([]backend.Issue, int, error) {
 	return []backend.Issue{}, 0, nil
 }
 
@@ -909,7 +909,7 @@ type demoCard struct {
 // before, and which it is in after.
 func demoCards(t *testing.T, b *demobackend.Backend) map[string]demoCard {
 	t.Helper()
-	page, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 500)
+	page, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", 0, 500)
 	if err != nil {
 		t.Fatalf("read the demo dataset: %v", err)
 	}

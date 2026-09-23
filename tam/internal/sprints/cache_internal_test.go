@@ -101,7 +101,7 @@ func TestARefreshAfterADeleteWritesAnEmptyAnswerBecauseItIsTrue(t *testing.T) {
 // not just the two this double still answers.
 type preLifecycleBackend struct{}
 
-func (preLifecycleBackend) SearchIssuesPage(context.Context, string, string, string, []string, int, int) ([]backend.Issue, int, error) {
+func (preLifecycleBackend) SearchIssuesPage(context.Context, string, string, string, int, int) ([]backend.Issue, int, error) {
 	return nil, 0, nil
 }
 func (preLifecycleBackend) BoardSprints(context.Context, int) ([]backend.Sprint, error) {

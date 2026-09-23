@@ -22,7 +22,7 @@ type ceremonyBackend struct {
 	started   []string
 }
 
-func (b *ceremonyBackend) SearchIssuesPage(_ context.Context, _, scope, _ string, _ []string, startAt, _ int) ([]backend.Issue, int, error) {
+func (b *ceremonyBackend) SearchIssuesPage(_ context.Context, _, scope, _ string, startAt, _ int) ([]backend.Issue, int, error) {
 	var out []backend.Issue
 	for _, iss := range b.issues {
 		if scope == "sprint = "+iss.SprintID {

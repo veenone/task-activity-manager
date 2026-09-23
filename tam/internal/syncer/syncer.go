@@ -144,7 +144,7 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 	}
 	pages, startAt, total := 0, 0, -1
 	for total < 0 || startAt < total {
-		page, n, err := e.b.SearchIssuesPage(ctx, projectKey, scopeJQL, since, backend.AllTypes, startAt, e.PageSize)
+		page, n, err := e.b.SearchIssuesPage(ctx, projectKey, scopeJQL, since, startAt, e.PageSize)
 		if err != nil {
 			return e.fail(ctx, profileID, state, pages, sum, err, emit)
 		}

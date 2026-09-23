@@ -130,8 +130,8 @@ func (b *Backend) issues() []backend.Issue {
 	return all
 }
 
-// SearchIssuesPage answers a page of the dataset, narrowed by issue type
-// and by the one scope this backend understands: "sprint = N".
+// SearchIssuesPage answers a page of the dataset, narrowed only by the one
+// scope this backend understands: "sprint = N".
 //
 // That scope is not decoration. A sprint completion reads the sprint it is
 // about with exactly that query and moves everything it comes back with, so
@@ -142,22 +142,16 @@ func (b *Backend) issues() []backend.Issue {
 // only true of a backend that honours the query. Any other scope is still
 // ignored: the demo has no JQL engine, and the profile's own scope JQL is a
 // filter this dataset was never built to answer.
-func (b *Backend) SearchIssuesPage(_ context.Context, _, scopeJQL, _ string, types []string, startAt, maxResults int) ([]backend.Issue, int, error) {
+func (b *Backend) SearchIssuesPage(_ context.Context, _, scopeJQL, _ string, startAt, maxResults int) ([]backend.Issue, int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	want := map[string]bool{}
-	for _, t := range types {
-		want[t] = true
-	}
 	sprintID, bySprint := sprintScope(scopeJQL)
 	var all []backend.Issue
 	for _, iss := range b.issues() {
 		if bySprint && iss.SprintID != sprintID {
 			continue
 		}
-		if len(want) == 0 || want[iss.Type] {
-			all = append(all, iss)
-		}
+		all = append(all, iss)
 	}
 	total := len(all)
 	if startAt >= total || maxResults <= 0 {

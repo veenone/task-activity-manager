@@ -80,7 +80,7 @@ func (f *fake) TestConnection(context.Context) (backend.User, error) {
 	return backend.User{Name: "fake"}, f.connErr
 }
 func (f *fake) IsDemo() bool { return false }
-func (f *fake) SearchIssuesPage(_ context.Context, _, _, since string, _ []string, startAt, maxResults int) ([]backend.Issue, int, error) {
+func (f *fake) SearchIssuesPage(_ context.Context, _, _, since string, startAt, maxResults int) ([]backend.Issue, int, error) {
 	f.sinceSeen = append(f.sinceSeen, since)
 	total := 0
 	for _, p := range f.pages {
@@ -362,7 +362,7 @@ func (c *cancelOnSearch) TestConnection(context.Context) (backend.User, error) {
 	return backend.User{Name: "fake"}, nil
 }
 func (c *cancelOnSearch) IsDemo() bool { return false }
-func (c *cancelOnSearch) SearchIssuesPage(ctx context.Context, _, _, _ string, _ []string, _, _ int) ([]backend.Issue, int, error) {
+func (c *cancelOnSearch) SearchIssuesPage(ctx context.Context, _, _, _ string, _, _ int) ([]backend.Issue, int, error) {
 	c.cancel()
 	return nil, 0, ctx.Err()
 }
