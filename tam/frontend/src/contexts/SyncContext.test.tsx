@@ -56,7 +56,7 @@ beforeEach(() => {
     { id: "p1", name: "Demo team", jiraUrl: "demo", projectKey: "DEMO", backend: "jira", createdAt: "" },
   ]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light" });
-  vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0 });
+  vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0, projectTotal: 0 });
 });
 
 function Probe() {
@@ -189,8 +189,8 @@ describe("SyncProvider", () => {
     expect(screen.getByRole("button", { name: "Sync" })).toBeDisabled();
     act(() => progressListener?.({ phase: "issues", fetched: 25, total: 60, done: false, stage: "Fetching issues" }));
     expect(screen.getByTestId("progress")).toHaveTextContent("25/60");
-    vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "2026-09-05T10:42:00Z", lastFull: "", lastError: "", issueCount: 60 });
-    await act(async () => { finish({ fetched: 60, upserted: 60, skipped: 0, full: false, elapsed: "1s" }); });
+    vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "2026-09-05T10:42:00Z", lastFull: "", lastError: "", issueCount: 60, projectTotal: 0 });
+    await act(async () => { finish({ fetched: 60, upserted: 60, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" }); });
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
     await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("60"));
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
@@ -198,7 +198,7 @@ describe("SyncProvider", () => {
 
   it("keeps the boards pass of the sync that just finished", async () => {
     vi.mocked(api.SyncIssues).mockResolvedValue({
-      fetched: 60, upserted: 60, skipped: 0, full: false, elapsed: "1s",
+      fetched: 60, upserted: 60, skipped: 0, projectTotal: 0, full: false, elapsed: "1s",
       boards: { boards: 1, columns: 3, sprints: 2, cards: 12, dropped: ["Ops Kanban: 403 Forbidden"], unavailable: false, elapsed: "2s" },
     });
     renderProbe();
@@ -209,7 +209,7 @@ describe("SyncProvider", () => {
   });
 
   it("has no boards pass to report when the sync did not run one", async () => {
-    vi.mocked(api.SyncIssues).mockResolvedValue({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" });
+    vi.mocked(api.SyncIssues).mockResolvedValue({ fetched: 1, upserted: 1, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" });
     renderProbe();
     await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("0"));
     await userEvent.click(screen.getByRole("button", { name: "Sync" }));
@@ -280,7 +280,7 @@ describe("SyncProvider", () => {
     await userEvent.click(screen.getByRole("button", { name: "Quiet write" }));
     await waitFor(() => expect(screen.getByTestId("quiet")).toHaveTextContent(/already running/));
 
-    await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" }); });
+    await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" }); });
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
   });
   // The sharpest thing in the Reports view is this: a report takes the same
@@ -356,7 +356,7 @@ describe("SyncProvider", () => {
     // shell is showing.
     expect(screen.getByTestId("stage")).toHaveTextContent("Starting");
 
-    await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, full: false, elapsed: "1s" }); });
+    await act(async () => { finishSync({ fetched: 1, upserted: 1, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" }); });
     await waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("idle"));
   });
 

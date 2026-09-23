@@ -20,6 +20,17 @@ import { useSyncState } from "./queries/issues";
 import { usePendingChanges } from "./queries/pending";
 import { formatWhen } from "./lib/format";
 
+// cachedCount is what the status bar says about the cache: the rows it
+// holds, and what the project holds when that is more. A sync narrowed by
+// the profile's scope JQL, or by a type the backend keeps out, caches part
+// of a project, and "38 issues" on its own read as a project of 38 when it
+// held 2,943 (#68). The two are equal after a plain full sync, and the
+// second half is left off then rather than repeating the number.
+function cachedCount({ issueCount, projectTotal }: { issueCount: number; projectTotal: number }): string {
+  const cached = issueCount.toLocaleString();
+  return projectTotal > issueCount ? `${cached} of ${projectTotal.toLocaleString()}` : cached;
+}
+
 // App is the shell: topbar, nav rail, the active view, and the status bar.
 // The topbar, profile controls, and status bar mirror XTM's App.tsx/App.css
 // so the two windows read as one product; the nav rail is TAM's own element
@@ -292,7 +303,7 @@ export default function App() {
           <span data-testid="sync-summary">
             {syncState.data
               ? syncState.data.lastSynced
-                ? `${syncState.data.issueCount.toLocaleString()} issues, last synced ${formatWhen(syncState.data.lastSynced)}`
+                ? `${cachedCount(syncState.data)} issues, last synced ${formatWhen(syncState.data.lastSynced)}`
                 : "Not synced yet"
               : ""}
           </span>

@@ -194,7 +194,7 @@ beforeEach(() => {
   });
   vi.mocked(api.GetProfileSetting).mockResolvedValue("");
   vi.mocked(api.GetSyncState).mockResolvedValue({
-    lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 61,
+    lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 61, projectTotal: 0,
   });
   vi.mocked(api.GetIssueDetail).mockResolvedValue({ key: "PLAT-412", description: "", links: [], fields: {}, comments: [], commentTotal: 0, commentsTruncated: false, fetchedAt: "" });
   vi.mocked(api.ListLinkedTests).mockResolvedValue([]);

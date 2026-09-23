@@ -110,7 +110,7 @@ beforeEach(() => {
     { id: "p1", name: "Demo team", jiraUrl: "demo", projectKey: "DEMO", backend: "jira", createdAt: "" },
   ]);
   vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: false });
-  vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0 });
+  vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0, projectTotal: 0 });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
   vi.mocked(api.ListSprints).mockResolvedValue([]);
   vi.mocked(api.GetEpicTree).mockResolvedValue({ epics: [], orphans: [], truncated: false });
@@ -287,9 +287,9 @@ describe("App shell", () => {
   it("syncs from the topbar and refreshes the status bar", async () => {
     vi.mocked(api.SyncIssues).mockImplementation(async () => {
       vi.mocked(api.GetSyncState).mockResolvedValue({
-        lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 60,
+        lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 60, projectTotal: 0,
       });
-      return { fetched: 60, upserted: 60, skipped: 0, full: false, elapsed: "1s" };
+      return { fetched: 60, upserted: 60, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" };
     });
     renderApp();
     await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent("Not synced yet"));
@@ -297,6 +297,18 @@ describe("App shell", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: "Sync changes" }));
     await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent(/60 issues, last synced today/));
     expect(api.SyncIssues).toHaveBeenCalledWith("p1", false);
+  });
+
+  it("says what is cached against what the project holds", async () => {
+    vi.mocked(api.GetSyncState).mockResolvedValue({
+      lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 38, projectTotal: 2943,
+    });
+    renderApp();
+    // 38 of 2,943 is what a scope JQL, or a type the backend holds back,
+    // leaves cached. "38 issues" alone read as a project of 38 (#68).
+    await waitFor(() =>
+      expect(screen.getByTestId("sync-summary")).toHaveTextContent(/38 of 2,943 issues, last synced today/),
+    );
   });
 
   it("refreshes from the topbar: the details are cleared and the view reads again", async () => {
@@ -320,7 +332,7 @@ describe("App shell", () => {
     vi.mocked(api.SyncIssues).mockImplementation(
       () =>
         new Promise((resolve) => {
-          finish = () => resolve({ fetched: 0, upserted: 0, skipped: 0, full: false, elapsed: "1s" });
+          finish = () => resolve({ fetched: 0, upserted: 0, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" });
         }),
     );
     renderApp();
@@ -351,7 +363,7 @@ describe("App shell", () => {
 
   it("shows the last sync error in the status bar", async () => {
     vi.mocked(api.GetSyncState).mockResolvedValue({
-      lastSynced: "2026-09-05T10:42:00Z", lastFull: "", lastError: "jira: 502 Bad Gateway", issueCount: 12,
+      lastSynced: "2026-09-05T10:42:00Z", lastFull: "", lastError: "jira: 502 Bad Gateway", issueCount: 12, projectTotal: 0,
     });
     renderApp();
     await waitFor(() => expect(screen.getByTestId("sync-error")).toHaveTextContent("jira: 502 Bad Gateway"));

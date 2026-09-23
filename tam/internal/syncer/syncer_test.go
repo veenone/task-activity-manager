@@ -44,8 +44,11 @@ func newRepoWithDB(t *testing.T) (*issuerepo.Repository, *sql.DB) {
 // tests in this file and the boards pass tests in boards_test.go can share
 // one backend rather than keeping two.
 type fake struct {
-	pages     [][]backend.Issue
-	failPage  int // 1-based page index that returns failErr; 0 for none
+	pages [][]backend.Issue
+	// projectTotal is what the project holds, which a scoped sync fetches
+	// only part of. Zero means the pages are the whole project.
+	projectTotal int
+	failPage     int // 1-based page index that returns failErr; 0 for none
 	failErr   error
 	connErr   error
 	sinceSeen []string
@@ -81,11 +84,21 @@ func (f *fake) TestConnection(context.Context) (backend.User, error) {
 }
 func (f *fake) IsDemo() bool { return false }
 func (f *fake) SearchIssuesPage(_ context.Context, _, _, since string, startAt, maxResults int) ([]backend.Issue, int, error) {
-	f.sinceSeen = append(f.sinceSeen, since)
 	total := 0
 	for _, p := range f.pages {
 		total += len(p)
 	}
+	// maxResults of zero is the count of the whole project, asked for with
+	// no scope and no cut-off. It is not one of the sync's pages, so it does
+	// not record a since, and projectTotal lets a test give the project more
+	// issues than the scope returns.
+	if maxResults <= 0 {
+		if f.projectTotal > 0 {
+			total = f.projectTotal
+		}
+		return []backend.Issue{}, total, nil
+	}
+	f.sinceSeen = append(f.sinceSeen, since)
 	idx := startAt / maxResults
 	if f.failPage > 0 && idx+1 == f.failPage {
 		return nil, 0, f.failErr
@@ -706,5 +719,31 @@ func TestSyncKeepsStoredIssueTypesWhenTheyCannotBeRead(t *testing.T) {
 	types, err := repo.ProjectTypes(ctx, "p1")
 	if err != nil || len(types) != 1 || types[0].Name != "Improvement" {
 		t.Errorf("project types = %+v, %v, want the seeded list kept", types, err)
+	}
+}
+
+// The line "38 fetched, 38 upserted, 0 skipped" is what made a project of
+// 2,943 issues read as a project of 38 (#68). A summary that cannot be
+// read that way has to say what it fetched against what the project holds.
+func TestSyncReportsWhatTheProjectHoldsAgainstWhatItFetched(t *testing.T) {
+	repo := newRepo(t)
+	f := &fake{pages: [][]backend.Issue{{issue("PLAT-1", "task"), issue("PLAT-2", "Improvement")}}, projectTotal: 2943}
+	e := syncer.New(f, repo)
+
+	sum, err := e.Sync(context.Background(), "p1", "PLAT", "labels = promo", true, nil)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if sum.Fetched != 2 || sum.Upserted != 2 || sum.ProjectTotal != 2943 {
+		t.Errorf("summary = %+v, want 2 of 2943 fetched and both kept", sum)
+	}
+	// The status bar reads the state, not the summary, so a restart must not
+	// take the number away.
+	state, err := repo.SyncState(context.Background(), "p1")
+	if err != nil {
+		t.Fatalf("state: %v", err)
+	}
+	if state.ProjectTotal != 2943 || state.IssueCount != 2 {
+		t.Errorf("state = %+v, want 2 cached of 2943 in the project", state)
 	}
 }

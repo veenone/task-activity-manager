@@ -224,7 +224,8 @@ func (a *App) SyncIssues(profileID string, full bool) (syncer.Summary, error) {
 		log.Printf("tam: sync %s (%s) failed: %v", p.Name, p.ProjectKey, err)
 		return sum, err
 	}
-	log.Printf("tam: synced %s (%s): %d fetched, %d upserted, %d skipped in %s", p.Name, p.ProjectKey, sum.Fetched, sum.Upserted, sum.Skipped, sum.Elapsed)
+	log.Printf("tam: synced %s (%s): %d fetched of %d in the project, %d upserted, %d skipped in %s",
+		p.Name, p.ProjectKey, sum.Fetched, sum.ProjectTotal, sum.Upserted, sum.Skipped, sum.Elapsed)
 	return sum, nil
 }
 

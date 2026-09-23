@@ -1088,6 +1088,7 @@ export namespace issuerepo {
 	    lastFull: string;
 	    lastError: string;
 	    issueCount: number;
+	    projectTotal: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new SyncState(source);
@@ -1099,6 +1100,7 @@ export namespace issuerepo {
 	        this.lastFull = source["lastFull"];
 	        this.lastError = source["lastError"];
 	        this.issueCount = source["issueCount"];
+	        this.projectTotal = source["projectTotal"];
 	    }
 	}
 	export class Tree {
@@ -1832,6 +1834,7 @@ export namespace syncer {
 	    fetched: number;
 	    upserted: number;
 	    skipped: number;
+	    projectTotal: number;
 	    full: boolean;
 	    elapsed: string;
 	    boards?: BoardSummary;
@@ -1845,6 +1848,7 @@ export namespace syncer {
 	        this.fetched = source["fetched"];
 	        this.upserted = source["upserted"];
 	        this.skipped = source["skipped"];
+	        this.projectTotal = source["projectTotal"];
 	        this.full = source["full"];
 	        this.elapsed = source["elapsed"];
 	        this.boards = this.convertValues(source["boards"], BoardSummary);

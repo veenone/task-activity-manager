@@ -29,6 +29,12 @@ type Summary struct {
 	Fetched  int    `json:"fetched"`
 	Upserted int    `json:"upserted"`
 	Skipped  int    `json:"skipped"`
+	// ProjectTotal is how many issues the project holds, counted with no
+	// scope and no cut-off, so the summary says what it fetched against
+	// what was there. Zero when the count could not be read. Without it
+	// "38 fetched, 38 upserted, 0 skipped" read as a project of 38 when
+	// the project held 2,943 (#68).
+	ProjectTotal int `json:"projectTotal"`
 	Full     bool   `json:"full"`
 	Elapsed  string `json:"elapsed"`
 	// Boards is the boards pass's own summary. It is nil when the engine
@@ -136,6 +142,20 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 		log.Printf("tam: read the issue types of %s for %s: %v", projectKey, profileID, terr)
 	} else if err := e.repo.PutProjectTypes(ctx, profileID, types); err != nil {
 		log.Printf("tam: store the issue types of %s for %s: %v", projectKey, profileID, err)
+	}
+
+	// What the project holds, before the profile's scope JQL and the
+	// incremental cut-off narrow it. maxResults of zero asks for the count
+	// alone, so this is one cheap request and not a second pass. A failure
+	// leaves the total at zero and does not fail the sync: a count nobody
+	// could read is not a reason to lose the issues.
+	if _, n, cerr := e.b.SearchIssuesPage(ctx, projectKey, "", "", 0, 0); cerr != nil {
+		log.Printf("tam: count the issues of %s for %s: %v", projectKey, profileID, cerr)
+	} else {
+		sum.ProjectTotal = n
+		if err := e.repo.SetProjectTotal(ctx, profileID, n); err != nil {
+			log.Printf("tam: store the issue count of %s for %s: %v", projectKey, profileID, err)
+		}
 	}
 
 	since := ""
