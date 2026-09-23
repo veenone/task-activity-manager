@@ -14,6 +14,7 @@ import { ReportsView } from "./components/ReportsView";
 import { RitualsView } from "./components/RitualsView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
+import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { useSync } from "./contexts/SyncContext";
 import { useSyncState } from "./queries/issues";
@@ -104,6 +105,7 @@ export default function App() {
   useEffect(() => {
     const offProfiles = EventsOn("menu:profiles", () => openModal("profiles"));
     const offAbout = EventsOn("menu:about", () => openModal("about"));
+    const offDiagnostics = EventsOn("menu:diagnostics", () => openModal("diagnostics"));
     // The View menu is TAM's primary navigation. It sends the view id the
     // menu was built with, which is why menuViews in main.go has to stay in
     // step with VIEWS in nav.ts.
@@ -116,6 +118,7 @@ export default function App() {
     return () => {
       offProfiles();
       offAbout();
+      offDiagnostics();
       offView();
       offRail();
       offSync();
@@ -198,7 +201,10 @@ export default function App() {
           <Menu
             label="Help"
             align="right"
-            items={[{ key: "about", label: "About", onClick: () => openModal("about") }]}
+            items={[
+              { key: "diagnostics", label: "Diagnostics", title: "Paths, build and the recent log", onClick: () => openModal("diagnostics") },
+              { key: "about", label: "About", onClick: () => openModal("about") },
+            ]}
           />
         </div>
       </header>
@@ -326,6 +332,7 @@ export default function App() {
       {!startupFailed && <LiveRegion />}
       {isOpen("profiles") && <ProfilesModal onClose={closeModal} />}
       {isOpen("about") && <AboutModal onClose={closeModal} />}
+      {isOpen("diagnostics") && <DiagnosticsModal onClose={closeModal} />}
       {isOpen("pending") && <PendingChangesModal onClose={closeModal} />}
     </div>
   );

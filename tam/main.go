@@ -111,6 +111,7 @@ func appMenu(app *App) *menu.Menu {
 	})
 
 	help := m.AddSubmenu("Help")
+	help.AddText("Diagnostics…", nil, emit("menu:diagnostics"))
 	help.AddText("About Task Activity Manager", nil, emit("menu:about"))
 	return m
 }

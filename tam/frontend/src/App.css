@@ -960,3 +960,16 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-sync-result { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
 .ritual-sync-result p, .ritual-sync-result ul { margin: 0; }
 @media (max-width: 720px) { .rituals-layout { grid-template-columns: 1fr; } .ritual-docs { border-right: 0; border-bottom: 1px solid var(--border); } }
+
+/* Diagnostics: XTM's readout in TAM's tokens. Font sizes are relative and
+   the log's ground is the chrome's, so both themes and the px-font ratchet
+   hold, where XTM's rules set literals for all three. */
+.diag-fields { margin: 0 0 12px; }
+.diag-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 4px 0; }
+.diag-row dt { color: var(--text-muted); font-weight: 600; }
+.diag-row dd { margin: 0; color: var(--text); }
+.diag-path { font-size: 0.92em; word-break: break-all; }
+.diag-log-head { margin: 8px 0 6px; font-size: 1em; color: var(--text-strong); }
+.diag-log { margin: 0; max-height: 320px; overflow: auto; padding: 10px 12px; border-radius: 6px;
+  background: var(--chrome-bg); color: var(--chrome-text); font-family: "Consolas", "SF Mono", "Menlo", monospace;
+  font-size: 0.85em; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }

@@ -37,48 +37,22 @@ const menuBus = vi.hoisted(() => {
 
 vi.mock("./api", async () => {
   const actual = await vi.importActual<typeof import("./api")>("./api");
+  // Several per line: one name per line pushed this file past the 400-line
+  // ratchet when #69 added three tests, and the list is a list either way.
   return {
     ...actual,
-    Health: vi.fn(),
-    GetDiagnostics: vi.fn(),
-    ListProfiles: vi.fn(),
-    CreateProfile: vi.fn(),
-    DeleteProfile: vi.fn(),
-    GetSettings: vi.fn(),
-    SetTheme: vi.fn(),
-    SetDefaultProfile: vi.fn(),
-    SetNavRailVisible: vi.fn(),
-    SyncIssues: vi.fn(),
-    GetSyncState: vi.fn(),
-    ListIssues: vi.fn(),
-    GetIssueDetail: vi.fn(),
-    ListLinkedTests: vi.fn(),
-    ListSprints: vi.fn(),
-    GetEpicTree: vi.fn(),
-    ListEpics: vi.fn(),
-    GetProfileSetting: vi.fn(),
-    ListBoards: vi.fn(),
-    ListBoardSprints: vi.fn(),
-    ListBoardSprintDetails: vi.fn(),
-    GetBoard: vi.fn(),
-    GetSprintReport: vi.fn(),
-    CancelSprintReport: vi.fn(),
-    SyncBoards: vi.fn(),
-    RefreshDetails: vi.fn(),
-    SetProfileSetting: vi.fn(),
-    EventsOn: vi.fn(menuBus.on),
-    BrowserOpenURL: vi.fn(),
-    ListPendingChanges: vi.fn(),
-    DiscardPendingChange: vi.fn(),
-    DiscardAllPendingChanges: vi.fn(),
-    CommitPendingChanges: vi.fn(),
-    PreviewImport: vi.fn(),
-    AutoMapImport: vi.fn(),
-    ImportIssues: vi.fn(),
-    SaveImportTemplate: vi.fn(),
-    GetConfluenceConfig: vi.fn(),
-    EnsureSprintRituals: vi.fn(),
-    LastRitualSync: vi.fn(),
+    Health: vi.fn(), GetDiagnostics: vi.fn(), ReadLog: vi.fn(), ExportDiagnostics: vi.fn(),
+    ListProfiles: vi.fn(), CreateProfile: vi.fn(), DeleteProfile: vi.fn(), GetSettings: vi.fn(),
+    SetTheme: vi.fn(), SetDefaultProfile: vi.fn(), SetNavRailVisible: vi.fn(), SyncIssues: vi.fn(),
+    GetSyncState: vi.fn(), ListIssues: vi.fn(), GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(),
+    ListSprints: vi.fn(), GetEpicTree: vi.fn(), ListEpics: vi.fn(), GetProfileSetting: vi.fn(),
+    ListBoards: vi.fn(), ListBoardSprints: vi.fn(), ListBoardSprintDetails: vi.fn(),
+    GetBoard: vi.fn(), GetSprintReport: vi.fn(), CancelSprintReport: vi.fn(), SyncBoards: vi.fn(),
+    RefreshDetails: vi.fn(), SetProfileSetting: vi.fn(), EventsOn: vi.fn(menuBus.on),
+    BrowserOpenURL: vi.fn(), ListPendingChanges: vi.fn(), DiscardPendingChange: vi.fn(),
+    DiscardAllPendingChanges: vi.fn(), CommitPendingChanges: vi.fn(), PreviewImport: vi.fn(),
+    AutoMapImport: vi.fn(), ImportIssues: vi.fn(), SaveImportTemplate: vi.fn(),
+    GetConfluenceConfig: vi.fn(), EnsureSprintRituals: vi.fn(), LastRitualSync: vi.fn(),
   };
 });
 
@@ -126,6 +100,11 @@ beforeEach(() => {
   vi.mocked(api.CancelSprintReport).mockResolvedValue();
   vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
   vi.mocked(api.RefreshDetails).mockResolvedValue();
+  vi.mocked(api.GetDiagnostics).mockResolvedValue({
+    version: "0.1.0", dbPath: "C:/tam.db", sharedPath: "C:/profiles.db", logPath: "C:/tam.log",
+    os: "windows", arch: "amd64", goVersion: "go1.25.0", schemaVersion: 14, profileCount: 1, startupError: "",
+  });
+  vi.mocked(api.ReadLog).mockResolvedValue("tam: local store ready");
 });
 
 describe("App shell", () => {
@@ -367,6 +346,21 @@ describe("App shell", () => {
     });
     renderApp();
     await waitFor(() => expect(screen.getByTestId("sync-error")).toHaveTextContent("jira: 502 Bad Gateway"));
+  });
+
+  it("opens Diagnostics from the Help menu, beside About", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Help" }));
+    await user.click(screen.getByRole("menuitem", { name: "Diagnostics" }));
+    const dialog = await screen.findByRole("dialog", { name: "Diagnostics" });
+    expect(within(dialog).getByText("C:/tam.log")).toBeInTheDocument();
+  });
+
+  it("opens Diagnostics from the native Help menu too", async () => {
+    renderApp();
+    await menuBus.emit("menu:diagnostics");
+    expect(await screen.findByRole("dialog", { name: "Diagnostics" })).toBeInTheDocument();
   });
 
   it("surfaces a startup failure instead of a blank page", async () => {
