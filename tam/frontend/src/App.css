@@ -150,7 +150,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-sprint { width: 140px; }
 /* The chips stay their own size. They are the grid's type chips, and a
    reader matches them to the column, not to the controls either side. */
-.type-filter { display: flex; align-items: center; gap: 6px; }
+.type-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The chip palette lives in tokens.css: these fills were literals, so a chip
    kept its pastel ground when the window went dark and the text on it was

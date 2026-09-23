@@ -2,6 +2,7 @@ package jira_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -74,19 +75,20 @@ func TestCreateSubtaskRefusesAMissingParent(t *testing.T) {
 	}
 }
 
-// TODOP calls its task level "Todo" and has no Xray types. Its scope names
-// no issue type at all: asking for "Task" found nothing there, and asking
-// for the six types TAM models found only the work that happened to be one
-// of them (#68).
+// This project calls its task level "Todo" and has no Xray types, so its
+// scope names no issue type at all: asking for "Task" found nothing there,
+// and asking for the six types TAM models found only the work that happened
+// to be one of them (#68).
 func TestScopeOfAProjectWithNothingToExcludeNamesNoType(t *testing.T) {
+	const project = "TODOP"
 	b, f := newBackend(t, twoFields)
-	if _, _, err := b.SearchIssuesPage(context.Background(), "TODOP", "", "", 0, 50); err != nil {
+	if _, _, err := b.SearchIssuesPage(context.Background(), project, "", "", 0, 50); err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	// The recorded request is the JQL, then the fields; issuetype is one of
 	// the fields every search asks for, so only the JQL half is examined.
 	jql, _, _ := strings.Cut(f.searches[len(f.searches)-1], " | fields=")
-	if jql != `project = "TODOP" ORDER BY key ASC` {
+	if jql != fmt.Sprintf("project = %q ORDER BY key ASC", project) {
 		t.Errorf("scope = %q", jql)
 	}
 }
