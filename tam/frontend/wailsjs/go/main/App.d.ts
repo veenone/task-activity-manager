@@ -58,6 +58,8 @@ export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:
 
 export function EnsureSprintRituals(arg1:string,arg2:number,arg3:number):Promise<Array<ritualrepo.Document>>;
 
+export function ExportDiagnostics():Promise<string>;
+
 export function ExportProfile(arg1:string):Promise<string>;
 
 export function ForgetRitualPage(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
@@ -139,6 +141,8 @@ export function PendingInSprint(arg1:string,arg2:number):Promise<number>;
 export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Preview>;
 
 export function RankIssue(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:number):Promise<void>;
+
+export function ReadLog():Promise<string>;
 
 export function RefreshDetails(arg1:string):Promise<void>;
 
