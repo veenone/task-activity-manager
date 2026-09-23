@@ -55,9 +55,9 @@ export function DiagnosticsModal({ onClose }: { onClose: () => void }) {
     ["Version", diag ? `v${diag.version}` : "…"],
     ["Schema", diag ? `v${diag.schemaVersion}` : "…"],
     ["Runtime", diag ? `${diag.goVersion} · ${diag.os}/${diag.arch}` : "…"],
-    ["Database", diag?.dbPath || "—", true],
-    ["Shared profiles", diag?.sharedPath || "—", true],
-    ["Log file", diag?.logPath || "—", true],
+    ["Database", diag?.dbPath || "not known", true],
+    ["Shared profiles", diag?.sharedPath || "not known", true],
+    ["Log file", diag?.logPath || "not known", true],
   ];
   if (diag?.startupError) rows.push(["Startup error", diag.startupError]);
 
