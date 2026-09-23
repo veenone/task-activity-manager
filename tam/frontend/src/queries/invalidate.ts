@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { keys } from "./keys";
+import { peopleKeys } from "./people";
 
 // invalidateProfileData refreshes everything a sync can change for one
 // profile: every issues page, the sprint list, the sync state, and the
@@ -28,6 +29,10 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     [profileId, "boardSprintDetails"] as const,
     keys.boardsUnavailable(profileId),
     keys.openSprints(profileId),
+    // A sync is the only thing that rewrites the project's issue types, so
+    // the dialog and the type filter would otherwise hold a pre-sync list
+    // for as long as the query stays fresh (#68).
+    peopleKeys.projectTypes(profileId),
     [profileId, "sprintReport"] as const,
   ]) {
     qc.invalidateQueries({ queryKey });
