@@ -348,6 +348,24 @@ describe("App shell", () => {
     await waitFor(() => expect(screen.getByTestId("sync-error")).toHaveTextContent("jira: 502 Bad Gateway"));
   });
 
+  // #69: the bar is the one strip always on screen, and a file name is not
+  // something a user acts on. The names moved into Diagnostics.
+  it("says the store is ready without naming a database file", async () => {
+    renderApp();
+    const bar = screen.getByRole("contentinfo");
+    await waitFor(() => expect(bar).toHaveTextContent("Local store ready"));
+    expect(bar).not.toHaveTextContent("tam.db");
+    expect(bar).not.toHaveTextContent("profiles.db");
+  });
+
+  it("names no database file when there is no profile to sync either", async () => {
+    vi.mocked(api.ListProfiles).mockResolvedValue([]);
+    renderApp();
+    const bar = screen.getByRole("contentinfo");
+    await waitFor(() => expect(bar).toHaveTextContent("Profiles are shared with Xray Test Manager"));
+    expect(bar).not.toHaveTextContent("profiles.db");
+  });
+
   it("opens Diagnostics from the Help menu, beside About", async () => {
     const user = userEvent.setup();
     renderApp();

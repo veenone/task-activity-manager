@@ -302,7 +302,7 @@ export default function App() {
 
       <footer className="app-statusbar">
         <span className={`dot ${health?.ok ? "dot-ok" : "dot-warn"}`} aria-hidden="true" />
-        <span>{health?.ok ? "Local store ready · tam.db" : "Starting up"}</span>
+        <span>{health?.ok ? "Local store ready" : "Starting up"}</span>
         {!startupFailed && profileError ? (
           <span className="error-text">Profiles could not be loaded: {profileError}</span>
         ) : activeProfile ? (
@@ -314,7 +314,7 @@ export default function App() {
               : ""}
           </span>
         ) : (
-          <span className="muted">Profiles shared with XTM · agile-suite/profiles.db</span>
+          <span className="muted">Profiles are shared with Xray Test Manager</span>
         )}
         {progress && <SyncBar progress={progress} />}
         {(syncError || syncState.data?.lastError) && !progress && (
