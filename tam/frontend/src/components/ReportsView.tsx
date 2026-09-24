@@ -6,6 +6,7 @@ import { useBoards, useBoardSprints } from "../queries/boards";
 import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
 import { busyLine, isBusyRefusal, unavailableLine } from "../lib/reportText";
+import { ReportOutputs } from "./ReportOutputs";
 import { SprintSummary } from "./SprintSummary";
 import { VelocityTable } from "./VelocityTable";
 import { BurndownChart } from "./charts/BurndownChart";
@@ -133,7 +134,16 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
 
   function content(r: SprintReport) {
     if (r.unavailable) {
-      return <p className="muted report-unavailable" role="status">{unavailableLine(r.unavailable)}</p>;
+      // The three outputs are still drawn, disabled, with their own reason
+      // beside them: a report that cannot be built is a report that cannot
+      // be published either, and saying so where the controls are is what
+      // keeps somebody from looking for them.
+      return (
+        <>
+          <p className="muted report-unavailable" role="status">{unavailableLine(r.unavailable)}</p>
+          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={false} />
+        </>
+      );
     }
     const inProgress = active.some((s) => s.id === r.series.sprintId);
     return (
@@ -152,6 +162,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           </span>
         {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
         </div>
+        <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={inProgress} />
         {/* The burndown is the wide one: it carries a point per sprint day,
             while the outcome chart carries five bars. */}
         <div className="report-charts">

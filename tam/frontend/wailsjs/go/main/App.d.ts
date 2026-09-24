@@ -6,6 +6,7 @@ import {committer} from '../models';
 import {profile} from '../models';
 import {main} from '../models';
 import {ritualrepo} from '../models';
+import {reportout} from '../models';
 import {boardrepo} from '../models';
 import {issuerepo} from '../models';
 import {settings} from '../models';
@@ -61,6 +62,10 @@ export function EnsureSprintRituals(arg1:string,arg2:number,arg3:number):Promise
 export function ExportDiagnostics():Promise<string>;
 
 export function ExportProfile(arg1:string):Promise<string>;
+
+export function ExportSprintReportPPTX(arg1:reportout.Document):Promise<string>;
+
+export function ExportSprintReportXLSX(arg1:reportout.Document):Promise<string>;
 
 export function ForgetRitualPage(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
@@ -139,6 +144,8 @@ export function MoveIssueToSprint(arg1:string,arg2:string,arg3:string):Promise<v
 export function PendingInSprint(arg1:string,arg2:number):Promise<number>;
 
 export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Preview>;
+
+export function PublishSprintReport(arg1:string,arg2:number,arg3:number,arg4:reportout.Document):Promise<reportout.Published>;
 
 export function RankIssue(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:number):Promise<void>;
 

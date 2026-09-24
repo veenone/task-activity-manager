@@ -9,7 +9,7 @@
 // class's createFrom so the binding receives the shape it declares.
 
 import * as App from "../wailsjs/go/main/App";
-import { backend, importer, issuerepo, profile } from "../wailsjs/go/models";
+import { backend, importer, issuerepo, profile, reportout } from "../wailsjs/go/models";
 
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 export type { SyncProgress } from "@agile-suite/core";
@@ -1208,6 +1208,54 @@ export const GetSprintReport = async (
 // sync for a screen nobody is looking at. It does nothing when none is
 // running, which is why the view can call it on every unmount.
 export const CancelSprintReport: (profileId: string) => Promise<void> = App.CancelSprintReport;
+
+// The report as something other than a screen. A ReportDocument is headings,
+// sentences, tables and the caveats on them, built by lib/reportDocument out
+// of lib/reportText and lib/reportTables, so the Confluence page, the
+// spreadsheet and the deck all read the report's one vocabulary and Go words
+// none of it. notes is the caveats, and no renderer may drop them.
+export interface ReportTable {
+  columns: string[];
+  rows: string[][];
+}
+
+export interface ReportSection {
+  heading: string;
+  lines: string[];
+  table: ReportTable;
+  notes: string[];
+}
+
+export interface ReportDocument {
+  title: string;
+  sections: ReportSection[];
+}
+
+// PublishedPage is the Confluence page a publish wrote, so the view can say
+// which one it was.
+export interface PublishedPage {
+  title: string;
+  pageId: string;
+}
+
+// PublishSprintReport writes the report to its own page under the sprint's
+// Confluence page, through the transport the rituals sync uses. It is a
+// write, so it happens when the user asks for it and never on mount, and it
+// takes Go's per-profile lock under "report". It reaches no Jira.
+export const PublishSprintReport = (
+  profileId: string,
+  boardId: number,
+  sprintId: number,
+  doc: ReportDocument,
+): Promise<PublishedPage> =>
+  App.PublishSprintReport(profileId, boardId, sprintId, reportout.Document.createFrom(doc)) as Promise<PublishedPage>;
+
+// The two file exports. Each writes beside tam.db, the convention
+// ExportDiagnostics set, and answers with the path it wrote.
+export const ExportSprintReportXLSX = (doc: ReportDocument): Promise<string> =>
+  App.ExportSprintReportXLSX(reportout.Document.createFrom(doc));
+export const ExportSprintReportPPTX = (doc: ReportDocument): Promise<string> =>
+  App.ExportSprintReportPPTX(reportout.Document.createFrom(doc));
 
 // How many journal rows belong to cards staying in this sprint. The Complete
 // button asks before it opens its dialog: a card dragged to Done an hour ago

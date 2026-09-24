@@ -79,6 +79,31 @@ export function unitLine(unit: string, unitReason: string): string {
   return "These figures count cards rather than points.";
 }
 
+// modeLine says whether the figures beside it are final. A running sprint's
+// are provisional, which is a qualification on every one of them, so it
+// travels with them onto a page, a spreadsheet and a deck as well as the
+// screen.
+export function modeLine(live: boolean): string {
+  if (live) return "In progress: these figures are provisional. They may change as work moves.";
+  return "Closed sprint · final results";
+}
+
+// emptyVelocityLine is a board with no closed sprint a row could be built
+// from, which is a fact about the board and not an empty table.
+export function emptyVelocityLine(): string {
+  return "No closed sprint on this board has a start and an end date TAM can read, so there is no velocity table.";
+}
+
+// velocityPartialLine is the row note "Built on a partial changelog" worded
+// for a table read away from the screen, where a marker in a cell has
+// nothing to explain it. It is empty when every row's history came back
+// whole.
+export function velocityPartialLine(sprintNames: string[]): string {
+  if (sprintNames.length === 0) return "";
+  const rows = sprintNames.length === 1 ? "row" : "rows";
+  return `Jira returned only part of the changelog behind ${sprintNames.length} ${rows} (${nameList(sprintNames)}), so those figures are not exact.`;
+}
+
 // velocityFloorLine is floorLine's rule worded for a table of sprints. The
 // Committed column is a floor in every row for the same reason one sprint's
 // figure is, and the table is read on its own: Phase 5's Rituals publishes
@@ -207,6 +232,27 @@ export function unavailableLine(reason: string): string {
       // empty pane saying nothing is worse than an unfamiliar word.
       return `There is no report for this sprint, for a reason this version has no wording for: ${reason}.`;
   }
+}
+
+// nothingToPublishLine is what the three outputs say when there is no
+// report to render. It does not repeat the reason: unavailableLine is
+// already on the surface these controls sit on, and the same paragraph
+// twice reads as two different problems.
+export function nothingToPublishLine(): string {
+  return "There is no report to publish or export yet.";
+}
+
+// publishedLine is what a publish that worked says. It names the page,
+// because a write the user asked for that answers "done" leaves them to go
+// and look for what it did.
+export function publishedLine(title: string): string {
+  return `Published to the Confluence page "${title}".`;
+}
+
+// savedLine is what an export says: the path, so the file can be found and
+// attached to something without hunting for it.
+export function savedLine(path: string): string {
+  return `Saved to ${path}`;
 }
 
 // isBusyRefusal recognises the refusal App.acquire makes in Go and the one

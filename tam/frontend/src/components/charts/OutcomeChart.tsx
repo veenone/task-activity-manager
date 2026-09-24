@@ -2,6 +2,7 @@ import type { ReportSeries } from "../../api";
 import { band, linear, niceTicks } from "../../lib/chartScale";
 import { reportFigures } from "../../lib/reportFigures";
 import { amount, outcomeLine } from "../../lib/reportText";
+import { outcomeTable } from "../../lib/reportTables";
 import { ChartFrame, Tooltip } from "./frame";
 import { BAR_PADDING, LABEL_OFFSET, OUTCOME_MARGIN, OUTCOME_ROW, TICKS } from "./geometry";
 import { usePointFocus } from "./usePointFocus";
@@ -15,12 +16,7 @@ import { usePointFocus } from "./usePointFocus";
 const TITLE = "Sprint outcome";
 
 export function OutcomeChart({ series, live = false, busy }: { series: ReportSeries; live?: boolean; busy?: boolean }) {
-  const figures = reportFigures(series, live);
-  const table = {
-    caption: TITLE,
-    columns: ["Figure", "Amount"],
-    rows: figures.map((f) => ({ key: f.key, cells: [f.label, amount(f.value, series.unit)] })),
-  };
+  const table = outcomeTable(series, live);
   return (
     <ChartFrame title={TITLE} table={table} busy={busy}>
       {(width, titleId) => <Bars series={series} live={live} width={width} titleId={titleId} />}
