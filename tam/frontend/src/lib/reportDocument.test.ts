@@ -108,12 +108,15 @@ describe("reportDocument", () => {
     expect(doc.sections[2].notes).toContain(velocityFloorLine());
   });
 
-  it("says a single row is not a trend, and names mixed units", () => {
+  it("says a single row is not a trend", () => {
     const one = reportDocument(report({ velocity: [report().velocity[0]] }))!;
     expect(one.sections[2].notes).toContain(singleSprintLine());
+  });
+
+  it("leaves out the line about one chart per unit, which no output here draws", () => {
     const mixed = report();
     mixed.velocity[1].unit = "cards";
-    expect(reportDocument(mixed)!.sections[2].notes).toContain(mixedUnitsLine());
+    expect(reportDocument(mixed)!.sections[2].notes).not.toContain(mixedUnitsLine());
   });
 });
 

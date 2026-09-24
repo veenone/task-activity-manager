@@ -6,7 +6,6 @@ import {
   emptyVelocityLine,
   floorLine,
   methodLine,
-  mixedUnitsLine,
   modeLine,
   singleSprintLine,
   summarySentence,
@@ -30,6 +29,12 @@ import type { TableSpec } from "./reportTables";
 // renderers take a document and lay it out, and the cost is that a report
 // can only be published or exported from the running app: there is no
 // headless path that could word one on its own.
+//
+// mixedUnitsLine is deliberately not among them. It says the velocity chart
+// splits into one panel per unit, which is true of the screen and false of a
+// spreadsheet and a deck that draw no chart at all; the unit rides on every
+// figure in the table instead, which is the protection that sentence exists
+// to explain.
 //
 // notes is the caveats, and it is not a footnote. A figure rebuilt from a
 // changelog walk can disagree with Jira's own report, and committed is a
@@ -62,7 +67,6 @@ export function reportDocument(report: SprintReport, live = false): ReportDocume
   const burndown = burndownTable(s.days);
   const velocity = velocityTable(report.velocity);
   const partial = report.velocity.filter((r) => r.truncated).map((r) => r.sprintName);
-  const units = [...new Set(report.velocity.map((r) => r.unit))];
   return {
     title: `${s.sprintName || "This sprint"} · Report`,
     sections: [
@@ -94,7 +98,6 @@ export function reportDocument(report: SprintReport, live = false): ReportDocume
             : kept([
                 velocityFloorLine(),
                 velocityPartialLine(partial),
-                units.length > 1 ? mixedUnitsLine() : "",
                 report.velocity.length === 1 ? singleSprintLine() : "",
               ]),
       },
