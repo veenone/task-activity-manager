@@ -2071,6 +2071,10 @@ entered. Kiwi profile file refused.
     app_reports.go       GetSprintReport, the one binding the Reports view calls, and
                           CancelSprintReport, which is how a view that has been left cancels a read
                           still holding the profile lock; both under the "report" lock name
+    app_reportout.go     the report's three outputs: PublishSprintReport (the sprint's own
+                          Confluence page, under the "report" lock name), ExportSprintReportXLSX
+                          and ExportSprintReportPPTX (beside tam.db, answering with the path, the
+                          convention ExportDiagnostics set); none of the three reaches Jira
     app_rituals.go       the ritual bindings: ensure, list, save, resolve, forget, delete, macro
                           preview, standup entry, last sync, Sync, CreateRitualRoot; all but Sync and
                           CreateRitualRoot under no lock, those two under the "rituals" lock name
@@ -2147,6 +2151,12 @@ entered. Kiwi profile file refused.
                           the store-or-fetch rule a closed sprint is served by, fetch.go the paged
                           changelog search with its progress frames, velocity.go the table
                           assembled from stored series plus whatever has to be read
+    internal/reportout/  the report rendered somewhere other than the screen: storage.go is
+                          Confluence storage format, publish.go the write through the transport
+                          the rituals sync uses, xlsx.go the spreadsheet through excelize,
+                          pptx.go and pptxparts.go the deck written straight into a zip of XML
+                          with the standard library; it words nothing, since the document that
+                          reaches it was worded in lib/reportDocument.ts
     internal/dbtx/       the one transaction helper issuerepo and boardrepo share: In for a write,
                           InRead for a deferred read-only transaction, and the Querier interface a
                           read helper takes so it can run on the handle or inside either kind
@@ -2192,8 +2202,16 @@ entered. Kiwi profile file refused.
                           operation actually holding the lock
       src/lib/reportText.ts  every sentence the sprint report prints: the summary, the floor and
                           removal qualifications, the method line, the four unavailable reasons,
-                          the unit and its reason, and the progress wording, all testable without
-                          rendering anything and all reused by Phase 5's Rituals
+                          the unit and its reason, the provisional or final mode line, and the
+                          progress wording, all testable without rendering anything and all
+                          reused by Phase 5's Rituals
+      src/lib/reportTables.ts  the report's three tables, captions, column names and cells: the
+                          outcome figures, the burndown day by day, the velocity rows, built once
+                          and drawn by the charts, the velocity table and the three outputs
+      src/lib/reportDocument.ts  the report as headings, lines, tables and the caveats on them,
+                          which is what the Confluence page, the spreadsheet and the deck are all
+                          rendered from; it answers null for an unavailable report, which is what
+                          makes the three outputs refuse rather than write a page of zeroes
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands
@@ -2243,6 +2261,9 @@ entered. Kiwi profile file refused.
                           pickers, the eight states a report can be in, and the rebuild),
                           SprintSummary (the sentence, its qualification, and the method line),
                           VelocityTable (the last six closed sprints, each row with its own unit),
+                          ReportOutputs (publish to Confluence, export a spreadsheet, export a
+                          deck, all three over one lib/reportDocument and disabled with a reason
+                          when there is no report),
                           RitualsView (the board and sprint pickers, the five-page nav, Sync
                           rituals and its result banner, the conflict and gone banners),
                           ritual-editor/RitualEditor (the TipTap editor over one page's storage
