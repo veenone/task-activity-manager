@@ -71,7 +71,6 @@ Gate: `frontend/core/src/instruction-gate.test.ts` (every class a component sets
 - Planned work is marked `TODO(tam)` or `TODO(xtm)` and names its phase or FR. Gate: the ratchet holds unscoped_todos.
 - Go source is gofmt-clean. Gate: CI only — `core.autocrlf` makes `gofmt -l` flag every file on a Windows checkout.
 - Release tags carry the app name: `xtm/v1.10.0`, `tam/v0.1.0`. The release workflow filters `xtm/v*`. Gate: review.
-- `origin` pushes to GitHub and the Gitea mirror together. After a PR merges on GitHub, run `.\scripts\sync-remotes.ps1`. Gate: review.
 - A `feat` PR links its spec or says in its `## Spec` section why it needs none. Gate: the `pr-acceptance` CI job.
 - No commit message, PR description or comment carries AI attribution: no `Co-Authored-By` naming an AI, no session link, no "Generated with" footer. Gate: `.githooks/commit-msg`, and the `no-ai-attribution` CI job over every commit in a PR and over its body.
 
