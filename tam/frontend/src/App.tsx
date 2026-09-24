@@ -14,11 +14,23 @@ import { ReportsView } from "./components/ReportsView";
 import { RitualsView } from "./components/RitualsView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
+import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { useSync } from "./contexts/SyncContext";
 import { useSyncState } from "./queries/issues";
 import { usePendingChanges } from "./queries/pending";
 import { formatWhen } from "./lib/format";
+
+// cachedCount is what the status bar says about the cache: the rows it
+// holds, and what the project holds when that is more. A sync narrowed by
+// the profile's scope JQL, or by a type the backend keeps out, caches part
+// of a project, and "38 issues" on its own read as a project of 38 when it
+// held 2,943 (#68). The two are equal after a plain full sync, and the
+// second half is left off then rather than repeating the number.
+function cachedCount({ issueCount, projectTotal }: { issueCount: number; projectTotal: number }): string {
+  const cached = issueCount.toLocaleString();
+  return projectTotal > issueCount ? `${cached} of ${projectTotal.toLocaleString()}` : cached;
+}
 
 // App is the shell: topbar, nav rail, the active view, and the status bar.
 // The topbar, profile controls, and status bar mirror XTM's App.tsx/App.css
@@ -93,6 +105,7 @@ export default function App() {
   useEffect(() => {
     const offProfiles = EventsOn("menu:profiles", () => openModal("profiles"));
     const offAbout = EventsOn("menu:about", () => openModal("about"));
+    const offDiagnostics = EventsOn("menu:diagnostics", () => openModal("diagnostics"));
     // The View menu is TAM's primary navigation. It sends the view id the
     // menu was built with, which is why menuViews in main.go has to stay in
     // step with VIEWS in nav.ts.
@@ -105,6 +118,7 @@ export default function App() {
     return () => {
       offProfiles();
       offAbout();
+      offDiagnostics();
       offView();
       offRail();
       offSync();
@@ -187,7 +201,10 @@ export default function App() {
           <Menu
             label="Help"
             align="right"
-            items={[{ key: "about", label: "About", onClick: () => openModal("about") }]}
+            items={[
+              { key: "diagnostics", label: "Diagnostics", title: "Paths, build and the recent log", onClick: () => openModal("diagnostics") },
+              { key: "about", label: "About", onClick: () => openModal("about") },
+            ]}
           />
         </div>
       </header>
@@ -285,19 +302,19 @@ export default function App() {
 
       <footer className="app-statusbar">
         <span className={`dot ${health?.ok ? "dot-ok" : "dot-warn"}`} aria-hidden="true" />
-        <span>{health?.ok ? "Local store ready · tam.db" : "Starting up"}</span>
+        <span>{health?.ok ? "Local store ready" : "Starting up"}</span>
         {!startupFailed && profileError ? (
           <span className="error-text">Profiles could not be loaded: {profileError}</span>
         ) : activeProfile ? (
           <span data-testid="sync-summary">
             {syncState.data
               ? syncState.data.lastSynced
-                ? `${syncState.data.issueCount.toLocaleString()} issues, last synced ${formatWhen(syncState.data.lastSynced)}`
+                ? `${cachedCount(syncState.data)} issues, last synced ${formatWhen(syncState.data.lastSynced)}`
                 : "Not synced yet"
               : ""}
           </span>
         ) : (
-          <span className="muted">Profiles shared with XTM · agile-suite/profiles.db</span>
+          <span className="muted">Profiles are shared with Xray Test Manager</span>
         )}
         {progress && <SyncBar progress={progress} />}
         {(syncError || syncState.data?.lastError) && !progress && (
@@ -315,6 +332,7 @@ export default function App() {
       {!startupFailed && <LiveRegion />}
       {isOpen("profiles") && <ProfilesModal onClose={closeModal} />}
       {isOpen("about") && <AboutModal onClose={closeModal} />}
+      {isOpen("diagnostics") && <DiagnosticsModal onClose={closeModal} />}
       {isOpen("pending") && <PendingChangesModal onClose={closeModal} />}
     </div>
   );

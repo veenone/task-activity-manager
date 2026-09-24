@@ -86,6 +86,10 @@ export function EnsureSprintRituals(arg1, arg2, arg3) {
   return window['go']['main']['App']['EnsureSprintRituals'](arg1, arg2, arg3);
 }
 
+export function ExportDiagnostics() {
+  return window['go']['main']['App']['ExportDiagnostics']();
+}
+
 export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
 }
@@ -248,6 +252,10 @@ export function PreviewImport(arg1, arg2) {
 
 export function RankIssue(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['RankIssue'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function ReadLog() {
+  return window['go']['main']['App']['ReadLog']();
 }
 
 export function RefreshDetails(arg1) {

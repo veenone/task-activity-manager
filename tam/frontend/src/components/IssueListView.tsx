@@ -10,13 +10,37 @@ import { useModal } from "../modals";
 import { NewIssueModal } from "./NewIssueModal";
 import { ImportIssuesModal } from "./ImportIssuesModal";
 import { useDebounced } from "../lib/useDebounced";
-import { useSubtaskType } from "../queries/people";
+import { useProjectTypes, useSubtaskType } from "../queries/people";
 
 // The page sizes the pager offers. 25 stays the default so the first render
 // is unchanged; the larger steps are for planning, where paging 25 at a time
 // through a project's backlog is the wrong interaction.
 const PAGE_SIZES = [25, 50, 100, 250];
 const SEARCH_DELAY_MS = 250;
+
+// typeChips is what the filter bar offers: one chip per type the project
+// has, in the order Jira lists them, keyed by the value the sync stored in
+// the type column. A type TAM models is that logical type, under TAM's own
+// short label; a type it does not is the project's own name, on the neutral
+// chip, the rule #67 set for the New issue dialog.
+//
+// Two Jira types can mean the same logical type ("Task" and "Todo" both do),
+// and two chips filtering for the same rows is a filter bar lying about
+// having two filters, so the first one wins. A project whose types have
+// never been synced falls back to the six TAM models, which is what the bar
+// offered before it could know better.
+function typeChips(projectTypes: { name: string; logical: string }[] | undefined) {
+  if (!projectTypes || projectTypes.length === 0) {
+    return ISSUE_TYPES.map((t) => ({ id: t.id, label: t.short, title: t.label, modelled: true }));
+  }
+  const chips = new Map<string, { id: string; label: string; title: string; modelled: boolean }>();
+  for (const t of projectTypes) {
+    const id = t.logical || t.name;
+    const short = ISSUE_TYPES.find((x) => x.id === t.logical)?.short;
+    if (!chips.has(id)) chips.set(id, { id, label: short ?? t.name, title: t.name, modelled: !!short });
+  }
+  return [...chips.values()];
+}
 
 interface IssueListViewProps {
   // Namespaces this instance's DOM ids (the pager's label/input pairs), so
@@ -45,6 +69,8 @@ interface IssueListViewProps {
 // table.
 export function IssueListView({ viewId, label, baseQuery, showCreate, showImport, emptyNote, onPage }: IssueListViewProps) {
   const { activeId, activeProfile } = useProfile<Profile, Settings>();
+  const projectTypes = useProjectTypes(activeId);
+  const chips = useMemo(() => typeChips(projectTypes.data), [projectTypes.data]);
   const [text, setText] = useState("");
   const [types, setTypes] = useState<string[]>([]);
   const [sprintId, setSprintId] = useState("");
@@ -155,15 +181,16 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
           }}
         />
         <div className="type-filter" role="group" aria-label="Issue types">
-          {ISSUE_TYPES.map((t) => (
+          {chips.map((t) => (
             <button
               key={t.id}
               type="button"
-              className={`chip chip-type chip-type-${t.id} chip-toggle${types.includes(t.id) ? " chip-on" : ""}`}
+              className={`chip chip-type chip-type-${t.modelled ? t.id : "none"} chip-toggle${types.includes(t.id) ? " chip-on" : ""}`}
               aria-pressed={types.includes(t.id)}
+              title={t.title}
               onClick={() => toggleType(t.id)}
             >
-              {t.short}
+              {t.label}
             </button>
           ))}
         </div>

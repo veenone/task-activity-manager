@@ -5,16 +5,33 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 // SyncState is what the status bar and the sync engine need to know about a
 // profile: when it last synced (RFC3339, empty when never), when it last did
-// a full sync, the last error, and how many issues are cached.
+// a full sync, the last error, how many issues are cached, and how many the
+// project holds.
 type SyncState struct {
 	LastSynced string `json:"lastSynced"`
 	LastFull   string `json:"lastFull"`
 	LastError  string `json:"lastError"`
 	IssueCount int    `json:"issueCount"`
+	// ProjectTotal is what the project held when the last sync counted it,
+	// zero when no sync has. IssueCount below it is a cache narrowed by the
+	// profile's scope JQL or by types the backend holds back, and saying so
+	// is what keeps a narrowed cache from reading as a small project (#68).
+	ProjectTotal int `json:"projectTotal"`
+}
+
+// settingProjectTotal is where the sync leaves the project's issue count.
+// It is a profile setting rather than a sync_state column because it is
+// bookkeeping for the status bar, not state the engine reads back.
+const settingProjectTotal = "project_total"
+
+// SetProjectTotal records how many issues the project holds.
+func (r *Repository) SetProjectTotal(ctx context.Context, profileID string, n int) error {
+	return r.SetProfileSetting(ctx, profileID, settingProjectTotal, strconv.Itoa(n))
 }
 
 // SyncState reads the profile's state; a profile that never synced returns
@@ -32,6 +49,13 @@ func (r *Repository) SyncState(ctx context.Context, profileID string) (SyncState
 		return SyncState{}, err
 	}
 	s.IssueCount = n
+	// An unset or unreadable value leaves the total at zero, which is what
+	// "no sync has counted the project" means and what the status bar shows
+	// the cached count alone for. The read failure is dropped on purpose:
+	// every caller of this wants the timestamps and the count, and a number
+	// for the status bar is not worth failing a sync over.
+	raw, _ := r.ProfileSetting(ctx, profileID, settingProjectTotal)
+	s.ProjectTotal, _ = strconv.Atoi(raw)
 	return s, nil
 }
 

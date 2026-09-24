@@ -46,7 +46,7 @@ var errNoLifecycle = errors.New("this connection cannot manage sprints")
 // issues come back with their statuses in one call rather than one call per
 // card. backend.IssueBackend satisfies it.
 type Backend interface {
-	SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, since string, types []string, startAt, maxResults int) ([]backend.Issue, int, error)
+	SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, since string, startAt, maxResults int) ([]backend.Issue, int, error)
 }
 
 // lifecycle is the part of backend.BoardBackend a push uses: the writes and
@@ -110,10 +110,10 @@ type Issues interface {
 // failure of the completion. MovedTo names where the moved cards went, the
 // backlog or a sprint by name.
 //
-// Every count here is over the issue types TAM syncs (backend.AllTypes) and
-// nothing else. A sprint holding a card of a type this project defines for
-// itself is a sprint the completion never sees that card in: it is not
-// counted, not moved to the chosen destination, and lands in the backlog by
+// Every count here is over the issue types the backend syncs, which is
+// every type the project has bar the ones the backend holds back (#68). A
+// card of a type outside that scope is one the completion never sees: not
+// counted, not moved to the chosen destination, and left in the backlog by
 // Jira's own close behaviour. So Moved describes what the completion
 // considered, and is not offered as the size of the sprint.
 type Completion struct {
@@ -355,7 +355,7 @@ func (s *Service) sprintIssues(ctx context.Context, sprintID string, complete fu
 	incomplete := []string{}
 	startAt, total := 0, -1
 	for total < 0 || startAt < total {
-		page, n, err := s.b.SearchIssuesPage(ctx, s.project, "sprint = "+sprintID, "", backend.AllTypes, startAt, s.pageWidth())
+		page, n, err := s.b.SearchIssuesPage(ctx, s.project, "sprint = "+sprintID, "", startAt, s.pageWidth())
 		if err != nil {
 			return nil, fmt.Errorf("read sprint %s: %w", sprintID, err)
 		}

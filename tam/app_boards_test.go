@@ -103,7 +103,7 @@ func (stubIssueBackend) TestConnection(context.Context) (backend.User, error) {
 	return backend.User{Name: "fake"}, nil
 }
 func (stubIssueBackend) IsDemo() bool { return false }
-func (stubIssueBackend) SearchIssuesPage(context.Context, string, string, string, []string, int, int) ([]backend.Issue, int, error) {
+func (stubIssueBackend) SearchIssuesPage(context.Context, string, string, string, int, int) ([]backend.Issue, int, error) {
 	return nil, 0, errors.New("not used")
 }
 func (stubIssueBackend) GetIssueDetail(context.Context, string) (backend.IssueDetail, error) {
@@ -250,7 +250,7 @@ type issueAndBoardBackend struct {
 	issues []backend.Issue
 }
 
-func (b *issueAndBoardBackend) SearchIssuesPage(_ context.Context, _, _, _ string, _ []string, startAt, _ int) ([]backend.Issue, int, error) {
+func (b *issueAndBoardBackend) SearchIssuesPage(_ context.Context, _, _, _ string, startAt, _ int) ([]backend.Issue, int, error) {
 	if startAt > 0 {
 		return []backend.Issue{}, len(b.issues), nil
 	}

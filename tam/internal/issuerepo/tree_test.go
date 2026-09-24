@@ -143,3 +143,43 @@ func TestEpicTreeCapsAtFiveThousandRows(t *testing.T) {
 		t.Errorf("Total counts the capped rows, not the whole cache: %d", tree.Epics[0].Total)
 	}
 }
+
+// An issue of a type TAM does not model reaches the tree now that the sync
+// fetches every type (#68). It is placed by its parent like any other
+// non-epic issue: under the epic it belongs to, and in the "No epic" group
+// when it belongs to none, which is the tree's own way of saying it could
+// not be placed under an epic. It counts towards its epic's progress, since
+// it is work the epic is waiting on like any other.
+func TestEpicTreePlacesATypeTAMDoesNotModel(t *testing.T) {
+	repo := newRepo(t)
+	seedTree(t, repo)
+	rows := []backend.Issue{
+		{Key: "PLAT-600", Type: "Improvement", Summary: "Trim the bundle", Status: "To Do", ParentKey: "PLAT-350", Rank: "0|c", Labels: []string{}},
+		{Key: "PLAT-601", Type: "Todo", Summary: "Chase the vendor", Status: "To Do", ParentKey: "", Rank: "0|d", Labels: []string{}},
+	}
+	if err := repo.UpsertPage(context.Background(), "p1", rows, time.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	tree, err := repo.EpicTree(context.Background(), "p1", issuerepo.TreeQuery{ShowDone: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	promo := tree.Epics[0]
+	if promo.Issue.Key != "PLAT-350" {
+		t.Fatalf("first epic = %s", promo.Issue.Key)
+	}
+	under := false
+	for _, c := range promo.Children {
+		under = under || c.Key == "PLAT-600"
+	}
+	if !under || promo.Total != 3 {
+		t.Errorf("promo = %+v, want PLAT-600 among its children and counted", promo)
+	}
+	loose := false
+	for _, o := range tree.Orphans {
+		loose = loose || o.Key == "PLAT-601"
+	}
+	if !loose {
+		t.Errorf("orphans = %+v, want PLAT-601 in the group for issues with no epic", tree.Orphans)
+	}
+}

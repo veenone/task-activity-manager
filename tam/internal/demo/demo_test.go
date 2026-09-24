@@ -33,7 +33,7 @@ func TestIssuesAreDeterministicAndWellFormed(t *testing.T) {
 			t.Errorf("%s has nil labels; want an empty slice", iss.Key)
 		}
 	}
-	for _, typ := range backend.AllTypes {
+	for _, typ := range []string{backend.TypeTask, backend.TypeEpic, backend.TypeStory, backend.TypeBug, backend.TypeRequirement, backend.TypeSubtask} {
 		if types[typ] == 0 {
 			t.Errorf("no issues of type %s", typ)
 		}

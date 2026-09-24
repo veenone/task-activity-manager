@@ -23,7 +23,7 @@ const query: IssueQuery = { text: "", types: [], sprintId: "", offset: 0, limit:
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
-  vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0 });
+  vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0, projectTotal: 0 });
 });
 
 function wrapper(qc = createQueryClient()) {

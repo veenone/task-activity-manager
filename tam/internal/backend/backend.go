@@ -15,8 +15,11 @@ import (
 	"strings"
 )
 
-// Logical issue types. Every issue TAM manages is one of these five; the
-// Jira names they map to are the backend's business.
+// Logical issue types. These are the types TAM models: it draws, filters
+// and creates them by these names, and the Jira names they map to are the
+// backend's business. They are not the scope of a sync, which is every type
+// the project has (#68); an issue whose type is none of these carries the
+// project's own name for it instead.
 const (
 	TypeTask        = "task"
 	TypeEpic        = "epic"
@@ -30,9 +33,6 @@ const (
 	// hardcoded.
 	TypeSubtask = "subtask"
 )
-
-// AllTypes is the six logical types in display order.
-var AllTypes = []string{TypeTask, TypeEpic, TypeStory, TypeBug, TypeRequirement, TypeSubtask}
 
 // Issue is one row of the Backlog: the columns the grid shows plus what sync
 // needs to keep it current. StoryPoints is nil when the issue has none.
@@ -580,10 +580,17 @@ type TransitionCheck struct {
 type IssueBackend interface {
 	TestConnection(ctx context.Context) (User, error)
 	IsDemo() bool
-	// SearchIssuesPage returns one page of issues in projectKey whose logical
-	// type is in types, narrowed by scopeJQL when non-empty and by
+	// SearchIssuesPage returns one page of every issue in projectKey the
+	// backend syncs, narrowed by scopeJQL when non-empty and by
 	// updated >= since (RFC3339) when non-empty, plus the total match count.
-	SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, since string, types []string, startAt, maxResults int) ([]Issue, int, error)
+	// There is no type argument: naming the types was what fetched 38 issues
+	// of a project's 2,943 and called it a success (#68). A backend that
+	// holds types of its own out of the scope, as the Jira one holds Xray's
+	// back for XTM, decides that for itself and says so.
+	//
+	// maxResults of zero asks for the count alone, which is how a caller
+	// learns what the project holds without paging it.
+	SearchIssuesPage(ctx context.Context, projectKey, scopeJQL, since string, startAt, maxResults int) ([]Issue, int, error)
 	// GetIssueDetail fetches what the grid does not carry: description,
 	// links, and the custom fields.
 	GetIssueDetail(ctx context.Context, key string) (IssueDetail, error)

@@ -83,7 +83,7 @@ func (f *fake) TestConnection(context.Context) (backend.User, error) {
 	return backend.User{Name: "f"}, nil
 }
 func (f *fake) IsDemo() bool { return false }
-func (f *fake) SearchIssuesPage(context.Context, string, string, string, []string, int, int) ([]backend.Issue, int, error) {
+func (f *fake) SearchIssuesPage(context.Context, string, string, string, int, int) ([]backend.Issue, int, error) {
 	return nil, 0, errors.New("not used")
 }
 func (f *fake) IssueTypes(context.Context, string) ([]backend.IssueType, error) { return nil, nil }

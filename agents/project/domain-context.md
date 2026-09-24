@@ -37,6 +37,27 @@ commit hash behind it; the instruction gate checks the hash exists.
   reads as "tested by" from one side and something else from the other, so a
   link is resolved by direction, never by type name alone (6ef4b6d, 0218fca).
 
+## Jira issue types
+
+- A project's issue types come from `GET /rest/api/2/project/{key}`, and the
+  names are the instance's, not Jira's: the sub-task level is "Technical
+  task" on one instance seen in the field and the task level "Todo" on the
+  same one. Discover them; never hardcode a name.
+- A sync scopes by what it excludes, not by what it names. Naming the six
+  types TAM models fetched 38 issues of a project's 2,943 and reported it as
+  a success (#68). Excluding leaves a type the project adds later in scope.
+- Xray's types cannot be recognised by name either, for the same reason XTM
+  discovers its own. The only signal in the project response is `iconUrl`:
+  a plugin's types are drawn from its own bundled resources, so Xray's point
+  at `com.xpandit.plugins.xray`. It is a heuristic with two failure modes,
+  both in `TestXrayTypesAreRecognisedByTheirPluginIcon`: an Xray type given
+  an uploaded avatar is synced anyway, and a type of the project's own given
+  an Xray icon is left out.
+- An issue whose type TAM has no logical type for keeps the project's own
+  name for it, everywhere, and draws on `chip-type-none`. A
+  `chip-type-Improvement` class no stylesheet defines renders as unstyled
+  text and reports nothing.
+
 ## Jira create and edit screens
 
 - Jira decides which fields an issue may be edited with per project and issue

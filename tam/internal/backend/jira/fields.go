@@ -121,15 +121,45 @@ func jiraTypeNames(types []string, requirementType string, pt projectTypes) []st
 	return names
 }
 
-// buildJQL is the sync scope: the project, the type list, the profile's
-// scope JQL in parentheses when set, the incremental clause when since
-// parses, and a stable order by key so paging never skips an issue.
-func buildJQL(projectKey, scopeJQL, since string, typeNames []string) string {
-	quoted := make([]string, len(typeNames))
-	for i, n := range typeNames {
-		quoted[i] = strconv.Quote(n)
+// xrayPluginKey is the plugin whose issue types belong to XTM, not to TAM.
+// Xray's types cannot be recognised by name: an instance renames and
+// localises them, which is why XTM discovers its own type names rather than
+// hardcoding them (xtm/internal/jira/client.go). The icon a project serves
+// for a type is the only field in that response that says which plugin
+// defined it, because a plugin's types are drawn from its own bundled
+// resources under this key.
+const xrayPluginKey = "com.xpandit.plugins.xray"
+
+// isXrayType says whether a project's issue type is one of Xray's, by the
+// only signal the project endpoint carries.
+//
+// ponytail: icon heuristic with two failure modes, both tested. An instance
+// that replaces an Xray type's icon with an uploaded avatar is not
+// recognised, so its Tests sync into TAM; a type of the project's own given
+// an Xray icon is excluded from the sync. Upgrade path: ask the instance
+// for the plugin that owns each type, if Jira ever answers that, or share
+// XTM's own type resolution through core.
+func isXrayType(iconURL string) bool {
+	return strings.Contains(strings.ToLower(iconURL), xrayPluginKey)
+}
+
+// buildJQL is the sync scope: the project, the types to keep out of it, the
+// profile's scope JQL in parentheses when set, the incremental clause when
+// since parses, and a stable order by key so paging never skips an issue.
+//
+// The type clause excludes rather than enumerates. TAM used to name the six
+// types it models, so a project whose work is mostly other types came back
+// almost empty and reported it as a success (#68). Excluding leaves a type
+// the project adds later inside the scope without TAM being taught its name.
+func buildJQL(projectKey, scopeJQL, since string, excludeTypes []string) string {
+	jql := fmt.Sprintf("project = %s", strconv.Quote(projectKey))
+	if len(excludeTypes) > 0 {
+		quoted := make([]string, len(excludeTypes))
+		for i, n := range excludeTypes {
+			quoted[i] = strconv.Quote(n)
+		}
+		jql += fmt.Sprintf(" AND issuetype not in (%s)", strings.Join(quoted, ", "))
 	}
-	jql := fmt.Sprintf("project = %s AND issuetype in (%s)", strconv.Quote(projectKey), strings.Join(quoted, ", "))
 	if s := strings.TrimSpace(scopeJQL); s != "" {
 		jql += " AND (" + s + ")"
 	}
@@ -201,7 +231,12 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 		iss.Priority = priority.Name
 	}
 	if err := json.Unmarshal(f["issuetype"], &issueType); err == nil {
-		iss.Type = logicalType(issueType.Name, requirementType, pt)
+		// A type TAM has no logical type for keeps the project's own name for
+		// it, the rule #67 set for the New issue dialog. The row is real work
+		// either way, and the empty string is what the sync dropped it for.
+		if iss.Type = logicalType(issueType.Name, requirementType, pt); iss.Type == "" {
+			iss.Type = issueType.Name
+		}
 	}
 	var assignee, reporter *userRef
 	if err := json.Unmarshal(f["assignee"], &assignee); err == nil && assignee != nil {

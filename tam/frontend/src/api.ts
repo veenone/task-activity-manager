@@ -270,12 +270,20 @@ export interface SyncState {
   lastFull: string;
   lastError: string;
   issueCount: number;
+  // What the project held when the last sync counted it, 0 when none has.
+  // issueCount below it is a cache the profile's scope JQL, or a type the
+  // backend holds back, has narrowed, and the status bar says so rather
+  // than letting a narrow cache read as a small project.
+  projectTotal: number;
 }
 
 export interface SyncSummary {
   fetched: number;
   upserted: number;
   skipped: number;
+  // How many issues the project holds, counted without the scope and the
+  // cut-off that narrow the fetch.
+  projectTotal: number;
   full: boolean;
   elapsed: string;
   // boards is the boards pass's own summary, absent when the pass did not
@@ -1012,6 +1020,10 @@ export function readFileAsBase64(file: File): Promise<string> {
 
 export const Health: () => Promise<HealthInfo> = App.Health;
 export const GetDiagnostics: () => Promise<Diagnostics> = App.GetDiagnostics;
+// The log reader takes no path on purpose: it answers with the tail of the
+// file TAM itself opened at startup, and nothing the frontend names.
+export const ReadLog: () => Promise<string> = App.ReadLog;
+export const ExportDiagnostics: () => Promise<string> = App.ExportDiagnostics;
 export const ListProfiles: () => Promise<Profile[]> = App.ListProfiles;
 export const CreateProfile: (
   name: string,

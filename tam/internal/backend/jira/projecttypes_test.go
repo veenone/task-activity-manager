@@ -60,3 +60,20 @@ func TestCreateSendsAProjectTypeNameItCanFind(t *testing.T) {
 		t.Error("a type the project does not have was created anyway")
 	}
 }
+
+// Xray's test artefacts belong to XTM, so they are not offered as types
+// here and not fetched by a sync. They are recognised by the plugin icon
+// the project serves for them, never by the name "Test", which an instance
+// renames and localises.
+func TestIssueTypesDropsXraysOwnTypes(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	types, err := b.IssueTypes(context.Background(), "PLAT")
+	if err != nil {
+		t.Fatalf("issue types: %v", err)
+	}
+	for _, ty := range types {
+		if ty.Name == "Test" {
+			t.Errorf("types = %+v, want Xray's Test left out", types)
+		}
+	}
+}

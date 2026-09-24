@@ -4,15 +4,13 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"agile-suite/tam/internal/backend"
 )
 
 // The sync reads the description with the rest of the row, so the detail
 // panel can draw it from the local store with no call of its own.
 func TestTheSyncsSearchAsksForTheDescription(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	if _, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 50); err != nil {
+	if _, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", 0, 50); err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	if len(f.searches) != 1 {
@@ -29,7 +27,7 @@ func TestTheSyncsSearchAsksForTheDescription(t *testing.T) {
 // description, and a response that did not carry the key at all.
 func TestADescriptionJiraDidNotSendIsNotAnEmptyOne(t *testing.T) {
 	b, f := newBackend(t, twoFields)
-	page, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 50)
+	page, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", 0, 50)
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -41,7 +39,7 @@ func TestADescriptionJiraDidNotSendIsNotAnEmptyOne(t *testing.T) {
 	}
 
 	f.searchBody = `{"total":1,"issues":[{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[]}}]}`
-	silent, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", backend.AllTypes, 0, 50)
+	silent, _, err := b.SearchIssuesPage(context.Background(), "PLAT", "", "", 0, 50)
 	if err != nil {
 		t.Fatalf("second search: %v", err)
 	}
