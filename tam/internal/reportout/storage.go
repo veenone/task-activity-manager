@@ -22,7 +22,7 @@ func Storage(d Document) string {
 		for _, line := range s.Lines {
 			para(&b, line)
 		}
-		table(&b, s.Table)
+		storageTable(&b, s.Table)
 		for _, note := range s.Notes {
 			para(&b, note)
 		}
@@ -39,7 +39,7 @@ func para(b *strings.Builder, text string) {
 	b.WriteString("<p>" + esc(text) + "</p>")
 }
 
-func table(b *strings.Builder, t Table) {
+func storageTable(b *strings.Builder, t Table) {
 	if len(t.Columns) == 0 {
 		return
 	}
