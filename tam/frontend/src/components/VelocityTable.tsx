@@ -1,5 +1,6 @@
 import type { VelocityRow } from "../api";
 import { amount, velocityFloorLine } from "../lib/reportText";
+import { velocityTable } from "../lib/reportTables";
 
 // VelocityTable is the board's last closed sprints as rows, oldest first,
 // which is the order VelocityChart reads them in beside it. The backend
@@ -17,6 +18,7 @@ import { amount, velocityFloorLine } from "../lib/reportText";
 // rule this phase works to is that the qualification goes on the surface
 // that shows the number.
 export function VelocityTable({ rows }: { rows: VelocityRow[] }) {
+  const spec = velocityTable(rows);
   if (rows.length === 0) {
     return (
       <p className="muted">
@@ -28,12 +30,10 @@ export function VelocityTable({ rows }: { rows: VelocityRow[] }) {
     <>
       <div className="report-table-wrap">
       <table className="report-table">
-        <caption className="sr-only">Velocity, oldest sprint first</caption>
+        <caption className="sr-only">{spec.caption}</caption>
         <thead>
           <tr>
-            <th scope="col">Sprint</th>
-            <th scope="col">Committed</th>
-            <th scope="col">Completed</th>
+            {spec.columns.map((c) => <th key={c} scope="col">{c}</th>)}
           </tr>
         </thead>
         <tbody>

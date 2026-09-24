@@ -2,6 +2,7 @@ import type { ReportDay } from "../../api";
 import { dayIndex, labelEvery, linear, niceTicks, spread } from "../../lib/chartScale";
 import { calendarDay, points } from "../../lib/format";
 import { amount, dayLine, emptyDaysLine } from "../../lib/reportText";
+import { burndownTable } from "../../lib/reportTables";
 import { ChartFrame, Tooltip } from "./frame";
 import { HIT_RADIUS, LABEL_OFFSET, LINE_HEIGHT, MARGIN, POINT_RADIUS, TICKS, VALUE_GAP } from "./geometry";
 import { usePointFocus } from "./usePointFocus";
@@ -23,14 +24,7 @@ const LEGEND = [
 ];
 
 export function BurndownChart({ days, unit, busy }: { days: ReportDay[]; unit: string; busy?: boolean }) {
-  const table = {
-    caption: "Burndown, day by day",
-    columns: ["Day", "Scope", "Completed", "Remaining", "Ideal"],
-    rows: days.map((d) => ({
-      key: d.date,
-      cells: [calendarDay(d.date), points(d.scope), points(d.completed), points(d.remaining), points(d.ideal)],
-    })),
-  };
+  const table = burndownTable(days);
   return (
     <ChartFrame
       title="Burndown"

@@ -1,5 +1,6 @@
 import { useId, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import type { TableSpec } from "../../lib/reportTables";
 import { useChartWidth } from "./useChartWidth";
 
 // ChartFrame is what the three report charts share: a figure with a caption
@@ -14,12 +15,6 @@ export interface LegendItem {
   label: string;
   // swatch is the colour role, one of the chart-swatch-* rules in App.css.
   swatch: string;
-}
-
-export interface TableSpec {
-  caption: string;
-  columns: string[];
-  rows: { key: string; cells: string[] }[];
 }
 
 interface Props {

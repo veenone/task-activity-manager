@@ -2,6 +2,7 @@ import type { VelocityRow } from "../../api";
 import { band, linear, niceTicks } from "../../lib/chartScale";
 import { points } from "../../lib/format";
 import { amount, mixedUnitsLine, singleSprintLine, velocityLine } from "../../lib/reportText";
+import { velocityTable } from "../../lib/reportTables";
 import { ChartFrame, Tooltip } from "./frame";
 import { BAR_HEIGHT, BAR_PADDING, LABEL_OFFSET, MARGIN, TICKS } from "./geometry";
 import { usePointFocus } from "./usePointFocus";
@@ -42,14 +43,7 @@ export function VelocityChart({ rows, busy, tabled }: { rows: VelocityRow[]; bus
 }
 
 function Panel({ rows, title, note, busy, tabled }: { rows: VelocityRow[]; title: string; note?: string; busy?: boolean; tabled?: boolean }) {
-  const table = {
-    caption: `${title}, oldest sprint first`,
-    columns: ["Sprint", "Committed", "Completed"],
-    rows: rows.map((r) => ({
-      key: String(r.sprintId),
-      cells: [r.sprintName, amount(r.committed, r.unit), amount(r.completed, r.unit)],
-    })),
-  };
+  const table = velocityTable(rows, title);
   return (
     <ChartFrame title={title} legend={LEGEND} table={tabled ? undefined : table} note={note} busy={busy}>
       {(width, titleId) => <Bars rows={rows} width={width} titleId={titleId} />}
