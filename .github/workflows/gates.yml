@@ -92,6 +92,34 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: sh scripts/pr-body-check.sh
+      - name: check the PR body carries no AI attribution
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s' "$PR_BODY" > /tmp/pr-body && sh .githooks/commit-msg /tmp/pr-body
+
+  no-ai-attribution:
+    # The commit-msg hook only runs where someone set core.hooksPath, so the
+    # same check runs here over every commit the PR carries.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: check every commit message
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          fail=0
+          for c in $(git rev-list "$BASE_SHA".."$HEAD_SHA"); do
+            git log -1 --format=%B "$c" > /tmp/msg
+            if ! sh .githooks/commit-msg /tmp/msg; then
+              echo "::error::$(git log -1 --format='%h %s' "$c")"
+              fail=1
+            fi
+          done
+          exit $fail
 
   proven-red:
     if: github.event_name == 'pull_request'

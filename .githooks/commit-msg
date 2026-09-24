@@ -1,0 +1,23 @@
+#!/bin/sh
+# Enable once per clone: git config core.hooksPath .githooks
+# No AI attribution in a commit message. The agents working on this
+# repository are told this in every brief and are reminded of it by their
+# own harness in the other direction, so the rule lives here where neither
+# can talk its way past it.
+#
+# Every pattern is anchored to the start of a line, because that is where an
+# attribution trailer or footer lives and prose about one is not. A message
+# may name Claude, and a message about this rule has to quote the footer it
+# rejects; the first version of this hook rejected its own pull request body
+# for doing exactly that.
+set -e
+
+pattern='^[[:space:]]*(Co-Authored-By:.*Claude|Claude-Session:|(🤖[[:space:]]*)?Generated with (\[Claude Code\]|Claude Code))'
+
+if grep -qiE "$pattern" "$1"; then
+	echo "commit-msg: this message carries AI attribution, which this repository does not use." >&2
+	echo "Offending line(s):" >&2
+	grep -inE "$pattern" "$1" >&2
+	echo "Remove them and commit again. The same rule covers PR descriptions and comments." >&2
+	exit 1
+fi
