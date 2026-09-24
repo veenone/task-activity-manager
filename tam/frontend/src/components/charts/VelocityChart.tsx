@@ -1,7 +1,7 @@
 import type { VelocityRow } from "../../api";
 import { band, linear, niceTicks } from "../../lib/chartScale";
 import { points } from "../../lib/format";
-import { amount, mixedUnitsLine, singleSprintLine, velocityLine } from "../../lib/reportText";
+import { mixedUnitsLine, singleSprintLine, velocityLine } from "../../lib/reportText";
 import { velocityTable } from "../../lib/reportTables";
 import { ChartFrame, Tooltip } from "./frame";
 import { BAR_HEIGHT, BAR_PADDING, LABEL_OFFSET, MARGIN, TICKS } from "./geometry";

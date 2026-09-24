@@ -1,4 +1,4 @@
-import type { SprintReport } from "../api";
+import type { ReportDocument, ReportTable, SprintReport } from "../api";
 import {
   builtAtLine,
   completionLine,
@@ -37,23 +37,6 @@ import type { TableSpec } from "./reportTables";
 // them. They repeat between sections on purpose: a deck shows one section at
 // a time, and a slide of numbers with the caveat on a different slide is a
 // slide that looks authoritative and is not.
-
-export interface ReportTable {
-  columns: string[];
-  rows: string[][];
-}
-
-export interface ReportSection {
-  heading: string;
-  lines: string[];
-  table: ReportTable;
-  notes: string[];
-}
-
-export interface ReportDocument {
-  title: string;
-  sections: ReportSection[];
-}
 
 const NO_TABLE: ReportTable = { columns: [], rows: [] };
 

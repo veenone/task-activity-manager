@@ -118,7 +118,8 @@ describe("reportDocument", () => {
 });
 
 describe("nothingToPublishLine", () => {
-  it("quotes the reason the report is unavailable", () => {
-    expect(nothingToPublishLine("sprintHasNoDates")).toContain(unavailableLine("sprintHasNoDates"));
+  it("says there is nothing to render without repeating the reason beside it", () => {
+    expect(nothingToPublishLine()).toBe("There is no report to publish or export yet.");
+    expect(nothingToPublishLine()).not.toContain(unavailableLine("sprintHasNoDates"));
   });
 });

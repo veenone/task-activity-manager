@@ -234,12 +234,25 @@ export function unavailableLine(reason: string): string {
   }
 }
 
-// nothingToPublishLine is what publishing or exporting a report that does
-// not exist answers with. It quotes the reason rather than replacing it,
-// because each reason is a different thing to do next, and it exists so the
-// three outputs refuse in the same words.
-export function nothingToPublishLine(reason: string): string {
-  return `There is no report to publish or export yet. ${unavailableLine(reason)}`;
+// nothingToPublishLine is what the three outputs say when there is no
+// report to render. It does not repeat the reason: unavailableLine is
+// already on the surface these controls sit on, and the same paragraph
+// twice reads as two different problems.
+export function nothingToPublishLine(): string {
+  return "There is no report to publish or export yet.";
+}
+
+// publishedLine is what a publish that worked says. It names the page,
+// because a write the user asked for that answers "done" leaves them to go
+// and look for what it did.
+export function publishedLine(title: string): string {
+  return `Published to the Confluence page "${title}".`;
+}
+
+// savedLine is what an export says: the path, so the file can be found and
+// attached to something without hunting for it.
+export function savedLine(path: string): string {
+  return `Saved to ${path}`;
 }
 
 // isBusyRefusal recognises the refusal App.acquire makes in Go and the one

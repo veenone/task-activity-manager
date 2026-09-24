@@ -90,6 +90,14 @@ export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
 }
 
+export function ExportSprintReportPPTX(arg1) {
+  return window['go']['main']['App']['ExportSprintReportPPTX'](arg1);
+}
+
+export function ExportSprintReportXLSX(arg1) {
+  return window['go']['main']['App']['ExportSprintReportXLSX'](arg1);
+}
+
 export function ForgetRitualPage(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ForgetRitualPage'](arg1, arg2, arg3, arg4);
 }
@@ -244,6 +252,10 @@ export function PendingInSprint(arg1, arg2) {
 
 export function PreviewImport(arg1, arg2) {
   return window['go']['main']['App']['PreviewImport'](arg1, arg2);
+}
+
+export function PublishSprintReport(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['PublishSprintReport'](arg1, arg2, arg3, arg4);
 }
 
 export function RankIssue(arg1, arg2, arg3, arg4, arg5) {
