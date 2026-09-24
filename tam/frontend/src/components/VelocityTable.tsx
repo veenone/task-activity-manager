@@ -1,5 +1,5 @@
 import type { VelocityRow } from "../api";
-import { amount, velocityFloorLine } from "../lib/reportText";
+import { amount, emptyVelocityLine, velocityFloorLine } from "../lib/reportText";
 import { velocityTable } from "../lib/reportTables";
 
 // VelocityTable is the board's last closed sprints as rows, oldest first,
@@ -21,9 +21,7 @@ export function VelocityTable({ rows }: { rows: VelocityRow[] }) {
   const spec = velocityTable(rows);
   if (rows.length === 0) {
     return (
-      <p className="muted">
-        No closed sprint on this board has a start and an end date TAM can read, so there is no velocity table.
-      </p>
+      <p className="muted">{emptyVelocityLine()}</p>
     );
   }
   return (
