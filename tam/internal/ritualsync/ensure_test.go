@@ -80,3 +80,35 @@ func TestSprintsCoversOpenSprintsAndClosedOnesThatHavePages(t *testing.T) {
 		t.Fatalf("sprints = %v", ids)
 	}
 }
+
+// The retro template as it stood before issue #72, kept literally so the test
+// keeps asking the question it was written for once the template moves again.
+const retroBeforeIssue72 = `<h2>What went well</h2><ul><li></li></ul><h2>What did not</h2><ul><li></li></ul>` +
+	`<h2>What we will try</h2><ul><li></li></ul><h2>Carried over</h2>` +
+	`<ac:structured-macro ac:name="jira"><ac:parameter ac:name="jqlQuery">sprint = 14 AND statusCategory != Done</ac:parameter>` +
+	`<ac:parameter ac:name="columns">key,summary,type,status,assignee</ac:parameter>` +
+	`<ac:parameter ac:name="maximumIssues">50</ac:parameter></ac:structured-macro>` +
+	`<h2>Action items</h2><ac:task-list><ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body></ac:task-body></ac:task></ac:task-list>`
+
+// A retrospective written under an older template is never rewritten by a
+// newer one: Ensure only fills a document that has neither a body nor a page.
+// The one place the change shows is an adoption, where a body TAM can no
+// longer recognise as its own untouched template stops being pulled over
+// silently and becomes a conflict the user decides, with both sides kept.
+func TestARetroFromTheOldTemplateIsKeptAndItsAdoptionAsks(t *testing.T) {
+	h := newHarness(t)
+	overview := h.fake.Seed("root", ritualtemplate.Title(ritualtemplate.Sprint, sprint14.Info), "<p>theirs</p>")
+	h.fake.Seed(overview, ritualtemplate.Title(ritualtemplate.Retro, sprint14.Info), "<p>written in Confluence</p>")
+	h.ensure(sprint14)
+	h.save(14, ritualtemplate.Retro, retroBeforeIssue72)
+	h.ensure(sprint14)
+	if got := h.doc(14, ritualtemplate.Retro).Body; got != retroBeforeIssue72 {
+		t.Fatalf("Ensure rewrote a retro written under the old template: %s", got)
+	}
+	res := h.run(sprint14)
+	d := h.doc(14, ritualtemplate.Retro)
+	if res.Conflicts != 1 || d.Status != ritualrepo.StatusConflict ||
+		d.Body != retroBeforeIssue72 || d.ConflictBody != "<p>written in Confluence</p>" {
+		t.Fatalf("result = %+v, retro = %+v", res, d)
+	}
+}

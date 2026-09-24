@@ -167,3 +167,43 @@ func TestParseJQLReadsTheThreeFormsAndNothingElse(t *testing.T) {
 		}
 	}
 }
+
+// The retro page's job is to produce actions somebody owns and to pick up the
+// ones the last retro produced, so both are headed blocks with a task list and
+// one line saying what a row needs, above the discussion rather than below a
+// macro fifty rows tall. "What we will try" is gone: it collected intentions
+// in a shape that holds neither an owner nor a date, directly above a block
+// that holds both, and two homes for one commitment is how one of them rots.
+func TestRetroLeadsWithActionsAndSaysWhatOneNeeds(t *testing.T) {
+	body := Render(Retro, golden, time.UTC)
+	for _, want := range []string{
+		"<p><strong>Dates:</strong> 14 Sep 2026 to 25 Sep 2026</p>",
+		"<p><strong>Goal:</strong> Ship promo codes &amp; the VAT fix</p>",
+		"<h2>Last sprint's action items</h2>",
+		"<p>Open the previous retrospective, tick what got done, and copy the rest here.</p>",
+		"<h2>Action items</h2>",
+		"<p>One line each: what changes, who owns it, and by when.</p>",
+		"<h2>What went well</h2>",
+		"<h2>What did not go well</h2>",
+		"<h2>Unfinished work, as Jira has it now</h2>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("retro is missing %q in %s", want, body)
+		}
+	}
+	if strings.Contains(body, "What we will try") {
+		t.Error("a third bucket for intentions is a second home for the action items")
+	}
+	if strings.Count(body, "<ac:task-list>") != 2 {
+		t.Errorf("retro should carry two task lists, last sprint's and this one's: %s", body)
+	}
+	if i, j := strings.Index(body, "<h2>Action items</h2>"), strings.Index(body, "<h2>What went well</h2>"); i > j {
+		t.Errorf("the actions belong above the discussion, not below it: %s", body)
+	}
+	// A sprint with no goal gets no label rather than an empty one.
+	noGoal := golden
+	noGoal.Goal = "  "
+	if strings.Contains(Render(Retro, noGoal, time.UTC), "<strong>Goal:</strong>") {
+		t.Error("a sprint with no goal should carry no Goal line")
+	}
+}

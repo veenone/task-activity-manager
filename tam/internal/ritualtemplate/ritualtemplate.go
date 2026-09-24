@@ -116,8 +116,16 @@ type page struct{ strings.Builder }
 
 func (p *page) h2(text string)   { p.WriteString("<h2>" + esc(text) + "</h2>") }
 func (p *page) para(text string) { p.WriteString("<p>" + esc(text) + "</p>") }
-func (p *page) emptyList()       { p.WriteString("<ul><li></li></ul>") }
-func (p *page) tasks()           { p.WriteString(taskList) }
+
+func (p *page) emptyList() { p.WriteString("<ul><li></li></ul>") }
+func (p *page) tasks()     { p.WriteString(taskList) }
+
+// fact is a bolded label and its value. The overview and the retro both open
+// with them, so a reader knows which sprint they are looking at before they
+// read a word of anybody's opinion.
+func (p *page) fact(label, value string) {
+	p.WriteString("<p><strong>" + esc(label) + ":</strong> " + esc(value) + "</p>")
+}
 
 const taskList = "<ac:task-list><ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body></ac:task-body></ac:task></ac:task-list>"
 
@@ -180,8 +188,8 @@ func Render(ritualType string, s SprintInfo, loc *time.Location) string {
 	var p page
 	switch normalize(ritualType) {
 	case Sprint:
-		p.WriteString("<p><strong>Board:</strong> " + esc(s.BoardName) + "</p>")
-		p.WriteString("<p><strong>Dates:</strong> " + esc(dates(s, loc)) + "</p>")
+		p.fact("Board", s.BoardName)
+		p.fact("Dates", dates(s, loc))
 		p.h2("Sprint goal")
 		p.para(s.Goal)
 		p.h2("Rituals")
@@ -221,16 +229,32 @@ func Render(ritualType string, s SprintInfo, loc *time.Location) string {
 		p.h2("Follow ups")
 		p.tasks()
 	case Retro:
+		// Two readers share this page: somebody typing while the team talks,
+		// and somebody opening it a month later to find out what was decided.
+		// The second one settles the order. The sprint it belongs to and the
+		// goal it was judging come first, then the actions it carried in and
+		// the actions it produced, then the discussion that produced them,
+		// and the live Jira list last because it is the only thing here that
+		// is not a record. Nothing sits between the cursor and a task list,
+		// which is where a retro's last ten minutes go.
+		p.fact("Dates", dates(s, loc))
+		if goal := strings.TrimSpace(s.Goal); goal != "" {
+			p.fact("Goal", goal)
+		}
+		p.h2("Last sprint's action items")
+		p.para("Open the previous retrospective, tick what got done, and copy the rest here.")
+		p.tasks()
+		p.h2("Action items")
+		p.para("One line each: what changes, who owns it, and by when.")
+		p.tasks()
 		p.h2("What went well")
 		p.emptyList()
-		p.h2("What did not")
+		p.h2("What did not go well")
 		p.emptyList()
-		p.h2("What we will try")
-		p.emptyList()
-		p.h2("Carried over")
+		// Named for what it is. The macro runs when the page is opened, so a
+		// month later it shows Jira now, not the sprint as it ended.
+		p.h2("Unfinished work, as Jira has it now")
 		p.jira(JQL(s.ID, NotDone), false)
-		p.h2("Action items")
-		p.tasks()
 	}
 	return p.String()
 }
