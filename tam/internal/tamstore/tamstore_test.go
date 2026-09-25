@@ -1111,3 +1111,54 @@ func TestSchemaVersionEighteenAddsTheSprintMembershipFlagToAnOlderDatabase(t *te
 		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
 	}
 }
+
+// Version 19 follows version 14's shape: an issue cached before the column
+// existed keeps an empty status_category, so the chip falls back to guessing
+// the colour from the name, and the watermark clears so the next sync
+// refetches every issue and fills the column in.
+func TestVersionNineteenMigrationAddsTheStatusCategoryAndClearsEveryWatermark(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE issue DROP COLUMN status_category`,
+		`INSERT INTO issue (profile_id, key, summary, status) VALUES ('p1', 'PLAT-412', 'Promo code', 'En cours')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p1', '2026-09-05T10:42:00Z', '2026-09-01T09:00:00Z', '')`,
+		`UPDATE meta SET value = '18' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var status, category string
+	if err := db.DB().QueryRow(
+		`SELECT status, status_category FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-412'`,
+	).Scan(&status, &category); err != nil {
+		t.Fatalf("read the kept issue: %v", err)
+	}
+	if status != "En cours" || category != "" {
+		t.Errorf("issue = %q category %q, want the row kept with no category yet", status, category)
+	}
+	var lastSynced, lastFull string
+	if err := db.DB().QueryRow(`SELECT last_synced, last_full FROM sync_state WHERE profile_id = 'p1'`).Scan(&lastSynced, &lastFull); err != nil {
+		t.Fatalf("read sync_state: %v", err)
+	}
+	if lastSynced != "" {
+		t.Errorf("last_synced = %q, want empty so the next sync refetches every issue", lastSynced)
+	}
+	if lastFull != "2026-09-01T09:00:00Z" {
+		t.Errorf("last_full = %q, want the migration to leave it alone", lastFull)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}

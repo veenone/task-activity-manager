@@ -25,8 +25,13 @@ import (
 func applyMoveColumns(ctx context.Context, q execer, profileID, key, entityType, value string) error {
 	switch entityType {
 	case EntityTransition:
+		// The category goes with the status it described. A board column
+		// holds status ids and no categories, so nothing here knows the
+		// target's, and keeping the old one would paint the new status in
+		// the colour of the one it left. Empty is what the chip falls back
+		// from, and the next sync brings the real one.
 		if _, err := q.ExecContext(ctx,
-			`UPDATE issue SET status = ?, status_id = ? WHERE profile_id = ? AND key = ?`,
+			`UPDATE issue SET status = ?, status_id = ?, status_category = '' WHERE profile_id = ? AND key = ?`,
 			MoveRawName(value), MoveID(value), profileID, key); err != nil {
 			return fmt.Errorf("move %s to status %s: %w", key, MoveID(value), err)
 		}

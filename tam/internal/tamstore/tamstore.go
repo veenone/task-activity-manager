@@ -47,6 +47,12 @@
 // board whose filter spans several projects. A column add in version 15's
 // shape, and it backfills nothing: before this version no closed sprint's
 // membership was ever fetched, so 0 is the truth for every cached row.
+// Version 19 adds the issue's status_category, Jira's own bucket for the
+// status: "new", "indeterminate" or "done" on every instance, where the
+// status name is whatever that instance calls it. Version 14's shape, a
+// column add and a watermark clear, because a row cached before this
+// version has no category and only a sync can fetch one. Until it does,
+// the empty string is what the frontend falls back from.
 package tamstore
 
 import (
@@ -80,7 +86,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 18,
+	Version: 19,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -309,6 +315,23 @@ var Schema = store.Schema{
 		Apply: func(db *sql.DB) error {
 			return store.AddColumnIfMissing(db, "sprint", "membership_synced INTEGER NOT NULL DEFAULT 0")
 		},
+	}, {
+		Version: 19,
+		// Jira's own bucket for the status, which is what the chip's colour
+		// has to come from: the status name is per-instance and often not
+		// English, so guessing from it paints every custom status the same
+		// grey. Version 14's shape, a column add and a watermark clear:
+		// nothing local can work out a category, only a sync carries one, and
+		// an incremental sync re-reads only what Jira reports changed, so a
+		// row nobody touches again would never gain one. Until the sync runs
+		// the column is empty, which is what the chip falls back from.
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "issue", "status_category TEXT NOT NULL DEFAULT ''"); err != nil {
+				return err
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -391,6 +414,9 @@ CREATE TABLE IF NOT EXISTS issue (
 	description       TEXT,
 	status            TEXT NOT NULL DEFAULT '',
 	status_id         TEXT NOT NULL DEFAULT '',
+	-- Jira's bucket for the status: new, indeterminate or done. Empty when
+	-- no sync has carried one, which is what the chip falls back from.
+	status_category   TEXT NOT NULL DEFAULT '',
 	assignee          TEXT NOT NULL DEFAULT '',
 	assignee_name     TEXT NOT NULL DEFAULT '',
 	reporter          TEXT NOT NULL DEFAULT '',
