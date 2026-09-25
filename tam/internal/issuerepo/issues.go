@@ -24,10 +24,20 @@ const (
 const issueColumns = `key, id, project, type, summary, description, status, status_id, assignee, assignee_name, reporter, priority, labels,
 	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
 
+// keyOrder orders a key by its project prefix and then its number, so
+// PLAT-10 follows PLAT-9 instead of PLAT-1. The prefix is the key with its
+// trailing digits stripped, which keeps the two hyphens of a draft key whole
+// and needs no regex SQLite does not have; the number is what is left, and
+// CASTs to 0 for a key that ends in no digit at all. Zero-padding the number
+// into the prefix keeps this one sortable expression, so a descending sort
+// reverses the prefix and the number together; twenty digits hold anything
+// the CAST can return.
+const keyOrder = `printf('%s%020d', rtrim(key,'0123456789'), CAST(substr(key,length(rtrim(key,'0123456789'))+1) AS INTEGER)) COLLATE NOCASE`
+
 // issueOrder puts drafts first, then ranked rows by rank with unranked rows
 // last, then key. ListIssues and the tree share it so the grid and the
 // Epics view agree on one row order.
-const issueOrder = ` ORDER BY CASE WHEN key LIKE '` + DraftPrefix + `%' THEN 0 WHEN rank = '' THEN 2 ELSE 1 END, rank, key`
+const issueOrder = ` ORDER BY CASE WHEN key LIKE '` + DraftPrefix + `%' THEN 0 WHEN rank = '' THEN 2 ELSE 1 END, rank, ` + keyOrder
 
 // sortColumns maps the sort keys the grid sends to the SQL that orders by
 // them. It is a whitelist, not a format string: the value from the frontend
@@ -35,10 +45,11 @@ const issueOrder = ` ORDER BY CASE WHEN key LIKE '` + DraftPrefix + `%' THEN 0 W
 //
 // Every expression sorts blanks last, so a page of issues does not open on a
 // block of rows with nothing in the sorted column. Story points are numeric
-// and NULL when unset; the rest are text, compared case-insensitively because
-// a Jira status or display name is prose, not an identifier.
+// and NULL when unset, and the key is a prefix and a number; the rest are
+// text, compared case-insensitively because a Jira status or display name is
+// prose, not an identifier.
 var sortColumns = map[string]string{
-	"key":         "key COLLATE NOCASE",
+	"key":         keyOrder,
 	"type":        "type = '' , type COLLATE NOCASE",
 	"summary":     "summary = '' , summary COLLATE NOCASE",
 	"status":      "status = '' , status COLLATE NOCASE",
@@ -86,7 +97,7 @@ func orderFor(q IssueQuery) string {
 		ordered[i] = part + dir
 	}
 	return ` ORDER BY CASE WHEN key LIKE '` + DraftPrefix + `%' THEN 0 ELSE 1 END, ` +
-		strings.Join(ordered, ", ") + `, key`
+		strings.Join(ordered, ", ") + `, ` + keyOrder
 }
 
 // COALESCE on the description and nowhere else: a write that did not read one
