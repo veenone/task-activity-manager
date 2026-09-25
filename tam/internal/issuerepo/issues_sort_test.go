@@ -2,6 +2,9 @@ package issuerepo_test
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -115,6 +118,75 @@ func TestListIssuesKeepsDraftsFirstUnderSort(t *testing.T) {
 	if got := listKeys(t, r, issuerepo.IssueQuery{Sort: "key", Desc: true}); got[0] != key {
 		t.Fatalf("draft should lead a descending key sort, got %v", got)
 	}
+}
+
+// numbered lands two projects whose keys cross the nine-to-ten boundary, so
+// a text sort of the key is visibly wrong, plus the two keys that are not a
+// prefix and a number at all. Every rank is empty and every type is the
+// same, so the default order and the tie-break under another column both
+// come down to the key.
+func numbered() []backend.Issue {
+	keys := []string{"PLAT-2", "OPS-10", "PLAT-100", "OPS-2", "PLAT-10", "PLAT-9", "OPS-1", "PLAT-1", "PLAT-7A", "NOHYPHEN"}
+	out := make([]backend.Issue, len(keys))
+	for i, k := range keys {
+		project, _, _ := strings.Cut(k, "-")
+		out[i] = backend.Issue{Key: k, ID: strconv.Itoa(i + 1), Project: project, Type: "task", Summary: k}
+	}
+	return out
+}
+
+func seedNumbered(t *testing.T, r *issuerepo.Repository) {
+	t.Helper()
+	now := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	if err := r.UpsertPage(context.Background(), "p1", numbered(), now, true); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+}
+
+// A key is a project prefix and a number, and the number sorts as a number:
+// PLAT-10 belongs after PLAT-9, not between PLAT-1 and PLAT-2. The two
+// projects do not interleave, and descending is the same order reversed. A
+// key with no number to read counts as zero, which puts NOHYPHEN under its
+// own prefix and PLAT-7A behind every numbered PLAT key rather than
+// anywhere the next row happens to fall.
+func TestListIssuesSortsKeysByNumber(t *testing.T) {
+	r := newRepo(t)
+	seedNumbered(t, r)
+
+	asc := []string{"NOHYPHEN", "OPS-1", "OPS-2", "OPS-10", "PLAT-1", "PLAT-2", "PLAT-9", "PLAT-10", "PLAT-100", "PLAT-7A"}
+	desc := make([]string, len(asc))
+	for i, k := range asc {
+		desc[len(asc)-1-i] = k
+	}
+
+	wantKeys(t, listKeys(t, r, issuerepo.IssueQuery{Sort: "key"}), asc...)
+	wantKeys(t, listKeys(t, r, issuerepo.IssueQuery{Sort: "key", Desc: true}), desc...)
+	// Every type is "task", so sorting by type falls through to the key.
+	wantKeys(t, listKeys(t, r, issuerepo.IssueQuery{Sort: "type"}), asc...)
+	// No sort column is the rank order, and every rank here is empty.
+	wantKeys(t, listKeys(t, r, issuerepo.IssueQuery{}), asc...)
+}
+
+// A draft key carries a second hyphen, so its number is what follows the
+// last one. Drafts stay pinned to the top and run 1, 2 ... 10 among
+// themselves.
+func TestListIssuesSortsDraftKeysByNumber(t *testing.T) {
+	r := newRepo(t)
+	seedNumbered(t, r)
+
+	drafts := make([]backend.IssueDraft, 10)
+	for i := range drafts {
+		drafts[i] = backend.IssueDraft{Type: "task", Summary: fmt.Sprintf("draft %d", i+1)}
+	}
+	keys, err := r.CreateDrafts(context.Background(), "p1", "PLAT", drafts, "")
+	if err != nil {
+		t.Fatalf("drafts: %v", err)
+	}
+	got := listKeys(t, r, issuerepo.IssueQuery{Sort: "key"})
+	if len(got) <= len(keys) {
+		t.Fatalf("got %v, want the %d drafts and the seeded issues", got, len(keys))
+	}
+	wantKeys(t, got[:len(keys)], keys...)
 }
 
 // SortColumns is what the frontend's header list agrees with, so it has to
