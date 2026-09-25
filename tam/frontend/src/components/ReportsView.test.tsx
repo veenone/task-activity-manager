@@ -183,7 +183,7 @@ describe("ReportsView", () => {
     renderView();
     await screen.findByText(SENTENCE);
     expect(screen.getByText(/Done means the board's last column/)).toBeInTheDocument();
-    expect(screen.getByText(/TAM uses Jira history, so totals may differ from Jira/)).toBeInTheDocument();
+    expect(screen.getByText(/TAM uses Jira history, so its totals can differ from Jira's own/)).toBeInTheDocument();
   });
 
   it("counts points and explains nothing when that is what the sprint was estimated in", async () => {

@@ -85,7 +85,7 @@ export function unitLine(unit: string, unitReason: string): string {
 // screen.
 export function modeLine(live: boolean): string {
   if (live) return "In progress: these figures are provisional. They may change as work moves.";
-  return "Closed sprint · final results";
+  return "Closed sprint. These figures are final.";
 }
 
 // emptyVelocityLine is a board with no closed sprint a row could be built
@@ -145,7 +145,7 @@ export function emptyDaysLine(): string {
 // mixedUnitsLine explains a velocity chart split into one panel per unit.
 // One axis over points and cards would read a card as a point.
 export function mixedUnitsLine(): string {
-  return "These sprints were estimated in different units, so each unit has a chart of its own rather than one axis that would read cards as points.";
+  return "These sprints use different units, so each unit gets a chart of its own. A single axis would read a card as a point.";
 }
 
 // singleSprintLine is under a velocity chart with one bar pair: it is a
@@ -158,7 +158,7 @@ export function singleSprintLine(): string {
 // because TAM's figures and Jira's are computed from different sources and
 // the disagreement surfaces in the middle of a review.
 export function methodLine(): string {
-  return "Done means the board's last column. TAM uses Jira history, so totals may differ from Jira. Removed cards count only when they return.";
+  return "Done means the board's last column. TAM uses Jira history, so its totals can differ from Jira's own, and a removed card counts only once it comes back.";
 }
 
 // MAX_NAMED_KEYS caps the keys truncationLine prints, so a sprint where
@@ -186,7 +186,7 @@ export function truncationLine(keys: string[]): string {
   const cards = keys.length === 1 ? "card" : "cards";
   return (
     `Jira returned only part of the changelog for ${keys.length} ${cards} (${nameList(keys)}), ` +
-    "so the figures above are not exact. Rebuilding the report reads those histories again."
+    "so the figures above are not exact. Rebuild the report to read those histories again."
   );
 }
 
@@ -196,7 +196,7 @@ export function truncationLine(keys: string[]): string {
 export function builtAtLine(builtAt: string): string {
   const when = formatWhen(builtAt);
   if (!when) return "";
-  return `This sprint's figures were built ${when}. The velocity rows carry no stamp of their own.`;
+  return `TAM built this sprint's figures ${when}. The velocity rows carry no stamp of their own.`;
 }
 
 // unavailableLine words the four reasons a report has nothing to show. Each
@@ -207,9 +207,8 @@ export function unavailableLine(reason: string): string {
     case "boardNotSynced":
       return (
         "TAM cannot tell which statuses count as finished on this board, so it has nothing to build a report " +
-        "from: either the board's columns are not in the cache, or its last column collects no status at all. " +
-        "The Boards view's Refresh fetches the columns; a last column that collects nothing is fixed in Jira's " +
-        "own board configuration."
+        "from. Either the board's columns are not in the cache, which the Boards view's Refresh fetches, or its " +
+        "last column collects no status at all, which is fixed in Jira's own board configuration."
       );
     case "sprintNotFound":
       return (
@@ -230,7 +229,7 @@ export function unavailableLine(reason: string): string {
     default:
       // A reason a later backend adds is printed rather than swallowed: an
       // empty pane saying nothing is worse than an unfamiliar word.
-      return `There is no report for this sprint, for a reason this version has no wording for: ${reason}.`;
+      return `There is no report for this sprint, and this version has no wording for the reason given: ${reason}.`;
   }
 }
 
@@ -252,7 +251,7 @@ export function publishedLine(title: string): string {
 // savedLine is what an export says: the path, so the file can be found and
 // attached to something without hunting for it.
 export function savedLine(path: string): string {
-  return `Saved to ${path}`;
+  return `Saved to ${path}.`;
 }
 
 // isBusyRefusal recognises the refusal App.acquire makes in Go and the one
