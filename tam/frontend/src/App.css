@@ -768,7 +768,18 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* Phase 4: the sprint report. The frame fills the available workspace while
    its body owns scrolling; readable text remains constrained inside it. */
 .report-frame { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-.report-body { flex: 1; min-width: 0; min-height: 0; width: 100%; overflow: auto; padding-right: 4px; }
+/* The frame is fixed height, so this does not scroll: it is the column
+   that gives the velocity panel whatever height the head and the charts
+   leave, and that panel is the only scroller on the view. A critique put
+   the budget at about 640px in a 1280x800 window against about 1050px of
+   content, which is what the condensation above had to find. */
+.report-body { flex: 1; min-width: 0; min-height: 0; width: 100%; overflow: hidden; display: flex; flex-direction: column; padding-right: 4px; }
+/* A state that replaces the whole report takes the frame instead of being
+   stretched down it by the panel's flex: 1 sibling. Same rule the Epics
+   tree pane uses for its own empty and error states. */
+.report-body > .report-unavailable, .report-body > .report-loading, .report-body > .muted, .report-body > .error-text {
+  flex: 1; display: grid; place-content: center; padding: 32px; text-align: center;
+}
 .report-summary { max-width: 78ch; }
 .report-heading { margin: 18px 0 6px; font-size: 15px; font-weight: 600; }
 .report-summary .report-heading { margin-top: 0; }
@@ -778,8 +789,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-mode { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
 .report-mode-live { color: var(--accent); }
 .report-mode-closed { color: var(--text-muted); }
-.report-outcome { margin: 0 0 10px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); font-weight: 600; }
-.report-outcome-label { display: block; margin-bottom: 3px; color: var(--text-muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+/* One line, not a callout. Both of its raw figures are already tiles and
+   already bars; the rate is the only thing it adds, and a 60px accent box
+   to carry a percentage was the largest single piece of the overrun. */
+.report-completion { margin: 0 0 8px; font-weight: 600; }
 .report-metric { min-width: 0; border-top: 2px solid var(--border); padding-top: 6px; }
 .report-metric dt { color: var(--text-muted); font-size: 11px; font-weight: 600; }
 .report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
@@ -796,8 +809,17 @@ input, button, select { font-family: inherit; font-size: inherit; }
    fix for the window scrollbar would have landed in a rule nothing read. */
 /* The velocity rows, on the same rules .conflict-table draws with: a table
    in this app is a header rule and padded cells, not a box. */
-.report-table-wrap { max-width: 100%; overflow-x: auto; }
-.report-table { border-collapse: collapse; margin-top: 8px; font-size: 13px; min-width: 420px; }
+/* The one scroller. flex and min-height as well as overflow, or the panel
+   sizes to its rows and the page grows again. scrollbar-gutter keeps the
+   columns still when the bar appears. It takes focus because a bare div
+   with overflow is not reachable from the keyboard in WebView2, and it is
+   now the only thing on the view that scrolls. */
+.report-table-wrap { flex: 1; min-height: 0; max-width: 100%; overflow: auto; scrollbar-gutter: stable; }
+.report-table-wrap:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.report-table { border-collapse: collapse; margin-top: 8px; font-size: 13px; width: 100%; }
+/* Sticky inside the panel, so scrolling the rows does not scroll away what
+   the columns are. */
+.report-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .report-table th { text-align: left; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 16px 4px 0; }
 .report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
 .report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
@@ -806,9 +828,15 @@ input, button, select { font-family: inherit; font-size: inherit; }
    are styled here by class rather than by attribute, so a theme change
    reaches the picture. Text in the SVG inherits the body font and takes
    its size relative to it. */
-.report-charts { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
+.report-charts { flex: none; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
 .report-caveats { margin: 6px 0 0; max-width: 78ch; }
-.report-velocity { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+/* Two parts, not two columns: a head that does not scroll, holding the
+   chart and the notes that belong to it, over the table that does. The
+   chart stays out of the scroller because its tooltip is absolutely
+   positioned and an overflow ancestor clips it, and because scrolling to
+   a row would scroll that row's chart out of sight. */
+.report-velocity { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.report-velocity-head { flex: none; }
 .chart-multiples { display: grid; gap: 8px; }
 .chart-figure { margin: 0; min-width: 0; }
 .chart-figure[aria-busy="true"] .chart-box { opacity: .5; }
@@ -873,8 +901,18 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-metric-group { min-width: 0; }
 .report-metric-group-label { display: block; margin-bottom: 4px; color: var(--text-muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .report-metric-group dl { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin: 0; }
+/* Height, not width: at 1280x800 the view fits, and the same content in a
+   shorter window does not. No other rule in this stylesheet asks about
+   height, so this is a new pattern here, and it is the honest one. */
+@media (max-height: 760px) {
+  .report-body { overflow: auto; }
+}
 @media (max-width: 900px) {
-  .report-charts, .report-velocity { grid-template-columns: minmax(0, 1fr); }
+  .report-charts { grid-template-columns: minmax(0, 1fr); }
+  /* Stacked, the charts are twice as tall and nothing fits. The chart
+     heights are constants that do not shrink, so a scrollbar is the
+     honest answer and crushing them is not. */
+  .report-body { overflow: auto; }
   /* The timeline takes the whole width under the sprint name rather than a
      track of its own, which at this width was narrower than a bar can say
      anything in. The caret keeps its column so the tree still reads as a

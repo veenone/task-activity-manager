@@ -34,11 +34,18 @@ export function SprintSummary({ series, builtAt, live = false }: { series: Repor
       <p className={`report-mode ${live ? "report-mode-live" : "report-mode-closed"}`} role={live ? "status" : undefined}>
         {modeLine(live)}
       </p>
-      <p className="report-outcome"><span className="report-outcome-label">Sprint outcome</span>{completionLine(series, live)}</p>
+      <p className="report-completion">{completionLine(series, live)}</p>
       <ReportMetrics series={series} live={live} />
-      {/* The caveat governs two of the figures directly above it, so it is
-          read with them or it is not read at all. It used to sit inside the
-          details below, which meant the numbers were read without it. */}
+      {/* Both caveats govern the figures directly above them, so they are
+          read with them or they are not read at all.
+
+          floorLine was moved out of the details below once already, because
+          leaving it there meant the numbers were read without it. unitLine
+          was left behind, and it is the stronger of the two: it says the
+          five figures count cards rather than points, which changes what
+          every one of them means. It is empty for a report counting points,
+          so having it here costs nothing in the ordinary case. */}
+      {unit && <p className="muted small report-caveats">{unit}</p>}
       <p className="muted small report-caveats">{floorLine()}</p>
       {truncation && <p className="warn-text small">{truncation}</p>}
       <details className="report-details">
@@ -46,7 +53,10 @@ export function SprintSummary({ series, builtAt, live = false }: { series: Repor
         {/* The sentence says what the tiles say. It stays for anyone who
             wants the figures in prose, below the surface that is scanned. */}
         <p className="report-sentence">{summarySentence(series, live)}</p>
-        {unit && <p className="muted small">{unit}</p>}
+        {/* The one line here that is not a qualification on a named figure:
+            it answers the argument that starts when Jira shows a different
+            number, which is a thing to look up rather than to read every
+            time. */}
         <p className="muted small">{methodLine()}</p>
       </details>
       {built && <p className="muted small">{built}</p>}

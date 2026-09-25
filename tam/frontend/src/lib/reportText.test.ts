@@ -110,7 +110,7 @@ describe("methodLine", () => {
     const line = methodLine();
     expect(line).toContain("board's last column");
     expect(line).toContain("uses Jira history");
-    expect(line).toContain("Removed cards count only when they return");
+    expect(line).toContain("counts only once it comes back");
   });
 });
 
@@ -140,7 +140,7 @@ describe("builtAtLine", () => {
   });
   it("claims the sprint's own age and says the velocity rows carry none", () => {
     const line = builtAtLine("2026-09-10T08:00:00Z");
-    expect(line).toContain("This sprint's figures were built");
+    expect(line).toContain("TAM built this sprint's figures");
     expect(line).toContain("velocity rows carry no stamp of their own");
   });
 });
