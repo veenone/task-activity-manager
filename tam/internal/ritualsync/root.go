@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"agile-suite/core/confluence"
-	"agile-suite/tam/internal/ritualtemplate"
 )
 
 // RootMissing is a pass that stopped because the rituals root page answered
@@ -60,17 +59,19 @@ type Root struct {
 	TopLevel bool `json:"topLevel"`
 }
 
-// CreateRoot creates a rituals root page at the top of the space, or, with
-// adopt, takes the top-level page that already carries the title. It writes
-// nothing locally: saving the new id to the profile and running the Sync are
-// the caller's, under the lock.
+// CreateRoot creates a root page at the top of the space with the given first
+// body, or, with adopt, takes the top-level page that already carries the
+// title. The rituals root and the reports root are both made this way, which
+// is why the body is the caller's to word. It writes nothing locally: saving
+// the new id to the profile and running the Sync are the caller's, under the
+// lock.
 //
 // A create refused with 403 is forbidden. A create refused with 400 or 409 is
 // looked up by title rather than read for its message, since which of the two
 // Confluence answers, and in what words, is a probe question
 // (docs/superpowers/plans/assets/2026-09-15-confluence-root-page-probe.md);
 // a title that turns out to be taken is titleTaken whichever it was.
-func CreateRoot(ctx context.Context, pages confluence.Pages, spaceKey, projectKey, title string, adopt bool) (Root, error) {
+func CreateRoot(ctx context.Context, pages confluence.Pages, spaceKey, body, title string, adopt bool) (Root, error) {
 	out := Root{Title: strings.TrimSpace(title), SpaceKey: spaceKey}
 	if out.Title == "" {
 		return out, errors.New("The root page needs a title")
@@ -78,7 +79,7 @@ func CreateRoot(ctx context.Context, pages confluence.Pages, spaceKey, projectKe
 	if adopt {
 		return adoptRoot(ctx, pages, out)
 	}
-	created, err := pages.CreatePage(ctx, spaceKey, "", out.Title, ritualtemplate.RootBody(projectKey))
+	created, err := pages.CreatePage(ctx, spaceKey, "", out.Title, body)
 	if err == nil {
 		out.Outcome, out.PageID, out.TopLevel = RootCreated, created.ID, true
 		return out, nil

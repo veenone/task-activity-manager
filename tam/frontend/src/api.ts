@@ -37,9 +37,22 @@ export interface Settings {
   // rows have no value, which reads as off. Optional here for the fixtures
   // that predate it.
   showNavRail?: boolean;
+  // The folder a report export's save dialog starts in. Empty, and absent in
+  // fixtures written before it existed, means the app data folder.
+  reportExportDir?: string;
 }
 
-export interface ConfluenceConfig { baseURL: string; spaceKey: string; rootPageID: string }
+// The rituals space and root, and the pair a sprint report is published to.
+// Both reports fields empty means the report goes where it always did: the
+// rituals space, under the sprint's own page or the rituals root. Optional
+// for the fixtures written before they existed.
+export interface ConfluenceConfig {
+  baseURL: string;
+  spaceKey: string;
+  rootPageID: string;
+  reportsSpaceKey?: string;
+  reportsRootPageID?: string;
+}
 
 export interface HealthInfo {
   ok: boolean;
@@ -1079,6 +1092,13 @@ export const SetDefaultProfile: (id: string) => Promise<void> =
   App.SetDefaultProfile;
 export const SetNavRailVisible: (visible: boolean) => Promise<void> =
   App.SetNavRailVisible;
+// SetReportExportDirectory rejects a path that is not a folder; "" clears the
+// setting. ChooseReportExportDirectory resolves to "" when the picker was
+// closed without choosing.
+export const SetReportExportDirectory: (dir: string) => Promise<void> =
+  App.SetReportExportDirectory;
+export const ChooseReportExportDirectory: () => Promise<string> =
+  App.ChooseReportExportDirectory;
 
 export const SyncIssues: (profileId: string, full: boolean) => Promise<SyncSummary> =
   App.SyncIssues;
@@ -1255,8 +1275,9 @@ export const PublishSprintReport = (
 ): Promise<PublishedPage> =>
   App.PublishSprintReport(profileId, boardId, sprintId, reportout.Document.createFrom(doc)) as Promise<PublishedPage>;
 
-// The two file exports. Each writes beside tam.db, the convention
-// ExportDiagnostics set, and answers with the path it wrote.
+// The two file exports. Each opens a save dialog and answers with the path it
+// wrote, or "" when the dialog was cancelled, the convention ExportProfile
+// set. A cancelled export is not a failure and has nothing to say.
 export const ExportSprintReportXLSX = (doc: ReportDocument): Promise<string> =>
   App.ExportSprintReportXLSX(reportout.Document.createFrom(doc));
 export const ExportSprintReportPPTX = (doc: ReportDocument): Promise<string> =>
@@ -1429,6 +1450,12 @@ export interface RitualRootResult { root: RitualRoot; sync: RitualSyncResult | n
 // CreateRitualRoot takes Go's "rituals" lock. Call it only through
 // SyncContext.runRitualRoot, never directly.
 export const CreateRitualRoot: (profileId: string, boardId: number, title: string, adopt: boolean) => Promise<RitualRootResult> = App.CreateRitualRoot as any;
+// CreateReportRoot makes, or adopts, the top level page a profile's sprint
+// reports hang under, with the same outcomes the rituals root has. An empty
+// space key means the rituals space. It saves nothing: the profile form saves
+// the page id it answers with.
+export const CreateReportRoot = (profileId: string, spaceKey: string, title: string, adopt: boolean): Promise<RitualRoot> =>
+  App.CreateReportRoot(profileId, spaceKey, title, adopt) as Promise<RitualRoot>;
 
 // LookupIssue is cast the same way ListIssues is above: the generated
 // binding types the issue type as a plain string, narrowed to IssueType here.

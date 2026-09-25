@@ -808,6 +808,19 @@
   display: flex;
   gap: 8px;
 }
+/* The chosen reports root and the buttons that pick or clear it read as one
+   row: the page id is shown, never typed, so the buttons sit beside it. */
+.reports-root-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* The same 3px a wrapped label leaves between its text and its control. */
+  margin-top: 3px;
+}
+.reports-root-field input {
+  flex: 1;
+  min-width: 0;
+}
 /* The token input and its show/hide eye read as one control. */
 .pat-field {
   display: flex;

@@ -170,3 +170,29 @@ func TestRemoveIgnoreWord(t *testing.T) {
 		t.Errorf("words = %v, want [euicc pkcs]", words)
 	}
 }
+
+// TestReportExportDirRoundTrips covers the folder a sprint report's save
+// dialog starts in. Unset is the app data directory, which the caller
+// resolves, so the setting itself is simply empty.
+func TestReportExportDirRoundTrips(t *testing.T) {
+	m := newManager(t)
+
+	got, err := m.Get()
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.ReportExportDir != "" {
+		t.Errorf("fresh install has ReportExportDir %q, want empty (the app data directory)", got.ReportExportDir)
+	}
+
+	if err := m.SetReportExportDir(`D:\reports`); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	got, err = m.Get()
+	if err != nil {
+		t.Fatalf("get after set: %v", err)
+	}
+	if got.ReportExportDir != `D:\reports` {
+		t.Errorf("got ReportExportDir %q, want D:\reports", got.ReportExportDir)
+	}
+}

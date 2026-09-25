@@ -20,6 +20,7 @@ const (
 	keySpellcheckIgnore    = "spellcheck_ignore_words"
 	keyTourSeenVersion     = "tour_seen_version"
 	keyShowNavRail         = "show_nav_rail"
+	keyReportExportDir     = "report_export_dir"
 )
 
 // Settings holds the global application preferences.
@@ -40,6 +41,10 @@ type Settings struct {
 	// thing and stays hidden until asked for; the zero value is that default.
 	// XTM does not render a rail and ignores this.
 	ShowNavRail bool `json:"showNavRail"`
+	// ReportExportDir is the folder TAM's export save dialog starts in.
+	// Empty means the app data directory, which is where exports went before
+	// there was a dialog at all. XTM has no sprint reports and ignores this.
+	ReportExportDir string `json:"reportExportDir"`
 }
 
 // Manager reads and writes global settings.
@@ -86,6 +91,10 @@ func (m *Manager) Get() (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
+	exportDir, err := m.value(keyReportExportDir)
+	if err != nil {
+		return Settings{}, err
+	}
 	s.DefaultProfileID = def
 	s.Theme = theme
 	// An unset value means "auto-resolve": the backend picks the instance's
@@ -100,6 +109,7 @@ func (m *Manager) Get() (Settings, error) {
 	// not fail the whole settings load, which runs at startup.
 	s.TourSeenVersion, _ = strconv.Atoi(tourSeen)
 	s.ShowNavRail, _ = strconv.ParseBool(navRail)
+	s.ReportExportDir = exportDir
 	return s, nil
 }
 
@@ -111,6 +121,13 @@ func (m *Manager) SetShowCoverage(v bool) error {
 // SetShowNavRail records whether TAM's left navigation rail is shown.
 func (m *Manager) SetShowNavRail(v bool) error {
 	return m.setValue(keyShowNavRail, strconv.FormatBool(v))
+}
+
+// SetReportExportDir records the folder an export's save dialog starts in.
+// An empty path clears it, which puts the dialog back in the app data
+// directory. The caller checks the folder is one; this only stores it.
+func (m *Manager) SetReportExportDir(dir string) error {
+	return m.setValue(keyReportExportDir, dir)
 }
 
 // SetTourSeenVersion records which version of the onboarding tour the user has

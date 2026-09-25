@@ -4,6 +4,7 @@ import {backend} from '../models';
 import {importer} from '../models';
 import {committer} from '../models';
 import {profile} from '../models';
+import {ritualsync} from '../models';
 import {main} from '../models';
 import {ritualrepo} from '../models';
 import {reportout} from '../models';
@@ -15,7 +16,6 @@ import {journal} from '../models';
 import {importfile} from '../models';
 import {sprints} from '../models';
 import {syncer} from '../models';
-import {ritualsync} from '../models';
 
 export function AddIssuesToBoard(arg1:string,arg2:Array<string>,arg3:number,arg4:string):Promise<void>;
 
@@ -26,6 +26,8 @@ export function AutoMapImport(arg1:Array<string>):Promise<importer.Mapping>;
 export function CanTransition(arg1:string,arg2:string,arg3:string):Promise<backend.TransitionCheck>;
 
 export function CancelSprintReport(arg1:string):Promise<void>;
+
+export function ChooseReportExportDirectory():Promise<string>;
 
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
@@ -38,6 +40,8 @@ export function CreateIssue(arg1:string,arg2:backend.IssueDraft):Promise<string>
 export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean):Promise<profile.Profile>;
 
 export function CreateProfileReusingToken(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<profile.Profile>;
+
+export function CreateReportRoot(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<ritualsync.Root>;
 
 export function CreateRitualRoot(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<main.RitualRootResult>;
 
@@ -174,6 +178,8 @@ export function SetDefaultProfile(arg1:string):Promise<void>;
 export function SetNavRailVisible(arg1:boolean):Promise<void>;
 
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SetReportExportDirectory(arg1:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 

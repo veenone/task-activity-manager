@@ -74,6 +74,18 @@ describe("ReportOutputs", () => {
     expect(bindings.ExportSprintReportXLSX.mock.calls[0][0].sections).toHaveLength(3);
   });
 
+  it("says nothing at all when the save dialog is cancelled", async () => {
+    // Go answers a cancelled dialog with an empty path and no error. Nothing
+    // was written, so nothing is claimed and nothing is red.
+    bindings.ExportSprintReportXLSX.mockResolvedValue("");
+    draw();
+    await userEvent.click(screen.getByRole("button", { name: "Export a spreadsheet" }));
+    await waitFor(() => expect(bindings.ExportSprintReportXLSX).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText("Working on it...")).toBeNull());
+    expect(screen.queryByText(/Saved to/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("offers nothing for a report that is unavailable, and says why", async () => {
     draw({ unavailable: "sprintHasNoDates" });
     expect(screen.getByText(nothingToPublishLine())).toBeInTheDocument();

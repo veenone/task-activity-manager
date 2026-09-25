@@ -2087,9 +2087,16 @@ entered. Kiwi profile file refused.
                           CancelSprintReport, which is how a view that has been left cancels a read
                           still holding the profile lock; both under the "report" lock name
     app_reportout.go     the report's three outputs: PublishSprintReport (the sprint's own
-                          Confluence page, under the "report" lock name), ExportSprintReportXLSX
-                          and ExportSprintReportPPTX (beside tam.db, answering with the path, the
-                          convention ExportDiagnostics set); none of the three reaches Jira
+                          Confluence page, in the profile's reports space and under its reports
+                          root, or, with neither set, where it always went: the rituals space,
+                          under the sprint's overview page or the rituals root; decided by
+                          reportDestination and taken under the "report" lock name),
+                          ExportSprintReportXLSX and ExportSprintReportPPTX (a save dialog
+                          starting in the ReportExportDir setting or the app data directory,
+                          answering with the path written, and "" with no error when the dialog
+                          was cancelled); CreateReportRoot picks the reports root the way
+                          CreateRitualRoot picks the rituals one, and saves nothing; none of
+                          these reaches Jira
     app_rituals.go       the ritual bindings: ensure, list, save, resolve, forget, delete, macro
                           preview, standup entry, last sync, Sync, CreateRitualRoot; all but Sync and
                           CreateRitualRoot under no lock, those two under the "rituals" lock name

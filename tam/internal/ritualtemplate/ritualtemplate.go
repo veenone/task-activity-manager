@@ -280,6 +280,19 @@ func RootBody(projectKey string) string {
 	return "<p>" + esc(subject+", kept by Task Activity Manager. Each sprint has a page here, with its Planning, Standup, Review and Retrospective pages beneath it.") + "</p>"
 }
 
+// ReportRootBody is the first body of a reports root page, the counterpart of
+// RootBody for the tree sprint reports are published into. A report is not a
+// ritual, so it does not borrow the rituals root's wording about Planning and
+// Retrospective pages.
+func ReportRootBody(projectKey string) string {
+	key := strings.TrimSpace(projectKey)
+	subject := "Sprint reports"
+	if key != "" {
+		subject += " for " + key
+	}
+	return "<p>" + esc(subject+", published by Task Activity Manager. Each sprint's report is a page here.") + "</p>"
+}
+
 // Note is one remark the retired wizard stored against an issue.
 type Note struct {
 	Key    string

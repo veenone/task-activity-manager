@@ -22,6 +22,10 @@ export function CancelSprintReport(arg1) {
   return window['go']['main']['App']['CancelSprintReport'](arg1);
 }
 
+export function ChooseReportExportDirectory() {
+  return window['go']['main']['App']['ChooseReportExportDirectory']();
+}
+
 export function CommitPendingChanges(arg1) {
   return window['go']['main']['App']['CommitPendingChanges'](arg1);
 }
@@ -44,6 +48,10 @@ export function CreateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
 
 export function CreateProfileReusingToken(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['CreateProfileReusingToken'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function CreateReportRoot(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateReportRoot'](arg1, arg2, arg3, arg4);
 }
 
 export function CreateRitualRoot(arg1, arg2, arg3, arg4) {
@@ -316,6 +324,10 @@ export function SetNavRailVisible(arg1) {
 
 export function SetProfileSetting(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetProfileSetting'](arg1, arg2, arg3);
+}
+
+export function SetReportExportDirectory(arg1) {
+  return window['go']['main']['App']['SetReportExportDirectory'](arg1);
 }
 
 export function SetTheme(arg1) {

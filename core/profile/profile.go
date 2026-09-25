@@ -59,15 +59,24 @@ type Profile struct {
 }
 
 // ConfluenceConfig is the non-secret Confluence connection configuration for a profile.
+//
+// SpaceKey and RootPageID are where the rituals live. A report is not a ritual
+// and may belong somewhere else, so it has its own pair. Both empty is what a
+// profile written before they existed has, and it means the report is
+// published exactly where it was before: the rituals space, under the sprint's
+// own overview page or the rituals root.
 type ConfluenceConfig struct {
-	BaseURL    string `json:"baseURL"`
-	SpaceKey   string `json:"spaceKey"`
-	RootPageID string `json:"rootPageID"`
+	BaseURL           string `json:"baseURL"`
+	SpaceKey          string `json:"spaceKey"`
+	RootPageID        string `json:"rootPageID"`
+	ReportsSpaceKey   string `json:"reportsSpaceKey"`
+	ReportsRootPageID string `json:"reportsRootPageID"`
 }
 
 func (m *Manager) ConfluenceConfig(profileID string) (ConfluenceConfig, error) {
 	var c ConfluenceConfig
-	err := m.db.QueryRow(`SELECT base_url, space_key, root_page_id FROM confluence_profile WHERE profile_id = ?`, profileID).Scan(&c.BaseURL, &c.SpaceKey, &c.RootPageID)
+	err := m.db.QueryRow(`SELECT base_url, space_key, root_page_id, reports_space_key, reports_root_page_id FROM confluence_profile WHERE profile_id = ?`, profileID).
+		Scan(&c.BaseURL, &c.SpaceKey, &c.RootPageID, &c.ReportsSpaceKey, &c.ReportsRootPageID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ConfluenceConfig{}, nil
 	}
@@ -78,7 +87,9 @@ func (m *Manager) ConfluenceConfig(profileID string) (ConfluenceConfig, error) {
 }
 
 func (m *Manager) SetConfluenceConfig(profileID string, c ConfluenceConfig) error {
-	_, err := m.db.Exec(`INSERT INTO confluence_profile(profile_id, base_url, space_key, root_page_id) VALUES(?, ?, ?, ?) ON CONFLICT(profile_id) DO UPDATE SET base_url=excluded.base_url, space_key=excluded.space_key, root_page_id=excluded.root_page_id`, profileID, strings.TrimRight(strings.TrimSpace(c.BaseURL), "/"), strings.TrimSpace(c.SpaceKey), strings.TrimSpace(c.RootPageID))
+	_, err := m.db.Exec(`INSERT INTO confluence_profile(profile_id, base_url, space_key, root_page_id, reports_space_key, reports_root_page_id) VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(profile_id) DO UPDATE SET base_url=excluded.base_url, space_key=excluded.space_key, root_page_id=excluded.root_page_id, reports_space_key=excluded.reports_space_key, reports_root_page_id=excluded.reports_root_page_id`,
+		profileID, strings.TrimRight(strings.TrimSpace(c.BaseURL), "/"), strings.TrimSpace(c.SpaceKey), strings.TrimSpace(c.RootPageID),
+		strings.TrimSpace(c.ReportsSpaceKey), strings.TrimSpace(c.ReportsRootPageID))
 	if err != nil {
 		return fmt.Errorf("set Confluence settings: %w", err)
 	}

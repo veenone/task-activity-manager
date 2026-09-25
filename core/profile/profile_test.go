@@ -108,6 +108,37 @@ func TestConfluenceConfigRoundTripsWithoutCredential(t *testing.T) {
 	if got.BaseURL != "https://confluence.example.com" || got.SpaceKey != want.SpaceKey || got.RootPageID != want.RootPageID {
 		t.Fatalf("config = %+v", got)
 	}
+	// The reports space and root are their own fields, and a profile that
+	// never set them reads them empty, which is what keeps it publishing
+	// where it always did.
+	if got.ReportsSpaceKey != "" || got.ReportsRootPageID != "" {
+		t.Fatalf("reports configuration = %q / %q, want both empty", got.ReportsSpaceKey, got.ReportsRootPageID)
+	}
+}
+
+func TestReportsSpaceAndRootRoundTrip(t *testing.T) {
+	m := newManager(t)
+	p, err := m.Create("QA", "https://jira.example.com", "QA", "", "", "", "", "", false, "")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	want := profile.ConfluenceConfig{
+		BaseURL: "https://confluence.example.com", SpaceKey: "ENG", RootPageID: "42",
+		ReportsSpaceKey: " REPORTS ", ReportsRootPageID: " 77 ",
+	}
+	if err := m.SetConfluenceConfig(p.ID, want); err != nil {
+		t.Fatalf("set Confluence config: %v", err)
+	}
+	got, err := m.ConfluenceConfig(p.ID)
+	if err != nil {
+		t.Fatalf("get Confluence config: %v", err)
+	}
+	if got.ReportsSpaceKey != "REPORTS" || got.ReportsRootPageID != "77" {
+		t.Fatalf("reports configuration = %q / %q, want the trimmed REPORTS / 77", got.ReportsSpaceKey, got.ReportsRootPageID)
+	}
+	if got.SpaceKey != "ENG" || got.RootPageID != "42" {
+		t.Fatalf("the rituals configuration changed: %+v", got)
+	}
 }
 
 func TestBugIssueTypeDefaultsAndPersists(t *testing.T) {

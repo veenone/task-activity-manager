@@ -9,8 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
+	"agile-suite/core/profile"
+	"agile-suite/tam/internal/errtext"
 	"agile-suite/tam/internal/reportout"
 	"agile-suite/tam/internal/ritualrepo"
+	"agile-suite/tam/internal/ritualsync"
 	"agile-suite/tam/internal/ritualtemplate"
 )
 
@@ -25,8 +30,8 @@ import (
 // what happened in one line.
 
 // PublishSprintReport writes a sprint's report to its own Confluence page,
-// under the sprint's overview page when the rituals sync has made one, and
-// at the rituals root otherwise.
+// where the profile's reports configuration says, and, when it says nothing,
+// under the sprint's overview page or at the rituals root as it always did.
 //
 // It is a write, so it happens when the user asks and never on a view's
 // mount, and it reports the page it wrote. It takes the profile's lock
@@ -54,13 +59,71 @@ func (a *App) PublishSprintReport(profileID string, boardID, sprintID int, doc r
 	}
 	defer a.release(p.ID)
 
-	published, err := reportout.Publish(a.ctx, pages, cfg.SpaceKey, a.sprintPageID(p.ID, boardID, sprintID, cfg.RootPageID), doc)
+	space, parent := reportDestination(cfg, a.sprintPageID(p.ID, boardID, sprintID, cfg.RootPageID))
+	published, err := reportout.Publish(a.ctx, pages, space, parent, doc)
 	if err != nil {
 		log.Printf("tam: publishing the report for sprint %d on board %d for %s failed: %v", sprintID, boardID, p.Name, err)
 		return reportout.Published{}, err
 	}
 	log.Printf("tam: report for sprint %d on board %d for %s published to page %s (%s)", sprintID, boardID, p.Name, published.PageID, published.Title)
 	return published, nil
+}
+
+// reportDestination is the space a report is published to and the page it
+// hangs under. A profile that set neither a reports space nor a reports root
+// lands exactly where it did before they existed: the rituals space, under
+// the sprint's own overview page or the rituals root, whichever sprintPageID
+// found.
+//
+// A reports space of its own with no root chosen puts the report at the top of
+// that space: the sprint's ritual page is in another space and cannot be its
+// parent.
+func reportDestination(cfg profile.ConfluenceConfig, sprintPage string) (space, parent string) {
+	rituals := strings.TrimSpace(cfg.SpaceKey)
+	space = strings.TrimSpace(cfg.ReportsSpaceKey)
+	if space == "" {
+		space = rituals
+	}
+	switch root := strings.TrimSpace(cfg.ReportsRootPageID); {
+	case root != "":
+		return space, root
+	case space == rituals:
+		return space, sprintPage
+	default:
+		return space, ""
+	}
+}
+
+// CreateReportRoot creates, or adopts, a top-level page for a profile's sprint
+// reports to hang under, the way the missing-rituals-root dialog creates the
+// rituals one. An empty space key means the rituals space, which is where an
+// unconfigured profile publishes.
+//
+// It writes nothing locally: the page id goes back to the profile form, and
+// the form saves it with the rest of the profile. Forbidden and a taken title
+// come back as the outcome, with no page made.
+func (a *App) CreateReportRoot(profileID, spaceKey, title string, adopt bool) (ritualsync.Root, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return ritualsync.Root{}, err
+	}
+	cfg, pages, err := a.confluencePages(p)
+	if err != nil {
+		return ritualsync.Root{}, err
+	}
+	// The space key is typed into a form, so it is trimmed here rather than
+	// sent to Confluence with whatever whitespace came with it.
+	space := strings.TrimSpace(spaceKey)
+	if space == "" {
+		space = cfg.SpaceKey
+	}
+	root, err := ritualsync.CreateRoot(a.ctx, pages, space, ritualtemplate.ReportRootBody(p.ProjectKey), title, adopt)
+	if err != nil {
+		log.Printf("tam: reports root for %s in %s refused: %v", p.ID, space, err)
+		return ritualsync.Root{}, errors.New(errtext.Line(err))
+	}
+	log.Printf("tam: reports root for %s in %s: %s (page %s)", p.ID, space, root.Outcome, root.PageID)
+	return root, nil
 }
 
 // sprintPageID is the page a report hangs under: the sprint's own overview
@@ -79,8 +142,9 @@ func (a *App) sprintPageID(profileID string, boardID, sprintID int, rootID strin
 	return overview.PageID
 }
 
-// ExportSprintReportXLSX writes the report as a spreadsheet beside tam.db
-// and answers with the path, the convention ExportDiagnostics set.
+// ExportSprintReportXLSX writes the report as a spreadsheet where the user
+// says and answers with the path, the convention ExportDiagnostics set. A
+// cancelled dialog answers with an empty path and no error.
 func (a *App) ExportSprintReportXLSX(doc reportout.Document) (string, error) {
 	data, err := reportout.XLSX(doc)
 	if err != nil {
@@ -89,8 +153,8 @@ func (a *App) ExportSprintReportXLSX(doc reportout.Document) (string, error) {
 	return a.writeExport(doc.Title, "xlsx", data)
 }
 
-// ExportSprintReportPPTX writes the report as a deck beside tam.db and
-// answers with the path.
+// ExportSprintReportPPTX writes the report as a deck where the user says and
+// answers with the path, empty when the dialog was cancelled.
 func (a *App) ExportSprintReportPPTX(doc reportout.Document) (string, error) {
 	data, err := reportout.PPTX(doc)
 	if err != nil {
@@ -99,23 +163,100 @@ func (a *App) ExportSprintReportPPTX(doc reportout.Document) (string, error) {
 	return a.writeExport(doc.Title, "pptx", data)
 }
 
-// writeExport saves an export beside the database and answers with where it
-// went, so the user is told a path rather than left to find the file.
+// writeExport asks the user where the export goes and writes it there,
+// answering with the path so they are told rather than left to find the file.
+// A cancelled dialog answers "" with no error: nothing was written, so there
+// is nothing to report and nothing went wrong.
 //
-// The name carries the report's own title so three sprints exported in one
-// sitting can be told apart, and a timestamp so a second export of the same
-// sprint does not silently replace a file somebody has already opened.
+// The prefilled name carries the report's own title so three sprints exported
+// in one sitting can be told apart, and a timestamp so a second export of the
+// same sprint does not land on a file somebody has already opened. Whether to
+// overwrite is the dialog's own question to ask.
 func (a *App) writeExport(title, extension string, data []byte) (string, error) {
-	dir := filepath.Dir(a.dbPath)
-	if a.dbPath == "" || dir == "" || dir == "." {
-		return "", errors.New("no app data directory to export into")
+	dir, err := a.exportDirectory()
+	if err != nil {
+		return "", err
 	}
-	path := filepath.Join(dir, fmt.Sprintf("tam-report-%s-%d.%s", slug(title), time.Now().Unix(), extension))
+	path, err := a.saveTo(runtime.SaveDialogOptions{
+		Title:            "Save the sprint report",
+		DefaultDirectory: dir,
+		DefaultFilename:  fmt.Sprintf("tam-report-%s-%d.%s", slug(title), time.Now().Unix(), extension),
+		Filters:          []runtime.FileFilter{{DisplayName: exportKinds[extension], Pattern: "*." + extension}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write the report to %s: %w", path, err)
 	}
 	log.Printf("tam: sprint report exported to %s", path)
 	return path, nil
+}
+
+// exportKinds names each export in the save dialog's file type list.
+var exportKinds = map[string]string{"xlsx": "Excel workbook", "pptx": "PowerPoint deck"}
+
+// saveTo opens the save dialog. The field is the seam a test answers through;
+// the running app has none and reaches Wails.
+func (a *App) saveTo(opts runtime.SaveDialogOptions) (string, error) {
+	if a.saveDialog != nil {
+		return a.saveDialog(opts)
+	}
+	return runtime.SaveFileDialog(a.ctx, opts)
+}
+
+// exportDirectory is where the save dialog starts: the configured folder while
+// it is still a folder, and the app data directory otherwise, which is where
+// exports landed before there was a setting at all. A folder that has gone, on
+// an unplugged drive or deleted since it was set, must not stop an export.
+func (a *App) exportDirectory() (string, error) {
+	if a.settings != nil {
+		if s, err := a.settings.Get(); err == nil && s.ReportExportDir != "" {
+			if info, err := os.Stat(s.ReportExportDir); err == nil && info.IsDir() {
+				return s.ReportExportDir, nil
+			}
+			log.Printf("tam: the report export folder %s is not there; starting in the app data directory", s.ReportExportDir)
+		}
+	}
+	dir := filepath.Dir(a.dbPath)
+	if a.dbPath == "" || dir == "" || dir == "." {
+		return "", errors.New("no app data directory to export into")
+	}
+	return dir, nil
+}
+
+// SetReportExportDirectory records where the export save dialog starts. The
+// path arrives from a text box, so it is checked rather than trusted: an empty
+// one clears the setting, and anything else has to be a folder that is there,
+// or the dialog would open somewhere the user never meant.
+func (a *App) SetReportExportDirectory(dir string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	dir = strings.TrimSpace(dir)
+	if dir != "" {
+		info, err := os.Stat(dir)
+		if err != nil {
+			return fmt.Errorf("%s cannot be opened as a folder: %w", dir, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("%s is a file, not a folder", dir)
+		}
+	}
+	return a.settings.SetReportExportDir(dir)
+}
+
+// ChooseReportExportDirectory is the Browse button beside that setting. It
+// answers "" when the user closes the picker, which leaves the field alone.
+func (a *App) ChooseReportExportDirectory() (string, error) {
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Choose the report export folder"})
+	if err != nil {
+		return "", fmt.Errorf("folder dialog: %w", err)
+	}
+	return dir, nil
 }
 
 // slug is a title reduced to what every filesystem accepts: lower case
