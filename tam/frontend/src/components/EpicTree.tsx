@@ -5,6 +5,8 @@ import { MAX_ORPHAN_ROWS, NO_EPIC_KEY, ownerOf, visibleRows } from "../lib/epicT
 import type { Row } from "../lib/epicTreeItems";
 import { EpicChildRow, EpicRow } from "./EpicRow";
 import { keyColumnWidth } from "../lib/keyColumn";
+import { typeChipLabel } from "../lib/typeChip";
+import { typeColumnWidth } from "../lib/typeColumn";
 import { MOVED_FLASH_MS } from "../lib/flash";
 import { drawnParents, familyPlace, subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
 
@@ -79,6 +81,10 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
     "All epics",
     ...tree.epics.flatMap((n) => [n.issue.key, ...n.children.map((c) => c.key)]),
     ...tree.orphans.map((o) => o.key),
+  ]);
+  const typeWidth = typeColumnWidth([
+    ...tree.epics.flatMap((n) => [typeChipLabel(n.issue.type, subtaskLabel), ...n.children.map((c) => typeChipLabel(c.type, subtaskLabel))]),
+    ...tree.orphans.map((o) => typeChipLabel(o.type, subtaskLabel)),
   ]);
   const indexOf = new Map(rows.map((r, i) => [r.id, i] as const));
 
@@ -207,7 +213,7 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
       aria-label="Epics"
       role="tree"
       ref={rootRef}
-      style={{ "--epic-key-w": keyWidth } as CSSProperties}
+      style={{ "--epic-key-w": keyWidth, "--type-col-w": typeWidth } as CSSProperties}
     >
       <div
         role="treeitem"

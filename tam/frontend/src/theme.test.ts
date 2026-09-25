@@ -20,10 +20,11 @@ const tokensCss = coreStyle("tokens.css");
 const light = tokenTable(tokensCss, ":root");
 const dark = new Map([...light, ...tokenTable(tokensCss, ':root[data-theme="dark"]')]);
 
-// The two grid tracks a component measures from the keys on the page and sets
-// on the element itself. They are widths, not colours, and no stylesheet can
+// The grid tracks a component measures from the content on the page and sets
+// on the element itself: the key columns from the keys, and the type column
+// from the chip labels. They are widths, not colours, and no stylesheet can
 // hold them.
-const MEASURED_AT_RUNTIME = ["--issue-key-w", "--sprint-key-w"];
+const MEASURED_AT_RUNTIME = ["--issue-key-w", "--sprint-key-w", "--type-col-w"];
 
 const isColour = (value: string) => /^(#|rgb|hsl|color-mix)/.test(value);
 
@@ -86,6 +87,9 @@ const FILLED = [
   ".chip-type-requirement",
   ".chip-type-subtask",
   ".chip-type-none",
+  ".chip-type-alt-teal",
+  ".chip-type-alt-pink",
+  ".chip-type-alt-orange",
   ".chip-status-todo",
   ".chip-status-active",
   ".chip-status-done",

@@ -1172,7 +1172,7 @@
    hide behind. That was the overlap. */
 .epic-row {
   display: grid;
-  grid-template-columns: 12px 44px var(--epic-key-w, 92px) 420px 132px 44px 13px;
+  grid-template-columns: 12px var(--type-col-w, 44px) var(--epic-key-w, 92px) 420px 132px 44px 13px;
   gap: 6px;
   align-items: center;
 }

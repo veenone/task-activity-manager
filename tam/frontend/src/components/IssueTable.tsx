@@ -6,6 +6,8 @@ import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
 import { statusClass } from "../lib/statusClass";
 import { keyColumnWidth } from "../lib/keyColumn";
+import { typeChipLabel } from "../lib/typeChip";
+import { typeColumnWidth } from "../lib/typeColumn";
 import { drawnParents, familyPlace, subtaskCounts, visibleFamilyIssues } from "../lib/issueFamilies";
 import { SubtaskToggle } from "./SubtaskToggle";
 
@@ -66,6 +68,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
   }
 
   const keyWidth = keyColumnWidth(issues.map((i) => i.key), PENDING_DOT_PX);
+  const typeWidth = typeColumnWidth(issues.map((i) => typeChipLabel(i.type, subtaskLabel)));
   const sortedLabel = GRID_COLUMNS.find((c) => c.id === sort)?.label;
   const parentKeys = drawnParents(issues);
 
@@ -79,7 +82,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
       aria-label="Issues"
       aria-multiselectable="false"
       aria-rowcount={rows.length + 1}
-      style={{ "--issue-key-w": keyWidth } as CSSProperties}
+      style={{ "--issue-key-w": keyWidth, "--type-col-w": typeWidth } as CSSProperties}
     >
       {/* The order was otherwise invisible, and rank order is the whole point
           of a backlog: a row's position means something, so say so. */}
