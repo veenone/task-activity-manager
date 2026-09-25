@@ -37,25 +37,32 @@ const (
 // Issue is one row of the Backlog: the columns the grid shows plus what sync
 // needs to keep it current. StoryPoints is nil when the issue has none.
 type Issue struct {
-	Key          string   `json:"key"`
-	ID           string   `json:"id"`
-	Project      string   `json:"project"`
-	Type         string   `json:"type"`
-	Summary      string   `json:"summary"`
-	Status       string   `json:"status"`
-	StatusID     string   `json:"statusId"`
-	Assignee     string   `json:"assignee"`
-	AssigneeName string   `json:"assigneeName"`
-	Reporter     string   `json:"reporter"`
-	Priority     string   `json:"priority"`
-	Labels       []string `json:"labels"`
-	SprintID     string   `json:"sprintId"`
-	SprintName   string   `json:"sprintName"`
-	ParentKey    string   `json:"parentKey"`
-	StoryPoints  *float64 `json:"storyPoints"`
-	Rank         string   `json:"rank"`
-	Created      string   `json:"created"`
-	Updated      string   `json:"updated"`
+	Key      string `json:"key"`
+	ID       string `json:"id"`
+	Project  string `json:"project"`
+	Type     string `json:"type"`
+	Summary  string `json:"summary"`
+	Status   string `json:"status"`
+	StatusID string `json:"statusId"`
+	// StatusCategory is Jira's own bucket for the status: "new",
+	// "indeterminate" or "done". The status name is whatever the instance
+	// calls it, in whatever language, so it is no basis for a colour; the
+	// category is the same three keys everywhere. Empty when nothing has
+	// read one for this row: a row cached before schema 19, or a key this
+	// Jira invented that is none of the three.
+	StatusCategory string   `json:"statusCategory"`
+	Assignee       string   `json:"assignee"`
+	AssigneeName   string   `json:"assigneeName"`
+	Reporter       string   `json:"reporter"`
+	Priority       string   `json:"priority"`
+	Labels         []string `json:"labels"`
+	SprintID       string   `json:"sprintId"`
+	SprintName     string   `json:"sprintName"`
+	ParentKey      string   `json:"parentKey"`
+	StoryPoints    *float64 `json:"storyPoints"`
+	Rank           string   `json:"rank"`
+	Created        string   `json:"created"`
+	Updated        string   `json:"updated"`
 
 	// Description is the issue's description, read with the rest of the row
 	// by the sync and kept on it, so the detail panel draws it from the
