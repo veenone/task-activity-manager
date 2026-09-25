@@ -1396,6 +1396,8 @@ export namespace profile {
 	    baseURL: string;
 	    spaceKey: string;
 	    rootPageID: string;
+	    reportsSpaceKey: string;
+	    reportsRootPageID: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConfluenceConfig(source);
@@ -1406,6 +1408,8 @@ export namespace profile {
 	        this.baseURL = source["baseURL"];
 	        this.spaceKey = source["spaceKey"];
 	        this.rootPageID = source["rootPageID"];
+	        this.reportsSpaceKey = source["reportsSpaceKey"];
+	        this.reportsRootPageID = source["reportsRootPageID"];
 	    }
 	}
 	export class Profile {

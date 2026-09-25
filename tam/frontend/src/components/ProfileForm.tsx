@@ -10,10 +10,12 @@ import {
   SetProfileSetting,
   GetConfluenceConfig,
   SetConfluenceConfig,
+  CreateReportRoot,
   isDemoUrl,
 } from "../api";
 import type { Profile } from "../api";
 import { ROOT_FIX_BEFORE_SAVE, readRootPageInput } from "../lib/confluenceRoot";
+import { ReportRootDialog } from "./ReportRootDialog";
 
 // REQUIREMENT_TYPE_KEY is the per-profile setting holding the Jira issue type
 // name TAM syncs as a requirement. It lives in tam.db, not on the shared
@@ -130,6 +132,12 @@ export function ProfileForm({
   const [confluenceRootPageID, setConfluenceRootPageID] = useState("");
   const [confluenceToken, setConfluenceToken] = useState("");
   const [confluenceLoaded, setConfluenceLoaded] = useState(false);
+  // Where sprint reports are published. Both blank is what every profile had
+  // before these existed, and it publishes where it always did: the rituals
+  // space, under the sprint's own page or the rituals root.
+  const [reportsSpace, setReportsSpace] = useState("");
+  const [reportsRootPageID, setReportsRootPageID] = useState("");
+  const [pickingReportsRoot, setPickingReportsRoot] = useState(false);
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState("");
@@ -175,6 +183,8 @@ export function ProfileForm({
         setConfluenceURL(c.baseURL);
         setConfluenceSpace(c.spaceKey);
         setConfluenceRootPageID(c.rootPageID);
+        setReportsSpace(c.reportsSpaceKey ?? "");
+        setReportsRootPageID(c.reportsRootPageID ?? "");
         setConfluenceLoaded(true);
       })
       .catch(() => { /* optional integration remains blank when unavailable */ });
@@ -188,6 +198,7 @@ export function ProfileForm({
   const urlErrorId = useId();
   const keyErrorId = useId();
   const rootErrorId = useId();
+  const reportsRootId = useId();
   const minutesErrorId = useId();
   const minutesError = detailMinutesError(detailMinutes);
 
@@ -272,15 +283,18 @@ export function ProfileForm({
       // so it is written after the profile write hands one back.
       await SetProfileSetting(p.id, REQUIREMENT_TYPE_KEY, requirementType.trim());
       await SetProfileSetting(p.id, DETAIL_CACHE_KEY, detailMinutes.trim());
-      if ((isEdit && confluenceLoaded) || ((!demo && (confluenceURL.trim() || confluenceSpace.trim() || confluenceRootPageID.trim())) || confluenceToken.trim())) {
+      if ((isEdit && confluenceLoaded) || ((!demo && (confluenceURL.trim() || confluenceSpace.trim() || confluenceRootPageID.trim() || reportsSpace.trim())) || confluenceToken.trim())) {
         await SetConfluenceConfig(p.id, {
           baseURL: confluenceURL.trim(),
           spaceKey: confluenceSpace.trim(),
           rootPageID: rootInput.id,
+          reportsSpaceKey: reportsSpace.trim(),
+          reportsRootPageID: reportsRootPageID.trim(),
         }, confluenceToken.trim());
         setConfluenceURL(confluenceURL.trim().replace(/\/+$/, ""));
         setConfluenceSpace(confluenceSpace.trim());
         setConfluenceRootPageID(rootInput.id);
+        setReportsSpace(reportsSpace.trim());
         setConfluenceLoaded(true);
       }
       onSaved(p);
@@ -392,8 +406,58 @@ export function ProfileForm({
           Confluence personal access token
           <input type="password" value={confluenceToken} onChange={(e) => setConfluenceToken(e.target.value)} placeholder={isEdit ? "Leave blank to keep the current token" : "Stored in Windows Credential Manager"} autoComplete="off" />
         </label>
+        {/* Where sprint reports go. A report is not a ritual and may belong in
+            another space or under another page, so it has its own pair. Both
+            left blank publishes where the profile always did. */}
+        <label>
+          Reports space key (optional)
+          <input
+            value={reportsSpace}
+            onChange={(e) => setReportsSpace(e.target.value)}
+            placeholder="The rituals space above"
+            spellCheck={false}
+          />
+        </label>
+        <label htmlFor={reportsRootId}>Reports root page (optional)</label>
+        <div className="reports-root-field">
+          <input
+            id={reportsRootId}
+            value={reportsRootPageID}
+            readOnly
+            spellCheck={false}
+            placeholder="The sprint's own ritual page"
+          />
+          <button
+            type="button"
+            className="btn"
+            disabled={!isEdit || !confluenceLoaded}
+            title={isEdit ? "Create or take the page reports hang under" : "Save the profile first, then choose the page"}
+            onClick={() => setPickingReportsRoot(true)}
+          >
+            Choose page...
+          </button>
+          {reportsRootPageID && (
+            <button type="button" className="btn" onClick={() => setReportsRootPageID("")}>Clear</button>
+          )}
+        </div>
+        <span className="field-hint">
+          Leave both blank and a report is published where it always was: the rituals space, under the sprint's
+          own page or the rituals root.
+        </span>
         {demo && <span className="field-hint">Demo profile sample: use <code>demo</code> as the Confluence URL. It is a local configuration example and does not contact a server.</span>}
       </details>
+      {pickingReportsRoot && profile && (
+        <ReportRootDialog
+          spaceKey={reportsSpace.trim() || confluenceSpace.trim()}
+          suggestedTitle={`${projectKey.trim().toUpperCase()} Reports`.trim()}
+          create={(title, adopt) => CreateReportRoot(profile.id, reportsSpace.trim(), title, adopt)}
+          onChosen={(root) => {
+            setReportsRootPageID(root.pageId);
+            setPickingReportsRoot(false);
+          }}
+          onClose={() => setPickingReportsRoot(false)}
+        />
+      )}
 
       {!isEdit && others.length > 0 && (
         <label>

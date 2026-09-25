@@ -50,6 +50,10 @@ export function CreateProfileReusingToken(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['CreateProfileReusingToken'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function CreateReportRoot(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateReportRoot'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateRitualRoot(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateRitualRoot'](arg1, arg2, arg3, arg4);
 }

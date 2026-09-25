@@ -42,7 +42,17 @@ export interface Settings {
   reportExportDir?: string;
 }
 
-export interface ConfluenceConfig { baseURL: string; spaceKey: string; rootPageID: string }
+// The rituals space and root, and the pair a sprint report is published to.
+// Both reports fields empty means the report goes where it always did: the
+// rituals space, under the sprint's own page or the rituals root. Optional
+// for the fixtures written before they existed.
+export interface ConfluenceConfig {
+  baseURL: string;
+  spaceKey: string;
+  rootPageID: string;
+  reportsSpaceKey?: string;
+  reportsRootPageID?: string;
+}
 
 export interface HealthInfo {
   ok: boolean;
@@ -1440,6 +1450,12 @@ export interface RitualRootResult { root: RitualRoot; sync: RitualSyncResult | n
 // CreateRitualRoot takes Go's "rituals" lock. Call it only through
 // SyncContext.runRitualRoot, never directly.
 export const CreateRitualRoot: (profileId: string, boardId: number, title: string, adopt: boolean) => Promise<RitualRootResult> = App.CreateRitualRoot as any;
+// CreateReportRoot makes, or adopts, the top level page a profile's sprint
+// reports hang under, with the same outcomes the rituals root has. An empty
+// space key means the rituals space. It saves nothing: the profile form saves
+// the page id it answers with.
+export const CreateReportRoot = (profileId: string, spaceKey: string, title: string, adopt: boolean): Promise<RitualRoot> =>
+  App.CreateReportRoot(profileId, spaceKey, title, adopt) as Promise<RitualRoot>;
 
 // LookupIssue is cast the same way ListIssues is above: the generated
 // binding types the issue type as a plain string, narrowed to IssueType here.

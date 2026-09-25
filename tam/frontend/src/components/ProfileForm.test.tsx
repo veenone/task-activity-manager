@@ -17,6 +17,7 @@ vi.mock("../api", async () => {
     SetProfileSetting: vi.fn(),
     GetConfluenceConfig: vi.fn(),
     SetConfluenceConfig: vi.fn(),
+    CreateReportRoot: vi.fn(),
   };
 });
 
@@ -52,7 +53,10 @@ describe("ProfileForm's Confluence root page id", () => {
     expect(root).toHaveValue("42");
     await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
-      expect(api.SetConfluenceConfig).toHaveBeenCalledWith("p1", { baseURL: "https://confluence.example.com", spaceKey: "TEAM", rootPageID: "42" }, ""),
+      expect(api.SetConfluenceConfig).toHaveBeenCalledWith("p1", {
+        baseURL: "https://confluence.example.com", spaceKey: "TEAM", rootPageID: "42",
+        reportsSpaceKey: "", reportsRootPageID: "",
+      }, ""),
     );
     expect(onSaved).toHaveBeenCalled();
   });
@@ -67,6 +71,57 @@ describe("ProfileForm's Confluence root page id", () => {
     expect(root).toHaveAttribute("aria-invalid", "true");
     expect(root).toHaveAccessibleDescription(ROOT_ID_NOT_A_NUMBER);
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+  });
+});
+
+describe("ProfileForm's Confluence reports destination", () => {
+  it("leaves a profile that sets neither field publishing where it always did", async () => {
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    await screen.findByDisplayValue("653264152");
+    expect(screen.getByLabelText(/Reports space key/)).toHaveValue("");
+    expect(screen.getByLabelText(/Reports root page/)).toHaveValue("");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api.SetConfluenceConfig).toHaveBeenCalledWith("p1", {
+        baseURL: "https://confluence.example.com", spaceKey: "TEAM", rootPageID: "653264152",
+        reportsSpaceKey: "", reportsRootPageID: "",
+      }, ""),
+    );
+  });
+
+  it("picks the reports root as a page, not a typed id, and saves what came back", async () => {
+    vi.mocked(api.CreateReportRoot).mockResolvedValue({
+      outcome: "created", pageId: "9100", title: "PLAT Reports", spaceKey: "REPORTS", topLevel: true,
+    });
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    const space = await screen.findByLabelText(/Reports space key/);
+    await userEvent.type(space, "REPORTS");
+    // The root field is filled by the dialog, never typed into.
+    expect(screen.getByLabelText(/Reports root page/)).toHaveAttribute("readonly");
+
+    await userEvent.click(screen.getByRole("button", { name: "Choose page..." }));
+    await userEvent.click(await screen.findByRole("button", { name: "Create page" }));
+    await waitFor(() => expect(api.CreateReportRoot).toHaveBeenCalledWith("p1", "REPORTS", "PLAT Reports", false));
+    await waitFor(() => expect(screen.getByLabelText(/Reports root page/)).toHaveValue("9100"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api.SetConfluenceConfig).toHaveBeenCalledWith("p1", {
+        baseURL: "https://confluence.example.com", spaceKey: "TEAM", rootPageID: "653264152",
+        reportsSpaceKey: "REPORTS", reportsRootPageID: "9100",
+      }, ""),
+    );
+  });
+
+  it("loads what the profile already has", async () => {
+    vi.mocked(api.GetConfluenceConfig).mockResolvedValue({
+      baseURL: "https://confluence.example.com", spaceKey: "TEAM", rootPageID: "653264152",
+      reportsSpaceKey: "REPORTS", reportsRootPageID: "9100",
+    });
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    await waitFor(() => expect(screen.getByLabelText(/Reports space key/)).toHaveValue("REPORTS"));
+    expect(screen.getByLabelText(/Reports root page/)).toHaveValue("9100");
   });
 });
 

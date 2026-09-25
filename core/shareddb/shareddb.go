@@ -9,6 +9,7 @@
 package shareddb
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 
@@ -17,7 +18,7 @@ import (
 
 // Schema is the shared database layout.
 var Schema = store.Schema{
-	Version: 1,
+	Version: 2,
 	Base: `
 CREATE TABLE IF NOT EXISTS profiles (
 	id          TEXT PRIMARY KEY,
@@ -61,7 +62,9 @@ CREATE TABLE IF NOT EXISTS confluence_profile (
 	profile_id TEXT PRIMARY KEY,
 	base_url TEXT NOT NULL DEFAULT '',
 	space_key TEXT NOT NULL DEFAULT '',
-	root_page_id TEXT NOT NULL DEFAULT ''
+	root_page_id TEXT NOT NULL DEFAULT '',
+	reports_space_key TEXT NOT NULL DEFAULT '',
+	reports_root_page_id TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS confluence_association (
@@ -82,6 +85,25 @@ CREATE TABLE IF NOT EXISTS confluence_page_cache (
 	PRIMARY KEY (profile_id, page_id)
 );
 `,
+	Migrations: []store.Migration{
+		{
+			// v2: where a profile's sprint reports are published. Both empty
+			// is what every profile written before this had, and it means the
+			// rituals space and the rituals placement, unchanged.
+			Version: 2,
+			Apply: func(db *sql.DB) error {
+				for _, column := range []string{
+					"reports_space_key TEXT NOT NULL DEFAULT ''",
+					"reports_root_page_id TEXT NOT NULL DEFAULT ''",
+				} {
+					if err := store.AddColumnIfMissing(db, "confluence_profile", column); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+		},
+	},
 }
 
 // Open opens (or creates) the shared database at path.

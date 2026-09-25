@@ -404,7 +404,7 @@ func (a *App) CreateRitualRoot(profileID string, boardID int, title string, adop
 	}
 	defer a.release(p.ID)
 
-	root, err := ritualsync.CreateRoot(a.ctx, pages, cfg.SpaceKey, p.ProjectKey, title, adopt)
+	root, err := ritualsync.CreateRoot(a.ctx, pages, cfg.SpaceKey, ritualtemplate.RootBody(p.ProjectKey), title, adopt)
 	if err != nil {
 		log.Printf("tam: rituals root for %s refused: %v", p.ID, err)
 		return RitualRootResult{}, errors.New(errtext.Line(err))

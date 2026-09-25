@@ -9,6 +9,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"agile-suite/core/profile"
 	"agile-suite/tam/internal/reportout"
 	"agile-suite/tam/internal/ritualrepo"
 	"agile-suite/tam/internal/ritualtemplate"
@@ -222,6 +223,89 @@ func TestPublishSprintReportWritesUnderTheSprintsOwnPage(t *testing.T) {
 	}
 	if len(page.AncestorIDs) == 0 || page.AncestorIDs[len(page.AncestorIDs)-1] != overview.PageID {
 		t.Errorf("the report page sits under %v, want the sprint's own page %s", page.AncestorIDs, overview.PageID)
+	}
+}
+
+// TestReportDestinationLeavesAnUnsetProfileWhereItWas is the backward
+// compatibility this change turns on: with no reports space and no reports
+// root, a report goes to the rituals space, under the sprint's own overview
+// page, and to the rituals root when that sprint has no page yet.
+func TestReportDestinationLeavesAnUnsetProfileWhereItWas(t *testing.T) {
+	rituals := profile.ConfluenceConfig{SpaceKey: "TEAM", RootPageID: "10"}
+	for _, tc := range []struct {
+		name       string
+		cfg        profile.ConfluenceConfig
+		sprintPage string
+		space      string
+		parent     string
+	}{
+		{"nothing set, the sprint has a page", rituals, "555", "TEAM", "555"},
+		{"nothing set, the sprint has none", rituals, "10", "TEAM", "10"},
+		{
+			"only a reports root: the rituals space, under that root",
+			profile.ConfluenceConfig{SpaceKey: "TEAM", RootPageID: "10", ReportsRootPageID: "900"},
+			"555", "TEAM", "900",
+		},
+		{
+			"a reports space and root",
+			profile.ConfluenceConfig{SpaceKey: "TEAM", RootPageID: "10", ReportsSpaceKey: "REPORTS", ReportsRootPageID: "900"},
+			"555", "REPORTS", "900",
+		},
+		{
+			// The sprint's ritual page is in the rituals space and cannot
+			// parent a page in another one, so the report sits at the top.
+			"a reports space with no root",
+			profile.ConfluenceConfig{SpaceKey: "TEAM", RootPageID: "10", ReportsSpaceKey: "REPORTS"},
+			"555", "REPORTS", "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			space, parent := reportDestination(tc.cfg, tc.sprintPage)
+			if space != tc.space || parent != tc.parent {
+				t.Errorf("destination = %s / %s, want %s / %s", space, parent, tc.space, tc.parent)
+			}
+		})
+	}
+}
+
+func TestPublishSprintReportHangsUnderTheProfilesReportsRoot(t *testing.T) {
+	a, p := newRitualSyncApp(t)
+	if _, err := a.EnsureSprintRituals(p.ID, 1, 14); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.SyncRituals(p.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	root, err := a.CreateReportRoot(p.ID, "", "PLAT Reports", false)
+	if err != nil {
+		t.Fatalf("create the reports root: %v", err)
+	}
+	if root.Outcome != "created" || root.PageID == "" || !root.TopLevel {
+		t.Fatalf("root = %+v, want a page created at the top of the space", root)
+	}
+	// The root is created, not saved: the profile form saves it with the rest.
+	stored, err := a.profiles.ConfluenceConfig(p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.ReportsRootPageID != "" {
+		t.Errorf("the reports root was saved behind the form's back: %q", stored.ReportsRootPageID)
+	}
+	stored.ReportsRootPageID = root.PageID
+	if err := a.profiles.SetConfluenceConfig(p.ID, stored); err != nil {
+		t.Fatal(err)
+	}
+
+	published, err := a.PublishSprintReport(p.ID, 1, 14, exportDoc())
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	page, ok := a.demoConfluence[p.ID].Page(published.PageID)
+	if !ok {
+		t.Fatalf("page %s is not in the space", published.PageID)
+	}
+	if len(page.AncestorIDs) == 0 || page.AncestorIDs[len(page.AncestorIDs)-1] != root.PageID {
+		t.Errorf("the report page sits under %v, want the reports root %s", page.AncestorIDs, root.PageID)
 	}
 }
 

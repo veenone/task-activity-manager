@@ -11,8 +11,11 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"agile-suite/core/profile"
+	"agile-suite/tam/internal/errtext"
 	"agile-suite/tam/internal/reportout"
 	"agile-suite/tam/internal/ritualrepo"
+	"agile-suite/tam/internal/ritualsync"
 	"agile-suite/tam/internal/ritualtemplate"
 )
 
@@ -27,8 +30,8 @@ import (
 // what happened in one line.
 
 // PublishSprintReport writes a sprint's report to its own Confluence page,
-// under the sprint's overview page when the rituals sync has made one, and
-// at the rituals root otherwise.
+// where the profile's reports configuration says, and, when it says nothing,
+// under the sprint's overview page or at the rituals root as it always did.
 //
 // It is a write, so it happens when the user asks and never on a view's
 // mount, and it reports the page it wrote. It takes the profile's lock
@@ -56,13 +59,71 @@ func (a *App) PublishSprintReport(profileID string, boardID, sprintID int, doc r
 	}
 	defer a.release(p.ID)
 
-	published, err := reportout.Publish(a.ctx, pages, cfg.SpaceKey, a.sprintPageID(p.ID, boardID, sprintID, cfg.RootPageID), doc)
+	space, parent := reportDestination(cfg, a.sprintPageID(p.ID, boardID, sprintID, cfg.RootPageID))
+	published, err := reportout.Publish(a.ctx, pages, space, parent, doc)
 	if err != nil {
 		log.Printf("tam: publishing the report for sprint %d on board %d for %s failed: %v", sprintID, boardID, p.Name, err)
 		return reportout.Published{}, err
 	}
 	log.Printf("tam: report for sprint %d on board %d for %s published to page %s (%s)", sprintID, boardID, p.Name, published.PageID, published.Title)
 	return published, nil
+}
+
+// reportDestination is the space a report is published to and the page it
+// hangs under. A profile that set neither a reports space nor a reports root
+// lands exactly where it did before they existed: the rituals space, under
+// the sprint's own overview page or the rituals root, whichever sprintPageID
+// found.
+//
+// A reports space of its own with no root chosen puts the report at the top of
+// that space: the sprint's ritual page is in another space and cannot be its
+// parent.
+func reportDestination(cfg profile.ConfluenceConfig, sprintPage string) (space, parent string) {
+	rituals := strings.TrimSpace(cfg.SpaceKey)
+	space = strings.TrimSpace(cfg.ReportsSpaceKey)
+	if space == "" {
+		space = rituals
+	}
+	switch root := strings.TrimSpace(cfg.ReportsRootPageID); {
+	case root != "":
+		return space, root
+	case space == rituals:
+		return space, sprintPage
+	default:
+		return space, ""
+	}
+}
+
+// CreateReportRoot creates, or adopts, a top-level page for a profile's sprint
+// reports to hang under, the way the missing-rituals-root dialog creates the
+// rituals one. An empty space key means the rituals space, which is where an
+// unconfigured profile publishes.
+//
+// It writes nothing locally: the page id goes back to the profile form, and
+// the form saves it with the rest of the profile. Forbidden and a taken title
+// come back as the outcome, with no page made.
+func (a *App) CreateReportRoot(profileID, spaceKey, title string, adopt bool) (ritualsync.Root, error) {
+	p, err := a.requireProfile(profileID)
+	if err != nil {
+		return ritualsync.Root{}, err
+	}
+	cfg, pages, err := a.confluencePages(p)
+	if err != nil {
+		return ritualsync.Root{}, err
+	}
+	// The space key is typed into a form, so it is trimmed here rather than
+	// sent to Confluence with whatever whitespace came with it.
+	space := strings.TrimSpace(spaceKey)
+	if space == "" {
+		space = cfg.SpaceKey
+	}
+	root, err := ritualsync.CreateRoot(a.ctx, pages, space, ritualtemplate.ReportRootBody(p.ProjectKey), title, adopt)
+	if err != nil {
+		log.Printf("tam: reports root for %s in %s refused: %v", p.ID, space, err)
+		return ritualsync.Root{}, errors.New(errtext.Line(err))
+	}
+	log.Printf("tam: reports root for %s in %s: %s (page %s)", p.ID, space, root.Outcome, root.PageID)
+	return root, nil
 }
 
 // sprintPageID is the page a report hangs under: the sprint's own overview
