@@ -9,6 +9,8 @@ import { rowIdOf, visibleRows } from "../lib/sprintRows";
 import type { TreeRow } from "../lib/sprintRows";
 import { plural, points } from "../lib/format";
 import { keyColumnWidth } from "../lib/keyColumn";
+import { typeChipLabel } from "../lib/typeChip";
+import { typeColumnWidth } from "../lib/typeColumn";
 import { statusClass } from "../lib/statusClass";
 import { MOVED_FLASH_MS } from "../lib/flash";
 import { TypeChip } from "./TypeChip";
@@ -125,6 +127,9 @@ export function SprintList({
   // every row is its own grid container, so a per-row track would size each
   // row to its own key and the columns would stop lining up.
   const keyWidth = keyColumnWidth(details.flatMap((d) => d.issues.map((i) => i.key)));
+  // The cards carry no subtaskLabel, so the chip shows TAM's own word here
+  // and the measurer is handed the same one.
+  const typeWidth = typeColumnWidth(details.flatMap((d) => d.issues.map((i) => typeChipLabel(i.type))));
 
   // Exactly one row keeps tabIndex 0. It follows the selection, and falls
   // back to the first row whenever a collapse or a refetch takes away
@@ -352,7 +357,7 @@ export function SprintList({
       aria-label="Sprints"
       role="tree"
       ref={rootRef}
-      style={{ "--sprint-key-w": keyWidth } as CSSProperties}
+      style={{ "--sprint-key-w": keyWidth, "--type-col-w": typeWidth } as CSSProperties}
     >
       {details.map((detail) => {
         const id = rowIdOf(detail);

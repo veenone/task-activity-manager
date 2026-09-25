@@ -70,6 +70,15 @@
   --chip-purple-text: #5b21b6;
   --chip-sky-bg: #e0f2fe;
   --chip-sky-text: #075985;
+  /* For the issue types TAM does not model, which since #68 is most of a
+     project's vocabulary. Kept clear of the six above so a chip does not
+     read as a type it is not. */
+  --chip-teal-bg: #ccfbf1;
+  --chip-teal-text: #115e59;
+  --chip-pink-bg: #fce7f3;
+  --chip-pink-text: #9d174d;
+  --chip-orange-bg: #ffedd5;
+  --chip-orange-text: #9a3412;
   /* Family rows. --subtask-indent is the one step a child is drawn to the
      right of its parent by, and --row-lead-slot the width every row of a
      family reserves for its expand toggle whether or not it has one. Both
@@ -174,6 +183,12 @@
   --chip-purple-text: #ddd6fe;
   --chip-sky-bg: #0c4a6e;
   --chip-sky-text: #bae6fd;
+  --chip-teal-bg: #134e4a;
+  --chip-teal-text: #99f6e4;
+  --chip-pink-bg: #831843;
+  --chip-pink-text: #fbcfe8;
+  --chip-orange-bg: #7c2d12;
+  --chip-orange-text: #fed7aa;
   /* The state and bar tokens, repeated rather than inherited: each alias
      re-points on its own because the chip pair behind it does, and a reader
      of this block sees the whole palette instead of half of it. Only

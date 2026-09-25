@@ -237,3 +237,40 @@ describe("the filter bar", () => {
     expect(valueOf(bar, "row-gap")).toMatch(/^\d+px$/);
   });
 });
+
+// Issue #79. The chip is drawn in cells that clip, and in tracks that were
+// sized before the sync started returning the project's whole vocabulary.
+describe("chips", () => {
+  it("is a box of its own, so the cells that clip do not cut its border", () => {
+    // A chip is a span with padding and a border. As an inline box neither
+    // contributes to the line box, so in a cell with overflow: hidden and a
+    // row locked at 34px the top and bottom border were cut off. An
+    // inline-flex box is atomic: the line box is its full height.
+    const chip = declarationsOf(appCss, ".chip");
+    expect(valueOf(chip, "display")).toBe("inline-flex");
+    expect(valueOf(chip, "align-items")).toBe("center");
+  });
+
+  const TRACKED = [
+    [".issue-row", "the Backlog grid"],
+    [".sprint-issue-row", "the sprint tree"],
+    [".epic-row", "the Epics tree"],
+  ] as const;
+
+  it.each(TRACKED)("%s sizes its type track from the page, not a literal", (selector) => {
+    // 104px in the Backlog and 44px in both trees, against names like
+    // Improvement and Sub Test Execution that the sync now returns.
+    const css = selector === ".epic-row" ? primitivesCss : appCss;
+    const tracks = valueOf(declarationsOf(css, selector), "grid-template-columns");
+    expect(tracks).toContain("var(--type-col-w");
+  });
+});
+
+describe("sprint band heading", () => {
+  it("reads as a band rather than as another row", () => {
+    // Only a bottom border separated it from the cards under it, which is
+    // the same separator the cards use between themselves.
+    const band = declarationsOf(appCss, ".sprint-group");
+    expect(valueOf(band, "background")).toBeTruthy();
+  });
+});

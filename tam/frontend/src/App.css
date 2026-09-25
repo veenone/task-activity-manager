@@ -46,7 +46,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .view-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .app-body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-.chip { padding: 2px 8px; border-radius: 9px; font-size: 10px; font-weight: 600; }
+/* inline-flex, not inline: a chip is a span with padding and a border, and
+   neither contributes to an inline box's line box. In a cell with
+   overflow: hidden, in a row locked at 34px, that left the top and bottom
+   border cut off. An inline-flex box is atomic, so the line box is its
+   full height and there is nothing to clip. */
+.chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9px; font-size: 10px; font-weight: 600; }
 
 .nav-rail {
   display: flex;
@@ -162,6 +167,14 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-type-requirement { background: var(--warning-bg); color: var(--warning-text); }
 .chip-type-subtask { background: var(--chip-sky-bg); color: var(--chip-sky-text); }
 .chip-type-none { background: var(--surface-3); color: var(--text-muted); }
+/* A type TAM has no concept of. Since #68 the sync fetches every type the
+   project has, so these are not the exception: Improvement, Change
+   Request and the instance's own words all used to share chip-type-none
+   and the column stopped telling one row from another. lib/typeChip.ts
+   picks one per name, stably. */
+.chip-type-alt-teal { background: var(--chip-teal-bg); color: var(--chip-teal-text); }
+.chip-type-alt-pink { background: var(--chip-pink-bg); color: var(--chip-pink-text); }
+.chip-type-alt-orange { background: var(--chip-orange-bg); color: var(--chip-orange-text); }
 .chip-toggle { cursor: pointer; opacity: 0.55; padding: 4px 10px; border-radius: 12px; }
 /* Hover lifts a chip part way; only a selected one is fully opaque, and it
    also fills. One rule used to give both states the same opacity, so
@@ -208,7 +221,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* SPRINT was 96px, which clipped every real sprint name ("Sprint 12 -
    Checkout polish") to its first two words. The grid scrolls sideways now,
    so a column wide enough to read costs nothing that matters. */
-.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) 104px 420px 132px 116px 168px 44px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
+.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) var(--type-col-w, 104px) 420px 132px 116px 168px 44px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
 /* Every cell clips to its track. Without this a grid item wider than its
    track paints over its neighbour (nowrap) or wraps to two lines in a row
    whose height is locked at 34px, and a clipped value reads as a complete
@@ -639,7 +652,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .sprint-issue-row {
   display: grid;
-  grid-template-columns: 16px 44px var(--sprint-key-w, 92px) minmax(120px, 1fr) 132px 44px 13px;
+  grid-template-columns: 16px var(--type-col-w, 44px) var(--sprint-key-w, 92px) minmax(120px, 1fr) 132px 44px 13px;
 }
 /* Every cell clips to its track, so no cell can paint over its neighbour. */
 .sprint-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -668,6 +681,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-children > p { padding: 2px 0; }
 /* A band heading, not a row: it labels the cards under it and answers to
    nothing, so it is quieter than they are. */
+/* A fill, not just a rule under it: the cards below are separated from
+   each other by that same bottom border, so a band wearing only a border
+   read as one more card. The surface is what makes it a heading over a
+   group rather than a row in it. */
 .sprint-group {
   display: flex;
   align-items: baseline;
@@ -675,6 +692,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   padding: 4px 10px 2px;
   font-size: 11px;
   color: var(--text-muted);
+  background: var(--surface-2);
   border-bottom: 1px solid var(--border-subtle);
 }
 .sprint-group-name { font-weight: 600; color: var(--text); }
