@@ -59,6 +59,16 @@ describe("IssueTable", () => {
     expect(rowOf(/^PLAT-409 /)).not.toHaveAttribute("aria-expanded");
   });
 
+  it("colours the status chip from the category, not from the status name", () => {
+    const rowOf = renderTable([
+      issue({ key: "PLAT-412", status: "Erledigt", statusCategory: "done" }),
+      issue({ key: "PLAT-409", status: "Resolved" }),
+    ]);
+    expect(within(rowOf(/^PLAT-412 /)).getByText("Erledigt")).toHaveClass("chip-status-done");
+    // A row synced before the category was stored keeps the name guess.
+    expect(within(rowOf(/^PLAT-409 /)).getByText("Resolved")).toHaveClass("chip-status-done");
+  });
+
   it("marks a subtask whose parent is not on this page", () => {
     const rowOf = renderTable([STORY, CHILD, STRAY]);
     const stray = rowOf(/^PLAT-501 /);
