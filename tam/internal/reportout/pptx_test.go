@@ -125,6 +125,63 @@ func TestPPTXSplitsALongTableAndRepeatsTheCaveatsOnEverySlide(t *testing.T) {
 	}
 }
 
+func TestPPTXIsBuiltOnTheTemplate(t *testing.T) {
+	parts := deck(t, sample())
+
+	// The template's design travels with the deck: its master, its theme,
+	// its two named layouts and its table style.
+	if !strings.Contains(parts["ppt/slideLayouts/slideLayout1.xml"], `name="`+titleLayoutName+`"`) {
+		t.Errorf("the first layout is not the template's %s layout", titleLayoutName)
+	}
+	sectionLayout := ""
+	for name, body := range parts {
+		if strings.HasPrefix(name, "ppt/slideLayouts/slideLayout") && strings.Contains(body, `name="`+sectionLayoutName+`"`) {
+			sectionLayout = name
+		}
+	}
+	if sectionLayout == "" {
+		t.Fatalf("the deck carries no %s layout", sectionLayoutName)
+	}
+	if !strings.Contains(parts["ppt/tableStyles.xml"], tableStyleID) {
+		t.Errorf("the deck carries no table style:\n%s", parts["ppt/tableStyles.xml"])
+	}
+
+	// A template's own main part type would make PowerPoint open the export
+	// as a new unsaved deck rather than as the file the user asked for.
+	types := parts["[Content_Types].xml"]
+	if strings.Contains(types, "presentationml.template.main") {
+		t.Error("the export is still typed as a template")
+	}
+	if !strings.Contains(types, "presentationml.presentation.main") {
+		t.Error("the export has no presentation content type")
+	}
+
+	// Every slide sits on a layout from the template, which is what gives
+	// it the theme's fonts and colours rather than PowerPoint's defaults.
+	if !strings.Contains(parts["ppt/slides/_rels/slide1.xml.rels"], "slideLayout1.xml") {
+		t.Errorf("the title slide is not on the %s layout", titleLayoutName)
+	}
+	want := sectionLayout[len("ppt/slideLayouts/"):]
+	if !strings.Contains(parts["ppt/slides/_rels/slide2.xml.rels"], want) {
+		t.Errorf("a section slide is not on the %s layout", sectionLayoutName)
+	}
+
+	// Heading, sentences and caveats are the layout's placeholders, so the
+	// template decides where they sit and how they read.
+	section := parts["ppt/slides/slide2.xml"]
+	for _, ph := range []string{`<p:ph type="title"/>`, `<p:ph idx="1"/>`, `<p:ph idx="2"/>`} {
+		if !strings.Contains(section, ph) {
+			t.Errorf("the section slide does not use the placeholder %s:\n%s", ph, section)
+		}
+	}
+	if !strings.Contains(parts["ppt/slides/slide1.xml"], `<p:ph type="ctrTitle"/>`) {
+		t.Error("the title slide does not use the layout's title placeholder")
+	}
+	if !strings.Contains(section, tableStyleID) {
+		t.Error("the table is a bare grid; it names no table style")
+	}
+}
+
 func TestPPTXEscapesWhatWouldBeMarkup(t *testing.T) {
 	d := sample()
 	d.Sections[0].Lines = []string{`a <b> & "quoted" sprint`}
