@@ -36,12 +36,14 @@ npm run typecheck --workspaces --if-present   # every workspace's type check
 
 ## Remotes
 
-The repository lives on three remotes, all equal: `veenone/task-activity-manager`
-and `veenone/xray-testcase-manager` on GitHub, and `achmarah/xray-test-manager`
-on the home Gitea. On a fresh clone, run `.\scripts\sync-remotes.ps1 -Setup`
-once (it points `origin` at task-activity-manager and makes it push to all
-three); from then on `git push` reaches every remote. After merging a pull
-request on GitHub, run `.\scripts\sync-remotes.ps1` to fast-forward the
-others. Merge Dependabot pull requests on task-activity-manager only.
+One remote: `veenone/task-activity-manager` on GitHub. `git push` reaches it
+and nothing else, and a pull request merged there needs no follow-up.
+
+The repository used to push to two more: `veenone/xray-testcase-manager`,
+which became a separate project after Phase 3a and now has its own `main`,
+and a mirror on a home Gitea. `scripts/sync-remotes.ps1` existed to keep the
+three in step and is gone with them. A clone from that era still carries the
+fan-out in `git remote -v`; `git remote set-url --push origin
+git@github.com:veenone/task-activity-manager.git` clears it.
 
 XTM releases are tagged `xtm/vX.Y.Z` (see `xtm/README.md`).
