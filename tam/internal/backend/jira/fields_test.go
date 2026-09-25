@@ -250,3 +250,34 @@ func TestParseIssueKeepsATypeTAMDoesNotModel(t *testing.T) {
 		t.Errorf("type = %q, want the project's own name", iss.Type)
 	}
 }
+
+// The status object already carries its category, so reading it costs no
+// extra request. I1: the key is a value from the server, so only the three
+// keys Jira defines are kept. Anything else leaves the column empty, which
+// reads the same as a row synced before the column existed, and the chip
+// falls back to guessing from the name.
+func TestParseIssueKeepsTheStatusCategoryJiraSends(t *testing.T) {
+	cases := []struct {
+		name   string
+		status string
+		want   string
+	}{
+		{"new", `{"id":"1","name":"Zu erledigen","statusCategory":{"id":2,"key":"new","name":"To Do"}}`, "new"},
+		{"indeterminate", `{"id":"3","name":"En cours","statusCategory":{"id":4,"key":"indeterminate","name":"In Progress"}}`, "indeterminate"},
+		{"done", `{"id":"5","name":"Erledigt","statusCategory":{"id":3,"key":"done","name":"Done"}}`, "done"},
+		{"a key this Jira invented", `{"id":"9","name":"Blocked","statusCategory":{"id":7,"key":"stalled"}}`, ""},
+		{"no category at all", `{"id":"9","name":"Blocked"}`, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			raw := corejira.RawIssue{ID: "1", Key: "PLAT-412", Fields: map[string]json.RawMessage{
+				"summary": json.RawMessage(`"Checkout: apply promo code"`),
+				"status":  json.RawMessage(c.status),
+			}}
+			iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{})
+			if iss.StatusCategory != c.want {
+				t.Errorf("status category = %q, want %q", iss.StatusCategory, c.want)
+			}
+		})
+	}
+}

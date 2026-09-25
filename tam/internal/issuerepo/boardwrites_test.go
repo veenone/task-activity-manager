@@ -26,7 +26,7 @@ func seedBoardCards(t *testing.T, repo *issuerepo.Repository) {
 	t.Helper()
 	rows := []backend.Issue{
 		{Key: "PLAT-1", ID: "101", Project: "PLAT", Type: backend.TypeStory, Summary: "one",
-			Status: "To Do", StatusID: "1", SprintID: "12", SprintName: "Sprint 12", Rank: "0|a", Updated: v1},
+			Status: "To Do", StatusID: "1", StatusCategory: "new", SprintID: "12", SprintName: "Sprint 12", Rank: "0|a", Updated: v1},
 		{Key: "PLAT-2", ID: "102", Project: "PLAT", Type: backend.TypeStory, Summary: "two",
 			Status: "In Progress", StatusID: "3", SprintID: "12", SprintName: "Sprint 12", Rank: "0|b", Updated: v1},
 		{Key: "PLAT-3", ID: "103", Project: "PLAT", Type: backend.TypeTask, Summary: "three",
@@ -62,6 +62,13 @@ func TestMoveToColumnJournalsTheTransitionAndMovesTheRow(t *testing.T) {
 	iss, _ := repo.GetIssue(ctx, "p1", "PLAT-1")
 	if iss.StatusID != "3" || iss.Status != "In Progress" || !iss.Pending {
 		t.Errorf("row after the move: %+v, want the target column written locally", iss)
+	}
+	// The category the row carried belonged to the status it left. A board
+	// column holds status ids and no categories, so nothing here knows the
+	// target's; leaving the old one on the row would paint the new status in
+	// the colour of the old one. Empty is what the chip falls back from.
+	if iss.StatusCategory != "" {
+		t.Errorf("status category after the move = %q, want it cleared with the status it described", iss.StatusCategory)
 	}
 	p := oneRow(t, repo, "PLAT-1")
 	if p.EntityType != issuerepo.EntityTransition || p.Field != issuerepo.FieldStatusID {

@@ -1725,6 +1725,21 @@ Detail panel title = one issue key that link out to instance
 on purpose: row select on click, so link inside one would put two actions on
 same pixels.
 
+**The status chip colours from Jira's category, not from the status name**
+(issue #78, schema 19). `status.statusCategory.key` is `new`,
+`indeterminate` or `done` on every instance, while the name beside it is
+whatever that instance calls its statuses, so guessing the colour from the
+name left every custom or non-English status grey. The key arrives in the
+`status` object the sync already reads, so carrying it costs no request. The
+parse keeps only those three keys and drops anything else a server answers.
+`statusClass` still guesses from the name when the column is empty, which is
+a row cached before migration 19 refilled it, a key none of the three, or a
+board move that wrote a status nothing local knows the category of (a board
+column holds status ids and no categories, so the move clears the column
+rather than leaving the old status's colour on the new status). Migration 19
+clears every sync watermark so the first sync after upgrading fills the
+column in, the way migrations 5, 14 and 17 did.
+
 ## People and priorities
 
 Assignee field = picker not text box, because two halves of user never

@@ -177,7 +177,7 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               <span role="gridcell">
                 {iss.draft
                   ? <span className="chip chip-draft">Draft</span>
-                  : <span className={`chip chip-status chip-status-${statusClass(iss.status)}`} title={iss.status}>{iss.status}</span>}
+                  : <span className={`chip chip-status chip-status-${statusClass(iss.status, iss.statusCategory)}`} title={iss.status}>{iss.status}</span>}
               </span>
               <span role="gridcell" title={iss.assignee || undefined}>{iss.assignee || "-"}</span>
               <span role="gridcell" title={iss.sprintName}>{iss.sprintName || iss.sprintId || "-"}</span>

@@ -118,6 +118,7 @@ export namespace backend {
 	    summary: string;
 	    status: string;
 	    statusId: string;
+	    statusCategory: string;
 	    assignee: string;
 	    assigneeName: string;
 	    reporter: string;
@@ -147,6 +148,7 @@ export namespace backend {
 	        this.summary = source["summary"];
 	        this.status = source["status"];
 	        this.statusId = source["statusId"];
+	        this.statusCategory = source["statusCategory"];
 	        this.assignee = source["assignee"];
 	        this.assigneeName = source["assigneeName"];
 	        this.reporter = source["reporter"];

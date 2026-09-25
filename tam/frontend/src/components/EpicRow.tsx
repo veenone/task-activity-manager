@@ -114,7 +114,7 @@ export function EpicChildRow({ child, subtaskCount = 0, subtasksExpanded = true,
         <span className="row-summary-text" title={summary}>{summary}</span>
       </span>
       <span className="epic-cell epic-cell-status">
-        <span className={`chip chip-status chip-status-${statusClass(child.status)}`} title={child.status}>{child.status}</span>
+        <span className={`chip chip-status chip-status-${statusClass(child.status, child.statusCategory)}`} title={child.status}>{child.status}</span>
       </span>
       <span className="epic-cell epic-cell-points">{child.storyPoints ?? "-"}</span>
       {child.pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}

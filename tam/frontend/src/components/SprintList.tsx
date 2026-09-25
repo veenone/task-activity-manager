@@ -283,7 +283,7 @@ export function SprintList({
           {nested && <small className="subtask-assignee">{issue.assignee || UNASSIGNED_LABEL}</small>}
         </span>
         <span className="sprint-cell">
-          <span className={`chip chip-status chip-status-${statusClass(issue.status)}`} title={issue.status}>
+          <span className={`chip chip-status chip-status-${statusClass(issue.status, issue.statusCategory)}`} title={issue.status}>
             {issue.status}
           </span>
         </span>

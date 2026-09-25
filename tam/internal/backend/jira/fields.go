@@ -222,10 +222,26 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 	if err := json.Unmarshal(f["labels"], &labels); err == nil && labels != nil {
 		iss.Labels = labels
 	}
-	var status, priority, issueType named
+	var priority, issueType named
+	// The status carries one thing the other two do not: the category Jira
+	// files it under, which is the same three keys on every instance while
+	// the name is whatever that instance calls it.
+	var status struct {
+		named
+		StatusCategory struct {
+			Key string `json:"key"`
+		} `json:"statusCategory"`
+	}
 	if err := json.Unmarshal(f["status"], &status); err == nil {
 		iss.Status = status.Name
 		iss.StatusID = status.ID
+		// I1: the key is the server's word. Only the three Jira defines are
+		// kept, so a key from a future version does not reach the store and
+		// come out as a colour nothing maps.
+		switch status.StatusCategory.Key {
+		case "new", "indeterminate", "done":
+			iss.StatusCategory = status.StatusCategory.Key
+		}
 	}
 	if err := json.Unmarshal(f["priority"], &priority); err == nil {
 		iss.Priority = priority.Name
