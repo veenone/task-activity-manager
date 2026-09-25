@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"agile-suite/tam/internal/reportout"
 	"agile-suite/tam/internal/ritualrepo"
 	"agile-suite/tam/internal/ritualtemplate"
@@ -79,8 +81,9 @@ func (a *App) sprintPageID(profileID string, boardID, sprintID int, rootID strin
 	return overview.PageID
 }
 
-// ExportSprintReportXLSX writes the report as a spreadsheet beside tam.db
-// and answers with the path, the convention ExportDiagnostics set.
+// ExportSprintReportXLSX writes the report as a spreadsheet where the user
+// says and answers with the path, the convention ExportDiagnostics set. A
+// cancelled dialog answers with an empty path and no error.
 func (a *App) ExportSprintReportXLSX(doc reportout.Document) (string, error) {
 	data, err := reportout.XLSX(doc)
 	if err != nil {
@@ -89,8 +92,8 @@ func (a *App) ExportSprintReportXLSX(doc reportout.Document) (string, error) {
 	return a.writeExport(doc.Title, "xlsx", data)
 }
 
-// ExportSprintReportPPTX writes the report as a deck beside tam.db and
-// answers with the path.
+// ExportSprintReportPPTX writes the report as a deck where the user says and
+// answers with the path, empty when the dialog was cancelled.
 func (a *App) ExportSprintReportPPTX(doc reportout.Document) (string, error) {
 	data, err := reportout.PPTX(doc)
 	if err != nil {
@@ -99,23 +102,100 @@ func (a *App) ExportSprintReportPPTX(doc reportout.Document) (string, error) {
 	return a.writeExport(doc.Title, "pptx", data)
 }
 
-// writeExport saves an export beside the database and answers with where it
-// went, so the user is told a path rather than left to find the file.
+// writeExport asks the user where the export goes and writes it there,
+// answering with the path so they are told rather than left to find the file.
+// A cancelled dialog answers "" with no error: nothing was written, so there
+// is nothing to report and nothing went wrong.
 //
-// The name carries the report's own title so three sprints exported in one
-// sitting can be told apart, and a timestamp so a second export of the same
-// sprint does not silently replace a file somebody has already opened.
+// The prefilled name carries the report's own title so three sprints exported
+// in one sitting can be told apart, and a timestamp so a second export of the
+// same sprint does not land on a file somebody has already opened. Whether to
+// overwrite is the dialog's own question to ask.
 func (a *App) writeExport(title, extension string, data []byte) (string, error) {
-	dir := filepath.Dir(a.dbPath)
-	if a.dbPath == "" || dir == "" || dir == "." {
-		return "", errors.New("no app data directory to export into")
+	dir, err := a.exportDirectory()
+	if err != nil {
+		return "", err
 	}
-	path := filepath.Join(dir, fmt.Sprintf("tam-report-%s-%d.%s", slug(title), time.Now().Unix(), extension))
+	path, err := a.saveTo(runtime.SaveDialogOptions{
+		Title:            "Save the sprint report",
+		DefaultDirectory: dir,
+		DefaultFilename:  fmt.Sprintf("tam-report-%s-%d.%s", slug(title), time.Now().Unix(), extension),
+		Filters:          []runtime.FileFilter{{DisplayName: exportKinds[extension], Pattern: "*." + extension}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil // cancelled
+	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write the report to %s: %w", path, err)
 	}
 	log.Printf("tam: sprint report exported to %s", path)
 	return path, nil
+}
+
+// exportKinds names each export in the save dialog's file type list.
+var exportKinds = map[string]string{"xlsx": "Excel workbook", "pptx": "PowerPoint deck"}
+
+// saveTo opens the save dialog. The field is the seam a test answers through;
+// the running app has none and reaches Wails.
+func (a *App) saveTo(opts runtime.SaveDialogOptions) (string, error) {
+	if a.saveDialog != nil {
+		return a.saveDialog(opts)
+	}
+	return runtime.SaveFileDialog(a.ctx, opts)
+}
+
+// exportDirectory is where the save dialog starts: the configured folder while
+// it is still a folder, and the app data directory otherwise, which is where
+// exports landed before there was a setting at all. A folder that has gone, on
+// an unplugged drive or deleted since it was set, must not stop an export.
+func (a *App) exportDirectory() (string, error) {
+	if a.settings != nil {
+		if s, err := a.settings.Get(); err == nil && s.ReportExportDir != "" {
+			if info, err := os.Stat(s.ReportExportDir); err == nil && info.IsDir() {
+				return s.ReportExportDir, nil
+			}
+			log.Printf("tam: the report export folder %s is not there; starting in the app data directory", s.ReportExportDir)
+		}
+	}
+	dir := filepath.Dir(a.dbPath)
+	if a.dbPath == "" || dir == "" || dir == "." {
+		return "", errors.New("no app data directory to export into")
+	}
+	return dir, nil
+}
+
+// SetReportExportDirectory records where the export save dialog starts. The
+// path arrives from a text box, so it is checked rather than trusted: an empty
+// one clears the setting, and anything else has to be a folder that is there,
+// or the dialog would open somewhere the user never meant.
+func (a *App) SetReportExportDirectory(dir string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	dir = strings.TrimSpace(dir)
+	if dir != "" {
+		info, err := os.Stat(dir)
+		if err != nil {
+			return fmt.Errorf("%s cannot be opened as a folder: %w", dir, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("%s is a file, not a folder", dir)
+		}
+	}
+	return a.settings.SetReportExportDir(dir)
+}
+
+// ChooseReportExportDirectory is the Browse button beside that setting. It
+// answers "" when the user closes the picker, which leaves the field alone.
+func (a *App) ChooseReportExportDirectory() (string, error) {
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Choose the report export folder"})
+	if err != nil {
+		return "", fmt.Errorf("folder dialog: %w", err)
+	}
+	return dir, nil
 }
 
 // slug is a title reduced to what every filesystem accepts: lower case

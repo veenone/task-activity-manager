@@ -33,6 +33,13 @@ export function ReportOutputs({ profileId, boardId, report, live }: Props) {
   const [done, setDone] = useState("");
   const [failure, setFailure] = useState("");
 
+  // An export answers with the path it wrote, or "" when the user closed the
+  // save dialog. Nothing was written then, so nothing is said: a cancel is
+  // neither a success to announce nor a failure to colour red.
+  function saved(path: string): string {
+    return path ? savedLine(path) : "";
+  }
+
   function run(what: string, action: () => Promise<string>) {
     setRunning(what);
     setDone("");
@@ -61,7 +68,7 @@ export function ReportOutputs({ profileId, boardId, report, live }: Props) {
         type="button"
         className="btn"
         disabled={busy}
-        onClick={() => doc && run("xlsx", async () => savedLine(await ExportSprintReportXLSX(doc)))}
+        onClick={() => doc && run("xlsx", async () => saved(await ExportSprintReportXLSX(doc)))}
       >
         Export a spreadsheet
       </button>
@@ -69,7 +76,7 @@ export function ReportOutputs({ profileId, boardId, report, live }: Props) {
         type="button"
         className="btn"
         disabled={busy}
-        onClick={() => doc && run("pptx", async () => savedLine(await ExportSprintReportPPTX(doc)))}
+        onClick={() => doc && run("pptx", async () => saved(await ExportSprintReportPPTX(doc)))}
       >
         Export a deck
       </button>

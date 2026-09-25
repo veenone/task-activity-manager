@@ -1822,6 +1822,7 @@ export namespace settings {
 	    showCoverage: boolean;
 	    tourSeenVersion: number;
 	    showNavRail: boolean;
+	    reportExportDir: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -1835,6 +1836,7 @@ export namespace settings {
 	        this.showCoverage = source["showCoverage"];
 	        this.tourSeenVersion = source["tourSeenVersion"];
 	        this.showNavRail = source["showNavRail"];
+	        this.reportExportDir = source["reportExportDir"];
 	    }
 	}
 

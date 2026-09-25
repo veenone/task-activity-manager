@@ -59,6 +59,11 @@ type App struct {
 	// the only file that touches it.
 	demoConfluence map[string]*demo.Confluence
 
+	// saveDialog is the seam an export's save dialog is opened through, so a
+	// test can answer it without a window. nil in the running app, where
+	// app_reportout.go reaches Wails.
+	saveDialog func(runtime.SaveDialogOptions) (string, error)
+
 	dbPath     string
 	sharedPath string
 	logPath    string

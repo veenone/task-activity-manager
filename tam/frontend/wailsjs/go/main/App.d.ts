@@ -27,6 +27,8 @@ export function CanTransition(arg1:string,arg2:string,arg3:string):Promise<backe
 
 export function CancelSprintReport(arg1:string):Promise<void>;
 
+export function ChooseReportExportDirectory():Promise<string>;
+
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
 export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
@@ -174,6 +176,8 @@ export function SetDefaultProfile(arg1:string):Promise<void>;
 export function SetNavRailVisible(arg1:boolean):Promise<void>;
 
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SetReportExportDirectory(arg1:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 

@@ -88,6 +88,7 @@ func appMenu(app *App) *menu.Menu {
 	m := menu.NewMenu()
 	file := m.AddSubmenu("File")
 	file.AddText("Profiles…", nil, emit("menu:profiles"))
+	file.AddText("Settings…", nil, emit("menu:settings"))
 	file.AddSeparator()
 	file.AddText("Sync", keys.CmdOrCtrl("r"), emit("menu:sync"))
 	file.AddText("Full Sync", keys.Combo("r", keys.CmdOrCtrlKey, keys.ShiftKey), emit("menu:full-sync"))

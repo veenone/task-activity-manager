@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"agile-suite/core/profile"
+	"agile-suite/core/settings"
 	"agile-suite/core/shareddb"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
@@ -78,6 +79,7 @@ func newTestApp(t *testing.T) *App {
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
 	a.profiles = profile.NewManager(shared.DB())
+	a.settings = settings.NewManager(shared.DB())
 	a.creds = newMemCredentialStore()
 	return a
 }
