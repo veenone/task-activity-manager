@@ -274,3 +274,78 @@ describe("sprint band heading", () => {
     expect(valueOf(band, "background")).toBeTruthy();
   });
 });
+
+// Issue #85. The view is fixed height: only the velocity table scrolls, and
+// the page itself does not. A critique measured the budget at roughly 640px
+// against about 1050px of content.
+/** The stylesheet with every @media block removed, for asserting on a base
+ *  rule that a media query deliberately overrides. */
+function withoutMediaBlocks(css: string): string {
+  let out = "";
+  for (let i = 0; i < css.length; i++) {
+    if (!css.startsWith("@media", i)) {
+      out += css[i];
+      continue;
+    }
+    let depth = 0;
+    for (; i < css.length; i++) {
+      if (css[i] === "{") depth++;
+      else if (css[i] === "}" && --depth === 0) break;
+    }
+  }
+  return out;
+}
+
+describe("reports view fits its frame", () => {
+  it("the body does not scroll and lays its children out in a column", () => {
+    // The base rule, with the media blocks taken out: those deliberately
+    // hand the scrollbar back at a narrow or a short window, and
+    // declarationsOf collects every matching rule, overrides included.
+    const body = declarationsOf(withoutMediaBlocks(appCss), ".report-body");
+    expect(valueOf(body, "overflow")).toBe("hidden");
+    expect(valueOf(body, "display")).toBe("flex");
+    expect(valueOf(body, "flex-direction")).toBe("column");
+    expect(valueOf(body, "min-height")).toBe("0");
+  });
+
+  it("the velocity table's panel is the one thing that scrolls", () => {
+    // All three, or the panel grows to its content instead of scrolling.
+    const wrap = declarationsOf(appCss, ".report-table-wrap");
+    expect(valueOf(wrap, "overflow")).toBe("auto");
+    expect(valueOf(wrap, "flex")).toBe("1");
+    expect(valueOf(wrap, "min-height")).toBe("0");
+  });
+
+  it("does not make the panel scroll sideways as well", () => {
+    // .report-table carried min-width: 420px, which gave the panel a second
+    // axis to scroll on inside a column already narrow enough.
+    expect(valueOf(declarationsOf(appCss, ".report-table"), "min-width")).toBeUndefined();
+  });
+
+  it("keeps the table's header visible while its rows scroll under it", () => {
+    expect(declarationsMentioning(appCss, ".report-table thead")).toMatch(/position:\s*sticky/);
+  });
+
+  it("shows the panel's own focus ring, since it is a scroller and takes focus", () => {
+    expect(declarationsMentioning(appCss, ".report-table-wrap:focus-visible")).toMatch(/box-shadow|outline/);
+  });
+
+  it("gives the loading and unavailable states the frame rather than stretching them", () => {
+    // They are single children of a flex column, so without this they are
+    // stretched down the page by the panel's flex: 1 sibling.
+    const centred = declarationsMentioning(appCss, ".report-body > .report-unavailable");
+    expect(centred).toMatch(/place-content:\s*center/);
+  });
+
+  const FALLBACK = [
+    ["a narrow window", "max-width: 900px"],
+    ["a short window", "max-height"],
+  ] as const;
+
+  it.each(FALLBACK)("lets the page scroll again in %s", (_label, query) => {
+    // The charts are fixed heights that do not shrink, so below a floor the
+    // honest answer is a scrollbar rather than crushed content.
+    const at = appCss.slice(appCss.indexOf(`@media (${query}`));
+    expect(at.slice(0, 600)).toMatch(/\.report-body\s*\{[^}]*overflow:\s*auto/);
+  });
+});

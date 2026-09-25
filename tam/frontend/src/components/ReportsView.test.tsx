@@ -535,3 +535,43 @@ describe("ReportsView's eight states", () => {
     });
   });
 });
+
+// Issue #85, from the layout critique.
+describe("ReportsView, fixed height", () => {
+  it("says a report counts cards where the figures are, not inside the details", async () => {
+    // unitLine says the five figures count cards rather than points, which
+    // changes what every one of them means. floorLine was pulled out of the
+    // details for exactly this reason and unitLine was left behind, so the
+    // numbers were read without it.
+    vi.mocked(api.GetSprintReport).mockResolvedValue(
+      report({ series: series({ unit: "cards", unitReason: "nothingEstimated" }) }),
+    );
+    renderView();
+    const line = await screen.findByText(/counts cards because points appear/);
+    expect(line.closest("details")).toBeNull();
+  });
+
+  it("leaves the details for the workings, not for a qualification", async () => {
+    renderView();
+    const method = await screen.findByText(/Done means the board's last column/);
+    expect(method.closest("details")).not.toBeNull();
+  });
+
+  it("gives the one scrolling panel a name and a place in the tab order", async () => {
+    // It becomes the only scroller on the page, and a bare div with
+    // overflow: auto is not reachable from the keyboard in WebView2.
+    renderView();
+    await screen.findByText(SENTENCE);
+    const panel = await screen.findByRole("group", { name: /velocity/i });
+    expect(panel).toHaveAttribute("tabindex", "0");
+  });
+
+  it("keeps the velocity chart out of the scrolling panel", async () => {
+    // Its tooltip is absolutely positioned and an overflow: auto ancestor
+    // clips it, and scrolling to a row would scroll its chart away.
+    renderView();
+    await screen.findByText(SENTENCE);
+    const panel = await screen.findByRole("group", { name: /velocity/i });
+    expect(within(panel).queryByRole("img", { name: /velocity/i })).toBeNull();
+  });
+});

@@ -149,33 +149,34 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
     return (
       <>
         <SprintSummary series={r.series} builtAt={r.builtAt} live={inProgress} />
-        {/* Directly under the summary, because the line that says these
-            figures are not exact is the last thing the reader saw, and a
-            rebuild is the only thing that can replace a report built while
-            Jira was cutting changelogs short. */}
+        {/* One strip, not two. Rebuild and the three outputs were stacked
+            toolbars, each with a sentence under it repeating what its own
+            button said, and .report-actions caps at 70ch, which guaranteed
+            the three export buttons wrapped to a second row. */}
         <div className="report-actions">
           <button type="button" className="btn" disabled={report.isFetching} onClick={() => void rebuild()}>
             {inProgress ? "Refresh report" : "Rebuild from Jira"}
           </button>
-          <span className="muted small">
-            Reads this sprint and the comparison rows again instead of using saved results.
-          </span>
-        {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
+          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={inProgress} />
+          {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
         </div>
-        <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={inProgress} />
         {/* The burndown is the wide one: it carries a point per sprint day,
             while the outcome chart carries five bars. */}
         <div className="report-charts">
           <BurndownChart days={r.series.days} unit={r.series.unit} busy={report.isFetching} />
           <OutcomeChart series={r.series} live={inProgress} busy={report.isFetching} />
         </div>
-        <h3 className="report-heading">Velocity</h3>
-        <p className="muted small">
-          Recent closed sprints on this board, oldest first. Each row shows its own unit so points and cards stay
-          distinct when a board changes how it estimates work.
-        </p>
+        {/* The panel: a head that does not scroll, holding the chart and the
+            notes about it, over the table that does. The paragraph that used
+            to sit here said each row shows its own unit, which every cell
+            already prints; the half that was not redundant, that the rows run
+            oldest first, is in the column header now, where it cannot scroll
+            away from the rows it describes. */}
         <div className="report-velocity">
-          <VelocityChart rows={r.velocity} busy={report.isFetching} tabled />
+          <div className="report-velocity-head">
+            <h3 className="report-heading" id="report-velocity-heading">Velocity</h3>
+            <VelocityChart rows={r.velocity} busy={report.isFetching} tabled />
+          </div>
           <VelocityTable rows={r.velocity} />
         </div>
       </>

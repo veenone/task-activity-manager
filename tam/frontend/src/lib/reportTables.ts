@@ -58,7 +58,12 @@ export function burndownTable(days: ReportDay[]): TableSpec {
 export function velocityTable(rows: VelocityRow[], title = "Velocity"): TableSpec {
   return {
     caption: `${title}, oldest sprint first`,
-    columns: ["Sprint", "Committed", "Completed"],
+    // "oldest first" rides in the header rather than in a paragraph above
+    // the panel: the header is sticky and the paragraph was not, so the one
+    // fact that orders the rows would have scrolled away from them. It also
+    // contradicts the sprint picker above, which is newest first, so it is
+    // worth saying where the rows are.
+    columns: ["Sprint, oldest first", "Committed", "Completed"],
     rows: rows.map((r) => ({
       key: String(r.sprintId),
       cells: [r.sprintName, amount(r.committed, r.unit), amount(r.completed, r.unit)],

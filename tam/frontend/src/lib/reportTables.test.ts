@@ -66,7 +66,7 @@ describe("burndownTable", () => {
 describe("velocityTable", () => {
   it("prints each row's figures in that row's own unit", () => {
     const t = velocityTable(rows);
-    expect(t.columns).toEqual(["Sprint", "Committed", "Completed"]);
+    expect(t.columns).toEqual(["Sprint, oldest first", "Committed", "Completed"]);
     expect(t.rows[1].cells).toEqual(["Sprint 10", amount(12, "cards"), amount(11, "cards")]);
   });
 

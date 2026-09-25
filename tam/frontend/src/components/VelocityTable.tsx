@@ -26,7 +26,20 @@ export function VelocityTable({ rows }: { rows: VelocityRow[] }) {
   }
   return (
     <>
-      <div className="report-table-wrap">
+      {/* The view's only scroller, so it has to be reachable: WebView2 does
+          not focus a scrolling div on its own, and a group with no name is
+          announced as nothing in particular. */}
+      <div
+        className="report-table-wrap"
+        role="group"
+        aria-labelledby="report-velocity-heading"
+        // A scrollable region has to be focusable or its content cannot be
+        // reached without a mouse, which is WCAG 2.1.1. The rule allows
+        // tabIndex only on role="tabpanel" out of the box and does not know
+        // about scroll containers, so this is the exception it should make.
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={0}
+      >
       <table className="report-table">
         <caption className="sr-only">{spec.caption}</caption>
         <thead>
