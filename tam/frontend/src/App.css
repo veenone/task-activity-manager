@@ -830,6 +830,31 @@ input, button, select { font-family: inherit; font-size: inherit; }
    its size relative to it. */
 .report-charts { flex: none; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
 .report-caveats { margin: 6px 0 0; max-width: 78ch; }
+/* The publisher ribbon: three cells, one per output, each saying where that
+   one is. A row of them rather than one line of text, because the three run
+   and finish independently.
+
+   Colour is carried on the text and the left rule, not on a fill. A filled
+   chip would have to earn its 4.5 to 1 in both themes for four states, and
+   the state is a word here, so the colour is reinforcement rather than the
+   only signal. */
+.report-ribbon { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0 0; padding: 0; list-style: none; }
+.report-ribbon-item { min-width: 0; padding-left: 8px; border-left: 2px solid var(--border); }
+/* Relative, not a pixel literal: the ratchet counts those and this block
+   was just rewritten to lower that count. */
+.report-ribbon-label { display: block; color: var(--text-muted); font-size: .85em; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.report-ribbon-state { font-weight: 600; }
+.report-ribbon-note { display: block; max-width: 48ch; }
+/* Idle keeps the neutral rule: a control nobody has used has not failed, and
+   a blank cell beside two filled ones reads as a problem. */
+.report-ribbon-idle .report-ribbon-state { color: var(--text-muted); font-weight: 400; }
+.report-ribbon-running { border-left-color: var(--accent); }
+.report-ribbon-running .report-ribbon-state { color: var(--accent); }
+.report-ribbon-done { border-left-color: var(--ok-text); }
+.report-ribbon-done .report-ribbon-state { color: var(--ok-text); }
+.report-ribbon-failed { border-left-color: var(--warn-border); }
+.report-ribbon-failed .report-ribbon-state { color: var(--warn-text); }
+
 /* Two parts, not two columns: a head that does not scroll, holding the
    chart and the notes that belong to it, over the table that does. The
    chart stays out of the scroller because its tooltip is absolutely

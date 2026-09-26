@@ -254,6 +254,37 @@ export function savedLine(path: string): string {
   return `Saved to ${path}.`;
 }
 
+// The publisher ribbon. Publishing to Confluence, exporting a spreadsheet
+// and exporting a deck are three operations that each take a moment, and
+// they finish independently, so each one carries its own state rather than
+// the three sharing one.
+
+// publisherStatusWord is the state a publisher is in. "Ready" rather than
+// "Idle" or nothing at all: a control that has not been used yet has not
+// failed, and a blank cell beside two filled ones reads as a problem.
+export function publisherStatusWord(status: string): string {
+  switch (status) {
+    case "running":
+      return "Working";
+    case "done":
+      return "Done";
+    case "failed":
+      return "Failed";
+    default:
+      return "Ready";
+  }
+}
+
+// publisherAnnouncement is what a screen reader hears when one publisher
+// changes state. It names the publisher because three of them change
+// independently and a bare "Done" would not say which finished, and it
+// carries the outcome because where the page or the file went is the part
+// worth hearing.
+export function publisherAnnouncement(label: string, status: string, message: string): string {
+  const state = `${label}: ${publisherStatusWord(status)}`;
+  return message ? `${state}. ${message}` : `${state}.`;
+}
+
 // isBusyRefusal recognises the refusal App.acquire makes in Go and the one
 // SyncContext makes in front of it. Both end "is already running for this
 // profile" and both name the operation holding the lock in front of it, Go
