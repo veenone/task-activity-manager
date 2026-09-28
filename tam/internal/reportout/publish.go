@@ -34,19 +34,19 @@ func Publish(ctx context.Context, pages confluence.Pages, spaceKey, parentID str
 	}
 	found, exists, err := pages.FindPageByTitle(ctx, spaceKey, d.Title)
 	if err != nil {
-		return Published{}, fmt.Errorf("Confluence could not be asked whether the page %q is in %s: %s", d.Title, spaceKey, errtext.Line(err))
+		return Published{}, fmt.Errorf("Confluence did not answer whether the page %q is in %s: %s", d.Title, spaceKey, errtext.Line(err))
 	}
 	body := Storage(d)
 	if exists {
 		updated, err := pages.UpdatePage(ctx, found.ID, d.Title, body, found.Version+1)
 		if err != nil {
-			return Published{}, fmt.Errorf("the Confluence page %q (%s) could not be updated: %s", d.Title, found.ID, errtext.Line(err))
+			return Published{}, fmt.Errorf("Confluence did not update the page %q (%s): %s", d.Title, found.ID, errtext.Line(err))
 		}
 		return Published{Title: d.Title, PageID: updated.ID}, nil
 	}
 	created, err := pages.CreatePage(ctx, spaceKey, parentID, d.Title, body)
 	if err != nil {
-		return Published{}, fmt.Errorf("the Confluence page %q could not be created in %s: %s", d.Title, spaceKey, errtext.Line(err))
+		return Published{}, fmt.Errorf("Confluence did not create the page %q in %s: %s", d.Title, spaceKey, errtext.Line(err))
 	}
 	return Published{Title: d.Title, PageID: created.ID}, nil
 }

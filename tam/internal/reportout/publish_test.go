@@ -69,17 +69,45 @@ func TestPublishRefusesADocumentWithNothingInIt(t *testing.T) {
 	}
 }
 
-func TestPublishNamesThePageAndTheReasonWhenConfluenceRefuses(t *testing.T) {
-	pages := space(t)
-	pages.FailNext("create", "Sprint 11 · Report", errors.New("403 Forbidden: you cannot add a page here"))
-	_, err := Publish(context.Background(), pages, "TEAM", "root", sample())
-	if err == nil {
-		t.Fatal("want a failure, got nil")
-	}
-	if !strings.Contains(err.Error(), "Sprint 11 · Report") {
-		t.Errorf("the failure does not name the page: %v", err)
-	}
-	if !strings.Contains(err.Error(), "403 Forbidden") {
-		t.Errorf("the failure does not say why: %v", err)
+// Whichever of the three calls fails, the failure has to carry the page, the
+// space or the page id, and what Confluence said. A user told only that
+// publishing failed has nothing to act on.
+func TestPublishNamesThePageWhereItGoesAndTheReasonWhicheverCallFails(t *testing.T) {
+	const title = "Sprint 11 · Report"
+	const reason = "403 Forbidden: you cannot add a page here"
+	for _, tc := range []struct {
+		name string
+		arm  func(t *testing.T, pages *demo.Confluence) []string
+	}{
+		{"the lookup", func(t *testing.T, pages *demo.Confluence) []string {
+			pages.FailNext("find", title, errors.New(reason))
+			return []string{`Confluence did not answer whether the page "` + title + `" is in TEAM`, reason}
+		}},
+		{"the update", func(t *testing.T, pages *demo.Confluence) []string {
+			first, err := Publish(context.Background(), pages, "TEAM", "root", sample())
+			if err != nil {
+				t.Fatalf("first publish: %v", err)
+			}
+			pages.FailNext("update", first.PageID, errors.New(reason))
+			return []string{`Confluence did not update the page "` + title + `" (` + first.PageID + `)`, reason}
+		}},
+		{"the create", func(t *testing.T, pages *demo.Confluence) []string {
+			pages.FailNext("create", title, errors.New(reason))
+			return []string{`Confluence did not create the page "` + title + `" in TEAM`, reason}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pages := space(t)
+			wants := tc.arm(t, pages)
+			_, err := Publish(context.Background(), pages, "TEAM", "root", sample())
+			if err == nil {
+				t.Fatal("want a failure, got nil")
+			}
+			for _, want := range wants {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("the failure does not carry %q: %v", want, err)
+				}
+			}
+		})
 	}
 }
