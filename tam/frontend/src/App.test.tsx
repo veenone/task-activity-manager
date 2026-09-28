@@ -268,7 +268,7 @@ describe("App shell", () => {
       vi.mocked(api.GetSyncState).mockResolvedValue({
         lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 60, projectTotal: 0,
       });
-      return { fetched: 60, upserted: 60, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" };
+      return { fetched: 60, upserted: 60, projectTotal: 0, full: false, elapsed: "1s" };
     });
     renderApp();
     await waitFor(() => expect(screen.getByTestId("sync-summary")).toHaveTextContent("Not synced yet"));
@@ -311,7 +311,7 @@ describe("App shell", () => {
     vi.mocked(api.SyncIssues).mockImplementation(
       () =>
         new Promise((resolve) => {
-          finish = () => resolve({ fetched: 0, upserted: 0, skipped: 0, projectTotal: 0, full: false, elapsed: "1s" });
+          finish = () => resolve({ fetched: 0, upserted: 0, projectTotal: 0, full: false, elapsed: "1s" });
         }),
     );
     renderApp();

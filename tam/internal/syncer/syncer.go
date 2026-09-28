@@ -28,7 +28,11 @@ type Progress struct {
 type Summary struct {
 	Fetched  int `json:"fetched"`
 	Upserted int `json:"upserted"`
-	Skipped  int `json:"skipped"`
+	// There is no skipped count. It counted the rows the type guard dropped,
+	// and now that every row a page carried is stored there is nothing left
+	// for it to count; reporting a number that is structurally zero invites
+	// a reader to trust it as evidence nothing was lost (#100).
+	//
 	// ProjectTotal is how many issues the project holds, counted with no
 	// scope and no cut-off, so the summary says what it fetched against
 	// what was there. Zero when the count could not be read. Without it
