@@ -7,6 +7,7 @@ const bindings = vi.hoisted(() => ({
   GetSettings: vi.fn(),
   SetReportExportDirectory: vi.fn(),
   ChooseReportExportDirectory: vi.fn(),
+  SetProjectKeyPatternCheck: vi.fn(),
 }));
 
 vi.mock("../api", async () => {
@@ -18,6 +19,7 @@ beforeEach(() => {
   bindings.GetSettings.mockReset().mockResolvedValue({ reportExportDir: "" });
   bindings.SetReportExportDirectory.mockReset().mockResolvedValue(undefined);
   bindings.ChooseReportExportDirectory.mockReset().mockResolvedValue("");
+  bindings.SetProjectKeyPatternCheck.mockReset().mockResolvedValue(undefined);
 });
 
 describe("SettingsModal", () => {
@@ -59,5 +61,24 @@ describe("SettingsModal", () => {
     bindings.ChooseReportExportDirectory.mockResolvedValue("D:\\picked");
     await userEvent.click(screen.getByRole("button", { name: "Browse..." }));
     await waitFor(() => expect(field).toHaveValue("D:\\picked"));
+  });
+
+  it("shows the project key check on when nothing is stored, and saves it off", async () => {
+    const onClose = vi.fn();
+    render(<SettingsModal onClose={onClose} />);
+    const check = await screen.findByLabelText(/project key/i);
+    expect(check).toBeChecked();
+
+    await userEvent.click(check);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(bindings.SetProjectKeyPatternCheck).toHaveBeenCalledWith(false));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows the project key check off when it is stored off", async () => {
+    bindings.GetSettings.mockResolvedValue({ reportExportDir: "", checkProjectKeyPattern: false });
+    render(<SettingsModal onClose={vi.fn()} />);
+    expect(await screen.findByLabelText(/project key/i)).not.toBeChecked();
   });
 });

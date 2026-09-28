@@ -179,6 +179,8 @@ export function SetNavRailVisible(arg1:boolean):Promise<void>;
 
 export function SetProfileSetting(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function SetProjectKeyPatternCheck(arg1:boolean):Promise<void>;
+
 export function SetReportExportDirectory(arg1:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;

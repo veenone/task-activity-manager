@@ -1352,6 +1352,7 @@ export namespace settings {
 	    tourSeenVersion: number;
 	    showNavRail: boolean;
 	    reportExportDir: string;
+	    checkProjectKeyPattern: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -1366,6 +1367,7 @@ export namespace settings {
 	        this.tourSeenVersion = source["tourSeenVersion"];
 	        this.showNavRail = source["showNavRail"];
 	        this.reportExportDir = source["reportExportDir"];
+	        this.checkProjectKeyPattern = source["checkProjectKeyPattern"];
 	    }
 	}
 

@@ -21,6 +21,11 @@ const (
 	keyTourSeenVersion     = "tour_seen_version"
 	keyShowNavRail         = "show_nav_rail"
 	keyReportExportDir     = "report_export_dir"
+	// An absent row means the check is on, so the key stores the switch as it
+	// is set rather than as an "off" flag: "false" is off, "true" is on, and
+	// nothing at all is on, which is what an install upgrading into this
+	// setting reads.
+	keyCheckProjectKeyPattern = "check_project_key_pattern"
 )
 
 // Settings holds the global application preferences.
@@ -45,6 +50,12 @@ type Settings struct {
 	// Empty means the app data directory, which is where exports went before
 	// there was a dialog at all. XTM has no sprint reports and ignores this.
 	ReportExportDir string `json:"reportExportDir"`
+	// CheckProjectKeyPattern is whether TAM's profile form refuses a project
+	// key that is not Jira's documented shape. On unless it was turned off:
+	// the pattern catches a typo most of the time, but a key the instance
+	// itself accepts is not TAM's to refuse. XTM has its own profile form and
+	// ignores this.
+	CheckProjectKeyPattern bool `json:"checkProjectKeyPattern"`
 }
 
 // Manager reads and writes global settings.
@@ -95,6 +106,10 @@ func (m *Manager) Get() (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
+	keyCheck, err := m.value(keyCheckProjectKeyPattern)
+	if err != nil {
+		return Settings{}, err
+	}
 	s.DefaultProfileID = def
 	s.Theme = theme
 	// An unset value means "auto-resolve": the backend picks the instance's
@@ -110,6 +125,13 @@ func (m *Manager) Get() (Settings, error) {
 	s.TourSeenVersion, _ = strconv.Atoi(tourSeen)
 	s.ShowNavRail, _ = strconv.ParseBool(navRail)
 	s.ReportExportDir = exportDir
+	// Default true: only a stored, parsable "false" turns the check off, so an
+	// absent row (a fresh install, or one upgrading into this setting) keeps
+	// the check it has always had.
+	s.CheckProjectKeyPattern = true
+	if v, err := strconv.ParseBool(keyCheck); err == nil {
+		s.CheckProjectKeyPattern = v
+	}
 	return s, nil
 }
 
@@ -128,6 +150,13 @@ func (m *Manager) SetShowNavRail(v bool) error {
 // directory. The caller checks the folder is one; this only stores it.
 func (m *Manager) SetReportExportDir(dir string) error {
 	return m.setValue(keyReportExportDir, dir)
+}
+
+// SetCheckProjectKeyPattern records whether the profile form checks a project
+// key against Jira's documented shape. Both values are written out, because a
+// stored "false" and no row at all have to mean different things.
+func (m *Manager) SetCheckProjectKeyPattern(v bool) error {
+	return m.setValue(keyCheckProjectKeyPattern, strconv.FormatBool(v))
 }
 
 // SetTourSeenVersion records which version of the onboarding tour the user has

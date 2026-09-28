@@ -18,6 +18,7 @@ vi.mock("../api", async () => {
     GetConfluenceConfig: vi.fn(),
     SetConfluenceConfig: vi.fn(),
     CreateReportRoot: vi.fn(),
+    GetSettings: vi.fn(),
   };
 });
 
@@ -40,6 +41,9 @@ beforeEach(() => {
   vi.mocked(api.UpdateProfile).mockResolvedValue(acme);
   vi.mocked(api.GetConfluenceConfig).mockResolvedValue({ baseURL: "https://confluence.example.com", spaceKey: "TEAM", rootPageID: "653264152" });
   vi.mocked(api.SetConfluenceConfig).mockResolvedValue();
+  // A settings row written before the switch existed says nothing about it,
+  // which is the default: the check is on.
+  vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "", theme: "" });
 });
 
 describe("ProfileForm's Confluence root page id", () => {
@@ -169,5 +173,39 @@ describe("ProfileForm's field errors", () => {
     await userEvent.type(key, "/X");
     expect(key).toHaveAttribute("aria-invalid", "true");
     expect(key).toHaveAccessibleDescription(/^Project key must start with a letter/);
+  });
+});
+
+describe("ProfileForm's project key check", () => {
+  // Jira's minimum project key length is an instance setting, so a one-letter
+  // key is a key some instances accept and the pattern refuses.
+  it("refuses a key the pattern rejects while the check is on", async () => {
+    render(<ProfileForm profile={acme} onSaved={vi.fn()} />);
+    const key = await screen.findByDisplayValue("PLAT");
+    await userEvent.clear(key);
+    await userEvent.type(key, "X");
+    expect(key).toHaveAccessibleDescription(/^Project key must start with a letter/);
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(api.UpdateProfile).not.toHaveBeenCalled();
+  });
+
+  it("saves that same key once the check is off", async () => {
+    vi.mocked(api.GetSettings).mockResolvedValue({
+      defaultProfileId: "", theme: "", checkProjectKeyPattern: false,
+    });
+    const onSaved = vi.fn();
+    render(<ProfileForm profile={acme} onSaved={onSaved} />);
+    const key = await screen.findByDisplayValue("PLAT");
+    await userEvent.clear(key);
+    await userEvent.type(key, "X");
+    expect(key).not.toHaveAttribute("aria-invalid");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api.UpdateProfile).toHaveBeenCalledWith(
+        "p1", "Acme Platform", "https://jira.acme.example", "X", "", "", "", false,
+      ),
+    );
+    expect(onSaved).toHaveBeenCalled();
   });
 });

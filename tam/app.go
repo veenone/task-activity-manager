@@ -230,6 +230,17 @@ func (a *App) SetTheme(theme string) error {
 	return fmt.Errorf("unknown theme %q", theme)
 }
 
+// SetProjectKeyPatternCheck records whether the profile form refuses a project
+// key that is not Jira's documented shape. The pattern is a convention of an
+// instance rather than a rule, so it is the user's to switch off; the Go side
+// asks only that a key is not blank either way.
+func (a *App) SetProjectKeyPatternCheck(v bool) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.settings.SetCheckProjectKeyPattern(v)
+}
+
 // showNavRail reads the stored nav-rail preference, defaulting to hidden when
 // the store is not up yet. main() builds the menu before startup runs, so the
 // first menu is built on that default and startup rebuilds it once the real
