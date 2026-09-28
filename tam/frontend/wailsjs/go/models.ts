@@ -1962,7 +1962,6 @@ export namespace syncer {
 	export class Summary {
 	    fetched: number;
 	    upserted: number;
-	    skipped: number;
 	    projectTotal: number;
 	    full: boolean;
 	    elapsed: string;
@@ -1976,7 +1975,6 @@ export namespace syncer {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fetched = source["fetched"];
 	        this.upserted = source["upserted"];
-	        this.skipped = source["skipped"];
 	        this.projectTotal = source["projectTotal"];
 	        this.full = source["full"];
 	        this.elapsed = source["elapsed"];

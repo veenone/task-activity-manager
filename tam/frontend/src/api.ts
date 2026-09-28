@@ -298,7 +298,8 @@ export interface SyncState {
 export interface SyncSummary {
   fetched: number;
   upserted: number;
-  skipped: number;
+  // No skipped count: since #100 a sync stores every row it fetched, so the
+  // number would always be zero and would read as proof nothing was lost.
   // How many issues the project holds, counted without the scope and the
   // cut-off that narrow the fetch.
   projectTotal: number;

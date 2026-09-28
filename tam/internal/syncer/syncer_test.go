@@ -224,7 +224,7 @@ func TestSyncPagesEverythingAndRecordsState(t *testing.T) {
 	repo := newRepo(t)
 	fb := &fake{pages: [][]backend.Issue{
 		{issue("PLAT-1", "task"), issue("PLAT-2", "story")},
-		{issue("PLAT-3", "bug"), issue("PLAT-4", "")},
+		{issue("PLAT-3", "Improvement"), issue("PLAT-4", "")},
 	}}
 	e := syncer.New(fb, repo)
 	e.PageSize = 2
@@ -236,12 +236,23 @@ func TestSyncPagesEverythingAndRecordsState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	if sum.Fetched != 4 || sum.Upserted != 3 || sum.Skipped != 1 || sum.Full || sum.Elapsed != "3s" {
+	if sum.Fetched != 4 || sum.Upserted != 4 || sum.Full || sum.Elapsed != "3s" {
 		t.Errorf("summary = %+v", sum)
 	}
 	n, _ := repo.CountIssues(context.Background(), "p1")
-	if n != 3 {
-		t.Errorf("cached = %d, want 3 (the untyped issue is skipped)", n)
+	if n != 4 {
+		t.Errorf("cached = %d, want every row the pages carried", n)
+	}
+	// #100: these two rows were the ones the sync dropped. PLAT-3 is a type
+	// the project has and TAM does not model, which arrives under the
+	// project's own name for it; PLAT-4 is a row Jira answered with no
+	// issuetype at all. Both carry a key, a summary and work behind them, and
+	// the grid draws both, so neither is the sync's to throw away.
+	for _, want := range []struct{ key, typ string }{{"PLAT-3", "Improvement"}, {"PLAT-4", ""}} {
+		got, err := repo.GetIssue(context.Background(), "p1", want.key)
+		if err != nil || got.Type != want.typ || got.Summary != want.key {
+			t.Errorf("%s = type %q summary %q, %v; want it cached as type %q", want.key, got.Type, got.Summary, err, want.typ)
+		}
 	}
 	st, _ := repo.SyncState(context.Background(), "p1")
 	if st.LastSynced != "2026-09-05T10:42:00Z" || st.LastFull != "" || st.LastError != "" {
