@@ -151,6 +151,23 @@ func (r *Repository) Board(ctx context.Context, issues IssueSource, profileID st
 	return view, nil
 }
 
+// ColumnHeads is one board's column heads for one sprint: the counts and
+// the WIP limits the Boards view draws over its columns, without the lanes
+// under them.
+//
+// It composes the whole board and keeps the heads, rather than counting the
+// cards a second way. A second count is a second answer, and the two would
+// be read side by side: the sprint report's capacity section and the board
+// on screen are the same columns, and a team looking at both has to see one
+// set of numbers.
+func (r *Repository) ColumnHeads(ctx context.Context, issues IssueSource, profileID string, boardID int, sprintID string) ([]ColumnView, error) {
+	view, err := r.Board(ctx, issues, profileID, boardID, sprintID, SwimlaneNone)
+	if err != nil {
+		return nil, err
+	}
+	return view.Columns, nil
+}
+
 // composeBoard is the read itself, every statement on the querier it was
 // given. lane is already normalized: the one check that needs no database
 // is made before a transaction is opened for it.

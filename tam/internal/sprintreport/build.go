@@ -3,6 +3,7 @@ package sprintreport
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
@@ -71,7 +72,36 @@ func (s *Service) Build(ctx context.Context, profileID string, boardID, sprintID
 	if err != nil {
 		return Report{}, err
 	}
-	return Report{Series: series, Velocity: rows, BuiltAt: builtAt}, nil
+	heads, err := s.capacity(ctx, profileID, boardID, sprint)
+	if err != nil {
+		return Report{}, err
+	}
+	return Report{Series: series, Velocity: rows, BuiltAt: builtAt, Capacity: heads}, nil
+}
+
+// capacity is the board's column heads for the sprint being reported on, or
+// no heads at all when this service has no composer behind it.
+//
+// It is scoped to the sprint rather than to the whole board, because the
+// board the reader has on screen beside the report is scoped that way too,
+// and a capacity section counting the board's backlog as well would be a
+// different number from the one the columns above it show.
+//
+// The read is local and runs after the fetch, not before it: it costs a
+// handful of statements against SQLite, against the minutes the changelog
+// takes, and a report that failed on its way to Jira never reaches here.
+func (s *Service) capacity(ctx context.Context, profileID string, boardID int, sprint backend.Sprint) ([]boardrepo.ColumnView, error) {
+	if s.Capacity == nil {
+		return []boardrepo.ColumnView{}, nil
+	}
+	heads, err := s.Capacity(ctx, profileID, boardID, strconv.Itoa(sprint.ID))
+	if err != nil {
+		return nil, err
+	}
+	if heads == nil {
+		return []boardrepo.ColumnView{}, nil
+	}
+	return heads, nil
 }
 
 // choose is the sprint a report is about: the one named, or the board's

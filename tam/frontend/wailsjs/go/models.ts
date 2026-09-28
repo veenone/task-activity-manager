@@ -1879,6 +1879,7 @@ export namespace sprintreport {
 	    series: reports.Series;
 	    velocity: reports.VelocityRow[];
 	    builtAt: string;
+	    capacity: boardrepo.ColumnView[];
 	    unavailable: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1890,6 +1891,7 @@ export namespace sprintreport {
 	        this.series = this.convertValues(source["series"], reports.Series);
 	        this.velocity = this.convertValues(source["velocity"], reports.VelocityRow);
 	        this.builtAt = source["builtAt"];
+	        this.capacity = this.convertValues(source["capacity"], boardrepo.ColumnView);
 	        this.unavailable = source["unavailable"];
 	    }
 	

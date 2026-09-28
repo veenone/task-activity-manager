@@ -559,6 +559,12 @@ export interface SprintReport {
   // them are usually served from the store, so nothing here describes how
   // old the table is.
   builtAt: string;
+  // capacity is the board's column heads: the cards each column holds
+  // against the WIP limit Jira sets on it, the same numbers the Boards view
+  // draws. It describes the board now rather than the sprint's history, since
+  // a limit is a fact about a column at this moment. Optional because a
+  // report read back from an older build carries none.
+  capacity?: ColumnView[];
   // One of REPORT_UNAVAILABLE_REASONS when there is no report, and empty
   // otherwise. When it is set, series and velocity are empty.
   unavailable: string;
