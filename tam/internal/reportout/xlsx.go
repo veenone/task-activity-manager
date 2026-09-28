@@ -28,6 +28,12 @@ var sheetTemplate []byte
 // called "Q3 / hardening" is worse than one whose tab always reads the same.
 const sheetName = "Sprint report"
 
+// pixelsPerRow is how tall a row is in the pixels a picture is measured in:
+// Excel's default row height is 15 points, which is 20 pixels at 96 DPI. A
+// chart is placed at its own pixel size, so this is what says how many rows
+// it covers and therefore where the next section may start.
+const pixelsPerRow = 20
+
 // The style key's anchors, in the rows the template puts them in.
 const (
 	styleTitle = iota + 1
@@ -46,7 +52,8 @@ const (
 // One sheet rather than one per section, because the caveats are what a
 // sheet of bare figures would lose: a tab of numbers whose qualification is
 // on another tab is a tab that looks authoritative and is not. The rows sit
-// in real cells, so the table can still be sorted, filtered or pivoted.
+// in real cells, so the table can still be sorted, filtered or pivoted, and
+// a section's chart sits under them as a picture the frontend drew.
 func XLSX(d Document) ([]byte, error) {
 	if err := d.Check(); err != nil {
 		return nil, err
@@ -82,6 +89,9 @@ func XLSX(d Document) ([]byte, error) {
 		}
 		for _, note := range s.Notes {
 			w.line(note, styleNote)
+		}
+		for _, im := range s.Images {
+			w.picture(im)
 		}
 	}
 	if w.err != nil {
@@ -142,6 +152,29 @@ func (w *sheet) cells(values []string, style int) {
 		w.keep(w.f.SetCellStyle(sheetName, at, at, w.styles[style]))
 	}
 	w.row++
+}
+
+// picture places a section's chart under the rows it was drawn from, at its
+// own pixel size, and then steps past the rows it covers so the next
+// section's heading is not written underneath it. The sheet is read top to
+// bottom, which is why a chart under its own figures is a chart beside them.
+func (w *sheet) picture(im Image) {
+	raw, cfg, err := im.PNG()
+	if err != nil {
+		w.keep(err)
+		return
+	}
+	at := fmt.Sprintf("A%d", w.row)
+	w.keep(w.f.AddPictureFromBytes(sheetName, at, &excelize.Picture{
+		Extension: ".png",
+		File:      raw,
+		// AltText is what a reader who cannot see the chart is given, and
+		// the figures it draws are in the table above it either way.
+		Format: &excelize.GraphicOptions{AltText: im.Alt, LockAspectRatio: true},
+	}))
+	// One row for the part of the last row the picture covers, and one for
+	// the gap a heading needs anyway.
+	w.row += cfg.Height/pixelsPerRow + 2
 }
 
 func (w *sheet) keep(err error) {

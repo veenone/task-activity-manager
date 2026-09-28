@@ -1244,11 +1244,26 @@ export interface ReportTable {
   rows: string[][];
 }
 
+// A section's chart as a picture: the file name it travels under inside the
+// output, the description a reader who cannot see it is given, and the PNG's
+// bytes as base64, which is how they cross the binding. A Go []byte would
+// arrive here as an array of numbers.
+//
+// The frontend rasterises it, because the chart's colours are CSS custom
+// properties that only a browser resolves. Plural on a section because the
+// velocity chart splits into one panel per unit.
+export interface ReportImage {
+  name: string;
+  alt: string;
+  data: string;
+}
+
 export interface ReportSection {
   heading: string;
   lines: string[];
   table: ReportTable;
   notes: string[];
+  images: ReportImage[];
 }
 
 export interface ReportDocument {

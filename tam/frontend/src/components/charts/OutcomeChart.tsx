@@ -18,7 +18,7 @@ const TITLE = "Sprint outcome";
 export function OutcomeChart({ series, live = false, busy }: { series: ReportSeries; live?: boolean; busy?: boolean }) {
   const table = outcomeTable(series, live);
   return (
-    <ChartFrame title={TITLE} table={table} busy={busy}>
+    <ChartFrame title={TITLE} exported="outcome" table={table} busy={busy}>
       {(width, titleId) => <Bars series={series} live={live} width={width} titleId={titleId} />}
     </ChartFrame>
   );

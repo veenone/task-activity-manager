@@ -142,6 +142,22 @@ export function emptyDaysLine(): string {
   return "No days to draw yet.";
 }
 
+// chartAltLine describes a chart that has left the screen as a picture, for a
+// reader of the page, the spreadsheet or the deck who cannot see it. It names
+// the chart by the caption it carries on screen and points at the table,
+// which is beside the picture in every output and holds the same figures.
+export function chartAltLine(title: string): string {
+  return `${title}, drawn as a chart. Its figures are in the table beside it.`;
+}
+
+// chartUndrawableLine is what an export says when a chart on screen would not
+// turn into a picture. The report is refused rather than exported without it:
+// the burndown is the one figure no table on the page states, so a file
+// missing it is not the report that was asked for.
+export function chartUndrawableLine(title: string): string {
+  return `The ${title} chart could not be drawn as a picture, so the report was not published or exported.`;
+}
+
 // mixedUnitsLine explains a velocity chart split into one panel per unit.
 // One axis over points and cards would read a card as a point.
 export function mixedUnitsLine(): string {

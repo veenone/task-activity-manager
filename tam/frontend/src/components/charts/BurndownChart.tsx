@@ -28,6 +28,7 @@ export function BurndownChart({ days, unit, busy }: { days: ReportDay[]; unit: s
   return (
     <ChartFrame
       title="Burndown"
+      exported="burndown"
       legend={LEGEND}
       table={table}
       empty={days.length === 0 ? emptyDaysLine() : undefined}

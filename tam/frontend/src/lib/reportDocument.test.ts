@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { SprintReport } from "../api";
+import type { ReportImage, SprintReport } from "../api";
 import { reportDocument } from "./reportDocument";
 import {
   emptyDaysLine,
@@ -41,6 +41,10 @@ function report(over: Partial<SprintReport> = {}): SprintReport {
     ...over,
   };
 }
+
+// A picture as the rasteriser hands one over: a name, a description and the
+// PNG's bytes, which nothing here reads.
+const picture = (n: number): ReportImage => ({ name: `chart-${n}.png`, alt: `Chart ${n}`, data: "iVBOR" });
 
 const headings = (r: SprintReport, live = false) => (reportDocument(r, live) ?? { sections: [] }).sections.map((s) => s.heading);
 
@@ -113,10 +117,42 @@ describe("reportDocument", () => {
     expect(one.sections[2].notes).toContain(singleSprintLine());
   });
 
-  it("leaves out the line about one chart per unit, which no output here draws", () => {
+  it("hands each chart's picture to the section whose figures it draws", () => {
+    const doc = reportDocument(report(), false, {
+      outcome: [picture(1)],
+      burndown: [picture(2)],
+      velocity: [picture(3)],
+    })!;
+    expect(doc.sections.map((s) => s.images.map((i) => i.name))).toEqual([
+      ["chart-1.png"],
+      ["chart-2.png"],
+      ["chart-3.png"],
+    ]);
+  });
+
+  it("carries no picture when no chart was drawn", () => {
+    expect(reportDocument(report())!.sections.map((s) => s.images)).toEqual([[], [], []]);
+  });
+
+  it("carries no picture for a section with nothing to draw", () => {
+    const r = report({ velocity: [] });
+    r.series.days = [];
+    const doc = reportDocument(r, false, { burndown: [picture(1)], velocity: [picture(2)] })!;
+    expect(doc.sections[1].images).toEqual([]);
+    expect(doc.sections[2].images).toEqual([]);
+  });
+
+  it("explains one chart per unit once the velocity section carries several", () => {
     const mixed = report();
     mixed.velocity[1].unit = "cards";
-    expect(reportDocument(mixed)!.sections[2].notes).not.toContain(mixedUnitsLine());
+    const doc = reportDocument(mixed, false, { velocity: [picture(1), picture(2)] })!;
+    expect(doc.sections[2].notes).toContain(mixedUnitsLine());
+  });
+
+  it("leaves that line out for a velocity section carrying one chart or none", () => {
+    expect(reportDocument(report())!.sections[2].notes).not.toContain(mixedUnitsLine());
+    const one = reportDocument(report(), false, { velocity: [picture(1)] })!;
+    expect(one.sections[2].notes).not.toContain(mixedUnitsLine());
   });
 });
 

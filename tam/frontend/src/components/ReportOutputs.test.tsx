@@ -40,8 +40,19 @@ function report(over: Partial<SprintReport> = {}): SprintReport {
   };
 }
 
+// No frame, so no chart is on screen and the document carries no picture. What
+// a drawn chart becomes is lib/chartImage's own suite; the canvas that ends it
+// does not exist under this runner.
 function draw(over: Partial<SprintReport> = {}) {
-  render(<ReportOutputs profileId="p1" boardId={1} report={report(over)} live={false} />);
+  render(
+    <ReportOutputs
+      profileId="p1"
+      boardId={1}
+      report={report(over)}
+      live={false}
+      charts={{ current: null }}
+    />,
+  );
 }
 
 beforeEach(() => {

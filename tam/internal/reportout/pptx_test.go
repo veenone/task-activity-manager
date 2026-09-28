@@ -4,6 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -189,6 +191,149 @@ func TestPPTXEscapesWhatWouldBeMarkup(t *testing.T) {
 	if strings.Contains(slide, "<b>") {
 		t.Errorf("an angle bracket reached the slide as markup:\n%s", slide)
 	}
+}
+
+// picSlides is every slide in the deck that carries a picture, by part name.
+func picSlides(parts map[string]string) map[string]string {
+	out := map[string]string{}
+	for name, body := range parts {
+		if strings.HasPrefix(name, "ppt/slides/slide") && strings.Contains(body, "<p:pic>") {
+			out[name] = body
+		}
+	}
+	return out
+}
+
+var blipRel = regexp.MustCompile(`<a:blip r:embed="(rId\d+)"/>`)
+var picExtent = regexp.MustCompile(`<p:pic>.*?<a:ext cx="(\d+)" cy="(\d+)"/>`)
+
+func TestPPTXShowsASectionsChartOnASlideOfItsOwn(t *testing.T) {
+	im := sampleImage(t)
+	raw, cfg, err := im.PNG()
+	if err != nil {
+		t.Fatalf("the test image: %v", err)
+	}
+	d := sample()
+	d.Sections[0].Images = []Image{im}
+	parts := deck(t, d)
+
+	if got := parts["ppt/media/"+im.Name]; got != string(raw) {
+		t.Fatalf("ppt/media/%s holds %d bytes, want the document's %d", im.Name, len(got), len(raw))
+	}
+	if !strings.Contains(parts["[Content_Types].xml"], `Extension="png"`) {
+		t.Error("the deck declares no content type for a png, so PowerPoint would offer to repair it")
+	}
+	slides := picSlides(parts)
+	if len(slides) != 1 {
+		t.Fatalf("pictures on %d slides, want the one this section carries", len(slides))
+	}
+	var name, body string
+	for name, body = range slides {
+	}
+
+	// The picture is embedded through this slide's own relationship, or
+	// PowerPoint shows an empty frame where the chart should be.
+	m := blipRel.FindStringSubmatch(body)
+	if m == nil {
+		t.Fatalf("the picture names no relationship:\n%s", body)
+	}
+	rels := parts[strings.Replace(name, "ppt/slides/", "ppt/slides/_rels/", 1)+".rels"]
+	if !strings.Contains(rels, `Id="`+m[1]+`"`) || !strings.Contains(rels, "../media/"+im.Name) {
+		t.Errorf("%s does not relate %s to the picture:\n%s", name, m[1], rels)
+	}
+	// I3: a picture with no description is a figure a screen reader cannot
+	// read.
+	if !strings.Contains(body, im.Alt) {
+		t.Error("the picture carries no description")
+	}
+	// The caveats travel with the picture, the way they travel with the
+	// table: a chart on a slide of its own still needs qualifying.
+	for _, want := range []string{d.Sections[0].Heading, d.Sections[0].Notes[0]} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the picture's slide is missing %q", want)
+		}
+	}
+
+	// Its own shape, fitted to the slide: a chart stretched to the box would
+	// misread its own axis.
+	e := picExtent.FindStringSubmatch(body)
+	if e == nil {
+		t.Fatalf("the picture has no extent:\n%s", body)
+	}
+	cx, cy := atoi(t, e[1]), atoi(t, e[2])
+	if cx > tableWidth || cy > tableBottom-tableTop {
+		t.Errorf("the picture is %dx%d EMU, past the %dx%d box the layout leaves", cx, cy, tableWidth, tableBottom-tableTop)
+	}
+	if want := float64(cfg.Width) / float64(cfg.Height); abs(float64(cx)/float64(cy)-want) > 0.02 {
+		t.Errorf("the picture is %dx%d EMU, a shape of %.3f, want the PNG's own %.3f", cx, cy, float64(cx)/float64(cy), want)
+	}
+}
+
+func TestPPTXGivesEveryPanelOfASectionItsOwnSlide(t *testing.T) {
+	d := sample()
+	d.Sections[0].Images = []Image{
+		{Name: "chart-1.png", Alt: "Velocity in points, drawn as a chart.", Data: samplePNG(t, 480, 200)},
+		{Name: "chart-2.png", Alt: "Velocity in cards, drawn as a chart.", Data: samplePNG(t, 480, 200)},
+	}
+	parts := deck(t, d)
+	slides := picSlides(parts)
+	if len(slides) != 2 {
+		t.Fatalf("pictures on %d slides, want one per panel", len(slides))
+	}
+	seen := map[string]bool{}
+	for _, body := range slides {
+		for _, im := range d.Sections[0].Images {
+			if strings.Contains(body, im.Alt) {
+				seen[im.Name] = true
+			}
+		}
+	}
+	if len(seen) != 2 {
+		t.Errorf("the two panels reached %d slides between them", len(seen))
+	}
+}
+
+// Two parts of one zip cannot share a name, and the deck is a zip. The
+// frontend numbers the pictures across the whole document, so this is the
+// boundary saying so rather than writing a file PowerPoint would refuse.
+func TestPPTXRefusesTwoPicturesUnderOneName(t *testing.T) {
+	d := sample()
+	d.Sections[0].Images = []Image{sampleImage(t), sampleImage(t)}
+	_, err := PPTX(d)
+	if err == nil {
+		t.Fatal("want a refusal, got nil")
+	}
+	if !strings.Contains(err.Error(), "chart-1.png") {
+		t.Errorf("the refusal does not name the picture: %v", err)
+	}
+}
+
+func TestPPTXDrawsNoPictureForASectionWithNoChart(t *testing.T) {
+	parts := deck(t, sample())
+	if slides := picSlides(parts); len(slides) != 0 {
+		t.Errorf("a report with nothing to draw put pictures on %d slide(s)", len(slides))
+	}
+	for name := range parts {
+		if strings.HasPrefix(name, "ppt/media/") {
+			t.Errorf("the deck carries %s with nothing to draw", name)
+		}
+	}
+}
+
+func atoi(t *testing.T, s string) int {
+	t.Helper()
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		t.Fatalf("%q is not a number: %v", s, err)
+	}
+	return n
+}
+
+func abs(f float64) float64 {
+	if f < 0 {
+		return -f
+	}
+	return f
 }
 
 func TestPPTXRefusesADocumentWithNothingInIt(t *testing.T) {

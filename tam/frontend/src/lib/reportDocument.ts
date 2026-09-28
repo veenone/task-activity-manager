@@ -6,6 +6,7 @@ import {
   emptyVelocityLine,
   floorLine,
   methodLine,
+  mixedUnitsLine,
   modeLine,
   singleSprintLine,
   summarySentence,
@@ -16,6 +17,7 @@ import {
 } from "./reportText";
 import { burndownTable, outcomeTable, velocityTable } from "./reportTables";
 import type { TableSpec } from "./reportTables";
+import type { ChartImages } from "./chartImage";
 
 // reportDocument is the sprint report as something other than a screen: the
 // Confluence page, the spreadsheet and the deck are all rendered from this
@@ -30,11 +32,12 @@ import type { TableSpec } from "./reportTables";
 // can only be published or exported from the running app: there is no
 // headless path that could word one on its own.
 //
-// mixedUnitsLine is deliberately not among them. It says the velocity chart
-// splits into one panel per unit, which is true of the screen and false of a
-// spreadsheet and a deck that draw no chart at all; the unit rides on every
-// figure in the table instead, which is the protection that sentence exists
-// to explain.
+// mixedUnitsLine rides with the velocity section once that section carries
+// more than one picture, which is exactly when the split it describes is true
+// of the output as well as of the screen. It was left out while the outputs
+// drew no chart at all, because a sentence about a chart split in two beside a
+// single table explains nothing; the unit rides on every figure in the table
+// either way, which is the protection that sentence exists to explain.
 //
 // notes is the caveats, and it is not a footnote. A figure rebuilt from a
 // changelog walk can disagree with Jira's own report, and committed is a
@@ -60,13 +63,21 @@ function kept(lines: string[]): string[] {
 // reportDocument answers null for a report there is nothing to render,
 // which is what makes an unavailable report refuse to publish rather than
 // publish a page of zeroes. The caller says so with nothingToPublishLine.
-export function reportDocument(report: SprintReport, live = false): ReportDocument | null {
+export function reportDocument(
+  report: SprintReport,
+  live = false,
+  images: ChartImages = {},
+): ReportDocument | null {
   if (report.unavailable) return null;
   const s = report.series;
   const outcome = outcomeTable(s, live);
   const burndown = burndownTable(s.days);
   const velocity = velocityTable(report.velocity);
   const partial = report.velocity.filter((r) => r.truncated).map((r) => r.sprintName);
+  // A section with nothing to draw carries no picture. The chart renders its
+  // sentence instead of an SVG in that case, so there is nothing to collect
+  // either; this says so where the section is built rather than relying on it.
+  const velocityImages = report.velocity.length > 0 ? images.velocity ?? [] : [];
   return {
     title: `${s.sprintName || "This sprint"} · Report`,
     sections: [
@@ -81,12 +92,14 @@ export function reportDocument(report: SprintReport, live = false): ReportDocume
           methodLine(),
           builtAtLine(report.builtAt),
         ]),
+        images: images.outcome ?? [],
       },
       {
         heading: burndown.caption,
         lines: s.days.length === 0 ? [emptyDaysLine()] : [],
         table: s.days.length === 0 ? NO_TABLE : cells(burndown),
         notes: s.days.length === 0 ? [] : kept([methodLine(), truncationLine(s.truncated)]),
+        images: s.days.length > 0 ? images.burndown ?? [] : [],
       },
       {
         heading: velocity.caption,
@@ -99,7 +112,9 @@ export function reportDocument(report: SprintReport, live = false): ReportDocume
                 velocityFloorLine(),
                 velocityPartialLine(partial),
                 report.velocity.length === 1 ? singleSprintLine() : "",
+                velocityImages.length > 1 ? mixedUnitsLine() : "",
               ]),
+        images: velocityImages,
       },
     ],
   };
