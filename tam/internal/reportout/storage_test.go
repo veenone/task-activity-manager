@@ -76,3 +76,45 @@ func TestStorageLeavesOutATableWithNoColumns(t *testing.T) {
 		t.Error("an empty table was written; a section with no rows says why in its lines instead")
 	}
 }
+
+// The charts are pictures on the page as well as tables in it. Storage format
+// cannot hold the bytes, so each one is a file the publish attaches and the
+// body names.
+func TestStorageReferencesEachChartAsAnAttachedFile(t *testing.T) {
+	d := sample()
+	im := sampleImage(t)
+	d.Sections[0].Images = []Image{im}
+	body := Storage(d)
+	want := `<ac:image ac:alt="Burndown, drawn as a chart."><ri:attachment ri:filename="chart-1.png"/></ac:image>`
+	if !strings.Contains(body, want) {
+		t.Errorf("storage body is missing %q:\n%s", want, body)
+	}
+	if strings.Contains(body, im.Data) {
+		t.Error("the image bytes are in the body; storage format cannot hold them and the page would be base64 a reader scrolls past")
+	}
+	if i, j := strings.Index(body, "34 points"), strings.Index(body, "ri:attachment"); i > j {
+		t.Error("the chart is above the table it draws; it belongs under it, as it does in the spreadsheet and the deck")
+	}
+}
+
+// I1: the description reaches an XML attribute, so a quote in it would close
+// the attribute and the rest would be markup nobody wrote on purpose.
+func TestStorageEscapesAChartDescription(t *testing.T) {
+	d := sample()
+	im := sampleImage(t)
+	im.Alt = `a <b> & "quoted" burndown`
+	d.Sections[0].Images = []Image{im}
+	body := Storage(d)
+	if strings.Contains(body, `"quoted"`) || strings.Contains(body, "<b>") {
+		t.Errorf("the description reached the attribute unescaped:\n%s", body)
+	}
+	if !strings.Contains(body, `ac:alt="a &lt;b&gt; &amp; &#34;quoted&#34; burndown"`) {
+		t.Errorf("the escaped description is missing:\n%s", body)
+	}
+}
+
+func TestStorageWritesNoImageForASectionWithNoChart(t *testing.T) {
+	if strings.Contains(Storage(sample()), "ac:image") {
+		t.Error("a section with no chart still got an image reference, which would render as a broken picture")
+	}
+}

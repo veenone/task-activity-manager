@@ -264,6 +264,14 @@ export function publishedLine(title: string): string {
   return `Published to the Confluence page "${title}".`;
 }
 
+// partlyPublishedLine is what a publish that wrote the page but could not put
+// every chart on it says. The page comes first, because it is there and the
+// user can open it, and what is missing from it follows. Go's warning names
+// each chart and what Confluence said about it.
+export function partlyPublishedLine(title: string, warning: string): string {
+  return `${publishedLine(title)} ${warning}`;
+}
+
 // savedLine is what an export says: the path, so the file can be found and
 // attached to something without hunting for it.
 export function savedLine(path: string): string {
@@ -278,12 +286,18 @@ export function savedLine(path: string): string {
 // publisherStatusWord is the state a publisher is in. "Ready" rather than
 // "Idle" or nothing at all: a control that has not been used yet has not
 // failed, and a blank cell beside two filled ones reads as a problem.
+//
+// "Partly done" is the publish that wrote its page and could not put every
+// chart on it. Neither "Done" nor "Failed" would be true: the report is on the
+// page and a picture of it is not.
 export function publisherStatusWord(status: string): string {
   switch (status) {
     case "running":
       return "Working";
     case "done":
       return "Done";
+    case "warned":
+      return "Partly done";
     case "failed":
       return "Failed";
     default:

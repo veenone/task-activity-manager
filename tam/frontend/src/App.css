@@ -835,7 +835,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    and finish independently.
 
    Colour is carried on the text and the left rule, not on a fill. A filled
-   chip would have to earn its 4.5 to 1 in both themes for four states, and
+   chip would have to earn its 4.5 to 1 in both themes for five states, and
    the state is a word here, so the colour is reinforcement rather than the
    only signal. */
 .report-ribbon { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0 0; padding: 0; list-style: none; }
@@ -852,8 +852,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-ribbon-running .report-ribbon-state { color: var(--accent); }
 .report-ribbon-done { border-left-color: var(--ok-text); }
 .report-ribbon-done .report-ribbon-state { color: var(--ok-text); }
-.report-ribbon-failed { border-left-color: var(--warn-border); }
-.report-ribbon-failed .report-ribbon-state { color: var(--warn-text); }
+/* Partly done is the publish that wrote its page and could not put every
+   chart on it. It takes the warn colour and failed takes the danger one the
+   reason beside it is already written in, so the two do not read alike. */
+.report-ribbon-warned { border-left-color: var(--warn-border); }
+.report-ribbon-warned .report-ribbon-state { color: var(--warn-text); }
+.report-ribbon-failed { border-left-color: var(--danger-text); }
+.report-ribbon-failed .report-ribbon-state { color: var(--danger-text); }
 
 /* Two parts, not two columns: a head that does not scroll, holding the
    chart and the notes that belong to it, over the table that does. The
