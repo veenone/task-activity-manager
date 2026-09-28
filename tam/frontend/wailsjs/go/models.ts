@@ -447,6 +447,10 @@ export namespace boardrepo {
 	    statusIds: string[];
 	    total: number;
 	    points: number;
+	    counted: number;
+	    min?: number;
+	    max?: number;
+	    constraint: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ColumnView(source);
@@ -458,6 +462,10 @@ export namespace boardrepo {
 	        this.statusIds = source["statusIds"];
 	        this.total = source["total"];
 	        this.points = source["points"];
+	        this.counted = source["counted"];
+	        this.min = source["min"];
+	        this.max = source["max"];
+	        this.constraint = source["constraint"];
 	    }
 	}
 	export class BoardView {
@@ -1875,6 +1883,7 @@ export namespace sprintreport {
 	    series: reports.Series;
 	    velocity: reports.VelocityRow[];
 	    builtAt: string;
+	    capacity: boardrepo.ColumnView[];
 	    unavailable: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1886,6 +1895,7 @@ export namespace sprintreport {
 	        this.series = this.convertValues(source["series"], reports.Series);
 	        this.velocity = this.convertValues(source["velocity"], reports.VelocityRow);
 	        this.builtAt = source["builtAt"];
+	        this.capacity = this.convertValues(source["capacity"], boardrepo.ColumnView);
 	        this.unavailable = source["unavailable"];
 	    }
 	

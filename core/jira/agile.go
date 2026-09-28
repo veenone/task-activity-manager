@@ -59,18 +59,34 @@ type RawSprint struct {
 // columnConfig and gives each column a list of status objects, not a list of
 // ids; flattening that here would mean this package quietly disagreeing with
 // the API it exists to speak.
+//
+// ConstraintType is what the board counts a column's limit in, "issueCount"
+// or "issueCountExclSubs", and it sits beside the columns because that is
+// where Jira puts it: it is a fact about the board and not about any one
+// column. A board with no constraint set sends no limits on its columns
+// either, so a caller needs it to word a count and not to decide whether
+// there is one.
 type RawBoardConfig struct {
 	ID           int `json:"id"`
 	ColumnConfig struct {
-		Columns []RawColumn `json:"columns"`
+		ConstraintType string      `json:"constraintType"`
+		Columns        []RawColumn `json:"columns"`
 	} `json:"columnConfig"`
 }
 
 // RawColumn is one column of a board's configuration, statuses left in
 // Jira's nested shape: a list of status objects, not a list of ids.
+//
+// Min and Max are the column's WIP limits, and they are pointers because
+// both are optional and a column with neither is the ordinary case. Decoded
+// as plain ints, a limit Jira never sent would be indistinguishable from a
+// limit of zero, which is a real limit a board can set and one that a
+// column holding a single card is already over.
 type RawColumn struct {
 	Name     string      `json:"name"`
 	Statuses []RawStatus `json:"statuses"`
+	Min      *int        `json:"min"`
+	Max      *int        `json:"max"`
 }
 
 // RawStatus is one status entry under a column, transport only. Name is

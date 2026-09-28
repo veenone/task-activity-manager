@@ -57,12 +57,15 @@ func StatusName(id string) string {
 	return ""
 }
 
-// boardColumns are the three columns both demo boards show.
+// boardColumns are the three columns both demo boards show. In Progress
+// carries a WIP limit and the other two carry none, which is the shape of a
+// real board: the limit is the exception and no limit is the rule.
 func boardColumns() []backend.BoardColumn {
+	limit := 2
 	return []backend.BoardColumn{
-		{Name: "To Do", StatusIDs: []string{StatusID("To Do")}},
-		{Name: "In Progress", StatusIDs: []string{StatusID("In Progress")}},
-		{Name: "Done", StatusIDs: []string{StatusID("Done")}},
+		{Name: "To Do", StatusIDs: []string{StatusID("To Do")}, Constraint: backend.ConstraintIssueCount},
+		{Name: "In Progress", StatusIDs: []string{StatusID("In Progress")}, Max: &limit, Constraint: backend.ConstraintIssueCount},
+		{Name: "Done", StatusIDs: []string{StatusID("Done")}, Constraint: backend.ConstraintIssueCount},
 	}
 }
 

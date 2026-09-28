@@ -1,13 +1,16 @@
 import { describe, it, expect } from "vitest";
-import type { ReportImage, SprintReport } from "../api";
+import type { ColumnView, ReportImage, SprintReport } from "../api";
 import { reportDocument } from "./reportDocument";
 import {
+  capacityBreachLine,
+  capacityCountLine,
   emptyDaysLine,
   emptyVelocityLine,
   floorLine,
   methodLine,
   mixedUnitsLine,
   modeLine,
+  noLimitsLine,
   nothingToPublishLine,
   singleSprintLine,
   truncationLine,
@@ -160,5 +163,52 @@ describe("nothingToPublishLine", () => {
   it("says there is nothing to render without repeating the reason beside it", () => {
     expect(nothingToPublishLine()).toBe("There is no report to publish or export yet.");
     expect(nothingToPublishLine()).not.toContain(unavailableLine("sprintHasNoDates"));
+  });
+});
+
+// The capacity section is the WIP limits, which reach Confluence, the
+// spreadsheet and the deck because all three renderers walk the document's
+// sections and this is one of them.
+describe("the capacity section", () => {
+  const head = (over: Partial<ColumnView>): ColumnView => ({
+    name: "In Progress", statusIds: ["3"], total: 4, points: 0, counted: 4,
+    min: null, max: null, constraint: "issueCount", ...over,
+  });
+
+  it("is left out for a report carrying no column heads at all", () => {
+    expect(headings(report())).toHaveLength(3);
+  });
+
+  it("says a board with no limit set has none rather than printing zeroes", () => {
+    const doc = reportDocument(report({ capacity: [head({}), head({ name: "Done" })] }))!;
+    const capacity = doc.sections[3];
+    expect(capacity.lines).toEqual([noLimitsLine()]);
+    expect(capacity.table.rows).toEqual([]);
+  });
+
+  it("carries a row per column with the count against the limit", () => {
+    const doc = reportDocument(report({
+      capacity: [
+        head({ name: "To Do", total: 2, counted: 2 }),
+        head({ name: "In Progress", total: 4, counted: 4, max: 3 }),
+        head({ name: "Done", total: 9, counted: 9, min: 1 }),
+      ],
+    }))!;
+    const capacity = doc.sections[3];
+    expect(capacity.table.rows).toEqual([
+      ["To Do", "2", "No limit", "No limit set"],
+      ["In Progress", "4", "3", "Over the limit"],
+      ["Done", "9", "Minimum 1", "Within the limit"],
+    ]);
+  });
+
+  it("names the columns that are over, and says what the cards are counted by", () => {
+    const doc = reportDocument(report({
+      capacity: [head({ name: "In Progress", counted: 4, max: 3, constraint: "issueCountExclSubs" })],
+    }))!;
+    const capacity = doc.sections[3];
+    expect(capacity.lines).toEqual([capacityCountLine("issueCountExclSubs")]);
+    expect(capacity.notes).toContain(capacityBreachLine(["In Progress"]));
+    expect(capacity.images).toEqual([]);
   });
 });

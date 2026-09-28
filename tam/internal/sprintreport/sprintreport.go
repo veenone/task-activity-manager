@@ -130,8 +130,18 @@ type Report struct {
 	// screen was the one that had to be fetched. A view that wants to say
 	// how old the table is has nothing here to say it from, and a refresh
 	// is what makes the whole thing current.
-	BuiltAt     string `json:"builtAt"`
-	Unavailable string `json:"unavailable"`
+	BuiltAt string `json:"builtAt"`
+	// Capacity is the board's column heads: the cards each column holds
+	// against the WIP limit Jira sets on it, empty for a service with no
+	// board composer behind it. It is what the report's capacity section is
+	// built from, and it comes from the same composer the Boards view draws
+	// from so the two cannot disagree about a count.
+	//
+	// It describes the board now and not the sprint's own history. A limit
+	// is a present-tense fact about a column, and TAM keeps no record of
+	// what a column held on a past afternoon.
+	Capacity    []boardrepo.ColumnView `json:"capacity"`
+	Unavailable string                 `json:"unavailable"`
 }
 
 // Store is what a report needs from the board cache: the columns that
@@ -171,6 +181,13 @@ type Service struct {
 	// nil in every test that does not look at it, which is why each emit
 	// goes through emit below.
 	Progress func(Progress)
+	// Capacity answers the board's column heads for one sprint, and is what
+	// fills Report.Capacity. It is a func rather than a method on Store for
+	// the same reason Progress is one: composing a board needs the issue
+	// cache as well as the board cache, the binding is what holds both, and
+	// a report built without one is a report with no capacity section
+	// rather than a failure.
+	Capacity func(ctx context.Context, profileID string, boardID int, sprintID string) ([]boardrepo.ColumnView, error)
 }
 
 // New builds a service with the default page size, the machine's clock and
@@ -196,6 +213,7 @@ func unavailable(reason string) Report {
 	return Report{
 		Series:      reports.Series{Days: []reports.Day{}, Truncated: []string{}},
 		Velocity:    []reports.VelocityRow{},
+		Capacity:    []boardrepo.ColumnView{},
 		Unavailable: reason,
 	}
 }

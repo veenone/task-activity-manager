@@ -206,6 +206,46 @@ export function truncationLine(keys: string[]): string {
   );
 }
 
+// The capacity section's wording. A column's limit is published beside the
+// sprint's own figures because a limit nobody reads is a limit nobody keeps,
+// and it is worded here rather than in the renderers for the same reason
+// every other figure in this file is.
+
+// noLimitsLine is a board Jira sets no column limit on, which is a fact
+// about the board and not an empty table.
+export function noLimitsLine(): string {
+  return "Jira sets no limit on any column of this board, so there is nothing for the cards to be counted against.";
+}
+
+// capacityCountLine says what the cards in the table are counted by, which
+// is Jira's own constraint on the board. It matters more on a page than on
+// screen: a published table is read away from the board, where nobody can
+// check its numbers against the columns they came from.
+export function capacityCountLine(constraint: string): string {
+  if (constraint === "issueCountExclSubs") {
+    return "Jira measures this board's limits without counting subtasks, and the cards below are counted the same way.";
+  }
+  return "Jira measures this board's limits by every card in a column, subtasks included, and the cards below are counted the same way.";
+}
+
+// capacityBreachLine names the columns that are over, and is empty when none
+// is. Each row says so in its own last column; this is what a reader gets
+// before the rows, and on a deck it is the one sentence that survives being
+// read from the back of a room.
+export function capacityBreachLine(columns: string[]): string {
+  if (columns.length === 0) return "";
+  const subject = columns.length === 1 ? "column is" : "columns are";
+  return `${columns.length} ${subject} over the limit: ${nameList(columns)}.`;
+}
+
+// capacityScopeLine says which cards were counted. The count is the board as
+// the last sync left it and not the sprint's own history: a limit is a fact
+// about a column now, and TAM keeps no record of what a column held on a
+// past afternoon.
+export function capacityScopeLine(): string {
+  return "The counts are this sprint's cards as the last sync left them, so a card Jira holds and TAM has not read is not among them.";
+}
+
 // builtAtLine stamps the sprint on screen and nothing else. The velocity
 // rows carry no age of their own and most of them are read back from the
 // store, so this line is careful to claim only the one sprint.

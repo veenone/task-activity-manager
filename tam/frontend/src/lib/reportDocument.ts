@@ -1,6 +1,9 @@
-import type { ReportDocument, ReportTable, SprintReport } from "../api";
+import type { ReportDocument, ReportSection, ReportTable, SprintReport } from "../api";
 import {
   builtAtLine,
+  capacityBreachLine,
+  capacityCountLine,
+  capacityScopeLine,
   completionLine,
   emptyDaysLine,
   emptyVelocityLine,
@@ -8,6 +11,7 @@ import {
   methodLine,
   mixedUnitsLine,
   modeLine,
+  noLimitsLine,
   singleSprintLine,
   summarySentence,
   truncationLine,
@@ -15,7 +19,8 @@ import {
   velocityFloorLine,
   velocityPartialLine,
 } from "./reportText";
-import { burndownTable, outcomeTable, velocityTable } from "./reportTables";
+import { hasLimit, limitBreach } from "./columnLimit";
+import { burndownTable, capacityTable, outcomeTable, velocityTable } from "./reportTables";
 import type { TableSpec } from "./reportTables";
 import type { ChartImages } from "./chartImage";
 
@@ -116,6 +121,35 @@ export function reportDocument(
               ]),
         images: velocityImages,
       },
+      ...capacitySection(report),
     ],
   };
+}
+
+// capacitySection is the board's columns against their WIP limits, and it is
+// a list of nothing or one so a report that carries no column heads at all
+// carries no section either. That is a report from a build before the heads
+// travelled, or one whose board the cache has nothing for, and a section
+// reading "no limits" would be claiming a fact about a board nobody read.
+//
+// A board on which Jira sets no limit is different: the columns are known and
+// none of them is limited, which is worth one sentence and no table.
+//
+// The constraint is the board's, so it is read off the first column; every
+// column carries the same value because that is how the sync sends it.
+function capacitySection(report: SprintReport): ReportSection[] {
+  const columns = report.capacity ?? [];
+  if (columns.length === 0) return [];
+  const capacity = capacityTable(columns);
+  if (!columns.some(hasLimit)) {
+    return [{ heading: capacity.caption, lines: [noLimitsLine()], table: NO_TABLE, notes: [], images: [] }];
+  }
+  const over = columns.filter((c) => limitBreach(c) === "over").map((c) => c.name);
+  return [{
+    heading: capacity.caption,
+    lines: [capacityCountLine(columns[0].constraint ?? "")],
+    table: cells(capacity),
+    notes: kept([capacityBreachLine(over), capacityScopeLine()]),
+    images: [],
+  }];
 }

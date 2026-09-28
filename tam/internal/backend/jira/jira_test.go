@@ -314,10 +314,12 @@ func (f *fakeJira) agile(w http.ResponseWriter, r *http.Request) {
 			{"id":3,"name":"PLAT Plans","type":"simple"}
 		]}`))
 	case "/rest/agile/1.0/board/1/configuration":
-		_, _ = w.Write([]byte(`{"id":1,"columnConfig":{"columns":[
-			{"name":"Backlog","statuses":[]},
+		// In Progress carries a limit pair, Backlog a nonsensical negative
+		// one, and the other two none at all, which is the ordinary case.
+		_, _ = w.Write([]byte(`{"id":1,"columnConfig":{"constraintType":"issueCountExclSubs","columns":[
+			{"name":"Backlog","statuses":[],"max":-3},
 			{"name":"To Do","statuses":[{"id":"1"}]},
-			{"name":"In Progress","statuses":[{"id":"3"},{"id":"4"}]},
+			{"name":"In Progress","statuses":[{"id":"3"},{"id":"4"}],"min":1,"max":4},
 			{"name":"Done","statuses":[{"id":"5"}]}
 		]}}`))
 	case "/rest/agile/1.0/board/1/sprint":
@@ -898,5 +900,35 @@ func TestCommentTimestampsAuthorsAndRestrictions(t *testing.T) {
 	}
 	if d.Comments[0].Restriction != "" || d.Comments[0].Created != "2026-09-12T06:00:00Z" {
 		t.Errorf("comment = %+v", d.Comments[0])
+	}
+}
+
+// The limits are what a kanban board exists to watch, so BoardColumns
+// carries them, and it carries the board's constraint on every column
+// because that is what says whether the count they are measured against
+// includes subtasks.
+//
+// A negative limit is dropped rather than stored. It is a limit no column
+// can be inside, and a server response is input: honouring one would paint
+// a column that holds nothing as over its limit.
+func TestBoardColumnsCarryTheLimitsAndTheConstraint(t *testing.T) {
+	b, _ := newBackend(t, twoFields)
+	cols, err := b.BoardColumns(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("columns: %v", err)
+	}
+	if cols[2].Min == nil || *cols[2].Min != 1 || cols[2].Max == nil || *cols[2].Max != 4 {
+		t.Errorf("In Progress = min %v max %v, want 1 and 4", cols[2].Min, cols[2].Max)
+	}
+	if cols[1].Min != nil || cols[1].Max != nil {
+		t.Errorf("To Do = min %v max %v, want a column with no limit to have none", cols[1].Min, cols[1].Max)
+	}
+	if cols[0].Max != nil {
+		t.Errorf("Backlog max = %v, want a negative limit dropped", cols[0].Max)
+	}
+	for _, c := range cols {
+		if c.Constraint != backend.ConstraintExclSubtasks {
+			t.Errorf("column %q constraint = %q, want the board's own", c.Name, c.Constraint)
+		}
 	}
 }

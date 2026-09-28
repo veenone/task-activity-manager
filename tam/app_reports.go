@@ -97,6 +97,13 @@ func (a *App) GetSprintReport(profileID string, boardID, sprintID int, refresh b
 	log.Printf("tam: report for sprint %d on board %d started for %s (%s)", sprintID, boardID, p.Name, p.ProjectKey)
 	service := sprintreport.New(history, a.boards)
 	service.Progress = a.emitReportProgress
+	// The report's capacity section is the board's own column heads, so it
+	// is composed by the thing that composes the board. Binding the issue
+	// cache to it is this file's job, the way it is in GetBoard: the board
+	// cache cannot reach the issue cache on its own.
+	service.Capacity = func(ctx context.Context, profileID string, boardID int, sprintID string) ([]boardrepo.ColumnView, error) {
+		return a.boards.ColumnHeads(ctx, a.repo, profileID, boardID, sprintID)
+	}
 	report, err := service.Build(ctx, p.ID, boardID, sprintID, refresh)
 	if err != nil {
 		log.Printf("tam: report for sprint %d on board %d for %s failed: %v", sprintID, boardID, p.Name, err)

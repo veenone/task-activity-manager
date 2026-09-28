@@ -90,6 +90,24 @@ commit hash behind it; the instruction gate checks the hash exists.
   editmeta read as "nothing is editable" would refuse every field on a 403;
   the write goes and Jira's own refusal decides (a0672d1).
 
+## Jira board configuration
+
+- `/rest/agile/1.0/board/{id}/configuration` carries each column's `min` and
+  `max` and the board's `columnConfig.constraintType`. Both limits are
+  optional per column and a board that sets neither is the ordinary case, so
+  every layer that holds one holds a pointer: as ints, an unset limit and a
+  limit of zero are the same value, and every column on every board reads as
+  over a limit of nothing (#101).
+- `constraintType` says what a limit counts, `issueCount` or
+  `issueCountExclSubs`. It is a board fact and Jira puts it beside the
+  columns rather than on them, so TAM carries it on every `BoardColumn`: the
+  boards sync reads nothing but the columns, and a count that ignored it
+  would disagree with the number Jira's own board shows the same team.
+- The endpoint answers the same shape for a scrum board as for a kanban one,
+  so nothing reading a limit asks which kind of board it has. Not probed
+  against a live instance: a scrum board that answered with no limits would
+  read as a board with none rather than misreport one (#101).
+
 ## Confluence API
 
 - A form post to Data Center needs `X-Atlassian-Token: nocheck`. Without it

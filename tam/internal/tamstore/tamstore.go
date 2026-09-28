@@ -53,6 +53,14 @@
 // column add and a watermark clear, because a row cached before this
 // version has no category and only a sync can fetch one. Until it does,
 // the empty string is what the frontend falls back from.
+// Version 20 adds board_column's wip_min, wip_max and constraint_type: a
+// column's WIP limits and what the board counts them in. The two limits are
+// the one pair of nullable columns in the board tables, because a column
+// with no limit is the ordinary case and zero is a limit a board can really
+// set. Version 15's shape otherwise, a column add with nothing to backfill:
+// a boards pass replaces a board's columns wholesale, so the next one fills
+// them in, and until it does a board reads as having no limits rather than
+// limits of zero.
 package tamstore
 
 import (
@@ -86,7 +94,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 19,
+	Version: 20,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -332,6 +340,27 @@ var Schema = store.Schema{
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 			return err
 		},
+	}, {
+		Version: 20,
+		// A board column's WIP limits and what the board counts them in.
+		// Version 15's shape, a column add with nothing to backfill, and
+		// nothing to clear either: a boards pass replaces a board's columns
+		// wholesale, so the next one fills these in without being asked.
+		// The two limits are nullable on purpose. Until that pass runs they
+		// are NULL, which says this board has no limit stored rather than
+		// that every column is limited to nothing.
+		Apply: func(db *sql.DB) error {
+			for _, col := range []string{
+				"wip_min INTEGER",
+				"wip_max INTEGER",
+				"constraint_type TEXT NOT NULL DEFAULT ''",
+			} {
+				if err := store.AddColumnIfMissing(db, "board_column", col); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -482,6 +511,15 @@ CREATE TABLE IF NOT EXISTS board_column (
 	position   INTEGER NOT NULL,
 	name       TEXT NOT NULL DEFAULT '',
 	status_ids TEXT NOT NULL DEFAULT '[]',
+	-- The column's WIP limits, nullable because a column with no limit is
+	-- the ordinary case and zero is a limit a board can really set. A NOT
+	-- NULL DEFAULT 0 here would report every column of every board as over
+	-- a limit of nothing.
+	wip_min    INTEGER,
+	wip_max    INTEGER,
+	-- What the board counts a limit in, Jira's columnConfig.constraintType.
+	-- Empty for a board synced before TAM read it.
+	constraint_type TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, board_id, position)
 );
 CREATE TABLE IF NOT EXISTS board_issue (

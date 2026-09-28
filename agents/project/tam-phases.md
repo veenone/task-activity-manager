@@ -1955,6 +1955,18 @@ counted as `Unmapped` rather than drawn, which is what board unmapped line
 report. Re-syncing board therefore pick up column added or renamed in Jira
 with no further work.
 
+Column WIP limits ride along the same read: each column `min` and `max` plus
+board's own `constraintType`, schema 20 (`wip_min`, `wip_max` nullable,
+`constraint_type` text). Pointers and nullable columns both because column
+with no limit is ordinary case and zero is limit board can really set; as
+ints the two are one value and every column report itself over limit of
+nothing. `ColumnView.Counted` = number limit measure against, Total without
+subtasks on board whose constraint exclude them, because count that ignore
+constraint disagree with Jira's own board in front of team. `ColumnHeads` =
+same composed view without lanes, which sprint report capacity section read,
+so board on screen and published table cannot carry two counts of same
+column. Negative limit from wire read as no limit and logged (I1).
+
 ## A drop asks for a column, not a status
 
 Jira board column collect several statuses: Done column commonly hold
@@ -2234,6 +2246,11 @@ entered. Kiwi profile file refused.
                           which is what the Confluence page, the spreadsheet and the deck are all
                           rendered from; it answers null for an unavailable report, which is what
                           makes the three outputs refuse rather than write a page of zeroes
+      src/lib/columnLimit.ts  a board column against its WIP limit: whether there is one, the
+                          count it is measured against, whether the column is over the maximum or
+                          under the minimum, and the clause the column head prints; read by the
+                          board head and by reportTables' capacity rows, so one limit is never
+                          worded two ways
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands

@@ -651,3 +651,39 @@ func TestBoardIssueKeysNarrowsToTheProject(t *testing.T) {
 		t.Errorf("jql = %q, want none", gotJQL)
 	}
 }
+
+// A column's min and max are optional and a board that sets neither is the
+// ordinary case, so they decode as pointers: nil for a limit Jira does not
+// send, and a real zero for one it does. Decoded as plain ints, an unset
+// limit would be indistinguishable from a limit of nothing.
+func TestBoardConfigurationDecodesColumnLimitsAndTheConstraint(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":1,"columnConfig":{"constraintType":"issueCountExclSubs","columns":[
+			{"name":"To Do","statuses":[{"id":"1"}]},
+			{"name":"In Progress","statuses":[{"id":"3"}],"min":1,"max":4},
+			{"name":"Done","statuses":[{"id":"5"}],"max":0}
+		]}}`))
+	}))
+	defer srv.Close()
+
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+	cfg, err := c.BoardConfiguration(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("configuration: %v", err)
+	}
+	if cfg.ColumnConfig.ConstraintType != "issueCountExclSubs" {
+		t.Errorf("constraint type = %q, want what Jira said it counts", cfg.ColumnConfig.ConstraintType)
+	}
+	cols := cfg.ColumnConfig.Columns
+	if cols[0].Min != nil || cols[0].Max != nil {
+		t.Errorf("column with no limits = min %v max %v, want both unset", cols[0].Min, cols[0].Max)
+	}
+	if cols[1].Min == nil || *cols[1].Min != 1 || cols[1].Max == nil || *cols[1].Max != 4 {
+		t.Errorf("column 1 = min %v max %v, want 1 and 4", cols[1].Min, cols[1].Max)
+	}
+	// A max of zero is a limit of nothing, which is a column Jira draws as
+	// over the limit the moment it holds one card. It is not "no limit".
+	if cols[2].Max == nil || *cols[2].Max != 0 {
+		t.Errorf("column 2 max = %v, want a real zero rather than unset", cols[2].Max)
+	}
+}

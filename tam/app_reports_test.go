@@ -263,3 +263,43 @@ func TestRefreshReachesTheServiceFromTheBinding(t *testing.T) {
 		t.Errorf("committed = %v with a refresh, want 0 from the fetch: the stored row is the thing being replaced", rebuilt.Series.Committed)
 	}
 }
+
+// A report carries the board's column capacity, so the capacity section of
+// a published report is the same count against the same limit the Boards
+// view draws. The numbers come from the board composer rather than from a
+// second count of the cards, which is what keeps the two from disagreeing
+// in front of a team.
+func TestTheReportCarriesTheBoardsColumnCapacity(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	a.backends[p.ID] = quietHistory()
+	seedReportBoard(t, a, p.ID)
+	board := backend.Board{ID: reportBoard, Name: "PLAT Scrum", Type: backend.BoardTypeScrum}
+	max := 3
+	cols := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}, Constraint: backend.ConstraintIssueCount},
+		{Name: "Done", StatusIDs: []string{"10001"}, Max: &max, Constraint: backend.ConstraintIssueCount},
+	}
+	sprints := []backend.Sprint{{
+		ID: 11, BoardID: reportBoard, Name: "Sprint 11", State: "closed",
+		StartDate: "2026-08-03T09:00:00.000+0000",
+		EndDate:   "2026-08-14T09:00:00.000+0000",
+	}}
+	if err := a.boards.ReplaceBoard(context.Background(), p.ID, board, cols, sprints, nil); err != nil {
+		t.Fatalf("seed the board's limits: %v", err)
+	}
+
+	got, err := a.GetSprintReport(p.ID, reportBoard, 11, false)
+	if err != nil {
+		t.Fatalf("GetSprintReport: %v", err)
+	}
+	if len(got.Capacity) != 2 {
+		t.Fatalf("capacity = %+v, want one head per column", got.Capacity)
+	}
+	if got.Capacity[0].Max != nil {
+		t.Errorf("To Do max = %v, want a column with no limit to carry none", got.Capacity[0].Max)
+	}
+	if got.Capacity[1].Max == nil || *got.Capacity[1].Max != 3 {
+		t.Errorf("Done max = %v, want the limit the board was synced with", got.Capacity[1].Max)
+	}
+}

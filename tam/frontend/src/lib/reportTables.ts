@@ -1,4 +1,5 @@
-import type { ReportDay, ReportSeries, VelocityRow } from "../api";
+import type { ColumnView, ReportDay, ReportSeries, VelocityRow } from "../api";
+import { counted, hasLimit, limitBreach } from "./columnLimit";
 import { calendarDay, points } from "./format";
 import { reportFigures } from "./reportFigures";
 import { amount } from "./reportText";
@@ -69,4 +70,47 @@ export function velocityTable(rows: VelocityRow[], title = "Velocity"): TableSpe
       cells: [r.sprintName, amount(r.committed, r.unit), amount(r.completed, r.unit)],
     })),
   };
+}
+
+// capacityTable is the board's columns against their WIP limits. Every
+// column is a row, the ones with no limit included: a table holding only the
+// limited columns would leave a reader working out which of the board's
+// columns were missing from it and why.
+//
+// The cards cell is the number the limit is measured against, which on a
+// board counting without subtasks is not the column's card total. Which of
+// the two it is rides in the section's wording rather than in the cell, since
+// a column of "4 cards, subtasks not counted" repeats one clause down the
+// whole table.
+export function capacityTable(columns: ColumnView[]): TableSpec {
+  return {
+    caption: "Column capacity",
+    columns: ["Column", "Cards", "Limit", "Standing"],
+    rows: columns.map((c) => ({
+      key: c.name,
+      cells: [c.name, String(counted(c)), limitCell(c), standingCell(c)],
+    })),
+  };
+}
+
+// limitCell is the limit itself, worded rather than left as a bare number: an
+// empty cell reads as a limit of nothing and a zero reads worse.
+function limitCell(c: ColumnView): string {
+  const min = c.min ?? null;
+  const max = c.max ?? null;
+  if (max === null && min === null) return "No limit";
+  if (max === null) return `Minimum ${min}`;
+  if (min === null) return String(max);
+  return `${max}, minimum ${min}`;
+}
+
+// standingCell is the column against its limit, in words. It is a column of
+// the table rather than a colour on the row, because two of the three
+// surfaces this table reaches cannot carry a colour that means anything.
+function standingCell(c: ColumnView): string {
+  if (!hasLimit(c)) return "No limit set";
+  const breach = limitBreach(c);
+  if (breach === "over") return "Over the limit";
+  if (breach === "under") return "Below the minimum";
+  return "Within the limit";
 }

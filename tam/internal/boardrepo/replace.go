@@ -184,7 +184,8 @@ func writeColumns(ctx context.Context, tx *sql.Tx, profileID string, boardID int
 		if err != nil {
 			return fmt.Errorf("status ids of column %q: %w", c.Name, err)
 		}
-		if _, err := tx.ExecContext(ctx, insertColumnSQL, profileID, boardID, i, c.Name, string(ids)); err != nil {
+		if _, err := tx.ExecContext(ctx, insertColumnSQL, profileID, boardID, i, c.Name, string(ids),
+			limitValue(c.Min), limitValue(c.Max), c.Constraint); err != nil {
 			return fmt.Errorf("insert column %q: %w", c.Name, err)
 		}
 	}

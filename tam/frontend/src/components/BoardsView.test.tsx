@@ -361,6 +361,28 @@ describe("BoardsView board", () => {
     expect(screen.getByText("3 cards, 27 pts")).toBeInTheDocument();
   });
 
+  // The one number a kanban board exists to watch. A column with no limit
+  // is the ordinary case and says nothing; a column over its limit says so
+  // in words, so the reading does not depend on seeing a colour.
+  it("shows a column's cards against its limit, and calls out the one that is over", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue(board({
+      columns: [
+        { name: "To Do", statusIds: ["1"], total: 4, points: 20, counted: 4, min: null, max: null, constraint: "issueCount" },
+        { name: "In Progress", statusIds: ["3"], total: 5, points: 0, counted: 5, min: null, max: 3, constraint: "issueCount" },
+        { name: "Done", statusIds: ["5"], total: 3, points: 27, counted: 3, min: null, max: 6, constraint: "issueCount" },
+      ],
+      lanes: [{ id: "", label: "All issues", count: 3, cells: [[KEYS], [PROMO], [RETRO]], overflow: [0, 0, 0] }],
+    }));
+    renderView();
+    const over = await screen.findByRole("columnheader", { name: /In Progress/ });
+    expect(within(over).getByText("5 of 3, over the limit")).toBeInTheDocument();
+    const within6 = screen.getByRole("columnheader", { name: /Done/ });
+    expect(within(within6).getByText("3 of 6")).toBeInTheDocument();
+    // Nothing is printed for the column Jira sets no limit on.
+    const none = screen.getByRole("columnheader", { name: /To Do/ });
+    expect(within(none).queryByText(/of /)).not.toBeInTheDocument();
+  });
+
   it("puts each card in its own column and names that column on the card", async () => {
     renderView();
     const promo = await screen.findByRole("gridcell", { name: "PLAT-412 Checkout: apply promo code In Progress" });
