@@ -47,6 +47,16 @@ const (
 	cellSize    = 1200
 )
 
+// A picture takes the same box as a table, because it is on a slide that
+// carries no table. emuPerPixel is a pixel at 96 DPI, which is the unit a
+// PNG's own header measures in. The shape id is the one a table would have
+// taken and the relationship id follows the layout's, which is always rId1.
+const (
+	emuPerPixel    = 9525
+	pictureShapeID = 5
+	pictureRelID   = 2
+)
+
 const xmlHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` + "\n"
 
 const relType = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
@@ -70,9 +80,9 @@ const emptyTree = `<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/
 // open. Go writes the slides and three bookkeeping parts, and copies the
 // rest of the template through untouched.
 //
-// Text and tables only: a chart part would be a second way of saying what
-// the table already says, and the decision on this report is that a chart
-// travels as its numbers.
+// No chart part: a section's chart arrives as the picture the frontend
+// rasterised from the SVG it already draws, which is the only place the
+// chart's colours exist, and it goes on a slide of its own.
 //
 // A table too long for one slide is continued on the next, under the same
 // heading and with the same caveats, rather than running off the bottom
@@ -94,17 +104,26 @@ func PPTX(d Document) ([]byte, error) {
 		return nil, err
 	}
 
-	type slide struct{ body, layout string }
-	slides := []slide{{titleSlide(d.Title), titleLayout}}
+	pics, files, err := pictures(d)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		order = append(order, f.name)
+		parts[f.name] = f.body
+	}
+
+	type slide struct{ body, layout, image string }
+	slides := []slide{{titleSlide(d.Title), titleLayout, ""}}
 	for _, s := range d.Sections {
-		for _, body := range sectionSlides(s) {
-			slides = append(slides, slide{body, sectionLayout})
+		for _, p := range sectionSlides(s, pics) {
+			slides = append(slides, slide{p.body, sectionLayout, p.image})
 		}
 	}
 
 	const relsPart = "ppt/_rels/presentation.xml.rels"
 	firstRel := nextRelID(parts[relsPart])
-	parts["[Content_Types].xml"] = withSlideTypes(parts["[Content_Types].xml"], len(slides))
+	parts["[Content_Types].xml"] = withSlideTypes(parts["[Content_Types].xml"], len(slides), len(files) > 0)
 	parts["ppt/presentation.xml"], err = withSlideIDs(parts["ppt/presentation.xml"], len(slides), firstRel)
 	if err != nil {
 		return nil, err
@@ -117,7 +136,7 @@ func PPTX(d Document) ([]byte, error) {
 		order = append(order, fmt.Sprintf("ppt/slides/slide%d.xml", i+1))
 		parts[order[len(order)-1]] = s.body
 		order = append(order, fmt.Sprintf("ppt/slides/_rels/slide%d.xml.rels", i+1))
-		parts[order[len(order)-1]] = slideRels(s.layout)
+		parts[order[len(order)-1]] = slideRels(s.layout, s.image)
 	}
 
 	var buf bytes.Buffer
@@ -191,11 +210,17 @@ func nextRelID(rels string) int {
 	return next
 }
 
-func withSlideTypes(types string, slides int) string {
+func withSlideTypes(types string, slides int, png bool) string {
 	// A deck still typed as a template opens in PowerPoint as a new unsaved
 	// copy rather than as the file the user asked for.
 	types = strings.ReplaceAll(types, "presentationml.template.main", "presentationml.presentation.main")
 	var b strings.Builder
+	// A part whose extension nothing types is a part PowerPoint offers to
+	// repair. The template has no picture of its own, so this is where the
+	// declaration for one arrives.
+	if png {
+		b.WriteString(`<Default Extension="png" ContentType="image/png"/>`)
+	}
 	for i := 1; i <= slides; i++ {
 		fmt.Fprintf(&b, `<Override PartName="/ppt/slides/slide%d.xml" `+
 			`ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`, i)
@@ -228,10 +253,15 @@ func withSlideRels(rels string, slides, firstRel int) (string, error) {
 	return strings.Replace(rels, "</Relationships>", b.String()+"</Relationships>", 1), nil
 }
 
-func slideRels(layout string) string {
+func slideRels(layout, image string) string {
+	pic := ""
+	if image != "" {
+		pic = fmt.Sprintf(`<Relationship Id="rId%d" Type="%simage" Target="../media/%s"/>`,
+			pictureRelID, relType, image)
+	}
 	return xmlHeader + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
 		`<Relationship Id="rId1" Type="` + relType + `slideLayout" Target="../slideLayouts/` + layout + `"/>` +
-		`</Relationships>`
+		pic + `</Relationships>`
 }
 
 func titleSlide(title string) string {
@@ -240,30 +270,44 @@ func titleSlide(title string) string {
 		`</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
 }
 
-// sectionSlides is one section, over as many slides as its table needs.
-func sectionSlides(s Section) []string {
+// page is one slide of a section: its body, and the media part it needs a
+// relationship to, which is empty for a slide of sentences and figures.
+type page struct{ body, image string }
+
+// sectionSlides is one section, over as many slides as its table needs and
+// then one per chart.
+//
+// A chart gets a slide of its own because the box the layout leaves is the
+// table's box: a picture squeezed beside a table would read as neither. The
+// heading and the caveats repeat on it for the reason they repeat on a
+// continuation slide, which is that a figure away from its qualification
+// looks more certain than it is.
+func sectionSlides(s Section, pics map[string]string) []page {
 	// One row of the budget is the column names, which every slide repeats.
 	perSlide := (tableBottom-tableTop)/rowHeight - 1
 	if perSlide < 1 {
 		perSlide = 1
 	}
 	rows := s.Table.Rows
-	var out []string
+	var out []page
 	for first := true; first || len(rows) > 0; first = false {
 		take := rows
 		if len(take) > perSlide {
 			take = take[:perSlide]
 		}
 		rows = rows[len(take):]
-		out = append(out, sectionSlide(s, Table{Columns: s.Table.Columns, Rows: take}))
+		out = append(out, page{body: sectionSlide(s, Table{Columns: s.Table.Columns, Rows: take}, "")})
 		if len(rows) == 0 {
 			break
 		}
 	}
+	for _, im := range s.Images {
+		out = append(out, page{sectionSlide(s, Table{}, pics[im.Name]), im.Name})
+	}
 	return out
 }
 
-func sectionSlide(s Section, t Table) string {
+func sectionSlide(s Section, t Table, pic string) string {
 	var b strings.Builder
 	b.WriteString(xmlHeader + `<p:sld ` + nsDecls + `><p:cSld><p:spTree>` + emptyTree)
 	b.WriteString(placeholder(2, "Heading", `type="title"`, []string{s.Heading}))
@@ -274,8 +318,9 @@ func sectionSlide(s Section, t Table) string {
 		b.WriteString(placeholder(4, "Caveats", `idx="2"`, s.Notes))
 	}
 	if len(t.Columns) > 0 {
-		b.WriteString(tableFrame(5, t))
+		b.WriteString(tableFrame(pictureShapeID, t))
 	}
+	b.WriteString(pic)
 	b.WriteString(`</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`)
 	return b.String()
 }
