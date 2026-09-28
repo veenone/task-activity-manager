@@ -1293,8 +1293,16 @@
    left the 12px gaps between them transparent, so cards scrolled through the
    header. The row carries the ground and the cells sit on it. */
 .board-columns-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-bottom: 8px; }
-.board-column-head { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
+/* Wraps, so the limit clause below takes a line of its own rather than
+   crowding the card count out of the head on a narrow column. */
+.board-column-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
 .board-column-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* The column's WIP limit, on the line under the name so it never competes
+   with the card count for the head's one right-hand slot. A breach takes the
+   warn colour, and the clause itself names it, so the colour is the second
+   signal and never the only one. */
+.board-column-limit { flex-basis: 100%; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.board-column-limit-breached { color: var(--warn-text); font-weight: 600; }
 .board-lane { display: flex; flex-direction: column; gap: 6px; }
 .board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
 .board-cell { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }

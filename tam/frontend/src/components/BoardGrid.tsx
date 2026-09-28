@@ -1,6 +1,7 @@
 import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent } from "react";
 import type { BoardView, Issue, Sprint } from "../api";
 import { posId } from "../lib/boardCells";
+import { limitBreach, limitLine } from "../lib/columnLimit";
 import { plural } from "../lib/format";
 import { drawnParents, familyPlace } from "../lib/issueFamilies";
 import { BoardCard } from "./BoardCard";
@@ -89,6 +90,14 @@ export function BoardGrid({
           <div key={c.name} className="board-column-head" role="columnheader" aria-colindex={col + 1}>
             <span>{c.name}</span>
             <span className="board-column-count">{columnCount(c.total, c.points)}</span>
+            {/* The limit, for the columns Jira sets one on. A breach is in
+                the words as well as the colour, so it reads the same to
+                somebody who cannot tell the two colours apart. */}
+            {limitLine(c) && (
+              <span className={`board-column-limit${limitBreach(c) ? " board-column-limit-breached" : ""}`}>
+                {limitLine(c)}
+              </span>
+            )}
           </div>
         ))}
       </div>
