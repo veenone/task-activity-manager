@@ -66,6 +66,12 @@ func (a *App) PublishSprintReport(profileID string, boardID, sprintID int, doc r
 		return reportout.Published{}, err
 	}
 	log.Printf("tam: report for sprint %d on board %d for %s published to page %s (%s)", sprintID, boardID, p.Name, published.PageID, published.Title)
+	if published.Warning != "" {
+		// The page was written, so this is not the error return. It is logged
+		// as well as answered because a chart Confluence refused is the kind
+		// of thing a user reports a week later.
+		log.Printf("tam: the report page %s is missing a chart: %s", published.PageID, published.Warning)
+	}
 	return published, nil
 }
 

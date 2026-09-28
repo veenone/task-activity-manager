@@ -1576,6 +1576,7 @@ export namespace reportout {
 	export class Published {
 	    title: string;
 	    pageId: string;
+	    warning: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Published(source);
@@ -1585,6 +1586,7 @@ export namespace reportout {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.title = source["title"];
 	        this.pageId = source["pageId"];
+	        this.warning = source["warning"];
 	    }
 	}
 	
