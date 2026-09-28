@@ -45,6 +45,16 @@ func (b *Backend) Boards(ctx context.Context, projectKey string) ([]backend.Boar
 // column's status objects to their ids. A column with no statuses keeps an
 // empty list: that is a real board shape (a Backlog column Jira never
 // fills), and the view relies on knowing about it. It never writes.
+//
+// The WIP limits come across as they are, nil and all: a column with no
+// limit is the ordinary case and has to stay distinguishable from one
+// limited to nothing. The board's constraintType rides on every column,
+// because it is what says whether the count a limit is measured against
+// includes subtasks, and the columns are all this call answers with.
+//
+// Both board types are read the same way. Jira serves the same
+// configuration for a scrum board as for a kanban one, column constraints
+// included, so nothing here asks which kind of board it is looking at.
 func (b *Backend) BoardColumns(ctx context.Context, boardID int) ([]backend.BoardColumn, error) {
 	cfg, err := b.c.BoardConfiguration(ctx, boardID)
 	if err != nil {
@@ -52,9 +62,32 @@ func (b *Backend) BoardColumns(ctx context.Context, boardID int) ([]backend.Boar
 	}
 	out := make([]backend.BoardColumn, 0, len(cfg.ColumnConfig.Columns))
 	for _, c := range cfg.ColumnConfig.Columns {
-		out = append(out, backend.BoardColumn{Name: c.Name, StatusIDs: c.StatusIDs()})
+		out = append(out, backend.BoardColumn{
+			Name:       c.Name,
+			StatusIDs:  c.StatusIDs(),
+			Min:        limit(boardID, c.Name, "min", c.Min),
+			Max:        limit(boardID, c.Name, "max", c.Max),
+			Constraint: cfg.ColumnConfig.ConstraintType,
+		})
 	}
 	return out, nil
+}
+
+// limit is one WIP limit as TAM will hold it: what Jira sent, or nothing at
+// all when what Jira sent was negative. A server response is input, and a
+// limit below zero is one no column can be inside, so honouring it would
+// paint an empty column as over its limit for as long as the board stayed
+// that way. It is logged rather than swallowed, because the board in Jira is
+// the thing that needs fixing and nothing else here would say so.
+func limit(boardID int, column, which string, n *int) *int {
+	if n == nil {
+		return nil
+	}
+	if *n < 0 {
+		log.Printf("tam: board %d column %q has a %s limit of %d, which no column can be inside; reading it as no limit", boardID, column, which, *n)
+		return nil
+	}
+	return n
 }
 
 // BoardSprints lists one board's sprints. A board with none, which is what

@@ -89,6 +89,24 @@ type ColumnView struct {
 	StatusIDs []string `json:"statusIds"`
 	Total     int      `json:"total"`
 	Points    float64  `json:"points"`
+	// Counted is the cards this column's limit is measured against: Total,
+	// or Total without the subtasks on a board whose constraint excludes
+	// them. It is its own number because Total is what the head prints as
+	// cards, and a limit measured against that on a board counting the
+	// other way would disagree with Jira's own board in front of a team.
+	Counted int `json:"counted"`
+	// Min, Max and Constraint are the column's WIP limits and what the
+	// board counts them in, straight off backend.BoardColumn. A nil limit
+	// is a column the board sets none on, which is the ordinary case and
+	// never a breach.
+	Min        *int   `json:"min"`
+	Max        *int   `json:"max"`
+	Constraint string `json:"constraint"`
+}
+
+// counts says whether one card is among those this column's limit measures.
+func (c ColumnView) counts(card backend.Issue) bool {
+	return c.Constraint != backend.ConstraintExclSubtasks || card.Type != backend.TypeSubtask
 }
 
 // LaneView is one swimlane: a cell per column, in the same order as
@@ -156,7 +174,13 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 		return view, nil
 	}
 	for _, c := range cols {
-		view.Columns = append(view.Columns, ColumnView{Name: c.Name, StatusIDs: backend.NonNil(c.StatusIDs)})
+		view.Columns = append(view.Columns, ColumnView{
+			Name:       c.Name,
+			StatusIDs:  backend.NonNil(c.StatusIDs),
+			Min:        c.Min,
+			Max:        c.Max,
+			Constraint: c.Constraint,
+		})
 	}
 
 	boardKeys, err := issueKeys(ctx, q, profileID, boardID, sprintID)
@@ -220,6 +244,9 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 			continue
 		}
 		view.Columns[col].Total++
+		if view.Columns[col].counts(card) {
+			view.Columns[col].Counted++
+		}
 		if card.StoryPoints != nil {
 			view.Columns[col].Points += *card.StoryPoints
 			if backend.IsDone(card.Status) {

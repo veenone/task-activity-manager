@@ -374,12 +374,38 @@ type Board struct {
 	ProjectKey string `json:"projectKey"`
 }
 
+// What a board counts a column's limit in, Jira's own
+// columnConfig.constraintType. A board that sets no constraint sends
+// neither value and no limits either, so the empty string is a board whose
+// limits nothing has read rather than a third way of counting.
+const (
+	// ConstraintIssueCount counts every card in the column.
+	ConstraintIssueCount = "issueCount"
+	// ConstraintExclSubtasks counts a column's cards without their
+	// subtasks.
+	ConstraintExclSubtasks = "issueCountExclSubs"
+)
+
 // BoardColumn is one column of a board's configuration. StatusIDs are the
 // Jira status ids the column collects; a column may have none, which is
 // how a Backlog column Jira never fills is described.
 type BoardColumn struct {
 	Name      string   `json:"name"`
 	StatusIDs []string `json:"statusIds"`
+	// Min and Max are the column's WIP limits, nil for a limit the board
+	// does not set, which is the ordinary case. They are pointers because
+	// zero is a limit a board can really carry: modelled as ints, every
+	// column Jira sets no limit on would report itself as over a limit of
+	// nothing.
+	Min *int `json:"min"`
+	Max *int `json:"max"`
+	// Constraint is the board's own constraintType, one of the two above or
+	// empty for a board synced before TAM read it. It is the board's fact
+	// rather than the column's, carried on every column because the column
+	// configuration is the only thing the boards sync reads, and a count
+	// that ignored it would disagree with the number Jira's own board shows
+	// the same team.
+	Constraint string `json:"constraint"`
 }
 
 // Sprint is one sprint of a board. State is Jira's own lowercase value

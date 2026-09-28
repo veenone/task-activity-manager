@@ -447,6 +447,10 @@ export namespace boardrepo {
 	    statusIds: string[];
 	    total: number;
 	    points: number;
+	    counted: number;
+	    min?: number;
+	    max?: number;
+	    constraint: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ColumnView(source);
@@ -458,6 +462,10 @@ export namespace boardrepo {
 	        this.statusIds = source["statusIds"];
 	        this.total = source["total"];
 	        this.points = source["points"];
+	        this.counted = source["counted"];
+	        this.min = source["min"];
+	        this.max = source["max"];
+	        this.constraint = source["constraint"];
 	    }
 	}
 	export class BoardView {

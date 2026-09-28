@@ -19,7 +19,8 @@ const upsertBoardSQL = `
 		name = excluded.name, type = excluded.type, synced_at = excluded.synced_at`
 
 const insertColumnSQL = `
-	INSERT INTO board_column (profile_id, board_id, position, name, status_ids) VALUES (?, ?, ?, ?, ?)`
+	INSERT INTO board_column (profile_id, board_id, position, name, status_ids, wip_min, wip_max, constraint_type)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
 const insertSprintSQL = `
 	INSERT INTO sprint (profile_id, id, board_id, name, state, start_date, end_date, goal, complete_date, membership_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -39,7 +40,8 @@ const listBoardsSQL = `
 	SELECT id, name, type, draft FROM board WHERE profile_id = ? ORDER BY name, id`
 
 const columnsSQL = `
-	SELECT name, status_ids FROM board_column WHERE profile_id = ? AND board_id = ? ORDER BY position`
+	SELECT name, status_ids, wip_min, wip_max, constraint_type FROM board_column
+	WHERE profile_id = ? AND board_id = ? ORDER BY position`
 
 // listSprintsSQL puts the sprint the user most likely wants first: the
 // active one, then the future ones, then what is closed, each group by start
@@ -123,19 +125,41 @@ func columnsOf(ctx context.Context, q dbtx.Querier, profileID string, boardID in
 	out := []backend.BoardColumn{}
 	for rows.Next() {
 		var (
-			c   backend.BoardColumn
-			ids string
+			c         backend.BoardColumn
+			ids       string
+			low, high sql.NullInt64
 		)
-		if err := rows.Scan(&c.Name, &ids); err != nil {
+		if err := rows.Scan(&c.Name, &ids, &low, &high, &c.Constraint); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(ids), &c.StatusIDs); err != nil {
 			return nil, fmt.Errorf("status ids of column %q: %w", c.Name, err)
 		}
 		c.StatusIDs = backend.NonNil(c.StatusIDs)
+		c.Min, c.Max = storedLimit(low), storedLimit(high)
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// storedLimit is one WIP limit as the column holds it. NULL is a limit the
+// board does not set, which is a different fact from a limit of zero, so it
+// comes back as no limit rather than as a number.
+func storedLimit(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int64)
+	return &v
+}
+
+// limitValue is one WIP limit on its way into the column, NULL for a limit
+// the board does not set.
+func limitValue(n *int) any {
+	if n == nil {
+		return nil
+	}
+	return *n
 }
 
 // ListSprints returns one board's sprints, active first, then future, then
