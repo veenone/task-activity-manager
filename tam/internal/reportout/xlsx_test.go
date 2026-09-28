@@ -1,8 +1,10 @@
 package reportout
 
 import (
+	"archive/zip"
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -145,6 +147,118 @@ func TestXLSXTakesItsLookFromTheTemplate(t *testing.T) {
 	if width < 44 {
 		t.Errorf("column A is %v wide; a caveat needs the template's width", width)
 	}
+}
+
+func TestXLSXPlacesASectionsChartUnderTheFiguresItWasDrawnFrom(t *testing.T) {
+	im := sampleImage(t)
+	d := sample()
+	d.Sections[0].Images = []Image{im}
+	d.Sections = append(d.Sections, Section{Heading: "Burndown, day by day", Lines: []string{"No days to draw yet."}})
+	data := mustXLSX(t, d)
+
+	f, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("the spreadsheet would not open: %v", err)
+	}
+	defer f.Close()
+	cells, err := f.GetPictureCells(sheetName)
+	if err != nil {
+		t.Fatalf("read the pictures: %v", err)
+	}
+	if len(cells) != 1 {
+		t.Fatalf("pictures at %v, want the one this section carries", cells)
+	}
+	pics, err := f.GetPictures(sheetName, cells[0])
+	if err != nil || len(pics) != 1 {
+		t.Fatalf("pictures at %s = %d, %v", cells[0], len(pics), err)
+	}
+	raw, cfg, err := im.PNG()
+	if err != nil {
+		t.Fatalf("the test image: %v", err)
+	}
+	if !bytes.Equal(pics[0].File, raw) {
+		t.Error("the picture in the sheet is not the PNG the document carried")
+	}
+
+	// Under this section's own rows and above the next heading, or it is a
+	// picture beside the wrong figures.
+	rows := sheetRows(t, data)
+	rowOf := func(text string) int {
+		for i, r := range rows {
+			if len(r) > 0 && r[0] == text {
+				return i + 1
+			}
+		}
+		return 0
+	}
+	_, at, err := excelize.CellNameToCoordinates(cells[0])
+	if err != nil {
+		t.Fatalf("the picture's cell %s: %v", cells[0], err)
+	}
+	note, next := rowOf("Committed is a minimum estimate."), rowOf("Burndown, day by day")
+	if note == 0 || next == 0 {
+		t.Fatalf("the sheet is missing the rows this places the picture between:\n%s", flat(rows))
+	}
+	if at <= note || at >= next {
+		t.Errorf("the picture is on row %d, outside its own section's rows %d to %d", at, note, next)
+	}
+	// The next heading may not land under the picture, which covers the rows
+	// its own height needs.
+	if covered := at + cfg.Height/pixelsPerRow; next <= covered {
+		t.Errorf("the next heading is on row %d, under a picture covering rows %d to %d", next, at, covered)
+	}
+}
+
+// I3: a picture with no description is a figure a screen reader cannot read.
+func TestXLSXGivesThePictureItsDescription(t *testing.T) {
+	im := sampleImage(t)
+	d := sample()
+	d.Sections[0].Images = []Image{im}
+	if drawing := sheetPart(t, mustXLSX(t, d), "xl/drawings/drawing1.xml"); !strings.Contains(drawing, im.Alt) {
+		t.Errorf("the picture carries no description:\n%s", drawing)
+	}
+}
+
+func TestXLSXDrawsNothingForASectionWithNoChart(t *testing.T) {
+	f, err := excelize.OpenReader(bytes.NewReader(mustXLSX(t, sample())))
+	if err != nil {
+		t.Fatalf("the spreadsheet would not open: %v", err)
+	}
+	defer f.Close()
+	cells, err := f.GetPictureCells(sheetName)
+	if err != nil {
+		t.Fatalf("read the pictures: %v", err)
+	}
+	if len(cells) != 0 {
+		t.Errorf("pictures at %v in a report with nothing to draw", cells)
+	}
+}
+
+// sheetPart is one part of the written workbook, for the bookkeeping excelize
+// does not read back.
+func sheetPart(t *testing.T, data []byte, name string) string {
+	t.Helper()
+	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("the spreadsheet is not a readable zip: %v", err)
+	}
+	for _, f := range r.File {
+		if f.Name != name {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("open %s: %v", name, err)
+		}
+		defer rc.Close()
+		body, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		return string(body)
+	}
+	t.Fatalf("the spreadsheet has no %s", name)
+	return ""
 }
 
 func mustXLSX(t *testing.T, d Document) []byte {
