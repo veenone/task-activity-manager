@@ -1,7 +1,7 @@
 // Package confluence is the Confluence Data Center transport behind TAM's
-// Rituals view: reading a page's storage body, finding a page by title, and
-// creating and updating pages. TAM's ritualsync decides when each is called;
-// nothing here keeps state between calls.
+// Rituals view: reading a page's storage body, finding a page by title,
+// creating and updating pages, and attaching a file to one. TAM's ritualsync
+// decides when each is called; nothing here keeps state between calls.
 package confluence
 
 import (
@@ -12,7 +12,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"time"
 )
@@ -67,10 +69,10 @@ func (c *Client) get(ctx context.Context, path string) responseDecoder {
 	return c.send(ctx, http.MethodGet, path, nil)
 }
 
-// send is every request this client makes. A nil payload sends no body; any
-// other payload is JSON. A non-2xx answer becomes *HTTPError carrying
+// send is every JSON request this client makes. A nil payload sends no body;
+// any other payload is JSON. A non-2xx answer becomes *HTTPError carrying
 // Confluence's own message, which is what errors.Is matches ErrNotFound and
-// ErrVersionConflict against.
+// ErrVersionConflict against. Uploading a file goes through sendFile instead.
 func (c *Client) send(ctx context.Context, method, path string, payload any) responseDecoder {
 	var body io.Reader
 	if payload != nil {
@@ -84,11 +86,17 @@ func (c *Client) send(ctx context.Context, method, path string, payload any) res
 	if err != nil {
 		return responseDecoder{err: err}
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	return c.do(req)
+}
+
+// do sets the headers every request shares, runs it, and turns a non-2xx
+// answer into *HTTPError carrying Confluence's own message.
+func (c *Client) do(req *http.Request) responseDecoder {
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return responseDecoder{err: err}
@@ -103,4 +111,40 @@ func (c *Client) send(ctx context.Context, method, path string, payload any) res
 		return responseDecoder{err: &HTTPError{Code: resp.StatusCode, Status: resp.Status, Message: e.Message}}
 	}
 	return responseDecoder{body: resp.Body}
+}
+
+// sendFile is the one request that is not JSON: a single multipart part named
+// file, carrying the bytes under filename, with the X-Atlassian-Token header
+// Data Center demands of any form post and without which it refuses the
+// request as XSRF. The body is built in memory because it is one chart.
+func (c *Client) sendFile(ctx context.Context, method, path, filename, contentType string, data []byte) responseDecoder {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	part, err := w.CreatePart(filePartHeader(filename, contentType))
+	if err != nil {
+		return responseDecoder{err: err}
+	}
+	if _, err := part.Write(data); err != nil {
+		return responseDecoder{err: err}
+	}
+	if err := w.Close(); err != nil {
+		return responseDecoder{err: err}
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		return responseDecoder{err: err}
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("X-Atlassian-Token", "nocheck")
+	return c.do(req)
+}
+
+// filePartHeader writes the part's own headers. filename goes in unescaped,
+// which is safe only because checkAttachment has already refused anything a
+// quote or a line break could do to this header.
+func filePartHeader(filename, contentType string) textproto.MIMEHeader {
+	h := textproto.MIMEHeader{}
+	h.Set("Content-Disposition", `form-data; name="file"; filename="`+filename+`"`)
+	h.Set("Content-Type", contentType)
+	return h
 }

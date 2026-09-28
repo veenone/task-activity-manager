@@ -90,6 +90,19 @@ commit hash behind it; the instruction gate checks the hash exists.
   editmeta read as "nothing is editable" would refuse every field on a 403;
   the write goes and Jira's own refusal decides (a0672d1).
 
+## Confluence API
+
+- A form post to Data Center needs `X-Atlassian-Token: nocheck`. Without it
+  the instance rejects the request as XSRF, which is why attaching a file has
+  its own request path in `core/confluence/client.go` rather than going
+  through the JSON `send`.
+- Posting an attachment whose filename is already on the page is a 400 on
+  some Data Center versions and a second attachment with the same name on
+  others. `AttachFile` therefore looks the filename up first and posts to the
+  existing attachment's `/data` endpoint, so republishing a report replaces
+  its chart. Atlassian documents that data update as a POST; the PUT on
+  `/child/attachment/{id}` updates an attachment's properties, not its bytes.
+
 ## Modals
 
 - Modal layering and backgrounds have cost four separate fixes: the grid header

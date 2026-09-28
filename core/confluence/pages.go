@@ -46,6 +46,7 @@ type Pages interface {
 	FindPageByTitle(ctx context.Context, spaceKey, title string) (StoredPage, bool, error)
 	CreatePage(ctx context.Context, spaceKey, parentID, title, body string) (StoredPage, error)
 	UpdatePage(ctx context.Context, id, title, body string, version int) (StoredPage, error)
+	AttachFile(ctx context.Context, pageID, filename, contentType string, data []byte) (Attachment, error)
 }
 
 var _ Pages = (*Client)(nil)
