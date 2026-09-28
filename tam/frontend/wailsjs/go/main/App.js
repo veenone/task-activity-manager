@@ -326,6 +326,10 @@ export function SetProfileSetting(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetProfileSetting'](arg1, arg2, arg3);
 }
 
+export function SetProjectKeyPatternCheck(arg1) {
+  return window['go']['main']['App']['SetProjectKeyPatternCheck'](arg1);
+}
+
 export function SetReportExportDirectory(arg1) {
   return window['go']['main']['App']['SetReportExportDirectory'](arg1);
 }

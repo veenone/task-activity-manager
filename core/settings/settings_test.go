@@ -196,3 +196,41 @@ func TestReportExportDirRoundTrips(t *testing.T) {
 		t.Errorf("got ReportExportDir %q, want D:\reports", got.ReportExportDir)
 	}
 }
+
+// TestProjectKeyPatternCheckIsOnUntilTurnedOff covers the switch behind TAM's
+// project key check (#99). A fresh install has no row, and that has to read as
+// on, or an upgrade would quietly lose the check; a stored false has to read as
+// off, or turning it off would not stick.
+func TestProjectKeyPatternCheckIsOnUntilTurnedOff(t *testing.T) {
+	m := newManager(t)
+
+	got, err := m.Get()
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if !got.CheckProjectKeyPattern {
+		t.Error("fresh install has the project key pattern check off, want on")
+	}
+
+	if err := m.SetCheckProjectKeyPattern(false); err != nil {
+		t.Fatalf("set false: %v", err)
+	}
+	got, err = m.Get()
+	if err != nil {
+		t.Fatalf("get after set false: %v", err)
+	}
+	if got.CheckProjectKeyPattern {
+		t.Error("after storing false the check reads as on, want off")
+	}
+
+	if err := m.SetCheckProjectKeyPattern(true); err != nil {
+		t.Fatalf("set true: %v", err)
+	}
+	got, err = m.Get()
+	if err != nil {
+		t.Fatalf("get after set true: %v", err)
+	}
+	if !got.CheckProjectKeyPattern {
+		t.Error("after storing true the check reads as off, want on")
+	}
+}

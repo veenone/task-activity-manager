@@ -8,6 +8,7 @@ import {
   TestProfileConnection,
   GetProfileSetting,
   SetProfileSetting,
+  GetSettings,
   GetConfluenceConfig,
   SetConfluenceConfig,
   CreateReportRoot,
@@ -51,15 +52,18 @@ interface Props {
   extraActions?: ReactNode;
 }
 
-// projectKeyError validates a Jira project key, rejecting trailing slashes,
-// spaces, and other invalid characters. Jira DC project keys start with a
-// letter and contain letters, digits, and underscores (e.g. RND_P_4TFINT_05);
-// any case is accepted and upper-cased on input.
-function projectKeyError(key: string): string {
+// projectKeyError checks a Jira project key against the shape Jira documents:
+// a letter first, then letters, digits and underscores (e.g. RND_P_4TFINT_05);
+// any case is accepted and upper-cased on input. That shape is a convention of
+// an instance rather than a rule, and things like the minimum key length are
+// configurable, so the check is switchable from application settings (#99);
+// off, the field takes whatever the instance accepts and Jira decides. Blank
+// is left to the Save button, which is disabled without a key.
+function projectKeyError(key: string, checkPattern: boolean): string {
   const k = key.trim();
-  if (k === "") return "";
+  if (k === "" || !checkPattern) return "";
   if (!/^[A-Z][A-Z0-9_]+$/.test(k)) {
-    return "Project key must start with a letter and contain only letters, digits, and underscores — no spaces, slashes, or other special characters.";
+    return "Project key must start with a letter and use only letters, digits, and underscores. No spaces, slashes, or other special characters.";
   }
   return "";
 }
@@ -138,6 +142,11 @@ export function ProfileForm({
   const [reportsSpace, setReportsSpace] = useState("");
   const [reportsRootPageID, setReportsRootPageID] = useState("");
   const [pickingReportsRoot, setPickingReportsRoot] = useState(false);
+  // Whether the project key is checked against Jira's documented shape, an
+  // application setting (#99). It starts on, which is both the default and
+  // what the field did before the setting existed, so a settings read that is
+  // slow or fails leaves the check where it has always been.
+  const [checkKeyPattern, setCheckKeyPattern] = useState(true);
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState("");
@@ -174,6 +183,14 @@ export function ProfileForm({
   }, [demo, profile]);
 
   useEffect(() => {
+    let live = true;
+    GetSettings()
+      .then((s) => live && setCheckKeyPattern(s.checkProjectKeyPattern !== false))
+      .catch(() => { /* unreadable settings leave the check on, its default */ });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
     if (!profile) return;
     let live = true;
     Promise.resolve()
@@ -191,7 +208,7 @@ export function ProfileForm({
     return () => { live = false; };
   }, [profile]);
 
-  const keyError = projectKeyError(projectKey);
+  const keyError = projectKeyError(projectKey, checkKeyPattern);
   const urlError = jiraUrlError(jiraUrl);
   // Each field error is the description of its input, so a screen reader
   // reads it with the field rather than only where it sits on the page.

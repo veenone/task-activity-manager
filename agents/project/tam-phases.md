@@ -2316,7 +2316,10 @@ Same as XTM's: logic in `internal/`, `app.go` only adapt it to Wails; Jira =
 system of record; credentials go to OS credential manager only;
 `TODO(tam): desc` mark planned work. TAM create Jira profiles, which core
 store with backend `xray`; Kiwi profiles from XTM hidden. UI text use no em
-dashes.
+dashes. The project key shape is checked in the profile form only, and only
+while the application setting `check_project_key_pattern` is on; an absent row
+reads as on, and `suiteprofiles.ValidateFields` asks just that a key is not
+blank either way.
 
 Sync scope = `project = KEY AND issuetype in (Task, Epic, Story, Bug, <requirement
 type>)` plus profile scope JQL; incremental syncs add `updated >=` last sync

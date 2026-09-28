@@ -40,6 +40,11 @@ export interface Settings {
   // The folder a report export's save dialog starts in. Empty, and absent in
   // fixtures written before it existed, means the app data folder.
   reportExportDir?: string;
+  // Whether the profile form checks a project key against Jira's documented
+  // shape. Absent means on, both in a fixture and in a settings row written
+  // before the switch existed, so a reader tests it against false rather than
+  // for truthiness.
+  checkProjectKeyPattern?: boolean;
 }
 
 // The rituals space and root, and the pair a sprint report is published to.
@@ -1100,6 +1105,10 @@ export const SetReportExportDirectory: (dir: string) => Promise<void> =
   App.SetReportExportDirectory;
 export const ChooseReportExportDirectory: () => Promise<string> =
   App.ChooseReportExportDirectory;
+// SetProjectKeyPatternCheck turns the profile form's project key pattern check
+// on and off. It is on for anyone who has never set it.
+export const SetProjectKeyPatternCheck: (on: boolean) => Promise<void> =
+  App.SetProjectKeyPatternCheck;
 
 export const SyncIssues: (profileId: string, full: boolean) => Promise<SyncSummary> =
   App.SyncIssues;

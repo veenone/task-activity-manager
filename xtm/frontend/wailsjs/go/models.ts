@@ -937,6 +937,27 @@ export namespace coveragepublish {
 
 }
 
+export namespace importfile {
+	
+	export class Preview {
+	    headers: string[];
+	    rowCount: number;
+	    sample: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Preview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.headers = source["headers"];
+	        this.rowCount = source["rowCount"];
+	        this.sample = source["sample"];
+	    }
+	}
+
+}
+
 export namespace jira {
 	
 	export class BugFieldOption {
@@ -1329,6 +1350,9 @@ export namespace settings {
 	    requirementLinkType: string;
 	    showCoverage: boolean;
 	    tourSeenVersion: number;
+	    showNavRail: boolean;
+	    reportExportDir: string;
+	    checkProjectKeyPattern: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -1341,6 +1365,9 @@ export namespace settings {
 	        this.requirementLinkType = source["requirementLinkType"];
 	        this.showCoverage = source["showCoverage"];
 	        this.tourSeenVersion = source["tourSeenVersion"];
+	        this.showNavRail = source["showNavRail"];
+	        this.reportExportDir = source["reportExportDir"];
+	        this.checkProjectKeyPattern = source["checkProjectKeyPattern"];
 	    }
 	}
 
@@ -2141,20 +2168,6 @@ export namespace testrepo {
 	        this.cucumberScenario = source["cucumberScenario"];
 	        this.cucumberType = source["cucumberType"];
 	        this.genericDefinition = source["genericDefinition"];
-	    }
-	}
-	export class ImportPreview {
-	    headers: string[];
-	    rowCount: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new ImportPreview(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.headers = source["headers"];
-	        this.rowCount = source["rowCount"];
 	    }
 	}
 	export class UnknownComponent {
