@@ -151,6 +151,19 @@ func TestRootBodyNamesTheProjectAndEscapesIt(t *testing.T) {
 	}
 }
 
+func TestReportRootBodySaysWhoPublishesTheReportsAndHowOftenBesidesNamingTheProject(t *testing.T) {
+	want := "<p>Sprint reports for PLAT. Task Activity Manager publishes one page here for each sprint.</p>"
+	if got := ReportRootBody("PLAT"); got != want {
+		t.Fatalf("ReportRootBody = %q", got)
+	}
+	if got := ReportRootBody(`A<&"`); !strings.Contains(got, "for A&lt;&amp;&quot;.") {
+		t.Fatalf("unescaped: %q", got)
+	}
+	if got := ReportRootBody(" "); !strings.HasPrefix(got, "<p>Sprint reports. Task Activity Manager publishes") {
+		t.Fatalf("blank project: %q", got)
+	}
+}
+
 func TestParseJQLReadsTheThreeFormsAndNothingElse(t *testing.T) {
 	for _, f := range []Filter{All, Done, NotDone} {
 		id, got, ok := ParseJQL(JQL(14, f))

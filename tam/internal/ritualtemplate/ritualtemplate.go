@@ -290,7 +290,7 @@ func ReportRootBody(projectKey string) string {
 	if key != "" {
 		subject += " for " + key
 	}
-	return "<p>" + esc(subject+", published by Task Activity Manager. Each sprint's report is a page here.") + "</p>"
+	return "<p>" + esc(subject+". Task Activity Manager publishes one page here for each sprint.") + "</p>"
 }
 
 // Note is one remark the retired wizard stored against an issue.
