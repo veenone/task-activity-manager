@@ -169,19 +169,19 @@ func (e *Engine) Sync(ctx context.Context, profileID, projectKey, scopeJQL strin
 			return e.fail(ctx, profileID, state, pages, sum, err, emit)
 		}
 		total = n
-		keep := make([]backend.Issue, 0, len(page))
-		for _, iss := range page {
-			if iss.Type != "" {
-				keep = append(keep, iss)
-			}
-		}
-		if err := e.repo.UpsertPage(ctx, profileID, keep, start, full && pages == 0); err != nil {
+		// Every row the page carried is stored. What belongs in the scope is
+		// the JQL's business since #70 moved Xray exclusion into it, and a
+		// type TAM does not model already arrives under the project's own
+		// name for it, so the guard that stood here only ever dropped rows:
+		// an Improvement before #70, and afterwards a row Jira answered with
+		// no issuetype field at all. Either one has a key, a summary and work
+		// behind it, and the grid draws both (#100).
+		if err := e.repo.UpsertPage(ctx, profileID, page, start, full && pages == 0); err != nil {
 			return e.fail(ctx, profileID, state, pages, sum, err, emit)
 		}
 		pages++
 		sum.Fetched += len(page)
-		sum.Upserted += len(keep)
-		sum.Skipped += len(page) - len(keep)
+		sum.Upserted += len(page)
 		startAt += len(page)
 		emit(Progress{Phase: "issues", Fetched: sum.Fetched, Total: total, Stage: "Fetching issues"})
 		if len(page) == 0 {
