@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import type { RefObject } from "react";
 import { call, errMsg } from "@agile-suite/core";
 import { ExportSprintReportPPTX, ExportSprintReportXLSX, PublishSprintReport } from "../api";
-import type { SprintReport } from "../api";
+import type { ReportDocument, SprintReport } from "../api";
+import { chartImages } from "../lib/chartImage";
 import { reportDocument } from "../lib/reportDocument";
 import {
   busyLine,
@@ -39,6 +41,11 @@ interface Props {
   boardId: number;
   report: SprintReport;
   live: boolean;
+  // charts is the report frame the view drew, and the only place a picture is
+  // looked for. The charts are in the DOM rather than in the report, so they
+  // are collected on the click: rasterising three of them on every render
+  // would be work for a button nobody pressed.
+  charts: RefObject<HTMLDivElement | null>;
 }
 
 // A publisher is idle until it is used. "failed" carries a reason and "done"
@@ -60,7 +67,7 @@ const PUBLISHERS = [
 
 type PublisherID = (typeof PUBLISHERS)[number]["id"];
 
-export function ReportOutputs({ profileId, boardId, report, live }: Props) {
+export function ReportOutputs({ profileId, boardId, report, live, charts }: Props) {
   const doc = useMemo(() => reportDocument(report, live), [report, live]);
   const [outcomes, setOutcomes] = useState<Record<PublisherID, Outcome>>({
     publish: IDLE,
@@ -96,16 +103,25 @@ export function ReportOutputs({ profileId, boardId, report, live }: Props) {
   const running = PUBLISHERS.find((p) => outcomes[p.id].status === "running");
   const busy = running !== undefined || !doc;
 
+  // drawn is the document with the pictures of the charts on screen in it. The
+  // document built above is what it falls back to, which is the same document
+  // without them.
+  async function drawn(built: ReportDocument): Promise<ReportDocument> {
+    return reportDocument(report, live, await chartImages(charts.current)) ?? built;
+  }
+
   function onRun(id: PublisherID, label: string) {
     if (!doc) return;
     if (id === "publish") {
       run(id, label, async () =>
-        publishedLine((await PublishSprintReport(profileId, boardId, report.series.sprintId, doc)).title));
+        publishedLine(
+          (await PublishSprintReport(profileId, boardId, report.series.sprintId, await drawn(doc))).title,
+        ));
       return;
     }
     const exportIt = id === "xlsx" ? ExportSprintReportXLSX : ExportSprintReportPPTX;
     run(id, label, async () => {
-      const path = await exportIt(doc);
+      const path = await exportIt(await drawn(doc));
       return path ? savedLine(path) : "";
     });
   }
@@ -120,7 +136,8 @@ export function ReportOutputs({ profileId, boardId, report, live }: Props) {
         ))}
         {doc ? (
           <span className="muted small">
-            The page, the spreadsheet and the deck carry these figures as tables, with the caveats on them.
+            The page, the spreadsheet and the deck carry these figures as tables, with the caveats on them. The
+            spreadsheet and the deck also carry the charts as pictures.
           </span>
         ) : (
           <span className="muted small">{nothingToPublishLine()}</span>

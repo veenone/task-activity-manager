@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { call, errMsg, useProfile } from "@agile-suite/core";
 import { CancelSprintReport } from "../api";
 import type { Profile, Settings, Sprint, SprintReport } from "../api";
@@ -28,6 +28,12 @@ import { VelocityChart } from "./charts/VelocityChart";
 // and Commit enabled and inert for the whole of it.
 export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}) {
   const { activeId } = useProfile<Profile, Settings>();
+  // The charts are in the DOM and the document is built in TypeScript, so
+  // something has to collect their pictures at the moment the user asks for an
+  // output. This frame is that scope: ReportOutputs queries the charts inside
+  // it and nothing outside it, so a chart drawn elsewhere on the page can
+  // never end up in a report.
+  const reportFrame = useRef<HTMLDivElement>(null);
   const { runReport, progress, running } = useSync();
   const [boardId, setBoardId] = useState(0);
   // A sprint id of 0 asks the backend for the board's most recent closed
@@ -141,7 +147,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
       return (
         <>
           <p className="muted report-unavailable" role="status">{unavailableLine(r.unavailable)}</p>
-          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={false} />
+          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={false} charts={reportFrame} />
         </>
       );
     }
@@ -157,7 +163,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           <button type="button" className="btn" disabled={report.isFetching} onClick={() => void rebuild()}>
             {inProgress ? "Refresh report" : "Rebuild from Jira"}
           </button>
-          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={inProgress} />
+          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={inProgress} charts={reportFrame} />
           {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
         </div>
         {/* The burndown is the wide one: it carries a point per sprint day,
@@ -239,7 +245,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   return (
     <section className="backlog" aria-label="Reports">
       <h2 className="sr-only">Reports</h2>
-      <div className="report-frame">
+      <div className="report-frame" ref={reportFrame}>
         <div className="board-head">
         {/* One scrum board needs no picker, and a select holding one option
             is a control that cannot be used. The board is still named,

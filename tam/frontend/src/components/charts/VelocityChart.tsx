@@ -45,7 +45,7 @@ export function VelocityChart({ rows, busy, tabled }: { rows: VelocityRow[]; bus
 function Panel({ rows, title, note, busy, tabled }: { rows: VelocityRow[]; title: string; note?: string; busy?: boolean; tabled?: boolean }) {
   const table = velocityTable(rows, title);
   return (
-    <ChartFrame title={title} legend={LEGEND} table={tabled ? undefined : table} note={note} busy={busy}>
+    <ChartFrame title={title} exported="velocity" legend={LEGEND} table={tabled ? undefined : table} note={note} busy={busy}>
       {(width, titleId) => <Bars rows={rows} width={width} titleId={titleId} />}
     </ChartFrame>
   );

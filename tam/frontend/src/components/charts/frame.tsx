@@ -1,5 +1,6 @@
 import { useId, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import type { ChartKey } from "../../lib/chartImage";
 import type { TableSpec } from "../../lib/reportTables";
 import { useChartWidth } from "./useChartWidth";
 
@@ -19,6 +20,10 @@ export interface LegendItem {
 
 interface Props {
   title: string;
+  // exported names the document section this chart's picture belongs to, and
+  // it is what lib/chartImage looks for. A chart that names none is not
+  // exported, and one with nothing to draw renders no SVG and so no picture.
+  exported?: ChartKey;
   legend?: LegendItem[];
   table?: TableSpec;
   // note is a sentence under the chart that qualifies it, from reportText.
@@ -29,12 +34,17 @@ interface Props {
   children?: (width: number, titleId: string) => ReactNode;
 }
 
-export function ChartFrame({ title, legend, table, note, empty, busy, children }: Props) {
+export function ChartFrame({ title, exported, legend, table, note, empty, busy, children }: Props) {
   const titleId = useId();
   const box = useRef<HTMLDivElement>(null);
   const width = useChartWidth(box);
   return (
-    <figure className="chart-figure" aria-labelledby={titleId} aria-busy={busy || undefined}>
+    <figure
+      className="chart-figure"
+      data-chart={exported}
+      aria-labelledby={titleId}
+      aria-busy={busy || undefined}
+    >
       <figcaption id={titleId} className="chart-title">{title}</figcaption>
       {empty ? (
         <p className="muted chart-empty">{empty}</p>

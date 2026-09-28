@@ -4,6 +4,7 @@ import {
   amount,
   builtAtLine,
   busyLine,
+  chartAltLine,
   dayLine,
   emptyDaysLine,
   floorLine,
@@ -247,5 +248,13 @@ describe("the chart sentences", () => {
     expect(mixedUnitsLine()).toMatch(/different units/);
     expect(singleSprintLine()).toMatch(/one closed sprint/i);
     expect(emptyDaysLine()).toBe("No days to draw yet.");
+  });
+
+  it("describes an exported chart by the caption it carries on screen", () => {
+    expect(chartAltLine("Burndown")).toContain("Burndown");
+    // The figures are in the table beside the picture in every output, so the
+    // description says where to read them rather than listing them again.
+    expect(chartAltLine("Burndown")).toMatch(/table/);
+    expect(chartAltLine("Velocity in cards")).toContain("Velocity in cards");
   });
 });
