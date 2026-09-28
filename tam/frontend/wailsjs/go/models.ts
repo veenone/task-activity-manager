@@ -1472,6 +1472,22 @@ export namespace profile {
 
 export namespace reportout {
 	
+	export class Image {
+	    name: string;
+	    alt: string;
+	    data: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Image(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.alt = source["alt"];
+	        this.data = source["data"];
+	    }
+	}
 	export class Table {
 	    columns: string[];
 	    rows: string[][];
@@ -1491,6 +1507,7 @@ export namespace reportout {
 	    lines: string[];
 	    table: Table;
 	    notes: string[];
+	    images: Image[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Section(source);
@@ -1502,6 +1519,7 @@ export namespace reportout {
 	        this.lines = source["lines"];
 	        this.table = this.convertValues(source["table"], Table);
 	        this.notes = source["notes"];
+	        this.images = this.convertValues(source["images"], Image);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1554,6 +1572,7 @@ export namespace reportout {
 		    return a;
 		}
 	}
+	
 	export class Published {
 	    title: string;
 	    pageId: string;
