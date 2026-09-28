@@ -184,6 +184,24 @@ describe("the publisher ribbon", () => {
     expect(cell(/deck/i)).toHaveTextContent(publisherStatusWord("done"));
   });
 
+  // Issue #95. The charts go on the page as attachments, and one Confluence
+  // refuses must not read as a failed publish: the page is there and its
+  // tables are on it.
+  it("says a chart did not reach the page without calling the publish failed", async () => {
+    bindings.PublishSprintReport.mockResolvedValue({
+      title: "Sprint 11 · Report",
+      pageId: "9",
+      warning: "Not every chart reached the page: chart-1.png: 413 Payload Too Large.",
+    });
+    draw();
+    await userEvent.click(screen.getByRole("button", { name: /Confluence/i }));
+    await waitFor(() => expect(cell(/Confluence/i)).toHaveTextContent(publisherStatusWord("warned")));
+    expect(cell(/Confluence/i)).toHaveTextContent(/chart-1\.png/);
+    expect(cell(/Confluence/i)).toHaveTextContent(/Sprint 11 · Report/);
+    expect(cell(/Confluence/i)).not.toHaveTextContent(publisherStatusWord("failed"));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("announces a state change rather than only colouring it", async () => {
     bindings.ExportSprintReportXLSX.mockResolvedValue("/tmp/a.xlsx");
     draw();

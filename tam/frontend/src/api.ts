@@ -1272,10 +1272,13 @@ export interface ReportDocument {
 }
 
 // PublishedPage is the Confluence page a publish wrote, so the view can say
-// which one it was.
+// which one it was. warning is empty unless the page was written and something
+// on it was not: a chart Confluence refused as an attachment. The page is
+// still the outcome, so that is not an error.
 export interface PublishedPage {
   title: string;
   pageId: string;
+  warning: string;
 }
 
 // PublishSprintReport writes the report to its own page under the sprint's

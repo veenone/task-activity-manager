@@ -9,6 +9,7 @@ import {
   busyLine,
   isBusyRefusal,
   nothingToPublishLine,
+  partlyPublishedLine,
   publishedLine,
   publisherAnnouncement,
   publisherStatusWord,
@@ -48,9 +49,11 @@ interface Props {
   charts: RefObject<HTMLDivElement | null>;
 }
 
-// A publisher is idle until it is used. "failed" carries a reason and "done"
-// carries where the output went; the other two carry nothing.
-type Status = "idle" | "running" | "done" | "failed";
+// A publisher is idle until it is used. "failed" carries a reason, "done"
+// carries where the output went, and "warned" carries both: the page that was
+// written and the chart that did not reach it. A refused attachment is not a
+// failed publish, because the tables on the page are the report.
+type Status = "idle" | "running" | "done" | "warned" | "failed";
 type Outcome = { status: Status; message: string };
 
 const IDLE: Outcome = { status: "idle", message: "" };
@@ -90,10 +93,10 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
     return message ? { status: "done", message } : IDLE;
   }
 
-  function run(id: PublisherID, label: string, action: () => Promise<string>) {
+  function run(id: PublisherID, label: string, action: () => Promise<Outcome>) {
     set(id, label, { status: "running", message: "" });
     void call(action)
-      .then((message) => set(id, label, outcomeOf(message)))
+      .then((next) => set(id, label, next))
       .catch((e) => set(id, label, { status: "failed", message: errMsg(e) }));
   }
 
@@ -113,16 +116,20 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
   function onRun(id: PublisherID, label: string) {
     if (!doc) return;
     if (id === "publish") {
-      run(id, label, async () =>
-        publishedLine(
-          (await PublishSprintReport(profileId, boardId, report.series.sprintId, await drawn(doc))).title,
-        ));
+      run(id, label, async () => {
+        // A warning means the page is written and a chart is not on it. The
+        // page is the outcome either way, so it is named either way.
+        const page = await PublishSprintReport(profileId, boardId, report.series.sprintId, await drawn(doc));
+        return page.warning
+          ? { status: "warned", message: partlyPublishedLine(page.title, page.warning) }
+          : { status: "done", message: publishedLine(page.title) };
+      });
       return;
     }
     const exportIt = id === "xlsx" ? ExportSprintReportXLSX : ExportSprintReportPPTX;
     run(id, label, async () => {
       const path = await exportIt(await drawn(doc));
-      return path ? savedLine(path) : "";
+      return outcomeOf(path ? savedLine(path) : "");
     });
   }
 
@@ -136,8 +143,8 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
         ))}
         {doc ? (
           <span className="muted small">
-            The page, the spreadsheet and the deck carry these figures as tables, with the caveats on them. The
-            spreadsheet and the deck also carry the charts as pictures.
+            The page, the spreadsheet and the deck carry these figures as tables, with the caveats on them, and the
+            charts as pictures. On the page the charts are attached files the page references.
           </span>
         ) : (
           <span className="muted small">{nothingToPublishLine()}</span>
@@ -162,7 +169,9 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
             >
               <span className="report-ribbon-label">{p.label}</span>
               <span className="report-ribbon-state">{publisherStatusWord(o.status)}</span>
-              {o.status === "done" && <span className="muted small report-ribbon-note">{o.message}</span>}
+              {(o.status === "done" || o.status === "warned") && (
+                <span className="muted small report-ribbon-note">{o.message}</span>
+              )}
               {o.status === "failed" && (
                 <span className="error-text small report-ribbon-note" role="alert">
                   {isBusyRefusal(o.message) ? busyLine(o.message) : o.message}
