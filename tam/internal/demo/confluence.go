@@ -35,6 +35,10 @@ type Confluence struct {
 type fakePage struct {
 	id, parent, title, body string
 	version                 int
+	// attachments maps a filename to the id it was given, which is all a
+	// demo page needs to show that attaching twice replaces rather than
+	// piles up.
+	attachments map[string]string
 }
 
 var _ confluence.Pages = (*Confluence)(nil)
@@ -263,6 +267,31 @@ func (c *Confluence) UpdatePage(_ context.Context, id, title, body string, versi
 	c.mu.Unlock()
 	hook()
 	return out, nil
+}
+
+// AttachFile puts a file on a page, keeping one entry per filename: a report
+// published twice replaces its chart instead of leaving two. The bytes are
+// dropped because nothing in the demo reads them back.
+func (c *Confluence) AttachFile(_ context.Context, pageID, filename, _ string, _ []byte) (confluence.Attachment, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.failure("attach", pageID); err != nil {
+		return confluence.Attachment{}, err
+	}
+	p, ok := c.pages[pageID]
+	if !ok {
+		return confluence.Attachment{}, notFound()
+	}
+	if p.attachments == nil {
+		p.attachments = map[string]string{}
+	}
+	id, ok := p.attachments[filename]
+	if !ok {
+		id = "att" + strconv.Itoa(c.next)
+		c.next++
+		p.attachments[filename] = id
+	}
+	return confluence.Attachment{ID: id, Filename: filename}, nil
 }
 
 // Seed adds a page as somebody writing in Confluence would, with no failure

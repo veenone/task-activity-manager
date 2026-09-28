@@ -46,6 +46,26 @@ func TestTheDemoSpaceEnforcesVersionPlusOne(t *testing.T) {
 	}
 }
 
+func TestTheDemoSpaceKeepsOneAttachmentPerFilename(t *testing.T) {
+	ctx := context.Background()
+	c := NewConfluence("DEMO", "root", false)
+	first, err := c.AttachFile(ctx, "root", "burndown.png", "image/png", []byte("one"))
+	if err != nil || first.ID == "" || first.Filename != "burndown.png" {
+		t.Fatalf("first attach = %+v, %v", first, err)
+	}
+	again, err := c.AttachFile(ctx, "root", "burndown.png", "image/png", []byte("two"))
+	if err != nil || again.ID != first.ID {
+		t.Fatalf("second attach = %+v, %v, it did not replace %s", again, err, first.ID)
+	}
+	other, err := c.AttachFile(ctx, "root", "velocity.png", "image/png", []byte("three"))
+	if err != nil || other.ID == first.ID {
+		t.Fatalf("another file = %+v, %v", other, err)
+	}
+	if _, err := c.AttachFile(ctx, "nope", "burndown.png", "image/png", nil); !errors.Is(err, confluence.ErrNotFound) {
+		t.Fatalf("attach to a missing page = %v", err)
+	}
+}
+
 func TestFailNextAndAfterFireOnce(t *testing.T) {
 	ctx := context.Background()
 	c := NewConfluence("DEMO", "root", false)
