@@ -1,6 +1,6 @@
-import { errMsg, useNotice, usePrompt, useProfile } from "@agile-suite/core";
+import { ProgressBar, errMsg, useNotice, usePrompt, useProfile } from "@agile-suite/core";
 import type { ColumnView, Profile, Settings } from "../api";
-import { limitBreach, limitLine, limitSource } from "../lib/columnLimit";
+import { limitBreach, limitLine, limitMeter, limitSource } from "../lib/columnLimit";
 import { useSetColumnLimit } from "../queries/boards";
 
 // ColumnLimit is the WIP limit under a column's name on the board, and the one
@@ -24,8 +24,39 @@ export function ColumnLimit({ column, boardId }: { column: ColumnView; boardId: 
   const line = limitLine(column);
   const breach = limitBreach(column) ? " board-column-limit-breached" : "";
 
+  // The limit drawn, on the line under the clause, and only where there is
+  // a limit to draw against. It is ProgressBar's track, fill and marker,
+  // because that is already a bar with a reference line across it and a
+  // second one here would be a second set of colours to keep in two themes.
+  //
+  // aria-hidden, because every figure it draws is in the clause beside it
+  // and a reader told the same fact twice is a reader kept from the next
+  // column. The props are still filled in: a meter with no name is one
+  // un-hiding away from being announced as a bare percentage.
+  function meter() {
+    const drawn = limitMeter(column);
+    if (!drawn) return null;
+    return (
+      <span className="board-column-meter" aria-hidden="true">
+        <ProgressBar
+          value={drawn.count}
+          max={drawn.scale}
+          marker={drawn.mark}
+          tone="muted"
+          label={`Cards in ${column.name} against its limit`}
+          valueText={line}
+        />
+      </span>
+    );
+  }
+
   if (limitSource(column) === "jira") {
-    return <span className={`board-column-limit${breach}`}>{line}</span>;
+    return (
+      <>
+        <span className={`board-column-limit${breach}`}>{line}</span>
+        {meter()}
+      </>
+    );
   }
 
   async function edit() {
@@ -54,14 +85,17 @@ export function ColumnLimit({ column, boardId }: { column: ColumnView; boardId: 
   // The visible text leads it, which is what keeps the two the same control.
   const label = line || "No limit, set one";
   return (
-    <button
-      type="button"
-      className={`board-column-limit link-btn${breach}`}
-      aria-label={`${label}, for ${column.name}`}
-      disabled={setLimit.isPending}
-      onClick={() => void edit()}
-    >
-      {label}
-    </button>
+    <>
+      <button
+        type="button"
+        className={`board-column-limit link-btn${breach}`}
+        aria-label={`${label}, for ${column.name}`}
+        disabled={setLimit.isPending}
+        onClick={() => void edit()}
+      >
+        {label}
+      </button>
+      {meter()}
+    </>
   );
 }

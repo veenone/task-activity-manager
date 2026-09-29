@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ColumnView } from "../api";
-import { counted, hasLimit, limitBreach, limitLine } from "./columnLimit";
+import { counted, hasLimit, limitBreach, limitLine, limitMeter } from "./columnLimit";
 
 function head(over: Partial<ColumnView> = {}): ColumnView {
   return {
@@ -78,6 +78,37 @@ describe("a column's limit", () => {
     const both = head({ counted: 4, max: 3, localMax: 9 });
     expect(limitLine(both)).toBe("4 of 3, from Jira, over the limit");
     expect(limitBreach(both)).toBe("over");
+  });
+
+  // The bar under the clause. The scale is the larger of the count and the
+  // limit, which is what puts the mark at the end of the track while the
+  // column is still within its limit and moves it inside the fill once the
+  // column is past it: 4 of 3 draws a bar that runs on beyond the mark
+  // rather than one that is merely full.
+  it("draws the count against the limit, with the limit as a mark on the track", () => {
+    expect(limitMeter(head({ counted: 2, max: 6 }))).toEqual({ count: 2, scale: 6, mark: 1 });
+    expect(limitMeter(head({ counted: 6, max: 6 }))).toEqual({ count: 6, scale: 6, mark: 1 });
+    expect(limitMeter(head({ counted: 4, max: 3 }))).toEqual({ count: 4, scale: 4, mark: 0.75 });
+    // The local limit is measured the same way, and Jira's still wins.
+    expect(limitMeter(head({ counted: 4, localMax: 8 }))).toEqual({ count: 4, scale: 8, mark: 1 });
+    expect(limitMeter(head({ counted: 4, max: 3, localMax: 9 }))?.scale).toBe(4);
+  });
+
+  it("marks the floor on a column the board gives only a minimum", () => {
+    expect(limitMeter(head({ counted: 1, min: 4 }))).toEqual({ count: 1, scale: 4, mark: 1 });
+    // Both set, and the ceiling is the mark, not the floor: it is the figure
+    // the clause above the bar leads with. The floor would put the mark at
+    // two ninths of this track instead of eight.
+    expect(limitMeter(head({ counted: 9, min: 2, max: 8 }))).toEqual({ count: 9, scale: 9, mark: 8 / 9 });
+  });
+
+  it("draws nothing for a column with no limit, and has a scale at zero", () => {
+    expect(limitMeter(head())).toBeNull();
+    // A column limited to nothing and holding nothing has no scale to
+    // divide by; its mark is the end of an empty track, which is where a
+    // limit the count has not passed belongs.
+    expect(limitMeter(head({ counted: 0, max: 0 }))).toEqual({ count: 0, scale: 0, mark: 1 });
+    expect(limitMeter(head({ counted: 2, max: 0 }))).toEqual({ count: 2, scale: 2, mark: 0 });
   });
 
   it("counts every card the column holds when nothing says otherwise", () => {

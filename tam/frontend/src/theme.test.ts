@@ -16,6 +16,7 @@ import {
 } from "./test/cssRules";
 
 const app = appCss();
+const primitivesCss = coreStyle("primitives.css");
 const tokensCss = coreStyle("tokens.css");
 const light = tokenTable(tokensCss, ":root");
 const dark = new Map([...light, ...tokenTable(tokensCss, ':root[data-theme="dark"]')]);
@@ -98,6 +99,30 @@ const FILLED = [
   ".chip-held",
   ".chip-conflict",
 ];
+
+// The column limit meter reuses ProgressBar and repoints the bar's track and
+// mark on the meter itself, so the mark is the track showing through the
+// fill: a notch, which is what says a column is past its limit to a reader
+// who cannot tell the warn colour from the muted one. The mark is only ever
+// drawn over the fill, because the limit sits at the end of the track
+// whenever the count has not reached it, so the pair that has to be legible
+// is the fill against the track and not the mark against bare track.
+describe.each([
+  ["light", light],
+  ["dark", dark],
+])("%s theme, the column limit meter", (_theme, table) => {
+  const meter = declarationsOf(primitivesCss, ".board-column-meter");
+  const fill = valueOf(declarationsOf(primitivesCss, ".progress-bar-muted .progress-bar-fill"), "background");
+
+  it("draws its fill and the mark that notches it against each other", () => {
+    const track = valueOf(meter, "--bar-track");
+    // Both repointed, and to one colour. Left alone, the track is the bar's
+    // sunken grey, which the muted fill reads against at only 4.43 to 1, and
+    // the mark is the orange today's line, which on that fill is 1.07 to 1.
+    expect([track, valueOf(meter, "--bar-marker")]).toEqual(["var(--surface)", "var(--surface)"]);
+    expect(contrast(resolve(track as string, table), resolve(fill as string, table))).toBeGreaterThanOrEqual(4.5);
+  });
+});
 
 describe.each([
   ["light", light],
