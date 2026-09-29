@@ -303,3 +303,48 @@ func TestTheReportCarriesTheBoardsColumnCapacity(t *testing.T) {
 		t.Errorf("Done max = %v, want the limit the board was synced with", got.Capacity[1].Max)
 	}
 }
+
+// A kanban board has no sprint, so the sprint report cannot reach it and the
+// Reports view had nothing to show a kanban team at all. Column capacity is
+// the one figure that needs no sprint and no changelog: it reads the synced
+// cache, which is why it is the first thing a kanban board is given.
+//
+// The count and the limit come from the same composer the Boards view and the
+// sprint report's capacity section already use, so a team reading the board
+// and the report side by side sees one set of numbers (#105).
+func TestBoardCapacityAnswersForAKanbanBoardWithNoSprint(t *testing.T) {
+	a := newTestApp(t)
+	p := newTestProfile(t, a)
+	a.backends[p.ID] = quietHistory()
+	seedReportBoard(t, a, p.ID)
+	max := 2
+	board := backend.Board{ID: reportBoard, Name: "PLAT Kanban", Type: backend.BoardTypeKanban}
+	cols := []backend.BoardColumn{
+		{Name: "To Do", StatusIDs: []string{"1"}, Constraint: backend.ConstraintIssueCount},
+		{Name: "In Progress", StatusIDs: []string{"3"}, Max: &max, Constraint: backend.ConstraintIssueCount},
+		{Name: "Done", StatusIDs: []string{"10001"}, Constraint: backend.ConstraintIssueCount},
+	}
+	// No sprints at all, which is what a kanban board has.
+	if err := a.boards.ReplaceBoard(context.Background(), p.ID, board, cols, nil, nil); err != nil {
+		t.Fatalf("seed the kanban board: %v", err)
+	}
+
+	got, err := a.GetBoardCapacity(p.ID, reportBoard)
+	if err != nil {
+		t.Fatalf("GetBoardCapacity: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("capacity = %+v, want one head per column", got)
+	}
+	if got[1].Name != "In Progress" {
+		t.Errorf("columns came back out of the board's own order: %+v", got)
+	}
+	// #101 both ways: a column the board sets no limit on carries none, and
+	// the one it does carries what it was synced with.
+	if got[0].Max != nil {
+		t.Errorf("To Do max = %v, want none", got[0].Max)
+	}
+	if got[1].Max == nil || *got[1].Max != 2 {
+		t.Errorf("In Progress max = %v, want 2", got[1].Max)
+	}
+}

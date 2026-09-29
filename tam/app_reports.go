@@ -13,8 +13,9 @@ import (
 	"agile-suite/tam/internal/sprintreport"
 )
 
-// The sprint report: one bound read, laid out the way the sprint writes in
-// app_sprintmanage.go are, because it takes the same guards they do. What
+// The report reads. GetSprintReport is the long one, laid out the way the
+// sprint writes in app_sprintmanage.go are, because it takes the same guards
+// they do; GetBoardCapacity below it is a cache read that takes none. What
 // it does not share with them is where the work lives. A report is paging,
 // a done rule, a cache and a velocity table assembled out of two sources,
 // which is internal/sprintreport's job; this file resolves the profile,
@@ -188,4 +189,29 @@ func (a *App) emitReportProgress(p sprintreport.Progress) {
 		return
 	}
 	runtime.EventsEmit(a.ctx, reportProgressEvent, p)
+}
+
+// GetBoardCapacity is one board's column heads with no sprint: the cards each
+// column holds now, against the limit the board sets on it.
+//
+// It exists because a kanban board has no sprint, so GetSprintReport cannot
+// reach it and the Reports view had nothing to show a kanban team. Capacity is
+// the one figure a board can answer without one: an empty sprint id reads the
+// board's own issue list the way the sync stored it, which is what issueKeys
+// documents, and no changelog is involved.
+//
+// It composes through ColumnHeads rather than counting the cards a second way,
+// for the reason that function's own comment gives: the Boards view, the sprint
+// report's capacity section and this are the same columns, and a team reading
+// two of them at once has to see one set of numbers (#105).
+//
+// No lock. acquire covers the long operations that talk to Jira, and this
+// talks to the local store only, the way GetBoard does. Giving it one would
+// refuse a capacity read while a sync ran, for a number the cache already
+// holds.
+func (a *App) GetBoardCapacity(profileID string, boardID int) ([]boardrepo.ColumnView, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.boards.ColumnHeads(a.ctx, a.repo, profileID, boardID, "")
 }

@@ -26,6 +26,11 @@ export const keys = {
   boards: (profileId: string) => [profileId, "boards"] as const,
   boardSprints: (profileId: string, boardId: number) =>
     [profileId, "boardSprints", boardId] as const,
+  // One board's column heads with no sprint: what the Reports view draws for
+  // a kanban board. Its own key rather than a slice of board, because that
+  // one carries every card in every lane and this carries five numbers.
+  boardCapacity: (profileId: string, boardId: number) =>
+    [profileId, "boardCapacity", boardId] as const,
   // One board's sprints with the cards in each, which is the Sprints view's
   // whole read. It is separate from boardSprints, whose rows carry no cards
   // and which the pickers and the ceremonies read.

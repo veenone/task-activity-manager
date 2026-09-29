@@ -75,6 +75,8 @@ export function ForgetRitualPage(arg1:string,arg2:number,arg3:number,arg4:string
 
 export function GetBoard(arg1:string,arg2:number,arg3:string,arg4:string):Promise<boardrepo.BoardView>;
 
+export function GetBoardCapacity(arg1:string,arg2:number):Promise<Array<boardrepo.ColumnView>>;
+
 export function GetConfluenceConfig(arg1:string):Promise<profile.ConfluenceConfig>;
 
 export function GetCreateFields(arg1:string,arg2:string):Promise<backend.CreateFieldSet>;

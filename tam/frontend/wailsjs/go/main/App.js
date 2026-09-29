@@ -118,6 +118,10 @@ export function GetBoard(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetBoard'](arg1, arg2, arg3, arg4);
 }
 
+export function GetBoardCapacity(arg1, arg2) {
+  return window['go']['main']['App']['GetBoardCapacity'](arg1, arg2);
+}
+
 export function GetConfluenceConfig(arg1) {
   return window['go']['main']['App']['GetConfluenceConfig'](arg1);
 }

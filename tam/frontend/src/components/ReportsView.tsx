@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { call, errMsg, useProfile } from "@agile-suite/core";
 import { CancelSprintReport } from "../api";
-import type { Profile, Settings, Sprint, SprintReport } from "../api";
+import type { Profile, Settings, SprintReport } from "../api";
 import { useBoards, useBoardSprints } from "../queries/boards";
+import { useBoardCapacity } from "../queries/capacity";
+import { closedNewestFirst } from "../lib/closedSprints";
 import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
 import { busyLine, isBusyRefusal, unavailableLine } from "../lib/reportText";
+import { flowDocument } from "../lib/flowDocument";
+import type { ChartImages } from "../lib/chartImage";
+import { reportDocument } from "../lib/reportDocument";
+import { FlowReport } from "./FlowReport";
 import { ReportOutputs } from "./ReportOutputs";
 import { SprintSummary } from "./SprintSummary";
 import { VelocityTable } from "./VelocityTable";
@@ -54,17 +60,33 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   }
 
   const boards = useBoards(activeId);
-  // Only a scrum board has sprints at all, so a kanban board is not offered
-  // here rather than offered and then explained.
-  const scrumBoards = (boards.data ?? []).filter((b) => b.type === "scrum");
-  const board = scrumBoards.find((b) => b.id === boardId) ?? scrumBoards[0];
-  const sprints = useBoardSprints(activeId, board?.id ?? 0);
+  // Every board, kanban ones included. They used to be filtered out, so a
+  // kanban team opened this view and found none of its own boards in it.
+  // Having no sprint is a reason to report on a board differently, not a
+  // reason to hide it.
+  const offeredBoards = boards.data ?? [];
+  const board = offeredBoards.find((b) => b.id === boardId) ?? offeredBoards[0];
+  // Which report this board gets. It is the board's own type and not a guess
+  // from whether sprints came back: a scrum board whose sprints have not
+  // synced yet is still a scrum board, and reading it as kanban would answer
+  // a sprint question with a column count.
+  const kanban = board?.type === "kanban";
+  // A kanban board has no sprints to ask for, and asking anyway is a call Go
+  // answers with ErrNoSprints for every kanban board in the list.
+  const sprints = useBoardSprints(activeId, kanban ? 0 : board?.id ?? 0);
   const closed = useMemo(() => closedNewestFirst(sprints.data ?? []), [sprints.data]);
   const active = (sprints.data ?? []).filter((s) => s.state === "active");
   const offered = [...closed, ...active];
   const requestedSprintId = sprintId || (closed.length ? 0 : active[0]?.id ?? 0);
   const live = active.some((s) => s.id === requestedSprintId);
-  const reportBoardId = sprints.isSuccess ? board?.id ?? 0 : 0;
+  const reportBoardId = !kanban && sprints.isSuccess ? board?.id ?? 0 : 0;
+
+  // The kanban read. Column capacity needs no sprint and no changelog: Go
+  // counts the board's own cards out of the synced cache against the limits
+  // the boards sync stored, which is why this one takes no lock and has no
+  // cancel path. #105 built the count and publishes it; what was missing was
+  // a way for a kanban board to reach it.
+  const capacity = useBoardCapacity(activeId, kanban ? board?.id ?? 0 : 0);
 
   // Wait for the list so a board running its first sprint never asks for
   // a nonexistent closed report before resolving its active default.
@@ -110,8 +132,32 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   const shown = report.data;
   const inProgress = active.some((s) => s.id === shown?.series.sprintId);
   // A report with nothing in it cannot be rebuilt into something, and it is
-  // the state that says why in the body instead.
-  const canRebuild = !!shown && !shown.unavailable;
+  // the state that says why in the body instead. A kanban board's capacity is
+  // a cache read with nothing to rebuild from Jira, so it offers no control:
+  // the figure moves when the project syncs, not when this view asks again.
+  const canRebuild = !kanban && !!shown && !shown.unavailable;
+
+  // What the outputs bar sends. Both kinds build the one ReportDocument shape,
+  // which is why there is one bar and not two: ReportOutputs, the Confluence
+  // publisher, the spreadsheet and the deck all take a document and know
+  // nothing about which report made it.
+  // useMemo, or `?? []` hands back a new array on every render and the
+  // builder below it is rebuilt every time, which would rebuild the document
+  // on every render of the view.
+  const columns = useMemo(() => capacity.data ?? [], [capacity.data]);
+  const sprintDoc = useCallback(
+    (images?: ChartImages) => (shown ? reportDocument(shown, inProgress, images) : null),
+    [shown, inProgress],
+  );
+  // No images: a capacity table has no chart to rasterise yet.
+  const flowDoc = useCallback(
+    () => flowDocument(board?.name ?? "", columns),
+    [board?.name, columns],
+  );
+  // Which one, and whether there is anything to publish at all.
+  const outputs = kanban
+    ? { show: columns.length > 0, build: flowDoc, sprintId: 0 }
+    : { show: !!shown, build: sprintDoc, sprintId: shown?.series.sprintId ?? 0 };
 
   function loading() {
     // The frame in the shell belongs to whichever operation holds the
@@ -209,6 +255,11 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
         </p>
       );
     }
+    // A kanban board's report is capacity, and it needs no sprint list, so
+    // this comes before the two sprint states below it.
+    if (kanban) {
+      return <FlowReport capacity={capacity} onOpenBoards={onOpenBoards} />;
+    }
     if (sprints.isError) {
       return <p className="error-text" role="alert">
         Could not load the sprints: {sprints.error.message}{" "}
@@ -251,11 +302,11 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             is a control that cannot be used. The board is still named,
             since the report on screen belongs to it and nothing else says
             so. This is the Sprints view's rule, not the Boards view's. */}
-        {scrumBoards.length > 1 ? (
+        {offeredBoards.length > 1 ? (
           <label className="board-picker">
             <span>Board</span>
             <select aria-label="Board" value={board?.id ?? ""} onChange={(e) => switchBoard(Number(e.target.value))}>
-              {scrumBoards.map((b) => (
+              {offeredBoards.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
@@ -264,8 +315,10 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           board && <h2 className="board-head-name">{board.name}</h2>
         )}
 
-        {/* Active sprints are provisional reports; velocity stays closed-only. */}
-        {offered.length > 0 && (
+        {/* Active sprints are provisional reports; velocity stays closed-only.
+            A kanban board has none, so the slot is simply empty rather than
+            holding a control that cannot be used. */}
+        {!kanban && offered.length > 0 && (
           <label className="board-picker">
             <span>Sprint</span>
             <select
@@ -306,13 +359,13 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             failing at once, each with its own unbounded reason, scroll inside
             this bar instead of collapsing the velocity panel that was the
             body's only shrinkable child. */}
-        {shown && (
+        {outputs.show && (
           <div className="report-outputs">
             <ReportOutputs
               profileId={activeId}
-              boardId={reportBoardId}
-              report={shown}
-              live={inProgress}
+              boardId={board?.id ?? 0}
+              sprintId={outputs.sprintId}
+              build={outputs.build}
               charts={reportFrame}
             />
           </div>
@@ -320,35 +373,4 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
       </div>
     </section>
   );
-}
-
-// closedNewestFirst is the sprint picker's order, and it mirrors
-// reports.VelocitySprints in Go: closed sprints by actual completion date
-// (planned end when completion is absent), newest first,
-// with the higher id breaking a tie. That is the rule a sprint id of 0
-// resolves through, so the first row of this list is the sprint the view
-// opens on, and the control never points at one sprint while the numbers
-// below it describe another.
-//
-// A sprint whose start date will not parse is dropped, because Go drops it
-// too: it parses both dates and skips a sprint that fails either. Sorting
-// on the end date alone let a sprint with a readable end and an unreadable
-// start sit at the top of this list while a sprint id of 0 resolved past
-// it, so the picker and the numbers disagreed about which sprint was the
-// newest one. Nothing was ever mis-titled, since the heading follows the
-// response, but the two should agree without that backstop.
-//
-// A sprint whose end date will not parse sinks to the bottom instead of
-// being dropped. It cannot be the first row from there, so it costs the
-// agreement above nothing, and picking it is answered with the
-// sprintHasNoDates state, which says more than leaving it out would.
-function closedNewestFirst(sprints: Sprint[]): Sprint[] {
-  const readable = (d: string) => !Number.isNaN(new Date(d).getTime());
-  const ended = (s: Sprint) => {
-    const t = new Date(s.completeDate?.trim() ? s.completeDate : s.endDate).getTime();
-    return Number.isNaN(t) ? -Infinity : t;
-  };
-  return sprints
-    .filter((s) => s.state === "closed" && readable(s.startDate))
-    .sort((a, b) => (ended(b) === ended(a) ? b.id - a.id : ended(b) - ended(a)));
 }
