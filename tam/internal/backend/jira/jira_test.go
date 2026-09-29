@@ -30,6 +30,7 @@ type fakeJira struct {
 	createFail bool     // POST /issue answers 400
 	writeFail  string   // when set, the 400 body every write answers with
 	linkTypes  string   // the /rest/api/2/issueLinkType body
+	worklogs   string   // the GET /issue/{key}/worklog body
 
 	// The comment endpoint. commentTotal is how many comments the issue has;
 	// the fake generates them, newest first, since that is what
@@ -165,6 +166,8 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			]}`))
 		case r.URL.Path == "/rest/api/2/issueLinkType" && r.Method == http.MethodGet:
 			_, _ = w.Write([]byte(f.linkTypes))
+		case strings.HasSuffix(r.URL.Path, "/worklog") && r.Method == http.MethodGet:
+			_, _ = w.Write([]byte(f.worklogs))
 		case r.Method == http.MethodPut || r.Method == http.MethodPost:
 			body, _ := io.ReadAll(r.Body)
 			f.writes = append(f.writes, r.Method+" "+r.URL.Path+" "+string(body))
