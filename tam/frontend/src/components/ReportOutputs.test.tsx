@@ -127,11 +127,26 @@ describe("the publisher ribbon", () => {
   /** The ribbon cell for one publisher, by its accessible name. */
   const cell = (name: RegExp) => screen.getByRole("listitem", { name });
 
-  it("starts with all three idle", () => {
+  // Issue #90 kept an idle cell reading "Ready" so that a blank cell beside
+  // two filled ones would not read as a problem. That argues for keeping the
+  // idle cells once the ribbon is live; it never argued for mounting three of
+  // them before anything has run. Three cells saying "Ready" under three
+  // enabled buttons state what the buttons already state, and they cost a
+  // whole row of a frame whose velocity panel pays for every row above it.
+  it("shows no ribbon at all until a publisher has been used", () => {
     draw();
-    for (const name of [/Confluence/i, /spreadsheet/i, /deck/i]) {
-      expect(cell(name)).toHaveTextContent(publisherStatusWord("idle"));
-    }
+    expect(screen.queryByRole("list")).toBeNull();
+    expect(screen.queryByText(publisherStatusWord("idle"))).toBeNull();
+  });
+
+  it("shows all three cells, idle ones included, once any publisher has run", async () => {
+    bindings.ExportSprintReportXLSX.mockResolvedValue("/tmp/a.xlsx");
+    draw();
+    await userEvent.click(screen.getByRole("button", { name: /spreadsheet/i }));
+    await waitFor(() => expect(cell(/spreadsheet/i)).toHaveTextContent(publisherStatusWord("done")));
+    // The other two keep their word rather than leaving a gap beside it.
+    expect(cell(/Confluence/i)).toHaveTextContent(publisherStatusWord("idle"));
+    expect(cell(/deck/i)).toHaveTextContent(publisherStatusWord("idle"));
   });
 
   it("marks only the publisher that is running", async () => {
@@ -164,7 +179,10 @@ describe("the publisher ribbon", () => {
     bindings.ExportSprintReportXLSX.mockResolvedValue("");
     draw();
     await userEvent.click(screen.getByRole("button", { name: /spreadsheet/i }));
-    await waitFor(() => expect(cell(/spreadsheet/i)).toHaveTextContent(publisherStatusWord("idle")));
+    // Nothing was written, so all three are idle again and the ribbon has
+    // nothing left to report. It goes away rather than leaving three cells
+    // saying "Ready" behind it.
+    await waitFor(() => expect(screen.queryByRole("list")).toBeNull());
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText(/Saved to/)).toBeNull();
   });

@@ -337,6 +337,43 @@ describe("reports view fits its frame", () => {
     expect(centred).toMatch(/place-content:\s*center/);
   });
 
+  // The critique's third defect. .report-velocity was the only shrinkable
+  // child of an overflow: hidden body, so anything that grew above it was
+  // paid for by the velocity table: three publishers failing at once, each
+  // with its own unbounded error text, collapsed the panel and then clipped
+  // it. The outputs bar is now a sibling of the body with a ceiling of its
+  // own, so a wall of errors scrolls inside the bar instead of eating the
+  // report it is reporting on.
+  it("bounds the outputs bar rather than letting it eat the velocity panel", () => {
+    const bar = declarationsOf(appCss, ".report-outputs");
+    expect(valueOf(bar, "flex")).toBe("none");
+    expect(bar).toMatch(/max-height:/);
+    expect(valueOf(bar, "overflow-y")).toBe("auto");
+  });
+
+  // Defect 19: with the default align-items: stretch, an idle cell drew its
+  // 2px rule the full height of whatever multi-line failure sat beside it.
+  it("does not stretch an idle ribbon cell down a neighbour's error", () => {
+    expect(valueOf(declarationsOf(appCss, ".report-ribbon"), "align-items")).toBe("flex-start");
+  });
+
+  // Defect 5: every interval in the band fell between 16px and 20px, so a
+  // structural boundary read no stronger than a wrap artifact. The charts
+  // open the evidence, so that edge is the one break that gets room.
+  it("separates the evidence from the summary by more than the summary's own gaps", () => {
+    const charts = valueOf(declarationsOf(appCss, ".report-charts"), "margin-top");
+    const inside = valueOf(declarationsMentioning(appCss, ".report-summary p.muted"), "margin");
+    expect(parseInt(charts ?? "0", 10)).toBeGreaterThan(2 * parseInt((inside ?? "0 0 0").split(" ")[2], 10));
+  });
+
+  // Defect 6: .report-caveats declared max-width: 78ch to match its parent,
+  // but it renders at 11px while the parent's 78ch resolves against 13px, so
+  // the two identical numbers drew right edges about 78px apart. The parent
+  // already caps the measure; the child needed no rule at all.
+  it("leaves the caveats' measure to the summary that already caps it", () => {
+    expect(appCss).not.toMatch(/\.report-caveats/);
+  });
+
   const FALLBACK = [
     ["a narrow window", "max-width: 900px"],
     ["a short window", "max-height"],

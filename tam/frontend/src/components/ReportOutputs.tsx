@@ -133,28 +133,47 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
     });
   }
 
+  // Whether the ribbon has anything to report. Issue #90 gave an unused
+  // publisher the word "Ready" so that a blank cell beside two filled ones
+  // would not read as a problem, and that still holds once the ribbon is
+  // live. It was never a reason to mount three cells saying "Ready" under
+  // three enabled buttons before anything has run: they state what the
+  // buttons state, and this view pays for every row out of the velocity
+  // table's height.
+  const used = PUBLISHERS.some((p) => outcomes[p.id].status !== "idle");
+
   return (
     <>
-      <div className="report-actions">
+      {/* The buttons and nothing else. This used to be a .report-actions
+          nested inside the view's own .report-actions, so one rule carrying
+          flex-wrap and a 70ch cap applied twice and the strip wrapped to
+          three rows at every width. The row is its own class now and the view
+          owns the bar around it. */}
+      <div className="report-outputs-row">
         {PUBLISHERS.map((p) => (
           <button key={p.id} type="button" className="btn" disabled={busy} onClick={() => onRun(p.id, p.label)}>
             {p.action}
           </button>
         ))}
-        {doc ? (
-          <span className="muted small">
-            The page, the spreadsheet and the deck carry these figures as tables, with the caveats on them, and the
-            charts as pictures. On the page the charts are attached files the page references.
-          </span>
-        ) : (
-          <span className="muted small">{nothingToPublishLine()}</span>
-        )}
       </div>
       {/* One region for all three. Three of them announce over each other,
           and a region mounted with its text already inside announces
           unreliably, so this one is always present and only its text
           changes. */}
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
+      {/* One slot under the buttons, never empty and never twice filled: the
+          reason the controls are dead, or what the outputs will carry before
+          anyone has pressed one, or where the three of them got to. The
+          guidance used to be a flex item inside the button strip, 233
+          characters of it, which is what guaranteed the wrap. */}
+      {!doc ? (
+        <p className="muted small report-outputs-note">{nothingToPublishLine()}</p>
+      ) : !used ? (
+        <p className="muted small report-outputs-note">
+          The page, the spreadsheet and the deck carry these figures as tables, with the caveats on them, and the
+          charts as pictures. On the page the charts are attached files the page references.
+        </p>
+      ) : (
       <ul className="report-ribbon">
         {PUBLISHERS.map((p) => {
           const o = outcomes[p.id];
@@ -181,6 +200,7 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
           );
         })}
       </ul>
+      )}
     </>
   );
 }
