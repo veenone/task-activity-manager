@@ -61,3 +61,29 @@ func TestTheDoneAgreementRendersATaskListAndReadsNoZone(t *testing.T) {
 		t.Errorf("the additions are not a task list: %s", additions)
 	}
 }
+
+// The sprint's own pages point at the agreement the team argues against, by
+// title. A page id or a URL would be the shape #74 rejected on the retro
+// template: an id is empty until the page is published and changes
+// afterwards, so publishing the agreement would make an untouched Review page
+// render differently and read as one somebody wrote in.
+func TestReviewAndPlanningPointAtTheDoneAgreementByTitle(t *testing.T) {
+	include := `<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link>` +
+		`<ri:page ri:content-title="PLAT board · Done agreement"/></ac:link></ac:parameter></ac:structured-macro>`
+	for _, typ := range []string{Review, Planning} {
+		body := Render(typ, golden, time.UTC)
+		if !strings.Contains(body, include) {
+			t.Errorf("%s does not include the board's agreement by title: %s", typ, body)
+		}
+		// The effective agreement is the board's items plus this sprint's, so
+		// the sprint's own page is named as well.
+		if !strings.Contains(body, "Sprint 14 · Done agreement") {
+			t.Errorf("%s does not name this sprint's additions: %s", typ, body)
+		}
+		for _, forbidden := range []string{"ri:content-id", "pageId", "viewpage.action", "ac:macro-id"} {
+			if strings.Contains(body, forbidden) {
+				t.Errorf("%s references a page by %s, which is not stable when that page is published: %s", typ, forbidden, body)
+			}
+		}
+	}
+}

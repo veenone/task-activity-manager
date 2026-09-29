@@ -156,6 +156,31 @@ func (p *page) fact(label, value string) {
 
 const taskList = "<ac:task-list><ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body></ac:task-body></ac:task></ac:task-list>"
 
+// doneAgreement is how a sprint's own pages point at the bar the team will
+// argue against in the meeting: the board's standing agreement included by
+// title, and one line naming the sprint's own additions page. Together they
+// are the effective agreement, board items plus whatever this sprint added.
+//
+// **By title, never by page id or URL.** A page id is empty until the page is
+// published and changes afterwards, so a body carrying one renders differently
+// once a neighbouring page is published, and run.go's comparison of a stored
+// body against a fresh render would then read an untouched page as one
+// somebody wrote in and raise a conflict every sprint. #74 is that failure.
+// A title built from the board and the sprint is the same bytes every time.
+//
+// The include macro is left to Confluence: it resolves the title when the page
+// is opened, so it shows the agreement as it is that day rather than a copy
+// taken when this page was written. TAM's editor holds it as an opaque block
+// labelled "include" and writes it back byte for byte.
+func (p *page) doneAgreement(s SprintInfo) {
+	p.h2(Label(DoneAgreement))
+	p.para("What this team agreed has to be true before a piece of work counts as done. The board's agreement is below, and anything this sprint added to it is on " + Title(DoneAgreement, s) + ".")
+	p.WriteString(`<ac:structured-macro ac:name="include">` +
+		`<ac:parameter ac:name=""><ac:link><ri:page ri:content-title="` +
+		esc(Title(DoneAgreement, SprintInfo{BoardName: s.BoardName})) +
+		`"/></ac:link></ac:parameter></ac:structured-macro>`)
+}
+
 func (p *page) table(headers ...string) {
 	p.WriteString("<table><tbody><tr>")
 	for _, h := range headers {
@@ -228,6 +253,9 @@ func Render(ritualType string, s SprintInfo, loc *time.Location) string {
 		p.table("Member", "Days available", "Notes")
 		p.h2("Committed scope")
 		p.jira(JQL(s.ID, All), true)
+		// After the scope, because the bar is what committing to that scope
+		// means, and before the risks, which are read against it.
+		p.doneAgreement(s)
 		p.h2("Risks and dependencies")
 		p.emptyList()
 		p.h2("Decisions")
@@ -245,6 +273,9 @@ func Render(ritualType string, s SprintInfo, loc *time.Location) string {
 		p.h2("Sprint goal")
 		p.para(s.Goal)
 		p.para("Met / Partly met / Not met")
+		// Above the two lists, because the argument about whether something is
+		// finished happens while they are read, not after.
+		p.doneAgreement(s)
 		p.h2("Completed")
 		p.jira(JQL(s.ID, Done), false)
 		p.h2("Not completed")
