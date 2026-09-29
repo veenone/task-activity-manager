@@ -10,15 +10,57 @@ import type { ColumnView } from "../api";
 // for one, and none of them treats an absent limit as zero: zero is a limit
 // a board can really set, and a column limited to nothing is over the moment
 // it holds a card.
+//
+// A limit comes from one of two places, and which one is part of what these
+// functions say. Jira's wins wherever the board sets one, because that is the
+// rule the whole team already sees in Jira; the local one fills the gap on the
+// boards, most of them, whose admin never set a limit at all. TAM writes
+// nothing back to board configuration, so the two are never the same number,
+// and a team reading "7 of 5" has to know whether that 5 is the board's rule
+// or one they set themselves.
 
 // A breach is what the limit says about the count: nothing, over the
 // maximum, or under the minimum.
 export type Breach = "" | "over" | "under";
 
-// limitOf is the pair, normalised. A board cached before TAM read the limits
-// carries neither, and undefined and null are the same fact here.
-function limitOf(c: ColumnView): { min: number | null; max: number | null } {
+// Where a column's limit came from, empty for a column with none.
+export type LimitSource = "" | "jira" | "tam";
+
+// jiraLimit is the pair the board sets, normalised. A board cached before TAM
+// read the limits carries neither, and undefined and null are the same fact.
+function jiraLimit(c: ColumnView): { min: number | null; max: number | null } {
   return { min: c.min ?? null, max: c.max ?? null };
+}
+
+// limitSource is which of the two places this column's limit came from. Jira's
+// pair is checked first because it wins: a board that sets a limit has said
+// what the limit is, and a local number cannot overrule it.
+export function limitSource(c: ColumnView): LimitSource {
+  const { min, max } = jiraLimit(c);
+  if (min !== null || max !== null) return "jira";
+  return (c.localMax ?? null) !== null ? "tam" : "";
+}
+
+// limitSourceWords names the source in the words every surface uses, so the
+// board head and the published capacity table attribute a number the same way.
+export function limitSourceWords(c: ColumnView): string {
+  switch (limitSource(c)) {
+    case "jira":
+      return "from Jira";
+    case "tam":
+      return "set in TAM";
+    default:
+      return "";
+  }
+}
+
+// effectiveLimit is the pair this column is actually measured against: the
+// board's when it sets one, the local maximum otherwise. It is exported
+// because lib/reportTables words the same pair into a cell of the capacity
+// table, and the precedence has to be decided once.
+export function effectiveLimit(c: ColumnView): { min: number | null; max: number | null } {
+  if (limitSource(c) === "tam") return { min: null, max: c.localMax ?? null };
+  return jiraLimit(c);
 }
 
 // counted is the number a limit is measured against. Go sends it; the total
@@ -28,10 +70,9 @@ export function counted(c: ColumnView): number {
   return c.counted ?? c.total;
 }
 
-// hasLimit says whether Jira sets a limit on this column at all.
+// hasLimit says whether this column has a limit at all, from either place.
 export function hasLimit(c: ColumnView): boolean {
-  const { min, max } = limitOf(c);
-  return min !== null || max !== null;
+  return limitSource(c) !== "";
 }
 
 // excludesSubtasks is the board counting a column without its subtasks,
@@ -44,7 +85,7 @@ function excludesSubtasks(c: ColumnView): boolean {
 // never a breach, and a maximum takes precedence over a minimum on a board
 // whose pair cannot both be satisfied.
 export function limitBreach(c: ColumnView): Breach {
-  const { min, max } = limitOf(c);
+  const { min, max } = effectiveLimit(c);
   const n = counted(c);
   if (max !== null && n > max) return "over";
   if (min !== null && n < min) return "under";
@@ -56,12 +97,16 @@ export function limitBreach(c: ColumnView): Breach {
 // left to a colour, because a reader who cannot see the colour is the reader
 // this number matters most to, and the clause says when subtasks are left
 // out of the count, since the head's own card total counts them.
+//
+// The source rides next to the figure rather than at the end of the clause, so
+// it attaches to the number it qualifies instead of to the breach.
 export function limitLine(c: ColumnView): string {
-  const { min, max } = limitOf(c);
+  const { min, max } = effectiveLimit(c);
   if (min === null && max === null) return "";
   const n = counted(c);
   const parts = [max === null ? `${n}, minimum ${min}` : `${n} of ${max}`];
   if (max !== null && min !== null) parts.push(`minimum ${min}`);
+  parts.push(limitSourceWords(c));
   if (excludesSubtasks(c)) parts.push("subtasks not counted");
   const breach = limitBreach(c);
   if (breach === "over") parts.push("over the limit");

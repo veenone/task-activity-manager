@@ -184,6 +184,9 @@ describe("the capacity section", () => {
     const capacity = doc.sections[3];
     expect(capacity.lines).toEqual([noLimitsLine()]);
     expect(capacity.table.rows).toEqual([]);
+    // The sentence covers both places a limit can come from, since a reader of
+    // the published page cannot check whether one was set in TAM either.
+    expect(noLimitsLine()).toContain("set in TAM");
   });
 
   it("carries a row per column with the count against the limit", () => {
@@ -197,8 +200,26 @@ describe("the capacity section", () => {
     const capacity = doc.sections[3];
     expect(capacity.table.rows).toEqual([
       ["To Do", "2", "No limit", "No limit set"],
-      ["In Progress", "4", "3", "Over the limit"],
-      ["Done", "9", "Minimum 1", "Within the limit"],
+      ["In Progress", "4", "3, from Jira", "Over the limit"],
+      ["Done", "9", "Minimum 1, from Jira", "Within the limit"],
+    ]);
+  });
+
+  // The published page is read away from the board and away from TAM, so a
+  // limit a team set for themselves has to be attributed there above all: a
+  // reader who takes it for the board's rule will go looking for it in Jira.
+  it("says which limit came from Jira and which was set in TAM", () => {
+    const doc = reportDocument(report({
+      capacity: [
+        head({ name: "To Do", total: 2, counted: 2, localMax: 4 }),
+        head({ name: "In Progress", total: 4, counted: 4, max: 3, localMax: 9 }),
+      ],
+    }))!;
+    const capacity = doc.sections[3];
+    expect(capacity.table.rows).toEqual([
+      ["To Do", "2", "4, set in TAM", "Within the limit"],
+      // Jira's limit wins, so the row prints the board's 3 and not the 9.
+      ["In Progress", "4", "3, from Jira", "Over the limit"],
     ]);
   });
 

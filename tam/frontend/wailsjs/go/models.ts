@@ -451,6 +451,7 @@ export namespace boardrepo {
 	    min?: number;
 	    max?: number;
 	    constraint: string;
+	    localMax?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ColumnView(source);
@@ -466,6 +467,7 @@ export namespace boardrepo {
 	        this.min = source["min"];
 	        this.max = source["max"];
 	        this.constraint = source["constraint"];
+	        this.localMax = source["localMax"];
 	    }
 	}
 	export class BoardView {

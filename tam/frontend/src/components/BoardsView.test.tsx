@@ -46,6 +46,7 @@ vi.mock("../api", async () => {
     AddIssuesToBoard: vi.fn(),
     ListBoardSprintDetails: vi.fn(),
     ListIssues: vi.fn(),
+    SetColumnLimit: vi.fn(),
   };
 });
 
@@ -375,12 +376,72 @@ describe("BoardsView board", () => {
     }));
     renderView();
     const over = await screen.findByRole("columnheader", { name: /In Progress/ });
-    expect(within(over).getByText("5 of 3, over the limit")).toBeInTheDocument();
+    expect(within(over).getByText("5 of 3, from Jira, over the limit")).toBeInTheDocument();
     const within6 = screen.getByRole("columnheader", { name: /Done/ });
-    expect(within(within6).getByText("3 of 6")).toBeInTheDocument();
-    // Nothing is printed for the column Jira sets no limit on.
+    expect(within(within6).getByText("3 of 6, from Jira")).toBeInTheDocument();
+    // The column Jira sets no limit on offers one instead of printing a blank
+    // line, which is also how a board with no limits anywhere says so.
     const none = screen.getByRole("columnheader", { name: /To Do/ });
-    expect(within(none).queryByText(/of /)).not.toBeInTheDocument();
+    expect(within(none).getByRole("button", { name: /No limit, set one/ })).toBeInTheDocument();
+  });
+
+  // The gap this feature exists for: most boards have no limit in Jira, so a
+  // team sets their own and the indicator starts working on that column. The
+  // number is stored in TAM and the head says so, because a reader who takes
+  // it for the board's rule will go looking for it in Jira.
+  it("takes a limit for a column Jira sets none on, and names it as TAM's own", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetBoard).mockResolvedValue(board({
+      columns: [
+        { name: "To Do", statusIds: ["1"], total: 4, points: 20, counted: 4, min: null, max: null, constraint: "issueCount" },
+        { name: "In Progress", statusIds: ["3"], total: 5, points: 0, counted: 5, min: null, max: null, constraint: "issueCount", localMax: 3 },
+      ],
+      lanes: [{ id: "", label: "All issues", count: 2, cells: [[KEYS], [PROMO]], overflow: [0, 0] }],
+    }));
+    renderView();
+    const own = await screen.findByRole("columnheader", { name: /In Progress/ });
+    expect(within(own).getByRole("button", { name: /5 of 3, set in TAM, over the limit/ })).toBeInTheDocument();
+
+    // Editing goes through the app's prompt dialog, and what the user typed is
+    // sent as text so Go is the one place that decides what a limit may be.
+    vi.mocked(api.SetColumnLimit).mockResolvedValue(undefined);
+    await user.click(within(own).getByRole("button", { name: /5 of 3/ }));
+    const dialog = await screen.findByRole("dialog", { name: /Card limit for In Progress/ });
+    const field = within(dialog).getByRole("textbox");
+    await user.clear(field);
+    await user.type(field, "8");
+    await user.click(within(dialog).getByRole("button", { name: "Save limit" }));
+    await waitFor(() => expect(api.SetColumnLimit).toHaveBeenCalledWith("p1", 1, "In Progress", "8"));
+  });
+
+  // Clearing is the one destructive thing here, so it is what the user typed
+  // and not a side effect of editing something else, and retyping the number
+  // brings it back.
+  it("clears a limit when the field is emptied, and says what went wrong when Go refuses one", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetBoard).mockResolvedValue(board({
+      columns: [
+        { name: "To Do", statusIds: ["1"], total: 4, points: 20, counted: 4, min: null, max: null, constraint: "issueCount", localMax: 6 },
+      ],
+      lanes: [{ id: "", label: "All issues", count: 1, cells: [[KEYS]], overflow: [0] }],
+    }));
+    renderView();
+    const head = await screen.findByRole("columnheader", { name: /To Do/ });
+    vi.mocked(api.SetColumnLimit).mockResolvedValue(undefined);
+    await user.click(within(head).getByRole("button", { name: /4 of 6/ }));
+    const clearing = await screen.findByRole("dialog", { name: /Card limit for To Do/ });
+    await user.clear(within(clearing).getByRole("textbox"));
+    await user.click(within(clearing).getByRole("button", { name: "Save limit" }));
+    await waitFor(() => expect(api.SetColumnLimit).toHaveBeenCalledWith("p1", 1, "To Do", ""));
+
+    // A refusal from Go is read by the person who typed the value, not lost.
+    vi.mocked(api.SetColumnLimit).mockRejectedValue(new Error("a column limit cannot be negative, and -2 is"));
+    await user.click(within(head).getByRole("button", { name: /4 of 6/ }));
+    const refused = await screen.findByRole("dialog", { name: /Card limit for To Do/ });
+    await user.clear(within(refused).getByRole("textbox"));
+    await user.type(within(refused).getByRole("textbox"), "-2");
+    await user.click(within(refused).getByRole("button", { name: "Save limit" }));
+    expect(await screen.findByText(/a column limit cannot be negative/)).toBeInTheDocument();
   });
 
   it("puts each card in its own column and names that column on the card", async () => {

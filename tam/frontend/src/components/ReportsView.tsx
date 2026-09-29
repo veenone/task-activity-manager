@@ -6,6 +6,7 @@ import { useBoards, useBoardSprints } from "../queries/boards";
 import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
 import { busyLine, isBusyRefusal, unavailableLine } from "../lib/reportText";
+import { CapacityPanel } from "./CapacityPanel";
 import { ReportOutputs } from "./ReportOutputs";
 import { SprintSummary } from "./SprintSummary";
 import { VelocityTable } from "./VelocityTable";
@@ -185,6 +186,15 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           </div>
           <VelocityTable rows={r.velocity} />
         </div>
+        {/* The board's columns against their limits, after the sprint's own
+            history because a limit is a fact about a column now rather than
+            about the fortnight the rows above describe.
+
+            flex: none with a ceiling of its own, the shape the outputs bar
+            took in #107: the velocity panel is the one shrinkable child of a
+            fixed-height column, so a band that grew without a bound here
+            would collapse it and then clip it. */}
+        <CapacityPanel report={r} />
       </>
     );
   }

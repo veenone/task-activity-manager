@@ -635,3 +635,59 @@ describe("ReportsView, fixed height", () => {
     expect(within(panel).queryByRole("img", { name: /velocity/i })).toBeNull();
   });
 });
+
+// The gap that started issue #106: the capacity section was built in
+// lib/reportDocument, which feeds the Confluence page, the spreadsheet and the
+// deck, and the view had no capacity code at all. Reading your own board's
+// capacity should not require publishing it somewhere.
+describe("ReportsView column capacity", () => {
+  const head = (over: Partial<api.ColumnView>): api.ColumnView => ({
+    name: "In Progress", statusIds: ["3"], total: 4, points: 0, counted: 4,
+    min: null, max: null, constraint: "issueCount", ...over,
+  });
+
+  it("shows the capacity section on screen, with each limit attributed", async () => {
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report({
+      capacity: [
+        head({ name: "To Do", total: 2, counted: 2 }),
+        head({ name: "In Progress", total: 5, counted: 5, max: 3 }),
+        head({ name: "Review", total: 1, counted: 1, localMax: 4 }),
+      ],
+    }));
+    renderView();
+    await screen.findByText(SENTENCE);
+    const panel = await screen.findByRole("group", { name: /column capacity/i });
+    const overRow = within(panel).getByRole("row", { name: /In Progress/ });
+    expect(within(overRow).getByRole("cell", { name: "3, from Jira" })).toBeInTheDocument();
+    expect(within(overRow).getByRole("cell", { name: "Over the limit" })).toBeInTheDocument();
+    // The limit the team set reads as theirs, and the column is within it.
+    const ownRow = within(panel).getByRole("row", { name: /Review/ });
+    expect(within(ownRow).getByRole("cell", { name: "4, set in TAM" })).toBeInTheDocument();
+    expect(within(ownRow).getByRole("cell", { name: "Within the limit" })).toBeInTheDocument();
+    // A column with no limit in either place shows its count and no ceiling,
+    // and is never a breach.
+    const noneRow = within(panel).getByRole("row", { name: /To Do/ });
+    expect(within(noneRow).getByRole("cell", { name: "No limit" })).toBeInTheDocument();
+    expect(within(noneRow).getByRole("cell", { name: "No limit set" })).toBeInTheDocument();
+  });
+
+  it("says a board with no limits anywhere has none rather than drawing a blank", async () => {
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report({
+      capacity: [head({ name: "To Do" }), head({ name: "Done" })],
+    }));
+    renderView();
+    await screen.findByText(SENTENCE);
+    expect(await screen.findByText(/No column of this board has a limit, from Jira or set in TAM/))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /To Do/ })).toBeNull();
+  });
+
+  // A report built before the column heads travelled, or one whose board the
+  // cache holds nothing for, is not a board with no limits: nobody read it.
+  it("draws no capacity section for a report carrying no column heads at all", async () => {
+    renderView();
+    await screen.findByText(SENTENCE);
+    expect(screen.queryByRole("group", { name: /column capacity/i })).toBeNull();
+    expect(screen.queryByText(/No column of this board has a limit/)).toBeNull();
+  });
+});

@@ -310,6 +310,10 @@ export function SearchUsers(arg1, arg2) {
   return window['go']['main']['App']['SearchUsers'](arg1, arg2);
 }
 
+export function SetColumnLimit(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SetColumnLimit'](arg1, arg2, arg3, arg4);
+}
+
 export function SetConfluenceConfig(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetConfluenceConfig'](arg1, arg2, arg3);
 }

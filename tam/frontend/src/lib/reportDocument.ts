@@ -139,7 +139,12 @@ export function reportDocument(
 //
 // The constraint is the board's, so it is read off the first column; every
 // column carries the same value because that is how the sync sends it.
-function capacitySection(report: SprintReport): ReportSection[] {
+//
+// It is exported because components/CapacityPanel draws this same section on
+// the Reports view. Reading your own board's capacity should not require
+// publishing it somewhere, and a screen that composed its own section would be
+// a second answer to the question the published page already answers.
+export function capacitySection(report: SprintReport): ReportSection[] {
   const columns = report.capacity ?? [];
   if (columns.length === 0) return [];
   const capacity = capacityTable(columns);
