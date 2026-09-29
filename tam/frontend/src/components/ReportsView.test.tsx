@@ -153,7 +153,10 @@ describe("ReportsView", () => {
   it("says under the sentence that committed is a floor and removed sees only the cards that came back", async () => {
     renderView();
     await screen.findByText(SENTENCE);
-    expect(screen.getByText(/Committed is a minimum estimate\. Removed counts cards that left and later returned/)).toBeInTheDocument();
+    expect(screen.getByText("Committed is a minimum estimate.")).toBeInTheDocument();
+    // The removed half only appears when something was removed, and the
+    // fixture removed two cards.
+    expect(screen.getByText(/left and later returned/)).toBeInTheDocument();
     expect(screen.getByText(/left and later returned/)).toBeInTheDocument();
   });
 
@@ -510,7 +513,7 @@ describe("ReportsView's eight states", () => {
     it("shows the floor caveat without the reader opening anything", async () => {
       vi.mocked(api.GetSprintReport).mockResolvedValue(report());
       renderView();
-      const caveat = await screen.findByText(/Committed is a minimum estimate\. Removed counts/);
+      const caveat = await screen.findByText("Committed is a minimum estimate.");
       expect(caveat.closest("details")).toBeNull();
     });
 
@@ -533,6 +536,63 @@ describe("ReportsView's eight states", () => {
       expect(within(screen.getByRole("group", { name: "Changes" })).getAllByRole("definition")).toHaveLength(2);
       expect(within(screen.getByRole("group", { name: "Outcome" })).getAllByRole("definition")).toHaveLength(2);
     });
+  });
+});
+
+// The layout critique of the band between the summary and the actions strip.
+// Every assertion here reads a structural relationship rather than the
+// presence of an element, because presence was never the problem: the strip
+// was present, nested inside another copy of itself, above the evidence it
+// publishes.
+describe("the report's three bands", () => {
+  const rebuild = () => screen.getByRole("button", { name: "Rebuild from Jira" });
+  const publish = () => screen.getByRole("button", { name: /Publish to Confluence/i });
+
+  beforeEach(() => {
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+  });
+
+  // The defect: ReportsView opened a .report-actions and put ReportOutputs,
+  // whose own root was a second .report-actions, inside it. Both matched one
+  // rule carrying flex-wrap and a 70ch cap, so the strip wrapped to three
+  // rows at every window width, deterministically, with the rebuild button
+  // stranded alone on the first of them.
+  it("never nests one actions strip inside another", async () => {
+    const { container } = renderView();
+    await screen.findByText(SENTENCE);
+    expect(container.querySelector(".report-actions .report-actions")).toBeNull();
+  });
+
+  // Rebuild re-reads the report the pickers name, so it belongs with them.
+  it("puts rebuild with the pickers rather than in the reading column", async () => {
+    renderView();
+    await screen.findByText(SENTENCE);
+    expect(rebuild().closest(".board-head")).not.toBeNull();
+    expect(rebuild().closest(".report-body")).toBeNull();
+  });
+
+  // The defect this is the fix for: a user could publish a report without
+  // having reached the burndown, which is the one figure no output table
+  // states, or the velocity trend.
+  it("offers the outputs after the evidence, not before it", async () => {
+    renderView();
+    await screen.findByText(SENTENCE);
+    const velocity = screen.getByRole("group", { name: /velocity/i });
+    expect(publish().closest(".report-body")).toBeNull();
+    // Node.compareDocumentPosition: 4 is DOCUMENT_POSITION_FOLLOWING, so the
+    // publish control comes after the velocity panel in document order, and
+    // therefore in focus order too.
+    expect(velocity.compareDocumentPosition(publish()) & 4).toBe(4);
+  });
+
+  // The strip used to carry a 233 character sentence as a flex item, which is
+  // what guaranteed the wrap. The buttons name their own actions.
+  it("keeps prose out of the row the buttons sit in", async () => {
+    const { container } = renderView();
+    await screen.findByText(SENTENCE);
+    const row = publish().parentElement!;
+    expect(row.textContent).not.toMatch(/carry these figures/);
+    expect(container.querySelector(".report-outputs")).not.toBeNull();
   });
 });
 

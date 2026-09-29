@@ -8,6 +8,7 @@ import {
   emptyDaysLine,
   emptyVelocityLine,
   floorLine,
+  removedFloorLine,
   methodLine,
   mixedUnitsLine,
   modeLine,
@@ -92,6 +93,7 @@ export function reportDocument(
         table: cells(outcome),
         notes: kept([
           floorLine(),
+          removedFloorLine(s.removed),
           unitLine(s.unit, s.unitReason),
           truncationLine(s.truncated),
           methodLine(),

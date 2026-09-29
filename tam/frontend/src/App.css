@@ -798,7 +798,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
 .report-metric dd span { color: var(--text-muted); font-size: 11px; }
 .report-summary p.muted, .report-summary p.warn-text { margin: 0 0 6px; line-height: 1.45; }
-.report-details { margin: 8px 0 0; max-width: 70ch; }
+.report-details { margin: 8px 0; max-width: 70ch; }
 .report-details summary { color: var(--text-muted); cursor: pointer; font-size: 12px; }
 .report-details p:first-of-type { margin-top: 8px; }
 .report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; max-width: 70ch; }
@@ -828,8 +828,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
    are styled here by class rather than by attribute, so a theme change
    reaches the picture. Text in the SVG inherits the body font and takes
    its size relative to it. */
-.report-charts { flex: none; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 16px; }
-.report-caveats { margin: 6px 0 0; max-width: 78ch; }
+/* 24px, against the 6 to 12px intervals inside the summary above it. Every
+   interval in this band used to fall between 16 and 20px, so the boundary
+   between the figures and the evidence read no stronger than a line wrap
+   inside a toolbar. This is the break that gets the room. */
+.report-charts { flex: none; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 24px; }
 /* The publisher ribbon: three cells, one per output, each saying where that
    one is. A row of them rather than one line of text, because the three run
    and finish independently.
@@ -838,7 +841,9 @@ input, button, select { font-family: inherit; font-size: inherit; }
    chip would have to earn its 4.5 to 1 in both themes for five states, and
    the state is a word here, so the colour is reinforcement rather than the
    only signal. */
-.report-ribbon { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0 0; padding: 0; list-style: none; }
+/* align-items, or an idle cell's 2px rule is stretched down the full height
+   of whatever multi-line failure sits beside it. */
+.report-ribbon { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; margin: 8px 0 0; padding: 0; list-style: none; }
 .report-ribbon-item { min-width: 0; padding-left: 8px; border-left: 2px solid var(--border); }
 /* Relative, not a pixel literal: the ratchet counts those and this block
    was just rewritten to lower that count. */
@@ -867,6 +872,26 @@ input, button, select { font-family: inherit; font-size: inherit; }
    a row would scroll that row's chart out of sight. */
 .report-velocity { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .report-velocity-head { flex: none; }
+
+/* The outputs bar: the foot of the frame, a sibling of .report-body rather
+   than a row inside it.
+
+   The ceiling is the point. Inside the body, this was the only growing thing
+   in a fixed-height overflow: hidden column whose one shrinkable child was
+   the velocity panel, so three publishers failing at once, each with an
+   unbounded reason under it, collapsed that panel and then clipped it. Out
+   here, with flex: none and a max-height, a wall of failures scrolls in the
+   bar and the report it is reporting on stays whole. em, not px: the bar's
+   content is text, so its ceiling scales with the text. */
+.report-outputs { flex: none; max-height: 12em; overflow-y: auto; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.report-outputs-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+/* 75ch at this element's own size, which is .small. No relation to the 78ch
+   the summary uses at body size: matching that number across two font sizes
+   is the bug this file just lost. */
+.report-outputs-note { margin: 8px 0 0; max-width: 75ch; }
+/* The head's own controls sit on the text baseline of the pickers beside
+   them, not stretched down the row. */
+.report-frame .board-head-actions { align-items: center; }
 .chart-multiples { display: grid; gap: 8px; }
 .chart-figure { margin: 0; min-width: 0; }
 .chart-figure[aria-busy="true"] .chart-box { opacity: .5; }
@@ -960,7 +985,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   .report-metrics { grid-template-columns: minmax(0, 1fr); }
   .report-frame .board-picker { width: 100%; }
   .report-frame .board-picker select { min-width: 0; width: 100%; }
-  .report-actions .btn { min-height: 44px; }
+  .report-actions .btn, .report-outputs-row .btn { min-height: 44px; }
 }
 
 /* The ritual editor: a toolbar, one scroller, and a status line. */

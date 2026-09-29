@@ -103,6 +103,16 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   // which closedNewestFirst puts first.
   const shownSprintId = report.data?.series.sprintId || requestedSprintId || closed[0]?.id || 0;
 
+  // The report on screen describes a sprint that is still running, which is
+  // what makes its figures provisional and its rebuild a refresh. The head
+  // and the body both word themselves from it, so it is resolved once here
+  // rather than twice from two different sprint ids.
+  const shown = report.data;
+  const inProgress = active.some((s) => s.id === shown?.series.sprintId);
+  // A report with nothing in it cannot be rebuilt into something, and it is
+  // the state that says why in the body instead.
+  const canRebuild = !!shown && !shown.unavailable;
+
   function loading() {
     // The frame in the shell belongs to whichever operation holds the
     // per-profile lock, and this read being in flight does not mean that
@@ -144,28 +154,18 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
       // beside them: a report that cannot be built is a report that cannot
       // be published either, and saying so where the controls are is what
       // keeps somebody from looking for them.
-      return (
-        <>
-          <p className="muted report-unavailable" role="status">{unavailableLine(r.unavailable)}</p>
-          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={false} charts={reportFrame} />
-        </>
-      );
+      return <p className="muted report-unavailable" role="status">{unavailableLine(r.unavailable)}</p>;
     }
-    const inProgress = active.some((s) => s.id === r.series.sprintId);
     return (
       <>
         <SprintSummary series={r.series} builtAt={r.builtAt} live={inProgress} />
-        {/* One strip, not two. Rebuild and the three outputs were stacked
-            toolbars, each with a sentence under it repeating what its own
-            button said, and .report-actions caps at 70ch, which guaranteed
-            the three export buttons wrapped to a second row. */}
-        <div className="report-actions">
-          <button type="button" className="btn" disabled={report.isFetching} onClick={() => void rebuild()}>
-            {inProgress ? "Refresh report" : "Rebuild from Jira"}
-          </button>
-          <ReportOutputs profileId={activeId} boardId={reportBoardId} report={r} live={inProgress} charts={reportFrame} />
-          {report.isFetching && <span className="muted small" role="status" aria-live="polite">Rebuilding the report...</span>}
-        </div>
+        {/* Nothing between the figures and the charts. Rebuild sits with the
+            pickers, because it re-reads the report they name, and the three
+            outputs are the bar at the foot of the frame, because publishing
+            is what a reader does after the evidence rather than before it.
+            They were one strip here, and that strip was two nested copies of
+            .report-actions: one rule carrying flex-wrap and a 70ch cap,
+            applied twice, wrapped it to three rows at every window width. */}
         {/* The burndown is the wide one: it carries a point per sprint day,
             while the outcome chart carries five bars. */}
         <div className="report-charts">
@@ -279,9 +279,44 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             </select>
           </label>
         )}
+
+        {/* Rebuild re-reads the report the two pickers name, so it is the
+            third control of the same group rather than a row in the reading
+            column below them. .board-head-actions is the class every other
+            head in the app puts its controls in, and its margin-left: auto
+            is what sets this one at the far end. */}
+        {canRebuild && (
+          <div className="board-head-actions">
+            <button type="button" className="btn" disabled={report.isFetching} onClick={() => void rebuild()}>
+              {inProgress ? "Refresh report" : "Rebuild from Jira"}
+            </button>
+            {report.isFetching && (
+              <span className="muted small" role="status" aria-live="polite">Rebuilding the report…</span>
+            )}
+          </div>
+        )}
         </div>
 
         <div className="report-body">{body()}</div>
+
+        {/* The foot of the frame, outside the body. Publishing is what a
+            reader does once the figures, the charts and the trend are read,
+            so the controls for it come after all three; and being a sibling
+            of the body rather than a row inside it means three publishers
+            failing at once, each with its own unbounded reason, scroll inside
+            this bar instead of collapsing the velocity panel that was the
+            body's only shrinkable child. */}
+        {shown && (
+          <div className="report-outputs">
+            <ReportOutputs
+              profileId={activeId}
+              boardId={reportBoardId}
+              report={shown}
+              live={inProgress}
+              charts={reportFrame}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

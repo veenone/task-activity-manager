@@ -52,11 +52,21 @@ export function completionLine(s: ReportSeries, live = false): string {
     : `${trimPoints(s.completed)} of ${trimPoints(s.committed)} ${unitWord(s.unit, s.committed)} completed (${rate}%).`;
 }
 
-// floorLine is the qualification that rides with every one of those
-// figures. It is on the surface and not in a footnote because two of them
-// can be low and nothing else on screen would say so.
+// floorLine qualifies Committed, and Committed is on screen in every report,
+// so this is never dead text. It is on the surface and not in a footnote
+// because the figure can be low and nothing else on screen would say so.
 export function floorLine(): string {
-  return "Committed is a minimum estimate. Removed counts cards that left and later returned; cards removed for good are not visible.";
+  return "Committed is a minimum estimate.";
+}
+
+// removedFloorLine is the rest of what floorLine used to say, and it only
+// bites once something was removed: a sprint that lost nothing has no
+// invisible removals to warn about. Joined to the sentence above, it printed
+// two lines of the smallest type in the view under the figures of every
+// report, most of which had nothing for it to qualify.
+export function removedFloorLine(removed: number): string {
+  if (removed <= 0) return "";
+  return "Removed counts cards that left and later returned; cards removed for good are not visible.";
 }
 
 // unitLine says why a report counts cards, and is empty for one counting

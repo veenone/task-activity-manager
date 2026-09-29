@@ -8,6 +8,7 @@ import {
   dayLine,
   emptyDaysLine,
   floorLine,
+  removedFloorLine,
   isBusyRefusal,
   methodLine,
   mixedUnitsLine,
@@ -81,10 +82,25 @@ describe("summarySentence", () => {
 });
 
 describe("floorLine", () => {
-  it("says that committed is a floor and that removed sees only the cards that came back", () => {
+  it("says that committed is a floor, and only that", () => {
+    // It qualifies the Committed tile, which every report draws, so it is
+    // the half of the old sentence that is never dead text.
     const line = floorLine();
     expect(line).toContain("Committed is a minimum estimate");
-    expect(line).toContain("left and later returned");
+    expect(line).not.toContain("left and later returned");
+  });
+});
+
+// The other half of what floorLine used to say. A sprint that removed
+// nothing has no invisible removals to warn about, so the sentence was two
+// lines of 11px grey under the figures on every report that did not need it.
+describe("removedFloorLine", () => {
+  it("says nothing for a sprint that removed nothing", () => {
+    expect(removedFloorLine(0)).toBe("");
+  });
+
+  it("warns that removed sees only the cards that came back, once one did", () => {
+    expect(removedFloorLine(3)).toContain("left and later returned");
   });
 });
 
