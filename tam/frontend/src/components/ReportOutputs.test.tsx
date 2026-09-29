@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SprintReport } from "../api";
 import { nothingToPublishLine, publishedLine, publisherStatusWord, savedLine } from "../lib/reportText";
+import { reportDocument } from "../lib/reportDocument";
 import { ReportOutputs } from "./ReportOutputs";
 
 const bindings = vi.hoisted(() => ({
@@ -44,12 +45,16 @@ function report(over: Partial<SprintReport> = {}): SprintReport {
 // a drawn chart becomes is lib/chartImage's own suite; the canvas that ends it
 // does not exist under this runner.
 function draw(over: Partial<SprintReport> = {}) {
+  const r = report(over);
   render(
     <ReportOutputs
       profileId="p1"
       boardId={1}
-      report={report(over)}
-      live={false}
+      sprintId={r.series.sprintId}
+      // The component takes the document as a builder now, so one bar serves
+      // both a sprint report and a kanban board's. This suite stays on the
+      // sprint document, which is the one whose sections it asserts.
+      build={(images) => reportDocument(r, false, images)}
       charts={{ current: null }}
     />,
   );

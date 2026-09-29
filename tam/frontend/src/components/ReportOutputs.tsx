@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import type { RefObject } from "react";
 import { call, errMsg } from "@agile-suite/core";
 import { ExportSprintReportPPTX, ExportSprintReportXLSX, PublishSprintReport } from "../api";
-import type { ReportDocument, SprintReport } from "../api";
+import type { ReportDocument } from "../api";
 import { chartImages } from "../lib/chartImage";
-import { reportDocument } from "../lib/reportDocument";
+import type { ChartImages } from "../lib/chartImage";
 import {
   busyLine,
   isBusyRefusal,
@@ -40,8 +40,21 @@ import {
 interface Props {
   profileId: string;
   boardId: number;
-  report: SprintReport;
-  live: boolean;
+  // sprintId is only where the page goes: PublishSprintReport resolves the
+  // sprint's ritual page as the parent and falls back to the configured root
+  // when there is none. A kanban board has no sprint and passes 0, which is
+  // that fallback, so its report lands under the root.
+  sprintId: number;
+  // build is the document, and taking it as a function rather than building it
+  // here is what lets one bar serve both report kinds. A sprint report and a
+  // kanban report are different figures in the same ReportDocument shape, so
+  // the publishers below need to know which document they are sending and
+  // nothing about which kind of report made it.
+  //
+  // It takes the chart pictures because the document is rebuilt with them at
+  // the moment a button is pressed. A report with no charts ignores the
+  // argument.
+  build: (images?: ChartImages) => ReportDocument | null;
   // charts is the report frame the view drew, and the only place a picture is
   // looked for. The charts are in the DOM rather than in the report, so they
   // are collected on the click: rasterising three of them on every render
@@ -70,8 +83,8 @@ const PUBLISHERS = [
 
 type PublisherID = (typeof PUBLISHERS)[number]["id"];
 
-export function ReportOutputs({ profileId, boardId, report, live, charts }: Props) {
-  const doc = useMemo(() => reportDocument(report, live), [report, live]);
+export function ReportOutputs({ profileId, boardId, sprintId, build, charts }: Props) {
+  const doc = useMemo(() => build(), [build]);
   const [outcomes, setOutcomes] = useState<Record<PublisherID, Outcome>>({
     publish: IDLE,
     xlsx: IDLE,
@@ -110,7 +123,7 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
   // document built above is what it falls back to, which is the same document
   // without them.
   async function drawn(built: ReportDocument): Promise<ReportDocument> {
-    return reportDocument(report, live, await chartImages(charts.current)) ?? built;
+    return build(await chartImages(charts.current)) ?? built;
   }
 
   function onRun(id: PublisherID, label: string) {
@@ -119,7 +132,7 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
       run(id, label, async () => {
         // A warning means the page is written and a chart is not on it. The
         // page is the outcome either way, so it is named either way.
-        const page = await PublishSprintReport(profileId, boardId, report.series.sprintId, await drawn(doc));
+        const page = await PublishSprintReport(profileId, boardId, sprintId, await drawn(doc));
         return page.warning
           ? { status: "warned", message: partlyPublishedLine(page.title, page.warning) }
           : { status: "done", message: publishedLine(page.title) };

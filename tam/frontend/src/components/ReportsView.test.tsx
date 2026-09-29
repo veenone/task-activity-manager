@@ -23,6 +23,7 @@ vi.mock("../api", async () => {
     ListBoardSprints: vi.fn(),
     GetSprintReport: vi.fn(),
     CancelSprintReport: vi.fn(),
+    GetBoardCapacity: vi.fn(),
   };
 });
 
@@ -118,6 +119,15 @@ function renderView(props: Partial<React.ComponentProps<typeof ReportsView>> = {
 
 const SENTENCE = "Sprint 11 committed 34 points, added 5, removed 2, completed 29 and carried over 10.";
 
+// A kanban board's column heads, as Go composes them: every column, the two
+// limits as pointers because a column without one is the ordinary case, and
+// counted as the number the limit is measured against.
+const CAPACITY: api.ColumnView[] = [
+  { name: "To Do", statusIds: ["1"], total: 4, points: 0, counted: 4, min: null, max: null, constraint: "issueCount" },
+  { name: "In Progress", statusIds: ["3"], total: 5, points: 0, counted: 5, min: null, max: 3, constraint: "issueCount" },
+  { name: "Done", statusIds: ["5"], total: 9, points: 0, counted: 9, min: null, max: null, constraint: "issueCount" },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
   sync.progress = null;
@@ -133,6 +143,7 @@ beforeEach(() => {
   vi.mocked(api.ListBoardSprints).mockResolvedValue(SPRINTS);
   vi.mocked(api.GetSprintReport).mockResolvedValue(report());
   vi.mocked(api.CancelSprintReport).mockResolvedValue();
+  vi.mocked(api.GetBoardCapacity).mockResolvedValue(CAPACITY);
 });
 
 describe("ReportsView", () => {
@@ -252,7 +263,10 @@ describe("ReportsView", () => {
     expect(screen.queryByRole("combobox", { name: "Board" })).not.toBeInTheDocument();
   });
 
-  it("offers a board picker when the profile has two scrum boards, and no kanban board", async () => {
+  // The picker used to drop every kanban board, so a kanban team opened
+  // Reports and found nothing of its own in it. A kanban board has no sprint,
+  // which is a reason to report on it differently and not a reason to hide it.
+  it("offers every board, kanban ones included", async () => {
     vi.mocked(api.ListBoards).mockResolvedValue([
       { id: 1, name: "Acme Platform Scrum", type: "scrum" },
       { id: 2, name: "Ops Kanban", type: "kanban" },
@@ -261,7 +275,7 @@ describe("ReportsView", () => {
     renderView();
     const picker = await screen.findByRole("combobox", { name: "Board" });
     expect(picker).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Ops Kanban" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Ops Kanban" })).toBeInTheDocument();
   });
 
   it("announces board failures and offers both retry and Boards recovery", async () => {
@@ -544,6 +558,76 @@ describe("ReportsView's eight states", () => {
 // presence of an element, because presence was never the problem: the strip
 // was present, nested inside another copy of itself, above the evidence it
 // publishes.
+// A kanban board has no sprint, so nothing the sprint report builds reaches
+// it. Column capacity is the figure that needs none: it reads the synced
+// cache, and #105 already computes it and publishes it. What was missing was
+// that a kanban board never reached the section that would serve it.
+describe("a kanban board", () => {
+  // The second board in the fixture list.
+  const kanban = async () => {
+    const user = userEvent.setup();
+    renderView();
+    const picker = await screen.findByRole("combobox", { name: "Board" });
+    await user.selectOptions(picker, "2");
+    return user;
+  };
+
+  it("reads its column capacity rather than a sprint report", async () => {
+    await kanban();
+    await waitFor(() => expect(api.GetBoardCapacity).toHaveBeenCalledWith("p1", 2));
+  });
+
+  it("draws every column against its limit, the unlimited ones included", async () => {
+    await kanban();
+    // The rows come from the same capacityTable spec the published document
+    // uses, so the table on screen and the table on the page are one table.
+    const row = await screen.findByRole("row", { name: /In Progress/ });
+    expect(row).toHaveTextContent("5");
+    expect(row).toHaveTextContent("3");
+    expect(row).toHaveTextContent(/Over/i);
+    // A column the board sets no limit on is still a row: a table holding
+    // only the limited columns leaves a reader working out which are missing.
+    expect(screen.getByRole("row", { name: /To Do/ })).toHaveTextContent(/No limit/i);
+  });
+
+  it("names the columns that are over before the rows", async () => {
+    await kanban();
+    expect(await screen.findByText(/1 column is over the limit: In Progress/)).toBeInTheDocument();
+  });
+
+  // The counts describe this moment, and a published capacity table is read
+  // away from the board where nothing else says so.
+  it("says the counts are the board as it stands, not a window that closed", async () => {
+    await kanban();
+    expect(await screen.findByText(/As it stands now/)).toBeInTheDocument();
+  });
+
+  it("offers no sprint picker, since a kanban board has no sprint", async () => {
+    await kanban();
+    await screen.findByRole("row", { name: /In Progress/ });
+    expect(screen.queryByRole("combobox", { name: "Sprint" })).not.toBeInTheDocument();
+  });
+
+  // The outputs bar is #107's and is not rebuilt per report kind: flowDocument
+  // builds the same ReportDocument shape, so the publishers work unchanged.
+  it("can still publish, through the same outputs bar", async () => {
+    await kanban();
+    await screen.findByRole("row", { name: /In Progress/ });
+    expect(screen.getByRole("button", { name: /Publish to Confluence/i })).toBeEnabled();
+  });
+
+  it("says which metrics are not built yet rather than reading as a failed report", async () => {
+    await kanban();
+    expect(await screen.findByText(/Throughput and cycle time are not built yet/)).toBeInTheDocument();
+  });
+
+  it("says a board whose columns were never synced has none, rather than an empty table", async () => {
+    vi.mocked(api.GetBoardCapacity).mockResolvedValue([]);
+    await kanban();
+    expect(await screen.findByText(/columns have not been synced/)).toBeInTheDocument();
+  });
+});
+
 describe("the report's three bands", () => {
   const rebuild = () => screen.getByRole("button", { name: "Rebuild from Jira" });
   const publish = () => screen.getByRole("button", { name: /Publish to Confluence/i });

@@ -1176,6 +1176,12 @@ export const GetBoard = (
 ): Promise<BoardView> =>
   App.GetBoard(profileId, boardId, sprintId, swimlane) as Promise<BoardView>;
 export const SyncBoards: (profileId: string) => Promise<BoardSummary> = App.SyncBoards;
+// GetBoardCapacity is one board's column heads with no sprint behind them: the
+// cards each column holds now against the limit the board sets on it. It is
+// what the Reports view shows a kanban board, which has no sprint for
+// GetSprintReport to report on.
+export const GetBoardCapacity: (profileId: string, boardId: number) => Promise<ColumnView[]> =
+  App.GetBoardCapacity;
 
 // The two sprint ceremonies and the read the start dialog opens with. Both
 // ceremonies are journaled and sent on Commit, but take the app's
