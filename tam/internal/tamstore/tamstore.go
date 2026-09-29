@@ -61,6 +61,13 @@
 // a boards pass replaces a board's columns wholesale, so the next one fills
 // them in, and until it does a board reads as having no limits rather than
 // limits of zero.
+// Version 21 adds board_column_limit, the maximum a user sets in TAM for a
+// column Jira sets no limit on. A whole new table, so it arrives through
+// baseDDL the way edit_screen did at version 16 and there is no migration
+// entry to run. It is keyed on the column's name rather than on its position
+// because a boards pass replaces a board's columns wholesale: a position is
+// only where the column sat at the last sync, so a limit keyed on one would
+// move to whichever column ended up there after a reorder in Jira.
 package tamstore
 
 import (
@@ -94,8 +101,8 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 20,
-	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + journal.DDL,
+	Version: 21,
+	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -611,6 +618,29 @@ CREATE TABLE IF NOT EXISTS edit_screen (
 	fields_json TEXT NOT NULL DEFAULT '[]',
 	cached_at   TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, project, issue_type)
+);`
+
+// columnLimitDDL is a maximum the user set in TAM for a board column, and it
+// is its own table rather than a column on board_column for two reasons. A
+// boards pass deletes and reinserts a board's columns, so a limit living
+// there would be thrown away by the next sync; and board_column is keyed on
+// the column's position, which is only where the column sat at that sync, so
+// a limit keyed the same way would move to whichever column the next reorder
+// in Jira put there. The column's name is the one handle that survives both.
+// The cost is that renaming a column in Jira loses its limit, which reads as
+// a column with none rather than as somebody else's number.
+//
+// wip_max is NOT NULL because the row is the limit: clearing one deletes the
+// row, and a stored zero is a real limit on a column that may hold nothing.
+// There is no minimum here. Jira's pair is Jira's, and a floor a team sets
+// for itself is a different feature from the ceiling this one is.
+const columnLimitDDL = `
+CREATE TABLE IF NOT EXISTS board_column_limit (
+	profile_id  TEXT NOT NULL,
+	board_id    INTEGER NOT NULL,
+	column_name TEXT NOT NULL,
+	wip_max     INTEGER NOT NULL,
+	PRIMARY KEY (profile_id, board_id, column_name)
 );`
 
 const indexDDL = `

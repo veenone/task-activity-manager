@@ -102,6 +102,15 @@ type ColumnView struct {
 	Min        *int   `json:"min"`
 	Max        *int   `json:"max"`
 	Constraint string `json:"constraint"`
+	// LocalMax is the maximum the user set for this column in TAM, nil for a
+	// column they set none on. It is beside Jira's pair rather than folded
+	// into it because the two are different facts and every surface that
+	// prints a limit has to say which one it is showing: a team reading
+	// "7 of 5" needs to know whether the 5 is the board's rule or their own.
+	// Jira's limit wins wherever the board sets one, which is decided in
+	// frontend/src/lib/columnLimit, the one place a limit is turned into
+	// words for both the board and the report.
+	LocalMax *int `json:"localMax"`
 }
 
 // counts says whether one card is among those this column's limit measures.
@@ -190,6 +199,13 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 		// board caught half written. There is no shape to draw either way.
 		return view, nil
 	}
+	// The limits the user set are read on this snapshot with the columns they
+	// belong to, and matched to them by name: that is the one handle a column
+	// keeps across the reorder a boards pass can bring with it.
+	own, err := columnLimitsOf(ctx, q, profileID, boardID)
+	if err != nil {
+		return BoardView{}, err
+	}
 	for _, c := range cols {
 		view.Columns = append(view.Columns, ColumnView{
 			Name:       c.Name,
@@ -197,6 +213,7 @@ func composeBoard(ctx context.Context, q dbtx.Querier, issues IssueSource, profi
 			Min:        c.Min,
 			Max:        c.Max,
 			Constraint: c.Constraint,
+			LocalMax:   ownLimit(own, c.Name),
 		})
 	}
 

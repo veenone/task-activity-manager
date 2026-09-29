@@ -56,3 +56,41 @@ func TestSchemaVersionTwentyAddsTheColumnLimitsToAnOlderDatabase(t *testing.T) {
 		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
 	}
 }
+
+// Version 21 adds board_column_limit, the limit a user sets in TAM for a
+// column Jira sets none on. It is a whole new table, so baseDDL creates it on
+// the next open of an older file and there is no migration entry to run; what
+// is worth asserting is that the table is there and keyed the way a reorder
+// needs, on the column's name rather than on its position.
+func TestSchemaVersionTwentyOneAddsTheOwnLimitTable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != 21 {
+		t.Errorf("schema version = %d, want 21, the version that adds the table below", v)
+	}
+	if _, err := db.DB().Exec(
+		`INSERT INTO board_column_limit (profile_id, board_id, column_name, wip_max) VALUES ('p1', 1, 'In Progress', 5)`,
+	); err != nil {
+		t.Fatalf("write a limit of the user's own: %v", err)
+	}
+	// The same column at another position is the same row: a position keyed
+	// table would take this as a second limit and a reorder would leave two.
+	if _, err := db.DB().Exec(
+		`INSERT INTO board_column_limit (profile_id, board_id, column_name, wip_max) VALUES ('p1', 1, 'In Progress', 9)`,
+	); err == nil {
+		t.Error("a second limit for the same column was accepted, want the column's name to be the key")
+	}
+	var max int
+	if err := db.DB().QueryRow(
+		`SELECT wip_max FROM board_column_limit WHERE profile_id = 'p1' AND board_id = 1 AND column_name = 'In Progress'`,
+	).Scan(&max); err != nil {
+		t.Fatalf("read the limit back: %v", err)
+	}
+	if max != 5 {
+		t.Errorf("wip_max = %d, want the 5 that was written", max)
+	}
+}

@@ -114,6 +114,21 @@ func (a *App) MoveIssueToColumn(profileID, key, statusID string) error {
 	return a.repo.MoveToColumn(a.ctx, profileID, key, statusID)
 }
 
+// SetColumnLimit stores the WIP limit a user typed for one board column, or
+// clears it when they typed nothing. It writes to TAM's store alone: a limit
+// Jira sets is Jira's, and nothing here ever pushes board configuration back.
+//
+// limit is the raw text from the editor. Checking it is the repository's, so
+// a word, a negative number and one past the ceiling are refused in one place
+// rather than once per caller, and the message comes back to the dialog the
+// user typed it in.
+func (a *App) SetColumnLimit(profileID string, boardID int, column, limit string) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.boards.SetColumnLimit(a.ctx, profileID, boardID, column, limit)
+}
+
 // RankIssue journals a card dropped before or after neighbourKey on the
 // board the drop was made on. The repository refuses a neighbour the cache
 // does not hold, so a rank can never be pushed against an issue nobody has
