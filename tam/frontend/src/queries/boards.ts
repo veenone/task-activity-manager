@@ -16,6 +16,7 @@ import {
   MoveIssueToSprint,
   RankIssue,
   SETTING_BOARDS_UNAVAILABLE,
+  SetColumnLimit,
   StartSprint,
   SuggestSprintDates,
   SyncBoards,
@@ -281,6 +282,39 @@ export function useCreateSprint(profileId: string, run: <T>(action: () => Promis
   return useMutation<SprintCreated, Error, CreateSprintArgs>({
     mutationFn: (v) => run(() => call(() => CreateSprint(profileId, v.boardId, v.name, v.goal, v.start, v.end))),
     onSettled: () => invalidateSprintWrites(qc, profileId),
+  });
+}
+
+export interface ColumnLimitArgs {
+  boardId: number;
+  // column is the column's name, which is what the limit is keyed on: a boards
+  // sync replaces a board's columns wholesale and keys them by position, so
+  // neither of those survives a reorder in Jira.
+  column: string;
+  // limit is what the user typed, sent as text so Go refuses a word, a negative
+  // number and one past its ceiling in the one place that decides what a limit
+  // may be. Empty text clears the limit.
+  limit: string;
+}
+
+// useSetColumnLimit stores a limit of the team's own for one board column.
+//
+// It takes no sync lock, like the board's journal writes: the call is one
+// statement against SQLite and reaches nothing, so refusing it while a commit
+// runs would lock the user out of a local number for no gain.
+//
+// invalidateWrites repaints the board's heads. The sprint report's key goes
+// with them because its capacity section reads the same heads through
+// boardrepo.ColumnHeads, and without it that section would keep showing the
+// limit that was just replaced.
+export function useSetColumnLimit(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, ColumnLimitArgs>({
+    mutationFn: (v) => call(() => SetColumnLimit(profileId, v.boardId, v.column, v.limit)),
+    onSettled: () => {
+      invalidateWrites(qc, profileId);
+      qc.invalidateQueries({ queryKey: [profileId, "sprintReport"] });
+    },
   });
 }
 

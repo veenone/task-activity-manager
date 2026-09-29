@@ -1,5 +1,5 @@
 import type { ColumnView, ReportDay, ReportSeries, VelocityRow } from "../api";
-import { counted, hasLimit, limitBreach } from "./columnLimit";
+import { counted, effectiveLimit, hasLimit, limitBreach, limitSourceWords } from "./columnLimit";
 import { calendarDay, points } from "./format";
 import { reportFigures } from "./reportFigures";
 import { amount } from "./reportText";
@@ -95,13 +95,17 @@ export function capacityTable(columns: ColumnView[]): TableSpec {
 
 // limitCell is the limit itself, worded rather than left as a bare number: an
 // empty cell reads as a limit of nothing and a zero reads worse.
+//
+// The cell names where the limit came from, because this table is read away
+// from the board and away from TAM: a reader who takes a number the team set
+// for itself as the board's rule will go looking for it in Jira and not find
+// it. The pair and the precedence come from lib/columnLimit, so the cell and
+// the column head on screen can never attribute the same figure differently.
 function limitCell(c: ColumnView): string {
-  const min = c.min ?? null;
-  const max = c.max ?? null;
+  const { min, max } = effectiveLimit(c);
   if (max === null && min === null) return "No limit";
-  if (max === null) return `Minimum ${min}`;
-  if (min === null) return String(max);
-  return `${max}, minimum ${min}`;
+  const figure = max === null ? `Minimum ${min}` : min === null ? String(max) : `${max}, minimum ${min}`;
+  return `${figure}, ${limitSourceWords(c)}`;
 }
 
 // standingCell is the column against its limit, in words. It is a column of

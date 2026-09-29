@@ -171,6 +171,8 @@ export function SaveRitualBody(arg1:string,arg2:number,arg3:number,arg4:string,a
 
 export function SearchUsers(arg1:string,arg2:string):Promise<Array<backend.User>>;
 
+export function SetColumnLimit(arg1:string,arg2:number,arg3:string,arg4:string):Promise<void>;
+
 export function SetConfluenceConfig(arg1:string,arg2:profile.ConfluenceConfig,arg3:string):Promise<void>;
 
 export function SetDefaultProfile(arg1:string):Promise<void>;

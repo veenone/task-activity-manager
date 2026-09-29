@@ -426,6 +426,12 @@ export interface ColumnView {
   min?: number | null;
   max?: number | null;
   constraint?: string;
+  // localMax is the maximum the team set for this column in TAM, null for a
+  // column they set none on. It is beside Jira's pair rather than folded into
+  // it because the two are different facts: Jira's wins wherever the board
+  // sets one, and every surface that prints a limit says which of the two it
+  // is showing. lib/columnLimit decides the precedence and the wording.
+  localMax?: number | null;
 }
 
 export interface LaneView {
@@ -1348,6 +1354,18 @@ export const JournalSprintMoves: (profileId: string, keys: string[], sprintId: s
 // board binding that reads Jira, and only to check a drop.
 export const MoveIssueToColumn: (profileId: string, key: string, statusId: string) => Promise<void> =
   App.MoveIssueToColumn;
+
+// SetColumnLimit stores the WIP limit the team set for one board column, or
+// clears it when limit is empty. limit is the text the user typed rather than a
+// number: Go is the one place that decides what a limit may be, so a word, a
+// negative number and one past its ceiling come back as an error the dialog
+// reads out. Nothing here reaches Jira; TAM never writes board configuration.
+export const SetColumnLimit: (
+  profileId: string,
+  boardId: number,
+  column: string,
+  limit: string,
+) => Promise<void> = App.SetColumnLimit;
 export const MoveIssueToSprint: (profileId: string, key: string, sprintId: string) => Promise<void> =
   App.MoveIssueToSprint;
 export const RankIssue: (

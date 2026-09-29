@@ -221,10 +221,10 @@ export function truncationLine(keys: string[]): string {
 // and it is worded here rather than in the renderers for the same reason
 // every other figure in this file is.
 
-// noLimitsLine is a board Jira sets no column limit on, which is a fact
-// about the board and not an empty table.
+// noLimitsLine is a board with no limit on any column, from Jira or set in
+// TAM, and it names both because a reader of the page can check neither.
 export function noLimitsLine(): string {
-  return "Jira sets no limit on any column of this board, so there is nothing for the cards to be counted against.";
+  return "No column of this board has a limit, from Jira or set in TAM, so there is nothing for the cards to be counted against.";
 }
 
 // capacityCountLine says what the cards in the table are counted by, which
