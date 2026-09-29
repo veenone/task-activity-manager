@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/committer"
@@ -427,16 +428,17 @@ func TestADraftSprintOnAConnectionThatCannotCreateOneIsHeld(t *testing.T) {
 	}
 }
 
-// journalLostOnLink is a Jira whose link lands and whose journal then cannot
-// be read: the moment after the last phase that used to turn a Commit that
-// had written to Jira into a Go error, beside which Wails drops the Result.
-type journalLostOnLink struct {
+// journalLostOnWorklog is a Jira whose worklog lands and whose journal then
+// cannot be read: the moment after the last phase that used to turn a Commit
+// that had written to Jira into a Go error, beside which Wails drops the
+// Result. It hangs off the last phase there is, which is the worklogs one.
+type journalLostOnWorklog struct {
 	*fake
 	db *sql.DB
 }
 
-func (j journalLostOnLink) CreateLink(ctx context.Context, fromKey string, d backend.LinkDraft) error {
-	if err := j.fake.CreateLink(ctx, fromKey, d); err != nil {
+func (j journalLostOnWorklog) AddWorklog(ctx context.Context, key string, d backend.WorklogDraft) error {
+	if err := j.fake.AddWorklog(ctx, key, d); err != nil {
 		return err
 	}
 	_, err := j.db.Exec(`ALTER TABLE pending_change RENAME TO pending_change_gone`)
@@ -452,7 +454,14 @@ func TestAJournalLostAfterTheLastPhaseStillReturnsTheResult(t *testing.T) {
 	if err := h.repo.AddLink(ctx, "p1", "PLAT-1", backend.LinkDraft{Type: "Relates", Direction: "outward", ToKey: "XT-9"}); err != nil {
 		t.Fatal(err)
 	}
-	eng := committer.New(journalLostOnLink{fake: h.jira, db: h.db}, h.repo, h.order)
+	logged, err := backend.NewWorklogDraft("2h", "Pairing", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.repo.LogWork(ctx, "p1", "PLAT-1", logged); err != nil {
+		t.Fatal(err)
+	}
+	eng := committer.New(journalLostOnWorklog{fake: h.jira, db: h.db}, h.repo, h.order)
 
 	res, err := eng.Commit(ctx, "p1", "PLAT")
 	if err != nil {
@@ -466,12 +475,12 @@ func TestAJournalLostAfterTheLastPhaseStillReturnsTheResult(t *testing.T) {
 		if strings.Contains(f.Error, "did not run") {
 			t.Errorf("no phase follows the last one: %+v", f)
 		}
-		lost = lost || strings.Contains(f.Error, "linked in Jira but the journal could not be cleared")
+		lost = lost || strings.Contains(f.Error, "logged in Jira but the journal could not be cleared")
 	}
 	if !lost {
 		t.Errorf("the journal was not lost, so this proves nothing: %+v", res.Failures)
 	}
 	if res.Remaining != 1 {
-		t.Errorf("remaining = %d, want the link row the last successful read counted", res.Remaining)
+		t.Errorf("remaining = %d, want the worklog row the last successful read counted", res.Remaining)
 	}
 }

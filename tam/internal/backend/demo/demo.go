@@ -25,12 +25,12 @@ const conflictKey = "PLAT-412"
 type Backend struct {
 	project string
 
-	mu          sync.Mutex
-	over        map[string]backend.Issue
-	desc        map[string]string
-	nextKey     int
-	conflict    map[string]bool
-	links       map[string][]backend.Link
+	mu       sync.Mutex
+	over     map[string]backend.Issue
+	desc     map[string]string
+	nextKey  int
+	conflict map[string]bool
+	links    map[string][]backend.Link
 	// worklogs holds the entries a Commit pushed this run, keyed by issue.
 	// The dataset seeds none: a worklog only exists because somebody logged
 	// it, and inventing entries would make the section read as a record of
