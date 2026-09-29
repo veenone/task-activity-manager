@@ -21,9 +21,29 @@ Four questions, chosen with the maintainer:
   figure a team actually quotes.
 - **Work in progress against the board's own limits.** How many cards sit
   in each column now, and which columns are over the maximum the board
-  sets?
+  sets? This one already exists and is not built again here; see below.
 - **Cumulative flow.** How did the cards distribute across the columns, day
   by day, over the window?
+
+## What already exists
+
+Work in progress against a column's limit was built by #105 and is not
+rebuilt here. The status to column lookup is `columnIndex` in
+`boardrepo/view.go`, the subtask rule the board's `constraintType` selects is
+`ColumnView.counts`, the count a limit is measured against is
+`ColumnView.Counted`, the over and under rule is `limitBreach` in
+`lib/columnLimit.ts`, and `capacitySection` in `lib/reportDocument.ts`
+already publishes it as a Column capacity section of the report.
+
+What is missing is only reach. `Report.Capacity` is filled by
+`sprintreport/build.go` from a sprint id, and `ReportsView` filters its
+picker to `type === "scrum"`, so a kanban board never gets as far as the
+section that would serve it.
+
+Anything here that needs a status to column lookup uses the one in
+`boardrepo` or an extraction of it. A second copy would be the third
+implementation of a rule this codebase already carries two scars about;
+`donerule`'s header records the first two.
 
 ## Non-goals
 
@@ -92,7 +112,6 @@ func Build(
 - `P50`, `P85 float64`, hours, from `CycleTimes`.
 - `Days []ColumnDay`, a `Date` plus a count per column, for the cumulative
   flow chart.
-- `WIP []ColumnWIP` with `Name`, `Count`, `Max *int`, `Over bool`.
 - `Unit`, `UnitReason`, the existing `reports` vocabulary unchanged, so a
   board that estimates nothing counts cards and says why.
 - `Truncated []string`, the same honesty the sprint report carries: Jira
@@ -101,6 +120,11 @@ func Build(
   not claim to be exact.
 - `AlgoVersion` of its own, so a stored flow a lower version wrote is
   rebuilt rather than served.
+
+It carries no work in progress figure. That one is `boardrepo`'s and is
+already published; see What already exists. What `flow` adds to the column
+model is the classification `boardrepo` has no notion of: which column is
+the first, which is the last, and which are the working ones between them.
 
 ### The column model
 
@@ -233,11 +257,17 @@ the red was an assertion rather than a missing symbol.
 
 Three PRs under this spec, cheapest and most useful first.
 
-1. **The `changelog` extraction, `internal/flow`, and the WIP table.** WIP
-   needs no changelog at all: it reads current statuses against the limits
-   #105 landed. It ships something useful on its own and proves the
-   plumbing, the bindings, the storage and the view's board-type switch.
-2. **Throughput and cycle time.** Two boundary timestamps per card.
+1. **The `changelog` extraction, and the Reports view opening a kanban
+   board.** The view stops filtering to scrum, the window picker takes the
+   sprint picker's slot, and a kanban board is shown the column capacity
+   section that #105 already builds. No new metric, no new table, no Jira
+   fetch: capacity reads the synced cache. It proves the view's board-type
+   switch, which every later phase needs, and it is the slice that makes a
+   kanban team's Reports view stop being empty.
+2. **Throughput and cycle time.** Two boundary timestamps per card, and
+   where `internal/flow` arrives. It carries only what is new: the first,
+   working and last column classification, which `boardrepo` has no notion
+   of. The lookup itself comes from `boardrepo`.
 3. **Cumulative flow.** The day-by-day reconstruction, the expensive one,
    and the only metric here needing a status for every card on every day
    rather than two moments per card.
