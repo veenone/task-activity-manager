@@ -93,10 +93,20 @@ func (a *App) demoSpace(profileID string, c profile.ConfluenceConfig) *demo.Conf
 			}
 			return d.BaseBody, d.Version
 		}
+		// Under the root go a sprint's overview page and a document with no
+		// sprint of its own, which is a board's done agreement. The second has
+		// no overview to hang under, so without a case of its own it was left
+		// out of the rebuild and the first Sync after a restart read its page
+		// as gone.
+		atRoot := func(d ritualrepo.Document) bool {
+			return d.RitualType == ritualtemplate.Sprint || d.SprintID == 0
+		}
 		overviews := map[[2]int]string{}
 		for _, d := range docs {
-			if d.RitualType == ritualtemplate.Sprint && d.Status != ritualrepo.StatusGone {
-				overviews[[2]int{d.BoardID, d.SprintID}] = d.PageID
+			if atRoot(d) && d.Status != ritualrepo.StatusGone {
+				if d.RitualType == ritualtemplate.Sprint {
+					overviews[[2]int{d.BoardID, d.SprintID}] = d.PageID
+				}
 				body, version := remote(d)
 				space.Restore(d.PageID, c.RootPageID, d.Title, body, version)
 			}
@@ -105,7 +115,7 @@ func (a *App) demoSpace(profileID string, c profile.ConfluenceConfig) *demo.Conf
 			if d.Status == ritualrepo.StatusGone {
 				continue
 			}
-			if parent, ok := overviews[[2]int{d.BoardID, d.SprintID}]; ok && d.RitualType != ritualtemplate.Sprint {
+			if parent, ok := overviews[[2]int{d.BoardID, d.SprintID}]; ok && !atRoot(d) {
 				body, version := remote(d)
 				space.Restore(d.PageID, parent, d.Title, body, version)
 			}
@@ -153,6 +163,28 @@ func ritualKey(profileID string, boardID, sprintID int, ritualType string) (ritu
 
 func nowStamp() string { return time.Now().UTC().Format(time.RFC3339) }
 
+// ritualDocuments is what the Rituals view draws for one sprint: the sprint's
+// own documents plus the board's standing done agreement, which is keyed to no
+// sprint and so is not in a sprint's own list. They travel together because
+// every surface beyond this point, the nav, the editor, the save guard, the
+// conflict and gone banners, takes the board, sprint and type from the
+// document it was handed rather than from the sprint picker, so a document
+// with no sprint needs nothing of its own there.
+func (a *App) ritualDocuments(profileID string, boardID, sprintID int) ([]ritualrepo.Document, error) {
+	list, err := a.rituals.Documents(a.ctx, profileID, boardID, sprintID)
+	if err != nil || sprintID == 0 {
+		return list, err
+	}
+	agreement, ok, err := a.rituals.Document(a.ctx, ritualrepo.Key{ProfileID: profileID, BoardID: boardID, RitualType: ritualtemplate.DoneAgreement})
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		list = append(list, agreement)
+	}
+	return list, nil
+}
+
 // EnsureSprintRituals writes whichever of a sprint's five pages are missing,
 // from templates, and lists the sprint's pages. Local only, no lock: this is
 // what lets a planning page be written with no network at all.
@@ -170,7 +202,50 @@ func (a *App) EnsureSprintRituals(profileID string, boardID, sprintID int) ([]ri
 	if err := ritualsync.Ensure(a.ctx, a.rituals, profileID, boardID, sp, time.Local, time.Now()); err != nil {
 		return nil, err
 	}
-	return a.rituals.Documents(a.ctx, profileID, boardID, sprintID)
+	return a.ritualDocuments(profileID, boardID, sprintID)
+}
+
+// CreateDoneAgreement writes the done agreement document somebody asked for,
+// from its template, and answers with it. sprintID 0 is the board's standing
+// agreement and a sprint's own id is that sprint's additions to it. A document
+// that already exists is answered with as it is, edits and all.
+//
+// It is a binding of its own rather than part of EnsureSprintRituals because
+// neither document is one a sprint gets without asking: a board has one
+// agreement for all its sprints, and a sprint carries additions only when it
+// has some. Writing one per sprint the way the five pages are written would
+// give every sprint an empty page to ignore. The caller reads the sprint's
+// documents back through ListRitualDocuments, which carries both.
+func (a *App) CreateDoneAgreement(profileID string, boardID, sprintID int) (ritualrepo.Document, error) {
+	if _, err := a.requireProfile(profileID); err != nil {
+		return ritualrepo.Document{}, err
+	}
+	if err := a.requireRituals(); err != nil {
+		return ritualrepo.Document{}, err
+	}
+	name := a.boardName(profileID, boardID)
+	if name == "" {
+		return ritualrepo.Document{}, fmt.Errorf("board %d is not in this profile's cache; refresh the boards first", boardID)
+	}
+	info := ritualtemplate.SprintInfo{BoardName: name}
+	if sprintID != 0 {
+		sp, err := a.ritualSprint(profileID, boardID, sprintID)
+		if err != nil {
+			return ritualrepo.Document{}, err
+		}
+		info = sp.Info
+	}
+	if err := ritualsync.EnsureAgreement(a.ctx, a.rituals, profileID, boardID, info, time.Now()); err != nil {
+		return ritualrepo.Document{}, err
+	}
+	d, ok, err := a.rituals.Document(a.ctx, ritualrepo.Key{ProfileID: profileID, BoardID: boardID, SprintID: sprintID, RitualType: ritualtemplate.DoneAgreement})
+	if err != nil {
+		return ritualrepo.Document{}, err
+	}
+	if !ok {
+		return ritualrepo.Document{}, fmt.Errorf("the done agreement for board %d was not written", boardID)
+	}
+	return d, nil
 }
 
 // ListRitualDocuments reads a sprint's pages from tam.db, and nothing else.
@@ -181,7 +256,7 @@ func (a *App) ListRitualDocuments(profileID string, boardID, sprintID int) ([]ri
 	if err := a.requireRituals(); err != nil {
 		return nil, err
 	}
-	return a.rituals.Documents(a.ctx, profileID, boardID, sprintID)
+	return a.ritualDocuments(profileID, boardID, sprintID)
 }
 
 // SaveRitualBody is the editor's local save. It takes no lock, the way a

@@ -3,10 +3,10 @@
 import {backend} from '../models';
 import {importer} from '../models';
 import {committer} from '../models';
+import {ritualrepo} from '../models';
 import {profile} from '../models';
 import {ritualsync} from '../models';
 import {main} from '../models';
-import {ritualrepo} from '../models';
 import {reportout} from '../models';
 import {boardrepo} from '../models';
 import {issuerepo} from '../models';
@@ -34,6 +34,8 @@ export function ChooseReportExportDirectory():Promise<string>;
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
 export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
+
+export function CreateDoneAgreement(arg1:string,arg2:number,arg3:number):Promise<ritualrepo.Document>;
 
 export function CreateDraftBoard(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<number>;
 

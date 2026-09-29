@@ -87,3 +87,26 @@ func Ensure(ctx context.Context, docs *ritualrepo.Repository, profileID string, 
 	}
 	return nil
 }
+
+// EnsureAgreement writes one done agreement document from its template if
+// there is none yet, locally and with no network call, and leaves a document
+// somebody has written in exactly as it is.
+//
+// It is separate from Ensure, and its only caller is the binding behind the
+// button that asks for the document, because a done agreement is not a page
+// every sprint gets: a board has one standing agreement and a sprint has
+// additions only when it needs them. info carries which one, through its
+// sprint id: zero for the board's own document, a sprint's id for that
+// sprint's additions.
+func EnsureAgreement(ctx context.Context, docs *ritualrepo.Repository, profileID string, boardID int, info ritualtemplate.SprintInfo, now time.Time) error {
+	need, err := docs.NeedsTemplate(ctx, profileID, boardID, info.ID, []string{ritualtemplate.DoneAgreement})
+	if err != nil || len(need) == 0 {
+		return err
+	}
+	k := ritualrepo.Key{ProfileID: profileID, BoardID: boardID, SprintID: info.ID, RitualType: ritualtemplate.DoneAgreement}
+	// nil for the zone: the done agreement's render reads no date and no
+	// clock, so the bytes this writes are the bytes ritualsync's adoption
+	// check renders to compare against, whatever zone that pass runs in.
+	body := ritualtemplate.Render(ritualtemplate.DoneAgreement, info, nil)
+	return docs.WriteTemplate(ctx, k, ritualtemplate.Title(ritualtemplate.DoneAgreement, info), body, stamp(now))
+}

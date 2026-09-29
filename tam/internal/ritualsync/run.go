@@ -75,6 +75,23 @@ func Run(ctx context.Context, pages confluence.Pages, docs *ritualrepo.Repositor
 		return res, fmt.Errorf("The Confluence root page %s could not be read: %s", cfg.RootID, errtext.Line(err))
 	}
 	p := &pass{ctx: ctx, pages: pages, docs: docs, cfg: cfg, res: &res}
+	// A board's done agreement belongs to the board rather than to any one
+	// sprint, so the walk over sprints below would never reach it: it hangs
+	// under the rituals root and is reconciled first. The zero Sprint says
+	// what its sprint id of 0 says, that there is no sprint, and it is also
+	// what makes place()'s adoption check render the board-level body to
+	// compare against. Nothing here creates the row: only the binding that
+	// asks for the document writes one, so a board whose team never asked has
+	// none and this is one query that finds nothing.
+	agreement, has, err := docs.Document(ctx, ritualrepo.Key{ProfileID: profileID, BoardID: boardID, RitualType: ritualtemplate.DoneAgreement})
+	if err != nil {
+		return res, err
+	}
+	if has {
+		if _, _, err := p.page(Sprint{}, agreement, cfg.RootID); err != nil {
+			return res, err
+		}
+	}
 	for _, sp := range sprints {
 		if err := ctx.Err(); err != nil {
 			return res, err
@@ -101,9 +118,13 @@ func Run(ctx context.Context, pages confluence.Pages, docs *ritualrepo.Repositor
 				return res, err
 			}
 		}
-		for _, t := range ritualtemplate.Types[1:] {
-			d, ok := byType[t]
-			if !ok || (!placeable && d.PageID == "") {
+		// Every document the sprint holds but its overview, which is done
+		// above. Driven by what is stored rather than by Types, so a kind
+		// that is not one of the five automatic pages, a sprint's done
+		// agreement additions today, still syncs: a second list of kinds to
+		// keep in step with the first is a bug waiting for the next kind.
+		for _, d := range list {
+			if d.RitualType == ritualtemplate.Sprint || (!placeable && d.PageID == "") {
 				continue
 			}
 			if _, _, err := p.page(sp, d, parentID); err != nil {

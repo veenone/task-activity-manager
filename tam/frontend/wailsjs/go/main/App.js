@@ -38,6 +38,10 @@ export function CompleteSprint(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CompleteSprint'](arg1, arg2, arg3, arg4);
 }
 
+export function CreateDoneAgreement(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateDoneAgreement'](arg1, arg2, arg3);
+}
+
 export function CreateDraftBoard(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['CreateDraftBoard'](arg1, arg2, arg3, arg4, arg5);
 }
