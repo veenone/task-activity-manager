@@ -374,15 +374,26 @@ describe("reports view fits its frame", () => {
     expect(appCss).not.toMatch(/\.report-caveats/);
   });
 
+  // Issue #113: velocity was the only band that could shrink, so at 1280x800
+  // it collapsed and its unclipped head painted over the capacity heading.
+  it("lays capacity beside velocity in one lower band of two columns", () => {
+    const lower = declarationsOf(withoutMediaBlocks(appCss), ".report-lower");
+    expect([valueOf(lower, "grid-auto-flow"), valueOf(lower, "min-height")]).toEqual(["column", "0"]);
+    const capacity = declarationsOf(appCss, ".report-capacity");
+    expect(valueOf(capacity, "overflow-y")).toBe("auto");
+    expect(valueOf(capacity, "max-height")).toBeUndefined();
+  });
+
   const FALLBACK = [
     ["a narrow window", "max-width: 900px"],
     ["a short window", "max-height"],
   ] as const;
 
   it.each(FALLBACK)("lets the page scroll again in %s", (_label, query) => {
-    // The charts are fixed heights that do not shrink, so below a floor the
-    // honest answer is a scrollbar rather than crushed content.
+    // The charts are fixed heights that do not shrink, so below a floor a
+    // scrollbar is honest, and the band must stop growing or it collapses.
     const at = appCss.slice(appCss.indexOf(`@media (${query}`));
     expect(at.slice(0, 600)).toMatch(/\.report-body\s*\{[^}]*overflow:\s*auto/);
+    expect(at.slice(0, 900)).toMatch(/\.report-lower\s*\{[^}]*flex:\s*none/);
   });
 });

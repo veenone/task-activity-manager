@@ -92,6 +92,32 @@ export function limitBreach(c: ColumnView): Breach {
   return "";
 }
 
+// limitMeter is the same facts drawn: the count as a fill, and the limit as
+// a mark on the track it fills. A column with no limit has nothing to draw
+// and answers null.
+//
+// The scale is the larger of the count and the limit, which is what puts the
+// mark at the end of the track while the column is within its limit and
+// moves it inside the fill once the column is past it. That is what makes
+// 4 of 3 read as a bar running on beyond its mark rather than as one that is
+// merely full, and it is the only thing about the drawing that says a column
+// is over: the colour changes too, but a reader who cannot see the colour
+// reads the breach off the shape.
+//
+// The mark is the ceiling wherever the column has one and the floor
+// otherwise, which is the figure limitLine leads with in each case.
+export function limitMeter(c: ColumnView): { count: number; scale: number; mark: number } | null {
+  const { min, max } = effectiveLimit(c);
+  const target = max ?? min;
+  if (target === null) return null;
+  const count = counted(c);
+  const scale = Math.max(count, target);
+  // A column limited to nothing and holding nothing has no scale to divide
+  // by. Its mark is the end of an empty track, which is where a limit the
+  // count has not passed belongs.
+  return { count, scale, mark: scale > 0 ? target / scale : 1 };
+}
+
 // limitLine is the clause the column head prints under the column's name,
 // empty for a column with no limit. A breach is named in words rather than
 // left to a colour, because a reader who cannot see the colour is the reader

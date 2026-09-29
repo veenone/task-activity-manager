@@ -385,6 +385,46 @@ describe("BoardsView board", () => {
     expect(within(none).getByRole("button", { name: /No limit, set one/ })).toBeInTheDocument();
   });
 
+  /** The meter's fill width and the left of the limit mark on it, as drawn.
+   *  Empty strings for a column with no meter, so an absent one reads as a
+   *  pair of values that are wrong rather than as a throw. */
+  function meterAt(head: HTMLElement): [string, string] {
+    const fill = head.querySelector<HTMLElement>(".progress-bar-fill");
+    const mark = head.querySelector<HTMLElement>(".progress-bar-marker");
+    return [fill?.style.width ?? "", mark?.style.left ?? ""];
+  }
+
+  // The limit drawn as well as written. The track is scaled to the larger of
+  // the count and the limit, so a column within its limit draws a short bar
+  // with the mark at the end of the track, and a column past it draws a full
+  // bar with the mark inside and fill running on beyond it. That shape is
+  // what says the column is over to a reader who cannot tell the warn colour
+  // from the muted one. The meter carries no words of its own: the clause
+  // beside it already has every figure, so it is hidden from a screen reader
+  // rather than read out a second time.
+  it("draws the count as a meter whose fill runs past the mark when the column is over", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue(board({
+      columns: [
+        { name: "To Do", statusIds: ["1"], total: 4, points: 20, counted: 4, min: null, max: null, constraint: "issueCount" },
+        { name: "In Progress", statusIds: ["3"], total: 5, points: 0, counted: 5, min: null, max: 3, constraint: "issueCount" },
+        { name: "Done", statusIds: ["5"], total: 3, points: 27, counted: 3, min: null, max: 6, constraint: "issueCount" },
+      ],
+      lanes: [{ id: "", label: "All issues", count: 3, cells: [[KEYS], [PROMO], [RETRO]], overflow: [0, 0, 0] }],
+    }));
+    renderView();
+    // 5 of 3: the track is the count, so the bar is full and three fifths
+    // along it there is a mark the fill carries on past.
+    const over = await screen.findByRole("columnheader", { name: /In Progress/ });
+    expect(meterAt(over)).toEqual(["100%", "60%"]);
+    // 3 of 6: half a bar, and the mark is the end of the track.
+    const under = screen.getByRole("columnheader", { name: /Done/ });
+    expect(meterAt(under)).toEqual(["50%", "100%"]);
+    // A column Jira limits not at all has nothing to draw a count against.
+    const none = screen.getByRole("columnheader", { name: /To Do/ });
+    expect(meterAt(none)).toEqual(["", ""]);
+    expect(within(none).getByRole("button", { name: /No limit, set one/ })).toBeInTheDocument();
+  });
+
   // The gap this feature exists for: most boards have no limit in Jira, so a
   // team sets their own and the indicator starts working on that column. The
   // number is stored in TAM and the head says so, because a reader who takes

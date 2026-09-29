@@ -1303,6 +1303,22 @@
    signal and never the only one. */
 .board-column-limit { flex-basis: 100%; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .board-column-limit-breached { color: var(--warn-text); font-weight: 600; }
+/* A hit area a mouse can find on the one that is a button, taken straight
+   back out with a matching negative margin so the head is laid out at the
+   size it was and the lines under the name keep their spacing. */
+.board-column-limit.link-btn { padding: 4px 6px; margin: -4px -6px; }
+/* The limit drawn (ProgressBar, on its own line under the clause): the count
+   as a fill, and a mark where the limit falls on the track. Past the limit
+   the track is scaled to the count, so the mark moves inside the fill and
+   the bar visibly runs on beyond it, which is how a reader who cannot see
+   the warn colour reads the breach.
+
+   The track and the mark are one colour, repointed here, so the mark reads
+   as the track showing through the fill: a notch. The bar's own orange
+   marker is drawn for a line across bare track and is all but invisible on
+   a fill, which is the only place this one is ever drawn, since a limit the
+   count has not reached sits at the end of the track. */
+.board-column-meter { flex-basis: 100%; --bar-track: var(--surface); --bar-marker: var(--surface); }
 .board-lane { display: flex; flex-direction: column; gap: 6px; }
 .board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
 .board-cell { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
@@ -1551,13 +1567,17 @@
 .progress-bar-time .progress-bar-fill { background: var(--bar-time); }
 .progress-bar-points .progress-bar-fill { background: var(--bar-points); }
 .progress-bar-muted .progress-bar-fill { background: var(--text-muted); }
-/* The marker rides on the fill rather than being clipped by it, so today's
-   line is visible whether the sprint is ahead of it or behind it. */
+/* The marker rides on the fill rather than being clipped by it, so a
+   reference line is visible whether the fill has passed it or not. Its
+   colour is a token a caller can repoint: on a sprint timeline it is a line
+   across a mostly empty track and takes the orange, and on a column limit
+   meter it is a notch cut out of a full fill and takes the track's own
+   colour. One value cannot do both. */
 .progress-bar-marker {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 2px;
   margin-left: -1px;
-  background: var(--today-marker);
+  background: var(--bar-marker);
 }

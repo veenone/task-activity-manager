@@ -179,22 +179,26 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             already prints; the half that was not redundant, that the rows run
             oldest first, is in the column header now, where it cannot scroll
             away from the rows it describes. */}
-        <div className="report-velocity">
-          <div className="report-velocity-head">
-            <h3 className="report-heading" id="report-velocity-heading">Velocity</h3>
-            <VelocityChart rows={r.velocity} busy={report.isFetching} tabled />
-          </div>
-          <VelocityTable rows={r.velocity} />
-        </div>
-        {/* The board's columns against their limits, after the sprint's own
-            history because a limit is a fact about a column now rather than
-            about the fortnight the rows above describe.
+        {/* The lower band, two panels wide: the sprint's own history and,
+            beside it, the board's columns against their limits, which is a
+            fact about a column now rather than about the fortnight the rows
+            beside it describe.
 
-            flex: none with a ceiling of its own, the shape the outputs bar
-            took in #107: the velocity panel is the one shrinkable child of a
-            fixed-height column, so a band that grew without a bound here
-            would collapse it and then clip it. */}
-        <CapacityPanel report={r} />
+            They were stacked until #113, and velocity was then the only
+            child of the fixed-height body that could shrink. It shrank to
+            nothing and its head, which its own box does not clip, painted
+            over the capacity heading. Sharing one row, neither can reach
+            the other. */}
+        <div className="report-lower">
+          <div className="report-velocity">
+            <div className="report-velocity-head">
+              <h3 className="report-heading" id="report-velocity-heading">Velocity</h3>
+              <VelocityChart rows={r.velocity} busy={report.isFetching} tabled />
+            </div>
+            <VelocityTable rows={r.velocity} />
+          </div>
+          <CapacityPanel report={r} />
+        </div>
       </>
     );
   }
