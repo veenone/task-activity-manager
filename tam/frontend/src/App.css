@@ -874,25 +874,36 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .report-ribbon-failed { border-left-color: var(--danger-text); }
 .report-ribbon-failed .report-ribbon-state { color: var(--danger-text); }
 
+/* The lower band: the velocity panel and the capacity table side by side,
+   the way .report-charts above splits the burndown from the outcome.
+
+   Stacked, these were the third and fourth bands of a fixed-height
+   overflow: hidden column in which velocity was the only child that could
+   shrink, and it shrank to nothing: measured at 1280x800, velocity was 0px
+   tall while its own head was still 246px and, not being clipped by its
+   box, painted 214px past the body and straight over the capacity heading.
+   Side by side they share the height one band was already budgeted.
+
+   grid-auto-flow rather than two named tracks, because a report built
+   before the column heads travelled draws no capacity table at all, and an
+   empty second track would leave the velocity panel short of half the row
+   for nothing. */
+.report-lower { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 16px; }
 /* Two parts, not two columns: a head that does not scroll, holding the
    chart and the notes that belong to it, over the table that does. The
    chart stays out of the scroller because its tooltip is absolutely
    positioned and an overflow ancestor clips it, and because scrolling to
    a row would scroll that row's chart out of sight. */
-.report-velocity { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.report-velocity { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
 .report-velocity-head { flex: none; }
 
-/* The capacity band: the board's columns against their limits, under the
-   velocity panel.
-
-   flex: none and a ceiling, for the reason the outputs bar below has one. The
-   velocity panel is the one shrinkable child of this fixed-height column, so a
-   band that grew with its content would collapse that panel and then clip it,
-   and a board can carry more columns than a window has room for. em, not px:
-   the band is a table of text, so its ceiling scales with the text. */
-.report-capacity { flex: none; max-height: 14em; overflow-y: auto; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+/* The capacity band: the board's columns against their limits, beside the
+   velocity panel. min-height: 0 and overflow-y are what keep a board with
+   more columns than the row is tall inside its own column of the band; the
+   14em ceiling it used to carry was there to stop it eating velocity, and
+   the band is what does that now. */
+.report-capacity { min-height: 0; overflow-y: auto; }
 .report-capacity:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
-.report-capacity .report-heading { margin-top: 0; }
 
 /* The outputs bar: the foot of the frame, a sibling of .report-body rather
    than a row inside it.
@@ -982,12 +993,20 @@ input, button, select { font-family: inherit; font-size: inherit; }
    height, so this is a new pattern here, and it is the honest one. */
 @media (max-height: 760px) {
   .report-body { overflow: auto; }
+  /* Once the body scrolls, the band takes the height its two panels ask
+     for. Left growing, it is still the body's one shrinkable child and
+     still collapses to nothing, which is the whole defect moved into a
+     window that scrolls rather than fixed. */
+  .report-lower { flex: none; }
 }
 @media (max-width: 900px) {
   .report-charts { grid-template-columns: minmax(0, 1fr); }
+  .report-lower { flex: none; grid-auto-flow: row; }
   /* Stacked, the charts are twice as tall and nothing fits. The chart
      heights are constants that do not shrink, so a scrollbar is the
-     honest answer and crushing them is not. */
+     honest answer and crushing them is not, and the lower band's two
+     panels stack with them rather than sharing a row too narrow for
+     either. */
   .report-body { overflow: auto; }
   /* The timeline takes the whole width under the sprint name rather than a
      track of its own, which at this width was narrower than a bar can say
