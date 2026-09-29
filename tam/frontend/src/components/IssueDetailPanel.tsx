@@ -16,6 +16,7 @@ import { EditableFields, descriptionFormat } from "./EditableFields";
 import { SprintField } from "./SprintField";
 import { ActivityTab } from "./ActivityTab";
 import { AddLinkForm } from "./AddLinkForm";
+import { WorkLogSection } from "./WorkLogSection";
 
 // Section is one collapsible block of the panel. XTM's detail sidebar stacks
 // its sections under uppercase headings rather than hiding them behind tabs,
@@ -380,6 +381,13 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
               ))}
             </ul>
           )}
+      </Section>
+
+      {/* Closed like the rest, which is what makes fetching Jira's entries on
+          expand the right call rather than a shortcut: the read happens when
+          a reader asks for the work log and never otherwise. */}
+      <Section title="Work log" open={open.worklog ?? false} onToggle={() => toggle("worklog")}>
+        <WorkLogSection profileId={profileId} issueKey={issue.key} open={open.worklog ?? false} />
       </Section>
 
       <Section title="Activity" open={open.activity ?? false} onToggle={() => toggle("activity")}>

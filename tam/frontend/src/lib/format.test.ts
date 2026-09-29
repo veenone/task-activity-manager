@@ -1,5 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { calendarDay, day, dayInput, formatWhen, progressText, sprintDates, sprintRelative } from "./format";
+import { calendarDay, day, dayInput, formatWhen, progressText, sprintDates, sprintRelative, workDuration } from "./format";
+
+describe("workDuration", () => {
+  it("reads seconds back as the phrasing a worklog is discussed in", () => {
+    expect(workDuration(9000)).toBe("2h 30m");
+    expect(workDuration(2700)).toBe("45m");
+    expect(workDuration(7200)).toBe("2h");
+    expect(workDuration(0)).toBe("0m");
+    // A day is eight hours, so a logged day reads as the hours it was.
+    expect(workDuration(8 * 3600)).toBe("8h");
+    // Seconds Jira counted that do not land on a whole minute round rather
+    // than vanish, so a 90-second entry is not "0m".
+    expect(workDuration(90)).toBe("2m");
+    expect(workDuration(-60)).toBe("0m");
+  });
+});
 
 describe("formatWhen", () => {
   const now = new Date("2026-09-05T14:00:00Z");

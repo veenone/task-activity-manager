@@ -10,6 +10,7 @@ import { dayInput, plural } from "../lib/format";
 import { CommitBanner } from "./CommitBanner";
 import { ConflictCard } from "./ConflictCard";
 import { PendingMoveRow } from "./PendingMoveRow";
+import { worklogEntryLine } from "./WorkLogSection";
 
 interface Props {
   onClose: () => void;
@@ -325,6 +326,14 @@ export function PendingChangesModal({ onClose }: Props) {
                           <span className="accent-text">{link.toKey}</span>{" "}
                           <span>{link.toSummary}</span>{" "}
                           <button type="button" className="btn btn-discard btn-discard-row" disabled={busy} aria-label={`Discard link to ${link.toKey}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
+                          </button>
+                        </li>
+                      ))}
+                      {g.worklogs.map(({ row, log }) => (
+                        <li key={row.id} className="pending-row pending-row-worklog">
+                          <span className="muted">Work log</span>{" "}
+                          <span className="b">{worklogEntryLine(log)}</span>{" "}
+                          <button type="button" className="btn btn-discard btn-discard-row" disabled={busy} aria-label={`Discard the ${log.timeSpent} entry on ${g.key}`} onClick={() => discardOne.mutate(row, { onError: onDiscardError })}><span className="discard-mark" aria-hidden="true">✕</span>Discard
                           </button>
                         </li>
                       ))}

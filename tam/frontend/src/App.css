@@ -605,10 +605,19 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .boards-pane .board-scroll { min-width: 0; }
 
 /* Plan 1c: links */
-.add-link { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
-.add-link h3 { margin: 0; font-size: 13px; }
+.add-link,
+/* The Log work form is the same shape as Add link: one form at the foot of a
+   section, so it takes the same rule rather than a second one that would
+   drift from it. */
+.add-worklog { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.add-link h3,
+.add-worklog h3 { margin: 0; font-size: 13px; }
 .add-link-key { display: flex; gap: 6px; }
 .add-link-key .detail-input { flex: 1; }
+/* The total above the entries: the one number a reader of a work log came
+   for, so it sits on its own line rather than inside the list. */
+.worklog-total { margin: 0 0 8px; font-weight: 600; }
+.pending-row-worklog { grid-template-columns: 110px 1fr auto; }
 .linked-row .pending-dot { margin-left: 4px; }
 .pending-row-link { grid-template-columns: 110px auto auto 1fr auto; }
 /* Phase 3b: a journaled board move reads as a place, so its row is label,

@@ -7,6 +7,7 @@ import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "
 import * as api from "../api";
 import type { PendingChange } from "../api";
 import { groupPending } from "../queries/pending";
+import { calendarDay } from "../lib/format";
 import { profileBackend } from "../profileBackend";
 import { SyncProvider } from "../contexts/SyncContext";
 import { PendingChangesModal, countPushable, sprintChangeLine } from "./PendingChangesModal";
@@ -328,6 +329,25 @@ describe("PendingChangesModal", () => {
     expect(within(card).getByRole("button", { name: "Discard link to XT-1018" })).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Commit (1)" }));
     expect(await within(dialog).findByText("Last commit: 1 link pushed.")).toBeInTheDocument();
+  });
+
+  // A journalled worklog is invisible until Commit fires it unless the dialog
+  // draws it, and it has to be discardable there like every other row.
+  it("shows a worklog entry, discards it, and counts pushed ones in the banner", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ListPendingChanges).mockResolvedValue([
+      { id: 9, entityType: "worklog", entityKey: "PLAT-412", field: "2026-09-29T01:00:00.000+0700", beforeVal: "", baseVersion: "", createdAt: "",
+        afterVal: JSON.stringify({ started: "2026-09-29T01:00:00.000+0700", timeSpent: "2h 30m", comment: "Pairing", seconds: 9000 }) },
+    ]);
+    vi.mocked(api.CommitPendingChanges).mockResolvedValue({ committed: [], created: [], linked: [], logged: [{ key: "PLAT-412", timeSpent: "2h 30m" }], conflicts: [], failures: [], remaining: 0 });
+    renderModal();
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
+    expect(card).toHaveTextContent(`Work log 2h 30m on ${calendarDay("2026-09-29")}, Pairing`);
+    await user.click(within(card).getByRole("button", { name: "Discard the 2h 30m entry on PLAT-412" }));
+    await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 9));
+    await user.click(within(dialog).getByRole("button", { name: "Commit (1)" }));
+    expect(await within(dialog).findByText("Last commit: 1 worklog pushed (2h 30m on PLAT-412).")).toBeInTheDocument();
   });
 
   it("shows a draft sprint as its own card, first, and discards it", async () => {

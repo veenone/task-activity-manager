@@ -88,6 +88,20 @@ export function dayInput(iso: string): string {
   return match ? match[1] : "";
 }
 
+// workDuration reads a count of seconds back as Jira's own phrasing, which
+// is the only wording a worklog is ever discussed in: "2h 30m", "45m", "1d".
+// A day is eight hours, Jira's default, the same assumption the Go side makes
+// when it reads a typed duration; a total is shown in hours past that rather
+// than in weeks, because "1w 2d" hides how long a fortnight of logged work
+// actually is.
+export function workDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (hours === 0) return `${minutes}m`;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
 // points trims a float that is really a whole number, so 27 does not print
 // as 27.0 and 2.5 still prints as 2.5. Go sums these as float64, so a column
 // of halves can arrive a millionth of a point out.

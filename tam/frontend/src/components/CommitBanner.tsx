@@ -35,6 +35,8 @@ export function bannerLine(r: CommitResult): string {
     parts.push(`${r.created.length} created (${mapping})`);
   }
   if (r.linked.length) parts.push(plural(r.linked.length, "link pushed", "links pushed"));
+  const logged = r.logged ?? [];
+  if (logged.length) parts.push(`${plural(logged.length, "worklog pushed", "worklogs pushed")} (${logged.map((l) => `${l.timeSpent} on ${l.key}`).join(", ")})`);
   const moved = r.moved ?? [];
   // A move Jira had already made is not a card this Commit moved, and
   // counting it as one credits the push with work it did not do.
@@ -49,7 +51,7 @@ export function bannerLine(r: CommitResult): string {
   const held = r.held ?? [];
   if (held.length) parts.push(`${held.length} waiting`);
   if (parts.length === 0) return "Last commit: nothing to push.";
-  if (!sprints.length && !sprintsChanged.length && !r.committed.length && !r.created.length && !r.linked.length && !pushed.length) {
+  if (!sprints.length && !sprintsChanged.length && !r.committed.length && !r.created.length && !r.linked.length && !logged.length && !pushed.length) {
     return `Last commit: nothing pushed, ${parts.join(", ")}.`;
   }
   return `Last commit: ${parts.join(", ")}.`;

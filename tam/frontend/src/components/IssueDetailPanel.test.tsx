@@ -12,7 +12,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), GetEditableFields: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn(), BrowserOpenURL: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), GetEditableFields: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn(), ListWorklogs: vi.fn(), BrowserOpenURL: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -225,6 +225,21 @@ describe("IssueDetailPanel", () => {
     await waitFor(() => expect(within(tests).getByText("XT-1019")).toBeInTheDocument());
     expect(within(tests).getByText(/via XTM, link: Tested By/)).toBeInTheDocument();
     expect(api.ListLinkedTests).toHaveBeenCalledWith("p1", "PLAT-412");
+  });
+
+  // The Work log section is why fetch-on-expand exists: Jira's entries are
+  // never carried by a sync, so nothing asks for them until a reader opens
+  // the section, and most rows are never opened.
+  it("reads the work log only once the section is expanded", async () => {
+    vi.mocked(api.ListWorklogs).mockResolvedValue([
+      { id: "10001", author: "ranand", authorName: "R. Anand", started: "2026-09-28T09:00:00.000+0700", timeSpent: "1h", seconds: 3600, comment: "Reproduced it" },
+    ]);
+    renderPanel();
+    await screen.findByRole("button", { name: /^Work log/ });
+    expect(api.ListWorklogs).not.toHaveBeenCalled();
+    const worklog = await openSection("Work log");
+    await waitFor(() => expect(within(worklog).getByText("1h logged over 1 entry")).toBeInTheDocument());
+    expect(api.ListWorklogs).toHaveBeenCalledWith("p1", "PLAT-412");
   });
 
   it("keeps the cached fields and offers a retry when the detail fetch fails", async () => {
