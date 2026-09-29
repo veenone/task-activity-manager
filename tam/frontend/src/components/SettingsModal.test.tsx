@@ -67,6 +67,11 @@ describe("SettingsModal", () => {
     const onClose = vi.fn();
     render(<SettingsModal onClose={onClose} />);
     const check = await screen.findByLabelText(/project key/i);
+    // Enabled is the modal saying GetSettings has landed: every control is
+    // disabled until then. Without the wait this assertion passes on the
+    // default the component starts from, which is also on, so it could not
+    // fail if the stored value never arrived (C6).
+    await waitFor(() => expect(check).toBeEnabled());
     expect(check).toBeChecked();
 
     await userEvent.click(check);
@@ -79,6 +84,13 @@ describe("SettingsModal", () => {
   it("shows the project key check off when it is stored off", async () => {
     bindings.GetSettings.mockResolvedValue({ reportExportDir: "", checkProjectKeyPattern: false });
     render(<SettingsModal onClose={vi.fn()} />);
-    expect(await screen.findByLabelText(/project key/i)).not.toBeChecked();
+    const check = await screen.findByLabelText(/project key/i);
+    // findBy resolves on the first render carrying the label, which is the one
+    // before GetSettings resolves, and checkKey starts on. So this asserted
+    // against the default rather than the stored value and lost the race
+    // whenever the first poll beat the promise, which is what a loaded CI
+    // runner does. Enabled is the modal saying the read has landed.
+    await waitFor(() => expect(check).toBeEnabled());
+    expect(check).not.toBeChecked();
   });
 });
