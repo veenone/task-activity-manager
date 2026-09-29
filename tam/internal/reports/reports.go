@@ -19,6 +19,12 @@
 // separated lists rather than single ids, because a card sits in two
 // sprints at once during a rollover.
 //
+// Reading a changelog entry, and the civil-date arithmetic a day-by-day
+// walk through one needs, live in internal/changelog, because internal/flow
+// reconstructs a board's flow from the same entries. What stays here is the
+// sprint model: rewound, walker, inSprint, and the card they move. The
+// unwinding above is the trap, and it has one implementation.
+//
 // What this cannot see is written down in section 3 of
 // docs/superpowers/specs/2026-09-09-tam-reports-design.md and is not a
 // detail: the issues come from a "sprint = N" search, which returns
@@ -37,6 +43,7 @@ import (
 	"time"
 
 	"agile-suite/tam/internal/backend"
+	"agile-suite/tam/internal/changelog"
 	"agile-suite/tam/internal/sprintdate"
 )
 
@@ -223,10 +230,10 @@ func unitOf(cards []*card, issues []backend.IssueHistory, start, last time.Time)
 			return UnitPoints, ""
 		}
 		for _, ch := range c.changes {
-			if ch.field != fieldPoints || !ch.at.After(start) || ch.at.After(last) {
+			if ch.Field != changelog.FieldPoints || !ch.At.After(start) || ch.At.After(last) {
 				continue
 			}
-			if parsePoints(ch.to) != nil {
+			if changelog.Points(ch.To) != nil {
 				return UnitPoints, ""
 			}
 		}
@@ -244,7 +251,7 @@ func cardsReason(issues []backend.IssueHistory) string {
 			return ReasonNothingEstimated
 		}
 		for _, ch := range h.Changes {
-			if ch.Field == fieldPoints {
+			if ch.Field == changelog.FieldPoints {
 				return ReasonNothingEstimated
 			}
 		}
