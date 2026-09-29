@@ -1967,6 +1967,42 @@ same composed view without lanes, which sprint report capacity section read,
 so board on screen and published table cannot carry two counts of same
 column. Negative limit from wire read as no limit and logged (I1).
 
+### A limit the team set, when Jira sets none (#106)
+
+Most boards carry no limit in Jira: their admin never set one, so #105's
+feature drew nothing on every column. Team can now set own maximum per column,
+stored locally, schema 21 (`board_column_limit`). **Jira's wins wherever board
+sets one** and TAM never writes board configuration, so precedence is not
+configurable and every surface name the source: `from Jira` / `set in TAM`,
+from `limitSourceWords` in `lib/columnLimit`, on board head and in published
+capacity table alike.
+
+**Keyed on column's *name*, not its position.** `board_column` PK is
+`(profile_id, board_id, position)` and boards pass replace board's columns
+wholesale, so neither survive: limit on that table thrown away by next sync,
+limit keyed on position land on whichever column next reorder in Jira put
+there, which is worse than no feature. Name is only handle that survive both.
+Cost: rename in Jira lose the limit, which read as column with none rather
+than as somebody else's number. `ownlimits_test.go` resync board in a
+different order and assert limit follow its column, not its old position.
+
+`wip_max` NOT NULL: the row *is* the limit, so clearing delete it and stored
+zero stay a real limit. No minimum, Jira's pair is Jira's. Table in both
+`PurgeProfile` list and in `RemoveBoards` (unlike `ritual_document`): limit is
+number about a column of that board and nothing else.
+
+`SetColumnLimit` take **text** user typed, not int: word, fraction, negative
+and past `MaxColumnLimit` each refused with what is wrong rather than clamped
+(I1), in one place, and refusal read by person who typed it. Editor is app's
+`usePrompt`; empty field clear the limit, which is what they typed rather than
+side effect of anything else, and retyping bring it back (I2).
+
+Section on screen is `CapacityPanel`, which render the `ReportSection` that
+`lib/reportDocument.capacitySection` already build for the three outputs
+rather than composing its own: screen and published page must not be two
+answers. `flex: none` + `max-height`, the shape #107 gave the outputs bar,
+because velocity panel is the one shrinkable child of a fixed-height column.
+
 ## A drop asks for a column, not a status
 
 Jira board column collect several statuses: Done column commonly hold
@@ -2246,11 +2282,18 @@ entered. Kiwi profile file refused.
                           which is what the Confluence page, the spreadsheet and the deck are all
                           rendered from; it answers null for an unavailable report, which is what
                           makes the three outputs refuse rather than write a page of zeroes
-      src/lib/columnLimit.ts  a board column against its WIP limit: whether there is one, the
-                          count it is measured against, whether the column is over the maximum or
-                          under the minimum, and the clause the column head prints; read by the
-                          board head and by reportTables' capacity rows, so one limit is never
-                          worded two ways
+      src/lib/columnLimit.ts  a board column against its WIP limit: whether there is one, which
+                          of the two places it came from and in whose words, the pair it is
+                          actually measured against (Jira's wins over the team's own), the count,
+                          whether the column is over the maximum or under the minimum, and the
+                          clause the column head prints; read by the board head and by
+                          reportTables' capacity rows, so one limit is never worded two ways
+                          components/ColumnLimit.tsx is the head's own control: a printed clause
+                          for a limit Jira sets, a button opening usePrompt for a column it does
+                          not, which is also how a board with no limits anywhere says so
+                          components/CapacityPanel.tsx draws reportDocument's own capacity
+                          section on the Reports view, so the screen and the published page are
+                          not two answers
       src/lib/boardCells.ts  the board's position arithmetic: keyboard focus and navigation
                           over the lane/column/index grid
       src/lib/cardMove.ts  the drag/keyboard arithmetic a board move shares: where a drop lands
