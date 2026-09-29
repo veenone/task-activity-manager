@@ -37,6 +37,27 @@ commit hash behind it; the instruction gate checks the hash exists.
   reads as "tested by" from one side and something else from the other, so a
   link is resolved by direction, never by type name alone (6ef4b6d, 0218fca).
 
+## Jira worklogs
+
+- An issue's worklog comes from `GET /rest/api/2/issue/{key}/worklog`, which
+  pages. A search's `fields=worklog` caps at 20 entries per issue and says
+  nothing about the rest, so an issue worked on for a month would read as one
+  worked on for a week (6400c42).
+- `started` is an offset-carrying stamp, `2026-09-29T01:00:00.000+0700`, and
+  Jira files the entry under the day that offset makes of it. Sending the same
+  instant as UTC moves the work to the day before for anyone east of
+  Greenwich, which is then wrong in every Jira report that groups by day, the
+  main reason people log work at all. TAM formats it from the machine's own
+  clock with `2006-01-02T15:04:05.000-0700` and sends it verbatim (6400c42).
+- Jira parses the duration phrase itself and refuses a zero or unparseable
+  one with a 400, which without a check of its own would surface at Commit
+  rather than at the keystroke. A day and a week inside a duration are
+  instance settings; the defaults are eight hours and five days, which is what
+  `ParseWorkSeconds` assumes for the total TAM shows beside an entry it has not
+  pushed yet. Jira's own seconds replace that reading once Commit has landed
+  it, so a non-default instance reads a pending `1d` a little high rather than
+  reporting a wrong number for ever (55129be).
+
 ## Jira issue types
 
 - A project's issue types come from `GET /rest/api/2/project/{key}`, and the

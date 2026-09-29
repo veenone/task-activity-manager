@@ -23,6 +23,16 @@ const (
 	// EntityLink is the journal entity type of a link to create. The row's
 	// field is LinkField(d) and its after_val the LinkDraft as JSON.
 	EntityLink = "link"
+	// EntityWorklog is the journal entity type of work logged against an
+	// issue. The row's field is the entry's started stamp, offset and all,
+	// and its after_val the WorklogDraft as JSON, the way a link's is a
+	// LinkDraft. The field is the stamp rather than a fixed name because an
+	// issue takes as many entries as somebody worked on it, so the journal's
+	// own uniqueness on (type, key, field) has to keep one row per entry;
+	// with a fixed field the second entry of a morning would replace the
+	// first. Nothing local changes when one is journalled: Jira owns the
+	// worklog, and TAM holds the entry until Commit sends it.
+	EntityWorklog = "worklog"
 	// EntityBoardCreate is the journal entity type of a drafted board, the
 	// board twin of EntitySprintCreate (sprintdrafts.go): its key is the
 	// negative id as text, its field FieldCreate, and its after_val the

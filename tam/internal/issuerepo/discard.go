@@ -109,6 +109,11 @@ func discardOne(ctx context.Context, tx *sql.Tx, profileID string, p journal.Pen
 		// Nothing local changed when these were queued.
 	case p.EntityType == EntityLink:
 		// A link that was never pushed: nothing on the row to revert.
+	case p.EntityType == EntityWorklog:
+		// Nor a worklog: Jira holds the entries and TAM cached none of
+		// them, so the journal row is the whole of it. Without this case the
+		// default branch below would read the row's field as an issue column
+		// and try to write the started stamp into it.
 	case p.EntityType == EntityTransition, p.EntityType == EntitySprintMove, p.EntityType == EntityRank, p.EntityType == EntityIssueBoard:
 		// A board add has no column to put back either, the way a rank has
 		// none: revertMove asks holdsMove first, which is false for both,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { PendingChange } from "../api";
-import { groupPending, sprintWaiting } from "./pending";
+import type { PendingChange, Worklog } from "../api";
+import { groupPending, sprintWaiting, worklogTotal } from "./pending";
 
 function row(id: number, entityType: string, entityKey: string, afterVal = "{}"): PendingChange {
   return { id, entityType, entityKey, field: "x", beforeVal: "", afterVal, baseVersion: "", createdAt: "" };
@@ -35,6 +35,39 @@ describe("groupPending", () => {
     ]);
     expect(groups.map((g) => g.key)).toEqual(["-1", "13", "TAM-NEW-1", "PLAT-1"]);
     expect(groups[1].sprintChanges.map((r) => r.id)).toEqual([3]);
+  });
+
+  // A worklog row sorted into edits would be drawn as a field change from
+  // nothing to a blob of JSON, which is the only rendering the dialog has for
+  // a row it does not recognise.
+  it("reads a worklog row as an entry rather than a field edit", () => {
+    const entry = { started: "2026-09-29T01:00:00.000+0700", timeSpent: "2h 30m", comment: "Pairing", seconds: 9000 };
+    const groups = groupPending([
+      row(2, "worklog", "PLAT-1", JSON.stringify(entry)),
+      row(1, "issue", "PLAT-1"),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].edits.map((r) => r.id)).toEqual([1]);
+    expect(groups[0].worklogs.map((w) => w.row.id)).toEqual([2]);
+    expect(groups[0].worklogs[0].log.timeSpent).toBe("2h 30m");
+    expect(groups[0].worklogs[0].log.comment).toBe("Pairing");
+  });
+
+  it("keeps a worklog row whose payload will not parse, as an edit to discard", () => {
+    const groups = groupPending([row(7, "worklog", "PLAT-1", "not json")]);
+    expect(groups[0].worklogs).toEqual([]);
+    expect(groups[0].edits.map((r) => r.id)).toEqual([7]);
+  });
+});
+
+describe("worklogTotal", () => {
+  it("adds Jira's seconds and the pending ones together", () => {
+    const logs = [
+      { seconds: 3600 },
+      { seconds: 9000, pending: true },
+    ] as Worklog[];
+    expect(worklogTotal(logs)).toBe(12600);
+    expect(worklogTotal([])).toBe(0);
   });
 });
 

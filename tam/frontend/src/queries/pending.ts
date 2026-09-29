@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
 import {
   AddLink,
+  ListWorklogs,
+  LogWork,
   DiscardAllPendingChanges,
   DiscardPendingChange,
   EditIssue,
@@ -14,7 +16,8 @@ import {
   ListUnpushableEdits,
 } from "../api";
 import { ENTITY_BOARD_CREATE, ENTITY_SPRINT_COMPLETE, ENTITY_SPRINT_DELETE, ENTITY_SPRINT_START, SPRINT_ENTITIES, isMoveEntity } from "../api";
-import type { DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange } from "../api";
+import { ENTITY_WORKLOG } from "../api";
+import type { DraftBoard, DraftSprint, IssueDraft, LinkDraft, PendingChange, Worklog } from "../api";
 import { keys } from "./keys";
 import { invalidateWrites } from "./invalidate";
 import { invalidateSprintWrites } from "./sprints";
@@ -134,6 +137,36 @@ export function useAddLink(profileId: string) {
   });
 }
 
+// useWorklogs is one issue's worklog, Jira's entries and the pending ones
+// together. open is what makes it fetch on expand: the section is closed by
+// default and a closed one has no reason to cost a round trip.
+export function useWorklogs(profileId: string, key: string, open: boolean) {
+  return useQuery({
+    queryKey: keys.worklogs(profileId, key),
+    queryFn: () => call(() => ListWorklogs(profileId, key)),
+    enabled: !!profileId && !!key && open,
+    retry: false,
+  });
+}
+
+export function useLogWork(profileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, timeSpent, comment }: { key: string; timeSpent: string; comment: string }) =>
+      call(() => LogWork(profileId, key, timeSpent, comment)),
+    onSuccess: (_, v) => invalidateWrites(qc, profileId, v.key),
+  });
+}
+
+// worklogTotal is the seconds the section adds up: Jira's own numbers for the
+// entries it holds, plus TAM's reading of each pending one. A pending entry's
+// seconds are worked out from Jira's default day and week, so an instance
+// setting its own reads a pending "1d" a little high until Commit replaces it
+// with Jira's number.
+export function worklogTotal(logs: Worklog[]): number {
+  return logs.reduce((sum, l) => sum + (l.seconds || 0), 0);
+}
+
 // useDiscardById discards a journal row known only by id and issue key,
 // which is what the Links tab has for a pending link.
 export function useDiscardById(profileId: string) {
@@ -148,7 +181,8 @@ export function useDiscardById(profileId: string) {
 // with its decoded DraftBoard. A draft group
 // carries its decoded draft; a draft sprint group its decoded DraftSprint;
 // a real sprint's group its edit or delete row in sprintChanges; an edit
-// group carries one row per field; a link group one row per journaled link;
+// group carries one row per field; a link group one row per journaled link,
+// and a worklog group one row per journalled entry;
 // a move group the board rows, which are their own kind because they are
 // pushed their own way and read as places rather than as field values.
 //
@@ -169,6 +203,7 @@ export interface PendingGroup {
   boardRow: PendingChange | null;
   edits: PendingChange[];
   links: { row: PendingChange; link: LinkDraft }[];
+  worklogs: { row: PendingChange; log: Worklog }[];
   moves: PendingChange[];
 }
 
@@ -191,7 +226,7 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     const id = `${kind}:${row.entityKey}`;
     let g = byKey.get(id);
     if (!g) {
-      g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], moves: [] };
+      g = { id, key: row.entityKey, kind, draft: null, createRow: null, sprint: null, sprintRow: null, sprintChanges: [], board: null, boardRow: null, edits: [], links: [], worklogs: [], moves: [] };
       byKey.set(id, g);
     }
     if (row.entityType === "issue_create") {
@@ -222,6 +257,12 @@ export function groupPending(rows: PendingChange[]): PendingGroup[] {
     } else if (row.entityType === "link") {
       try {
         g.links.push({ row, link: JSON.parse(row.afterVal) as LinkDraft });
+      } catch {
+        g.edits.push(row);
+      }
+    } else if (row.entityType === ENTITY_WORKLOG) {
+      try {
+        g.worklogs.push({ row, log: JSON.parse(row.afterVal) as Worklog });
       } catch {
         g.edits.push(row);
       }

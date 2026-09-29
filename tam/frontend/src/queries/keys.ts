@@ -7,6 +7,12 @@ export const keys = {
   issue: (profileId: string, key: string) => [profileId, "issue", key] as const,
   linkedTests: (profileId: string, key: string) =>
     [profileId, "issue", key, "tests"] as const,
+  // One issue's worklog: Jira's entries plus the pending ones. It sits under
+  // the issue's own key so invalidateWrites refreshes it with everything else
+  // a local write can change, and it is only ever fetched while the Work log
+  // section is open.
+  worklogs: (profileId: string, key: string) =>
+    [profileId, "issue", key, "worklogs"] as const,
   sprints: (profileId: string) => [profileId, "sprints"] as const,
   syncState: (profileId: string) => [profileId, "syncState"] as const,
   pending: (profileId: string) => [profileId, "pending"] as const,

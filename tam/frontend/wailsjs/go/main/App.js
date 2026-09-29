@@ -22,6 +22,10 @@ export function CancelSprintReport(arg1) {
   return window['go']['main']['App']['CancelSprintReport'](arg1);
 }
 
+export function CheckWorkDuration(arg1) {
+  return window['go']['main']['App']['CheckWorkDuration'](arg1);
+}
+
 export function ChooseReportExportDirectory() {
   return window['go']['main']['App']['ChooseReportExportDirectory']();
 }
@@ -244,6 +248,14 @@ export function ListSprints(arg1) {
 
 export function ListUnpushableEdits(arg1) {
   return window['go']['main']['App']['ListUnpushableEdits'](arg1);
+}
+
+export function ListWorklogs(arg1, arg2) {
+  return window['go']['main']['App']['ListWorklogs'](arg1, arg2);
+}
+
+export function LogWork(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['LogWork'](arg1, arg2, arg3, arg4);
 }
 
 export function LookupIssue(arg1, arg2) {

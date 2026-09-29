@@ -169,6 +169,25 @@ export interface Link {
   pendingId?: number;
 }
 
+// Worklog is one entry against an issue. started carries its own UTC offset,
+// which is what Jira dates the entry by, so it is read as a stamp and never
+// normalised. timeSpent is the phrase somebody typed and seconds is what Jira
+// made of it, which is the only one a total adds up from. pending and
+// pendingId mark an entry the journal still holds, for the same reason Link
+// carries them: the section draws Jira's entries and TAM's own in one list
+// and only the second kind can be taken back.
+export interface Worklog {
+  id: string;
+  author: string;
+  authorName: string;
+  started: string;
+  timeSpent: string;
+  seconds: number;
+  comment: string;
+  pending?: boolean;
+  pendingId?: number;
+}
+
 // One comment on an issue. Named IssueComment because Comment is a DOM
 // global. author and authorName are both empty for a comment Jira answered
 // with no author (anonymous, or a user deleted since); restriction is the
@@ -756,6 +775,11 @@ export interface PendingChange {
 // entityKey is the draft's negative id and its afterVal a DraftSprint.
 export const ENTITY_SPRINT_CREATE = "sprint_create";
 
+// ENTITY_WORKLOG is the journal entity of work logged against an issue. Its
+// key is the issue key, its field the entry's started stamp, and its afterVal
+// the entry as JSON.
+export const ENTITY_WORKLOG = "worklog";
+
 // ENTITY_BOARD_CREATE is the journal entity of a board drafted in TAM,
 // mirroring issuerepo.EntityBoardCreate. Its entityKey is the draft's
 // negative id and its afterVal a DraftBoard.
@@ -987,6 +1011,9 @@ export interface CommitResult {
   // delete, "Sprint 12 edited"; optional for the same reason.
   sprintsChanged?: string[];
   linked: { key: string; toKey: string; type: string }[];
+  // logged names each worklog entry pushed; optional for the reason
+  // createdSprints is, since fixtures written before it do not carry it.
+  logged?: { key: string; timeSpent: string }[];
   // moved is optional for the same reason CommitFailure's fields are.
   moved?: CommitMove[];
   conflicts: Conflict[];
@@ -1529,6 +1556,20 @@ export const LookupIssue = (profileId: string, key: string): Promise<Issue> =>
   App.LookupIssue(profileId, key) as Promise<Issue>;
 export const AddLink = (profileId: string, key: string, link: LinkDraft): Promise<void> =>
   App.AddLink(profileId, key, backend.LinkDraft.createFrom(link));
+
+// ListWorklogs is Jira's entries for the issue followed by the ones the
+// journal holds. It is called when the Work log section is expanded, not on
+// every sync: most rows are never asked about, and the answer is Jira's own
+// rather than anything the store caches.
+export const ListWorklogs: (profileId: string, key: string) => Promise<Worklog[]> =
+  App.ListWorklogs as unknown as (profileId: string, key: string) => Promise<Worklog[]>;
+// LogWork journals an entry. Nothing reaches Jira until Commit.
+export const LogWork: (profileId: string, key: string, timeSpent: string, comment: string) => Promise<void> =
+  App.LogWork;
+// CheckWorkDuration is the duration rule on its own, so the form can refuse
+// what was typed where it was typed. It is the same rule LogWork applies, so
+// the two cannot disagree about what Jira will take.
+export const CheckWorkDuration: (timeSpent: string) => Promise<void> = App.CheckWorkDuration;
 
 // isDemoUrl mirrors suiteprofiles.IsDemoURL in the backend: "demo" on its own
 // or a "demo:" / "demo-" variant selects the offline dataset.

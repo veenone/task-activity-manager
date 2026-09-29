@@ -29,6 +29,10 @@ type fake struct {
 	getErr    map[string]error
 	links     []string
 	linkErr   error
+	// worklogs records "KEY started timeSpent comment" for every entry
+	// pushed, and worklogErr refuses the ones for the keys it names.
+	worklogs   []string
+	worklogErr map[string]error
 
 	// The board writes: pushed records them in the order they were made,
 	// which is half of what the board pass promises.
@@ -167,6 +171,18 @@ func (f *fake) CreateLink(_ context.Context, fromKey string, d backend.LinkDraft
 		return f.linkErr
 	}
 	f.links = append(f.links, fromKey+" "+d.Direction+" "+d.Type+" "+d.ToKey)
+	return nil
+}
+
+func (f *fake) Worklogs(_ context.Context, key string) ([]backend.Worklog, error) {
+	return nil, fmt.Errorf("not used for %s", key)
+}
+
+func (f *fake) AddWorklog(_ context.Context, key string, d backend.WorklogDraft) error {
+	if err := f.worklogErr[key]; err != nil {
+		return err
+	}
+	f.worklogs = append(f.worklogs, strings.TrimSpace(key+" "+d.Started+" "+d.TimeSpent+" "+d.Comment))
 	return nil
 }
 

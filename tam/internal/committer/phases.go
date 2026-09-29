@@ -43,7 +43,10 @@ type phase struct {
 //  4. every other creatable type, so a sub-task's parent does;
 //  5. sub-tasks;
 //  6. edits, then the board moves (sprint moves, transitions, ranks), then
-//     links, exactly as before phases existed.
+//     links, exactly as before phases existed;
+//  7. worklogs, last because an entry names one issue and waits on nothing
+//     else, so it has no reason to run before a phase that other rows depend
+//     on and every reason to run after the creates that give it its key.
 func phases() []phase {
 	return []phase{
 		{name: "boards", run: func(ctx context.Context, r *commitRun) { r.createBoards(ctx) }},
@@ -56,6 +59,7 @@ func phases() []phase {
 		{name: "edits", run: func(ctx context.Context, r *commitRun) { r.pushEdits(ctx) }},
 		{name: "board moves", run: func(ctx context.Context, r *commitRun) { r.e.commitBoardMoves(ctx, r.profileID, r.res, r.deps) }},
 		{name: "links", run: func(ctx context.Context, r *commitRun) { r.e.commitLinks(ctx, r.profileID, r.res, r.deps) }},
+		{name: "worklogs", run: func(ctx context.Context, r *commitRun) { r.pushWorklogs(ctx) }},
 	}
 }
 

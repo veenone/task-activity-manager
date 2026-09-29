@@ -102,6 +102,7 @@ type Result struct {
 	CreatedSprints []CreatedSprint `json:"createdSprints"`
 	SprintsChanged []string        `json:"sprintsChanged"`
 	Linked         []Linked        `json:"linked"`
+	Logged         []Logged        `json:"logged"`
 	Moved          []Moved         `json:"moved"`
 	Conflicts      []Conflict      `json:"conflicts"`
 	Failures       []Failure       `json:"failures"`
@@ -136,7 +137,7 @@ func New(b backend.IssueBackend, repo *issuerepo.Repository, order BoardOrder) *
 // rows left that cannot be read keeps the last count that could.
 func (e *Engine) Commit(ctx context.Context, profileID, projectKey string) (Result, error) {
 	res := Result{
-		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, Linked: []Linked{},
+		Committed: []string{}, Created: []Created{}, CreatedSprints: []CreatedSprint{}, SprintsChanged: []string{}, Linked: []Linked{}, Logged: []Logged{},
 		Moved: []Moved{}, Conflicts: []Conflict{}, Failures: []Failure{}, Held: []Held{},
 	}
 	run := &commitRun{e: e, profileID: profileID, projectKey: projectKey, res: &res, deps: newDependencies()}

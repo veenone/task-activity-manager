@@ -381,6 +381,34 @@ export namespace backend {
 	        this.displayName = source["displayName"];
 	    }
 	}
+	export class Worklog {
+	    id: string;
+	    author: string;
+	    authorName: string;
+	    started: string;
+	    timeSpent: string;
+	    seconds: number;
+	    comment: string;
+	    pending: boolean;
+	    pendingId: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Worklog(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.author = source["author"];
+	        this.authorName = source["authorName"];
+	        this.started = source["started"];
+	        this.timeSpent = source["timeSpent"];
+	        this.seconds = source["seconds"];
+	        this.comment = source["comment"];
+	        this.pending = source["pending"];
+	        this.pendingId = source["pendingId"];
+	    }
+	}
 
 }
 
@@ -782,6 +810,20 @@ export namespace committer {
 	        this.type = source["type"];
 	    }
 	}
+	export class Logged {
+	    key: string;
+	    timeSpent: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Logged(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.timeSpent = source["timeSpent"];
+	    }
+	}
 	export class Moved {
 	    key: string;
 	    entityType: string;
@@ -808,6 +850,7 @@ export namespace committer {
 	    createdSprints: CreatedSprint[];
 	    sprintsChanged: string[];
 	    linked: Linked[];
+	    logged: Logged[];
 	    moved: Moved[];
 	    conflicts: Conflict[];
 	    failures: Failure[];
@@ -825,6 +868,7 @@ export namespace committer {
 	        this.createdSprints = this.convertValues(source["createdSprints"], CreatedSprint);
 	        this.sprintsChanged = source["sprintsChanged"];
 	        this.linked = this.convertValues(source["linked"], Linked);
+	        this.logged = this.convertValues(source["logged"], Logged);
 	        this.moved = this.convertValues(source["moved"], Moved);
 	        this.conflicts = this.convertValues(source["conflicts"], Conflict);
 	        this.failures = this.convertValues(source["failures"], Failure);

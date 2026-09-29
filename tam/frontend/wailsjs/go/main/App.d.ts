@@ -27,6 +27,8 @@ export function CanTransition(arg1:string,arg2:string,arg3:string):Promise<backe
 
 export function CancelSprintReport(arg1:string):Promise<void>;
 
+export function CheckWorkDuration(arg1:string):Promise<void>;
+
 export function ChooseReportExportDirectory():Promise<string>;
 
 export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
@@ -138,6 +140,10 @@ export function ListRitualDocuments(arg1:string,arg2:number,arg3:number):Promise
 export function ListSprints(arg1:string):Promise<Array<issuerepo.SprintRef>>;
 
 export function ListUnpushableEdits(arg1:string):Promise<Array<issuerepo.UnpushableEdit>>;
+
+export function ListWorklogs(arg1:string,arg2:string):Promise<Array<backend.Worklog>>;
+
+export function LogWork(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function LookupIssue(arg1:string,arg2:string):Promise<backend.Issue>;
 
