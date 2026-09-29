@@ -73,6 +73,25 @@ change, no new table, no migration entry.
    `lib/ritualNav.ts`, because the board's document and a sprint's additions
    share a type.
 
+5. **The sprint's own pages point at it** (added to the issue after it was
+   opened). Review carries a Done agreement section above its two issue
+   lists, where the argument about whether something is finished happens, and
+   Planning carries the same after Committed scope, because the bar is what
+   committing to that scope means. Each is one line of prose naming the
+   sprint's own additions page and an `include` macro of the board's
+   agreement **by title**.
+
+   By title, never by page id or URL. A page id is empty until the page is
+   published and changes afterwards, so a body carrying one renders
+   differently once a neighbouring page is published, and `run.go` would read
+   an untouched page as one somebody wrote in. That is #74. A title built
+   from the board and the sprint is the same bytes every time, and the
+   include macro also means the section shows the agreement as it is the day
+   the page is opened rather than a copy taken when it was written. The
+   golden files for `planning.xml` and `review.xml` move with it, which is
+   also the frontend's round-trip corpus, so the macro is proven to survive
+   the editor.
+
 ## Places that assumed a ritual belongs to a sprint
 
 Searched for, rather than hoped about. Two needed changing, the rest hold.
@@ -96,6 +115,10 @@ Searched for, rather than hoped about. Two needed changing, the rest hold.
   `sprintId = 0` unchanged.
 - `boardrepo.RemoveBoards` leaves `ritual_document` alone by design and
   `PurgeProfile` sweeps it; both already cover the new rows.
+
+A sprint report section drawn from the agreement is **not** in scope here or
+in #116: the figures it would need are the per-issue ticks, so it comes after
+them, in its own issue.
 
 ## What the next branch does (#116)
 

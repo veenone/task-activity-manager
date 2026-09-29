@@ -556,3 +556,78 @@ Automatic merging of a conflict. Deleting Confluence pages from TAM.
 Comments, attachments, search. Inserting sprint report figures. A title
 prefix setting. Per-day standup pages. New pages for closed sprints. Anything
 in XTM.
+
+## 8. The done agreement, added for issue #115
+
+A team's agreement about what finished means is a sixth kind of ritual
+document, `ritualtemplate.DoneAgreement` (`"doneagreement"`), labelled **Done
+agreement**. It is named for what it is, the team's agreement, and not for
+what it is about: `donerule`, `backend.IsDone` and `lib/unfinished.ts` each
+decide whether an issue reads as finished, and `donerule`'s package comment
+distinguishes all four. Nothing derives a status from this document.
+
+**Storage.** No schema change. `ritual_document` is keyed on
+`(profile_id, board_id, sprint_id, ritual_type)`, so the board's standing
+agreement is that key with **`sprint_id = 0`**, and a sprint's additions to it
+are the same type with the sprint's own id. A board has one agreement for all
+its sprints; a sprint has additions only when it needs them.
+
+**Never automatic.** `DoneAgreement` is not in `ritualtemplate.Types`, so
+`Ensure` (section 1, "Creating pages starts locally") never writes one. The
+only writer is `ritualsync.EnsureAgreement`, called by one binding,
+`CreateDoneAgreement(profileID, boardID, sprintID)`, behind the offer in the
+Rituals view's document list. It fills a missing row and leaves an existing
+document as it is, edits and all.
+
+**Titles.** `<board name> · Done agreement` for the board's, and
+`<sprint name> · Done agreement` for a sprint's additions. `Title` reads a
+sprint id of 0 as "no sprint" and titles the page after the board, which is
+what keeps it from reading as "Sprint 0".
+
+**The template** is a sentence and one `<ac:task-list>`, the shape
+`lib/storage` already round trips and the shape the per-issue ticks (#116)
+read the items back from. It reads no clock and ignores its `*time.Location`,
+so the adoption check in section 2 stays byte-stable for the same board or
+sprint.
+
+**The pass.** `Run` reconciles the `sprint_id = 0` row, when there is one,
+under the rituals root before it walks the sprints, with a zero `Sprint`
+value: there is no sprint, which is also what makes the adoption check render
+the board-level body to compare against. Inside a sprint, the loop over the
+sprint's documents replaced the loop over `Types[1:]`, so a kind that is not
+one of the five automatic pages still syncs; a second list of kinds to keep in
+step with the first would be a bug waiting for the next kind.
+
+**Both documents travel with the sprint's.** `App.ritualDocuments` answers a
+sprint's documents plus the board's agreement, so `EnsureSprintRituals` and
+`ListRitualDocuments` carry it and the editor, the save guard and the conflict
+and gone banners reach it unchanged: each of them takes the board, sprint and
+type from the document it was handed. `lib/ritualNav.ts` is the one place that
+had to learn the difference, because the two agreements share a type and a nav
+keyed on the type alone would collide; its keys are `sprintId:ritualType`.
+
+**The sprint's own pages point at it.** Review carries a Done agreement
+section above its Completed and Not completed lists, and Planning the same
+after Committed scope. Each is a line of prose naming the sprint's own
+additions page and an `include` macro of the board's agreement **by title**:
+`<ac:structured-macro ac:name="include">` with `<ri:page ri:content-title=...>`
+in its unnamed parameter. A page id is empty until the page is published and
+changes afterwards, so a reference carrying one would render differently once
+the agreement was published and section 2's adoption check would read an
+untouched Review page as one somebody wrote in; that is #74. Titles built from
+the board and the sprint are the same bytes every time. The macro is an opaque
+block in the editor, labelled `Confluence: include`, written back byte for
+byte, which the corpus round-trip covers now that `planning.xml` and
+`review.xml` carry it.
+
+**The demo space** rebuild hangs each stored page under its sprint's overview.
+A document with no sprint has no overview, so it is restored under the root
+beside the overviews; without that case the first Sync after a restart read
+its page as gone.
+
+**Verification** beyond the sections above: the kind is `Known` and is not in
+`Types`; the render carries a task list and does not move with the zone; the
+board's agreement is created under the root and pushed on a later pass; a
+sprint's additions land under its overview; `Ensure` writes none; the board's
+agreement survives a demo restart; the nav lists both and keys them apart; the
+view asks for each and opens what it wrote.
