@@ -21,19 +21,32 @@ const (
 	Standup  = "standup"
 	Review   = "review"
 	Retro    = "retro"
+
+	// DoneAgreement is the team's own statement of what finished means: one
+	// document for the board, at sprint id 0, and optionally a second per
+	// sprint carrying only what that sprint adds to it. It is not a status
+	// rule, and the package comment on internal/donerule says how it differs
+	// from the three things in TAM that are. It is a kind of ritual document
+	// and not one of Types, because Types is what every sprint gets without
+	// anybody asking and a board's agreement is neither per sprint nor
+	// automatic.
+	DoneAgreement = "doneagreement"
 )
 
 // Types is every page a sprint gets, the overview first because Sync has to
-// create it before any ritual page can sit under it.
+// create it before any ritual page can sit under it. DoneAgreement is
+// deliberately not here; see its comment above.
 var Types = []string{Sprint, Planning, Standup, Review, Retro}
 
 var labels = map[string]string{
 	Sprint: "Overview", Planning: "Planning", Standup: "Standup", Review: "Review", Retro: "Retrospective",
+	DoneAgreement: "Done agreement",
 }
 
 func normalize(ritualType string) string { return strings.ToLower(strings.TrimSpace(ritualType)) }
 
-// Known reports whether ritualType names one of the five pages.
+// Known reports whether ritualType names a document this package renders,
+// which is the five of Types plus the done agreement.
 func Known(ritualType string) bool { _, ok := labels[normalize(ritualType)]; return ok }
 
 // Label is a page's name on screen and in its title.
@@ -56,11 +69,25 @@ func (s SprintInfo) name() string {
 	return "Sprint " + strconv.Itoa(s.ID)
 }
 
+func (s SprintInfo) board() string {
+	if n := strings.TrimSpace(s.BoardName); n != "" {
+		return n
+	}
+	return "Board"
+}
+
 // Title is the page title Sync creates and matches by. Confluence keeps
 // titles unique within a space, which is why ritual pages carry the sprint.
+// A document with no sprint (id 0) belongs to the board instead, so it is
+// titled after the board; the board's done agreement is the only such
+// document, and titling it after a sprint it has nothing to do with would
+// read as "Sprint 0".
 func Title(ritualType string, s SprintInfo) string {
 	if normalize(ritualType) == Sprint {
 		return s.name()
+	}
+	if s.ID == 0 {
+		return s.board() + " · " + Label(ritualType)
 	}
 	return s.name() + " · " + Label(ritualType)
 }
@@ -128,6 +155,31 @@ func (p *page) fact(label, value string) {
 }
 
 const taskList = "<ac:task-list><ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body></ac:task-body></ac:task></ac:task-list>"
+
+// doneAgreement is how a sprint's own pages point at the bar the team will
+// argue against in the meeting: the board's standing agreement included by
+// title, and one line naming the sprint's own additions page. Together they
+// are the effective agreement, board items plus whatever this sprint added.
+//
+// **By title, never by page id or URL.** A page id is empty until the page is
+// published and changes afterwards, so a body carrying one renders differently
+// once a neighbouring page is published, and run.go's comparison of a stored
+// body against a fresh render would then read an untouched page as one
+// somebody wrote in and raise a conflict every sprint. #74 is that failure.
+// A title built from the board and the sprint is the same bytes every time.
+//
+// The include macro is left to Confluence: it resolves the title when the page
+// is opened, so it shows the agreement as it is that day rather than a copy
+// taken when this page was written. TAM's editor holds it as an opaque block
+// labelled "include" and writes it back byte for byte.
+func (p *page) doneAgreement(s SprintInfo) {
+	p.h2(Label(DoneAgreement))
+	p.para("What this team agreed has to be true before a piece of work counts as done. The board's agreement is below, and anything this sprint added to it is on " + Title(DoneAgreement, s) + ".")
+	p.WriteString(`<ac:structured-macro ac:name="include">` +
+		`<ac:parameter ac:name=""><ac:link><ri:page ri:content-title="` +
+		esc(Title(DoneAgreement, SprintInfo{BoardName: s.BoardName})) +
+		`"/></ac:link></ac:parameter></ac:structured-macro>`)
+}
 
 func (p *page) table(headers ...string) {
 	p.WriteString("<table><tbody><tr>")
@@ -201,6 +253,9 @@ func Render(ritualType string, s SprintInfo, loc *time.Location) string {
 		p.table("Member", "Days available", "Notes")
 		p.h2("Committed scope")
 		p.jira(JQL(s.ID, All), true)
+		// After the scope, because the bar is what committing to that scope
+		// means, and before the risks, which are read against it.
+		p.doneAgreement(s)
 		p.h2("Risks and dependencies")
 		p.emptyList()
 		p.h2("Decisions")
@@ -218,6 +273,9 @@ func Render(ritualType string, s SprintInfo, loc *time.Location) string {
 		p.h2("Sprint goal")
 		p.para(s.Goal)
 		p.para("Met / Partly met / Not met")
+		// Above the two lists, because the argument about whether something is
+		// finished happens while they are read, not after.
+		p.doneAgreement(s)
 		p.h2("Completed")
 		p.jira(JQL(s.ID, Done), false)
 		p.h2("Not completed")
@@ -227,6 +285,21 @@ func Render(ritualType string, s SprintInfo, loc *time.Location) string {
 		p.h2("Stakeholder feedback")
 		p.table("Who", "Feedback", "Follow up")
 		p.h2("Follow ups")
+		p.tasks()
+	case DoneAgreement:
+		// Reads neither the clock nor loc, and nothing from the sprint but its
+		// name, so the same board or sprint always renders the same bytes and
+		// the adoption check in ritualsync stays honest. The items are one
+		// task list, the shape lib/storage already round trips, because the
+		// per-issue ticks in #116 read them back from it.
+		if s.ID == 0 {
+			p.para("What this team agrees has to be true before a piece of work counts as done. It holds for every sprint on this board.")
+			p.h2("Items")
+		} else {
+			p.fact("Sprint", s.name())
+			p.para("What this sprint adds to the board's done agreement. The board's own items apply as well and are not repeated here.")
+			p.h2("Extra items")
+		}
 		p.tasks()
 	case Retro:
 		// Two readers share this page: somebody typing while the team talks,

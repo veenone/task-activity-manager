@@ -52,7 +52,7 @@ vi.mock("./api", async () => {
     BrowserOpenURL: vi.fn(), ListPendingChanges: vi.fn(), DiscardPendingChange: vi.fn(),
     DiscardAllPendingChanges: vi.fn(), CommitPendingChanges: vi.fn(), PreviewImport: vi.fn(),
     AutoMapImport: vi.fn(), ImportIssues: vi.fn(), SaveImportTemplate: vi.fn(),
-    GetConfluenceConfig: vi.fn(), EnsureSprintRituals: vi.fn(), LastRitualSync: vi.fn(),
+    GetConfluenceConfig: vi.fn(), EnsureSprintRituals: vi.fn(), LastRitualSync: vi.fn(), CreateDoneAgreement: vi.fn(),
   };
 });
 

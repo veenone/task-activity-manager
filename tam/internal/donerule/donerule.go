@@ -7,7 +7,9 @@
 // argument that would follow.
 //
 // It is not the only rule in TAM that answers to the name, and the other
-// two are each different from it in a different way.
+// two are each different from it in a different way. A fourth thing answers
+// to the name and is not a rule at all, which is the sharpest difference of
+// the lot; it is last below.
 //
 // backend.IsDone matches on the status *name* ("done", "closed",
 // "resolved") and powers the Backlog grid's chip, the Epics tree's counts,
@@ -32,6 +34,18 @@
 // and it is recorded rather than smoothed over, because a user comparing
 // the Sprints view's done count against a sprint report's completed figure
 // deserves to find the reason written down.
+//
+// The fourth is ritualtemplate.DoneAgreement, the done agreement: a ritual
+// document holding what the team agreed has to be true before a piece of
+// work counts as done, one per board and optionally one per sprint carrying
+// that sprint's additions. It is prose and a task list that people wrote,
+// synced to Confluence, and no code in TAM derives a status from it. The
+// three above read Jira's own data and answer whether an issue is finished;
+// the done agreement answers what the team said finished means, which is a
+// question Jira models nowhere. It is named as it is for that reason: called
+// dod, or done, or definitionOfDone, it would be indistinguishable from
+// these three in a grep, and a reader would reasonably expect it to decide
+// something.
 //
 // The two implementations are not one rule at every edge, either. A board
 // with a single column has no column ahead of its last one, so

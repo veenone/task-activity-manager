@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { announce, errMsg, useConfirm, useProfile } from "@agile-suite/core";
 import {
-  BrowserOpenURL, DeleteRitualDocument, EnsureSprintRituals, ForgetRitualPage, GetConfluenceConfig,
+  BrowserOpenURL, CreateDoneAgreement, DeleteRitualDocument, EnsureSprintRituals, ForgetRitualPage, GetConfluenceConfig,
   LastRitualSync, ListBoards, ListBoardSprints, ResolveRitualConflict,
 } from "../api";
 import type {
   Board, ConfluenceConfig, Profile, RitualDocument, RitualRootMissing, RitualRootResult, RitualSyncResult, Settings, Sprint,
 } from "../api";
 import { useSync } from "../contexts/SyncContext";
+import { isBoardAgreement, navItems, navKey, selectedKey } from "../lib/ritualNav";
 import {
-  CLOSED_EMPTY_SENTENCE, GONE_SENTENCE, NO_SCRUM_BOARD_SENTENCE, RITUAL_LABEL, RITUAL_ORDER, STATUS_LABEL,
-  UNCONFIGURED_SENTENCE, conflictSentence, pendingLine, rootDoneSentence, rootMissingSentence, syncSummary,
+  ADD_BOARD_AGREEMENT, ADD_SPRINT_AGREEMENT, AGREEMENT_ADDED, CLOSED_EMPTY_SENTENCE, DONE_AGREEMENT, GONE_SENTENCE,
+  NO_SCRUM_BOARD_SENTENCE, RITUAL_LABEL, STATUS_LABEL, UNCONFIGURED_SENTENCE, conflictSentence, pendingLine,
+  rootDoneSentence, rootMissingSentence, syncSummary,
 } from "../lib/ritualText";
 import { useModal } from "../modals";
 import { RitualEditor } from "./ritual-editor/RitualEditor";
@@ -42,7 +44,10 @@ export function RitualsView() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [sprintId, setSprintId] = useState(0);
   const [docs, setDocs] = useState<RitualDocument[] | null>(null);
-  const [selected, setSelected] = useState<string>("planning");
+  // A nav key (sprint id and ritual type), because the board's done agreement
+  // and a sprint's additions to it share a type. Empty until something is
+  // picked, which selectedKey reads as Planning.
+  const [selected, setSelected] = useState<string>("");
   const [lastSync, setLastSync] = useState("");
   const [result, setResult] = useState<RitualSyncResult | null>(null);
   const [error, setError] = useState("");
@@ -277,6 +282,26 @@ export function RitualsView() {
     }
   }
 
+  // The board's standing agreement (sprint id 0) and a sprint's additions are
+  // written only here, when somebody asks for one, which is what keeps them
+  // from becoming a sixth page every sprint gets. It is a local write and takes
+  // no lock, like a save: a row written while a Sync runs is simply not in the
+  // list that pass read, and the next Sync places it. The list is reloaded
+  // rather than taken from the answer: the binding answers with the one
+  // document and the nav draws the sprint's whole list.
+  async function addAgreement(forSprintId: number) {
+    const at = capture();
+    setError("");
+    try {
+      await CreateDoneAgreement(activeId, at.boardId, forSprintId);
+      announce(AGREEMENT_ADDED);
+      await reloadDocs(at);
+      if (at.current()) setSelected(navKey({ sprintId: forSprintId, ritualType: DONE_AGREEMENT }));
+    } catch (e) {
+      if (at.current()) setError(errMsg(e));
+    }
+  }
+
   if (boards === null) {
     return <section className="backlog rituals-view" aria-label="Rituals"><p className="muted" role="status">Loading rituals</p></section>;
   }
@@ -292,17 +317,17 @@ export function RitualsView() {
   const configured = !!config && !!config.baseURL.trim() && !!config.spaceKey.trim() && !!config.rootPageID.trim();
   const demoSpace = config?.baseURL.trim().toLowerCase() === "demo";
   const sprint = sprints.find((s) => s.id === sprintId);
-  // selected can point at a type the current sprint's list no longer has: it
-  // never resets on a board/sprint switch, and a closed sprint's Ensure does
-  // not backfill a type removeLocal just deleted. effectiveSelected falls
-  // back to the first RITUAL_ORDER type the list actually has, so the nav
-  // and the article pane agree on something real rather than both going
-  // blank with no explanation.
+  // selected can point at a document the current sprint's list no longer has:
+  // it never resets on a board or sprint switch, and a closed sprint's Ensure
+  // does not backfill one removeLocal just deleted. selectedKey falls back, so
+  // the nav and the article pane agree on something real rather than both
+  // going blank with no explanation.
   const docList = docs ?? [];
-  const effectiveSelected = docList.some((d) => d.ritualType === selected)
-    ? selected
-    : (RITUAL_ORDER.find((t) => docList.some((d) => d.ritualType === t)) ?? selected);
-  const doc = docList.find((d) => d.ritualType === effectiveSelected) ?? null;
+  const items = navItems(docList);
+  const effectiveSelected = selectedKey(items, selected);
+  const doc = items.find((i) => i.key === effectiveSelected)?.doc ?? null;
+  const hasBoardAgreement = docList.some(isBoardAgreement);
+  const hasSprintAdditions = docList.some((d) => d.ritualType === DONE_AGREEMENT && d.sprintId === sprintId);
   const base = config?.baseURL.trim().replace(/\/+$/, "") ?? "";
   const pageUrl = doc?.pageId && configured && !demoSpace && isWebURL(base)
     ? `${base}/pages/viewpage.action?pageId=${encodeURIComponent(doc.pageId)}`
@@ -352,22 +377,34 @@ export function RitualsView() {
         <div className="rituals-layout">
           <nav aria-label="Ritual documents" className="ritual-docs">
             <ul>
-              {RITUAL_ORDER.map((type) => {
-                const d = docs.find((x) => x.ritualType === type);
-                if (!d) return null;
-                return (
-                  <li key={type}>
-                    <button
-                      className={`folder-item ritual-doc${effectiveSelected === type ? " folder-selected" : ""}`}
-                      aria-current={effectiveSelected === type ? "page" : undefined}
-                      onClick={() => { setSelected(type); setViewTheirs(false); }}
-                    >
-                      <span>{RITUAL_LABEL[type]}</span>
-                      <span className={`ritual-chip ritual-chip-${d.status}`}>{STATUS_LABEL[d.status]}</span>
-                    </button>
-                  </li>
-                );
-              })}
+              {items.map((item) => (
+                <li key={item.key}>
+                  <button
+                    className={`folder-item ritual-doc${effectiveSelected === item.key ? " folder-selected" : ""}`}
+                    aria-current={effectiveSelected === item.key ? "page" : undefined}
+                    onClick={() => { setSelected(item.key); setViewTheirs(false); }}
+                  >
+                    <span>{item.label}</span>
+                    <span className={`ritual-chip ritual-chip-${item.doc.status}`}>{STATUS_LABEL[item.doc.status]}</span>
+                  </button>
+                </li>
+              ))}
+              {/* The two documents nobody gets unasked. Each offer stands
+                  where the document itself will, and goes once it exists. */}
+              {!hasBoardAgreement && (
+                <li>
+                  <button className="folder-item ritual-doc" onClick={() => void addAgreement(0)}>
+                    <span>{ADD_BOARD_AGREEMENT}</span>
+                  </button>
+                </li>
+              )}
+              {!hasSprintAdditions && (
+                <li>
+                  <button className="folder-item ritual-doc" onClick={() => void addAgreement(sprintId)}>
+                    <span>{ADD_SPRINT_AGREEMENT}</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </nav>
           <article aria-label="Ritual page" className="ritual-page">

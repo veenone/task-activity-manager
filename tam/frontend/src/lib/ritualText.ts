@@ -5,9 +5,23 @@ import type { RitualDocument, RitualRoot, RitualStatus, RitualSyncResult } from 
 
 export const RITUAL_ORDER = ["_sprint", "planning", "standup", "review", "retro"] as const;
 
+// The done agreement is what the team agreed has to be true before a piece of
+// work counts as done: one document for the board, and optionally one per
+// sprint carrying that sprint's additions. It is not one of RITUAL_ORDER,
+// because those five are what every sprint gets and this is asked for.
+export const DONE_AGREEMENT = "doneagreement";
+
 export const RITUAL_LABEL: Record<string, string> = {
   _sprint: "Overview", planning: "Planning", standup: "Standup", review: "Review", retro: "Retrospective",
+  [DONE_AGREEMENT]: "Done agreement",
 };
+
+// A sprint's additions sit under the board's own agreement in the nav, so
+// they are labelled by what they add rather than repeating its name.
+export const AGREEMENT_ADDITIONS_LABEL = "This sprint's additions";
+export const ADD_BOARD_AGREEMENT = "Add a done agreement";
+export const ADD_SPRINT_AGREEMENT = "Add this sprint's additions";
+export const AGREEMENT_ADDED = "Added the document. It is local until the next Sync.";
 
 export const STATUS_LABEL: Record<RitualStatus, string> = {
   local: "Local", synced: "Synced", unsynced: "Unsynced", conflict: "Conflict", gone: "Gone",

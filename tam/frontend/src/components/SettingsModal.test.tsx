@@ -63,10 +63,22 @@ describe("SettingsModal", () => {
     await waitFor(() => expect(field).toHaveValue("D:\\picked"));
   });
 
+  // The checkbox is in the DOM before GetSettings resolves, showing its
+  // pre-load default (on) and disabled until the settings land. Asserting or
+  // clicking as soon as findByLabelText matches therefore reads the default
+  // rather than what is stored, and a click on a disabled input is a no-op.
+  // Wait for it to be enabled, which is the query's data arriving, not its
+  // presence. The trap is in agents/project/testing.md.
+  const projectKeyCheck = async () => {
+    const check = await screen.findByLabelText(/project key/i);
+    await waitFor(() => expect(check).toBeEnabled());
+    return check;
+  };
+
   it("shows the project key check on when nothing is stored, and saves it off", async () => {
     const onClose = vi.fn();
     render(<SettingsModal onClose={onClose} />);
-    const check = await screen.findByLabelText(/project key/i);
+    const check = await projectKeyCheck();
     expect(check).toBeChecked();
 
     await userEvent.click(check);
@@ -79,6 +91,6 @@ describe("SettingsModal", () => {
   it("shows the project key check off when it is stored off", async () => {
     bindings.GetSettings.mockResolvedValue({ reportExportDir: "", checkProjectKeyPattern: false });
     render(<SettingsModal onClose={vi.fn()} />);
-    expect(await screen.findByLabelText(/project key/i)).not.toBeChecked();
+    expect(await projectKeyCheck()).not.toBeChecked();
   });
 });

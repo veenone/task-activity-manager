@@ -57,8 +57,18 @@ _Avoid_: queue, outbox, drafts
 
 **Ritual**:
 One of the four agile ceremonies a sprint has: planning, standup, review,
-retro. A ritual document is the local record of one, published to Confluence.
+retro. A ritual document is the local record of one, published to Confluence;
+the done agreement below is a document synced the same way without being a
+ritual.
 _Avoid_: ceremony, meeting, event
+
+**Done agreement**:
+What a team agreed has to be true before a piece of work counts as done. A
+ritual document, one per board and optionally one per sprint holding that
+sprint's additions. It decides nothing: `donerule`, `backend.IsDone` and
+`lib/unfinished.ts` each answer whether an issue reads as finished from
+Jira's data, and `donerule`'s package comment distinguishes all four.
+_Avoid_: definition of done, DoD, done rule, done criteria
 
 **Sprint report**:
 The reconstruction of one sprint from its issues' changelog: committed, added,

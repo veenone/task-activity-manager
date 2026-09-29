@@ -582,6 +582,36 @@ Retired: wizard, `ritualdefaults`, page associations, `GetRitualPage` live
 read. `confluence_association` and `confluence_page_cache` tables left in
 `profiles.db`, unwritten, still purged with profile.
 
+**Done agreement = a sixth kind, never automatic** (#115).
+`ritualtemplate.DoneAgreement` (`doneagreement`, label "Done agreement") =
+what the team agreed has to be true before work count as done. A
+`ritual_document` row, no schema change: board's standing one = `sprint_id 0`,
+a sprint's additions = same type, sprint's own id. Not in `Types`, so `Ensure`
+never write one; only `ritualsync.EnsureAgreement`, reached by the
+`CreateDoneAgreement` binding behind the offer in the Rituals view's document
+list. Template = one sentence and one `<ac:task-list>`, no clock, `loc`
+unread, so the adoption compare stay byte stable (the trap in #74). `Run`
+reconcile the `sprint_id 0` row under the root before the sprint walk, with a
+zero `Sprint`: no sprint, which is also what make the adoption check render
+the board-level body. Sprint loop now walk the documents the sprint hold, not
+`Types[1:]`, so a kind beyond the five sync too. `App.ritualDocuments` =
+sprint's rows plus the board's agreement, so editor, save guard, conflict and
+gone banners need nothing: each take board, sprint and type off the document
+it was handed. `lib/ritualNav.ts` key the nav on `sprintId:ritualType`, since
+both agreements share a type. Demo rebuild restore a sprint-less document
+under the root, else the first Sync after a restart call its page gone. Name
+deliberately not `dod` or `done`: `donerule`'s package comment now
+distinguishes four things, and `agents/project/glossary.md` has the entry.
+Review and Planning point at it: prose naming the sprint's own additions page
+plus an `include` macro of the board's agreement **by title**, never a page id
+or URL, since an id is empty until publish and change after, and a body
+carrying one would render different once a neighbour is published and read as
+written in (#74 again). Golden `planning.xml` and `review.xml` move with it, so
+the frontend corpus prove the macro survive the editor (opaque block, label
+`Confluence: include`). Per-issue ticks are #116, not built. A sprint report
+section from the agreement is after #116, own issue. Plan:
+`docs/superpowers/plans/2026-09-29-tam-done-agreement.md`.
+
 ## Phase 3a: boards
 
 `core/jira/agile.go` = Agile 1.0 transport: `Boards`, `BoardConfiguration`,
@@ -2245,10 +2275,10 @@ entered. Kiwi profile file refused.
                           is the boards pass, reached through backend.BoardBackend
     internal/errtext/    reduces an error to one readable line (strips HTML tags, collapses
                           whitespace) for sync summaries and dropped-board reasons
-    internal/ritualtemplate/  renders a sprint's five ritual pages (pure, no clock, no I/O), the
-                          body of a root page TAM creates (RootBody), and reads a Jira Issues
-                          macro's JQL back (JQL, ParseJQL), the three written forms and nothing
-                          else
+    internal/ritualtemplate/  renders a sprint's five ritual pages and a board's or sprint's done
+                          agreement (pure, no clock, no I/O), the body of a root page TAM creates
+                          (RootBody), and reads a Jira Issues macro's JQL back (JQL, ParseJQL),
+                          the three written forms and nothing else
     internal/ritualrepo/ the store layer over ritual_document; documents.go is the CRUD, the
                           dirty and status computation, and Apply{Created,Pulled,Pushed,Conflict},
                           MarkGone, the writes a Sync pass makes
@@ -2309,6 +2339,9 @@ entered. Kiwi profile file refused.
       src/lib/ritualText.ts  every sentence the Rituals view prints: chip and status labels, the
                           conflict and gone banners, the sync summary and pending line, the
                           unconfigured and no-scrum-board sentences
+      src/lib/ritualNav.ts  the Rituals view's document list as data: the five pages in order,
+                          then the board's done agreement and the sprint's additions, keyed on
+                          sprint id and ritual type because those two share a type
       src/lib/confluenceRoot.ts  the Profile settings root page id field: a number, or the pageId
                           read out of a pasted page address
       src/lib/standupLog.ts  finds where today's dated Yesterday/Today/Blockers section belongs
