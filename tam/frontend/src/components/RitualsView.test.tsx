@@ -23,6 +23,7 @@ vi.mock("../api", async () => {
     ...actual,
     ListProfiles: vi.fn(), GetSettings: vi.fn(), GetConfluenceConfig: vi.fn(), ListBoards: vi.fn(), ListBoardSprints: vi.fn(),
     EnsureSprintRituals: vi.fn(), LastRitualSync: vi.fn(), ResolveRitualConflict: vi.fn(), ForgetRitualPage: vi.fn(),
+    CreateDoneAgreement: vi.fn(),
     DeleteRitualDocument: vi.fn(), BrowserOpenURL: vi.fn(),
   };
 });
@@ -354,6 +355,54 @@ describe("RitualsView", () => {
     await waitFor(() => expect(screen.getByTestId("editor")).toHaveAttribute("data-type", "_sprint"));
     const nav = screen.getByRole("navigation", { name: "Ritual documents" });
     expect(within(nav).getByRole("button", { name: /Overview/ })).toHaveAttribute("aria-current", "page");
+  });
+
+  // The board's standing done agreement and a sprint's additions to it are the
+  // same ritual type with different sprint ids, so they are two documents in
+  // one list and the nav has to tell them apart.
+  const boardAgreement = docFor("doneagreement", { sprintId: 0, title: "PLAT board · Done agreement", body: "<p>the board's</p>" });
+
+  it("lists the board's done agreement and a sprint's additions as separate documents", async () => {
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValue([...five(), boardAgreement, docFor("doneagreement")]);
+    renderView();
+    const nav = await screen.findByRole("navigation", { name: "Ritual documents" });
+    expect(within(nav).getByRole("button", { name: /This sprint's additions/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add a done agreement" })).not.toBeInTheDocument();
+
+    await userEvent.click(within(nav).getByRole("button", { name: /^Done agreement/ }));
+    expect(screen.getByTestId("editor")).toHaveTextContent("the board's");
+    await userEvent.click(within(nav).getByRole("button", { name: /This sprint's additions/ }));
+    expect(screen.getByTestId("editor")).toHaveTextContent("doneagreement body");
+  });
+
+  it("asks for the board's agreement, then opens the document it wrote", async () => {
+    vi.mocked(api.CreateDoneAgreement).mockResolvedValue(boardAgreement);
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValueOnce(five()).mockResolvedValue([...five(), boardAgreement]);
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Add a done agreement" }));
+    expect(api.CreateDoneAgreement).toHaveBeenCalledWith("p1", 1, 0);
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveTextContent("the board's"));
+    expect(screen.queryByRole("button", { name: "Add a done agreement" })).not.toBeInTheDocument();
+  });
+
+  it("asks for this sprint's additions against the sprint on screen", async () => {
+    const additions = docFor("doneagreement", { body: "<p>this sprint only</p>" });
+    vi.mocked(api.CreateDoneAgreement).mockResolvedValue(additions);
+    vi.mocked(api.EnsureSprintRituals).mockResolvedValueOnce(five()).mockResolvedValue([...five(), additions]);
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Add this sprint's additions" }));
+    expect(api.CreateDoneAgreement).toHaveBeenCalledWith("p1", 1, 14);
+    await waitFor(() => expect(screen.getByTestId("editor")).toHaveTextContent("this sprint only"));
+  });
+
+  it("shows why a refused done agreement was not written", async () => {
+    vi.mocked(api.CreateDoneAgreement).mockRejectedValue(new Error("board 1 is not in this profile's cache, refresh the boards first"));
+    renderView();
+    await screen.findByTestId("editor");
+    await userEvent.click(screen.getByRole("button", { name: "Add a done agreement" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("refresh the boards first")
   });
 
   const rootMissingResult = (canCreate: boolean): api.RitualSyncResult => ({

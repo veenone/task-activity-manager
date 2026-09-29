@@ -1524,6 +1524,13 @@ export interface RitualMacroPreview { supported: boolean; jql: string; issues: I
 
 export const EnsureSprintRituals: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.EnsureSprintRituals as any;
 export const ListRitualDocuments: (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument[]> = App.ListRitualDocuments as any;
+// The done agreement is asked for, never written for every sprint: sprintId 0
+// is the board's standing one and a sprint's own id is its additions. Both
+// arrive in the sprint's list afterwards.
+// The cast goes through unknown rather than any: the generated class types
+// status as a plain string where RitualDocument names the five it can hold.
+export const CreateDoneAgreement = App.CreateDoneAgreement as unknown as
+  (profileId: string, boardId: number, sprintId: number) => Promise<RitualDocument>;
 // version and pageId are what the editor was opened on; the save is refused
 // once a Sync has moved the row past either.
 export const SaveRitualBody: (profileId: string, boardId: number, sprintId: number, ritualType: string, body: string, version: number, pageId: string) => Promise<RitualDocument> = App.SaveRitualBody as any;
