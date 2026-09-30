@@ -34,6 +34,7 @@ function report(over: Partial<SprintReport> = {}): SprintReport {
       carriedOver: 10,
       days: [{ date: "2026-03-02", scope: 34, completed: 0, remaining: 34, ideal: 34 }],
       truncated: [],
+      issues: [],
     },
     velocity: [
       { sprintId: 10, sprintName: "Sprint 10", unit: "points", unitReason: "", committed: 30, completed: 28, truncated: false },

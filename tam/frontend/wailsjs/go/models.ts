@@ -1681,6 +1681,7 @@ export namespace reports {
 	    carriedOver: number;
 	    days: Day[];
 	    truncated: string[];
+	    issues: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Series(source);
@@ -1699,6 +1700,7 @@ export namespace reports {
 	        this.carriedOver = source["carriedOver"];
 	        this.days = this.convertValues(source["days"], Day);
 	        this.truncated = source["truncated"];
+	        this.issues = source["issues"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

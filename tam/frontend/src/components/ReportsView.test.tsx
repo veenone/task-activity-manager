@@ -53,6 +53,7 @@ function series(over: Partial<ReportSeries> = {}): ReportSeries {
     carriedOver: 10,
     days: [],
     truncated: [],
+    issues: [],
     ...over,
   };
 }

@@ -182,3 +182,18 @@ func TestAnIssueWhoseHistoryWasCutShortIsNamed(t *testing.T) {
 		t.Errorf("a report holding a partial history has to name it; got %v", s.Truncated)
 	}
 }
+
+// TestTheSeriesNamesTheCardsItWasBuiltFrom is the set the sprint report's
+// done agreement section counts against. It rides in the series rather than
+// being asked of the cache later, so a report served from the store counts
+// against the cards it was built from and not against whoever is in the
+// sprint today.
+func TestTheSeriesNamesTheCardsItWasBuiltFrom(t *testing.T) {
+	s := build(t, sprint11(), afterTheSprint, time.UTC,
+		card("PLAT-9", "To Do", "1", "11", points(1)),
+		card("PLAT-1", "Done", "10001", "11", points(2)),
+	)
+	if got := strings.Join(s.Issues, ","); got != "PLAT-1,PLAT-9" {
+		t.Errorf("the series has to name the cards it measured, in a stable order; got %q", got)
+	}
+}

@@ -47,12 +47,17 @@ const (
 )
 
 // AlgoVersion is bumped whenever a change to this package's reconstruction
-// would give an old cached series a different answer today. boardrepo
-// stores it beside every report it saves and compares it against this
-// constant on read, rebuilding rather than serving a row a lower version
-// wrote, so the first reconstruction bug is not permanent in every user's
-// database.
-const AlgoVersion = 2
+// would give an old cached series a different answer today, or leave one
+// unable to answer at all. boardrepo stores it beside every report it saves
+// and compares it against this constant on read, rebuilding rather than
+// serving a row a lower version wrote, so the first reconstruction bug is
+// not permanent in every user's database.
+//
+// 3 added Issues. A row written before it names no card, and a report's
+// done agreement section counts against the cards named here, so serving
+// such a row would leave a sprint that has an agreement looking like a
+// sprint that has none. Rebuilding is what the version is for.
+const AlgoVersion = 3
 
 // ErrNoDates says a sprint cannot be reconstructed because its own dates
 // cannot be read: no start, no end, or an end before its start. Build
@@ -141,6 +146,18 @@ type Series struct {
 	// Their part of these numbers rests on a partial history, so a report
 	// holding any of them is not exact and has to say so.
 	Truncated []string `json:"truncated"`
+	// Issues names every card the walk read, which is every card the
+	// sprint held when the search ran. It rides in the series so that a
+	// surface counting something per card, the report's done agreement
+	// section being the first, counts against the cards these figures
+	// were built from rather than against whoever is in the sprint by the
+	// time it asks. A report served from the store answers the same way
+	// months later, which is the whole point of the stamp beside it.
+	//
+	// It carries the blind spot Removed carries: a card dragged out of the
+	// sprint and left out is never returned by the search, so it is not
+	// here either.
+	Issues []string `json:"issues"`
 }
 
 // Build reconstructs one sprint from its issues' changelogs.
@@ -199,7 +216,12 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 		doneName: doneNames(issues, done),
 		loc:      loc,
 	}
-	s := Series{SprintID: sprint.ID, SprintName: sprint.Name, Truncated: truncatedKeys(issues)}
+	s := Series{
+		SprintID:   sprint.ID,
+		SprintName: sprint.Name,
+		Truncated:  truncatedKeys(issues),
+		Issues:     issueKeys(issues),
+	}
 	s.Unit, s.UnitReason = unitOf(cards, issues, start, last)
 	w.points = s.Unit == UnitPoints
 	// Committed is read off the rewound state before a single change is
@@ -286,6 +308,21 @@ func doneNames(issues []backend.IssueHistory, done func(string) bool) map[string
 // truncatedKeys is the issues whose changelog came back cut short, sorted
 // so two builds of the same sprint do not differ only in this list's
 // order once one of them has been stored.
+// issueKeys names the cards the walk read. Sorted for the reason
+// truncatedKeys is: the search's order is Jira's, and a stored series that
+// changed shape between two builds of the same closed sprint would be a
+// diff nobody could read.
+func issueKeys(issues []backend.IssueHistory) []string {
+	out := make([]string, 0, len(issues))
+	for _, h := range issues {
+		if h.Issue.Key != "" {
+			out = append(out, h.Issue.Key)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func truncatedKeys(issues []backend.IssueHistory) []string {
 	out := []string{}
 	for _, h := range issues {
