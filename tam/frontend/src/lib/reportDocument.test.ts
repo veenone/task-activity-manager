@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ColumnView, ReportImage, SprintReport } from "../api";
-import { reportDocument } from "./reportDocument";
+import { kanbanDocument, reportDocument } from "./reportDocument";
 import {
   agreementCountLine,
   agreementSourceLine,
@@ -10,6 +10,8 @@ import {
   emptyDaysLine,
   emptyVelocityLine,
   floorLine,
+  kanbanMetricsLine,
+  kanbanScopeLine,
   methodLine,
   mixedUnitsLine,
   modeLine,
@@ -235,6 +237,70 @@ describe("the capacity section", () => {
     expect(capacity.lines).toEqual([capacityCountLine("issueCountExclSubs")]);
     expect(capacity.notes).toContain(capacityBreachLine(["In Progress"]));
     expect(capacity.images).toEqual([]);
+  });
+});
+
+// Issue #119: a kanban board has no sprint, so nothing in a sprint report is
+// scoped to anything it has. What it can honestly be shown is the capacity
+// section on its own, as a document the three publishers already render.
+describe("kanbanDocument", () => {
+  const head = (over: Partial<ColumnView>): ColumnView => ({
+    name: "In Progress", statusIds: ["3"], total: 4, points: 0, counted: 4,
+    min: null, max: null, constraint: "issueCount", ...over,
+  });
+
+  it("has nothing to publish for a board whose columns are not in the cache", () => {
+    expect(kanbanDocument("Ops Kanban", [])).toBeNull();
+  });
+
+  it("titles the document after the board, since no sprint can name it", () => {
+    expect(kanbanDocument("Ops Kanban", [head({})])!.title).toBe("Ops Kanban · Board report");
+  });
+
+  it("carries one section, a row per column, the unlimited ones included", () => {
+    const doc = kanbanDocument("Ops Kanban", [
+      head({ name: "To Do", total: 2, counted: 2 }),
+      head({ name: "In Progress", total: 4, counted: 4, max: 3 }),
+    ])!;
+    expect(doc.sections).toHaveLength(1);
+    expect(doc.sections[0].heading).toBe("Column capacity");
+    expect(doc.sections[0].table.rows).toEqual([
+      ["To Do", "2", "No limit", "No limit set"],
+      ["In Progress", "4", "3, from Jira", "Over the limit"],
+    ]);
+  });
+
+  it("names the columns that are over before the rows rather than after them", () => {
+    // lines are printed above the table and notes below it, so which of the
+    // two this sentence rides in is the difference between a reader meeting
+    // the breach first and finding it under the rows it summarises.
+    const doc = kanbanDocument("Ops Kanban", [head({ name: "In Progress", counted: 4, max: 3 })])!;
+    expect(doc.sections[0].lines).toEqual([
+      capacityCountLine("issueCount"),
+      capacityBreachLine(["In Progress"]),
+    ]);
+    expect(doc.sections[0].notes).not.toContain(capacityBreachLine(["In Progress"]));
+  });
+
+  it("puts the counts now, and says what it does not carry", () => {
+    const doc = kanbanDocument("Ops Kanban", [head({ name: "In Progress", counted: 2, max: 3 })])!;
+    expect(doc.sections[0].notes).toEqual([kanbanScopeLine(), kanbanMetricsLine()]);
+    // No breach, so no sentence naming one, and no picture: a kanban report
+    // draws no chart for a renderer to collect.
+    expect(doc.sections[0].lines).toEqual([capacityCountLine("issueCount")]);
+    expect(doc.sections[0].images).toEqual([]);
+  });
+
+  it("keeps the rows for a board with no limit anywhere and says there is none", () => {
+    // The sprint report drops the table here, because its other three
+    // sections are the report and a column of counts against nothing is
+    // noise. On a kanban board the counts are the whole report.
+    const doc = kanbanDocument("Ops Kanban", [head({ name: "To Do", total: 2, counted: 2 }), head({ name: "Done" })])!;
+    expect(doc.sections[0].table.rows).toEqual([
+      ["To Do", "2", "No limit", "No limit set"],
+      ["Done", "4", "No limit", "No limit set"],
+    ]);
+    expect(doc.sections[0].notes).toContain(noLimitsLine());
   });
 });
 

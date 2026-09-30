@@ -257,6 +257,49 @@ export function capacityScopeLine(): string {
   return "The counts are this sprint's cards as the last sync left them, so a card Jira holds and TAM has not read is not among them.";
 }
 
+// The kanban report's wording. A kanban board has no sprint, so nothing in
+// the sprint report's vocabulary fits it: there is no window its figures
+// belong to, no changelog behind them, and column capacity is the only thing
+// about it TAM has read. These four sentences are what keeps that from
+// reading as a sprint report with its other sections missing.
+
+// kanbanScopeLine is where the counts stand in time. capacityScopeLine's
+// sprint has a start and an end a reader can place the figures inside, and
+// builtAtLine stamps the walk that produced them; a column count has neither,
+// so this says the counts are now and says what a count off the cache cannot
+// see, which is the half of capacityScopeLine that still holds.
+export function kanbanScopeLine(): string {
+  return (
+    "These counts are the board as the last sync left it, not a period that has closed. " +
+    "A card Jira holds and TAM has not read is not among them."
+  );
+}
+
+// kanbanMetricsLine names what a kanban team looks for in a report and will
+// not find in this one. Throughput and cycle time both need a period, and a
+// cumulative flow diagram needs a history of them, none of which TAM keeps
+// yet. Saying so is cheaper than a reader concluding the sections failed to
+// load.
+export function kanbanMetricsLine(): string {
+  return "Throughput, cycle time and a cumulative flow diagram are not built yet, so column capacity is the whole of this report.";
+}
+
+// kanbanUnsyncedLine is a board whose columns have never reached the cache.
+// Nothing about it has been read, so there is no count to qualify, and the
+// one useful thing to say is where columns come from.
+export function kanbanUnsyncedLine(): string {
+  return "This board's columns are not in the cache, so there is nothing to count. Open Boards and refresh to fetch them.";
+}
+
+// kanbanEmptyLine is the other empty board, and it is a different fact: the
+// columns are known and no card TAM holds falls in any of them. The two are
+// kept apart because their fixes are, and a reader sent to the Boards view
+// from here would refresh the columns it already has and read the same empty
+// table again.
+export function kanbanEmptyLine(): string {
+  return "This board's columns are synced and none of them holds a card TAM has read. Sync this project's issues to fill them.";
+}
+
 // The done agreement section's wording. The items are the team's own words,
 // out of the agreement document the Rituals view edits, and a tick is TAM's
 // record of somebody checking one against a card. A published page is read

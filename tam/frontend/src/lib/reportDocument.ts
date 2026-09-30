@@ -1,4 +1,4 @@
-import type { ReportDocument, ReportSection, ReportTable, SprintReport } from "../api";
+import type { ColumnView, ReportDocument, ReportSection, ReportTable, SprintReport } from "../api";
 import {
   agreementCountLine,
   agreementSourceLine,
@@ -11,6 +11,8 @@ import {
   emptyDaysLine,
   emptyVelocityLine,
   floorLine,
+  kanbanMetricsLine,
+  kanbanScopeLine,
   removedFloorLine,
   methodLine,
   mixedUnitsLine,
@@ -165,6 +167,44 @@ export function capacitySection(report: SprintReport): ReportSection[] {
     notes: kept([capacityBreachLine(over), capacityScopeLine()]),
     images: [],
   }];
+}
+
+// kanbanDocument is a kanban board's report: its columns against their
+// limits, and nothing else, because nothing else about it has been read.
+//
+// It takes the columns rather than a SprintReport because there is no sprint
+// to build one from. That is the whole of issue #119: Report.Capacity is
+// filled from a sprint id, so a board with no sprint never reached the
+// section that would serve it. The columns come out of the synced cache
+// through boardrepo.ColumnHeads, which composes the board the Boards view
+// draws, so the screen and this document count the same cards.
+//
+// It answers null for a board whose columns are not in the cache, the way
+// reportDocument answers null for an unavailable report, which is what leaves
+// the three publishers disabled with a reason rather than writing a page with
+// an empty table on it.
+//
+// Two things differ from capacitySection on purpose. The breach sentence is
+// in lines rather than notes, so a reader meets the columns that are over on
+// the way to the rows that state them one at a time. And every column keeps
+// its row even when the board limits none of them: the sprint report drops
+// that table because its other three sections are the report, while here the
+// counts are the report and a reader would be left working out which of the
+// board's columns the sentence was about.
+export function kanbanDocument(boardName: string, columns: ColumnView[]): ReportDocument | null {
+  if (columns.length === 0) return null;
+  const capacity = capacityTable(columns);
+  const over = columns.filter((c) => limitBreach(c) === "over").map((c) => c.name);
+  return {
+    title: `${boardName || "This board"} · Board report`,
+    sections: [{
+      heading: capacity.caption,
+      lines: kept([capacityCountLine(columns[0].constraint ?? ""), capacityBreachLine(over)]),
+      table: cells(capacity),
+      notes: kept([columns.some(hasLimit) ? "" : noLimitsLine(), kanbanScopeLine(), kanbanMetricsLine()]),
+      images: [],
+    }],
+  };
 }
 
 // AgreementFigures is what the done agreement section is built from, read by
