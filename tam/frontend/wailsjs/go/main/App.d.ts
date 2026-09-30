@@ -61,6 +61,8 @@ export function DiscardAllPendingChanges(arg1:string):Promise<number>;
 
 export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
 
+export function DoneAgreementTicks(arg1:string,arg2:number,arg3:Array<string>):Promise<Record<string, Array<string>>>;
+
 export function EditIssue(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function EditSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<void>;
@@ -184,6 +186,8 @@ export function SetColumnLimit(arg1:string,arg2:number,arg3:string,arg4:string):
 export function SetConfluenceConfig(arg1:string,arg2:profile.ConfluenceConfig,arg3:string):Promise<void>;
 
 export function SetDefaultProfile(arg1:string):Promise<void>;
+
+export function SetDoneAgreementTick(arg1:string,arg2:number,arg3:string,arg4:string,arg5:boolean):Promise<void>;
 
 export function SetNavRailVisible(arg1:boolean):Promise<void>;
 

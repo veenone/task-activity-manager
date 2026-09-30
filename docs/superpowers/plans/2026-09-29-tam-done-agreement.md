@@ -122,29 +122,45 @@ them, in its own issue.
 
 ## What the next branch does (#116)
 
-Not started here. The plan a reviewer needs now is where the ticks go.
+Built, on `feat/tam-done-agreement-ticks`. The objective was stated after the
+issue was opened and settles two things this section had guessed at: **the
+point of the ticks is a record a team can be shown at a sprint review**, and
+the artefact is the report #117 publishes rather than the store. What follows
+is what landed.
 
 - A new profile-keyed table, `done_agreement_tick`, keyed on
   `(profile_id, board_id, issue_key, item_text)`. Through `baseDDL` with a
-  version bump, the way `board_column_limit` arrived: a whole new table needs
-  no migration entry. Named in both `PurgeProfile` lists and in
-  `RemoveBoards`, which the instruction gate checks.
-- **Local only.** The ticks are TAM's bookkeeping about work, not a change to
-  a Jira issue, and Jira has nowhere to put them, so they are not journalled
-  and not pushed on Commit. That is the one write in TAM that works this way,
-  and the reason belongs in a comment on the table and on the binding.
+  version bump to 22, the way `board_column_limit` arrived: a whole new table
+  needs no migration entry. Swept by `boardrepo.PurgeProfile`, which is the
+  purge list a board-keyed table belongs to, and by `RemoveBoards` for the
+  reason `board_column_limit` is in it. The instruction gate checks both.
+- **Local only.** The ticks are TAM's own record of what a team checked, not a
+  change to a Jira issue, and Jira has nowhere to put them, so they are not
+  journalled and not pushed on Commit. That is the one write in TAM that works
+  this way, and the reason is on the table's DDL, on the repository and on the
+  bindings. The panel says it too, because Work log says the opposite two
+  sections above it.
 - **An item is identified by its text**, because a task list in Confluence
-  storage gives nothing else that survives an edit. Reword an item and its
-  ticks stop matching it: the item shows unticked, which is visibly wrong
-  rather than quietly wrong. Remove an item and the effective list stops
-  showing it; its rows stay until the profile or the board goes, and if the
-  same words come back they carry their old ticks. Say so in the panel.
+  storage gives nothing else that survives an edit. So the row stores the
+  wording the tick was made against, and nothing rewrites or drops it because
+  the agreement has moved on: a tick that followed the document would be
+  evidence that changed underneath the review. Reword an item and the old tick
+  stays, shown against the old words and marked as made against wording since
+  changed. The same rule answers the removed-and-restored case: the words
+  match again only if they really are identical, which is what the row says.
 - **The effective list** is the board's items plus, for an issue in a sprint,
   that sprint's additions. An issue with no sprint sees the board's alone.
-  Items come from parsing the stored body's task list, which
-  `lib/storage/parse.ts` already does.
+- **The parse lives on the frontend**, in `lib/doneAgreement.ts`, over
+  `lib/storage/xml`. #117's report document is built in TypeScript in
+  `lib/reportDocument`, so a parse in Go would be answered by a second one on
+  this side anyway. Go stores a tick against an item's text and never learns
+  what an item is. `DoneAgreementTicks` takes a list of issues so the report's
+  section can ask for a whole sprint in the call the panel makes for one.
 - The panel section sits beside the others in `IssueDetailPanel`, collapsed
-  by default, like Work log, with a `4 of 7` count in its summary.
+  by default, like Work log, with a `4 of 7` count in its summary counting the
+  items the agreement still states. Unlike Work log both its reads are local,
+  so they run when the panel opens rather than on expand; a count nobody can
+  see until they expand the section is not a summary.
 
 ## Gates
 

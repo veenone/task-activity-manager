@@ -13,6 +13,13 @@ export const keys = {
   // section is open.
   worklogs: (profileId: string, key: string) =>
     [profileId, "issue", key, "worklogs"] as const,
+  // One issue's done agreement: the items it is held to and the ticks made
+  // against it. The board is in the key because the agreement is a document
+  // of the board's, and the sprint because a sprint's additions are part of
+  // what its issues are held to. It sits under the issue's own key so an
+  // invalidation of that issue refreshes it with everything else.
+  doneAgreement: (profileId: string, key: string, boardId: number, sprintId: number) =>
+    [profileId, "issue", key, "doneAgreement", boardId, sprintId] as const,
   sprints: (profileId: string) => [profileId, "sprints"] as const,
   syncState: (profileId: string) => [profileId, "syncState"] as const,
   pending: (profileId: string) => [profileId, "pending"] as const,

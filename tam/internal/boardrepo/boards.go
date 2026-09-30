@@ -62,24 +62,27 @@ const boardSprintSQL = `
 	SELECT state FROM sprint WHERE profile_id = ? AND board_id = ? AND id = ? LIMIT 1`
 
 // RemoveBoards drops the boards and everything hanging off them: their
-// columns, the limits the user set on those columns, their issue keys, their
-// sprints, and any report built for one of those sprints on this board, in
-// one transaction. ritual_document is not in the list: it holds text people
-// wrote, possibly never pushed, and a board leaves Jira's list for reasons
-// that say nothing about that text (a setting switched off, a location
-// change, a lost permission). PurgeProfile removes it.
+// columns, the limits the user set on those columns, their issue keys, the
+// done agreement ticks made against them, their sprints, and any report built
+// for one of those sprints on this board, in one transaction. ritual_document
+// is not in the list: it holds text people wrote, possibly never pushed, and a
+// board leaves Jira's list for reasons that say nothing about that text (a
+// setting switched off, a location change, a lost permission). PurgeProfile
+// removes it.
 //
 // board_column_limit is in the list, unlike ritual_document, because a limit
 // is a number about a column of this board and nothing else. Once the board's
 // columns are gone there is nothing left for it to describe, and a limit
-// nobody can see is worse kept than dropped.
+// nobody can see is worse kept than dropped. done_agreement_tick is in it for
+// the same reason: a tick is a judgement against this board's done agreement,
+// and the agreement is a document of this board's.
 func (r *Repository) RemoveBoards(ctx context.Context, profileID string, boardIDs []int) error {
 	if len(boardIDs) == 0 {
 		return nil
 	}
 	return r.inTx(ctx, func(tx *sql.Tx) error {
 		for _, id := range boardIDs {
-			for _, table := range []string{"board_column", "board_column_limit", "board_issue", "sprint", "sprint_report", "board"} {
+			for _, table := range []string{"board_column", "board_column_limit", "board_issue", "done_agreement_tick", "sprint", "sprint_report", "board"} {
 				column := "board_id"
 				if table == "board" {
 					column = "id"

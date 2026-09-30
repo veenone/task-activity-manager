@@ -68,6 +68,11 @@
 // because a boards pass replaces a board's columns wholesale: a position is
 // only where the column sat at the last sync, so a limit keyed on one would
 // move to whichever column ended up there after a reorder in Jira.
+// Version 22 adds done_agreement_tick, the items of the board's done
+// agreement a reader has ticked for one issue. Version 21's shape, a whole
+// new table through baseDDL with no migration entry to run. It is the one
+// write in TAM that is neither journalled nor pushed: see the comment on the
+// table itself.
 package tamstore
 
 import (
@@ -101,8 +106,8 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 21,
-	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + journal.DDL,
+	Version: 22,
+	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
 		// SQLite has no ADD COLUMN IF NOT EXISTS, and a database created
@@ -641,6 +646,38 @@ CREATE TABLE IF NOT EXISTS board_column_limit (
 	column_name TEXT NOT NULL,
 	wip_max     INTEGER NOT NULL,
 	PRIMARY KEY (profile_id, board_id, column_name)
+);`
+
+// doneTickDDL is which items of the done agreement a reader has ticked for
+// one issue. The row is the tick: unticking deletes it, and there is no
+// column to hold a false, because an item nobody has ticked and an item
+// nobody has looked at are the same fact about the work.
+//
+// These ticks are local. They are not journalled and they are not pushed on
+// Commit, which makes them the one write in TAM that works this way. Jira has
+// nowhere to put them: they are not a field, a worklog or a comment, but
+// TAM's own bookkeeping about a piece of work, and inventing a place for them
+// in Jira would mean writing something a team's other tools would read as
+// data Jira owns. Nothing here reaches the journal, so nothing here can reach
+// Jira, and a purge of the profile is what ends them.
+//
+// item_text is the wording the tick was made against, and it is the key
+// because a Confluence task list gives nothing else that survives an edit:
+// its ac:task-id is Confluence's own, absent until the page is published.
+// Storing the wording is also what makes a tick a record rather than a
+// checklist entry. These ticks are shown at a sprint review through the report
+// #117 publishes, and a tick that followed the document's current wording
+// would be evidence that changed underneath the review. So rewording an item
+// leaves the old tick here saying exactly what was ticked, the panel shows it
+// as made against different words, and nothing rewrites or drops a row because
+// the agreement moved on.
+const doneTickDDL = `
+CREATE TABLE IF NOT EXISTS done_agreement_tick (
+	profile_id TEXT NOT NULL,
+	board_id   INTEGER NOT NULL,
+	issue_key  TEXT NOT NULL,
+	item_text  TEXT NOT NULL,
+	PRIMARY KEY (profile_id, board_id, issue_key, item_text)
 );`
 
 const indexDDL = `
