@@ -1,5 +1,8 @@
 import type { ReportDocument, ReportSection, ReportTable, SprintReport } from "../api";
 import {
+  agreementCountLine,
+  agreementSourceLine,
+  agreementStaleLine,
   builtAtLine,
   capacityBreachLine,
   capacityCountLine,
@@ -21,7 +24,8 @@ import {
   velocityPartialLine,
 } from "./reportText";
 import { hasLimit, limitBreach } from "./columnLimit";
-import { burndownTable, capacityTable, outcomeTable, velocityTable } from "./reportTables";
+import { agreementRows } from "./doneAgreement";
+import { burndownTable, capacityTable, doneAgreementTable, outcomeTable, velocityTable } from "./reportTables";
 import type { TableSpec } from "./reportTables";
 import type { ChartImages } from "./chartImage";
 
@@ -73,6 +77,7 @@ export function reportDocument(
   report: SprintReport,
   live = false,
   images: ChartImages = {},
+  agreement?: AgreementFigures,
 ): ReportDocument | null {
   if (report.unavailable) return null;
   const s = report.series;
@@ -124,6 +129,7 @@ export function reportDocument(
         images: velocityImages,
       },
       ...capacitySection(report),
+      ...doneAgreementSection(report, agreement),
     ],
   };
 }
@@ -157,6 +163,54 @@ export function capacitySection(report: SprintReport): ReportSection[] {
     lines: [capacityCountLine(columns[0].constraint ?? "")],
     table: cells(capacity),
     notes: kept([capacityBreachLine(over), capacityScopeLine()]),
+    images: [],
+  }];
+}
+
+// AgreementFigures is what the done agreement section is built from, read by
+// the caller and passed in the way the chart pictures are: this module words
+// a document and reads nothing itself.
+export interface AgreementFigures {
+  // items is the effective agreement for this sprint, from lib/doneAgreement:
+  // the board's standing items plus the sprint's own additions, in order.
+  items: string[];
+  // ticked is the wording of every item ticked, per issue key, as
+  // DoneAgreementTicks answers it for a whole sprint.
+  ticked: Record<string, string[]>;
+}
+
+// doneAgreementSection is the team's own bar for finished and how much of the
+// sprint met it, which is the question a sprint review argues about and the
+// one thing the rest of this report says nothing about.
+//
+// It is a list of nothing or one for the reason capacitySection is. A sprint
+// whose board states no agreement carries no section, the way a report with
+// no chart carries no picture, and so does a report whose series names no
+// card: that is a sprint that held nothing, and a table of "0 of 0" would be
+// claiming a fact about neither the cards nor the items.
+//
+// A tick counts only against wording the agreement still states. The issue
+// panel counts the same way and through the same agreementRows, so the page
+// and the screen cannot disagree about whether a tick counts; and a tick made
+// against wording somebody has since edited is evidence about words that are
+// not in the table. The notes say how many of those there were rather than
+// leaving a reader to assume there were none.
+export function doneAgreementSection(report: SprintReport, agreement?: AgreementFigures): ReportSection[] {
+  const cards = report.series.issues ?? [];
+  const items = agreement?.items ?? [];
+  if (items.length === 0 || cards.length === 0) return [];
+  const perCard = cards.map((key) => agreementRows(items, agreement?.ticked[key] ?? []));
+  const counts = items.map((text) => ({
+    text,
+    met: perCard.filter((rows) => rows.some((r) => r.text === text && r.ticked)).length,
+  }));
+  const stale = perCard.reduce((n, rows) => n + rows.filter((r) => !r.stated).length, 0);
+  const table = doneAgreementTable(counts, cards.length);
+  return [{
+    heading: table.caption,
+    lines: [agreementCountLine(cards.length)],
+    table: cells(table),
+    notes: kept([agreementStaleLine(stale), agreementSourceLine()]),
     images: [],
   }];
 }

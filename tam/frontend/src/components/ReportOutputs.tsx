@@ -5,6 +5,7 @@ import { ExportSprintReportPPTX, ExportSprintReportXLSX, PublishSprintReport } f
 import type { ReportDocument, SprintReport } from "../api";
 import { chartImages } from "../lib/chartImage";
 import { reportDocument } from "../lib/reportDocument";
+import { sprintDoneAgreement } from "../queries/doneAgreement";
 import {
   busyLine,
   isBusyRefusal,
@@ -106,11 +107,19 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
   const running = PUBLISHERS.find((p) => outcomes[p.id].status === "running");
   const busy = running !== undefined || !doc;
 
-  // drawn is the document with the pictures of the charts on screen in it. The
-  // document built above is what it falls back to, which is the same document
-  // without them.
+  // drawn is the document with the pictures of the charts on screen in it,
+  // and the sprint's done agreement beside them. The document built above is
+  // what it falls back to, which is the same document without either.
+  //
+  // Both are collected on the click rather than on every render, for the same
+  // reason: the pictures cost a rasterise apiece, and what the agreement
+  // section says belongs to the moment the page was written. Both reads are
+  // local, and a failure in either refuses the publish through run's own
+  // error handling rather than writing a report with a section missing.
   async function drawn(built: ReportDocument): Promise<ReportDocument> {
-    return reportDocument(report, live, await chartImages(charts.current)) ?? built;
+    const images = await chartImages(charts.current);
+    const agreement = await sprintDoneAgreement(profileId, boardId, report.series.sprintId, report.series.issues ?? []);
+    return reportDocument(report, live, images, agreement) ?? built;
   }
 
   function onRun(id: PublisherID, label: string) {

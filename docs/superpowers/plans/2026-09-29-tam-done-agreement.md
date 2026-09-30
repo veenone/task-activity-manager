@@ -162,6 +162,47 @@ is what landed.
   so they run when the panel opens rather than on expand; a count nobody can
   see until they expand the section is not a summary.
 
+## The report's own section (#117)
+
+Built, on `feat/tam-report-done-agreement`. The ticks were recorded as
+review material, and this is the artefact they were recorded for: a
+published report now carries the items and, for each, how many of the
+sprint's cards met it.
+
+- **The section is a section and nothing else.** `Document.Sections` is a
+  list and `storage.go`, `xlsx.go` and `pptx.go` each walk it, so
+  `doneAgreementSection` in `lib/reportDocument` reaches the Confluence page,
+  the spreadsheet and the deck with no renderer touched. Checked again rather
+  than taken from #101, #109 and #114: all three still `range d.Sections`,
+  and `Document.Check` constrains a section's contents in no way beyond its
+  images. There is no screen version of the section, so no class and no rule.
+- **Which cards it counts.** `reports.Series` now carries `Issues`, the keys
+  the walk read, and the section counts against those. Every other figure on
+  the page is as of the report's `builtAt`, and a section that asked the
+  cache who is in the sprint now would drift away from the rest of the page
+  the first time somebody moved a card. `AlgoVersion` went to 3 so a stored
+  row written before the field is rebuilt rather than served: the absence of
+  the section has to mean one thing, which is that the sprint has no
+  agreement.
+- **A stale tick counts towards nothing.** The figures read through the same
+  `agreementRows` the panel draws, so a tick made against wording the
+  agreement no longer states is counted for neither side, exactly as the
+  panel's `4 of 7` counts. The notes then say how many such ticks there
+  were, because a figure that quietly drops evidence is worse at a review
+  than one that says what it left out.
+- **An item nobody ticked is a row reading 0**, and a sprint with no
+  agreement carries no section, the way `capacitySection` carries none for a
+  board with no column heads.
+- **The read happens on the click.** `sprintDoneAgreement` in
+  `queries/doneAgreement` is a plain function beside the panel's hook, and
+  `ReportOutputs.drawn` awaits it next to `chartImages`. What a published
+  page carries is what the store held when it was written, and a read that
+  fails refuses the publish through the error handling already around it
+  rather than writing a page with the section missing.
+- **The split #117 asked for as a prerequisite was already done.** #122 moved
+  the publishing wording into `lib/publishText`, leaving `reportText.ts` at
+  301 lines and `publishText.ts` at 110, so nothing was split again.
+
 ## Gates
 
 `cd tam && go build ./... && go vet ./... && go test ./... -count=1`;

@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { ColumnView, ReportImage, SprintReport } from "../api";
 import { reportDocument } from "./reportDocument";
 import {
+  agreementCountLine,
+  agreementSourceLine,
+  agreementStaleLine,
   capacityBreachLine,
   capacityCountLine,
   emptyDaysLine,
@@ -232,5 +235,57 @@ describe("the capacity section", () => {
     expect(capacity.lines).toEqual([capacityCountLine("issueCountExclSubs")]);
     expect(capacity.notes).toContain(capacityBreachLine(["In Progress"]));
     expect(capacity.images).toEqual([]);
+  });
+});
+
+// The done agreement section is the team's own bar for finished, and it
+// reaches Confluence, the spreadsheet and the deck the way the capacity
+// section does: all three renderers walk the document's sections and this is
+// one of them.
+describe("the done agreement section", () => {
+  // A report whose series names the cards the walk read, which is what the
+  // counts are counted over.
+  const sprint = (issues = ["PLAT-1", "PLAT-2"]) => report({ series: { ...report().series, issues } });
+  const figures = {
+    items: ["Unit tests pass", "Docs updated"],
+    ticked: { "PLAT-1": ["Unit tests pass"], "PLAT-2": ["Unit tests pass"] },
+  };
+  const section = (r = sprint(), f = figures) => reportDocument(r, false, {}, f)!.sections[3];
+
+  it("is left out for a sprint whose board states no agreement", () => {
+    expect(reportDocument(sprint(), false, {}, { items: [], ticked: {} })!.sections).toHaveLength(3);
+    expect(reportDocument(sprint())!.sections).toHaveLength(3);
+  });
+
+  it("is left out for a report whose series names no card", () => {
+    expect(reportDocument(sprint([]), false, {}, figures)!.sections).toHaveLength(3);
+  });
+
+  it("counts the sprint's own cards per item, and reads an item nobody ticked as zero", () => {
+    expect(section().heading).toBe("Done agreement");
+    expect(section().table.columns).toEqual(["Item", "Cards that met it"]);
+    expect(section().table.rows).toEqual([
+      ["Unit tests pass", "2 of 2"],
+      // A missing row and a zero row say different things about an item to
+      // somebody reading this as evidence.
+      ["Docs updated", "0 of 2"],
+    ]);
+    expect(section().lines).toEqual([agreementCountLine(2)]);
+  });
+
+  it("counts no tick made against wording the agreement has since changed", () => {
+    const stale = {
+      items: ["Unit tests pass"],
+      ticked: { "PLAT-1": ["Unit tests pass"], "PLAT-2": ["Unit tests pas"] },
+    };
+    // The second card ticked words the agreement no longer states, so it
+    // counts towards neither side, which is what the panel's own count does.
+    expect(section(sprint(), stale).table.rows).toEqual([["Unit tests pass", "1 of 2"]]);
+    expect(section(sprint(), stale).notes).toContain(agreementStaleLine(1));
+  });
+
+  it("says where the items and the ticks came from, and nothing about stale ticks when there are none", () => {
+    expect(section().notes).toEqual([agreementSourceLine()]);
+    expect(section().images).toEqual([]);
   });
 });

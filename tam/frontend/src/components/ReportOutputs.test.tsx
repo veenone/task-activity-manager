@@ -3,12 +3,17 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SprintReport } from "../api";
 import { nothingToPublishLine, publishedLine, publisherStatusWord, savedLine } from "../lib/publishText";
+import { DONE_AGREEMENT } from "../lib/ritualText";
 import { ReportOutputs } from "./ReportOutputs";
 
 const bindings = vi.hoisted(() => ({
   PublishSprintReport: vi.fn(),
   ExportSprintReportXLSX: vi.fn(),
   ExportSprintReportPPTX: vi.fn(),
+  // The two local reads behind the done agreement section, which is
+  // collected on the click the way the chart pictures are.
+  ListRitualDocuments: vi.fn(),
+  DoneAgreementTicks: vi.fn(),
 }));
 
 vi.mock("../api", async () => {
@@ -60,6 +65,10 @@ beforeEach(() => {
   bindings.PublishSprintReport.mockReset();
   bindings.ExportSprintReportXLSX.mockReset();
   bindings.ExportSprintReportPPTX.mockReset();
+  // No agreement document, so no done agreement section, which is the state
+  // every test here but the two below it is about.
+  bindings.ListRitualDocuments.mockReset().mockResolvedValue([]);
+  bindings.DoneAgreementTicks.mockReset().mockResolvedValue({});
 });
 
 describe("ReportOutputs", () => {
@@ -227,5 +236,69 @@ describe("the publisher ribbon", () => {
     const live = screen.getByRole("status");
     await userEvent.click(screen.getByRole("button", { name: /spreadsheet/i }));
     await waitFor(() => expect(live).toHaveTextContent(/spreadsheet/i));
+  });
+});
+
+// The done agreement section is the question a sprint review argues about,
+// and it reaches the page, the spreadsheet and the deck out of the one
+// document: no renderer in Go knows the section exists.
+describe("the done agreement on a published report", () => {
+  const body = (...items: string[]) =>
+    `<ac:task-list>${items
+      .map((i) => `<ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body>${i}</ac:task-body></ac:task>`)
+      .join("")}</ac:task-list>`;
+
+  // A board with a standing agreement of two items, one of which one of the
+  // sprint's two cards was ticked for.
+  function withAgreement(): Partial<SprintReport> {
+    bindings.ListRitualDocuments.mockResolvedValue([
+      { sprintId: 0, ritualType: DONE_AGREEMENT, body: body("Unit tests pass", "Docs updated") },
+    ]);
+    bindings.DoneAgreementTicks.mockResolvedValue({ "PLAT-1": ["Unit tests pass"] });
+    return { series: { ...report().series, issues: ["PLAT-1", "PLAT-2"] } };
+  }
+
+  it("publishes a count per card against each item the agreement states", async () => {
+    bindings.PublishSprintReport.mockResolvedValue({ title: "Sprint 11 · Report", pageId: "1234" });
+    draw(withAgreement());
+    await userEvent.click(screen.getByRole("button", { name: "Publish to Confluence" }));
+    await waitFor(() => expect(bindings.PublishSprintReport).toHaveBeenCalled());
+    const doc = bindings.PublishSprintReport.mock.calls[0][3];
+    expect(doc.sections[doc.sections.length - 1].heading).toBe("Done agreement");
+    expect(doc.sections[doc.sections.length - 1].table.rows).toEqual([
+      ["Unit tests pass", "1 of 2"],
+      ["Docs updated", "0 of 2"],
+    ]);
+    // The ticks are read once, for the cards the report was built from, and
+    // the documents for the sprint the report is about.
+    expect(bindings.DoneAgreementTicks).toHaveBeenCalledWith("p1", 1, ["PLAT-1", "PLAT-2"]);
+    expect(bindings.ListRitualDocuments).toHaveBeenCalledWith("p1", 1, 11);
+  });
+
+  it("carries the same section into the spreadsheet and the deck", async () => {
+    bindings.ExportSprintReportXLSX.mockResolvedValue("/tmp/a.xlsx");
+    bindings.ExportSprintReportPPTX.mockResolvedValue("/tmp/a.pptx");
+    draw(withAgreement());
+    await userEvent.click(screen.getByRole("button", { name: /spreadsheet/i }));
+    await screen.findByText(savedLine("/tmp/a.xlsx"));
+    await userEvent.click(screen.getByRole("button", { name: /deck/i }));
+    await screen.findByText(savedLine("/tmp/a.pptx"));
+    const sheet = bindings.ExportSprintReportXLSX.mock.calls[0][0];
+    const deck = bindings.ExportSprintReportPPTX.mock.calls[0][0];
+    expect(sheet.sections[3].table.rows).toEqual([
+      ["Unit tests pass", "1 of 2"],
+      ["Docs updated", "0 of 2"],
+    ]);
+    expect(deck.sections[3]).toEqual(sheet.sections[3]);
+  });
+
+  it("refuses the publish rather than writing a page the section is missing from", async () => {
+    bindings.ListRitualDocuments.mockRejectedValue(new Error("the store is not open"));
+    draw({ series: { ...report().series, issues: ["PLAT-1"] } });
+    await userEvent.click(screen.getByRole("button", { name: "Publish to Confluence" }));
+    await waitFor(() =>
+      expect(screen.getByRole("listitem", { name: /Confluence/i })).toHaveTextContent(/the store is not open/),
+    );
+    expect(bindings.PublishSprintReport).not.toHaveBeenCalled();
   });
 });

@@ -257,6 +257,40 @@ export function capacityScopeLine(): string {
   return "The counts are this sprint's cards as the last sync left them, so a card Jira holds and TAM has not read is not among them.";
 }
 
+// The done agreement section's wording. The items are the team's own words,
+// out of the agreement document the Rituals view edits, and a tick is TAM's
+// record of somebody checking one against a card. A published page is read
+// at a review, away from TAM and away from the document, so these sentences
+// say where both halves came from and what the figures cannot see.
+
+// agreementCountLine is what the rows below are counted over: the sprint's
+// own cards as the report measured them, which is the footing the rest of
+// the page stands on. It names the number because a row reading "9 of 20"
+// says nothing about which twenty.
+export function agreementCountLine(cards: number): string {
+  return `This sprint held ${cards} ${cards === 1 ? "card" : "cards"} when TAM built the report, and each item below counts the ones it was ticked for.`;
+}
+
+// agreementSourceLine says who wrote the items and who ticked them. Neither
+// is in Jira and the page carries no other way to tell, so a reader who
+// takes these figures for Jira's own would go looking for a field that does
+// not exist, the way a reader of a WIP limit set in TAM would.
+export function agreementSourceLine(): string {
+  return "The items are the team's done agreement for this sprint, and the ticks are TAM's own record of what was checked against each card. Neither is held in Jira.";
+}
+
+// agreementStaleLine is the ticks made against wording the agreement no
+// longer states. They count towards no item, because the words they were
+// made against are not the words in the table, and a stale tick read as
+// compliance is the one figure in this section worth getting wrong: a
+// review is where somebody would act on it. Empty when every tick matches
+// an item the agreement still states.
+export function agreementStaleLine(ticks: number): string {
+  if (ticks <= 0) return "";
+  if (ticks === 1) return "One tick was made against wording the agreement has since changed, so it is not counted above.";
+  return `${ticks} ticks were made against wording the agreement has since changed, so they are not counted above.`;
+}
+
 // builtAtLine stamps the sprint on screen and nothing else. The velocity
 // rows carry no age of their own and most of them are read back from the
 // store, so this line is careful to claim only the one sprint.
