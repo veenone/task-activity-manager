@@ -69,8 +69,11 @@ func TestSchemaVersionTwentyOneAddsTheOwnLimitTable(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 	defer db.Close()
-	if v, _ := store.ReadSchemaVersion(db.DB()); v != 21 {
-		t.Errorf("schema version = %d, want 21, the version that adds the table below", v)
+	// At least 21, the version that added the table below. It was an equality
+	// check until version 22 arrived and made it a test about the newest
+	// version rather than about this table.
+	if v, _ := store.ReadSchemaVersion(db.DB()); v < 21 {
+		t.Errorf("schema version = %d, want at least 21, the version that adds the table below", v)
 	}
 	if _, err := db.DB().Exec(
 		`INSERT INTO board_column_limit (profile_id, board_id, column_name, wip_max) VALUES ('p1', 1, 'In Progress', 5)`,

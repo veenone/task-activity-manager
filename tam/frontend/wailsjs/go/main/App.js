@@ -90,6 +90,10 @@ export function DiscardPendingChange(arg1, arg2) {
   return window['go']['main']['App']['DiscardPendingChange'](arg1, arg2);
 }
 
+export function DoneAgreementTicks(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DoneAgreementTicks'](arg1, arg2, arg3);
+}
+
 export function EditIssue(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EditIssue'](arg1, arg2, arg3, arg4);
 }
@@ -336,6 +340,10 @@ export function SetConfluenceConfig(arg1, arg2, arg3) {
 
 export function SetDefaultProfile(arg1) {
   return window['go']['main']['App']['SetDefaultProfile'](arg1);
+}
+
+export function SetDoneAgreementTick(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetDoneAgreementTick'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SetNavRailVisible(arg1) {
