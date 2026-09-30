@@ -1,22 +1,25 @@
-import type { SprintReport } from "../api";
-import { capacitySection } from "../lib/reportDocument";
+import type { ReportSection } from "../api";
 
 // CapacityPanel is the report's capacity section on screen: the board's columns
 // against their WIP limits, with each limit attributed to Jira or to this team.
 //
-// It renders the section lib/reportDocument already builds rather than
-// composing one of its own. That section is what the Confluence page, the
-// spreadsheet and the deck are laid out from, so a team comparing the screen
-// with the page it published reads one set of rows worded one way. Building a
-// second version here is exactly the failure lib/reportText and
-// lib/reportTables exist to prevent.
+// It takes the section lib/reportDocument already built rather than composing
+// one of its own. That section is what the Confluence page, the spreadsheet
+// and the deck are laid out from, so a team comparing the screen with the page
+// it published reads one set of rows worded one way. Building a second version
+// here is exactly the failure lib/reportText and lib/reportTables exist to
+// prevent.
 //
-// A report carrying no column heads draws nothing, because that is a report
-// from a build before the heads travelled or one whose board the cache has
-// nothing for. A section saying "no limits" there would claim a fact about a
-// board nobody read.
-export function CapacityPanel({ report }: { report: SprintReport }) {
-  const [section] = capacitySection(report);
+// Which section it is differs. A sprint report's is capacitySection, scoped to
+// the sprint's own cards; a kanban board's is the only section kanbanDocument
+// carries, scoped to the board. Neither difference reaches the markup, which
+// is why this draws both.
+//
+// No section draws nothing. For a sprint that is a report from a build before
+// the column heads travelled, or one whose board the cache has nothing for,
+// and a panel reading "no limits" there would claim a fact about a board
+// nobody read.
+export function CapacityPanel({ section }: { section?: ReportSection }) {
   if (!section) return null;
   const { columns, rows } = section.table;
   return (

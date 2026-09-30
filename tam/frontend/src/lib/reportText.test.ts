@@ -10,6 +10,10 @@ import {
   dayLine,
   emptyDaysLine,
   floorLine,
+  kanbanEmptyLine,
+  kanbanMetricsLine,
+  kanbanScopeLine,
+  kanbanUnsyncedLine,
   removedFloorLine,
   methodLine,
   mixedUnitsLine,
@@ -255,5 +259,36 @@ describe("the done agreement's sentences", () => {
     );
     expect(agreementStaleLine(3)).toContain("3 ticks were made against wording the agreement has since changed");
     expect(agreementStaleLine(3)).toContain("not counted above");
+  });
+});
+
+// The kanban report's sentences. A kanban board has no sprint, so its report
+// has no window its figures belong to, no stamp in the sense builtAtLine
+// makes one, and two empty boards that mean two different things.
+describe("the kanban report's sentences", () => {
+  it("puts the counts now rather than in a period that closed", () => {
+    expect(kanbanScopeLine()).toContain("the board as the last sync left it");
+    expect(kanbanScopeLine()).toContain("not a period that has closed");
+    // A card Jira holds and TAM has not read is the one thing a count off the
+    // cache cannot see, and the caveat capacityScopeLine carries for a sprint.
+    expect(kanbanScopeLine()).toContain("TAM has not read");
+  });
+
+  it("names the three metrics a kanban team will not find in it", () => {
+    expect(kanbanMetricsLine()).toContain("Throughput");
+    expect(kanbanMetricsLine()).toContain("cycle time");
+    expect(kanbanMetricsLine()).toContain("cumulative flow diagram");
+    expect(kanbanMetricsLine()).toContain("not built yet");
+  });
+
+  it("tells a board whose columns never arrived from one whose columns hold nothing", () => {
+    // Two facts and two fixes: the first is the Boards view's refresh and the
+    // second is an issue sync, so a reader sent to the wrong one refreshes the
+    // boards and reads the same empty table again.
+    expect(kanbanUnsyncedLine()).toContain("columns are not in the cache");
+    expect(kanbanUnsyncedLine()).toContain("Open Boards");
+    expect(kanbanEmptyLine()).toContain("columns are synced");
+    expect(kanbanEmptyLine()).toContain("Sync this project's issues");
+    expect(kanbanEmptyLine()).not.toContain("not in the cache");
   });
 });

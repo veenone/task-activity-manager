@@ -212,8 +212,10 @@ describe("App shell", () => {
     await userEvent.click(within(rail).getByRole("button", { name: "Reports" }));
     expect(screen.getByRole("region", { name: /Reports/ })).toBeInTheDocument();
     // No board is synced in this fixture, which is ReportsView's own empty
-    // state rather than the placeholder that used to stand here.
-    expect(await screen.findByText(/No scrum board has been synced for this project/)).toBeInTheDocument();
+    // state rather than the placeholder that used to stand here. It says
+    // "board" and not "scrum board", because a kanban board is reported on
+    // too since issue #119.
+    expect(await screen.findByText(/No board has been synced for this project/)).toBeInTheDocument();
     expect(screen.queryByText(/arrives in Phase/)).not.toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Views" })).getByRole("button", { name: "Reports" }))
       .toHaveAttribute("aria-current", "page");

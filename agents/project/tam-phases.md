@@ -2070,6 +2070,40 @@ rather than composing its own: screen and published page must not be two
 answers. `flex: none` + `max-height`, the shape #107 gave the outputs bar,
 because velocity panel is the one shrinkable child of a fixed-height column.
 
+## Reports on a kanban board (#119)
+
+Picker was filtered to `type === "scrum"`, so a kanban team opened Reports and
+found none of its own boards. Filter was not arbitrary, every figure in view is
+sprint-scoped, but having no sprint is reason to report differently and not to
+hide board.
+
+Capacity reaches a board with no sprint through `GetBoard`, the read Boards
+view already makes: `boardrepo.ColumnHeads` is that same composition with the
+lanes dropped, so no binding, no migration and no Go change. `Report.Capacity`
+and `sprintreport.Service.Capacity` stay the sprint path.
+
+`lib/reportDocument.kanbanDocument` takes columns, not a `SprintReport`, and
+answer one section. Two deliberate differences from `capacitySection`: breach
+sentence sit in `lines` (printed above table) so reader meet columns that are
+over before rows that state them one at a time, and every column keep its row
+on board limiting none of them, where sprint report drop that table because
+its other three sections are report and here counts are.
+
+`ReportOutputs` take document as prop with optional `sprint` half (chart
+pictures, done agreement, sprint id for page parent). Kanban report publish
+document it was given; Go already fall back to reports root for sprint id no
+ritual document can be keyed on, so page hang off board.
+
+**Two empty boards, two sentences, never collapsed.** Columns absent from cache
+is Boards refresh (`kanbanUnsyncedLine`, with button); columns present holding
+no card is issue sync (`kanbanEmptyLine`). Team sent to Boards from second one
+refresh columns it already has.
+
+**No window picker**, deliberately: capacity is true now rather than over a
+period, which is the inert control #107 removed from this view. Throughput,
+cycle time and CFD not built; `kanbanMetricsLine` say so rather than leaving
+report looking like one whose sections failed to load.
+
 ## A drop asks for a column, not a status
 
 Jira board column collect several statuses: Done column commonly hold
@@ -2430,6 +2464,9 @@ entered. Kiwi profile file refused.
                           create and edit dialogs share), useSprintSelection (the tree's own
                           multi-select, the board's under a different name), ReportsView (the two
                           pickers, the eight states a report can be in, and the rebuild),
+                          KanbanReport (the same view for a board with no sprint: its columns out
+                          of the cache through GetBoard, the two empty boards, and the outputs
+                          bar over lib/reportDocument's kanbanDocument),
                           SprintSummary (the sentence, its qualification, and the method line),
                           VelocityTable (the last six closed sprints, each row with its own unit),
                           ReportOutputs (publish to Confluence, export a spreadsheet, export a
