@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SprintReport } from "../api";
 import { nothingToPublishLine, publishedLine, publisherStatusWord, savedLine } from "../lib/publishText";
+import { reportDocument } from "../lib/reportDocument";
 import { DONE_AGREEMENT } from "../lib/ritualText";
 import { ReportOutputs } from "./ReportOutputs";
 
@@ -50,13 +51,13 @@ function report(over: Partial<SprintReport> = {}): SprintReport {
 // a drawn chart becomes is lib/chartImage's own suite; the canvas that ends it
 // does not exist under this runner.
 function draw(over: Partial<SprintReport> = {}) {
+  const r = report(over);
   render(
     <ReportOutputs
       profileId="p1"
       boardId={1}
-      report={report(over)}
-      live={false}
-      charts={{ current: null }}
+      doc={reportDocument(r, false)}
+      sprint={{ report: r, live: false, charts: { current: null } }}
     />,
   );
 }

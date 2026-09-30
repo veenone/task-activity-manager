@@ -5,6 +5,7 @@ import type { Profile, Settings, Sprint, SprintReport } from "../api";
 import { useBoards, useBoardSprints } from "../queries/boards";
 import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
+import { reportDocument } from "../lib/reportDocument";
 import { unavailableLine } from "../lib/reportText";
 import { busyLine, isBusyRefusal } from "../lib/publishText";
 import { CapacityPanel } from "./CapacityPanel";
@@ -326,9 +327,8 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             <ReportOutputs
               profileId={activeId}
               boardId={reportBoardId}
-              report={shown}
-              live={inProgress}
-              charts={reportFrame}
+              doc={reportDocument(shown, inProgress)}
+              sprint={{ report: shown, live: inProgress, charts: reportFrame }}
             />
           </div>
         )}

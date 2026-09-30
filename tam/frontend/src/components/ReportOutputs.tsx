@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { RefObject } from "react";
 import { call, errMsg } from "@agile-suite/core";
 import { ExportSprintReportPPTX, ExportSprintReportXLSX, PublishSprintReport } from "../api";
@@ -24,6 +24,11 @@ import {
 // reads the same in the app, on the page, in the sheet and on the slide.
 // None of them reaches Jira.
 //
+// The document arrives as a prop rather than being built here, because there
+// is more than one kind: a sprint's, and a kanban board's column capacity,
+// which has no sprint to build one from. This bar is the buttons, the states
+// and the ribbon, and it publishes whatever document it was handed.
+//
 // Publishing is a write. It happens on this button and never on the view's
 // mount, and it says which page it wrote, because a write that answers
 // "done" leaves the user to go and find out what it did.
@@ -41,13 +46,24 @@ import {
 interface Props {
   profileId: string;
   boardId: number;
-  report: SprintReport;
-  live: boolean;
-  // charts is the report frame the view drew, and the only place a picture is
-  // looked for. The charts are in the DOM rather than in the report, so they
-  // are collected on the click: rasterising three of them on every render
-  // would be work for a button nobody pressed.
-  charts: RefObject<HTMLDivElement | null>;
+  // doc is the report as something other than a screen, null for a report
+  // there is nothing to publish. The caller words it, because what a document
+  // is built from differs: a sprint report is built from its series, and a
+  // kanban board's from the columns in the cache.
+  doc: ReportDocument | null;
+  // sprint is what a sprint report adds on the click, and its absence is what
+  // makes this bar a kanban board's as well. A kanban report has no chart to
+  // rasterise and no done agreement to count, so it publishes the document it
+  // was given, under the board rather than under a sprint's own page.
+  sprint?: {
+    report: SprintReport;
+    live: boolean;
+    // charts is the report frame the view drew, and the only place a picture
+    // is looked for. The charts are in the DOM rather than in the report, so
+    // they are collected on the click: rasterising three of them on every
+    // render would be work for a button nobody pressed.
+    charts: RefObject<HTMLDivElement | null>;
+  };
 }
 
 // A publisher is idle until it is used. "failed" carries a reason, "done"
@@ -71,8 +87,7 @@ const PUBLISHERS = [
 
 type PublisherID = (typeof PUBLISHERS)[number]["id"];
 
-export function ReportOutputs({ profileId, boardId, report, live, charts }: Props) {
-  const doc = useMemo(() => reportDocument(report, live), [report, live]);
+export function ReportOutputs({ profileId, boardId, doc, sprint }: Props) {
   const [outcomes, setOutcomes] = useState<Record<PublisherID, Outcome>>({
     publish: IDLE,
     xlsx: IDLE,
@@ -107,9 +122,10 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
   const running = PUBLISHERS.find((p) => outcomes[p.id].status === "running");
   const busy = running !== undefined || !doc;
 
-  // drawn is the document with the pictures of the charts on screen in it,
-  // and the sprint's done agreement beside them. The document built above is
-  // what it falls back to, which is the same document without either.
+  // drawn is a sprint report's document with the pictures of the charts on
+  // screen in it, and the sprint's done agreement beside them. The document
+  // passed in is what it falls back to, which is the same document without
+  // either, and it is the whole answer for a report with no sprint behind it.
   //
   // Both are collected on the click rather than on every render, for the same
   // reason: the pictures cost a rasterise apiece, and what the agreement
@@ -117,6 +133,8 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
   // local, and a failure in either refuses the publish through run's own
   // error handling rather than writing a report with a section missing.
   async function drawn(built: ReportDocument): Promise<ReportDocument> {
+    if (!sprint) return built;
+    const { report, live, charts } = sprint;
     const images = await chartImages(charts.current);
     const agreement = await sprintDoneAgreement(profileId, boardId, report.series.sprintId, report.series.issues ?? []);
     return reportDocument(report, live, images, agreement) ?? built;
@@ -128,7 +146,11 @@ export function ReportOutputs({ profileId, boardId, report, live, charts }: Prop
       run(id, label, async () => {
         // A warning means the page is written and a chart is not on it. The
         // page is the outcome either way, so it is named either way.
-        const page = await PublishSprintReport(profileId, boardId, report.series.sprintId, await drawn(doc));
+        // A kanban board has no sprint, so the page hangs off the profile's
+        // reports root rather than under a sprint's own page, which is what
+        // Go answers with for a sprint id no ritual document can be keyed on.
+        const sprintId = sprint?.report.series.sprintId ?? 0;
+        const page = await PublishSprintReport(profileId, boardId, sprintId, await drawn(doc));
         return page.warning
           ? { status: "warned", message: partlyPublishedLine(page.title, page.warning) }
           : { status: "done", message: publishedLine(page.title) };
