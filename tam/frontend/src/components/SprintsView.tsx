@@ -411,6 +411,9 @@ export function SprintsView() {
             // the Backlog's profile-wide list can say, so no emptyNote goes
             // with it.
             sprints={openSprints}
+            // The board whose sprints these are, and so the board whose done
+            // agreement the panel holds the issue to.
+            boardId={board?.id}
             onClose={() => setSelectedKey("")}
           />
         ) : (

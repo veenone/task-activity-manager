@@ -1393,6 +1393,28 @@ export const SetColumnLimit: (
   column: string,
   limit: string,
 ) => Promise<void> = App.SetColumnLimit;
+// The done agreement's per-issue ticks. These are the one pair of writes in
+// TAM that never reaches Jira: a tick is not journalled and is not pushed on
+// Commit, because Jira has nowhere to put it and it is TAM's own record of
+// what a team checked rather than a change to a Jira issue.
+//
+// DoneAgreementTicks answers the wording of every item ticked against each
+// issue named, whether or not the agreement still states it, and takes a list
+// of issues so the report's section can ask about a whole sprint in the call
+// the panel makes for one. Deciding which of those wordings the agreement
+// still states is the caller's, through lib/doneAgreement.
+export const DoneAgreementTicks: (
+  profileId: string,
+  boardId: number,
+  issueKeys: string[],
+) => Promise<Record<string, string[]>> = App.DoneAgreementTicks;
+export const SetDoneAgreementTick: (
+  profileId: string,
+  boardId: number,
+  issueKey: string,
+  item: string,
+  ticked: boolean,
+) => Promise<void> = App.SetDoneAgreementTick;
 export const MoveIssueToSprint: (profileId: string, key: string, sprintId: string) => Promise<void> =
   App.MoveIssueToSprint;
 export const RankIssue: (

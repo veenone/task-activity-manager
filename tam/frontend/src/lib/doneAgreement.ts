@@ -66,3 +66,27 @@ export function agreementItems(body: string): string[] {
 export function effectiveAgreement(boardBody: string, sprintBody = ""): string[] {
   return unique([...agreementItems(boardBody), ...agreementItems(sprintBody)]);
 }
+
+// One line of the panel's list. stated is whether the agreement still says
+// this, which is the answer to a tick made against wording somebody has since
+// edited: the tick is a record of what was checked, so it stays, marked as
+// made against different words, rather than being dropped or moved onto
+// whatever the item says now.
+export interface AgreementRow {
+  text: string;
+  ticked: boolean;
+  stated: boolean;
+}
+
+// agreementRows puts the store's ticks beside today's items: every item the
+// agreement states, in its own order, and then the wording of any tick the
+// agreement no longer states. The progress count reads against the stated
+// rows alone, because an item the agreement dropped is not something this
+// issue is still held to.
+export function agreementRows(items: string[], ticked: string[]): AgreementRow[] {
+  const stated = new Set(items);
+  return [
+    ...items.map((text) => ({ text, ticked: ticked.includes(text), stated: true })),
+    ...ticked.filter((text) => !stated.has(text)).map((text) => ({ text, ticked: true, stated: false })),
+  ];
+}

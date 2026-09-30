@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agreementItems, effectiveAgreement } from "./doneAgreement";
+import { agreementItems, agreementRows, effectiveAgreement } from "./doneAgreement";
 
 // The body the Go template writes for a board's agreement, with items typed
 // into it. The blank task is what a fresh document carries.
@@ -77,6 +77,38 @@ describe("effectiveAgreement", () => {
     expect(effectiveAgreement(additions, additions)).toEqual([
       "Load test run against staging",
       "Unit tests pass",
+    ]);
+  });
+});
+
+describe("agreementRows", () => {
+  const items = ["Reviewed by someone else", "Unit tests pass"];
+
+  it("is every item the agreement states, ticked where the store says so", () => {
+    expect(agreementRows(items, ["Unit tests pass"])).toEqual([
+      { text: "Reviewed by someone else", ticked: false, stated: true },
+      { text: "Unit tests pass", ticked: true, stated: true },
+    ]);
+  });
+
+  it("keeps a tick made against words the agreement no longer states, after the items", () => {
+    expect(agreementRows(items, ["Unit tests pass on CI", "Unit tests pass"])).toEqual([
+      { text: "Reviewed by someone else", ticked: false, stated: true },
+      { text: "Unit tests pass", ticked: true, stated: true },
+      { text: "Unit tests pass on CI", ticked: true, stated: false },
+    ]);
+  });
+
+  it("is the items alone for an issue nobody has ticked anything on", () => {
+    expect(agreementRows(items, [])).toEqual([
+      { text: "Reviewed by someone else", ticked: false, stated: true },
+      { text: "Unit tests pass", ticked: false, stated: true },
+    ]);
+  });
+
+  it("is the ticks alone once the agreement states nothing", () => {
+    expect(agreementRows([], ["Unit tests pass"])).toEqual([
+      { text: "Unit tests pass", ticked: true, stated: false },
     ]);
   });
 });

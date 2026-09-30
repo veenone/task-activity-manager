@@ -331,6 +331,9 @@ export function BoardsView() {
             // about why the list is empty, which only the profile-wide
             // callers are in a position to explain.
             sprints={openSprints}
+            // The board the card is being read on, which is the board whose
+            // done agreement the panel holds the issue to.
+            boardId={board?.id}
             onClose={() => setSelectedKey("")}
           />
         )}

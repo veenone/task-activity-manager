@@ -17,6 +17,8 @@ import { SprintField } from "./SprintField";
 import { ActivityTab } from "./ActivityTab";
 import { AddLinkForm } from "./AddLinkForm";
 import { WorkLogSection } from "./WorkLogSection";
+import { DoneAgreementSection, agreementProgressLine } from "./DoneAgreementSection";
+import { useDoneAgreement } from "../queries/doneAgreement";
 
 // Section is one collapsible block of the panel. XTM's detail sidebar stacks
 // its sections under uppercase headings rather than hiding them behind tabs,
@@ -32,7 +34,11 @@ function Section({
   children,
 }: {
   title: string;
-  count?: number;
+  // A tally beside the title: a plain number where the section is a list, or
+  // a phrase where a bare number would not say what it counted. The done
+  // agreement's is "4 of 7", since 4 alone reads as four items rather than
+  // four of them ticked.
+  count?: number | string;
   open: boolean;
   onToggle: () => void;
   action?: ReactNode;
@@ -103,6 +109,11 @@ interface Props {
   // sprint query, a scrum board still loading, or one whose sprints are all
   // closed, and none of those is "this profile has never synced a board".
   emptyNote?: string;
+  // The board this issue is being read on, when the caller has one. The done
+  // agreement is a document of a board's, so its section is drawn only where
+  // there is a board to hold the issue to: Backlog and the epic tree pass
+  // none and the section is absent there.
+  boardId?: number;
   onClose: () => void;
 }
 
@@ -110,7 +121,7 @@ interface Props {
 // render at once, the description among them since the sync caches it on the
 // row; the links, comments and linked tests load through the backend's
 // detail cache, which is a round trip per issue and stays one.
-export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote, onClose }: Props) {
+export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote, boardId, onClose }: Props) {
   // Fields open, everything else closed: the panel starts on what a reader
   // came for and lets them reach the rest without leaving the column.
   const [open, setOpen] = useState<Record<string, boolean>>({ fields: true });
@@ -124,6 +135,11 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const { status } = useSync();
   const busy = status !== "idle";
   const subtaskType = useSubtaskType(profileId);
+  // The sprint whose additions this issue is held to. A card on a kanban
+  // board, or one in the sprint's backlog, is in none and sees the board's
+  // items alone. The query behind it reads nothing unless there is a board.
+  const sprintId = Number(issue.sprintId) || 0;
+  const agreement = useDoneAgreement(profileId, boardId ?? 0, issue.key, sprintId);
   const [drafting, setDrafting] = useState(false);
   // The comment chips read the description's syntax, which the toggle in
   // EditableFields can change; this is what carries that change up here.
@@ -389,6 +405,23 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
       <Section title="Work log" open={open.worklog ?? false} onToggle={() => toggle("worklog")}>
         <WorkLogSection profileId={profileId} issueKey={issue.key} open={open.worklog ?? false} />
       </Section>
+
+      {/* Closed like the rest, and its count in the summary: both of its
+          reads are local, so a reader learns how far this issue is against
+          the agreement without opening anything. */}
+      {/* A board id of its own, which a board drafted in TAM does not have
+          until Commit creates it: its id is negative until then, and the
+          store keys a tick on a real board. */}
+      {boardId !== undefined && boardId > 0 && (
+        <Section
+          title="Done agreement"
+          count={agreementProgressLine(agreement.data)}
+          open={open.agreement ?? false}
+          onToggle={() => toggle("agreement")}
+        >
+          <DoneAgreementSection profileId={profileId} boardId={boardId} issueKey={issue.key} sprintId={sprintId} />
+        </Section>
+      )}
 
       <Section title="Activity" open={open.activity ?? false} onToggle={() => toggle("activity")}>
         <ActivityTab profileId={profileId} issueKey={issue.key} />

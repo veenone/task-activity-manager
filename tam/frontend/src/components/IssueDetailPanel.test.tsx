@@ -12,7 +12,7 @@ import { IssueDetailPanel } from "./IssueDetailPanel";
 
 vi.mock("../api", async () => {
   const actual = await vi.importActual<typeof import("../api")>("../api");
-  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), GetEditableFields: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn(), ListWorklogs: vi.fn(), BrowserOpenURL: vi.fn() };
+  return { ...actual, GetIssueDetail: vi.fn(), ListLinkedTests: vi.fn(), EditIssue: vi.fn(), ListActivity: vi.fn(), DiscardPendingChange: vi.fn(), GetLinkTypes: vi.fn(), ListEpics: vi.fn(), SearchUsers: vi.fn(), ListPriorities: vi.fn(), GetSubtaskTypeName: vi.fn(), GetEditableFields: vi.fn(), CreateIssue: vi.fn(), MoveIssueToSprint: vi.fn(), ListWorklogs: vi.fn(), ListRitualDocuments: vi.fn(), DoneAgreementTicks: vi.fn(), BrowserOpenURL: vi.fn() };
 });
 
 // The panel reads useSync to hold Save while a sync or commit runs. Its
@@ -39,16 +39,29 @@ const epics: Issue[] = [
 
 // The panel opens the create dialog for a sub-task, and that dialog reads the
 // active profile, so the harness carries a provider the way the app does.
-function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[], issue: Issue = story, emptyNote?: string, jiraUrl?: string) {
+function renderPanel(onClose = vi.fn(), sprints?: api.Sprint[], issue: Issue = story, emptyNote?: string, jiraUrl?: string, boardId?: number) {
   return render(
     <QueryClientProvider client={createQueryClient()}>
       <DialogProvider>
         <ProfileProvider backend={profileBackend}>
-          <IssueDetailPanel profileId="p1" issue={issue} jiraUrl={jiraUrl} sprints={sprints} emptyNote={emptyNote} onClose={onClose} />
+          <IssueDetailPanel profileId="p1" issue={issue} jiraUrl={jiraUrl} sprints={sprints} emptyNote={emptyNote} boardId={boardId} onClose={onClose} />
         </ProfileProvider>
       </DialogProvider>
     </QueryClientProvider>,
   );
+}
+
+// The board's done agreement, two items, plus one the sprint adds. The
+// document body is the shape the Go template writes and lib/doneAgreement
+// reads the items out of.
+function agreementDoc(sprintId: number, ...items: string[]): api.RitualDocument {
+  const tasks = items.map((i) => `<ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body>${i}</ac:task-body></ac:task>`);
+  const body = `<h2>Items</h2><ac:task-list>${tasks.join("")}</ac:task-list>`;
+  return {
+    profileId: "p1", boardId: 1, sprintId, ritualType: "doneagreement", title: "PLAT board · Done agreement",
+    body, baseBody: body, pageId: "", version: 0, conflictBody: "", conflictVersion: 0,
+    status: "local", updatedAt: "", syncedAt: "",
+  };
 }
 
 // detail is the fetched half of one issue, with only the parts a test cares
@@ -240,6 +253,36 @@ describe("IssueDetailPanel", () => {
     const worklog = await openSection("Work log");
     await waitFor(() => expect(within(worklog).getByText("1h logged over 1 entry")).toBeInTheDocument());
     expect(api.ListWorklogs).toHaveBeenCalledWith("p1", "PLAT-412");
+  });
+
+  // The done agreement's section sits beside the others and starts closed,
+  // like Work log, but its count is in the summary: both its reads are local,
+  // so a reader sees how far this issue is without opening anything.
+  it("carries the effective done agreement's progress in its summary, closed", async () => {
+    vi.mocked(api.ListRitualDocuments).mockResolvedValue([
+      agreementDoc(0, "Reviewed by someone else", "Unit tests pass"),
+      agreementDoc(12, "Load test run against staging"),
+    ]);
+    vi.mocked(api.DoneAgreementTicks).mockResolvedValue({ "PLAT-412": ["Unit tests pass"] });
+    renderPanel(vi.fn(), undefined, story, undefined, undefined, 1);
+    const toggle = await screen.findByRole("button", { name: /^Done agreement/ });
+    await waitFor(() => expect(toggle).toHaveTextContent("1 of 3"));
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    // The sprint the issue is in is the one whose additions it is held to.
+    expect(api.ListRitualDocuments).toHaveBeenCalledWith("p1", 1, 12);
+    const agreement = await openSection("Done agreement");
+    expect(within(agreement).getByRole("checkbox", { name: "Unit tests pass" })).toBeChecked();
+    expect(within(agreement).getByRole("checkbox", { name: "Load test run against staging" })).not.toBeChecked();
+  });
+
+  // Backlog and the epic tree hand the panel no board, and a done agreement
+  // is a document of one board's: there is no question the section could
+  // answer there.
+  it("shows no done agreement away from a board", async () => {
+    renderPanel();
+    await screen.findByRole("button", { name: /^Work log/ });
+    expect(screen.queryByRole("button", { name: /^Done agreement/ })).not.toBeInTheDocument();
+    expect(api.ListRitualDocuments).not.toHaveBeenCalled();
   });
 
   it("keeps the cached fields and offers a retry when the detail fetch fails", async () => {

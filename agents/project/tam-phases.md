@@ -608,9 +608,46 @@ or URL, since an id is empty until publish and change after, and a body
 carrying one would render different once a neighbour is published and read as
 written in (#74 again). Golden `planning.xml` and `review.xml` move with it, so
 the frontend corpus prove the macro survive the editor (opaque block, label
-`Confluence: include`). Per-issue ticks are #116, not built. A sprint report
-section from the agreement is after #116, own issue. Plan:
+`Confluence: include`). A sprint report section from the agreement is #117,
+own issue. Plan:
 `docs/superpowers/plans/2026-09-29-tam-done-agreement.md`.
+
+**Per-issue ticks = a record, not a checklist** (#116). Schema 22 add
+`done_agreement_tick (profile_id, board_id, issue_key, item_text)`, whole new
+table through `baseDDL`, no migration entry, swept by `boardrepo.PurgeProfile`
+and `RemoveBoards`. The row is the tick; untick delete it. **The one write in
+TAM that is neither journalled nor pushed on Commit**: Jira have no field for
+it, and it is TAM's own record of what a team check, not a change to a Jira
+issue. Reason written on `tamstore.doneTickDDL`, repeat on
+`boardrepo/doneticks.go` and `app_doneagreement.go`.
+
+`item_text` = the wording the tick was made against, and nothing rewrite or
+drop a row because the agreement move on. These tick are review material,
+publish by #117, so a tick that follow the document's current wording would be
+evidence that change underneath the review. Reword an item and the old tick
+stay, drawn against the old words and marked "Made against wording the
+agreement has since changed". Same rule answer the resurrection question: a
+removed item's tick match again only if the words really are identical, which
+is what the row say.
+
+The parse live on the frontend, `src/lib/doneAgreement.ts`, not in Go: the XML
+reader it need is `lib/storage/xml`, and #117's report `Document` is built in
+TypeScript in `lib/reportDocument`, so a Go parse would be answer by a second
+one on this side. `agreementItems` read one body, `effectiveAgreement` join
+board plus sprint additions, `agreementRows` put the store's ticks beside
+today's items (`stated` = the agreement still say it). Go never know what an
+item is.
+
+`App.DoneAgreementTicks(profile, board, issueKeys)` answer per issue key, a
+list so #117 ask for a whole sprint in the call the panel make for one issue;
+`App.SetDoneAgreementTick` the write. Panel section =
+`components/DoneAgreementSection.tsx`, beside Work log, closed by default,
+`agreementProgressLine` put "4 of 7" in the summary (stated rows only, so a
+stale tick count towards neither number). Both read are local, so the query
+run when the panel open rather than on expand: the count is worth something
+closed. `boardId` is a new optional `IssueDetailPanel` prop, passed by
+BoardsView and SprintsView; Backlog and the epic tree pass none and the
+section is absent there, since an agreement belong to a board.
 
 ## Phase 3a: boards
 
@@ -2342,6 +2379,12 @@ entered. Kiwi profile file refused.
       src/lib/ritualNav.ts  the Rituals view's document list as data: the five pages in order,
                           then the board's done agreement and the sprint's additions, keyed on
                           sprint id and ritual type because those two share a type
+      src/lib/doneAgreement.ts  the done agreement's items, read out of a document body's
+                          ac:task-list and identified by their words; effectiveAgreement joins a
+                          board's with a sprint's additions, agreementRows puts the store's ticks
+                          beside today's items and marks the ones made against wording since
+                          changed. The one parse of those items, because #117's report document
+                          is built on this side too
       src/lib/confluenceRoot.ts  the Profile settings root page id field: a number, or the pageId
                           read out of a pasted page address
       src/lib/standupLog.ts  finds where today's dated Yesterday/Today/Blockers section belongs
