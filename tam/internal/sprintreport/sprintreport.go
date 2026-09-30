@@ -206,12 +206,12 @@ func (s *Service) emit(p Progress) {
 // unavailable is a report that is only its reason.
 //
 // Every slice in it is empty rather than nil, the velocity rows and the
-// series' own days and truncated list alike, because a nil slice marshals
+// series' own days, truncated list and issue keys alike, because a nil slice marshals
 // to null and the view would otherwise have to guard three fields three
 // different ways for the one state where none of them holds anything.
 func unavailable(reason string) Report {
 	return Report{
-		Series:      reports.Series{Days: []reports.Day{}, Truncated: []string{}},
+		Series:      reports.Series{Days: []reports.Day{}, Truncated: []string{}, Issues: []string{}},
 		Velocity:    []reports.VelocityRow{},
 		Capacity:    []boardrepo.ColumnView{},
 		Unavailable: reason,

@@ -2339,16 +2339,24 @@ entered. Kiwi profile file refused.
                           operation actually holding the lock
       src/lib/reportText.ts  every sentence the sprint report prints: the summary, the floor and
                           removal qualifications, the method line, the four unavailable reasons,
-                          the unit and its reason, the provisional or final mode line, and the
-                          progress wording, all testable without rendering anything and all
-                          reused by Phase 5's Rituals
-      src/lib/reportTables.ts  the report's three tables, captions, column names and cells: the
-                          outcome figures, the burndown day by day, the velocity rows, built once
-                          and drawn by the charts, the velocity table and the three outputs
+                          the unit and its reason, the provisional or final mode line, the
+                          progress wording, and the done agreement section's three sentences (what
+                          the counts are counted over, that neither the items nor the ticks are
+                          Jira's, and how many ticks were made against wording since changed), all
+                          testable without rendering anything and all reused by Phase 5's Rituals
+      src/lib/reportTables.ts  the report's tables, captions, column names and cells: the
+                          outcome figures, the burndown day by day, the velocity rows, the board's
+                          column capacity and the done agreement's items against the sprint's own
+                          cards, built once and drawn by the charts, the velocity table and the
+                          three outputs
       src/lib/reportDocument.ts  the report as headings, lines, tables and the caveats on them,
                           which is what the Confluence page, the spreadsheet and the deck are all
                           rendered from; it answers null for an unavailable report, which is what
-                          makes the three outputs refuse rather than write a page of zeroes
+                          makes the three outputs refuse rather than write a page of zeroes.
+                          capacitySection and doneAgreementSection are each a list of nothing or
+                          one, so a board with no column heads and a sprint with no agreement
+                          carry no section rather than a table of zeroes; a section added here
+                          reaches all three outputs because every renderer walks Document.Sections
       src/lib/columnLimit.ts  a board column against its WIP limit: whether there is one, which
                           of the two places it came from and in whose words, the pair it is
                           actually measured against (Jira's wins over the team's own), the count,
@@ -2383,8 +2391,10 @@ entered. Kiwi profile file refused.
                           ac:task-list and identified by their words; effectiveAgreement joins a
                           board's with a sprint's additions, agreementRows puts the store's ticks
                           beside today's items and marks the ones made against wording since
-                          changed. The one parse of those items, because #117's report document
-                          is built on this side too
+                          changed. The one parse of those items, because the report document
+                          #117's section rides in is built on this side too; queries/doneAgreement
+                          holds both the panel's hook and sprintDoneAgreement, the whole-sprint
+                          read the report makes on the click that publishes it
       src/lib/confluenceRoot.ts  the Profile settings root page id field: a number, or the pageId
                           read out of a pasted page address
       src/lib/standupLog.ts  finds where today's dated Yesterday/Today/Blockers section belongs

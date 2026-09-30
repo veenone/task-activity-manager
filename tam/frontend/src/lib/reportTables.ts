@@ -93,6 +93,30 @@ export function capacityTable(columns: ColumnView[]): TableSpec {
   };
 }
 
+// One row of doneAgreementTable: an item the agreement states, and how many
+// of the sprint's cards were ticked against those words.
+export interface AgreementCount {
+  text: string;
+  met: number;
+}
+
+// doneAgreementTable is the team's own bar for finished against the
+// sprint's cards. An item nobody ticked is a row reading zero rather than
+// no row at all: this table is read as evidence at a review, where a
+// missing row and a zero row say different things about an item.
+//
+// The cell is a bare "9 of 20" and the column head carries what is being
+// counted, the way the burndown's cells drop the unit. Every row counts the
+// same cards out of the same total, so printing "cards" once per row down
+// the column explains nothing.
+export function doneAgreementTable(rows: AgreementCount[], cards: number): TableSpec {
+  return {
+    caption: "Done agreement",
+    columns: ["Item", "Cards that met it"],
+    rows: rows.map((r) => ({ key: r.text, cells: [r.text, `${r.met} of ${cards}`] })),
+  };
+}
+
 // limitCell is the limit itself, worded rather than left as a bare number: an
 // empty cell reads as a limit of nothing and a zero reads worse.
 //

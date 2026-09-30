@@ -35,7 +35,7 @@ function report(): SprintReport {
   return {
     series: {
       sprintId: 11, sprintName: "Sprint 11", unit: "points", unitReason: "",
-      committed: 34, added: 5, removed: 2, completed: 29, carriedOver: 10, days: [], truncated: [],
+      committed: 34, added: 5, removed: 2, completed: 29, carriedOver: 10, days: [], truncated: [], issues: [],
     },
     velocity: [],
     builtAt: "2026-09-10T08:00:00Z",

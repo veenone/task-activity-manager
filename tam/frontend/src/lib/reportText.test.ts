@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { ReportSeries } from "../api";
 import {
+  agreementCountLine,
+  agreementSourceLine,
+  agreementStaleLine,
   amount,
   builtAtLine,
   chartAltLine,
@@ -36,6 +39,7 @@ function series(over: Partial<ReportSeries> = {}): ReportSeries {
     carriedOver: 10,
     days: [],
     truncated: [],
+    issues: [],
     ...over,
   };
 }
@@ -229,5 +233,27 @@ describe("the chart sentences", () => {
     // description says where to read them rather than listing them again.
     expect(chartAltLine("Burndown")).toMatch(/table/);
     expect(chartAltLine("Velocity in cards")).toContain("Velocity in cards");
+  });
+});
+
+describe("the done agreement's sentences", () => {
+  it("says how many cards the counts beside the items are counted over", () => {
+    expect(agreementCountLine(20)).toContain("held 20 cards");
+    expect(agreementCountLine(1)).toContain("held 1 card ");
+  });
+
+  it("says the items and the ticks are not Jira's", () => {
+    // The page is read at a review, away from TAM, where somebody who takes
+    // these figures for Jira's own goes looking for a field that is not there.
+    expect(agreementSourceLine()).toContain("Neither is held in Jira");
+  });
+
+  it("counts the ticks made against wording the agreement has since changed", () => {
+    expect(agreementStaleLine(0)).toBe("");
+    expect(agreementStaleLine(1)).toBe(
+      "One tick was made against wording the agreement has since changed, so it is not counted above.",
+    );
+    expect(agreementStaleLine(3)).toContain("3 ticks were made against wording the agreement has since changed");
+    expect(agreementStaleLine(3)).toContain("not counted above");
   });
 });

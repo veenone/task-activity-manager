@@ -568,6 +568,13 @@ export interface ReportSeries {
   // The keys of the issues whose changelog came back cut short, so the
   // numbers above rest in part on a partial history.
   truncated: string[];
+  // The keys of every card the walk read, which is every card the sprint
+  // held when the search ran. Anything counted per card, the report's done
+  // agreement section being the first, counts against these rather than
+  // asking the cache who is in the sprint now, so a report published for a
+  // review says the same thing a month later. A card dragged out of the
+  // sprint and left out is not among them, the blind spot removed carries.
+  issues: string[];
 }
 
 export interface VelocityRow {
