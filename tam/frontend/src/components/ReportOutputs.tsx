@@ -14,7 +14,7 @@ import {
   publisherAnnouncement,
   publisherStatusWord,
   savedLine,
-} from "../lib/reportText";
+} from "../lib/publishText";
 
 // ReportOutputs is the report leaving the screen: a Confluence page, a
 // spreadsheet and a deck.
