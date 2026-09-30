@@ -17,8 +17,8 @@ Gate: `frontend/core/src/instruction-gate.test.ts` (no token literal written to 
 ### Store schema and purge
 Owns: SQLite schema, migration order, and everything a profile owns locally.
 Path: migrations in `core/store`; per-profile deletion in the two `PurgeProfile` implementations (`tam/internal/issuerepo/state.go` sweeps issue data, `tam/internal/boardrepo/boardrepo.go` sweeps board data); per-board deletion in `RemoveBoards`.
-Never: a profile-keyed table absent from both purge lists; a column added to an existing table without a migration entry.
-Gate: `frontend/core/src/instruction-gate.test.ts` (every profile-keyed table name appears in both purge lists).
+Never: a profile-keyed table named in neither purge list; a board-keyed table absent from `RemoveBoards`, `ritual_document` excepted for the reason recorded on it; a column added to an existing table without a migration entry.
+Gate: `frontend/core/src/instruction-gate.test.ts` (every profile-keyed table is named in one of the two purge lists, which partition the tables between them, and every board-keyed table is also named in `RemoveBoards`).
 
 ### Generated bindings
 Owns: the Wails binding layer, `tam/frontend/wailsjs` and `xtm/frontend/wailsjs`.

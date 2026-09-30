@@ -212,7 +212,7 @@ describe('instruction gate', () => {
     // a failure here means a real offender, not a busy machine.
   }, 120_000);
 
-  it('every profile-keyed table is swept by both purge lists', () => {
+  it('every profile-keyed table is swept by one of the two purge lists', () => {
     const schema = read('tam/internal/tamstore/tamstore.go');
     const tables = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\);/g)]
       .filter(([, , body]) => /profile_id/.test(body))
