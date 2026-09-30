@@ -11,7 +11,6 @@ import {
   mixedUnitsLine,
   modeLine,
   noLimitsLine,
-  nothingToPublishLine,
   singleSprintLine,
   truncationLine,
   unavailableLine,
@@ -19,6 +18,7 @@ import {
   velocityFloorLine,
   velocityPartialLine,
 } from "./reportText";
+import { nothingToPublishLine } from "./publishText";
 
 function report(over: Partial<SprintReport> = {}): SprintReport {
   return {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SprintReport } from "../api";
-import { nothingToPublishLine, publishedLine, publisherStatusWord, savedLine } from "../lib/reportText";
+import { nothingToPublishLine, publishedLine, publisherStatusWord, savedLine } from "../lib/publishText";
 import { ReportOutputs } from "./ReportOutputs";
 
 const bindings = vi.hoisted(() => ({

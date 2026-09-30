@@ -15,7 +15,7 @@ import {
 import type { SyncProgress, SyncStatus } from "@agile-suite/core";
 import { CommitPendingChanges, CreateRitualRoot, EventsOn, REPORT_PROGRESS_EVENT, RefreshDetails, SyncBoards, SyncIssues, SyncRituals } from "../api";
 import type { BoardSummary, CommitResult, Profile, ReportProgress, RitualRootResult, RitualSyncResult, Settings } from "../api";
-import { progressStage } from "../lib/reportText";
+import { progressStage } from "../lib/publishText";
 import { invalidateProfileData, invalidateWrites } from "../queries/invalidate";
 
 // SyncProvider owns the one reducer that keeps sync and commit from
@@ -201,7 +201,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   // busyRefusal is what a run* throws when the lock is already taken, worded
   // the way Go's acquire words its own so the two read alike and
-  // reportText.isBusyRefusal recognises either.
+  // publishText.isBusyRefusal recognises either.
   //
   // It names no operation in the one tick where running has not caught up
   // with the ref yet. Guessing a name there would be the bug this whole

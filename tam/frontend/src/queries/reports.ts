@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
 import { GetSprintReport } from "../api";
-import { isBusyRefusal } from "../lib/reportText";
+import { isBusyRefusal } from "../lib/publishText";
 import { keys } from "./keys";
 
 // The Reports view's one read. It is one call rather than two because Go's
