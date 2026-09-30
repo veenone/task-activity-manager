@@ -23,6 +23,10 @@ vi.mock("../api", async () => {
     ListBoardSprints: vi.fn(),
     GetSprintReport: vi.fn(),
     CancelSprintReport: vi.fn(),
+    // The kanban half of the view reads the board's column heads out of the
+    // cache and publishes them, so it touches neither of the two above.
+    GetBoard: vi.fn(),
+    PublishSprintReport: vi.fn(),
   };
 });
 
@@ -134,7 +138,26 @@ beforeEach(() => {
   vi.mocked(api.ListBoardSprints).mockResolvedValue(SPRINTS);
   vi.mocked(api.GetSprintReport).mockResolvedValue(report());
   vi.mocked(api.CancelSprintReport).mockResolvedValue();
+  vi.mocked(api.GetBoard).mockResolvedValue(boardView([]));
+  vi.mocked(api.PublishSprintReport).mockResolvedValue({ title: "Ops Kanban · Board report", pageId: "77", warning: "" });
 });
+
+// One column head as the board cache composes one, and the view around it.
+// Both are the kanban report's whole input: it reads no sprint and no
+// changelog, so this is everything GetBoard has to answer with.
+function head(over: Partial<api.ColumnView>): api.ColumnView {
+  return {
+    name: "In Progress", statusIds: ["3"], total: 4, points: 0, counted: 4,
+    min: null, max: null, constraint: "issueCount", ...over,
+  };
+}
+
+function boardView(columns: api.ColumnView[]): api.BoardView {
+  return {
+    boardId: 2, sprintId: "", swimlane: "none", columns, lanes: [],
+    donePoints: 0, unmapped: 0, unmappedStatuses: [], notSynced: 0, capped: false, needsStatusSync: false,
+  };
+}
 
 describe("ReportsView", () => {
   it("opens on the board's most recent closed sprint without naming one itself", async () => {
@@ -253,16 +276,17 @@ describe("ReportsView", () => {
     expect(screen.queryByRole("combobox", { name: "Board" })).not.toBeInTheDocument();
   });
 
-  it("offers a board picker when the profile has two scrum boards, and no kanban board", async () => {
+  it("offers every board the profile has synced, kanban ones included", async () => {
     vi.mocked(api.ListBoards).mockResolvedValue([
       { id: 1, name: "Acme Platform Scrum", type: "scrum" },
       { id: 2, name: "Ops Kanban", type: "kanban" },
       { id: 3, name: "Payments Scrum", type: "scrum" },
     ]);
     renderView();
-    const picker = await screen.findByRole("combobox", { name: "Board" });
-    expect(picker).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Ops Kanban" })).not.toBeInTheDocument();
+    // Issue #119: the picker filtered to scrum, so a kanban team opened this
+    // view and found none of its own boards in it.
+    expect(await screen.findByRole("option", { name: "Ops Kanban" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Payments Scrum" })).toBeInTheDocument();
   });
 
   it("announces board failures and offers both retry and Boards recovery", async () => {
@@ -372,10 +396,10 @@ describe("ReportsView", () => {
     await waitFor(() => expect(api.CancelSprintReport).toHaveBeenCalledWith("p1"));
   });
 
-  it("says which board has no scrum board to report on", async () => {
-    vi.mocked(api.ListBoards).mockResolvedValue([{ id: 2, name: "Ops Kanban", type: "kanban" }]);
+  it("says when the project has no board at all to report on", async () => {
+    vi.mocked(api.ListBoards).mockResolvedValue([]);
     renderView();
-    expect(await screen.findByText(/No scrum board has been synced for this project/)).toBeInTheDocument();
+    expect(await screen.findByText(/No board has been synced for this project/)).toBeInTheDocument();
     expect(api.GetSprintReport).not.toHaveBeenCalled();
   });
 });
@@ -690,5 +714,136 @@ describe("ReportsView column capacity", () => {
     await screen.findByText(SENTENCE);
     expect(screen.queryByRole("group", { name: /column capacity/i })).toBeNull();
     expect(screen.queryByText(/No column of this board has a limit/)).toBeNull();
+  });
+});
+
+// Issue #119. A kanban board has no sprint, so every figure the sprint report
+// prints is scoped to something it does not have. What it is shown instead is
+// its column capacity, read straight from the synced cache: no sprint, no
+// changelog, and no call to GetSprintReport at all.
+describe("ReportsView on a kanban board", () => {
+  // The kanban board on its own, so it is the board the view opens on and
+  // nothing has to be picked. Switching to one is its own test below.
+  function onlyKanban() {
+    vi.mocked(api.ListBoards).mockResolvedValue([{ id: 2, name: "Ops Kanban", type: "kanban" }]);
+  }
+
+  const COLUMNS = [
+    head({ name: "To Do", total: 2, counted: 2 }),
+    head({ name: "In Progress", total: 4, counted: 4, max: 3 }),
+    head({ name: "Done", total: 9, counted: 9, localMax: 12 }),
+  ];
+
+  async function panel() {
+    return screen.findByRole("group", { name: /column capacity/i });
+  }
+
+  it("reads the board's columns out of the cache and asks for no sprint report", async () => {
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
+    renderView();
+    await panel();
+    // No sprint id, the board's own columns, and nothing that walks a
+    // changelog. GetBoard is the read the Boards view already makes.
+    expect(api.GetBoard).toHaveBeenCalledWith("p1", 2, "", "none");
+    expect(api.GetSprintReport).not.toHaveBeenCalled();
+    expect(api.ListBoardSprints).not.toHaveBeenCalled();
+  });
+
+  it("offers no sprint picker, because there is no sprint to pick", async () => {
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
+    renderView();
+    await panel();
+    expect(screen.queryByRole("combobox", { name: "Sprint" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Rebuild from Jira/ })).toBeNull();
+  });
+
+  it("gives every column a row, the ones with no limit included", async () => {
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
+    renderView();
+    const rows = within(await panel()).getAllByRole("row");
+    // The header row, then one row per column in the board's own order.
+    expect(rows).toHaveLength(4);
+    expect(rows[1]).toHaveTextContent("To Do2No limitNo limit set");
+    expect(rows[2]).toHaveTextContent("In Progress");
+    expect(within(rows[2]).getByRole("cell", { name: "3, from Jira" })).toBeInTheDocument();
+    expect(within(rows[2]).getByRole("cell", { name: "Over the limit" })).toBeInTheDocument();
+    expect(within(rows[3]).getByRole("cell", { name: "12, set in TAM" })).toBeInTheDocument();
+  });
+
+  it("names the columns that are over above the rows, not under them", async () => {
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
+    renderView();
+    const p = await panel();
+    const breach = within(p).getByText("1 column is over the limit: In Progress.");
+    const table = within(p).getByRole("table");
+    // A reader meets the breach on the way to the rows it summarises, which
+    // on a deck is the one sentence that survives the back of the room.
+    expect(breach.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says the counts are the board as it stands and which metrics are missing", async () => {
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
+    renderView();
+    const p = await panel();
+    expect(within(p).getByText(/not a period that has closed/)).toBeInTheDocument();
+    expect(within(p).getByText(/Throughput, cycle time and a cumulative flow diagram are not built yet/))
+      .toBeInTheDocument();
+    // Nothing claims a build time the way a sprint report's stamp does.
+    expect(within(p).queryByText(/TAM built this sprint's figures/)).toBeNull();
+  });
+
+  it("points a board whose columns were never synced at Boards", async () => {
+    const openBoards = vi.fn();
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView([]));
+    renderView({ onOpenBoards: openBoards });
+    expect(await screen.findByText(/This board's columns are not in the cache/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open Boards" }));
+    expect(openBoards).toHaveBeenCalled();
+    expect(screen.queryByRole("group", { name: /column capacity/i })).toBeNull();
+  });
+
+  it("says a board whose columns hold nothing synced is waiting on an issue sync", async () => {
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView([
+      head({ name: "To Do", total: 0, counted: 0 }),
+      head({ name: "Done", total: 0, counted: 0 }),
+    ]));
+    renderView();
+    expect(await screen.findByText(/none of them holds a card TAM has read/)).toBeInTheDocument();
+    // The other empty state's sentence sends a reader to refresh the boards,
+    // which would fetch the columns it already has.
+    expect(screen.queryByText(/columns are not in the cache/)).toBeNull();
+  });
+
+  it("publishes the kanban report through the same publishers", async () => {
+    onlyKanban();
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
+    renderView();
+    await panel();
+    await userEvent.click(screen.getByRole("button", { name: "Publish to Confluence" }));
+    await waitFor(() => expect(api.PublishSprintReport).toHaveBeenCalled());
+    const [profileId, boardId, sprintId, doc] = vi.mocked(api.PublishSprintReport).mock.calls[0];
+    expect([profileId, boardId, sprintId]).toEqual(["p1", 2, 0]);
+    expect(doc.title).toBe("Ops Kanban · Board report");
+    expect(doc.sections[0].table.rows[1]).toEqual(["In Progress", "4", "3, from Jira", "Over the limit"]);
+  });
+
+  it("switches from a scrum board to a kanban one and drops the sprint report", async () => {
+    vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
+    renderView();
+    await screen.findByText(SENTENCE);
+    // Wait for the option rather than the control: the select enables on its
+    // query's loading flag and fills from its data.
+    await screen.findByRole("option", { name: "Ops Kanban" });
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Board" }), "2");
+    expect(await screen.findByRole("group", { name: /column capacity/i })).toBeInTheDocument();
+    expect(screen.queryByText(SENTENCE)).toBeNull();
+    expect(api.GetSprintReport).not.toHaveBeenCalledWith("p1", 2, expect.anything(), expect.anything());
   });
 });

@@ -5,10 +5,11 @@ import type { Profile, Settings, Sprint, SprintReport } from "../api";
 import { useBoards, useBoardSprints } from "../queries/boards";
 import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
-import { reportDocument } from "../lib/reportDocument";
+import { capacitySection, reportDocument } from "../lib/reportDocument";
 import { unavailableLine } from "../lib/reportText";
 import { busyLine, isBusyRefusal } from "../lib/publishText";
 import { CapacityPanel } from "./CapacityPanel";
+import { KanbanReport } from "./KanbanReport";
 import { ReportOutputs } from "./ReportOutputs";
 import { SprintSummary } from "./SprintSummary";
 import { VelocityTable } from "./VelocityTable";
@@ -57,11 +58,17 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   }
 
   const boards = useBoards(activeId);
-  // Only a scrum board has sprints at all, so a kanban board is not offered
-  // here rather than offered and then explained.
-  const scrumBoards = (boards.data ?? []).filter((b) => b.type === "scrum");
-  const board = scrumBoards.find((b) => b.id === boardId) ?? scrumBoards[0];
-  const sprints = useBoardSprints(activeId, board?.id ?? 0);
+  // Every board, kanban ones included. Only a scrum board has a sprint, so
+  // only a scrum board has a sprint report; a kanban board is shown the one
+  // thing about it that has been read, which is KanbanReport's job. Issue
+  // #119: filtering the picker to scrum left a kanban team opening this view
+  // and finding none of its own boards in it.
+  const all = boards.data ?? [];
+  const board = all.find((b) => b.id === boardId) ?? all[0];
+  const kanban = !!board && board.type !== "scrum";
+  // A board id of 0 asks for nothing, so a kanban board fires neither the
+  // sprint list nor, through reportBoardId below, the report itself.
+  const sprints = useBoardSprints(activeId, kanban ? 0 : board?.id ?? 0);
   const closed = useMemo(() => closedNewestFirst(sprints.data ?? []), [sprints.data]);
   const active = (sprints.data ?? []).filter((s) => s.state === "active");
   const offered = [...closed, ...active];
@@ -199,7 +206,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             </div>
             <VelocityTable rows={r.velocity} />
           </div>
-          <CapacityPanel report={r} />
+          <CapacityPanel section={capacitySection(r)[0]} />
         </div>
       </>
     );
@@ -219,7 +226,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
     if (!board) {
       return (
         <p className="muted" role="status">
-          No scrum board has been synced for this project, so there is no sprint to report on. Open Boards to
+          No board has been synced for this project, so there is nothing to report on. Open Boards to
           sync one.
           {onOpenBoards && <>{" "}<button type="button" className="btn" onClick={onOpenBoards}>Open Boards</button></>}
         </p>
@@ -263,15 +270,15 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
       <h2 className="sr-only">Reports</h2>
       <div className="report-frame" ref={reportFrame}>
         <div className="board-head">
-        {/* One scrum board needs no picker, and a select holding one option
-            is a control that cannot be used. The board is still named,
-            since the report on screen belongs to it and nothing else says
-            so. This is the Sprints view's rule, not the Boards view's. */}
-        {scrumBoards.length > 1 ? (
+        {/* One board needs no picker, and a select holding one option is a
+            control that cannot be used. The board is still named, since the
+            report on screen belongs to it and nothing else says so. This is
+            the Sprints view's rule, not the Boards view's. */}
+        {all.length > 1 ? (
           <label className="board-picker">
             <span>Board</span>
             <select aria-label="Board" value={board?.id ?? ""} onChange={(e) => switchBoard(Number(e.target.value))}>
-              {scrumBoards.map((b) => (
+              {all.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
@@ -313,24 +320,34 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
         )}
         </div>
 
-        <div className="report-body">{body()}</div>
+        {/* A kanban board has no sprint, so none of the above is about it and
+            it draws its own body and its own outputs bar. The picker stays
+            here, because it is what a pick of either kind of board goes
+            through. */}
+        {kanban && board ? (
+          <KanbanReport profileId={activeId} board={board} onOpenBoards={onOpenBoards} />
+        ) : (
+          <>
+            <div className="report-body">{body()}</div>
 
-        {/* The foot of the frame, outside the body. Publishing is what a
-            reader does once the figures, the charts and the trend are read,
-            so the controls for it come after all three; and being a sibling
-            of the body rather than a row inside it means three publishers
-            failing at once, each with its own unbounded reason, scroll inside
-            this bar instead of collapsing the velocity panel that was the
-            body's only shrinkable child. */}
-        {shown && (
-          <div className="report-outputs">
-            <ReportOutputs
-              profileId={activeId}
-              boardId={reportBoardId}
-              doc={reportDocument(shown, inProgress)}
-              sprint={{ report: shown, live: inProgress, charts: reportFrame }}
-            />
-          </div>
+            {/* The foot of the frame, outside the body. Publishing is what a
+                reader does once the figures, the charts and the trend are
+                read, so the controls for it come after all three; and being a
+                sibling of the body rather than a row inside it means three
+                publishers failing at once, each with its own unbounded reason,
+                scroll inside this bar instead of collapsing the velocity panel
+                that was the body's only shrinkable child. */}
+            {shown && (
+              <div className="report-outputs">
+                <ReportOutputs
+                  profileId={activeId}
+                  boardId={reportBoardId}
+                  doc={reportDocument(shown, inProgress)}
+                  sprint={{ report: shown, live: inProgress, charts: reportFrame }}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
