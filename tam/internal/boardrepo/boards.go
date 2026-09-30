@@ -64,10 +64,11 @@ const boardSprintSQL = `
 // RemoveBoards drops the boards and everything hanging off them: their
 // columns, the limits the user set on those columns, their issue keys, the
 // done agreement ticks made against them, their sprints, and any report built
-// for one of those sprints on this board, in one transaction. ritual_document is not in the list: it holds text people
-// wrote, possibly never pushed, and a board leaves Jira's list for reasons
-// that say nothing about that text (a setting switched off, a location
-// change, a lost permission). PurgeProfile removes it.
+// for one of those sprints on this board, in one transaction. ritual_document
+// is not in the list: it holds text people wrote, possibly never pushed, and a
+// board leaves Jira's list for reasons that say nothing about that text (a
+// setting switched off, a location change, a lost permission). PurgeProfile
+// removes it.
 //
 // board_column_limit is in the list, unlike ritual_document, because a limit
 // is a number about a column of this board and nothing else. Once the board's
