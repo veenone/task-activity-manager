@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { Menu, LiveRegion, useProfile, errMsg } from "@agile-suite/core";
-import { Health, EventsOn, SetNavRailVisible, isDemoUrl } from "./api";
+import { useEffect, useRef, useState } from "react";
+import { Menu, LiveRegion, useProfile, useTour, errMsg } from "@agile-suite/core";
+import { Health, EventsOn, SetNavRailVisible, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
+import { TOURS, TOUR_VERSION, shouldOfferTour } from "./tour/steps";
 import type { View } from "./nav";
 import { useModal } from "./modals";
 import { BacklogView } from "./components/BacklogView";
@@ -91,17 +92,47 @@ export default function App() {
   // lives in the shared settings so the menu's tick and the rail agree
   // across restarts; the menu owns the toggle and tells us through an event.
   const [navRail, setNavRail] = useState(false);
+  // Which version of the onboarding tour this user has already been
+  // through. It starts at the current one so a slow settings read cannot
+  // flash the tour at somebody who has seen it; the read below lowers it
+  // when they have not.
+  const [tourSeenVersion, setTourSeenVersion] = useState(TOUR_VERSION);
+  const { start: startTour } = useTour({
+    tours: TOURS,
+    version: TOUR_VERSION,
+    markSeen: SetTourSeenVersion,
+    onFinish: () => setTourSeenVersion(TOUR_VERSION),
+  });
 
   useEffect(() => {
     Health()
       .then((h) => {
         setHealth(h);
-        if (h.ok) void reload().then((s) => setNavRail(s?.showNavRail ?? false));
+        if (h.ok) {
+          void reload().then((s) => {
+            setNavRail(s?.showNavRail ?? false);
+            setTourSeenVersion(s?.tourSeenVersion ?? 0);
+          });
+        }
       })
       .catch((e) =>
         setHealth({ ok: false, error: errMsg(e), dbPath: "", sharedPath: "", logPath: "" }),
       );
   }, [reload]);
+
+  // The first-run tour starts itself once the profile has synced, which is
+  // the first moment there is anything to be shown around. offeredTour
+  // keeps it to once a session: the seen version is written when the tour
+  // ends, but a tour closed before that write lands must not reopen on the
+  // next render.
+  const offeredTour = useRef(false);
+  const hasSynced = (syncState.data?.lastSynced ?? "") !== "";
+  useEffect(() => {
+    if (offeredTour.current) return;
+    if (!shouldOfferTour(tourSeenVersion, hasSynced)) return;
+    offeredTour.current = true;
+    startTour("start", () => setView("backlog"));
+  }, [tourSeenVersion, hasSynced, startTour, setView]);
 
   useEffect(() => {
     const offProfiles = EventsOn("menu:profiles", () => openModal("profiles"));
@@ -142,6 +173,7 @@ export default function App() {
           <label className="sr-only" htmlFor="profile-select">Profile</label>
           <select
             id="profile-select"
+            data-tour="profile"
             className="profile-select"
             value={activeId}
             onChange={(e) => setActiveId(e.target.value)}
@@ -182,6 +214,7 @@ export default function App() {
           >
             Refresh
           </button>
+          <span data-tour="sync">
           <Menu
             label="Sync"
             align="right"
@@ -191,6 +224,7 @@ export default function App() {
               { key: "full", label: "Full sync", title: "Clears the cached issues and fetches everything", onClick: () => void runSync(true), disabled: !canSync },
             ]}
           />
+          </span>
           <Menu
             label="Theme"
             align="right"
@@ -201,14 +235,18 @@ export default function App() {
               onClick: () => void setTheme(t),
             }))}
           />
+          <span data-tour="help">
           <Menu
             label="Help"
             align="right"
             items={[
+              { key: "tour", label: "Take the tour", title: "A short walk through this view", onClick: () => startTour(view) },
+              { key: "start", label: "Take the first-run tour", title: "Sync, plan, commit: the loop TAM is built around", onClick: () => startTour("start", () => setView("backlog")) },
               { key: "diagnostics", label: "Diagnostics", title: "Paths, build and the recent log", onClick: () => openModal("diagnostics") },
               { key: "about", label: "About", onClick: () => openModal("about") },
             ]}
           />
+          </span>
         </div>
       </header>
 
@@ -216,11 +254,12 @@ export default function App() {
           optional rail reach the same places; this is the one that is always
           visible, so it is the one that says where you are. */}
       <nav className="view-tabs-bar" aria-label="Views">
-        <div className="view-tabs">
+        <div className="view-tabs" data-tour="views">
           {VIEWS.map((v) => (
             <button
               key={v.id}
               type="button"
+              data-tour={`tab-${v.id}`}
               className={`view-tab${v.id === view ? " view-tab-active" : ""}`}
               aria-current={v.id === view ? "page" : undefined}
               onClick={() => setView(v.id)}

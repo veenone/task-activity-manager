@@ -167,7 +167,7 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
   }
 
   return (
-    <section className="backlog" aria-label={label}>
+    <section className="backlog" aria-label={label} data-tour={`${viewId}-body`}>
       <div className="filter-bar">
         <input
           type="search"

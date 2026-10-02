@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient } from "@agile-suite/core";
 import * as api from "./api";
+import { TOUR_VERSION } from "./tour/steps";
 import App from "./App";
 import { profileBackend } from "./profileBackend";
 import { ViewProvider } from "./nav";
@@ -83,7 +84,9 @@ beforeEach(() => {
   vi.mocked(api.ListProfiles).mockResolvedValue([
     { id: "p1", name: "Demo team", jiraUrl: "demo", projectKey: "DEMO", backend: "jira", createdAt: "" },
   ]);
-  vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: false });
+  // tourSeenVersion: the onboarding tour is tested in tour/firstRun.test.tsx,
+  // and a popover over the shell would answer this file's queries.
+  vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: false, tourSeenVersion: TOUR_VERSION });
   vi.mocked(api.GetSyncState).mockResolvedValue({ lastSynced: "", lastFull: "", lastError: "", issueCount: 0, projectTotal: 0 });
   vi.mocked(api.ListIssues).mockResolvedValue({ issues: [], total: 0 });
   vi.mocked(api.ListSprints).mockResolvedValue([]);
@@ -124,7 +127,7 @@ describe("App shell", () => {
   });
 
   it("shows the nav rail when the stored setting asks for it", async () => {
-    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true, tourSeenVersion: TOUR_VERSION });
     renderApp();
     expect(await screen.findByRole("navigation", { name: "Navigation rail" })).toBeInTheDocument();
   });
@@ -185,7 +188,7 @@ describe("App shell", () => {
   });
 
   it("hides the rail from its own close button and persists that", async () => {
-    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true, tourSeenVersion: TOUR_VERSION });
     renderApp();
     await userEvent.click(await screen.findByRole("button", { name: "Hide the navigation rail" }));
     expect(screen.queryByRole("navigation", { name: "Navigation rail" })).not.toBeInTheDocument();
@@ -206,7 +209,7 @@ describe("App shell", () => {
   });
 
   it("switches views from the nav rail, and Reports is the real view now", async () => {
-    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true });
+    vi.mocked(api.GetSettings).mockResolvedValue({ defaultProfileId: "p1", theme: "light", showNavRail: true, tourSeenVersion: TOUR_VERSION });
     renderApp();
     const rail = await screen.findByRole("navigation", { name: "Navigation rail" });
     await userEvent.click(within(rail).getByRole("button", { name: "Reports" }));

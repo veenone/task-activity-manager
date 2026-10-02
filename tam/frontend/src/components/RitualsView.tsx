@@ -335,7 +335,7 @@ export function RitualsView() {
   const syncing = running === "rituals";
 
   return (
-    <section className="backlog rituals-view" aria-label="Rituals">
+    <section className="backlog rituals-view" aria-label="Rituals" data-tour="rituals-body">
       <div className="board-head rituals-toolbar">
         {boards.length > 1 ? (
           <label className="board-picker">

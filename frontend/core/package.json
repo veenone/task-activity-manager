@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "driver.js": "^1.8.0",
     "marked": "18.0.13"
   },
   "peerDependencies": {
