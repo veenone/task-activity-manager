@@ -19,6 +19,8 @@ export { useNotice } from "./components/useNotice";
 export type { NoticeOptions } from "./components/useNotice";
 export { useConfirm } from "./components/useConfirm";
 export type { ConfirmOptions } from "./components/useConfirm";
+export { useTour } from "./tour/useTour";
+export type { TourStep, TourOptions } from "./tour/useTour";
 export { usePrompt } from "./components/usePrompt";
 export type { PromptOptions } from "./components/usePrompt";
 export { call } from "./lib/apiCall";

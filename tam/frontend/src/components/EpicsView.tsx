@@ -94,7 +94,7 @@ export function EpicsView() {
   const empty = epicCount === 0 && orphanCount === 0;
 
   return (
-    <section className="backlog" aria-label="Epics">
+    <section className="backlog" aria-label="Epics" data-tour="epics-body">
       <div className="filter-bar">
         <input
           type="search"

@@ -212,7 +212,7 @@ export function BoardsView() {
   const pass = lastBoards;
 
   return (
-    <section className="backlog" aria-label="Boards">
+    <section className="backlog" aria-label="Boards" data-tour="boards-body">
       <BoardsToolbar
         boards={boardList}
         board={board}

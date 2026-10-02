@@ -37,6 +37,10 @@ export interface Settings {
   // rows have no value, which reads as off. Optional here for the fixtures
   // that predate it.
   showNavRail?: boolean;
+  // Which version of the onboarding tour this user has been through, 0 or
+  // absent when they never have. A version rather than a flag, so a later
+  // release can offer a rewritten tour by raising TOUR_VERSION.
+  tourSeenVersion?: number;
   // The folder a report export's save dialog starts in. Empty, and absent in
   // fixtures written before it existed, means the app data folder.
   reportExportDir?: string;
@@ -1169,6 +1173,9 @@ export const SetDefaultProfile: (id: string) => Promise<void> =
   App.SetDefaultProfile;
 export const SetNavRailVisible: (visible: boolean) => Promise<void> =
   App.SetNavRailVisible;
+// SetTourSeenVersion records that the onboarding tour has been seen, so it
+// is offered once rather than at every launch.
+export const SetTourSeenVersion: (version: number) => Promise<void> = App.SetTourSeenVersion;
 // SetReportExportDirectory rejects a path that is not a folder; "" clears the
 // setting. ChooseReportExportDirectory resolves to "" when the picker was
 // closed without choosing.

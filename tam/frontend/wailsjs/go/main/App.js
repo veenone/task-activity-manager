@@ -366,6 +366,10 @@ export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
 }
 
+export function SetTourSeenVersion(arg1) {
+  return window['go']['main']['App']['SetTourSeenVersion'](arg1);
+}
+
 export function StandupEntry(arg1) {
   return window['go']['main']['App']['StandupEntry'](arg1);
 }

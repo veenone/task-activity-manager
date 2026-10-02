@@ -328,7 +328,7 @@ export function SprintsView() {
   }
 
   return (
-    <section className="backlog" aria-label="Sprints">
+    <section className="backlog" aria-label="Sprints" data-tour="sprints-body">
       <div className="board-head">
         {/* One scrum board needs no picker, and a select holding one option
             is a control that cannot be used. The board is still named, since
