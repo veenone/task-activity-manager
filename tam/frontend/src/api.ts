@@ -1624,3 +1624,11 @@ export function isDemoUrl(url?: string): boolean {
   const u = (url ?? "").trim().toLowerCase();
   return u === "demo" || u.startsWith("demo:") || u.startsWith("demo-");
 }
+
+// ExportBacklog writes the rows a query matches to a workbook, wherever
+// the save dialog says, and answers with the path. An empty path is a
+// cancelled dialog: nothing was written and nothing went wrong. It is the
+// filter that is exported, not the page, so the caller sends its query
+// with the paging cleared.
+export const ExportBacklog = (profileId: string, q: IssueQuery): Promise<string> =>
+  App.ExportBacklog(profileId, issuerepo.IssueQuery.createFrom(q)) as Promise<string>;
