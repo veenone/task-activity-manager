@@ -22,7 +22,8 @@ const (
 
 // issueColumns is the SELECT list every row read uses, in scan order.
 const issueColumns = `key, id, project, type, summary, description, status, status_id, status_category, assignee, assignee_name, reporter, priority, labels,
-	sprint_id, sprint_name, parent_key, story_points, rank, created, updated, ` + pendingFlag
+	sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s, aggregate_time_spent_s,
+	rank, created, updated, ` + pendingFlag
 
 // keyOrder orders a key by its project prefix and then its number, so
 // PLAT-10 follows PLAT-9 instead of PLAT-1. The prefix is the key with its
@@ -56,6 +57,7 @@ var sortColumns = map[string]string{
 	"assignee":    "assignee = '' , assignee COLLATE NOCASE",
 	"sprint":      "sprint_name = '' , sprint_name COLLATE NOCASE",
 	"storyPoints": "story_points IS NULL, story_points",
+	"timeSpent":   "time_spent_s IS NULL, time_spent_s",
 }
 
 // SortColumns lists the sort keys ListIssues accepts, for the frontend and
@@ -107,8 +109,9 @@ func orderFor(q IssueQuery) string {
 // column is always carried.
 const upsertIssueSQL = `
 	INSERT INTO issue (profile_id, key, id, project, type, summary, description, status, status_id, status_category, assignee, assignee_name, reporter, priority, labels,
-		sprint_id, sprint_name, parent_key, story_points, rank, created, updated, synced_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s, aggregate_time_spent_s,
+		rank, created, updated, synced_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, key) DO UPDATE SET
 		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
 		description = COALESCE(excluded.description, issue.description),
@@ -116,7 +119,10 @@ const upsertIssueSQL = `
 		assignee = excluded.assignee, assignee_name = excluded.assignee_name, reporter = excluded.reporter,
 		priority = excluded.priority, labels = excluded.labels, sprint_id = excluded.sprint_id,
 		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
-		story_points = excluded.story_points, rank = excluded.rank, created = excluded.created,
+		story_points = excluded.story_points,
+		original_estimate_s = excluded.original_estimate_s, remaining_estimate_s = excluded.remaining_estimate_s,
+		time_spent_s = excluded.time_spent_s, aggregate_time_spent_s = excluded.aggregate_time_spent_s,
+		rank = excluded.rank, created = excluded.created,
 		updated = excluded.updated, synced_at = excluded.synced_at`
 
 func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Issue, syncedAt time.Time) error {
@@ -134,7 +140,9 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 	}
 	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, description, iss.Status, iss.StatusID, iss.StatusCategory,
 		iss.Assignee, iss.AssigneeName, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
-		points, iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
+		points, nullSeconds(iss.OriginalEstimateSeconds), nullSeconds(iss.RemainingEstimateSeconds),
+		nullSeconds(iss.TimeSpentSeconds), nullSeconds(iss.AggregateTimeSpentSeconds),
+		iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
 		return fmt.Errorf("upsert %s: %w", iss.Key, err)
 	}
 	return nil
@@ -515,13 +523,22 @@ func scanIssue(s scanner) (backend.Issue, error) {
 		description sql.NullString
 		labels      string
 		points      sql.NullFloat64
+		estimate    sql.NullInt64
+		remaining   sql.NullInt64
+		spent       sql.NullInt64
+		aggregate   sql.NullInt64
 		pending     int
 	)
 	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &description, &iss.Status, &iss.StatusID, &iss.StatusCategory, &iss.Assignee, &iss.AssigneeName,
 		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
+		&estimate, &remaining, &spent, &aggregate,
 		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err
 	}
+	iss.OriginalEstimateSeconds = secondsOf(estimate)
+	iss.RemainingEstimateSeconds = secondsOf(remaining)
+	iss.TimeSpentSeconds = secondsOf(spent)
+	iss.AggregateTimeSpentSeconds = secondsOf(aggregate)
 	// NULL stays nil: the row has never been synced with a description, and
 	// the panel says so rather than drawing the empty string it would get
 	// from an issue that really has none.
@@ -540,4 +557,22 @@ func scanIssue(s scanner) (backend.Issue, error) {
 	iss.Pending = pending != 0
 	iss.Draft = strings.HasPrefix(iss.Key, DraftPrefix)
 	return iss, nil
+}
+
+// nullSeconds and secondsOf carry a time field between the row and the
+// column. NULL and nil mean the same thing at both ends: the issue carries
+// no such time, which is not the same as a time of zero.
+func nullSeconds(n *int) sql.NullInt64 {
+	if n == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(*n), Valid: true}
+}
+
+func secondsOf(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int64)
+	return &v
 }

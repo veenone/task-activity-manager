@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calendarDay, day, dayInput, formatWhen, progressText, sprintDates, sprintRelative, workDuration } from "./format";
+import { calendarDay, day, dayInput, formatWhen, progressText, sprintDates, sprintRelative, workDuration, workSplit } from "./format";
 
 describe("workDuration", () => {
   it("reads seconds back as the phrasing a worklog is discussed in", () => {
@@ -13,6 +13,23 @@ describe("workDuration", () => {
     // than vanish, so a 90-second entry is not "0m".
     expect(workDuration(90)).toBe("2m");
     expect(workDuration(-60)).toBe("0m");
+  });
+});
+
+describe("workSplit", () => {
+  it("reads the spent against the estimate", () => {
+    expect(workSplit(21600, 28800)).toBe("6h of 8h");
+  });
+  it("says what it knows when only one of the two is there", () => {
+    expect(workSplit(undefined, 28800)).toBe("8h estimated");
+    expect(workSplit(21600, undefined)).toBe("6h logged");
+  });
+  it("is empty for an issue with neither, rather than an hour of nothing", () => {
+    expect(workSplit(undefined, undefined)).toBe("");
+    expect(workSplit(null, null)).toBe("");
+  });
+  it("keeps an estimate of zero, which somebody set on purpose", () => {
+    expect(workSplit(undefined, 0)).toBe("0m estimated");
   });
 });
 

@@ -192,6 +192,6 @@ func TestListIssuesSortsDraftKeysByNumber(t *testing.T) {
 // SortColumns is what the frontend's header list agrees with, so it has to
 // name every column the grid offers and nothing else.
 func TestSortColumns(t *testing.T) {
-	want := []string{"assignee", "key", "sprint", "status", "storyPoints", "summary", "type"}
+	want := []string{"assignee", "key", "sprint", "status", "storyPoints", "summary", "timeSpent", "type"}
 	wantKeys(t, issuerepo.SortColumns(), want...)
 }

@@ -106,7 +106,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 22,
+	Version: 23,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -373,6 +373,28 @@ var Schema = store.Schema{
 			}
 			return nil
 		},
+	}, {
+		Version: 23,
+		// Jira's time tracking on the issue. Version 19's shape, a column
+		// add and a watermark clear: only a sync carries these, and an
+		// incremental sync re-reads only what Jira reports changed, so a
+		// row nobody touches again would never gain one. Until the sync
+		// runs they are NULL, which says this issue carries no estimate
+		// rather than that it is estimated at nothing.
+		Apply: func(db *sql.DB) error {
+			for _, col := range []string{
+				"original_estimate_s INTEGER",
+				"remaining_estimate_s INTEGER",
+				"time_spent_s INTEGER",
+				"aggregate_time_spent_s INTEGER",
+			} {
+				if err := store.AddColumnIfMissing(db, "issue", col); err != nil {
+					return err
+				}
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -467,6 +489,15 @@ CREATE TABLE IF NOT EXISTS issue (
 	sprint_name       TEXT NOT NULL DEFAULT '',
 	parent_key        TEXT NOT NULL DEFAULT '',
 	story_points      REAL,
+	-- Jira's time tracking, in seconds. Nullable for the reason the story
+	-- points are: an issue nobody has estimated is not one estimated at no
+	-- time. The aggregate is the family's total, which Jira counts apart
+	-- from the issue's own, so it gets its own column rather than being
+	-- folded into time_spent_s.
+	original_estimate_s    INTEGER,
+	remaining_estimate_s   INTEGER,
+	time_spent_s           INTEGER,
+	aggregate_time_spent_s INTEGER,
 	rank              TEXT NOT NULL DEFAULT '',
 	created           TEXT NOT NULL DEFAULT '',
 	updated           TEXT NOT NULL DEFAULT '',

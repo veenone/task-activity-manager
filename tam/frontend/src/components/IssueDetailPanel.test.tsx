@@ -214,6 +214,25 @@ describe("IssueDetailPanel", () => {
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412"));
   });
 
+  it("reads the estimate and the time spent against it, and the family's total when it differs", async () => {
+    renderPanel(vi.fn(), undefined, {
+      ...story, originalEstimateSeconds: 28800, timeSpentSeconds: 21600, aggregateTimeSpentSeconds: 39600,
+    });
+    expect(screen.getByText("6h of 8h")).toBeInTheDocument();
+    // An epic or a parent burns hours through its children, which Jira
+    // counts apart from its own. Reporting one as the other would have the
+    // parent claim every hour its children logged.
+    expect(screen.getByText("11h with subtasks")).toBeInTheDocument();
+    await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
+  });
+
+  it("says nothing about time for an issue nobody estimated or logged against", async () => {
+    renderPanel();
+    expect(screen.queryByText(/of 8h/)).toBeNull();
+    expect(screen.queryByText(/logged/)).toBeNull();
+    await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
+  });
+
   // Fix round 3, Minor: D6 chose one Refresh for the whole view. The Fields
   // section's own went through GetIssueDetail, so it did nothing at all
   // while the cached detail was still fresh, and nothing ever at

@@ -5,6 +5,7 @@ import { GRID_COLUMNS } from "../api";
 import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
 import { statusClass } from "../lib/statusClass";
+import { workSplit } from "../lib/format";
 import { keyColumnWidth } from "../lib/keyColumn";
 import { typeChipLabel } from "../lib/typeChip";
 import { typeColumnWidth } from "../lib/typeColumn";
@@ -30,7 +31,7 @@ interface Props {
   onSort: (column: SortColumn) => void;
 }
 
-// IssueTable renders one page of issues in the mockup's seven columns.
+// IssueTable renders one page of issues in the mockup's columns.
 //
 // Two things this used to get wrong, both of them layout:
 //
@@ -182,6 +183,10 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               <span role="gridcell" title={iss.assignee || undefined}>{iss.assignee || "-"}</span>
               <span role="gridcell" title={iss.sprintName}>{iss.sprintName || iss.sprintId || "-"}</span>
               <span role="gridcell">{iss.storyPoints ?? "-"}</span>
+              {/* Blank, not a dash and not a zero: most projects estimate in
+                  nothing but points, and a column of "0h" over all of them
+                  would report a habit as a measurement. */}
+              <span role="gridcell" className="issue-time">{workSplit(iss.timeSpentSeconds, iss.originalEstimateSeconds)}</span>
             </div>
           );
         })}

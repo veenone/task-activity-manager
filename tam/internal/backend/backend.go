@@ -64,6 +64,21 @@ type Issue struct {
 	Created        string   `json:"created"`
 	Updated        string   `json:"updated"`
 
+	// Jira's time tracking on this issue, in seconds, nil when the issue
+	// carries none. A pointer rather than a plain int because an issue
+	// nobody has estimated and one estimated at no time are different
+	// facts, and a grid that prints "0h" over a project which does not
+	// estimate in time at all is reporting the first as the second.
+	//
+	// AggregateTimeSpentSeconds is what the issue and its children burned
+	// together, which Jira counts separately from the issue's own. The two
+	// travel in their own fields for the same reason: an epic whose
+	// children logged eleven hours has not had eleven hours logged on it.
+	OriginalEstimateSeconds   *int `json:"originalEstimateSeconds"`
+	RemainingEstimateSeconds  *int `json:"remainingEstimateSeconds"`
+	TimeSpentSeconds          *int `json:"timeSpentSeconds"`
+	AggregateTimeSpentSeconds *int `json:"aggregateTimeSpentSeconds"`
+
 	// Description is the issue's description, read with the rest of the row
 	// by the sync and kept on it, so the detail panel draws it from the
 	// local store instead of a round trip per selection.
