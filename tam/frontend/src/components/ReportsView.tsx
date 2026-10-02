@@ -181,7 +181,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
         <div className="report-charts">
           <BurndownChart days={r.series.days} unit={r.series.unit} exported="burndown" busy={report.isFetching} />
           {(r.series.timeDays?.length ?? 0) > 0 && (
-            <BurndownChart days={r.series.timeDays ?? []} unit="hours" title="Burndown in hours" busy={report.isFetching} />
+            <BurndownChart days={r.series.timeDays ?? []} unit="hours" title="Burndown in hours" exported="burndownTime" busy={report.isFetching} />
           )}
           <OutcomeChart series={r.series} live={inProgress} busy={report.isFetching} />
         </div>

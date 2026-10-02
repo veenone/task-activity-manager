@@ -189,6 +189,15 @@ export function methodLine(): string {
   return "Done means the board's last column. TAM uses Jira history, so its totals can differ from Jira's own, and a removed card counts only once it comes back.";
 }
 
+// timeBurndownLine is the hours line's own caveat, in place of methodLine.
+// The two lines are built from different facts: the estimates line is
+// reconstructed from the changelog, where this one is measured from the
+// work people logged, and an estimate changed mid-sprint moves the whole
+// scope rather than stepping it on the day it changed.
+export function timeBurndownLine(): string {
+  return "Hours are measured, not reconstructed: the scope is the issues' original estimates and the burn is the work logged against them, on the day it was logged for. An estimate changed during the sprint moves the whole scope line.";
+}
+
 // MAX_NAMED_KEYS caps the keys truncationLine prints, so a sprint where
 // every card came back cut short does not answer with a paragraph of keys.
 const MAX_NAMED_KEYS = 8;
