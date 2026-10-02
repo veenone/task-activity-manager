@@ -1,6 +1,6 @@
 import { createViewContext } from "@agile-suite/core";
 
-export type View = "backlog" | "assigned" | "epics" | "boards" | "sprints" | "reports" | "rituals";
+export type View = "backlog" | "assigned" | "epics" | "boards" | "sprints" | "reports" | "dashboards" | "rituals";
 
 export interface ViewInfo {
   id: View;
@@ -14,6 +14,7 @@ export const VIEWS: ViewInfo[] = [
   { id: "boards", label: "Boards" },
   { id: "sprints", label: "Sprints" },
   { id: "reports", label: "Reports" },
+  { id: "dashboards", label: "Dashboards" },
   { id: "rituals", label: "Rituals" },
 ];
 

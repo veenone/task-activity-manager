@@ -11,6 +11,7 @@ import { EpicsView } from "./components/EpicsView";
 import { BoardsView } from "./components/BoardsView";
 import { SprintsView } from "./components/SprintsView";
 import { ReportsView } from "./components/ReportsView";
+import { DashboardsView } from "./components/DashboardsView";
 import { RitualsView } from "./components/RitualsView";
 import { ProfilesModal } from "./components/ProfilesModal";
 import { AboutModal } from "./components/AboutModal";
@@ -296,6 +297,8 @@ export default function App() {
               <SprintsView />
             ) : current.id === "reports" ? (
               <ReportsView onOpenBoards={() => setView("boards")} />
+            ) : current.id === "dashboards" ? (
+              <DashboardsView />
             ) : (
               <RitualsView />
             )
