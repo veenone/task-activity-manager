@@ -1125,3 +1125,24 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .diag-log { margin: 0; max-height: 320px; overflow: auto; padding: 10px 12px; border-radius: 6px;
   background: var(--chrome-bg); color: var(--chrome-text); font-family: "Consolas", "SF Mono", "Menlo", monospace;
   font-size: 0.85em; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+/* Dashboards: one panel per pinned filter, in a grid that reflows rather
+   than scrolling sideways. The panels are read side by side, so they size
+   to a readable minimum and wrap when the window cannot hold another. */
+.dashboards-view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; padding: 10px; }
+.dashboards-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; align-items: start; }
+.dashboard-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.dashboard-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.dashboard-title { margin: 0; font-size: 1em; font-weight: 600; }
+.dashboard-actions { display: flex; gap: 4px; flex: none; }
+.dashboard-when { margin: 0; }
+.dashboard-figures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0; }
+.dashboard-figures dt { color: var(--text-muted); font-size: 0.85em; }
+.dashboard-figures dd { margin: 0; font-size: 1.5em; font-variant-numeric: tabular-nums; }
+.dashboard-rankings { display: flex; flex-direction: column; gap: 8px; }
+.dashboard-ranking { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+.dashboard-ranking caption { text-align: start; padding-bottom: 2px; }
+.dashboard-ranking th { text-align: start; color: var(--text-muted); font-weight: 600; font-size: 0.9em; border-bottom: 1px solid var(--border-subtle); }
+.dashboard-ranking td { padding: 2px 0; border-bottom: 1px solid var(--border-subtle); }
+.dashboard-ranking td:last-child, .dashboard-ranking th:last-child { text-align: end; font-variant-numeric: tabular-nums; }

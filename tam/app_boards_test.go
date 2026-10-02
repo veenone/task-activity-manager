@@ -15,6 +15,7 @@ import (
 	"agile-suite/core/shareddb"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/dashboardrepo"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/suiteprofiles"
 	"agile-suite/tam/internal/tamstore"
@@ -76,6 +77,7 @@ func newTestApp(t *testing.T) *App {
 	a.shared = shared
 	a.repo = issuerepo.New(local.DB())
 	a.boards = boardrepo.New(local.DB())
+	a.dashboards = dashboardrepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
 	a.profiles = profile.NewManager(shared.DB())

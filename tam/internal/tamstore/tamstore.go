@@ -106,7 +106,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 23,
+	Version: 24,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -506,6 +506,23 @@ CREATE TABLE IF NOT EXISTS issue (
 	detail_fetched_at TEXT,
 	PRIMARY KEY (profile_id, key)
 );
+CREATE TABLE IF NOT EXISTS dashboard (
+	profile_id    TEXT NOT NULL,
+	id            TEXT NOT NULL,
+	name          TEXT NOT NULL,
+	-- The saved Jira filter this dashboard is pinned to, empty for one
+	-- built from typed JQL. The JQL is kept beside it rather than resolved
+	-- on every read: a dashboard has to say what it counts while Jira is
+	-- unreachable, and the filter's own words are the only honest answer.
+	filter_id     TEXT NOT NULL DEFAULT '',
+	jql           TEXT NOT NULL,
+	-- When the figures were taken, empty for a dashboard nobody has
+	-- refreshed. A number with no date on it reads as today's.
+	refreshed_at  TEXT NOT NULL DEFAULT '',
+	snapshot_json TEXT NOT NULL DEFAULT '{}',
+	PRIMARY KEY (profile_id, id)
+);
+
 CREATE TABLE IF NOT EXISTS issue_link (
 	profile_id TEXT NOT NULL,
 	from_key   TEXT NOT NULL,
