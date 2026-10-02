@@ -3,6 +3,7 @@ import { dayIndex, labelEvery, linear, niceTicks, spread } from "../../lib/chart
 import { calendarDay, points } from "../../lib/format";
 import { amount, dayLine, emptyDaysLine } from "../../lib/reportText";
 import { burndownTable } from "../../lib/reportTables";
+import type { ChartKey } from "../../lib/chartImage";
 import { ChartFrame, Tooltip } from "./frame";
 import { HIT_RADIUS, LABEL_OFFSET, LINE_HEIGHT, MARGIN, POINT_RADIUS, TICKS, VALUE_GAP } from "./geometry";
 import { usePointFocus } from "./usePointFocus";
@@ -23,12 +24,23 @@ const LEGEND = [
   { label: "Scope", swatch: "scope" },
 ];
 
-export function BurndownChart({ days, unit, busy }: { days: ReportDay[]; unit: string; busy?: boolean }) {
-  const table = burndownTable(days);
+// title names the chart and its table. The hours line is drawn by a second
+// instance of this chart rather than by a second unit on the first: a team
+// estimating in both reads two different quantities, and one axis cannot
+// carry them. Only the estimates chart is exported as a picture, so the
+// published report keeps the one burndown it has always carried.
+export function BurndownChart({ days, unit, title = "Burndown", exported, busy }: {
+  days: ReportDay[];
+  unit: string;
+  title?: string;
+  exported?: ChartKey;
+  busy?: boolean;
+}) {
+  const table = burndownTable(days, title);
   return (
     <ChartFrame
-      title="Burndown"
-      exported="burndown"
+      title={title}
+      exported={exported}
       legend={LEGEND}
       table={table}
       empty={days.length === 0 ? emptyDaysLine() : undefined}

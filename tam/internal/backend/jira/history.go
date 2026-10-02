@@ -2,6 +2,7 @@ package jira
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	corejira "agile-suite/core/jira"
@@ -27,7 +28,11 @@ var _ backend.HistoryBackend = (*Backend)(nil)
 // names other backends and the rest of TAM use for the same fields.
 func (b *Backend) SearchIssuesWithHistory(ctx context.Context, jql string, startAt, maxResults int) ([]backend.IssueHistory, int, error) {
 	ids := b.discover(ctx)
-	fields := append(append([]string{}, baseFields...), ids.list()...)
+	// The worklog rides along with the row. It is not in baseFields, which
+	// the sync's own search uses and which never reads one: a report is the
+	// only caller that burns hours, and making every sync page carry every
+	// issue's worklog would be a cost paid for nothing.
+	fields := append(append([]string{fieldWorklog}, baseFields...), ids.list()...)
 	page, err := b.c.SearchIssues(ctx, jql, fields, changelogExpand, startAt, maxResults)
 	if err != nil {
 		return nil, 0, err
@@ -42,9 +47,23 @@ func (b *Backend) SearchIssuesWithHistory(ctx context.Context, jql string, start
 	out := make([]backend.IssueHistory, 0, len(page.Issues))
 	for _, raw := range page.Issues {
 		pt := b.typesOrEmpty(ctx, projectOf(raw.Key))
+		logs, whole := parseWorklogs(raw.Fields[fieldWorklog])
+		if !whole {
+			// The search caps an issue's worklogs at 20 and says so in the
+			// field's own total, so this is the only issue that costs a
+			// call. A failure here is not worth losing the sprint's report
+			// over: the partial list burns what it knows and the line is
+			// short by the rest, where refusing would leave no line at all.
+			if full, err := b.Worklogs(ctx, raw.Key); err == nil {
+				logs = full
+			} else {
+				log.Printf("tam: %s has more worklogs than the search returned and they could not be read, so its burndown is short by the rest: %v", raw.Key, err)
+			}
+		}
 		out = append(out, backend.IssueHistory{
 			Issue:     parseIssue(raw, ids, b.requirementType, pt),
 			Changes:   normalizeChanges(raw.Changelog.Histories, ids),
+			Worklogs:  logs,
 			Truncated: raw.Changelog.Total > len(raw.Changelog.Histories),
 		})
 	}

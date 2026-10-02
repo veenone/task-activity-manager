@@ -50,10 +50,15 @@ type change struct {
 // on Tuesday and back on Thursday shows once in Removed and once in Added
 // rather than describing a sprint that gained and lost work all week.
 type card struct {
-	in             bool
-	status         string
-	statusID       string
-	points         *float64
+	in       bool
+	status   string
+	statusID string
+	points   *float64
+	// estimate is the card's original estimate in seconds, and logs is the
+	// work booked against it. Neither is rewound: see timeseries.go for
+	// why the time line is measured where the points line is reconstructed.
+	estimate       *int
+	logs           []workLog
 	changes        []change
 	addedCharged   bool
 	removedCharged bool
@@ -99,7 +104,8 @@ func rewound(sprint backend.Sprint, issues []backend.IssueHistory, start time.Ti
 		if err != nil {
 			return nil, err
 		}
-		c := &card{in: true, status: h.Issue.Status, statusID: h.Issue.StatusID, changes: chs}
+		c := &card{in: true, status: h.Issue.Status, statusID: h.Issue.StatusID, changes: chs,
+			estimate: h.Issue.OriginalEstimateSeconds, logs: logsOf(h)}
 		if p := h.Issue.StoryPoints; p != nil {
 			v := *p
 			c.points = &v
@@ -215,6 +221,19 @@ type walker struct {
 	loc      *time.Location
 	added    float64
 	removed  float64
+	// firstMoment is where the sprint opened, which is the earliest a
+	// worklog can burn any of it.
+	firstMoment time.Time
+	// timed says the sprint has a time burndown at all, which is whether
+	// any card in it carries an estimate. timeCommitted is the estimated
+	// scope it opened with, in hours, which can be zero on a sprint whose
+	// estimates all arrived after it started.
+	timed         bool
+	timeCommitted float64
+	// timeDays is the burndown in hours, built alongside the one in
+	// estimates and empty when no card in the sprint carries an estimate
+	// in time.
+	timeDays []Day
 }
 
 // value is what one card contributes, which is its estimate in points mode
@@ -304,13 +323,17 @@ func (w *walker) run(start, last, end time.Time, committed float64) []Day {
 			elapsed++
 		}
 		scope, completed := w.totals()
+		date := d.Format(sprintdate.Day)
 		days = append(days, Day{
-			Date:      d.Format(sprintdate.Day),
+			Date:      date,
 			Scope:     scope,
 			Completed: completed,
 			Remaining: scope - completed,
 			Ideal:     ideal(committed, elapsed, working),
 		})
+		if w.timed {
+			w.timeDays = append(w.timeDays, w.timeDay(date, boundary, w.timeCommitted, elapsed, working))
+		}
 	}
 	return days
 }
@@ -335,64 +358,4 @@ func (w *walker) queue(start, last time.Time) []pending {
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].ch.at.Before(out[j].ch.at) })
 	return out
-}
-
-// ideal is the guide line's value after elapsed working days of a sprint
-// that has working of them, which is the committed total run down to zero
-// in equal steps. A sprint with no working day at all, a weekend hackathon
-// for instance, keeps its guide flat rather than dividing by zero.
-//
-// An overdue active sprint continues past its planned end. Its ideal line
-// stays at zero rather than turning negative while actual work continues.
-func ideal(committed float64, elapsed, working int) float64 {
-	if working <= 0 {
-		return committed
-	}
-	if elapsed >= working {
-		return 0
-	}
-	return committed * (1 - float64(elapsed)/float64(working))
-}
-
-// civil is the calendar date t falls on in loc, carried as a UTC midnight.
-//
-// The arithmetic below counts and steps days, and it does that in UTC on
-// purpose: UTC has no daylight saving, so adding a day can never land on
-// the same date twice or skip one, which stepping a local midnight through
-// a spring forward can. The one place a real local moment is needed, the
-// midnight a day's changes are cut off at, builds it from these fields in
-// loc rather than reusing this value.
-func civil(t time.Time, loc *time.Location) time.Time {
-	y, m, d := t.In(loc).Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
-}
-
-// daysBetween is how many whole days separate two civil dates, negative
-// when to is the earlier one.
-func daysBetween(from, to time.Time) int {
-	return int(to.Sub(from).Hours() / 24)
-}
-
-// workingDays counts the Mondays to Fridays from one civil date to another
-// inclusive.
-func workingDays(from, to time.Time) int {
-	n := 0
-	for i := 0; i <= daysBetween(from, to); i++ {
-		if isWorkingDay(from.AddDate(0, 0, i)) {
-			n++
-		}
-	}
-	return n
-}
-
-// isWorkingDay is the guide line's definition of a day the team works,
-// which is Monday to Friday. It is not configurable: a per-profile working
-// week and a holiday calendar are a feature with their own settings and
-// their own tests, and nothing in this phase's design asks for one.
-func isWorkingDay(d time.Time) bool {
-	switch d.Weekday() {
-	case time.Saturday, time.Sunday:
-		return false
-	}
-	return true
 }

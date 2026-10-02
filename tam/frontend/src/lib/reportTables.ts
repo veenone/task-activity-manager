@@ -38,9 +38,9 @@ export function outcomeTable(series: ReportSeries, live = false): TableSpec {
 // burndownTable is the day by day line behind the totals. The cells are bare
 // numbers rather than amounts because the unit is the same in every one of
 // them, and a column of "34 points" reads as five columns of noise.
-export function burndownTable(days: ReportDay[]): TableSpec {
+export function burndownTable(days: ReportDay[], title = "Burndown"): TableSpec {
   return {
-    caption: "Burndown, day by day",
+    caption: `${title}, day by day`,
     columns: ["Day", "Scope", "Completed", "Remaining", "Ideal"],
     rows: days.map((d) => ({
       key: d.date,

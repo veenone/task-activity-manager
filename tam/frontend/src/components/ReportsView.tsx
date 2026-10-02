@@ -179,7 +179,10 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
         {/* The burndown is the wide one: it carries a point per sprint day,
             while the outcome chart carries five bars. */}
         <div className="report-charts">
-          <BurndownChart days={r.series.days} unit={r.series.unit} busy={report.isFetching} />
+          <BurndownChart days={r.series.days} unit={r.series.unit} exported="burndown" busy={report.isFetching} />
+          {(r.series.timeDays?.length ?? 0) > 0 && (
+            <BurndownChart days={r.series.timeDays ?? []} unit="hours" title="Burndown in hours" busy={report.isFetching} />
+          )}
           <OutcomeChart series={r.series} live={inProgress} busy={report.isFetching} />
         </div>
         {/* The panel: a head that does not scroll, holding the chart and the

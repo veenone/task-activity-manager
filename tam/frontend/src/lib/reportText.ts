@@ -21,6 +21,7 @@ import { calendarDay, formatWhen, points as trimPoints } from "./format";
 export function unitWord(unit: string, n: number): string {
   if (unit === "points") return n === 1 ? "point" : "points";
   if (unit === "cards") return n === 1 ? "card" : "cards";
+  if (unit === "hours") return n === 1 ? "hour" : "hours";
   // A unit this version does not know is printed rather than guessed at.
   return unit;
 }
