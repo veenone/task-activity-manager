@@ -568,6 +568,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .filter-new { margin-left: auto; }
 .filter-import { margin-left: auto; }
 .filter-import + .filter-new { margin-left: 8px; }
+/* Export is the first of the trailing buttons, so it takes the margin that
+   pushes the group right and the two beside it follow at a gap. */
+.filter-export { margin-left: auto; }
+.filter-export + .filter-import, .filter-export + .filter-new { margin-left: 8px; }
+.filter-note { margin: 0 10px 4px; }
 
 /* Phase 2: Epics */
 .epics-body { display: flex; gap: 0; align-items: stretch; min-height: 0; flex: 1; }

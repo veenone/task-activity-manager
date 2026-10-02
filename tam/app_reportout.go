@@ -156,7 +156,7 @@ func (a *App) ExportSprintReportXLSX(doc reportout.Document) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return a.writeExport(doc.Title, "xlsx", data)
+	return a.writeExport(sprintReportExport, doc.Title, "xlsx", data)
 }
 
 // ExportSprintReportPPTX writes the report as a deck where the user says and
@@ -166,7 +166,7 @@ func (a *App) ExportSprintReportPPTX(doc reportout.Document) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return a.writeExport(doc.Title, "pptx", data)
+	return a.writeExport(sprintReportExport, doc.Title, "pptx", data)
 }
 
 // writeExport asks the user where the export goes and writes it there,
@@ -178,15 +178,29 @@ func (a *App) ExportSprintReportPPTX(doc reportout.Document) (string, error) {
 // in one sitting can be told apart, and a timestamp so a second export of the
 // same sprint does not land on a file somebody has already opened. Whether to
 // overwrite is the dialog's own question to ask.
-func (a *App) writeExport(title, extension string, data []byte) (string, error) {
+// what names the dialog and the file: "the sprint report" and
+// "tam-report", or "the backlog" and "tam-backlog". It is a parameter
+// because two different things are saved through this one dialog and a
+// box titled "Save the sprint report" over a backlog is a lie.
+type exportKind struct {
+	dialogTitle string
+	filePrefix  string
+}
+
+var (
+	sprintReportExport = exportKind{dialogTitle: "Save the sprint report", filePrefix: "tam-report"}
+	backlogExport      = exportKind{dialogTitle: "Save the backlog", filePrefix: "tam-backlog"}
+)
+
+func (a *App) writeExport(what exportKind, title, extension string, data []byte) (string, error) {
 	dir, err := a.exportDirectory()
 	if err != nil {
 		return "", err
 	}
 	path, err := a.saveTo(runtime.SaveDialogOptions{
-		Title:            "Save the sprint report",
+		Title:            what.dialogTitle,
 		DefaultDirectory: dir,
-		DefaultFilename:  fmt.Sprintf("tam-report-%s-%d.%s", slug(title), time.Now().Unix(), extension),
+		DefaultFilename:  fmt.Sprintf("%s-%s-%d.%s", what.filePrefix, slug(title), time.Now().Unix(), extension),
 		Filters:          []runtime.FileFilter{{DisplayName: exportKinds[extension], Pattern: "*." + extension}},
 	})
 	if err != nil {
@@ -198,7 +212,7 @@ func (a *App) writeExport(title, extension string, data []byte) (string, error) 
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write the report to %s: %w", path, err)
 	}
-	log.Printf("tam: sprint report exported to %s", path)
+	log.Printf("tam: %s exported to %s", what.filePrefix, path)
 	return path, nil
 }
 
