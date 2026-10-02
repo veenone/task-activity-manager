@@ -1687,6 +1687,7 @@ export namespace reports {
 	    removed: number;
 	    completed: number;
 	    carriedOver: number;
+	    timeDays: Day[];
 	    days: Day[];
 	    truncated: string[];
 	    issues: string[];
@@ -1706,6 +1707,7 @@ export namespace reports {
 	        this.removed = source["removed"];
 	        this.completed = source["completed"];
 	        this.carriedOver = source["carriedOver"];
+	        this.timeDays = this.convertValues(source["timeDays"], Day);
 	        this.days = this.convertValues(source["days"], Day);
 	        this.truncated = source["truncated"];
 	        this.issues = source["issues"];

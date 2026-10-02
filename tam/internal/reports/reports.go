@@ -57,7 +57,12 @@ const (
 // done agreement section counts against the cards named here, so serving
 // such a row would leave a sprint that has an agreement looking like a
 // sprint that has none. Rebuilding is what the version is for.
-const AlgoVersion = 3
+//
+// 4 added TimeDays. A row written before it carries no hours line at all,
+// which on screen is indistinguishable from a sprint nobody estimated in
+// time, so every stored report has to be built again before the chart can
+// be trusted to be absent for the right reason.
+const AlgoVersion = 4
 
 // ErrNoDates says a sprint cannot be reconstructed because its own dates
 // cannot be read: no start, no end, or an end before its start. Build
@@ -138,6 +143,11 @@ type Series struct {
 	// the board's own rule for finished.
 	Completed   float64 `json:"completed"`
 	CarriedOver float64 `json:"carriedOver"`
+	// TimeDays is the same walk counted in hours: the cards' estimates as
+	// the scope and the work logged against them as the burn. It is empty
+	// for a sprint where no card carries an estimate in time, which is
+	// what tells a reader there is no such line rather than a flat one.
+	TimeDays []Day `json:"timeDays"`
 	// Days runs from the sprint's first local day to the last one the
 	// walk reached, which is the sprint's end for a closed sprint and
 	// today for one still running.
@@ -219,6 +229,7 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	s := Series{
 		SprintID:   sprint.ID,
 		SprintName: sprint.Name,
+		TimeDays:   []Day{},
 		Truncated:  truncatedKeys(issues),
 		Issues:     issueKeys(issues),
 	}
@@ -228,7 +239,14 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	// replayed, which is the one moment the cards hold the values they
 	// had when the sprint started.
 	s.Committed, _ = w.totals()
+	w.firstMoment = start
+	if w.timed = w.estimated(); w.timed {
+		w.timeCommitted, _ = w.timeTotals(start)
+	}
 	s.Days = w.run(start, last, end, s.Committed)
+	// append, not assign: an untimed sprint keeps the empty slice, so the
+	// wire carries [] rather than null.
+	s.TimeDays = append(s.TimeDays, w.timeDays...)
 	scope, completed := w.totals()
 	s.Added, s.Removed = w.added, w.removed
 	s.Completed, s.CarriedOver = completed, scope-completed

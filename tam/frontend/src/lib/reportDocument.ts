@@ -1,4 +1,4 @@
-import type { ColumnView, ReportDocument, ReportSection, ReportTable, SprintReport } from "../api";
+import type { ColumnView, ReportDocument, ReportSection, ReportSeries, ReportTable, SprintReport } from "../api";
 import {
   agreementCountLine,
   agreementSourceLine,
@@ -20,6 +20,7 @@ import {
   noLimitsLine,
   singleSprintLine,
   summarySentence,
+  timeBurndownLine,
   truncationLine,
   unitLine,
   velocityFloorLine,
@@ -115,6 +116,7 @@ export function reportDocument(
         notes: s.days.length === 0 ? [] : kept([methodLine(), truncationLine(s.truncated)]),
         images: s.days.length > 0 ? images.burndown ?? [] : [],
       },
+      ...timeBurndownSection(s, images),
       {
         heading: velocity.caption,
         lines: report.velocity.length === 0 ? [emptyVelocityLine()] : [],
@@ -134,6 +136,27 @@ export function reportDocument(
       ...doneAgreementSection(report, agreement),
     ],
   };
+}
+
+// timeBurndownSection is the sprint's hours line, and it is a list of
+// nothing or one: a sprint where no card carries an estimate in time has no
+// such line, and a section saying so would be a heading over an empty table
+// on every report a team counting in points ever publishes.
+//
+// It carries timeBurndownLine in place of methodLine, because the two lines
+// rest on different facts: this one is measured from the work people
+// logged, not reconstructed from the changelog.
+function timeBurndownSection(s: ReportSeries, images: ChartImages): ReportSection[] {
+  const days = s.timeDays ?? [];
+  if (days.length === 0) return [];
+  const table = burndownTable(days, "Burndown in hours");
+  return [{
+    heading: table.caption,
+    lines: [],
+    table: cells(table),
+    notes: [timeBurndownLine()],
+    images: images.burndownTime ?? [],
+  }];
 }
 
 // capacitySection is the board's columns against their WIP limits, and it is

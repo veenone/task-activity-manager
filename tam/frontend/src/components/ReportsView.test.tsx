@@ -56,6 +56,7 @@ function series(over: Partial<ReportSeries> = {}): ReportSeries {
     completed: 29,
     carriedOver: 10,
     days: [],
+    timeDays: [],
     truncated: [],
     issues: [],
     ...over,
@@ -529,6 +530,35 @@ describe("ReportsView's eight states", () => {
       const cells = within(table).getAllByRole("cell").map((c) => c.textContent);
       expect(cells).toContain("22");
       expect(cells).toContain("39");
+    });
+
+    // The hours line is a second chart rather than a second unit on the
+    // first: a team estimating in both reads two different quantities, and
+    // one axis cannot carry them.
+    it("draws a burndown in hours when the sprint was estimated in time", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report({
+        series: series({
+          days: DAYS,
+          timeDays: [
+            { date: "2026-08-22", scope: 12, completed: 0, remaining: 12, ideal: 12 },
+            { date: "2026-08-23", scope: 12, completed: 3, remaining: 9, ideal: 6 },
+          ],
+        }),
+      }));
+      renderView();
+      expect(await screen.findByRole("figure", { name: "Burndown in hours" })).toBeInTheDocument();
+      const table = await screen.findByRole("table", { name: /burndown in hours/i });
+      expect(within(table).getAllByRole("cell").map((c) => c.textContent)).toContain("9");
+    });
+
+    // A sprint nobody estimated in time gets no such chart. An empty one
+    // would say the team burned nothing rather than that it counts in
+    // points.
+    it("leaves the hours chart out when no card was estimated in time", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ days: DAYS }) }));
+      renderView();
+      expect(await screen.findByRole("figure", { name: "Burndown" })).toBeInTheDocument();
+      expect(screen.queryByRole("figure", { name: "Burndown in hours" })).toBeNull();
     });
   });
 
