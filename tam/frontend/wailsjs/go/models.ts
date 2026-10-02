@@ -131,6 +131,10 @@ export namespace backend {
 	    rank: string;
 	    created: string;
 	    updated: string;
+	    originalEstimateSeconds?: number;
+	    remainingEstimateSeconds?: number;
+	    timeSpentSeconds?: number;
+	    aggregateTimeSpentSeconds?: number;
 	    description?: string;
 	    pending: boolean;
 	    draft: boolean;
@@ -161,6 +165,10 @@ export namespace backend {
 	        this.rank = source["rank"];
 	        this.created = source["created"];
 	        this.updated = source["updated"];
+	        this.originalEstimateSeconds = source["originalEstimateSeconds"];
+	        this.remainingEstimateSeconds = source["remainingEstimateSeconds"];
+	        this.timeSpentSeconds = source["timeSpentSeconds"];
+	        this.aggregateTimeSpentSeconds = source["aggregateTimeSpentSeconds"];
 	        this.description = source["description"];
 	        this.pending = source["pending"];
 	        this.draft = source["draft"];

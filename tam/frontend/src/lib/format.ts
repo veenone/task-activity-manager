@@ -102,6 +102,21 @@ export function workDuration(seconds: number): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
+// workSplit is one issue's time tracking in a phrase: what has been logged
+// against what was estimated. Either half can be missing, and missing is not
+// zero: an issue nobody estimated reads as nothing at all, where "0h of 0h"
+// would say the team estimated it at no work. An estimate of zero somebody
+// actually set is kept, which is why this reads the two for absence rather
+// than for falsiness.
+export function workSplit(spent?: number | null, estimate?: number | null): string {
+  const logged = spent ?? null;
+  const planned = estimate ?? null;
+  if (logged === null && planned === null) return "";
+  if (planned === null) return `${workDuration(logged as number)} logged`;
+  if (logged === null) return `${workDuration(planned)} estimated`;
+  return `${workDuration(logged)} of ${workDuration(planned)}`;
+}
+
 // points trims a float that is really a whole number, so 27 does not print
 // as 27.0 and 2.5 still prints as 2.5. Go sums these as float64, so a column
 // of halves can arrive a millionth of a point out.

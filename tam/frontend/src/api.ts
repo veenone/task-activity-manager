@@ -143,6 +143,15 @@ export interface Issue {
   sprintName: string;
   parentKey: string;
   storyPoints?: number | null;
+  // Jira's time tracking on the issue, in seconds (schema 23). Absent or
+  // null is "this issue carries no such time", which the grid leaves blank:
+  // zero would say the team estimated it at no work. The aggregate is what
+  // the issue and its children burned together, which Jira counts apart
+  // from the issue's own.
+  originalEstimateSeconds?: number | null;
+  remainingEstimateSeconds?: number | null;
+  timeSpentSeconds?: number | null;
+  aggregateTimeSpentSeconds?: number | null;
   rank: string;
   created: string;
   updated: string;
@@ -253,9 +262,10 @@ export type SortColumn =
   | "status"
   | "assignee"
   | "sprint"
-  | "storyPoints";
+  | "storyPoints"
+  | "timeSpent";
 
-// GRID_COLUMNS is the Backlog's seven columns in display order: the header
+// GRID_COLUMNS is the Backlog's eight columns in display order: the header
 // label, whether the column can be sorted by, and which way a first click
 // takes it. Text reads best ascending; a number or a status the user is
 // hunting for reads best with the largest first.
@@ -271,6 +281,7 @@ export const GRID_COLUMNS: {
   { id: "assignee", label: "Assignee", firstClickDesc: false },
   { id: "sprint", label: "Sprint", firstClickDesc: true },
   { id: "storyPoints", label: "Pts", firstClickDesc: true },
+  { id: "timeSpent", label: "Time", firstClickDesc: true },
 ];
 
 export interface IssuePage {

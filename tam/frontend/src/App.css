@@ -221,7 +221,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* SPRINT was 96px, which clipped every real sprint name ("Sprint 12 -
    Checkout polish") to its first two words. The grid scrolls sideways now,
    so a column wide enough to read costs nothing that matters. */
-.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) var(--type-col-w, 104px) 420px 132px 116px 168px 44px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
+.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) var(--type-col-w, 104px) 420px 132px 116px 168px 44px 92px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
+.issue-time { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Every cell clips to its track. Without this a grid item wider than its
    track paints over its neighbour (nowrap) or wraps to two lines in a row
    whose height is locked at 34px, and a clipped value reads as a complete

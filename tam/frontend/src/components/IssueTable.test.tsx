@@ -76,4 +76,14 @@ describe("IssueTable", () => {
     expect(within(stray).getByText("Parent not shown")).toBeInTheDocument();
     expect(stray).toHaveAttribute("aria-level", "2");
   });
+
+  it("reads the time logged against the estimate, and leaves an unestimated row blank", () => {
+    const rowOf = renderTable([
+      issue({ key: "PLAT-412", timeSpentSeconds: 21600, originalEstimateSeconds: 28800 }),
+      issue({ key: "PLAT-409" }),
+    ]);
+    expect(within(rowOf(/^PLAT-412 /)).getByText("6h of 8h")).toBeInTheDocument();
+    // Not "0h": an issue nobody estimated has not been estimated at nothing.
+    expect(within(rowOf(/^PLAT-409 /)).queryByText(/h of /)).toBeNull();
+  });
 });

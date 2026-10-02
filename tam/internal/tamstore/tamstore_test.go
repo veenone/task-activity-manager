@@ -1162,3 +1162,58 @@ func TestVersionNineteenMigrationAddsTheStatusCategoryAndClearsEveryWatermark(t 
 		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
 	}
 }
+
+func TestVersionTwentyThreeMigrationAddsTheTimeTrackingAndClearsEveryWatermark(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tam.db")
+	db, err := tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	for _, stmt := range []string{
+		`ALTER TABLE issue DROP COLUMN original_estimate_s`,
+		`ALTER TABLE issue DROP COLUMN remaining_estimate_s`,
+		`ALTER TABLE issue DROP COLUMN time_spent_s`,
+		`ALTER TABLE issue DROP COLUMN aggregate_time_spent_s`,
+		`INSERT INTO issue (profile_id, key, summary) VALUES ('p1', 'PLAT-412', 'Promo code')`,
+		`INSERT INTO sync_state (profile_id, last_synced, last_full, last_error) VALUES ('p1', '2026-09-05T10:42:00Z', '2026-09-01T09:00:00Z', '')`,
+		`UPDATE meta SET value = '22' WHERE key = 'schema_version'`,
+	} {
+		if _, err := db.DB().Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	_ = db.Close()
+
+	db, err = tamstore.Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db.Close()
+	var summary string
+	var estimate, remaining, spent, aggregate sql.NullInt64
+	if err := db.DB().QueryRow(
+		`SELECT summary, original_estimate_s, remaining_estimate_s, time_spent_s, aggregate_time_spent_s
+		 FROM issue WHERE profile_id = 'p1' AND key = 'PLAT-412'`,
+	).Scan(&summary, &estimate, &remaining, &spent, &aggregate); err != nil {
+		t.Fatalf("read the kept issue: %v", err)
+	}
+	if summary != "Promo code" {
+		t.Errorf("summary = %q, want the row kept through the upgrade", summary)
+	}
+	if estimate.Valid || remaining.Valid || spent.Valid || aggregate.Valid {
+		t.Errorf("time tracking = %v %v %v %v, want NULL until a sync carries one", estimate, remaining, spent, aggregate)
+	}
+	var lastSynced, lastFull string
+	if err := db.DB().QueryRow(`SELECT last_synced, last_full FROM sync_state WHERE profile_id = 'p1'`).Scan(&lastSynced, &lastFull); err != nil {
+		t.Fatalf("read sync_state: %v", err)
+	}
+	if lastSynced != "" {
+		t.Errorf("last_synced = %q, want empty so the next sync refetches every issue", lastSynced)
+	}
+	if lastFull != "2026-09-01T09:00:00Z" {
+		t.Errorf("last_full = %q, want the migration to leave it alone", lastFull)
+	}
+	if v, _ := store.ReadSchemaVersion(db.DB()); v != tamstore.Schema.Version {
+		t.Errorf("schema version = %d, want %d", v, tamstore.Schema.Version)
+	}
+}

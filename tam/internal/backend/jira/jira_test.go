@@ -161,7 +161,7 @@ func (f *fakeJira) handler(t *testing.T) http.Handler {
 			// answers as null: the two shapes the field arrives in once the
 			// sync asks for it.
 			_, _ = w.Write([]byte(`{"total":2,"issues":[
-				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","description":"Apply the code at the payment step.","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5}},
+				{"id":"1","key":"PLAT-412","fields":{"summary":"Promo","description":"Apply the code at the payment step.","status":{"name":"In Progress"},"issuetype":{"name":"Story"},"project":{"key":"PLAT"},"labels":[],"customfield_10020":[{"id":12,"name":"Sprint 12"}],"customfield_10016":5,"timeoriginalestimate":28800,"timeestimate":7200,"timespent":21600,"aggregatetimespent":36000}},
 				{"id":"2","key":"PLAT-388","fields":{"summary":"Single use","description":null,"status":{"name":"Approved"},"issuetype":{"name":"Business Requirement"},"project":{"key":"PLAT"},"labels":["promo"]}}
 			]}`))
 		case r.URL.Path == "/rest/api/2/issueLinkType" && r.Method == http.MethodGet:
