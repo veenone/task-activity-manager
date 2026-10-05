@@ -20,7 +20,7 @@ import { chartAltLine, chartUndrawableLine } from "./reportText";
 // ChartKey is the section of the document a picture belongs to. The three
 // charts declare their own through data-chart, so a picture is placed by the
 // chart that drew it rather than by matching a caption.
-export type ChartKey = "outcome" | "burndown" | "velocity";
+export type ChartKey = "outcome" | "burndown" | "burndownTime" | "velocity";
 
 // ChartImages is every picture collected, by the section it belongs to. A
 // section can own several: the velocity chart splits into one panel per unit

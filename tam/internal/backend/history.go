@@ -46,6 +46,12 @@ type IssueHistory struct {
 	// it cannot recognise, and carrying it along would only invite a
 	// caller to guess.
 	Changes []Change
+	// Worklogs is every entry Jira holds against the issue, which is what
+	// a burndown counted in time is burned by. It is empty for a backend
+	// that cannot answer for worklogs and for an issue nobody has logged
+	// against; neither is distinguishable from the other here, and neither
+	// burns anything, so neither needs to be.
+	Worklogs []Worklog
 	// Truncated is true when the issue's changelog carries more entries
 	// than this page of the search returned: a search expansion caps how
 	// many histories one request answers with, per issue, and a truncated

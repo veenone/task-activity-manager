@@ -211,7 +211,7 @@ func (s *Service) emit(p Progress) {
 // different ways for the one state where none of them holds anything.
 func unavailable(reason string) Report {
 	return Report{
-		Series:      reports.Series{Days: []reports.Day{}, Truncated: []string{}, Issues: []string{}},
+		Series:      reports.Series{Days: []reports.Day{}, TimeDays: []reports.Day{}, Truncated: []string{}, Issues: []string{}},
 		Velocity:    []reports.VelocityRow{},
 		Capacity:    []boardrepo.ColumnView{},
 		Unavailable: reason,

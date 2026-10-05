@@ -15,6 +15,7 @@ import {
   methodLine,
   mixedUnitsLine,
   modeLine,
+  timeBurndownLine,
   noLimitsLine,
   singleSprintLine,
   truncationLine,
@@ -87,6 +88,35 @@ describe("reportDocument", () => {
     const burndown = reportDocument(report())!.sections[1];
     expect(burndown.table.rows).toHaveLength(1);
     expect(burndown.notes).toContain(methodLine());
+  });
+
+  // A sprint estimated in time publishes its hours line too, under its own
+  // heading: one section cannot carry two quantities, and a reader of the
+  // page sees the same two charts the view does.
+  it("publishes the hours burndown when the sprint was estimated in time", () => {
+    const r = report();
+    r.series.timeDays = [
+      { date: "2026-03-02", scope: 12, completed: 0, remaining: 12, ideal: 12 },
+      { date: "2026-03-03", scope: 12, completed: 3, remaining: 9, ideal: 6 },
+    ];
+    const doc = reportDocument(r, false, { burndownTime: [picture(4)] })!;
+    expect(doc.sections.map((s) => s.heading)).toEqual([
+      "Sprint outcome", "Burndown, day by day", "Burndown in hours, day by day", "Velocity, oldest sprint first",
+    ]);
+    const hours = doc.sections[2];
+    expect(hours.table.rows).toHaveLength(2);
+    expect(hours.table.rows[1]).toContain("9");
+    expect(hours.images).toEqual([picture(4)]);
+    // The hours line is measured from worklogs, not reconstructed from the
+    // changelog, so it carries its own caveat and not the method one.
+    expect(hours.notes).toContain(timeBurndownLine());
+  });
+
+  it("leaves the hours section out when no card was estimated in time", () => {
+    expect(headings(report())).not.toContain("Burndown in hours, day by day");
+    const r = report();
+    r.series.timeDays = [];
+    expect(headings(r)).not.toContain("Burndown in hours, day by day");
   });
 
   it("carries the partial changelog caveat into every section that rests on one", () => {

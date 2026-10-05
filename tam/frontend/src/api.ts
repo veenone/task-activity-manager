@@ -576,6 +576,12 @@ export interface ReportSeries {
   carriedOver: number;
   // The day by day line behind the totals, which the burndown draws.
   days: ReportDay[];
+  // The same walk counted in hours: the cards' estimates as the scope and
+  // the work logged against them as the burn. Empty for a sprint where no
+  // card carries an estimate in time, which is what tells the view to draw
+  // no such chart rather than a flat line at zero. Optional so fixtures
+  // written before it still type-check.
+  timeDays?: ReportDay[];
   // The keys of the issues whose changelog came back cut short, so the
   // numbers above rest in part on a partial history.
   truncated: string[];
