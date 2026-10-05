@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useProfile } from "@agile-suite/core";
-import { GRID_COLUMNS, ISSUE_TYPES } from "../api";
+import { errMsg, useProfile } from "@agile-suite/core";
+import { ExportBacklog, GRID_COLUMNS, ISSUE_TYPES } from "../api";
 import type { Issue, IssueQuery, Profile, Settings, SortColumn } from "../api";
 import { useIssues, useSprints } from "../queries/issues";
 import { useOpenSprints } from "../queries/boards";
@@ -115,6 +115,26 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
     [baseQuery, search, types, sprintId, page, pageSize, sort, desc],
   );
   const issues = useIssues(activeId, query);
+  // The export's own state. It is not a query: nothing is cached, the
+  // user asked for a file once, and what comes back is where it went.
+  const [exporting, setExporting] = useState(false);
+  const [exported, setExported] = useState("");
+  const [exportError, setExportError] = useState("");
+
+  async function exportBacklog(q: IssueQuery) {
+    setExporting(true);
+    setExportError("");
+    setExported("");
+    try {
+      // An empty path is a cancelled dialog, which is the user saying no
+      // and nothing to announce.
+      setExported(await ExportBacklog(activeId, q));
+    } catch (e) {
+      setExportError(errMsg(e));
+    } finally {
+      setExporting(false);
+    }
+  }
   useEffect(() => {
     if (issues.data) onPage?.(issues.data.total, issues.data.issues);
   }, [issues.data, onPage]);
@@ -208,6 +228,16 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
+        <button
+          type="button"
+          className="btn filter-export"
+          disabled={!activeId || exporting}
+          // The export is of the filter, so the paging goes: a planning
+          // session wants the whole list it narrowed to, not the page.
+          onClick={() => void exportBacklog({ ...query, offset: 0, limit: 0 })}
+        >
+          {exporting ? "Exporting" : "Export"}
+        </button>
         {showImport && (
           <button type="button" className="btn filter-import" disabled={!activeId} onClick={() => openModal("import")}>
             Import
@@ -219,6 +249,9 @@ export function IssueListView({ viewId, label, baseQuery, showCreate, showImport
           </button>
         )}
       </div>
+
+      {exported && <p className="muted small filter-note">Saved to {exported}</p>}
+      {exportError && <p className="error-text filter-note">The backlog could not be exported: {exportError}</p>}
 
       <div className="backlog-body">
         <div className="backlog-grid">

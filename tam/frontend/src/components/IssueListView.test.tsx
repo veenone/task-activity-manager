@@ -20,6 +20,7 @@ vi.mock("../api", async () => {
     ListOpenSprints: vi.fn(),
     GetSubtaskTypeName: vi.fn(),
     ListProjectTypes: vi.fn(),
+    ExportBacklog: vi.fn(),
   };
 });
 
@@ -62,6 +63,7 @@ beforeEach(() => {
     }],
     total: 1,
   });
+  vi.mocked(api.ExportBacklog).mockResolvedValue("C:/exports/tam-backlog.xlsx");
   vi.mocked(api.ListSprints).mockResolvedValue([]);
   vi.mocked(api.ListOpenSprints).mockResolvedValue([]);
   vi.mocked(api.GetSubtaskTypeName).mockResolvedValue("Technical task");
@@ -106,5 +108,52 @@ describe("IssueListView's type filter", () => {
     await within(bar).findByRole("button", { name: "Bug" });
     await userEvent.click(within(bar).getByRole("button", { name: "Sub" }));
     await waitFor(() => expect(lastQuery()?.types).toEqual(["subtask"]));
+  });
+});
+
+describe("IssueListView's export", () => {
+  it("exports the filter the grid is showing, not the page", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("Apply promo");
+    const bar = screen.getByRole("group", { name: "Issue types" });
+    await user.click(within(bar).getByRole("button", { name: "Story" }));
+    await user.click(screen.getByRole("button", { name: /Export/ }));
+    await waitFor(() => expect(api.ExportBacklog).toHaveBeenCalled());
+    const sent = vi.mocked(api.ExportBacklog).mock.calls.at(-1)?.[1];
+    expect(sent?.types).toEqual(["story"]);
+    // Offset and limit are the grid's paging, which an export of the
+    // whole filter has no use for.
+    expect(sent?.limit).toBe(0);
+    expect(sent?.offset).toBe(0);
+  });
+
+  it("says where the file went", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText("Apply promo");
+    await user.click(screen.getByRole("button", { name: /Export/ }));
+    expect(await screen.findByText(/tam-backlog.xlsx/)).toBeInTheDocument();
+  });
+
+  // A cancelled dialog answers with no path, which is not a failure and
+  // not something to announce.
+  it("says nothing when the save dialog was cancelled", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ExportBacklog).mockResolvedValue("");
+    renderView();
+    await screen.findByText("Apply promo");
+    await user.click(screen.getByRole("button", { name: /Export/ }));
+    await waitFor(() => expect(api.ExportBacklog).toHaveBeenCalled());
+    expect(screen.queryByText(/Saved/)).toBeNull();
+  });
+
+  it("reports an export that failed", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.ExportBacklog).mockRejectedValue(new Error("the drive is full"));
+    renderView();
+    await screen.findByText("Apply promo");
+    await user.click(screen.getByRole("button", { name: /Export/ }));
+    expect(await screen.findByText(/the drive is full/)).toBeInTheDocument();
   });
 });
