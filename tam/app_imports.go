@@ -12,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"agile-suite/core/importfile"
+	"agile-suite/tam/internal/backend"
 	jirabackend "agile-suite/tam/internal/backend/jira"
 	"agile-suite/tam/internal/boardrepo"
 	"agile-suite/tam/internal/importer"
@@ -115,6 +116,10 @@ func (a *App) SaveImportTemplate(profileID string) (string, error) {
 	}
 	reqType := jirabackend.DefaultRequirementType
 	var open []boardrepo.SprintChoice
+	// The project's own issue types, so the Type dropdown offers what this
+	// project takes rather than TAM's six (#137). Empty for a profile that
+	// has never synced, and the template falls back to the six there.
+	var own []backend.IssueType
 	// A template is worth offering even without a usable profile, so a
 	// profile that cannot be read falls back to the default type name and
 	// an unlisted Sprint column rather than failing the save.
@@ -124,6 +129,9 @@ func (a *App) SaveImportTemplate(profileID string) (string, error) {
 		}
 		if s, err := a.boards.OpenSprints(a.ctx, p.ID); err == nil {
 			open = s
+		}
+		if t, err := a.repo.ProjectTypes(a.ctx, p.ID); err == nil {
+			own = t
 		}
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
@@ -144,7 +152,7 @@ func (a *App) SaveImportTemplate(profileID string) (string, error) {
 	if strings.EqualFold(filepath.Ext(path), ".csv") {
 		data = importer.TemplateCSV(reqType)
 	} else {
-		if data, err = importer.TemplateXLSX(reqType, open); err != nil {
+		if data, err = importer.TemplateXLSX(reqType, open, own); err != nil {
 			return "", fmt.Errorf("build template: %w", err)
 		}
 	}

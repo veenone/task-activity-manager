@@ -243,7 +243,7 @@ func TestTemplateCSVRoundTripsThroughAutoMap(t *testing.T) {
 // The workbook has to be a workbook the importer itself can read back, or
 // the round trip the template exists for does not close.
 func TestTemplateXLSXParsesBackIntoTheSameRows(t *testing.T) {
-	data, err := importer.TemplateXLSX("Business Requirement", nil)
+	data, err := importer.TemplateXLSX("Business Requirement", nil, nil)
 	if err != nil {
 		t.Fatalf("TemplateXLSX: %v", err)
 	}

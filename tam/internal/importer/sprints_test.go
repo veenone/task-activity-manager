@@ -126,7 +126,7 @@ func TestTheTemplateCarriesTheSprintColumnAndItsOpenSprints(t *testing.T) {
 	// The workbook builds with a dropdown on the Sprint column and without
 	// one; neither is allowed to fail the save.
 	for _, open := range [][]boardrepo.SprintChoice{openSprints(), nil} {
-		data, err := importer.TemplateXLSX("Business Requirement", open)
+		data, err := importer.TemplateXLSX("Business Requirement", open, nil)
 		if err != nil || len(data) == 0 {
 			t.Fatalf("TemplateXLSX with %d sprints: %v", len(open), err)
 		}
