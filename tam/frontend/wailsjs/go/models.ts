@@ -110,6 +110,22 @@ export namespace backend {
 	}
 	
 	
+	export class Filter {
+	    id: string;
+	    name: string;
+	    jql: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Filter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.jql = source["jql"];
+	    }
+	}
 	export class Issue {
 	    key: string;
 	    id: string;
@@ -882,6 +898,109 @@ export namespace committer {
 	        this.failures = this.convertValues(source["failures"], Failure);
 	        this.held = this.convertValues(source["held"], Held);
 	        this.remaining = source["remaining"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace dashboardrepo {
+	
+	export class Bucket {
+	    name: string;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Bucket(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.count = source["count"];
+	    }
+	}
+	export class Snapshot {
+	    total: number;
+	    points: number;
+	    estimateSeconds: number;
+	    spentSeconds: number;
+	    byStatus: Bucket[];
+	    byType: Bucket[];
+	    byAssignee: Bucket[];
+	    capped: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Snapshot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.points = source["points"];
+	        this.estimateSeconds = source["estimateSeconds"];
+	        this.spentSeconds = source["spentSeconds"];
+	        this.byStatus = this.convertValues(source["byStatus"], Bucket);
+	        this.byType = this.convertValues(source["byType"], Bucket);
+	        this.byAssignee = this.convertValues(source["byAssignee"], Bucket);
+	        this.capped = source["capped"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Dashboard {
+	    id: string;
+	    name: string;
+	    filterId: string;
+	    jql: string;
+	    refreshedAt: string;
+	    snapshot: Snapshot;
+	
+	    static createFrom(source: any = {}) {
+	        return new Dashboard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.filterId = source["filterId"];
+	        this.jql = source["jql"];
+	        this.refreshedAt = source["refreshedAt"];
+	        this.snapshot = this.convertValues(source["snapshot"], Snapshot);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

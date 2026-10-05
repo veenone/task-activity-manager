@@ -3,6 +3,7 @@
 import {backend} from '../models';
 import {importer} from '../models';
 import {committer} from '../models';
+import {dashboardrepo} from '../models';
 import {ritualrepo} from '../models';
 import {profile} from '../models';
 import {ritualsync} from '../models';
@@ -35,6 +36,8 @@ export function CommitPendingChanges(arg1:string):Promise<committer.Result>;
 
 export function CompleteSprint(arg1:string,arg2:number,arg3:number,arg4:string):Promise<void>;
 
+export function CreateDashboard(arg1:string,arg2:string,arg3:string,arg4:string):Promise<dashboardrepo.Dashboard>;
+
 export function CreateDoneAgreement(arg1:string,arg2:number,arg3:number):Promise<ritualrepo.Document>;
 
 export function CreateDraftBoard(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<number>;
@@ -50,6 +53,8 @@ export function CreateReportRoot(arg1:string,arg2:string,arg3:string,arg4:boolea
 export function CreateRitualRoot(arg1:string,arg2:number,arg3:string,arg4:boolean):Promise<main.RitualRootResult>;
 
 export function CreateSprint(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string):Promise<main.SprintCreated>;
+
+export function DeleteDashboard(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
 
@@ -123,9 +128,13 @@ export function ListBoardSprints(arg1:string,arg2:number):Promise<Array<boardrep
 
 export function ListBoards(arg1:string):Promise<Array<boardrepo.Board>>;
 
+export function ListDashboards(arg1:string):Promise<Array<dashboardrepo.Dashboard>>;
+
 export function ListEpics(arg1:string):Promise<Array<backend.Issue>>;
 
 export function ListIssues(arg1:string,arg2:issuerepo.IssueQuery):Promise<issuerepo.IssuePage>;
+
+export function ListJiraFilters(arg1:string):Promise<Array<backend.Filter>>;
 
 export function ListLinkedTests(arg1:string,arg2:string):Promise<Array<issuerepo.LinkedTest>>;
 
@@ -164,6 +173,8 @@ export function PublishSprintReport(arg1:string,arg2:number,arg3:number,arg4:rep
 export function RankIssue(arg1:string,arg2:string,arg3:string,arg4:boolean,arg5:number):Promise<void>;
 
 export function ReadLog():Promise<string>;
+
+export function RefreshDashboard(arg1:string,arg2:string):Promise<dashboardrepo.Dashboard>;
 
 export function RefreshDetails(arg1:string):Promise<void>;
 

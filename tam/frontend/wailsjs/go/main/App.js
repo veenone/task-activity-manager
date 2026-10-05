@@ -38,6 +38,10 @@ export function CompleteSprint(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CompleteSprint'](arg1, arg2, arg3, arg4);
 }
 
+export function CreateDashboard(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateDashboard'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateDoneAgreement(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateDoneAgreement'](arg1, arg2, arg3);
 }
@@ -68,6 +72,10 @@ export function CreateRitualRoot(arg1, arg2, arg3, arg4) {
 
 export function CreateSprint(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['CreateSprint'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
+export function DeleteDashboard(arg1, arg2) {
+  return window['go']['main']['App']['DeleteDashboard'](arg1, arg2);
 }
 
 export function DeleteProfile(arg1) {
@@ -214,12 +222,20 @@ export function ListBoards(arg1) {
   return window['go']['main']['App']['ListBoards'](arg1);
 }
 
+export function ListDashboards(arg1) {
+  return window['go']['main']['App']['ListDashboards'](arg1);
+}
+
 export function ListEpics(arg1) {
   return window['go']['main']['App']['ListEpics'](arg1);
 }
 
 export function ListIssues(arg1, arg2) {
   return window['go']['main']['App']['ListIssues'](arg1, arg2);
+}
+
+export function ListJiraFilters(arg1) {
+  return window['go']['main']['App']['ListJiraFilters'](arg1);
 }
 
 export function ListLinkedTests(arg1, arg2) {
@@ -296,6 +312,10 @@ export function RankIssue(arg1, arg2, arg3, arg4, arg5) {
 
 export function ReadLog() {
   return window['go']['main']['App']['ReadLog']();
+}
+
+export function RefreshDashboard(arg1, arg2) {
+  return window['go']['main']['App']['RefreshDashboard'](arg1, arg2);
 }
 
 export function RefreshDetails(arg1) {

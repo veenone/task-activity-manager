@@ -18,6 +18,7 @@ import (
 	"agile-suite/core/store"
 	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
+	"agile-suite/tam/internal/dashboardrepo"
 	"agile-suite/tam/internal/demo"
 	"agile-suite/tam/internal/issuerepo"
 	"agile-suite/tam/internal/ritualrepo"
@@ -34,17 +35,18 @@ var _ boardrepo.IssueSource = (*issuerepo.Repository)(nil)
 // is callable from JavaScript, so it only validates and delegates; the rules
 // live in internal/.
 type App struct {
-	ctx       context.Context
-	local     *store.DB
-	shared    *store.DB
-	profiles  *profile.Manager
-	creds     profile.CredentialStore
-	settings  *settings.Manager
-	repo      *issuerepo.Repository
-	boards    *boardrepo.Repository
-	rituals   *ritualrepo.Repository
-	backendMu sync.Mutex
-	backends  map[string]backend.IssueBackend
+	ctx        context.Context
+	local      *store.DB
+	shared     *store.DB
+	profiles   *profile.Manager
+	creds      profile.CredentialStore
+	settings   *settings.Manager
+	repo       *issuerepo.Repository
+	boards     *boardrepo.Repository
+	rituals    *ritualrepo.Repository
+	dashboards *dashboardrepo.Repository
+	backendMu  sync.Mutex
+	backends   map[string]backend.IssueBackend
 	// busy names the operation running for a profile, one of "sync",
 	// "commit", "import", "sprint", "boards refresh" and "report", so none
 	// of them overlap; the frontend reducer mirrors this.
@@ -127,6 +129,7 @@ func (a *App) initStore() error {
 	a.repo = issuerepo.New(local.DB())
 	a.boards = boardrepo.New(local.DB())
 	a.rituals = ritualrepo.New(local.DB())
+	a.dashboards = dashboardrepo.New(local.DB())
 	a.backends = map[string]backend.IssueBackend{}
 	a.busy = map[string]string{}
 	a.demoConfluence = map[string]*demo.Confluence{}
