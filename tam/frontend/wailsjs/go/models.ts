@@ -150,6 +150,8 @@ export namespace backend {
 	    originalEstimateSeconds?: number;
 	    remainingEstimateSeconds?: number;
 	    timeSpentSeconds?: number;
+	    aggregateEstimateSeconds?: number;
+	    aggregateRemainingSeconds?: number;
 	    aggregateTimeSpentSeconds?: number;
 	    description?: string;
 	    pending: boolean;
@@ -184,6 +186,8 @@ export namespace backend {
 	        this.originalEstimateSeconds = source["originalEstimateSeconds"];
 	        this.remainingEstimateSeconds = source["remainingEstimateSeconds"];
 	        this.timeSpentSeconds = source["timeSpentSeconds"];
+	        this.aggregateEstimateSeconds = source["aggregateEstimateSeconds"];
+	        this.aggregateRemainingSeconds = source["aggregateRemainingSeconds"];
 	        this.aggregateTimeSpentSeconds = source["aggregateTimeSpentSeconds"];
 	        this.description = source["description"];
 	        this.pending = source["pending"];

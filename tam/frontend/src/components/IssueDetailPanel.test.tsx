@@ -214,22 +214,40 @@ describe("IssueDetailPanel", () => {
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalledWith("p1", "PLAT-412"));
   });
 
-  it("reads the estimate and the time spent against it, and the family's total when it differs", async () => {
+  it("lists estimated, remaining and logged for a leaf", async () => {
     renderPanel(vi.fn(), undefined, {
-      ...story, originalEstimateSeconds: 28800, timeSpentSeconds: 21600, aggregateTimeSpentSeconds: 39600,
+      ...story, originalEstimateSeconds: 28800, remainingEstimateSeconds: 7200, timeSpentSeconds: 21600,
+      aggregateEstimateSeconds: 28800, aggregateRemainingSeconds: 7200, aggregateTimeSpentSeconds: 21600,
     });
-    expect(screen.getByText("6h of 8h")).toBeInTheDocument();
-    // An epic or a parent burns hours through its children, which Jira
-    // counts apart from its own. Reporting one as the other would have the
-    // parent claim every hour its children logged.
-    expect(screen.getByText("11h with subtasks")).toBeInTheDocument();
+    const fields = screen.getByText("Estimated").closest("dl") as HTMLElement;
+    expect(within(fields).getByText("8h")).toBeInTheDocument();
+    expect(within(fields).getByText("2h")).toBeInTheDocument();
+    expect(within(fields).getByText("6h")).toBeInTheDocument();
+    expect(screen.queryByText(/including sub-tasks/)).toBeNull();
+    await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
+  });
+
+  // An epic or a parent burns hours through its children, which Jira
+  // counts apart from its own: the figures are the family's, and the
+  // panel says so rather than letting the parent claim them.
+  it("reads a parent as its family and says what is the issue's own", async () => {
+    renderPanel(vi.fn(), undefined, {
+      ...story, originalEstimateSeconds: null, remainingEstimateSeconds: null, timeSpentSeconds: null,
+      aggregateEstimateSeconds: 144000, aggregateRemainingSeconds: 100800, aggregateTimeSpentSeconds: 43200,
+    });
+    const fields = screen.getByText("Estimated").closest("dl") as HTMLElement;
+    expect(within(fields).getByText("40h")).toBeInTheDocument();
+    expect(within(fields).getByText("28h")).toBeInTheDocument();
+    expect(within(fields).getByText("12h")).toBeInTheDocument();
+    expect(screen.getByText(/including sub-tasks/)).toBeInTheDocument();
+    expect(screen.getByText(/none on the issue itself/)).toBeInTheDocument();
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
   });
 
   it("says nothing about time for an issue nobody estimated or logged against", async () => {
     renderPanel();
-    expect(screen.queryByText(/of 8h/)).toBeNull();
-    expect(screen.queryByText(/logged/)).toBeNull();
+    expect(screen.queryByText("Estimated")).toBeNull();
+    expect(screen.queryByText("Remaining")).toBeNull();
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
   });
 

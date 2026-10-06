@@ -254,3 +254,52 @@ func TestTheNumbersStaySummable(t *testing.T) {
 		}
 	}
 }
+
+// A parent estimated through its sub-tasks carries the family's figures,
+// and the sheet says so in a column of its own: a spreadsheet cannot
+// carry a mark inside a number and keep the column summable.
+func TestTheExportCarriesTheFamilysFiguresAndSaysSo(t *testing.T) {
+	parent := backend.Issue{
+		Key: "PLAT-19171", Type: backend.TypeStory, Summary: "Promo overhaul", Status: "In Progress", Labels: []string{},
+		AggregateEstimateSeconds: secs(144000), AggregateRemainingSeconds: secs(100800), AggregateTimeSpentSeconds: secs(43200),
+	}
+	leaf := backend.Issue{
+		Key: "PLAT-19172", Type: backend.TypeTask, Summary: "Wire it", Status: "To Do", Labels: []string{},
+		OriginalEstimateSeconds: secs(28800), RemainingEstimateSeconds: secs(7200), TimeSpentSeconds: secs(21600),
+		AggregateEstimateSeconds: secs(28800), AggregateRemainingSeconds: secs(7200), AggregateTimeSpentSeconds: secs(21600),
+	}
+	data, err := issueexport.Workbook([]backend.Issue{parent, leaf})
+	if err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	cells, err := read(t, data).GetRows("Backlog")
+	if err != nil {
+		t.Fatalf("rows: %v", err)
+	}
+	at := func(row int, head string) string {
+		for i, name := range cells[0] {
+			if name == head {
+				if i < len(cells[row]) {
+					return cells[row][i]
+				}
+				return ""
+			}
+		}
+		t.Fatalf("no %s column in %v", head, cells[0])
+		return ""
+	}
+	// The parent reads as its family, remaining included.
+	if at(1, "Estimated (h)") != "40" || at(1, "Remaining (h)") != "28" || at(1, "Logged (h)") != "12" {
+		t.Errorf("parent row = %v, want the family's 40/28/12", cells[1])
+	}
+	if at(1, "Includes sub-tasks") != "yes" {
+		t.Errorf("parent's sub-task column = %q, want yes", at(1, "Includes sub-tasks"))
+	}
+	// The leaf reads as itself and says nothing about sub-tasks.
+	if at(2, "Estimated (h)") != "8" || at(2, "Remaining (h)") != "2" || at(2, "Logged (h)") != "6" {
+		t.Errorf("leaf row = %v, want its own 8/2/6", cells[2])
+	}
+	if at(2, "Includes sub-tasks") != "" {
+		t.Errorf("leaf's sub-task column = %q, want nothing", at(2, "Includes sub-tasks"))
+	}
+}

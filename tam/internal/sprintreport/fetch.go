@@ -3,6 +3,7 @@ package sprintreport
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"agile-suite/tam/internal/backend"
 )
@@ -43,5 +44,54 @@ func (s *Service) fetch(ctx context.Context, sprint backend.Sprint, phase string
 	}
 	frame.Done = true
 	s.emit(frame)
+	s.attachSubtaskWorklogs(ctx, out)
 	return out, nil
+}
+
+// attachSubtaskWorklogs reads what the sub-tasks of these issues logged,
+// for the cards the report will scope by their family.
+//
+// Only the issues that need it are asked about: one whose family spent
+// matches its own has no child carrying hours, and one whose children
+// are in the sprint beside it is counted as itself anyway. A backend
+// that cannot answer, or a Jira that refuses the query, leaves the burn
+// counting what is in the sprint, which is what it did before this
+// existed: a sprint report is worth more than the hours it is short.
+func (s *Service) attachSubtaskWorklogs(ctx context.Context, issues []backend.IssueHistory) {
+	b, ok := s.b.(backend.FamilyWorklogBackend)
+	if !ok {
+		return
+	}
+	inSprint := make(map[string]bool, len(issues))
+	for _, h := range issues {
+		inSprint[h.Issue.Key] = true
+	}
+	hasChild := map[string]bool{}
+	for _, h := range issues {
+		if h.Issue.ParentKey != "" && inSprint[h.Issue.ParentKey] {
+			hasChild[h.Issue.ParentKey] = true
+		}
+	}
+	var parents []string
+	for _, h := range issues {
+		if hasChild[h.Issue.Key] {
+			continue
+		}
+		if t := h.Issue.Time(); t.Family {
+			parents = append(parents, h.Issue.Key)
+		}
+	}
+	if len(parents) == 0 {
+		return
+	}
+	byParent, err := b.SubtaskWorklogs(ctx, parents)
+	if err != nil {
+		log.Printf("tam: the sub-task worklogs of sprint %s could not be read, so its hours burndown counts only what is in the sprint: %v", issues[0].Issue.SprintName, err)
+		return
+	}
+	for i := range issues {
+		if logs, ok := byParent[issues[i].Issue.Key]; ok {
+			issues[i].SubtaskWorklogs = logs
+		}
+	}
 }

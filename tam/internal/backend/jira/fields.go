@@ -19,10 +19,8 @@ const DefaultRequirementType = "Requirement"
 // baseFields are the search fields the grid needs, before the custom ones.
 // description is among them so the sync caches it on the row: it is the one
 // field the detail panel used to pay a round trip for on every selection.
-// The four time fields are among them for the same reason: an estimate read
-// with the row is an estimate the grid can show without a call per issue.
-var baseFields = []string{"summary", "description", "status", "assignee", "reporter", "priority", "labels", "issuetype", "project", "parent", "created", "updated",
-	fieldOriginalEstimate, fieldRemainingEstimate, fieldTimeSpent, fieldAggregateSpent}
+// timeFields are among them for the reason timetracking.go gives.
+var baseFields = append([]string{"summary", "description", "status", "assignee", "reporter", "priority", "labels", "issuetype", "project", "parent", "created", "updated"}, timeFields...)
 
 // fieldIDs are the discovered custom field ids. Any may be empty when the
 // instance lacks the field.

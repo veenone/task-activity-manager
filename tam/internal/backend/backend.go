@@ -70,13 +70,22 @@ type Issue struct {
 	// facts, and a grid that prints "0h" over a project which does not
 	// estimate in time at all is reporting the first as the second.
 	//
-	// AggregateTimeSpentSeconds is what the issue and its children burned
-	// together, which Jira counts separately from the issue's own. The two
-	// travel in their own fields for the same reason: an epic whose
-	// children logged eleven hours has not had eleven hours logged on it.
-	OriginalEstimateSeconds   *int `json:"originalEstimateSeconds"`
-	RemainingEstimateSeconds  *int `json:"remainingEstimateSeconds"`
-	TimeSpentSeconds          *int `json:"timeSpentSeconds"`
+	// The aggregates are what the issue and its children carry together,
+	// which Jira counts separately from the issue's own. The two sets
+	// travel apart because they answer different questions: an epic
+	// whose children logged eleven hours has not had eleven hours logged
+	// on it. Issue.Time is the one place that decides which set a reader
+	// is shown.
+	OriginalEstimateSeconds  *int `json:"originalEstimateSeconds"`
+	RemainingEstimateSeconds *int `json:"remainingEstimateSeconds"`
+	TimeSpentSeconds         *int `json:"timeSpentSeconds"`
+	// The family's three: the issue and its sub-tasks together, which is
+	// where everything sits for an issue estimated through its children.
+	// Jira answers a leaf with the same values it puts in the three
+	// above, so the two sets differ exactly when the issue has children
+	// carrying time, which is what Issue.Time reads.
+	AggregateEstimateSeconds  *int `json:"aggregateEstimateSeconds"`
+	AggregateRemainingSeconds *int `json:"aggregateRemainingSeconds"`
 	AggregateTimeSpentSeconds *int `json:"aggregateTimeSpentSeconds"`
 
 	// Description is the issue's description, read with the rest of the row

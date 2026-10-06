@@ -220,11 +220,12 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	}
 
 	w := &walker{
-		sprint:   sprint,
-		cards:    cards,
-		doneID:   done,
-		doneName: doneNames(issues, done),
-		loc:      loc,
+		sprint:           sprint,
+		cards:            cards,
+		hasChildInSprint: childrenInSprint(cards),
+		doneID:           done,
+		doneName:         doneNames(issues, done),
+		loc:              loc,
 	}
 	s := Series{
 		SprintID:   sprint.ID,
@@ -251,6 +252,25 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	s.Added, s.Removed = w.added, w.removed
 	s.Completed, s.CarriedOver = completed, scope-completed
 	return s, nil
+}
+
+// childrenInSprint names every card that has a sub-task in the sprint
+// beside it. It is read off the cards the search returned, which is who
+// is in the sprint now, and it never changes while the walk runs.
+func childrenInSprint(cards []*card) map[string]bool {
+	in := make(map[string]bool, len(cards))
+	for _, c := range cards {
+		if c.key != "" {
+			in[c.key] = true
+		}
+	}
+	out := map[string]bool{}
+	for _, c := range cards {
+		if c.parent != "" && in[c.parent] {
+			out[c.parent] = true
+		}
+	}
+	return out
 }
 
 // unitOf decides what this sprint is counted in and why. Points win as

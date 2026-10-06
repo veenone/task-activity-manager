@@ -54,11 +54,21 @@ type card struct {
 	status   string
 	statusID string
 	points   *float64
-	// estimate is the card's original estimate in seconds, and logs is the
-	// work booked against it. Neither is rewound: see timeseries.go for
-	// why the time line is measured where the points line is reconstructed.
+	// key and parent are what say whether a card's children are in the
+	// sprint beside it, which decides whether it is counted as itself or
+	// as its family.
+	key    string
+	parent string
+	// estimate is the card's own original estimate in seconds, and logs
+	// is the work booked against the card itself. family is what the
+	// issue and its sub-tasks carry together, and familyLogs is what
+	// those sub-tasks logged. Neither is rewound: see timeseries.go for
+	// why the time line is measured where the points line is
+	// reconstructed.
 	estimate       *int
 	logs           []workLog
+	family         backend.TimeFigures
+	familyLogs     []workLog
 	changes        []change
 	addedCharged   bool
 	removedCharged bool
@@ -105,7 +115,9 @@ func rewound(sprint backend.Sprint, issues []backend.IssueHistory, start time.Ti
 			return nil, err
 		}
 		c := &card{in: true, status: h.Issue.Status, statusID: h.Issue.StatusID, changes: chs,
-			estimate: h.Issue.OriginalEstimateSeconds, logs: logsOf(h)}
+			key: h.Issue.Key, parent: h.Issue.ParentKey,
+			estimate: h.Issue.OriginalEstimateSeconds, logs: logsOf(h.Worklogs),
+			family: h.Issue.Time(), familyLogs: logsOf(h.SubtaskWorklogs)}
 		if p := h.Issue.StoryPoints; p != nil {
 			v := *p
 			c.points = &v
@@ -221,6 +233,10 @@ type walker struct {
 	loc      *time.Location
 	added    float64
 	removed  float64
+	// hasChildInSprint names the cards whose sub-tasks are in this sprint
+	// beside them, which is what decides whether a card is counted as
+	// itself or as its family.
+	hasChildInSprint map[string]bool
 	// firstMoment is where the sprint opened, which is the earliest a
 	// worklog can burn any of it.
 	firstMoment time.Time

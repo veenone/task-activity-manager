@@ -79,11 +79,24 @@ describe("IssueTable", () => {
 
   it("reads the time logged against the estimate, and leaves an unestimated row blank", () => {
     const rowOf = renderTable([
-      issue({ key: "PLAT-412", timeSpentSeconds: 21600, originalEstimateSeconds: 28800 }),
+      issue({
+        key: "PLAT-412", timeSpentSeconds: 21600, originalEstimateSeconds: 28800,
+        aggregateTimeSpentSeconds: 21600, aggregateEstimateSeconds: 28800,
+      }),
       issue({ key: "PLAT-409" }),
     ]);
     expect(within(rowOf(/^PLAT-412 /)).getByText("6h of 8h")).toBeInTheDocument();
     // Not "0h": an issue nobody estimated has not been estimated at nothing.
     expect(within(rowOf(/^PLAT-409 /)).queryByText(/h of /)).toBeNull();
+  });
+
+  // The issue #142 was raised for: everything is estimated on the
+  // sub-tasks, so the row showed nothing at all until it read as its
+  // family.
+  it("reads a row estimated through its sub-tasks as the family, marked", () => {
+    const rowOf = renderTable([
+      issue({ key: "PLAT-412", aggregateEstimateSeconds: 144000, aggregateRemainingSeconds: 100800, aggregateTimeSpentSeconds: 43200 }),
+    ]);
+    expect(within(rowOf(/^PLAT-412 /)).getByText("Σ 12h of 40h")).toBeInTheDocument();
   });
 });
