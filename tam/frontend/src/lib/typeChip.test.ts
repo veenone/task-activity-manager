@@ -34,6 +34,15 @@ describe("typeChipClass", () => {
     expect(TYPE_CHIP_ALT_CLASSES).toContain(typeChipClass("Improvement"));
   });
 
+  // The backlog export paints the same chips in Go
+  // (tam/internal/issueexport/palette.go), so these pairs are pinned on
+  // both sides: either implementation drifting fails its own test.
+  it("spreads the names the exporter pins over the same colours", () => {
+    expect(typeChipClass("Improvement")).toBe("alt-pink");
+    expect(typeChipClass("Change Request")).toBe("alt-orange");
+    expect(typeChipClass("Technical task")).toBe("alt-teal");
+  });
+
   it("gives the same name the same colour every time", () => {
     expect(typeChipClass("Improvement")).toBe(typeChipClass("Improvement"));
     expect(typeChipClass("Technical task")).toBe(typeChipClass("Technical task"));
