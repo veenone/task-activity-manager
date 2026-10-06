@@ -1685,3 +1685,11 @@ export const CreateDashboard: (profileId: string, name: string, filterId: string
 export const RefreshDashboard: (profileId: string, id: string) => Promise<Dashboard> =
   App.RefreshDashboard as unknown as (profileId: string, id: string) => Promise<Dashboard>;
 export const DeleteDashboard: (profileId: string, id: string) => Promise<void> = App.DeleteDashboard;
+
+// ExportBacklog writes the rows a query matches to a workbook, wherever
+// the save dialog says, and answers with the path. An empty path is a
+// cancelled dialog: nothing was written and nothing went wrong. It is the
+// filter that is exported, not the page, so the caller sends its query
+// with the paging cleared.
+export const ExportBacklog = (profileId: string, q: IssueQuery): Promise<string> =>
+  App.ExportBacklog(profileId, issuerepo.IssueQuery.createFrom(q)) as Promise<string>;
