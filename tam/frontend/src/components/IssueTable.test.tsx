@@ -85,7 +85,7 @@ describe("IssueTable", () => {
       }),
       issue({ key: "PLAT-409" }),
     ]);
-    expect(within(rowOf(/^PLAT-412 /)).getByText("6h of 8h")).toBeInTheDocument();
+    expect(within(rowOf(/^PLAT-412 /)).getByText("6h/8h")).toBeInTheDocument();
     // Not "0h": an issue nobody estimated has not been estimated at nothing.
     expect(within(rowOf(/^PLAT-409 /)).queryByText(/h of /)).toBeNull();
   });
@@ -97,6 +97,21 @@ describe("IssueTable", () => {
     const rowOf = renderTable([
       issue({ key: "PLAT-412", aggregateEstimateSeconds: 144000, aggregateRemainingSeconds: 100800, aggregateTimeSpentSeconds: 43200 }),
     ]);
-    expect(within(rowOf(/^PLAT-412 /)).getByText("Σ 12h of 40h")).toBeInTheDocument();
+    const row = rowOf(/^PLAT-412 /);
+    expect(within(row).getByText("Σ 12h/40h")).toBeInTheDocument();
+    // The bar is what makes the column readable at a glance, and it says
+    // its own value: colour and length are never the only carriers.
+    const bar = within(row).getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", String(43200));
+    expect(bar).toHaveAttribute("aria-valuemax", String(144000));
+    expect(bar).toHaveAttribute("aria-valuetext", "12h of 40h, including sub-tasks");
+  });
+
+  // Nothing to fill a track against, so the figures stand alone.
+  it("draws no bar for a row with hours logged and no estimate", () => {
+    const rowOf = renderTable([issue({ key: "PLAT-412", timeSpentSeconds: 3600, aggregateTimeSpentSeconds: 3600 })]);
+    const row = rowOf(/^PLAT-412 /);
+    expect(within(row).getByText("1h logged")).toBeInTheDocument();
+    expect(within(row).queryByRole("progressbar")).toBeNull();
   });
 });

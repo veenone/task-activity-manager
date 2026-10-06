@@ -221,8 +221,21 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* SPRINT was 96px, which clipped every real sprint name ("Sprint 12 -
    Checkout polish") to its first two words. The grid scrolls sideways now,
    so a column wide enough to read costs nothing that matters. */
-.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) var(--type-col-w, 104px) 420px 132px 116px 168px 44px 92px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
-.issue-time { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.issue-row { display: grid; grid-template-columns: var(--issue-key-w, 84px) var(--type-col-w, 104px) 420px 132px 116px 168px 44px 132px; align-items: center; gap: 8px; padding: 0 10px; height: 34px; border-bottom: 1px solid var(--border-subtle); width: max-content; min-width: 100%; }
+/* The Time cell is a bar and its figures: the bar takes what is left
+   after the text, which is sized to the longest pair it holds. */
+.issue-time { display: flex; align-items: center; gap: 6px; color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.issue-time-bar { flex: 1 1 auto; min-width: 28px; }
+.issue-time-text { flex: none; font-variant-numeric: tabular-nums; }
+
+/* The detail panel's time tracking block: a heading, the bar, and the
+   figures under it in a row that wraps on a narrow panel. */
+.detail-time { padding: 8px 12px 10px; border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 6px; }
+.detail-time-head { margin: 0; font-size: 0.95em; font-weight: 600; }
+.detail-time-empty, .detail-time-own { margin: 0; }
+.detail-time-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.detail-time-figures dt { color: var(--text-muted); font-size: 0.85em; }
+.detail-time-figures dd { margin: 0; font-variant-numeric: tabular-nums; }
 /* Every cell clips to its track. Without this a grid item wider than its
    track paints over its neighbour (nowrap) or wraps to two lines in a row
    whose height is locked at 34px, and a clipped value reads as a complete
@@ -848,6 +861,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
    between the figures and the evidence read no stronger than a line wrap
    inside a toolbar. This is the break that gets the room. */
 .report-charts { flex: none; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; margin-top: 24px; }
+/* With a second burndown the row carries three charts, and the two lines
+   are read against each other: they take the same width, and the outcome
+   chart sits under the first of them. The 3fr to 2fr split above is for
+   the one-chart case, where nothing is being compared. */
+.report-charts-timed { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 /* The publisher ribbon: three cells, one per output, each saying where that
    one is. A row of them rather than one line of text, because the three run
    and finish independently.

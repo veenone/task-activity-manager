@@ -178,7 +178,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
             applied twice, wrapped it to three rows at every window width. */}
         {/* The burndown is the wide one: it carries a point per sprint day,
             while the outcome chart carries five bars. */}
-        <div className="report-charts">
+        <div className={`report-charts${(r.series.timeDays?.length ?? 0) > 0 ? " report-charts-timed" : ""}`}>
           <BurndownChart days={r.series.days} unit={r.series.unit} exported="burndown" busy={report.isFetching} />
           {(r.series.timeDays?.length ?? 0) > 0 && (
             <BurndownChart days={r.series.timeDays ?? []} unit="hours" title="Burndown in hours" exported="burndownTime" busy={report.isFetching} />

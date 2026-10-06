@@ -79,11 +79,14 @@ export function hasTime(t: IssueTime): boolean {
 export function timeCell(issue: Issue): string {
   const t = issueTime(issue);
   if (!hasTime(t)) return "";
+  // Compact: the bar beside it carries the proportion, so the cell
+  // needs the two numbers and not a sentence. The sentence, remaining
+  // included, is in timeCellTitle.
   const body =
     t.spentSeconds !== null && t.estimateSeconds !== null
-      ? `${workDuration(t.spentSeconds)} of ${workDuration(t.estimateSeconds)}`
+      ? `${workDuration(t.spentSeconds)}/${workDuration(t.estimateSeconds)}`
       : t.estimateSeconds !== null
-        ? `${workDuration(t.estimateSeconds)} estimated`
+        ? `${workDuration(t.estimateSeconds)} est`
         : `${workDuration(t.spentSeconds as number)} logged`;
   return t.family ? `${FAMILY_MARK} ${body}` : body;
 }
@@ -99,4 +102,44 @@ export function timeCellTitle(issue: Issue): string {
     t.spentSeconds !== null ? `${workDuration(t.spentSeconds)} logged` : "",
   ].filter((p) => p !== "");
   return t.family ? `${parts.join(", ")}, including sub-tasks` : parts.join(", ");
+}
+
+// TimeBar is what the Backlog cell and the panel draw their bar from:
+// what has been logged against what was estimated, plus the two strings
+// a progressbar needs to say what it means where no stylesheet applies.
+export interface TimeBar {
+  value: number;
+  max: number;
+  label: string;
+  valueText: string;
+}
+
+// timeBar is the bar for one issue's figures, or null when there is
+// nothing to draw one against.
+//
+// An estimate is what gives the track its scale, so a row with hours
+// logged and nothing estimated gets no bar: a track with no end would be
+// a shape saying something it does not know. An estimate with nothing
+// logged does get one, empty, because "planned and untouched" is worth
+// seeing. Work that overran fills the track and no further; the figures
+// beside it are what say it went over, since a bar cannot.
+export function timeBar(t: IssueTime): TimeBar | null {
+  if (t.estimateSeconds === null || t.estimateSeconds <= 0) return null;
+  const logged = t.spentSeconds ?? 0;
+  return {
+    value: Math.min(logged, t.estimateSeconds),
+    max: t.estimateSeconds,
+    label: t.family ? "Time logged against the estimate, including sub-tasks" : "Time logged against the estimate",
+    valueText: `${workDuration(logged)} of ${workDuration(t.estimateSeconds)}${t.family ? ", including sub-tasks" : ""}`,
+  };
+}
+
+// timeFigures is the three the panel lists under the bar, in the order
+// a reader reads them, with the ones an issue does not carry left out.
+export function timeFigures(t: IssueTime): { label: string; text: string }[] {
+  const out: { label: string; text: string }[] = [];
+  if (t.estimateSeconds !== null) out.push({ label: "Estimated", text: workDuration(t.estimateSeconds) });
+  if (t.remainingSeconds !== null) out.push({ label: "Remaining", text: workDuration(t.remainingSeconds) });
+  if (t.spentSeconds !== null) out.push({ label: "Logged", text: workDuration(t.spentSeconds) });
+  return out;
 }

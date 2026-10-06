@@ -5,7 +5,8 @@ import { GRID_COLUMNS } from "../api";
 import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
 import { statusClass } from "../lib/statusClass";
-import { timeCell, timeCellTitle } from "../lib/issueTime";
+import { hasTime, issueTime, timeBar, timeCell, timeCellTitle } from "../lib/issueTime";
+import { ProgressBar } from "@agile-suite/core";
 import { keyColumnWidth } from "../lib/keyColumn";
 import { typeChipLabel } from "../lib/typeChip";
 import { typeColumnWidth } from "../lib/typeColumn";
@@ -188,11 +189,35 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
                   would report a habit as a measurement. A row estimated
                   through its sub-tasks reads as the family, marked, which
                   is what lib/issueTime decides. */}
-              <span role="gridcell" className="issue-time" title={timeCellTitle(iss) || undefined}>{timeCell(iss)}</span>
+              <TimeCell issue={iss} />
             </div>
           );
         })}
       </div>
     </div>
+  );
+}
+
+// TimeCell is the Backlog's Time column: a bar for how much of the
+// estimate is gone, with the figures beside it.
+//
+// The bar is what makes the column readable at a glance; it is never the
+// only carrier, so the figures sit next to it and the whole phrase,
+// remaining included, is in the cell's title. A row with no estimate has
+// nothing to fill a track against and shows the figures alone.
+function TimeCell({ issue }: { issue: Issue }) {
+  const time = issueTime(issue);
+  const bar = timeBar(time);
+  const text = timeCell(issue);
+  if (!hasTime(time)) return <span role="gridcell" className="issue-time" />;
+  return (
+    <span role="gridcell" className="issue-time" title={timeCellTitle(issue) || undefined}>
+      {bar && (
+        <span className="issue-time-bar">
+          <ProgressBar value={bar.value} max={bar.max} label={bar.label} valueText={bar.valueText} tone="time" />
+        </span>
+      )}
+      <span className="issue-time-text">{text}</span>
+    </span>
   );
 }

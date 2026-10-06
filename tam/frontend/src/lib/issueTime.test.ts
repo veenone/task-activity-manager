@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Issue } from "../api";
-import { hasTime, issueTime, timeCell, timeCellTitle } from "./issueTime";
+import { hasTime, issueTime, timeBar, timeCell, timeCellTitle } from "./issueTime";
 
 // The same six-field shape the Go side's test uses, in the same order:
 // the issue's own three, then its family's three. The two
@@ -56,13 +56,15 @@ describe("issueTime", () => {
 });
 
 describe("the Backlog's time cell", () => {
+  // Compact: the bar beside it carries the proportion, so the cell
+  // holds the two numbers rather than a sentence.
   it("marks a family and leaves a leaf unmarked", () => {
-    expect(timeCell(issue([21600, 7200, 21600], [21600, 7200, 21600]))).toBe("6h of 6h");
-    expect(timeCell(issue([null, null, null], [144000, 100800, 43200]))).toBe("Σ 12h of 40h");
+    expect(timeCell(issue([21600, 7200, 21600], [21600, 7200, 21600]))).toBe("6h/6h");
+    expect(timeCell(issue([null, null, null], [144000, 100800, 43200]))).toBe("Σ 12h/40h");
   });
 
   it("says what it knows when only one figure is there", () => {
-    expect(timeCell(issue([28800, null, null], [28800, null, null]))).toBe("8h estimated");
+    expect(timeCell(issue([28800, null, null], [28800, null, null]))).toBe("8h est");
     expect(timeCell(issue([null, null, 3600], [null, null, 3600]))).toBe("1h logged");
     expect(timeCell(issue([null, null, null], [null, null, null]))).toBe("");
   });
@@ -75,5 +77,42 @@ describe("the Backlog's time cell", () => {
     expect(title).toContain("including sub-tasks");
     // A leaf says the same three without the sub-task clause.
     expect(timeCellTitle(issue([28800, 7200, 21600], [28800, 7200, 21600]))).not.toContain("sub-tasks");
+  });
+});
+
+describe("the time bar", () => {
+  it("fills by what is logged against what was estimated", () => {
+    const bar = timeBar(issueTime(issue([40 * 3600, null, 10 * 3600], [40 * 3600, null, 10 * 3600])));
+    expect(bar).not.toBeNull();
+    expect(bar!.value).toBe(10 * 3600);
+    expect(bar!.max).toBe(40 * 3600);
+  });
+
+  // An overrun reads as full rather than past the end, and the figures
+  // beside it still say what happened.
+  it("stops at full when the work overran", () => {
+    const bar = timeBar(issueTime(issue([2 * 3600, null, 6 * 3600], [2 * 3600, null, 6 * 3600])));
+    expect(bar!.value).toBe(bar!.max);
+  });
+
+  // Nothing to measure against: a bar with no scale would be a shape
+  // saying something it does not know.
+  it("is nothing without an estimate", () => {
+    expect(timeBar(issueTime(issue([null, null, 3600], [null, null, 3600])))).toBeNull();
+    expect(timeBar(issueTime(issue([null, null, null], [null, null, null])))).toBeNull();
+  });
+
+  // An estimate nobody has worked against is an empty track, not an
+  // absent one: it says the work is planned and untouched.
+  it("is an empty track for an estimate with nothing logged", () => {
+    const bar = timeBar(issueTime(issue([8 * 3600, null, null], [8 * 3600, null, null])));
+    expect(bar!.value).toBe(0);
+    expect(bar!.max).toBe(8 * 3600);
+  });
+
+  it("names itself and says its value in words", () => {
+    const bar = timeBar(issueTime(issue([null, null, null], [144000, 100800, 43200])));
+    expect(bar!.label).toMatch(/time/i);
+    expect(bar!.valueText).toBe("12h of 40h, including sub-tasks");
   });
 });
