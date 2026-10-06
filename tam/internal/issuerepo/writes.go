@@ -23,7 +23,8 @@ var fieldColumns = map[string]string{
 	"labels": "labels", "storyPoints": "story_points", "assignee": "assignee", "parentKey": "parent_key",
 }
 
-// draftTypes are the logical types a draft may have.
+// draftTypes are the logical types a draft may have whatever the project
+// is. They are TAM's own six, which every Jira has something answering to.
 var draftTypes = map[string]bool{backend.TypeTask: true, backend.TypeStory: true, backend.TypeBug: true, backend.TypeRequirement: true, backend.TypeEpic: true, backend.TypeSubtask: true}
 
 // execer is the subset of *sql.Tx and *sql.DB the field helpers use.
@@ -431,10 +432,14 @@ func (r *Repository) CreateDrafts(ctx context.Context, profileID, projectKey str
 	if len(drafts) == 0 {
 		return nil, errors.New("nothing to create")
 	}
+	offered, err := r.draftableTypes(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
 	for i := range drafts {
 		d := &drafts[i]
-		if !draftTypes[d.Type] {
-			return nil, fmt.Errorf("type %q cannot be created here; tasks, stories, bugs, requirements, epics, and subtasks can", d.Type)
+		if !offered.has(d.Type) {
+			return nil, fmt.Errorf("type %q cannot be created here; %s can", d.Type, offered.words())
 		}
 		if strings.TrimSpace(d.Summary) == "" {
 			return nil, errors.New("summary cannot be empty")

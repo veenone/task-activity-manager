@@ -3,10 +3,12 @@ package importer
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
 
+	"agile-suite/tam/internal/backend"
 	"agile-suite/tam/internal/boardrepo"
 )
 
@@ -43,7 +45,7 @@ const (
 // three are checked against what is already cached for the profile, so any
 // value written in here would be wrong for everyone but the machine it was
 // written on, and would greet a first-time user with validation errors.
-func TemplateXLSX(requirementType string, open []boardrepo.SprintChoice) ([]byte, error) {
+func TemplateXLSX(requirementType string, open []boardrepo.SprintChoice, own []backend.IssueType) ([]byte, error) {
 	f := excelize.NewFile()
 	defer f.Close()
 
@@ -120,7 +122,7 @@ func TemplateXLSX(requirementType string, open []boardrepo.SprintChoice) ([]byte
 	// instance, and a wrong list would block valid input.
 	dv := excelize.NewDataValidation(true)
 	dv.Sqref = "B2:B1000"
-	if err := dv.SetDropList(templateTypes(requirementType)); err != nil {
+	if err := dv.SetDropList(templateTypes(requirementType, own)); err != nil {
 		return nil, err
 	}
 	dv.SetError(excelize.DataValidationErrorStyleStop, "Type", "Pick one of the listed types, or clear the cell for Task.")
@@ -182,8 +184,24 @@ func addSprintList(f *excelize.File, names []string) error {
 	return f.AddDataValidation(templateSheet, dv)
 }
 
-func templateTypes(requirementType string) []string {
-	return []string{"Task", "Story", "Bug", "Epic", requirementLabel(requirementType)}
+// templateTypes is the Type column's dropdown. Excel refuses anything off
+// it before TAM ever reads the sheet, so it lists what the project itself
+// offers when a sync has recorded that, and TAM's own list otherwise
+// (#137). The sub-task level is left out: a sub-task is drafted from the
+// issue it belongs to, never from a row of its own.
+func templateTypes(requirementType string, own []backend.IssueType) []string {
+	if len(own) == 0 {
+		return []string{"Task", "Story", "Bug", "Epic", requirementLabel(requirementType)}
+	}
+	names := make([]string, 0, len(own))
+	for _, t := range own {
+		if t.Subtask {
+			continue
+		}
+		names = append(names, t.Name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // templateRows are the examples: four creates that show a filled row of each

@@ -52,7 +52,7 @@ func TestASprintNameWithACommaIsLeftOutOfTheDropdown(t *testing.T) {
 	data, err := TemplateXLSX("Business Requirement", []boardrepo.SprintChoice{
 		{ID: 12, Name: "Sprint 12, phase two", BoardName: "PLAT Scrum", State: "active"},
 		{ID: 13, Name: "Sprint 13", BoardName: "PLAT Scrum", State: "future"},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("TemplateXLSX: %v", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -173,9 +174,13 @@ func blank(row []string, c columns) bool {
 	return true
 }
 
-// logicalType maps a type cell to a creatable logical type. Blank means
-// task; the profile's requirement type name counts as requirement.
-func logicalType(raw, requirementType string) (string, error) {
+// logicalType maps a type cell to a type a draft may carry. Blank means
+// task; the profile's requirement type name counts as requirement; and a
+// name the project itself offers passes through under the project's own
+// spelling, which is what the New issue dialog already offers and what
+// the Jira create takes (#137). own is empty for a profile no sync has
+// recorded types for, and the modelled list is then the whole answer.
+func logicalType(raw, requirementType string, own []backend.IssueType) (string, error) {
 	n := strings.ToLower(strings.TrimSpace(raw))
 	switch n {
 	case "", backend.TypeTask:
@@ -186,7 +191,27 @@ func logicalType(raw, requirementType string) (string, error) {
 	if requirementType != "" && n == strings.ToLower(strings.TrimSpace(requirementType)) {
 		return backend.TypeRequirement, nil
 	}
-	return "", fmt.Errorf("Type %q cannot be created; use Task, Story, Bug, Epic, or %s", strings.TrimSpace(raw), requirementLabel(requirementType))
+	for _, t := range own {
+		if n == strings.ToLower(strings.TrimSpace(t.Name)) {
+			return t.Name, nil
+		}
+	}
+	return "", fmt.Errorf("Type %q cannot be created; use %s", strings.TrimSpace(raw), typeWords(requirementType, own))
+}
+
+// typeWords lists what this sheet may say in its Type column: the
+// project's own types when a sync has recorded them, since those are what
+// the project takes, and the modelled list otherwise.
+func typeWords(requirementType string, own []backend.IssueType) string {
+	if len(own) == 0 {
+		return fmt.Sprintf("Task, Story, Bug, Epic, or %s", requirementLabel(requirementType))
+	}
+	names := make([]string, 0, len(own))
+	for _, t := range own {
+		names = append(names, t.Name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 func requirementLabel(requirementType string) string {
@@ -275,6 +300,12 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 	if err != nil {
 		return Result{}, err
 	}
+	// What this project offers, so a sheet may name a type TAM does not
+	// model. Read once: it is the same answer for every row.
+	ownTypes, err := repo.ProjectTypes(ctx, profileID)
+	if err != nil {
+		return Result{}, err
+	}
 	newEpics := map[string]bool{}
 	seen := map[string]int{}
 	seenKeys := map[string]int{}
@@ -346,7 +377,7 @@ func Run(ctx context.Context, repo *issuerepo.Repository, profileID, projectKey,
 			fail("Summary is empty.")
 			continue
 		}
-		typ, err := logicalType(cell(row, c.typ), requirementType)
+		typ, err := logicalType(cell(row, c.typ), requirementType, ownTypes)
 		if err != nil {
 			fail(err.Error() + ".")
 			continue
