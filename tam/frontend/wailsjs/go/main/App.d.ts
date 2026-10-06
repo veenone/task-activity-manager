@@ -212,6 +212,8 @@ export function SetReportExportDirectory(arg1:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 
+export function SetTourSeenVersion(arg1:number):Promise<void>;
+
 export function StandupEntry(arg1:string):Promise<string>;
 
 export function StartSprint(arg1:string,arg2:number,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string):Promise<void>;

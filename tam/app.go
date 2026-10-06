@@ -220,6 +220,16 @@ func (a *App) GetSettings() (settings.Settings, error) {
 	return a.settings.Get()
 }
 
+// SetTourSeenVersion records that the user has been through this version of
+// the onboarding tour, so it is offered once rather than every launch. The
+// setting is shared with XTM, which does the same with its own tour.
+func (a *App) SetTourSeenVersion(v int) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.settings.SetTourSeenVersion(v)
+}
+
 // SetTheme stores the colour theme: "light", "dark", or "system". Both apps
 // read it.
 func (a *App) SetTheme(theme string) error {

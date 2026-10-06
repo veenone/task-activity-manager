@@ -269,7 +269,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   }
 
   return (
-    <section className="backlog" aria-label="Reports">
+    <section className="backlog" aria-label="Reports" data-tour="reports-body">
       <h2 className="sr-only">Reports</h2>
       <div className="report-frame" ref={reportFrame}>
         <div className="board-head">

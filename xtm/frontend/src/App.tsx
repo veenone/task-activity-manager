@@ -12,6 +12,7 @@ import {
   ImportProfile,
   UpdateProfileToken,
   SetShowCoverage,
+  SetTourSeenVersion,
   ResolveConflictOverride,
   ResolveConflictKeepRemote,
   ResolveConflictMerge,
@@ -91,8 +92,8 @@ import { LiveRegion } from "./components/LiveRegion";
 import { usePrompt } from "./components/usePrompt";
 import { useConfirm } from "./components/useConfirm";
 import { useNotice } from "./components/useNotice";
-import { useTour } from "./tour/useTour";
-import { TOUR_VERSION } from "./tour/steps";
+import { useTour } from "@agile-suite/core";
+import { TOURS, TOUR_VERSION } from "./tour/steps";
 
 function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -193,6 +194,9 @@ function App() {
   // The onboarding tour (-335). Steps target Browse-only elements and the tour
   // can be replayed from any view, so it switches to Browse before starting.
   const { start: startTour } = useTour({
+    tours: TOURS,
+    version: TOUR_VERSION,
+    markSeen: SetTourSeenVersion,
     onFinish: () => setTourSeenVersion(TOUR_VERSION),
   });
 

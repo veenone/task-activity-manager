@@ -12,16 +12,12 @@
 // widgets themselves; the per-view tours anchor on each view's own tab (always
 // mounted in the topbar) plus the shared More menu, for the same reason.
 
+import type { TourStep } from "@agile-suite/core";
+
 export const TOUR_VERSION = 1;
 
-export interface TourStep {
-  id: string;
-  /** Value of the target element's data-tour attribute. */
-  target: string;
-  title: string;
-  body: string;
-  side?: "top" | "bottom" | "left" | "right";
-}
+// The step shape lives with the hook that reads it, in core.
+export type { TourStep } from "@agile-suite/core";
 
 // The Browse tour: the core "sync → browse → edit → commit" loop. It is the
 // first-run tour and stays inside Browse.
