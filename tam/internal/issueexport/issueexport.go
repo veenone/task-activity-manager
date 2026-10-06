@@ -52,7 +52,12 @@ var columns = []column{
 	{head: "Sprint", width: 20},
 	{head: "Points", width: 8, numeric: true},
 	{head: "Estimated (h)", width: 13, numeric: true},
+	{head: "Remaining (h)", width: 13, numeric: true},
 	{head: "Logged (h)", width: 11, numeric: true},
+	// A spreadsheet cannot carry the Backlog's mark inside a number and
+	// keep the column summable, so which set a row's figures came from
+	// is a column of its own.
+	{head: "Includes sub-tasks", width: 17},
 	{head: "Parent", width: 14},
 	{head: "Labels", width: 24},
 	{head: "Project", width: 10},
@@ -189,10 +194,14 @@ func writeHeader(f *excelize.File, s *styles) error {
 // and Status are the columns that carry meaning by colour on screen, so
 // they are the ones that carry it here; the rest is plain.
 func writeRow(f *excelize.File, s *styles, row int, iss backend.Issue) error {
+	// The figures a reader is shown: the issue's own, or its family's
+	// when it is estimated through its sub-tasks. backend.Issue.Time is
+	// the one place that decides, so the sheet and the grid agree.
+	t := iss.Time()
 	values := []any{
 		iss.Key, iss.Type, iss.Summary, iss.Status, iss.Assignee, iss.SprintName,
-		number(iss.StoryPoints), hours(iss.OriginalEstimateSeconds), hours(iss.TimeSpentSeconds),
-		iss.ParentKey, strings.Join(iss.Labels, ", "), iss.Project, description(iss),
+		number(iss.StoryPoints), hours(t.EstimateSeconds), hours(t.RemainingSeconds), hours(t.SpentSeconds),
+		familyMark(t), iss.ParentKey, strings.Join(iss.Labels, ", "), iss.Project, description(iss),
 	}
 	for i, v := range values {
 		cell, err := excelize.CoordinatesToCellName(i+1, row)
@@ -264,6 +273,16 @@ func finish(f *excelize.File, rows int) error {
 		return fmt.Errorf("add the filter: %w", err)
 	}
 	return nil
+}
+
+// familyMark is what the sub-task column says: a word on a row whose
+// figures are its family's, and nothing on a row reading as itself, so
+// the column filters to the parents in one click.
+func familyMark(t backend.TimeFigures) string {
+	if t.Family && t.Any() {
+		return "yes"
+	}
+	return ""
 }
 
 // number and hours leave a cell empty where the issue carries no value.

@@ -46,15 +46,15 @@ type workLog struct {
 	seconds int
 }
 
-// logsOf reads an issue's worklogs into the burn, dropping any entry whose
+// logsOf reads worklogs into the burn, dropping any entry whose
 // timestamp will not parse. That is the one place this file is laxer than
 // the changelog walk, which refuses the whole report over an unreadable
 // date: a changelog entry nobody can read may have moved a card between
 // sprints, where a worklog nobody can read is an hour of work missing from
 // a line that is already an approximation of effort.
-func logsOf(h backend.IssueHistory) []workLog {
-	out := make([]workLog, 0, len(h.Worklogs))
-	for _, w := range h.Worklogs {
+func logsOf(entries []backend.Worklog) []workLog {
+	out := make([]workLog, 0, len(entries))
+	for _, w := range entries {
 		at, err := sprintdate.Parse(w.Started)
 		if err != nil {
 			continue
@@ -70,11 +70,38 @@ func logsOf(h backend.IssueHistory) []workLog {
 // at zero would say the team finished everything before it started.
 func (w *walker) estimated() bool {
 	for _, c := range w.cards {
-		if c.estimate != nil {
+		if w.scopeOf(c) != nil {
 			return true
 		}
 	}
 	return false
+}
+
+// scopeOf is the estimate a card stands for.
+//
+// A card whose sub-tasks are in the sprint beside it stands for itself
+// alone: the children are cards in their own right and carry their own
+// estimates, so counting the family here would count them twice. A card
+// whose sub-tasks are not in the sprint stands for the family, because
+// that is the work the sprint actually took on; for a leaf the two are
+// the same number, so nothing special happens to one (#142).
+func (w *walker) scopeOf(c *card) *int {
+	if w.hasChildInSprint[c.key] {
+		return c.estimate
+	}
+	if c.family.EstimateSeconds != nil {
+		return c.family.EstimateSeconds
+	}
+	return c.estimate
+}
+
+// burnOf is the work that counts against that estimate: the card's own,
+// plus its sub-tasks' when the card is standing for the family.
+func (w *walker) burnOf(c *card) []workLog {
+	if w.hasChildInSprint[c.key] {
+		return c.logs
+	}
+	return append(append([]workLog{}, c.logs...), c.familyLogs...)
 }
 
 // timeTotals is the estimated scope of the cards in the sprint right now,
@@ -86,10 +113,10 @@ func (w *walker) timeTotals(boundary time.Time) (scope, burned float64) {
 		if !c.in {
 			continue
 		}
-		if c.estimate != nil {
-			scope += float64(*c.estimate) / hour
+		if e := w.scopeOf(c); e != nil {
+			scope += float64(*e) / hour
 		}
-		for _, l := range c.logs {
+		for _, l := range w.burnOf(c) {
 			if l.at.Before(boundary) && !l.at.Before(w.firstMoment) {
 				burned += float64(l.seconds) / hour
 			}

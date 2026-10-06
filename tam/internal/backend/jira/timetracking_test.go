@@ -17,7 +17,10 @@ func TestTheSyncsSearchAsksForTheTimeTrackingFields(t *testing.T) {
 		t.Fatalf("searches = %v", f.searches)
 	}
 	fields := f.searches[0][strings.Index(f.searches[0], "| fields=")+len("| fields="):]
-	for _, want := range []string{"timeoriginalestimate", "timeestimate", "timespent", "aggregatetimespent"} {
+	for _, want := range []string{
+		"timeoriginalestimate", "timeestimate", "timespent",
+		"aggregatetimeoriginalestimate", "aggregatetimeestimate", "aggregatetimespent",
+	} {
 		if !strings.Contains(fields, want) {
 			t.Errorf("search fields = %q, want %s among them", fields, want)
 		}
@@ -43,12 +46,21 @@ func TestTimeTrackingIsReadInSecondsAndIsNilWhenJiraSendsNone(t *testing.T) {
 	if estimated.TimeSpentSeconds == nil || *estimated.TimeSpentSeconds != 21600 {
 		t.Errorf("PLAT-412 time spent = %v", estimated.TimeSpentSeconds)
 	}
-	if estimated.AggregateTimeSpentSeconds == nil || *estimated.AggregateTimeSpentSeconds != 36000 {
+	// The family's three, which is where everything sits for an issue
+	// estimated through its sub-tasks (#142).
+	if estimated.AggregateEstimateSeconds == nil || *estimated.AggregateEstimateSeconds != 144000 {
+		t.Errorf("PLAT-412 aggregate estimate = %v, want the family's 40h", estimated.AggregateEstimateSeconds)
+	}
+	if estimated.AggregateRemainingSeconds == nil || *estimated.AggregateRemainingSeconds != 100800 {
+		t.Errorf("PLAT-412 aggregate remaining = %v", estimated.AggregateRemainingSeconds)
+	}
+	if estimated.AggregateTimeSpentSeconds == nil || *estimated.AggregateTimeSpentSeconds != 43200 {
 		t.Errorf("PLAT-412 aggregate time spent = %v", estimated.AggregateTimeSpentSeconds)
 	}
 	unestimated := page[1]
 	if unestimated.OriginalEstimateSeconds != nil || unestimated.RemainingEstimateSeconds != nil ||
-		unestimated.TimeSpentSeconds != nil || unestimated.AggregateTimeSpentSeconds != nil {
+		unestimated.TimeSpentSeconds != nil || unestimated.AggregateEstimateSeconds != nil ||
+		unestimated.AggregateRemainingSeconds != nil || unestimated.AggregateTimeSpentSeconds != nil {
 		t.Errorf("PLAT-388 = %+v, want no time tracking at all", unestimated)
 	}
 }

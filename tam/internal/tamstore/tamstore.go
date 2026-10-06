@@ -106,7 +106,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 24,
+	Version: 25,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -395,6 +395,26 @@ var Schema = store.Schema{
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 			return err
 		},
+	}, {
+		Version: 25,
+		// The other two aggregates. Version 23 took the issue's own three
+		// and the family's spent, which left an issue estimated through
+		// its sub-tasks showing nothing at all (#142). Same shape as 23:
+		// a column add and a watermark clear, since only a sync carries
+		// these and an incremental one re-reads only what Jira reports
+		// changed.
+		Apply: func(db *sql.DB) error {
+			for _, col := range []string{
+				"aggregate_estimate_s INTEGER",
+				"aggregate_remaining_s INTEGER",
+			} {
+				if err := store.AddColumnIfMissing(db, "issue", col); err != nil {
+					return err
+				}
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -497,6 +517,11 @@ CREATE TABLE IF NOT EXISTS issue (
 	original_estimate_s    INTEGER,
 	remaining_estimate_s   INTEGER,
 	time_spent_s           INTEGER,
+	-- The family's three: the issue and its sub-tasks together, which is
+	-- where every figure sits for an issue estimated through its
+	-- children. Nullable for the reason the three above are.
+	aggregate_estimate_s   INTEGER,
+	aggregate_remaining_s  INTEGER,
 	aggregate_time_spent_s INTEGER,
 	rank              TEXT NOT NULL DEFAULT '',
 	created           TEXT NOT NULL DEFAULT '',

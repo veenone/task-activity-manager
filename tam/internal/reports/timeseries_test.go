@@ -119,3 +119,51 @@ func TestRemainingDoesNotGoBelowZero(t *testing.T) {
 		t.Errorf("remaining = %v, want 0 rather than negative work", d.Remaining)
 	}
 }
+
+// family is one card whose figures live on its sub-tasks: nothing of its
+// own, everything in the aggregates, and its children's worklogs beside
+// it the way the fetch attaches them.
+func family(key string, famEstimate int, logs []backend.Worklog, changes ...backend.Change) backend.IssueHistory {
+	h := card(key, "In Progress", "3", "11", nil, changes...)
+	h.Issue.AggregateEstimateSeconds = hours(famEstimate)
+	h.Issue.AggregateTimeSpentSeconds = hours(0)
+	h.SubtaskWorklogs = logs
+	return h
+}
+
+// The issue #142 was raised for, as a sprint: every estimate is on the
+// sub-tasks, and the sub-tasks are not in the sprint. Counting only what
+// the cards carry themselves drew no line at all.
+func TestASprintEstimatedThroughSubtasksBurnsTheFamily(t *testing.T) {
+	s := build(t, sprint11(), afterTheSprint, time.UTC,
+		family("PLAT-1", 40, []backend.Worklog{logged("2026-08-04", 10, 4)}),
+	)
+	if len(s.TimeDays) == 0 {
+		t.Fatal("no hours burndown for a sprint estimated through its sub-tasks")
+	}
+	first := timeDay(t, s, "2026-08-03")
+	if first.Scope != 40 {
+		t.Errorf("3 Aug scope = %v, want the family's 40h", first.Scope)
+	}
+	if second := timeDay(t, s, "2026-08-04"); second.Remaining != 36 {
+		t.Errorf("4 Aug remaining = %v, want the sub-task's four hours burned", second.Remaining)
+	}
+}
+
+// A sprint holding a parent and its sub-tasks counts the family once:
+// the children are cards in their own right, so the parent contributes
+// what it carries itself, which is usually nothing.
+func TestAParentAndItsChildrenInOneSprintCountOnce(t *testing.T) {
+	parent := family("PLAT-1", 40, []backend.Worklog{logged("2026-08-04", 10, 4)})
+	child := timed("PLAT-2", "In Progress", "3", hours(40), []backend.Worklog{logged("2026-08-04", 10, 4)})
+	child.Issue.ParentKey = "PLAT-1"
+	s := build(t, sprint11(), afterTheSprint, time.UTC, parent, child)
+
+	first := timeDay(t, s, "2026-08-03")
+	if first.Scope != 40 {
+		t.Errorf("scope = %v, want the family counted once", first.Scope)
+	}
+	if second := timeDay(t, s, "2026-08-04"); second.Remaining != 36 {
+		t.Errorf("remaining = %v, want the four hours burned once", second.Remaining)
+	}
+}

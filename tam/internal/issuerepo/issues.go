@@ -22,7 +22,8 @@ const (
 
 // issueColumns is the SELECT list every row read uses, in scan order.
 const issueColumns = `key, id, project, type, summary, description, status, status_id, status_category, assignee, assignee_name, reporter, priority, labels,
-	sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s, aggregate_time_spent_s,
+	sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s,
+	aggregate_estimate_s, aggregate_remaining_s, aggregate_time_spent_s,
 	rank, created, updated, ` + pendingFlag
 
 // keyOrder orders a key by its project prefix and then its number, so
@@ -109,9 +110,10 @@ func orderFor(q IssueQuery) string {
 // column is always carried.
 const upsertIssueSQL = `
 	INSERT INTO issue (profile_id, key, id, project, type, summary, description, status, status_id, status_category, assignee, assignee_name, reporter, priority, labels,
-		sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s, aggregate_time_spent_s,
+		sprint_id, sprint_name, parent_key, story_points, original_estimate_s, remaining_estimate_s, time_spent_s,
+		aggregate_estimate_s, aggregate_remaining_s, aggregate_time_spent_s,
 		rank, created, updated, synced_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(profile_id, key) DO UPDATE SET
 		id = excluded.id, project = excluded.project, type = excluded.type, summary = excluded.summary,
 		description = COALESCE(excluded.description, issue.description),
@@ -121,7 +123,9 @@ const upsertIssueSQL = `
 		sprint_name = excluded.sprint_name, parent_key = excluded.parent_key,
 		story_points = excluded.story_points,
 		original_estimate_s = excluded.original_estimate_s, remaining_estimate_s = excluded.remaining_estimate_s,
-		time_spent_s = excluded.time_spent_s, aggregate_time_spent_s = excluded.aggregate_time_spent_s,
+		time_spent_s = excluded.time_spent_s,
+		aggregate_estimate_s = excluded.aggregate_estimate_s, aggregate_remaining_s = excluded.aggregate_remaining_s,
+		aggregate_time_spent_s = excluded.aggregate_time_spent_s,
 		rank = excluded.rank, created = excluded.created,
 		updated = excluded.updated, synced_at = excluded.synced_at`
 
@@ -141,7 +145,8 @@ func upsertIssue(ctx context.Context, q execer, profileID string, iss backend.Is
 	if _, err := q.ExecContext(ctx, upsertIssueSQL, profileID, iss.Key, iss.ID, iss.Project, iss.Type, iss.Summary, description, iss.Status, iss.StatusID, iss.StatusCategory,
 		iss.Assignee, iss.AssigneeName, iss.Reporter, iss.Priority, string(labels), iss.SprintID, iss.SprintName, iss.ParentKey,
 		points, nullSeconds(iss.OriginalEstimateSeconds), nullSeconds(iss.RemainingEstimateSeconds),
-		nullSeconds(iss.TimeSpentSeconds), nullSeconds(iss.AggregateTimeSpentSeconds),
+		nullSeconds(iss.TimeSpentSeconds), nullSeconds(iss.AggregateEstimateSeconds),
+		nullSeconds(iss.AggregateRemainingSeconds), nullSeconds(iss.AggregateTimeSpentSeconds),
 		iss.Rank, iss.Created, iss.Updated, syncedAt.UTC().Format(time.RFC3339)); err != nil {
 		return fmt.Errorf("upsert %s: %w", iss.Key, err)
 	}
@@ -519,25 +524,29 @@ type scanner interface {
 
 func scanIssue(s scanner) (backend.Issue, error) {
 	var (
-		iss         backend.Issue
-		description sql.NullString
-		labels      string
-		points      sql.NullFloat64
-		estimate    sql.NullInt64
-		remaining   sql.NullInt64
-		spent       sql.NullInt64
-		aggregate   sql.NullInt64
-		pending     int
+		iss          backend.Issue
+		description  sql.NullString
+		labels       string
+		points       sql.NullFloat64
+		estimate     sql.NullInt64
+		remaining    sql.NullInt64
+		spent        sql.NullInt64
+		famEstimate  sql.NullInt64
+		famRemaining sql.NullInt64
+		aggregate    sql.NullInt64
+		pending      int
 	)
 	if err := s.Scan(&iss.Key, &iss.ID, &iss.Project, &iss.Type, &iss.Summary, &description, &iss.Status, &iss.StatusID, &iss.StatusCategory, &iss.Assignee, &iss.AssigneeName,
 		&iss.Reporter, &iss.Priority, &labels, &iss.SprintID, &iss.SprintName, &iss.ParentKey, &points,
-		&estimate, &remaining, &spent, &aggregate,
+		&estimate, &remaining, &spent, &famEstimate, &famRemaining, &aggregate,
 		&iss.Rank, &iss.Created, &iss.Updated, &pending); err != nil {
 		return backend.Issue{}, err
 	}
 	iss.OriginalEstimateSeconds = secondsOf(estimate)
 	iss.RemainingEstimateSeconds = secondsOf(remaining)
 	iss.TimeSpentSeconds = secondsOf(spent)
+	iss.AggregateEstimateSeconds = secondsOf(famEstimate)
+	iss.AggregateRemainingSeconds = secondsOf(famRemaining)
 	iss.AggregateTimeSpentSeconds = secondsOf(aggregate)
 	// NULL stays nil: the row has never been synced with a description, and
 	// the panel says so rather than drawing the empty string it would get

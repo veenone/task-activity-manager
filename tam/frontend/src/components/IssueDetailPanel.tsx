@@ -6,7 +6,9 @@ import { BrowserOpenURL } from "../api";
 import type { Issue, IssueComment, IssueDetail, Link, SprintOption } from "../api";
 import { useIssueDetail, useLinkedTests } from "../queries/issues";
 import { useDiscardById } from "../queries/pending";
-import { formatWhen, workDuration, workSplit } from "../lib/format";
+import { formatWhen, workDuration } from "../lib/format";
+import { hasTime, issueTime } from "../lib/issueTime";
+import type { IssueTime } from "../lib/issueTime";
 import { useSync } from "../contexts/SyncContext";
 import { TypeChip } from "./TypeChip";
 import { IssueKeyLink, browseUrl } from "./IssueKeyLink";
@@ -66,6 +68,21 @@ function Section({
       </div>
     </section>
   );
+}
+
+// FAMILY_NOTE says the figures beside it are the issue and its sub-tasks
+// together. The Backlog marks the same thing with a sign, because a
+// column has no room for a sentence; a panel has.
+const FAMILY_NOTE = "including sub-tasks";
+
+// ownTimeAside names what belongs to the issue itself, for a parent
+// whose figures are its family's. "none on the issue itself" is the
+// common case and the one worth saying: it is what tells a reader the
+// hours were logged by the children.
+function ownTimeAside(t: IssueTime): string {
+  if (t.ownSpentSeconds === null || t.ownSpentSeconds === 0) return "none on the issue itself";
+  if (t.ownSpentSeconds === t.spentSeconds) return "";
+  return `${workDuration(t.ownSpentSeconds)} on the issue itself`;
 }
 
 const DEFAULT_WIDTH = 352;
@@ -141,14 +158,14 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
   const sprintId = Number(issue.sprintId) || 0;
   const agreement = useDoneAgreement(profileId, boardId ?? 0, issue.key, sprintId);
   const [drafting, setDrafting] = useState(false);
-  // The issue's own time, and the family's total beside it when the two
-  // differ. A parent burns hours through its children, which Jira counts
-  // apart from its own: an epic whose subtasks logged eleven hours has had
-  // none logged against the epic itself, and one number for both would say
-  // otherwise.
-  const time = workSplit(issue.timeSpentSeconds, issue.originalEstimateSeconds);
-  const rolled = issue.aggregateTimeSpentSeconds;
-  const family = rolled != null && rolled !== (issue.timeSpentSeconds ?? 0) ? `${workDuration(rolled)} with subtasks` : "";
+  // The three figures a reader wants: estimated, remaining and logged.
+  // They are the issue's own, or its family's when it is estimated
+  // through its sub-tasks, which lib/issueTime decides and marks; the
+  // issue's own is named beside them when the two differ, because an
+  // epic whose children logged eleven hours has had none logged on it.
+  const time = issueTime(issue);
+  const tracked = hasTime(time);
+  const ownAside = time.family ? ownTimeAside(time) : "";
   // The comment chips read the description's syntax, which the toggle in
   // EditableFields can change; this is what carries that change up here.
   const [, bumpFormat] = useState(0);
@@ -263,7 +280,22 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
             ? <SprintField profileId={profileId} issue={issue} sprints={sprints} busy={busy} emptyNote={emptyNote} />
             : issue.sprintName || "-"}
         </dd>
-        {time && <><dt>Time</dt><dd>{time}{family && <span className="muted small"> {family}</span>}</dd></>}
+        {tracked && (
+          <>
+            <dt>Estimated</dt>
+            <dd>
+              {time.estimateSeconds !== null ? workDuration(time.estimateSeconds) : "-"}
+              {time.family && <span className="muted small"> {FAMILY_NOTE}</span>}
+            </dd>
+            <dt>Remaining</dt>
+            <dd>{time.remainingSeconds !== null ? workDuration(time.remainingSeconds) : "-"}</dd>
+            <dt>Logged</dt>
+            <dd>
+              {time.spentSeconds !== null ? workDuration(time.spentSeconds) : "-"}
+              {ownAside && <span className="muted small"> {ownAside}</span>}
+            </dd>
+          </>
+        )}
         <dt>Updated</dt><dd>{formatWhen(issue.updated) || "-"}</dd>
         <dt>Reporter</dt><dd>{issue.reporter || "-"}</dd>
       </dl>

@@ -5,7 +5,7 @@ import { GRID_COLUMNS } from "../api";
 import type { Issue, SortColumn } from "../api";
 import { TypeChip } from "./TypeChip";
 import { statusClass } from "../lib/statusClass";
-import { workSplit } from "../lib/format";
+import { timeCell, timeCellTitle } from "../lib/issueTime";
 import { keyColumnWidth } from "../lib/keyColumn";
 import { typeChipLabel } from "../lib/typeChip";
 import { typeColumnWidth } from "../lib/typeColumn";
@@ -185,8 +185,10 @@ export function IssueTable({ issues, subtaskLabel, selectedKey, onSelect, sort, 
               <span role="gridcell">{iss.storyPoints ?? "-"}</span>
               {/* Blank, not a dash and not a zero: most projects estimate in
                   nothing but points, and a column of "0h" over all of them
-                  would report a habit as a measurement. */}
-              <span role="gridcell" className="issue-time">{workSplit(iss.timeSpentSeconds, iss.originalEstimateSeconds)}</span>
+                  would report a habit as a measurement. A row estimated
+                  through its sub-tasks reads as the family, marked, which
+                  is what lib/issueTime decides. */}
+              <span role="gridcell" className="issue-time" title={timeCellTitle(iss) || undefined}>{timeCell(iss)}</span>
             </div>
           );
         })}

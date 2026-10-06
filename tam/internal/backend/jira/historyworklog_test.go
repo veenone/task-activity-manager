@@ -96,3 +96,37 @@ func TestOnlyACutShortWorklogCostsACallOfItsOwn(t *testing.T) {
 		t.Errorf("worklog calls = %d, want exactly the one issue the search cut short", *calls)
 	}
 }
+
+// A parent's sub-tasks are read in one search rather than one call per
+// issue, and each entry is filed under the parent that owns it.
+func TestSubtaskWorklogsComeBackByParent(t *testing.T) {
+	b, searches, calls := newWorklogHistoryServer(t, `{"total":2,"issues":[
+		{"id":"3","key":"PLAT-10","fields":{"parent":{"key":"PLAT-1"},
+			"worklog":{"startAt":0,"maxResults":20,"total":1,"worklogs":[
+				{"id":"1","started":"2026-08-04T10:00:00.000+0000","timeSpent":"4h","timeSpentSeconds":14400}]}}},
+		{"id":"4","key":"PLAT-11","fields":{"parent":{"key":"PLAT-1"},
+			"worklog":{"startAt":0,"maxResults":20,"total":1,"worklogs":[
+				{"id":"2","started":"2026-08-05T10:00:00.000+0000","timeSpent":"2h","timeSpentSeconds":7200}]}}}
+	]}`, "")
+	byParent, err := b.SubtaskWorklogs(context.Background(), []string{"PLAT-1", "PLAT-2"})
+	if err != nil {
+		t.Fatalf("sub-task worklogs: %v", err)
+	}
+	if len(byParent["PLAT-1"]) != 2 {
+		t.Fatalf("PLAT-1 = %+v, want both children's entries", byParent["PLAT-1"])
+	}
+	if _, ok := byParent["PLAT-2"]; ok {
+		t.Error("a parent whose children logged nothing should be absent rather than empty")
+	}
+	// One search for the batch, and no per-issue call: that is the whole
+	// point of asking by parent.
+	if len(*searches) != 1 {
+		t.Errorf("searches = %v, want one for the batch", *searches)
+	}
+	if !strings.Contains((*searches)[0], "parent+in") {
+		t.Errorf("search = %q, want it to ask by parent", (*searches)[0])
+	}
+	if *calls != 0 {
+		t.Errorf("per-issue worklog calls = %d, want none", *calls)
+	}
+}

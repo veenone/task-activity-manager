@@ -52,6 +52,12 @@ type IssueHistory struct {
 	// against; neither is distinguishable from the other here, and neither
 	// burns anything, so neither needs to be.
 	Worklogs []Worklog
+	// SubtaskWorklogs is what the issue's sub-tasks logged, for an issue
+	// whose work is done through them. It is kept apart from Worklogs
+	// because only a caller that is also counting the family's estimate
+	// may add it: a sprint holding the parent and its children would
+	// otherwise burn every hour twice.
+	SubtaskWorklogs []Worklog
 	// Truncated is true when the issue's changelog carries more entries
 	// than this page of the search returned: a search expansion caps how
 	// many histories one request answers with, per issue, and a truncated

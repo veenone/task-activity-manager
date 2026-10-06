@@ -1,0 +1,102 @@
+import type { Issue } from "../api";
+import { workDuration } from "./format";
+
+// Which of an issue's two sets of time figures a reader is shown.
+//
+// Jira keeps an issue's own estimate, remaining and spent apart from its
+// family's, and puts the family's in the aggregate trio. An issue
+// estimated through its sub-tasks answers null for its own three and
+// carries everything in the other set, which is why reading only its own
+// showed nothing at all for a parent (#142).
+//
+// So a row reads as its family when it has one, the way Jira's own time
+// tracking panel does, and says which set it is showing. A leaf carries
+// the same values in both, so it reads as itself and is marked as
+// nothing.
+//
+// This is the same rule as backend.Issue.Time in Go, which the export
+// uses. The two are pinned against the same cases in their own tests, so
+// either drifting fails where it is written.
+
+// FAMILY_MARK is what says a figure is the family's. It is a prefix
+// rather than a word so the Time column stays a column; the cell's title
+// spells it out, and the panel names it in full.
+export const FAMILY_MARK = "Σ";
+
+export interface IssueTime {
+  estimateSeconds: number | null;
+  remainingSeconds: number | null;
+  spentSeconds: number | null;
+  // family says the three above are the issue and its sub-tasks
+  // together rather than the issue alone.
+  family: boolean;
+  // The issue's own, kept beside the family's so the panel can say what
+  // belongs to the issue itself. null on a parent whose every hour was
+  // logged on a child.
+  ownSpentSeconds: number | null;
+  ownEstimateSeconds: number | null;
+}
+
+const value = (v?: number | null): number | null => (v === undefined ? null : v);
+
+// differs says the family carries a figure the issue's own does not
+// match. A missing family value says nothing: that is an instance or a
+// row cached before the aggregates were stored, not a family of no work.
+function differs(own: number | null, family: number | null): boolean {
+  if (family === null) return false;
+  return own === null || own !== family;
+}
+
+export function issueTime(issue: Issue): IssueTime {
+  const ownEstimate = value(issue.originalEstimateSeconds);
+  const ownRemaining = value(issue.remainingEstimateSeconds);
+  const ownSpent = value(issue.timeSpentSeconds);
+  const famEstimate = value(issue.aggregateEstimateSeconds);
+  const famRemaining = value(issue.aggregateRemainingSeconds);
+  const famSpent = value(issue.aggregateTimeSpentSeconds);
+  const family =
+    differs(ownEstimate, famEstimate) ||
+    differs(ownRemaining, famRemaining) ||
+    differs(ownSpent, famSpent);
+  return {
+    estimateSeconds: family ? famEstimate ?? ownEstimate : ownEstimate,
+    remainingSeconds: family ? famRemaining ?? ownRemaining : ownRemaining,
+    spentSeconds: family ? famSpent ?? ownSpent : ownSpent,
+    family,
+    ownSpentSeconds: ownSpent,
+    ownEstimateSeconds: ownEstimate,
+  };
+}
+
+// hasTime says there is anything to show at all. An issue nobody has
+// estimated or logged against shows nothing, not a zero.
+export function hasTime(t: IssueTime): boolean {
+  return t.estimateSeconds !== null || t.remainingSeconds !== null || t.spentSeconds !== null;
+}
+
+// timeCell is the Backlog's Time column: logged against estimated, with
+// the mark in front when the figures are the family's.
+export function timeCell(issue: Issue): string {
+  const t = issueTime(issue);
+  if (!hasTime(t)) return "";
+  const body =
+    t.spentSeconds !== null && t.estimateSeconds !== null
+      ? `${workDuration(t.spentSeconds)} of ${workDuration(t.estimateSeconds)}`
+      : t.estimateSeconds !== null
+        ? `${workDuration(t.estimateSeconds)} estimated`
+        : `${workDuration(t.spentSeconds as number)} logged`;
+  return t.family ? `${FAMILY_MARK} ${body}` : body;
+}
+
+// timeCellTitle spells out what the cell is showing, since the mark on
+// its own is not an explanation.
+export function timeCellTitle(issue: Issue): string {
+  const t = issueTime(issue);
+  if (!hasTime(t)) return "";
+  const parts = [
+    t.estimateSeconds !== null ? `${workDuration(t.estimateSeconds)} estimated` : "",
+    t.remainingSeconds !== null ? `${workDuration(t.remainingSeconds)} remaining` : "",
+    t.spentSeconds !== null ? `${workDuration(t.spentSeconds)} logged` : "",
+  ].filter((p) => p !== "");
+  return t.family ? `${parts.join(", ")}, including sub-tasks` : parts.join(", ");
+}

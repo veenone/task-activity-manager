@@ -127,3 +127,18 @@ func NewWorklogDraft(timeSpent, comment string, at time.Time) (WorklogDraft, err
 		Seconds:   seconds,
 	}, nil
 }
+
+// FamilyWorklogBackend reads the work logged on an issue's sub-tasks.
+//
+// It is its own optional interface rather than part of WorklogBackend
+// because only one caller needs it: the sprint report, which scopes an
+// issue by its family when the sub-tasks are not in the sprint and then
+// has to burn that scope down with the hours they logged. A backend that
+// cannot answer leaves the burn counting what is in the sprint, which is
+// what it did before.
+type FamilyWorklogBackend interface {
+	// SubtaskWorklogs is the entries logged against the sub-tasks of
+	// each parent key, by parent. A parent with no sub-tasks, or none
+	// that anybody logged against, is absent rather than empty.
+	SubtaskWorklogs(ctx context.Context, parentKeys []string) (map[string][]Worklog, error)
+}

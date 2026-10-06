@@ -18,6 +18,8 @@ func TestSyncKeepsTheTimeTrackingOnTheRow(t *testing.T) {
 	page[0].OriginalEstimateSeconds = secs(28800)
 	page[0].RemainingEstimateSeconds = secs(7200)
 	page[0].TimeSpentSeconds = secs(21600)
+	page[0].AggregateEstimateSeconds = secs(144000)
+	page[0].AggregateRemainingSeconds = secs(100800)
 	page[0].AggregateTimeSpentSeconds = secs(36000)
 	if err := r.UpsertPage(ctx, "p1", page, time.Now(), false); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -34,6 +36,8 @@ func TestSyncKeepsTheTimeTrackingOnTheRow(t *testing.T) {
 		{"original estimate", iss.OriginalEstimateSeconds, 28800},
 		{"remaining estimate", iss.RemainingEstimateSeconds, 7200},
 		{"time spent", iss.TimeSpentSeconds, 21600},
+		{"aggregate estimate", iss.AggregateEstimateSeconds, 144000},
+		{"aggregate remaining", iss.AggregateRemainingSeconds, 100800},
 		{"aggregate time spent", iss.AggregateTimeSpentSeconds, 36000},
 	} {
 		if c.got == nil {
@@ -60,7 +64,8 @@ func TestAnUnestimatedIssueReadsBackAsNoEstimateRatherThanZero(t *testing.T) {
 		t.Fatalf("get: %v", err)
 	}
 	if iss.OriginalEstimateSeconds != nil || iss.RemainingEstimateSeconds != nil ||
-		iss.TimeSpentSeconds != nil || iss.AggregateTimeSpentSeconds != nil {
+		iss.TimeSpentSeconds != nil || iss.AggregateEstimateSeconds != nil ||
+		iss.AggregateRemainingSeconds != nil || iss.AggregateTimeSpentSeconds != nil {
 		t.Errorf("unestimated issue = %+v, want all four nil", iss)
 	}
 }

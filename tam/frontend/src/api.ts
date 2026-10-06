@@ -155,6 +155,11 @@ export interface Issue {
   originalEstimateSeconds?: number | null;
   remainingEstimateSeconds?: number | null;
   timeSpentSeconds?: number | null;
+  // The family's three: the issue and its sub-tasks together, which is
+  // where every figure sits for an issue estimated through its children.
+  // lib/issueTime decides which set a surface shows.
+  aggregateEstimateSeconds?: number | null;
+  aggregateRemainingSeconds?: number | null;
   aggregateTimeSpentSeconds?: number | null;
   rank: string;
   created: string;
