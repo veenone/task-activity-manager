@@ -1,8 +1,15 @@
 
-// BarTone is what the bar is measuring, which is the only thing that varies
-// between one bar and the next. It is not a colour: which fill each tone
-// draws is one token in tokens.css.
-export type BarTone = "time" | "points" | "muted";
+// BarTone is what the bar's fill means. For most bars that is what they
+// measure, which is the only thing varying between one and the next; for
+// a bar that reports a state as well, it is the state it is in. It is
+// not a colour either way: which fill and track each tone draws are
+// tokens in tokens.css.
+//
+// progress, complete and over are the three a measure-against-a-target
+// bar moves through: under way, met exactly, and past it. They carry a
+// tinted track as well as a fill, because an unfilled bar the colour of
+// the page reads as empty space rather than as the rest of the target.
+export type BarTone = "time" | "points" | "muted" | "progress" | "complete" | "over";
 
 interface Props {
   value: number;

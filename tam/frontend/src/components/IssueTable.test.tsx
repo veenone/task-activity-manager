@@ -107,6 +107,23 @@ describe("IssueTable", () => {
     expect(bar).toHaveAttribute("aria-valuetext", "12h of 40h, including sub-tasks");
   });
 
+  // Past the estimate the bar turns over: the track is what was logged
+  // and the fill is the estimate inside it, so the overrun is the part
+  // the fill does not reach. A bar clamped at full would have said
+  // "finished" about work that went over.
+  it("turns the bar over for a row that overran, and marks one logged to plan", () => {
+    const rowOf = renderTable([
+      issue({ key: "PLAT-412", originalEstimateSeconds: 7200, timeSpentSeconds: 21600, aggregateEstimateSeconds: 7200, aggregateTimeSpentSeconds: 21600 }),
+      issue({ key: "PLAT-409", originalEstimateSeconds: 7200, timeSpentSeconds: 7200, aggregateEstimateSeconds: 7200, aggregateTimeSpentSeconds: 7200 }),
+    ]);
+    const over = within(rowOf(/^PLAT-412 /)).getByRole("progressbar");
+    expect(over).toHaveClass("progress-bar-over");
+    expect(over).toHaveAttribute("aria-valuenow", String(7200));
+    expect(over).toHaveAttribute("aria-valuemax", String(21600));
+    expect(over).toHaveAttribute("aria-valuetext", "6h logged against 2h estimated, over by 4h");
+    expect(within(rowOf(/^PLAT-409 /)).getByRole("progressbar")).toHaveClass("progress-bar-complete");
+  });
+
   // Nothing to fill a track against, so the figures stand alone.
   it("draws no bar for a row with hours logged and no estimate", () => {
     const rowOf = renderTable([issue({ key: "PLAT-412", timeSpentSeconds: 3600, aggregateTimeSpentSeconds: 3600 })]);

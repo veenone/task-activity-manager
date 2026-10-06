@@ -214,7 +214,7 @@ function TimeCell({ issue }: { issue: Issue }) {
     <span role="gridcell" className="issue-time" title={timeCellTitle(issue) || undefined}>
       {bar && (
         <span className="issue-time-bar">
-          <ProgressBar value={bar.value} max={bar.max} label={bar.label} valueText={bar.valueText} tone="time" />
+          <ProgressBar value={bar.value} max={bar.max} label={bar.label} valueText={bar.valueText} tone={bar.tone} />
         </span>
       )}
       <span className="issue-time-text">{text}</span>

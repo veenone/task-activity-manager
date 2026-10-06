@@ -112,6 +112,9 @@ export interface TimeBar {
   max: number;
   label: string;
   valueText: string;
+  // Which state the bar is in, which is also what colours it: under way,
+  // logged exactly to the estimate, or past it.
+  tone: "progress" | "complete" | "over";
 }
 
 // timeBar is the bar for one issue's figures, or null when there is
@@ -125,12 +128,32 @@ export interface TimeBar {
 // beside it are what say it went over, since a bar cannot.
 export function timeBar(t: IssueTime): TimeBar | null {
   if (t.estimateSeconds === null || t.estimateSeconds <= 0) return null;
+  const estimate = t.estimateSeconds;
   const logged = t.spentSeconds ?? 0;
+  const family = t.family ? ", including sub-tasks" : "";
+  const label = t.family
+    ? "Time logged against the estimate, including sub-tasks"
+    : "Time logged against the estimate";
+  // Past the estimate the bar turns over. The track becomes what was
+  // actually logged and the fill becomes the estimate inside it, so the
+  // overrun is the part of the track the fill does not reach: a bar
+  // clamped at full would have said "finished" about work that went
+  // over, which is the opposite of what happened.
+  if (logged > estimate) {
+    return {
+      value: estimate,
+      max: logged,
+      label,
+      tone: "over",
+      valueText: `${workDuration(logged)} logged against ${workDuration(estimate)} estimated, over by ${workDuration(logged - estimate)}${family}`,
+    };
+  }
   return {
-    value: Math.min(logged, t.estimateSeconds),
-    max: t.estimateSeconds,
-    label: t.family ? "Time logged against the estimate, including sub-tasks" : "Time logged against the estimate",
-    valueText: `${workDuration(logged)} of ${workDuration(t.estimateSeconds)}${t.family ? ", including sub-tasks" : ""}`,
+    value: logged,
+    max: estimate,
+    label,
+    tone: logged === estimate ? "complete" : "progress",
+    valueText: `${workDuration(logged)} of ${workDuration(estimate)}${family}`,
   };
 }
 

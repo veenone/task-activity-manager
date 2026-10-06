@@ -227,6 +227,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-time { display: flex; align-items: center; gap: 6px; color: var(--text-muted); white-space: nowrap; overflow: hidden; }
 .issue-time-bar { flex: 1 1 auto; min-width: 28px; }
 .issue-time-text { flex: none; font-variant-numeric: tabular-nums; }
+/* The Epics tree's progress cell: the same bar as the Time column, with
+   the sentence it already printed beside it. */
+.epic-cell-progress { display: flex; align-items: center; gap: 6px; }
+.epic-progress-bar { flex: 1 1 auto; min-width: 28px; max-width: 72px; }
+.epic-progress-text { flex: none; font-variant-numeric: tabular-nums; }
 
 /* The detail panel's time tracking block: a heading, the bar, and the
    figures under it in a row that wraps on a narrow panel. */

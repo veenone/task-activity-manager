@@ -33,7 +33,7 @@ export function TimeTracking({ issue }: { issue: Issue }) {
         <p className="muted small detail-time-empty">Not tracked in Jira.</p>
       ) : (
         <>
-          {bar && <ProgressBar value={bar.value} max={bar.max} label={bar.label} valueText={bar.valueText} tone="time" />}
+          {bar && <ProgressBar value={bar.value} max={bar.max} label={bar.label} valueText={bar.valueText} tone={bar.tone} />}
           {/* Every figure is in text beside the bar: colour and length
               are never the only carriers of what it says. */}
           <dl className="detail-time-figures">

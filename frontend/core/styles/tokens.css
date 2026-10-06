@@ -109,6 +109,18 @@
   --bar-time: var(--accent);
   --bar-points: var(--chart-completed);
   --bar-marker: #c2410c;
+  /* The three states a progress bar can be in, each a fill over a track
+     tinted with the same hue, so the unfilled part reads as part of the
+     bar rather than as a gap in it. The pairs clear 3:1 against each
+     other, which WCAG 1.4.11 asks of a graphic that carries meaning:
+     a bar whose fill and track are a shade apart says nothing at a
+     glance to half the people reading it. */
+  --bar-progress: #65a30d;
+  --bar-progress-track: #ecfccb;
+  --bar-complete: #16a34a;
+  --bar-complete-track: var(--chip-green-bg);
+  --bar-over: #800000;
+  --bar-over-track: var(--chip-red-bg);
   /* The report charts. One token per series role, so a line, its legend
      swatch and its end label read from the same place and the SVG carries
      no colour of its own. Remaining is the accent and completed the success
@@ -207,6 +219,14 @@
   --bar-track: var(--surface-sunken);
   --bar-time: var(--accent);
   --bar-points: var(--chart-completed);
+  /* The same three states on a dark ground: the fills lift and the
+     tracks sink, so each pair keeps its 3:1 the other way up. */
+  --bar-progress: #a3e635;
+  --bar-progress-track: #35471a;
+  --bar-complete: #4ade80;
+  --bar-complete-track: #14532d;
+  --bar-over: #e06a6a;
+  --bar-over-track: #4a1414;
   --bar-marker: #fb923c;
   /* The chart roles on a dark ground: the same hues, lifted so a bar reads
      against the surface rather than sinking into it. */

@@ -88,11 +88,28 @@ describe("the time bar", () => {
     expect(bar!.max).toBe(40 * 3600);
   });
 
-  // An overrun reads as full rather than past the end, and the figures
-  // beside it still say what happened.
-  it("stops at full when the work overran", () => {
-    const bar = timeBar(issueTime(issue([2 * 3600, null, 6 * 3600], [2 * 3600, null, 6 * 3600])));
+  it("is under way while there is estimate left", () => {
+    const bar = timeBar(issueTime(issue([40 * 3600, null, 10 * 3600], [40 * 3600, null, 10 * 3600])));
+    expect(bar!.tone).toBe("progress");
+  });
+
+  // Logged exactly to the estimate is the one state worth its own
+  // colour: the work is done to plan.
+  it("is complete when the logged time met the estimate", () => {
+    const bar = timeBar(issueTime(issue([8 * 3600, null, 8 * 3600], [8 * 3600, null, 8 * 3600])));
+    expect(bar!.tone).toBe("complete");
     expect(bar!.value).toBe(bar!.max);
+  });
+
+  // Past the estimate the bar turns over: the track becomes what was
+  // logged and the fill becomes the estimate inside it, so the overrun
+  // is the part of the track the fill does not reach.
+  it("turns over when the work overran, and measures the estimate inside the logged", () => {
+    const bar = timeBar(issueTime(issue([2 * 3600, null, 6 * 3600], [2 * 3600, null, 6 * 3600])));
+    expect(bar!.tone).toBe("over");
+    expect(bar!.value).toBe(2 * 3600);
+    expect(bar!.max).toBe(6 * 3600);
+    expect(bar!.valueText).toBe("6h logged against 2h estimated, over by 4h");
   });
 
   // Nothing to measure against: a bar with no scale would be a shape
@@ -114,5 +131,6 @@ describe("the time bar", () => {
     const bar = timeBar(issueTime(issue([null, null, null], [144000, 100800, 43200])));
     expect(bar!.label).toMatch(/time/i);
     expect(bar!.valueText).toBe("12h of 40h, including sub-tasks");
+    expect(bar!.tone).toBe("progress");
   });
 });
