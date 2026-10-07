@@ -551,6 +551,27 @@ describe("ReportsView's eight states", () => {
       expect(within(table).getAllByRole("cell").map((c) => c.textContent)).toContain("9");
     });
 
+    // The two lines are read against each other, so they take the same
+    // width; with only the points line the row keeps its old split.
+    it("gives the two burndowns the same width", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report({
+        series: series({ days: DAYS, timeDays: [{ date: "2026-08-22", scope: 12, completed: 0, remaining: 12, ideal: 12 }] }),
+      }));
+      const { container } = renderView();
+      await screen.findByRole("figure", { name: "Burndown in hours" });
+      expect(container.querySelector(".report-charts")).toHaveClass("report-charts-timed");
+    });
+
+    // With one line there is nothing being compared, so the row keeps
+    // the split it has always had: the burndown wide, the outcome beside
+    // it.
+    it("keeps the old split when there is only the points line", async () => {
+      vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ days: DAYS }) }));
+      const { container } = renderView();
+      await screen.findByRole("figure", { name: "Burndown" });
+      expect(container.querySelector(".report-charts")).not.toHaveClass("report-charts-timed");
+    });
+
     // A sprint nobody estimated in time gets no such chart. An empty one
     // would say the team burned nothing rather than that it counts in
     // points.

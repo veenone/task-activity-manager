@@ -85,7 +85,7 @@ describe("IssueTable", () => {
       }),
       issue({ key: "PLAT-409" }),
     ]);
-    expect(within(rowOf(/^PLAT-412 /)).getByText("6h of 8h")).toBeInTheDocument();
+    expect(within(rowOf(/^PLAT-412 /)).getByText("6h/8h")).toBeInTheDocument();
     // Not "0h": an issue nobody estimated has not been estimated at nothing.
     expect(within(rowOf(/^PLAT-409 /)).queryByText(/h of /)).toBeNull();
   });
@@ -97,6 +97,49 @@ describe("IssueTable", () => {
     const rowOf = renderTable([
       issue({ key: "PLAT-412", aggregateEstimateSeconds: 144000, aggregateRemainingSeconds: 100800, aggregateTimeSpentSeconds: 43200 }),
     ]);
-    expect(within(rowOf(/^PLAT-412 /)).getByText("Σ 12h of 40h")).toBeInTheDocument();
+    const row = rowOf(/^PLAT-412 /);
+    expect(within(row).getByText("Σ 12h/40h")).toBeInTheDocument();
+    // The bar is what makes the column readable at a glance, and it says
+    // its own value: colour and length are never the only carriers.
+    const bar = within(row).getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", String(43200));
+    expect(bar).toHaveAttribute("aria-valuemax", String(144000));
+    expect(bar).toHaveAttribute("aria-valuetext", "12h of 40h, including sub-tasks");
+  });
+
+  // Past the estimate the bar turns over: the track is what was logged
+  // and the fill is the estimate inside it, so the overrun is the part
+  // the fill does not reach. A bar clamped at full would have said
+  // "finished" about work that went over.
+  it("turns the bar over for a row that overran, and marks one logged to plan", () => {
+    const rowOf = renderTable([
+      issue({ key: "PLAT-412", originalEstimateSeconds: 7200, timeSpentSeconds: 21600, aggregateEstimateSeconds: 7200, aggregateTimeSpentSeconds: 21600 }),
+      issue({ key: "PLAT-409", originalEstimateSeconds: 7200, timeSpentSeconds: 7200, aggregateEstimateSeconds: 7200, aggregateTimeSpentSeconds: 7200 }),
+    ]);
+    const over = within(rowOf(/^PLAT-412 /)).getByRole("progressbar");
+    expect(over).toHaveClass("progress-bar-over");
+    expect(over).toHaveAttribute("aria-valuenow", String(7200));
+    expect(over).toHaveAttribute("aria-valuemax", String(21600));
+    expect(over).toHaveAttribute("aria-valuetext", "6h logged against 2h estimated, over by 4h");
+    expect(within(rowOf(/^PLAT-409 /)).getByRole("progressbar")).toHaveClass("progress-bar-complete");
+  });
+
+  // Nothing to measure against, so the row is marked rather than
+  // measured: a stripe in its own colour, with no progressbar role
+  // because there is no value for one to carry.
+  it("marks a row with hours logged and no estimate instead of measuring it", () => {
+    const rowOf = renderTable([issue({ key: "PLAT-412", timeSpentSeconds: 3600, aggregateTimeSpentSeconds: 3600 })]);
+    const row = rowOf(/^PLAT-412 /);
+    expect(within(row).getByText("1h logged")).toBeInTheDocument();
+    expect(within(row).queryByRole("progressbar")).toBeNull();
+    expect(row.querySelector(".progress-bar-unestimated")).not.toBeNull();
+  });
+
+  // An issue nobody has touched gets neither: there is nothing to say.
+  it("leaves an untracked row with no bar and no stripe", () => {
+    const rowOf = renderTable([issue({ key: "PLAT-409" })]);
+    const row = rowOf(/^PLAT-409 /);
+    expect(within(row).queryByRole("progressbar")).toBeNull();
+    expect(row.querySelector(".progress-bar-unestimated")).toBeNull();
   });
 });

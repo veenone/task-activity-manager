@@ -219,10 +219,11 @@ describe("IssueDetailPanel", () => {
       ...story, originalEstimateSeconds: 28800, remainingEstimateSeconds: 7200, timeSpentSeconds: 21600,
       aggregateEstimateSeconds: 28800, aggregateRemainingSeconds: 7200, aggregateTimeSpentSeconds: 21600,
     });
-    const fields = screen.getByText("Estimated").closest("dl") as HTMLElement;
-    expect(within(fields).getByText("8h")).toBeInTheDocument();
-    expect(within(fields).getByText("2h")).toBeInTheDocument();
-    expect(within(fields).getByText("6h")).toBeInTheDocument();
+    const block = screen.getByRole("region", { name: "Time tracking" });
+    expect(within(block).getByText("8h")).toBeInTheDocument();
+    expect(within(block).getByText("2h")).toBeInTheDocument();
+    expect(within(block).getByText("6h")).toBeInTheDocument();
+    expect(within(block).getByRole("progressbar")).toHaveAttribute("aria-valuetext", "6h of 8h");
     expect(screen.queryByText(/including sub-tasks/)).toBeNull();
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
   });
@@ -235,19 +236,37 @@ describe("IssueDetailPanel", () => {
       ...story, originalEstimateSeconds: null, remainingEstimateSeconds: null, timeSpentSeconds: null,
       aggregateEstimateSeconds: 144000, aggregateRemainingSeconds: 100800, aggregateTimeSpentSeconds: 43200,
     });
-    const fields = screen.getByText("Estimated").closest("dl") as HTMLElement;
-    expect(within(fields).getByText("40h")).toBeInTheDocument();
-    expect(within(fields).getByText("28h")).toBeInTheDocument();
-    expect(within(fields).getByText("12h")).toBeInTheDocument();
-    expect(screen.getByText(/including sub-tasks/)).toBeInTheDocument();
-    expect(screen.getByText(/none on the issue itself/)).toBeInTheDocument();
+    const block = screen.getByRole("region", { name: "Time tracking" });
+    expect(within(block).getByText("40h")).toBeInTheDocument();
+    expect(within(block).getByText("28h")).toBeInTheDocument();
+    expect(within(block).getByText("12h")).toBeInTheDocument();
+    expect(within(block).getByText(/including sub-tasks/)).toBeInTheDocument();
+    expect(within(block).getByText(/None of it logged on the issue itself/)).toBeInTheDocument();
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
   });
 
-  it("says nothing about time for an issue nobody estimated or logged against", async () => {
+  // Hours against no estimate: the panel says so in words and marks it
+  // with the stripe, since there is no proportion to draw.
+  it("says when the logged hours were never estimated", async () => {
+    renderPanel(vi.fn(), undefined, {
+      ...story, originalEstimateSeconds: null, remainingEstimateSeconds: null, timeSpentSeconds: 10800,
+      aggregateEstimateSeconds: null, aggregateRemainingSeconds: null, aggregateTimeSpentSeconds: 10800,
+    });
+    const block = screen.getByRole("region", { name: "Time tracking" });
+    expect(within(block).getByText("3h")).toBeInTheDocument();
+    expect(within(block).getByText(/Logged against no estimate/)).toBeInTheDocument();
+    expect(within(block).queryByRole("progressbar")).toBeNull();
+    expect(block.querySelector(".progress-bar-unestimated")).not.toBeNull();
+    await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
+  });
+
+  // The block stays on screen for an untracked issue and says so: when
+  // it hid itself instead, that was read as the feature being missing.
+  it("says an untracked issue is untracked rather than hiding the block", async () => {
     renderPanel();
-    expect(screen.queryByText("Estimated")).toBeNull();
-    expect(screen.queryByText("Remaining")).toBeNull();
+    const block = screen.getByRole("region", { name: "Time tracking" });
+    expect(within(block).getByText(/Not tracked in Jira/)).toBeInTheDocument();
+    expect(within(block).queryByRole("progressbar")).toBeNull();
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
   });
 

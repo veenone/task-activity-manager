@@ -79,11 +79,14 @@ export function hasTime(t: IssueTime): boolean {
 export function timeCell(issue: Issue): string {
   const t = issueTime(issue);
   if (!hasTime(t)) return "";
+  // Compact: the bar beside it carries the proportion, so the cell
+  // needs the two numbers and not a sentence. The sentence, remaining
+  // included, is in timeCellTitle.
   const body =
     t.spentSeconds !== null && t.estimateSeconds !== null
-      ? `${workDuration(t.spentSeconds)} of ${workDuration(t.estimateSeconds)}`
+      ? `${workDuration(t.spentSeconds)}/${workDuration(t.estimateSeconds)}`
       : t.estimateSeconds !== null
-        ? `${workDuration(t.estimateSeconds)} estimated`
+        ? `${workDuration(t.estimateSeconds)} est`
         : `${workDuration(t.spentSeconds as number)} logged`;
   return t.family ? `${FAMILY_MARK} ${body}` : body;
 }
@@ -99,4 +102,80 @@ export function timeCellTitle(issue: Issue): string {
     t.spentSeconds !== null ? `${workDuration(t.spentSeconds)} logged` : "",
   ].filter((p) => p !== "");
   return t.family ? `${parts.join(", ")}, including sub-tasks` : parts.join(", ");
+}
+
+// TimeBar is what the Backlog cell and the panel draw their bar from:
+// what has been logged against what was estimated, plus the two strings
+// a progressbar needs to say what it means where no stylesheet applies.
+export interface TimeBar {
+  value: number;
+  max: number;
+  label: string;
+  valueText: string;
+  // Which state the bar is in, which is also what colours it: under way,
+  // logged exactly to the estimate, or past it.
+  tone: "progress" | "complete" | "over";
+}
+
+// timeBar is the bar for one issue's figures, or null when there is
+// nothing to draw one against.
+//
+// An estimate is what gives the track its scale, so a row with hours
+// logged and nothing estimated gets no bar: a track with no end would be
+// a shape saying something it does not know. An estimate with nothing
+// logged does get one, empty, because "planned and untouched" is worth
+// seeing. Work that overran fills the track and no further; the figures
+// beside it are what say it went over, since a bar cannot.
+export function timeBar(t: IssueTime): TimeBar | null {
+  if (t.estimateSeconds === null || t.estimateSeconds <= 0) return null;
+  const estimate = t.estimateSeconds;
+  const logged = t.spentSeconds ?? 0;
+  const family = t.family ? ", including sub-tasks" : "";
+  const label = t.family
+    ? "Time logged against the estimate, including sub-tasks"
+    : "Time logged against the estimate";
+  // Past the estimate the bar turns over. The track becomes what was
+  // actually logged and the fill becomes the estimate inside it, so the
+  // overrun is the part of the track the fill does not reach: a bar
+  // clamped at full would have said "finished" about work that went
+  // over, which is the opposite of what happened.
+  if (logged > estimate) {
+    return {
+      value: estimate,
+      max: logged,
+      label,
+      tone: "over",
+      valueText: `${workDuration(logged)} logged against ${workDuration(estimate)} estimated, over by ${workDuration(logged - estimate)}${family}`,
+    };
+  }
+  return {
+    value: logged,
+    max: estimate,
+    label,
+    tone: logged === estimate ? "complete" : "progress",
+    valueText: `${workDuration(logged)} of ${workDuration(estimate)}${family}`,
+  };
+}
+
+// timeUnestimated says the row has work logged against no estimate.
+//
+// There is no target, so there is no proportion and timeBar answers
+// nothing: a track with no end would be a shape claiming something it
+// does not know. The row is still worth marking rather than leaving
+// blank, because somebody is spending time on work nobody sized, and
+// that is a different fact from an untouched row. What marks it is a
+// stripe rather than a bar, in its own colour, and the figure beside it
+// is what says how long.
+export function timeUnestimated(t: IssueTime): boolean {
+  return t.estimateSeconds === null && (t.spentSeconds ?? 0) > 0;
+}
+
+// timeFigures is the three the panel lists under the bar, in the order
+// a reader reads them, with the ones an issue does not carry left out.
+export function timeFigures(t: IssueTime): { label: string; text: string }[] {
+  const out: { label: string; text: string }[] = [];
+  if (t.estimateSeconds !== null) out.push({ label: "Estimated", text: workDuration(t.estimateSeconds) });
+  if (t.remainingSeconds !== null) out.push({ label: "Remaining", text: workDuration(t.remainingSeconds) });
+  if (t.spentSeconds !== null) out.push({ label: "Logged", text: workDuration(t.spentSeconds) });
+  return out;
 }

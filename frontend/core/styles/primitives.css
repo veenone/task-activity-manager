@@ -1567,6 +1567,21 @@
 .progress-bar-time .progress-bar-fill { background: var(--bar-time); }
 .progress-bar-points .progress-bar-fill { background: var(--bar-points); }
 .progress-bar-muted .progress-bar-fill { background: var(--text-muted); }
+/* The three states carry their own track as well as their own fill: an
+   unfilled bar that is the page's own colour reads as empty space, which
+   is what sent the Time column unnoticed (#146). */
+.progress-bar-progress { background: var(--bar-progress-track); }
+.progress-bar-progress .progress-bar-fill { background: var(--bar-progress); }
+.progress-bar-complete { background: var(--bar-complete-track); }
+.progress-bar-complete .progress-bar-fill { background: var(--bar-complete); }
+.progress-bar-over { background: var(--bar-over-track); }
+.progress-bar-over .progress-bar-fill { background: var(--bar-over); }
+/* Not a progressbar: a row with hours logged and no estimate has no
+   proportion to draw, so this is a stripe in the bar's own shape, filled
+   edge to edge, saying "tracked, unsized". It carries no role and no
+   value, because it is marking a row rather than measuring it; the hours
+   beside it are what say how long. */
+.progress-bar-unestimated { background: var(--bar-unestimated); }
 /* The marker rides on the fill rather than being clipped by it, so a
    reference line is visible whether the fill has passed it or not. Its
    colour is a token a caller can repoint: on a sprint timeline it is a line

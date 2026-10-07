@@ -166,6 +166,14 @@ describe("EpicsView", () => {
     // Both trees print the same progress sentence, points landed of points
     // estimated, so one column does not read two ways.
     expect(screen.getByText("1 of 2 done, 5 of 10 pts")).toBeInTheDocument();
+    // The sentence is read at a glance as a bar too, the same one the
+    // Backlog's Time column draws, and the sentence is its value text so
+    // nothing is carried by the bar alone.
+    const bar = screen.getByRole("progressbar", { name: "Issues done in PLAT-100" });
+    expect(bar).toHaveClass("progress-bar-progress");
+    expect(bar).toHaveAttribute("aria-valuenow", "1");
+    expect(bar).toHaveAttribute("aria-valuemax", "2");
+    expect(bar).toHaveAttribute("aria-valuetext", "1 of 2 done, 5 of 10 pts");
     expect(screen.getByText("Apply promo code")).toBeInTheDocument();
     expect(screen.getByText("Add coupon banner")).toBeInTheDocument();
   });

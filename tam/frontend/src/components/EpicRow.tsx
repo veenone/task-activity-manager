@@ -6,6 +6,7 @@ import { TypeChip } from "./TypeChip";
 import { SubtaskToggle } from "./SubtaskToggle";
 import { statusClass } from "../lib/statusClass";
 import type { Row } from "../lib/epicTreeItems";
+import { ProgressBar } from "@agile-suite/core";
 import { progressText } from "../lib/format";
 
 interface EpicRowProps {
@@ -59,7 +60,20 @@ export function EpicRow({
       <span className="epic-cell epic-cell-summary" title={isEpic ? summary : undefined}>
         {isEpic ? summary : ""}
       </span>
-      <span className="epic-cell folder-count epic-cell-progress">{countText}</span>
+      <span className="epic-cell folder-count epic-cell-progress">
+        {isEpic && node.total > 0 && (
+          <span className="epic-progress-bar">
+            <ProgressBar
+              value={node.done}
+              max={node.total}
+              label={`Issues done in ${rowKey}`}
+              valueText={countText}
+              tone={node.done >= node.total ? "complete" : "progress"}
+            />
+          </span>
+        )}
+        <span className="epic-progress-text">{countText}</span>
+      </span>
       {pending && <span className="pending-dot" role="img" aria-label="Pending changes" />}
     </div>
   );

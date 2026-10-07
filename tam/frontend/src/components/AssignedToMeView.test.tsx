@@ -99,6 +99,29 @@ describe("AssignedToMeView", () => {
     });
   });
 
+  // This view and the Backlog are one grid with a narrower query, so the
+  // Time column and its bar are the same here as there. It is asserted
+  // rather than assumed: the two were read as separate screens (#146).
+  it("draws the same time bar the Backlog does", async () => {
+    vi.mocked(api.GetProfileSetting).mockImplementation((_id, key) =>
+      Promise.resolve(key === "jira_username" ? "rahmad" : key === "jira_display_name" ? "R. Anand" : ""),
+    );
+    vi.mocked(api.ListIssues).mockResolvedValue({
+      issues: [issue({
+        key: "PLAT-412", summary: "Checkout: apply promo code",
+        originalEstimateSeconds: 28800, timeSpentSeconds: 21600,
+        aggregateEstimateSeconds: 28800, aggregateTimeSpentSeconds: 21600,
+      })],
+      total: 1,
+    });
+
+    renderView();
+
+    const row = await screen.findByRole("row", { name: /PLAT-412/ });
+    expect(within(row).getByText("6h/8h")).toBeInTheDocument();
+    expect(within(row).getByRole("progressbar")).toHaveClass("progress-bar-progress");
+  });
+
   it("explains itself when there is no profile at all, rather than rendering nothing", async () => {
     // No profile means both settings queries are disabled, and a disabled
     // query stays pending forever, so a bare isPending guard would leave the
