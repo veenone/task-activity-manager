@@ -65,7 +65,11 @@ Gate: `frontend/core/src/instruction-gate.test.ts` (every class a component sets
 ## Project rules
 
 - Run Go commands from the module directory (`core`, `tam`, `xtm`); run npm commands from the repo root. Run `git config core.hooksPath .githooks` once per clone so the pre-commit gates exist.
-- Prose people read (docs, commit bodies, PR and issue bodies, review comments) is written with the slop-mop skill; prose reviews run its detect mode on Opus or newer.
+- Prose people read (docs, commit bodies, PR and issue bodies, review comments)
+  is written with the humanizer skill: embedded mode for text going straight
+  into a commit or PR body, file mode for a doc already on disk. Reviews of
+  prose run its audit step on Opus or newer, because the audit is what names
+  the tells a writer has stopped seeing. Gate: review.
 - Jira is the system of record. The local store is a cache plus a pending-change journal, never authoritative. Gate: review.
 - Backend logic lives in `internal/`; `app.go` only adapts it to Wails bindings. Gate: review.
 - Planned work is marked `TODO(tam)` or `TODO(xtm)` and names its phase or FR. Gate: the ratchet holds unscoped_todos.
@@ -89,6 +93,12 @@ Per commit, run what the change touches; the full set before push or PR.
 Ratchet baselines lower with `bash scripts/ratchet.sh --update`; raising one
 needs a reason in the commit message (C7). CI also runs proven red (P2) and
 `pr-acceptance`. State completed checks in handoff.
+
+`sm swab` (slop-mop, configured by `.sb_config.json`) reads the same tree and
+is advisory, not a gate: its file-size check is looser than C2's 400 lines and
+its a11y check overlaps eslint_a11y, so a finding it reports that no counter in
+`.ratchet-baseline` holds is a suggestion. Set `PYTHONUTF8=1` to run it on
+Windows. It is not in `make gates` and failing it does not block a commit.
 
 ## Playbooks
 
