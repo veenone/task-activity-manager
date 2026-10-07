@@ -62,6 +62,13 @@ func main() {
 // them. It has to agree with VIEWS in frontend/src/nav.ts: the id is what the
 // menu:view event carries and what the frontend routes on. Adding a view means
 // adding it in both places, which is the cost of the menu bar being native.
+//
+// This comment used to be the whole of the enforcement, and Dashboards
+// shipped in nav.ts alone (#147): the two lists are paired by a gate in
+// frontend/core/src/instruction-gate.test.ts now. The accelerator is the
+// view's place in this list, so a view inserted in the middle renumbers
+// the ones after it; a shortcut that matches the tab it belongs to is
+// worth more than one that never moves.
 var menuViews = []struct{ id, label, accelerator string }{
 	{"backlog", "Backlog", "1"},
 	{"assigned", "Assigned to me", "2"},
@@ -69,7 +76,8 @@ var menuViews = []struct{ id, label, accelerator string }{
 	{"boards", "Boards", "4"},
 	{"sprints", "Sprints", "5"},
 	{"reports", "Reports", "6"},
-	{"rituals", "Rituals", "7"},
+	{"dashboards", "Dashboards", "7"},
+	{"rituals", "Rituals", "8"},
 }
 
 // appMenu is the native menu bar, and TAM's primary navigation: the View menu

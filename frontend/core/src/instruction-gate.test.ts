@@ -212,6 +212,20 @@ describe('instruction gate', () => {
     // a failure here means a real offender, not a busy machine.
   }, 120_000);
 
+  // The native menu bar is Go's and the tabs are the frontend's, so the
+  // same list of views is written twice. menuViews already said in a
+  // comment that the two have to agree, and Dashboards shipped in one of
+  // them and not the other (#147): a rule a script can check needs a
+  // gate, not a comment.
+  it('the View menu and the view tabs name the same views, in the same order', () => {
+    const go = read('tam/main.go');
+    const nav = read('tam/frontend/src/nav.ts');
+    const menu = [...go.matchAll(/\{"(\w+)", "([^"]+)", "(\w+)"\}/g)].map(([, id, label]) => `${id}:${label}`);
+    const tabs = [...nav.matchAll(/\{ id: "(\w+)", label: "([^"]+)" \}/g)].map(([, id, label]) => `${id}:${label}`);
+    expect(tabs.length, 'read no views out of nav.ts').toBeGreaterThan(0);
+    expect(menu, 'the View menu and the tabs have drifted').toEqual(tabs);
+  });
+
   it('every profile-keyed table is swept by one of the two purge lists', () => {
     const schema = read('tam/internal/tamstore/tamstore.go');
     const tables = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\);/g)]
