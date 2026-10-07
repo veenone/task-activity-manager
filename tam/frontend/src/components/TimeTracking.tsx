@@ -1,7 +1,7 @@
 import { ProgressBar } from "@agile-suite/core";
 import type { Issue } from "../api";
 import { workDuration } from "../lib/format";
-import { hasTime, issueTime, timeBar, timeFigures } from "../lib/issueTime";
+import { hasTime, issueTime, timeBar, timeFigures, timeUnestimated } from "../lib/issueTime";
 import type { IssueTime } from "../lib/issueTime";
 
 // The detail panel's time tracking block: the bar, the three figures
@@ -34,6 +34,12 @@ export function TimeTracking({ issue }: { issue: Issue }) {
       ) : (
         <>
           {bar && <ProgressBar value={bar.value} max={bar.max} label={bar.label} valueText={bar.valueText} tone={bar.tone} />}
+          {!bar && timeUnestimated(time) && (
+            <span className="progress-bar progress-bar-unestimated" aria-hidden="true" />
+          )}
+          {!bar && timeUnestimated(time) && (
+            <p className="muted small detail-time-own">Logged against no estimate.</p>
+          )}
           {/* Every figure is in text beside the bar: colour and length
               are never the only carriers of what it says. */}
           <dl className="detail-time-figures">

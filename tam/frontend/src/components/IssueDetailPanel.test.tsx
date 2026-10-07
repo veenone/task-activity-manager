@@ -245,6 +245,21 @@ describe("IssueDetailPanel", () => {
     await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
   });
 
+  // Hours against no estimate: the panel says so in words and marks it
+  // with the stripe, since there is no proportion to draw.
+  it("says when the logged hours were never estimated", async () => {
+    renderPanel(vi.fn(), undefined, {
+      ...story, originalEstimateSeconds: null, remainingEstimateSeconds: null, timeSpentSeconds: 10800,
+      aggregateEstimateSeconds: null, aggregateRemainingSeconds: null, aggregateTimeSpentSeconds: 10800,
+    });
+    const block = screen.getByRole("region", { name: "Time tracking" });
+    expect(within(block).getByText("3h")).toBeInTheDocument();
+    expect(within(block).getByText(/Logged against no estimate/)).toBeInTheDocument();
+    expect(within(block).queryByRole("progressbar")).toBeNull();
+    expect(block.querySelector(".progress-bar-unestimated")).not.toBeNull();
+    await waitFor(() => expect(api.GetIssueDetail).toHaveBeenCalled());
+  });
+
   // The block stays on screen for an untracked issue and says so: when
   // it hid itself instead, that was read as the feature being missing.
   it("says an untracked issue is untracked rather than hiding the block", async () => {

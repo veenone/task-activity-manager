@@ -121,6 +121,10 @@
   --bar-complete-track: var(--chip-green-bg);
   --bar-over: #800000;
   --bar-over-track: var(--chip-red-bg);
+  /* Work logged against no estimate: not a state of a measure, since
+     there is nothing to measure, so it wears a colour of its own rather
+     than one of the three above. */
+  --bar-unestimated: #c2410c;
   /* The report charts. One token per series role, so a line, its legend
      swatch and its end label read from the same place and the SVG carries
      no colour of its own. Remaining is the accent and completed the success
@@ -227,6 +231,7 @@
   --bar-complete-track: #14532d;
   --bar-over: #e06a6a;
   --bar-over-track: #4a1414;
+  --bar-unestimated: #fb923c;
   --bar-marker: #fb923c;
   /* The chart roles on a dark ground: the same hues, lifted so a bar reads
      against the surface rather than sinking into it. */

@@ -157,6 +157,19 @@ export function timeBar(t: IssueTime): TimeBar | null {
   };
 }
 
+// timeUnestimated says the row has work logged against no estimate.
+//
+// There is no target, so there is no proportion and timeBar answers
+// nothing: a track with no end would be a shape claiming something it
+// does not know. The row is still worth marking rather than leaving
+// blank, because somebody is spending time on work nobody sized, and
+// that is a different fact from an untouched row. What marks it is a
+// stripe rather than a bar, in its own colour, and the figure beside it
+// is what says how long.
+export function timeUnestimated(t: IssueTime): boolean {
+  return t.estimateSeconds === null && (t.spentSeconds ?? 0) > 0;
+}
+
 // timeFigures is the three the panel lists under the bar, in the order
 // a reader reads them, with the ones an issue does not carry left out.
 export function timeFigures(t: IssueTime): { label: string; text: string }[] {

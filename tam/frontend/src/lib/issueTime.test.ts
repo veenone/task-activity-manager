@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Issue } from "../api";
-import { hasTime, issueTime, timeBar, timeCell, timeCellTitle } from "./issueTime";
+import { hasTime, issueTime, timeBar, timeCell, timeCellTitle, timeUnestimated } from "./issueTime";
 
 // The same six-field shape the Go side's test uses, in the same order:
 // the issue's own three, then its family's three. The two
@@ -132,5 +132,32 @@ describe("the time bar", () => {
     expect(bar!.label).toMatch(/time/i);
     expect(bar!.valueText).toBe("12h of 40h, including sub-tasks");
     expect(bar!.tone).toBe("progress");
+  });
+});
+
+describe("work logged against no estimate", () => {
+  // There is no target, so there is no proportion and no bar. The row
+  // still has something worth seeing at a glance: somebody is spending
+  // time on work nobody sized.
+  it("is marked, not measured", () => {
+    const t = issueTime(issue([null, null, 3600], [null, null, 3600]));
+    expect(timeBar(t)).toBeNull();
+    expect(timeUnestimated(t)).toBe(true);
+  });
+
+  it("is not marked when there is an estimate to measure against", () => {
+    expect(timeUnestimated(issueTime(issue([7200, null, 3600], [7200, null, 3600])))).toBe(false);
+  });
+
+  it("is not marked for an issue nobody has logged against either", () => {
+    expect(timeUnestimated(issueTime(issue([null, null, null], [null, null, null])))).toBe(false);
+    // An estimate with nothing logged is measured, not marked.
+    expect(timeUnestimated(issueTime(issue([7200, null, null], [7200, null, null])))).toBe(false);
+  });
+
+  // A parent whose children logged hours nobody estimated is the same
+  // case, read off the family's figures.
+  it("reads the family's figures like any other", () => {
+    expect(timeUnestimated(issueTime(issue([null, null, null], [null, null, 43200])))).toBe(true);
   });
 });

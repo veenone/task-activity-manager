@@ -124,11 +124,22 @@ describe("IssueTable", () => {
     expect(within(rowOf(/^PLAT-409 /)).getByRole("progressbar")).toHaveClass("progress-bar-complete");
   });
 
-  // Nothing to fill a track against, so the figures stand alone.
-  it("draws no bar for a row with hours logged and no estimate", () => {
+  // Nothing to measure against, so the row is marked rather than
+  // measured: a stripe in its own colour, with no progressbar role
+  // because there is no value for one to carry.
+  it("marks a row with hours logged and no estimate instead of measuring it", () => {
     const rowOf = renderTable([issue({ key: "PLAT-412", timeSpentSeconds: 3600, aggregateTimeSpentSeconds: 3600 })]);
     const row = rowOf(/^PLAT-412 /);
     expect(within(row).getByText("1h logged")).toBeInTheDocument();
     expect(within(row).queryByRole("progressbar")).toBeNull();
+    expect(row.querySelector(".progress-bar-unestimated")).not.toBeNull();
+  });
+
+  // An issue nobody has touched gets neither: there is nothing to say.
+  it("leaves an untracked row with no bar and no stripe", () => {
+    const rowOf = renderTable([issue({ key: "PLAT-409" })]);
+    const row = rowOf(/^PLAT-409 /);
+    expect(within(row).queryByRole("progressbar")).toBeNull();
+    expect(row.querySelector(".progress-bar-unestimated")).toBeNull();
   });
 });
