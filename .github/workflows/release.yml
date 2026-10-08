@@ -1,16 +1,26 @@
 name: Release
 
-# Tag an XTM release to build and publish Windows + macOS artifacts:
+# Tag a release to build and publish Windows + macOS artifacts:
 #   git tag xtm/v1.10.0 && git push origin xtm/v1.10.0
-# The two jobs upload to the same GitHub Release for the tag. The xtm/ prefix
-# is what keeps this workflow from firing on tags for the other apps in the
-# repository.
+#   git tag tam/v0.1.0  && git push origin tam/v0.1.0
+# The tag's prefix names the app, and the resolve job below turns it into the
+# directory, product name and binary name the build jobs use. Both jobs upload
+# to the same GitHub Release for the tag.
+#
+# Adding an app means adding its prefix here and a matching entry in resolve.
+# The instruction gate fails when an app carrying a wails.json has no prefix,
+# so a new app cannot be left unreleasable in silence (#154).
 
 on:
   push:
-    tags: ["xtm/v*"]
+    tags: ["xtm/v*", "tam/v*"]
   workflow_dispatch:
     inputs:
+      app:
+        description: "App to build"
+        required: true
+        type: choice
+        options: [xtm, tam]
       version:
         description: "Version to build (x.y.z), no leading v"
         required: true
@@ -25,7 +35,49 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  # One place decides which app a run is for, so neither build job parses the
+  # tag itself and the two cannot disagree about it. The product name is read
+  # from the app's wails.json rather than written here, which is the same
+  # source scripts/release-app.ps1 reads.
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.r.outputs.app }}
+      version: ${{ steps.r.outputs.version }}
+      product: ${{ steps.r.outputs.product }}
+      binary: ${{ steps.r.outputs.binary }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: r
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            app="${{ github.event.inputs.app }}"
+            version="${{ github.event.inputs.version }}"
+          else
+            app="${GITHUB_REF_NAME%%/*}"
+            version="${GITHUB_REF_NAME#*/v}"
+          fi
+          if [ ! -f "$app/wails.json" ]; then
+            echo "::error::No app at '$app': $app/wails.json does not exist. The tag prefix names the app directory."
+            exit 1
+          fi
+          case "$version" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::Version '$version' is not semver (expected x.y.z)."; exit 1 ;;
+          esac
+          product=$(node -e "process.stdout.write(require('./$app/wails.json').info.productName)")
+          binary=$(node -e "process.stdout.write(require('./$app/wails.json').outputfilename)")
+          {
+            echo "app=$app"
+            echo "version=$version"
+            echo "product=$product"
+            echo "binary=$binary"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building $product v$version from $app/"
+
   release-windows:
+    needs: resolve
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,41 +99,30 @@ jobs:
       - name: Install Inno Setup (for the installer)
         run: choco install innosetup -y --no-progress
 
-      - name: Resolve version
-        id: ver
-        shell: pwsh
-        run: |
-          $v = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-            "${{ github.event.inputs.version }}"
-          } else {
-            "${{ github.ref_name }}" -replace '^xtm/v', ''
-          }
-          "version=$v" >> $env:GITHUB_OUTPUT
-          Write-Host "Building version $v"
-
       - name: Build & bundle
         shell: pwsh
-        run: ./xtm/scripts/release.ps1 -Version ${{ steps.ver.outputs.version }}
+        run: ./scripts/release-app.ps1 -App ${{ needs.resolve.outputs.app }} -Version ${{ needs.resolve.outputs.version }}
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          name: Xray Test Manager v${{ steps.ver.outputs.version }}
+          name: ${{ needs.resolve.outputs.product }} v${{ needs.resolve.outputs.version }}
           generate_release_notes: true
           files: |
-            xtm/dist/*.exe
-            xtm/dist/*.zip
-            xtm/dist/SHA256SUMS.txt
+            ${{ needs.resolve.outputs.app }}/dist/*.exe
+            ${{ needs.resolve.outputs.app }}/dist/*.zip
+            ${{ needs.resolve.outputs.app }}/dist/SHA256SUMS.txt
 
       - name: Upload artifacts (manual runs)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: xray-test-manager-${{ steps.ver.outputs.version }}
-          path: xtm/dist/*
+          name: ${{ needs.resolve.outputs.binary }}-${{ needs.resolve.outputs.version }}
+          path: ${{ needs.resolve.outputs.app }}/dist/*
 
   release-macos:
+    needs: resolve
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -100,19 +141,8 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.15.0
 
-      - name: Resolve version
-        id: ver
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            v="${{ github.event.inputs.version }}"
-          else
-            v="${GITHUB_REF_NAME#xtm/v}"
-          fi
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "Building version $v"
-
       - name: Build universal .app
-        working-directory: xtm
+        working-directory: ${{ needs.resolve.outputs.app }}
         run: wails build -platform darwin/universal -clean
 
       # --- Code signing + notarization (optional) ---
@@ -156,28 +186,28 @@ jobs:
 
       - name: Codesign .app
         if: steps.sign.outputs.enabled == 'true'
-        working-directory: xtm/build/bin
+        working-directory: ${{ needs.resolve.outputs.app }}/build/bin
         run: |
           codesign --force --deep --options runtime --timestamp \
-            --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" "xray-test-manager.app"
-          codesign --verify --strict --verbose=2 "xray-test-manager.app"
+            --sign "${{ secrets.MACOS_SIGNING_IDENTITY }}" "${{ needs.resolve.outputs.binary }}.app"
+          codesign --verify --strict --verbose=2 "${{ needs.resolve.outputs.binary }}.app"
 
       - name: Notarize + staple
         if: steps.sign.outputs.enabled == 'true' && steps.sign.outputs.notarize == 'true'
-        working-directory: xtm/build/bin
+        working-directory: ${{ needs.resolve.outputs.app }}/build/bin
         run: |
-          ditto -c -k --keepParent "xray-test-manager.app" "$RUNNER_TEMP/notarize.zip"
+          ditto -c -k --keepParent "${{ needs.resolve.outputs.binary }}.app" "$RUNNER_TEMP/notarize.zip"
           xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
             --apple-id "${{ secrets.MACOS_NOTARY_APPLE_ID }}" \
             --team-id "${{ secrets.MACOS_NOTARY_TEAM_ID }}" \
             --password "${{ secrets.MACOS_NOTARY_PASSWORD }}" --wait
-          xcrun stapler staple "xray-test-manager.app"
+          xcrun stapler staple "${{ needs.resolve.outputs.binary }}.app"
 
       - name: Package .app (zip + checksum)
-        working-directory: xtm/build/bin
+        working-directory: ${{ needs.resolve.outputs.app }}/build/bin
         run: |
-          app="xray-test-manager.app"
-          out="xray-test-manager-${{ steps.ver.outputs.version }}-macos-universal.zip"
+          app="${{ needs.resolve.outputs.binary }}.app"
+          out="${{ needs.resolve.outputs.binary }}-${{ needs.resolve.outputs.version }}-macos-universal.zip"
           # ditto preserves the bundle structure and resource forks for a valid .app zip.
           ditto -c -k --sequesterRsrc --keepParent "$app" "$out"
           shasum -a 256 "$out" > "SHA256SUMS-macos.txt"
@@ -187,15 +217,15 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          name: Xray Test Manager v${{ steps.ver.outputs.version }}
+          name: ${{ needs.resolve.outputs.product }} v${{ needs.resolve.outputs.version }}
           generate_release_notes: true
           files: |
-            xtm/build/bin/*.zip
-            xtm/build/bin/SHA256SUMS-macos.txt
+            ${{ needs.resolve.outputs.app }}/build/bin/*.zip
+            ${{ needs.resolve.outputs.app }}/build/bin/SHA256SUMS-macos.txt
 
       - name: Upload artifacts (manual runs)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: xray-test-manager-macos-${{ steps.ver.outputs.version }}
-          path: xtm/build/bin/*.zip
+          name: ${{ needs.resolve.outputs.binary }}-macos-${{ needs.resolve.outputs.version }}
+          path: ${{ needs.resolve.outputs.app }}/build/bin/*.zip

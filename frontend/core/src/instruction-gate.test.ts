@@ -226,6 +226,19 @@ describe('instruction gate', () => {
     expect(menu, 'the View menu and the tabs have drifted').toEqual(tabs);
   });
 
+  // An app is releasable or it is not, and nothing used to say which. TAM
+  // carried a wails.json and a tam/v0.1.0 tag convention for months while
+  // release.yml fired on xtm/v* alone, so tagging TAM built nothing and said
+  // nothing either (#154). Every app that can be built is an app that can be
+  // tagged, and this is what holds the two lists together.
+  it('every app with a wails.json has a release tag prefix', () => {
+    const release = read('.github/workflows/release.yml');
+    const apps = GO_DIRS.filter((d) => fs.existsSync(path.join(repoRoot, d, 'wails.json')));
+    expect(apps.length, 'found no app modules with a wails.json').toBeGreaterThan(0);
+    const triggers = [...release.matchAll(/"(\w+)\/v\*"/g)].map(([, app]) => app).sort();
+    expect(triggers, 'release.yml tag filters and the buildable apps have drifted').toEqual(apps.sort());
+  });
+
   it('every profile-keyed table is swept by one of the two purge lists', () => {
     const schema = read('tam/internal/tamstore/tamstore.go');
     const tables = [...schema.matchAll(/CREATE TABLE IF NOT EXISTS (\w+) \(([\s\S]*?)\);/g)]

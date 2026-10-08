@@ -56,7 +56,7 @@ frontend/            React + TypeScript (Vite), rendered in WebView2
   src/api.ts         Re-exports the generated Wails bindings as the frontend's typed API
   src/contexts/, components/   several files are re-exports from @agile-suite/core (frontend/core)
   wailsjs/           GENERATED bindings — do not hand-edit
-scripts/release.ps1  Version-stamp + bundle portable exe and Inno Setup installer into dist/
+build/windows/installer/installer.iss  Inno Setup script; its AppId is XTM's own and never changes
 ```
 
 ## Architecture — the big picture
@@ -172,12 +172,20 @@ that logic, add or update the `.test.tsx` beside it.
 ## Releasing
 
 Version is single-sourced in `wails.json` (`info.productVersion`).
-`scripts/release.ps1 -Version X.Y.Z` stamps it, builds the portable exe, compiles
-the installer from `build/windows/installer/installer.iss` with Inno Setup (needs
-`ISCC.exe`), bundles the user guide, and writes `SHA256SUMS.txt` into `dist/`
-(`-NoInstaller` skips the installer). Pushing an `xtm/vX.Y.Z` tag triggers
-`.github/workflows/release.yml` on `windows-latest` to build and publish a
-GitHub Release. See README for the artifact table.
+`scripts/release-app.ps1 -App xtm -Version X.Y.Z`, run from the repository root,
+stamps it, builds the portable exe, compiles the installer from
+`build/windows/installer/installer.iss` with Inno Setup (needs `ISCC.exe`),
+bundles the user guide, and writes `SHA256SUMS.txt` into `xtm/dist/`
+(`-NoInstaller` skips the installer). The script serves every app in the
+repository and reads the product and binary names from the app's `wails.json`,
+so it carries no XTM literals; `-App tam` releases TAM the same way.
+
+Pushing an `xtm/vX.Y.Z` tag triggers `.github/workflows/release.yml`, whose
+`resolve` job reads the app out of the tag's prefix and hands the build jobs the
+directory, product name and binary name. A `tam/vX.Y.Z` tag runs the same two
+jobs for TAM. The instruction gate fails when an app carrying a `wails.json`
+has no matching prefix, so a new app cannot be left unreleasable without
+anything saying so. See README for the artifact table.
 
 ## Current status
 

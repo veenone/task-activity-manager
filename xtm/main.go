@@ -17,7 +17,7 @@ import (
 var assets embed.FS
 
 // wailsConfig is the embedded wails.json, the single source of truth for the
-// product version (stamped by scripts/release.ps1). productVersion() reads it
+// product version (stamped by scripts/release-app.ps1). productVersion() reads it
 // so the About dialog never drifts from the built version.
 //
 //go:embed wails.json
