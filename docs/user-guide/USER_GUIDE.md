@@ -1,6 +1,6 @@
 # Xray Test Manager — User Guide
 
-**Version:** 1.9.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** QA engineers,
+**Version:** 1.10.0 · **Platform:** Windows 10/11 (64-bit) · **Audience:** QA engineers,
 test leads, and anyone managing Xray test cases in Jira Data Center.
 
 Xray Test Manager is a lightweight Windows desktop app for managing **Xray test
@@ -21,8 +21,11 @@ you commit.
 
 ## What's new in 1.10.0
 
-Version 1.10.0 adds bulk summary renaming and a guided tour, and rebuilds the
-precondition sync so a first sync on a large project keeps what it fetched.
+Version 1.10.0 adds bulk summary renaming and a guided tour, rebuilds the
+precondition sync so a first sync on a large project keeps what it fetched, and
+gives the Preconditions view a large overhaul: its definition text, its own
+Sync button, and a list that opens instantly on a project with thousands of
+them. Kiwi TCMS users can now file bugs into a Jira project.
 
 - **Rename many summaries at once.** Select tests in Browse, then **Rename
   summaries…**, and add a common **prefix, suffix, or both**. A live preview
@@ -57,6 +60,33 @@ precondition sync so a first sync on a large project keeps what it fetched.
   were previously silent.
 - **A faster interface.** Editing something no longer reloads a whole view;
   only what actually changed refreshes.
+- **A precondition's Condition is shown and editable.** The definition text on
+  a Precondition was never read, so every one of them arrived blank and the
+  detail panel said "No condition defined" whatever Xray held. It now syncs,
+  and editing it pushes back on commit.
+- **The Preconditions view has its own Sync.** Refreshing preconditions no
+  longer costs a full sync of tests, folders and containers. The status bar
+  tracks both halves of the run, **Finding preconditions** and **Linking
+  preconditions to tests**, each with its own count.
+- **A precondition key opens its Jira issue.** The key in the Preconditions
+  detail header is a link, the way the test key already was.
+- **The Preconditions list opens instantly on a large project.** On a project
+  with several thousand preconditions the list used to sit on "Loading..." for
+  about a minute. It is now near-instant.
+- **Switching profiles clears what the last one had selected.** A view used to
+  keep the previous profile's selection, so the Preconditions detail panel went
+  on showing a precondition from the profile you had just left.
+- **Browse shows the folder tree even with no folders.** A project whose tests
+  were never filed into a folder showed "No folders synced." and no way to
+  reach them. The tree is now always drawn, with an **All tests** row counting
+  every test in the profile.
+- **Kiwi TCMS bugs can be filed into Jira.** A Kiwi profile can be given a Jira
+  bug tracker of its own: URL, project, issue type, token and TLS settings,
+  configured on the profile. Filing a bug creates the Jira issue and links it
+  back on the Kiwi Test Execution, and sync reads those links so the Bugs view
+  shows what relates to this product.
+- **The About dialog fits its window.** It used to stretch to the full height
+  of the screen, and in a short window its footer sat below the fold.
 
 ---
 
@@ -311,6 +341,42 @@ a trusted internal server).
 ![Figure 49: TLS / certificate settings](images/49-tls-settings.png)
 *Figure 49 — Advanced TLS settings: a custom CA certificate, or the
 allow-untrusted escape hatch.*
+
+### Reporting Kiwi defects into Jira
+
+Kiwi TCMS has no issue type of its own, so a defect raised against a Kiwi test
+has nowhere to live. Point the profile at a Jira project instead.
+
+On a Kiwi profile (**Backend: Kiwi TCMS**), open **Edit profile** and fill in
+the **Bug tracker** section: the Jira URL, the bug project key, the issue type
+(usually `Bug`), and a personal access token for that Jira. This connection is
+separate from the Kiwi connection itself, with its own **Advanced: TLS /
+certificate settings (bug tracker)** for a CA certificate or an
+allow-untrusted-certificate option. The token is stored in the Windows
+Credential Manager, never in the local database. Leave the URL and project key
+blank to keep bug reporting off.
+
+Once both fields are filled in, **Create Bug** appears on a failed test the
+same way it does for an Xray profile. Committing creates the issue in Jira and
+adds a hyperlink to it on the Kiwi Test Execution the bug was raised from. The
+next sync reads those hyperlinks and fetches only the issues they name,
+filling in each one's summary, status, and priority, so the Bugs view shows
+what relates to this product instead of every defect in the Jira project.
+
+If Jira creates the issue but the link back to Kiwi fails, the issue is kept
+and the commit reports which link is missing. Commit again to add it; the
+existing issue is reused instead of a second one being filed. If Jira creates
+the issue and the link succeeds but Jira later deletes it (or the linked key
+turns out to be malformed), the next sync drops it from the Bugs view rather
+than showing a blank row.
+
+If the bug tracker is set up but its credential cannot be loaded, sync
+reports the failure on the bug stage instead of emptying the Bugs view; what
+was cached from the last successful sync stays in place.
+
+To turn bug reporting off again, clear both the bug tracker URL and the
+project key and save. This asks for confirmation, since it deletes the stored
+connection and its credential.
 
 ### Demo mode — try it without Jira
 
@@ -807,6 +873,10 @@ Which Jira project a new bug lands in, and its issue type, are configurable per
 profile (the test project, the execution's project, or a dedicated defect
 project). Bug sync respects the profile's scope and shows progress in the status
 bar.
+
+On a Kiwi profile, bugs are filed into a separate Jira bug tracker configured
+on the profile rather than into the same connection. See [Reporting Kiwi
+defects into Jira](#reporting-kiwi-defects-into-jira).
 
 **Affected-tests breakdown.** The affected-tests table shows each test's
 **Project**, and each row expands to a per-test run breakdown — execution,

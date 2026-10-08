@@ -5,6 +5,16 @@ import (
 	"errors"
 )
 
+// The two halves of a precondition sync, as reported by
+// PreconditionStreamer.ListPreconditionsStream. Each is minutes long on a large
+// project (finding is one paged search per 100 preconditions, linking is one
+// association read per precondition), so a caller that shows progress has to
+// label them apart or its bar appears to fill, reset and start again.
+const (
+	PreconditionStageFinding = "finding"
+	PreconditionStageLinking = "linking"
+)
+
 // ErrUnsupported is returned by a backend for an operation its target system
 // does not support. Callers gate on Capabilities first; ErrUnsupported is the
 // runtime backstop.
@@ -69,7 +79,17 @@ type Capabilities struct {
 	SupportsWorkflowTransitions bool `json:"supportsWorkflowTransitions"`
 	SupportsBugCreation         bool `json:"supportsBugCreation"`
 	SupportsBugLinks            bool `json:"supportsBugLinks"`
-	SupportsTags                bool `json:"supportsTags"`
+	// SupportsBugRouting reports that this profile files its defects into a
+	// SEPARATE backend: a Kiwi workspace with a Jira bug connection
+	// (RND_P_4TFINT_05-359). It is a property of the profile's configuration,
+	// not of the adapter, so no adapter's Capabilities() sets it; app.go's
+	// GetCapabilities merges it in.
+	//
+	// SupportsBugCreation stays whatever the primary adapter reports. Kiwi
+	// still cannot create a bug; something else does it on Kiwi's behalf, and
+	// flipping the adapter's own flag would make it lie.
+	SupportsBugRouting bool `json:"supportsBugRouting"`
+	SupportsTags       bool `json:"supportsTags"`
 }
 
 // Backend is the storage/tracker-agnostic contract the sync engine and app
@@ -136,6 +156,11 @@ type Backend interface {
 	CucumberScenarioFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error)
 	CucumberTypeFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error)
 	GenericDefinitionFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error)
+	// ConditionFieldValue resolves a Precondition's condition text to the
+	// backend's field id + value. Xray keeps it in an instance-specific custom
+	// field; ok=false means the backend or instance has no such field, so the
+	// commit engine skips that one field rather than failing the commit.
+	ConditionFieldValue(ctx context.Context, v string) (fieldID string, value any, ok bool, err error)
 
 	// --- containers (Test Sets / Plans / Executions) ---
 	ListContainers(ctx context.Context, projectKey string, onProgress func(done, total int)) ([]Container, []ContainerLink, error)
@@ -231,7 +256,7 @@ type PreconditionStreamer interface {
 	ListPreconditionsStream(
 		ctx context.Context,
 		projectKey string,
-		onProgress func(done, total int),
+		onProgress func(stage string, done, total int),
 		onBatch func(pre []Precondition, links map[string][]string) error,
 	) error
 }
@@ -246,4 +271,39 @@ type PreconditionStreamer interface {
 // skip the fast path when the backend does not implement it.
 type TestPreconditionReader interface {
 	ListTestPreconditions(ctx context.Context, testKey string) ([]Precondition, error)
+}
+
+// BugKeyReader is an optional capability: fetching specific bug issues by key.
+//
+// It is deliberately kept off Backend. Only a Jira-style tracker can answer it
+// cheaply (one JQL "key in (...)" search), and no other adapter has a better
+// answer than the project-wide ListProjectBugs it already provides.
+//
+// The syncer needs it when a workspace's bugs live in a DIFFERENT backend from
+// its tests (RND_P_4TFINT_05-359): the primary backend reports which keys are
+// linked, and this fills in what those keys actually are. Callers type-assert
+// and fall back to the project-wide read when the backend does not implement
+// it.
+type BugKeyReader interface {
+	ListBugsByKeys(ctx context.Context, keys []string) ([]Bug, error)
+}
+
+// RunScopedBugLinker is an optional capability: attaching a bug to the single
+// test run it was raised from, which takes BOTH the Test Execution container
+// and the test inside it.
+//
+// It is deliberately kept off Backend. Backend.CreateBugLink carries one key
+// because in an issue tracker a defect links to the Test issue itself, and
+// that is all Xray needs. Kiwi has no issue link: a defect is a hyperlink hung
+// on a TestExecution row, which IS the (run, case) pair and carries its own
+// id, distinct from both the run's and the case's. The execution key the
+// syncer holds is a Kiwi TestRun id (a KindTestExec container key), so neither
+// key alone identifies what to hang the link on — passing the run id where an
+// execution id is expected either fails or lands on an unrelated execution
+// whose pk happens to match (RND_P_4TFINT_05-359).
+//
+// Only Kiwi needs this. Callers type-assert, and fall back to
+// Backend.CreateBugLink when the backend does not implement it.
+type RunScopedBugLinker interface {
+	CreateRunBugLink(ctx context.Context, execKey, testKey, bugKey string) error
 }

@@ -112,6 +112,8 @@ export function CreateVersion(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function DeallocateTests(arg1:string,arg2:string,arg3:Array<string>):Promise<testrepo.DeallocateResult>;
 
+export function DeleteBugConnection(arg1:string):Promise<void>;
+
 export function DeleteCanonicalRequirement(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteChangeRequest(arg1:string,arg2:string):Promise<void>;
@@ -189,6 +191,10 @@ export function ExportTests(arg1:string,arg2:testrepo.Query):Promise<string>;
 export function ExportTraceability(arg1:string,arg2:string,arg3:Array<string>,arg4:Array<string>,arg5:boolean,arg6:Array<string>,arg7:Array<string>):Promise<string>;
 
 export function GetBridgeMapping(arg1:string,arg2:string,arg3:string):Promise<bridge.Mapping>;
+
+export function GetBugBrowseBase(arg1:string):Promise<string>;
+
+export function GetBugConnection(arg1:string):Promise<connection.Connection>;
 
 export function GetBugCreateFields(arg1:string):Promise<Array<jira.BugCreateField>>;
 
@@ -388,6 +394,8 @@ export function RunStatuses():Promise<Array<string>>;
 
 export function SaveBridgeMapping(arg1:string,arg2:string,arg3:string,arg4:bridge.Mapping):Promise<void>;
 
+export function SaveBugConnection(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean):Promise<connection.Connection>;
+
 export function ScanAllDuplicateSteps(arg1:string):Promise<number>;
 
 export function ScanDuplicateGroupSteps(arg1:string,arg2:string):Promise<testrepo.DuplicateGroup>;
@@ -451,6 +459,8 @@ export function SetVersionStatus(arg1:string,arg2:string,arg3:string):Promise<vo
 export function SyncBugs(arg1:string):Promise<void>;
 
 export function SyncContainers(arg1:string):Promise<void>;
+
+export function SyncPreconditions(arg1:string):Promise<void>;
 
 export function SyncProfile(arg1:string):Promise<void>;
 

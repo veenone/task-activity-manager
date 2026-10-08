@@ -9,6 +9,7 @@ import (
 	"agile-suite/core/connection"
 	"agile-suite/core/profile"
 	"agile-suite/core/settings"
+	"agile-suite/core/shareddb"
 	"agile-suite/xtm/internal/backend/kiwi"
 	"agile-suite/xtm/internal/backend/xray"
 	"agile-suite/xtm/internal/store"
@@ -60,6 +61,16 @@ func newTestApp(t *testing.T) *App {
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = st.Close() })
+
+	// The app opens two databases and gives profile, connection and settings
+	// the shared one, whose schema owns the confluence tables core/profile
+	// deletes from on Delete. This harness keeps a single database, so that
+	// schema is applied to it as well; every statement is CREATE TABLE IF NOT
+	// EXISTS, so the tables XTM's own store already made are left alone.
+	// Without it, DeleteProfile fails on a table the real app always has.
+	if _, err := st.DB().Exec(shareddb.Schema.Base); err != nil {
+		t.Fatalf("apply the shared schema: %v", err)
+	}
 
 	a := &App{
 		statusCache:   map[string][]string{},

@@ -87,6 +87,11 @@ type Adapter struct {
 	// comment for the full retry rule.
 	detectMu   sync.Mutex
 	detectDone bool
+
+	// bugBrowseBase is the browse-URL prefix of the tracker this workspace
+	// files its defects into, set by SetBugBrowseBase. Empty means bug links
+	// are not recognizable, so the bug read reports nothing (see bugs.go).
+	bugBrowseBase string
 }
 
 // New builds a Kiwi backend.Backend against baseURL, authenticating with
@@ -610,6 +615,13 @@ func (a *Adapter) ExecTypeFieldValue(ctx context.Context, execType string) (fiel
 	return "", nil, false, nil // P4.2 — ExecType derives from is_automated, not a field (spec §3.4)
 }
 
+// A Kiwi precondition carries its text in the object itself, not a custom
+// field, so there is nothing to resolve: ok=false and the commit engine skips
+// the field.
+func (a *Adapter) ConditionFieldValue(ctx context.Context, v string) (string, any, bool, error) {
+	return "", nil, false, nil
+}
+
 // Cucumber/Generic body fields have no Kiwi analog (#54): ok=false so the
 // commit engine skips them.
 func (a *Adapter) CucumberScenarioFieldValue(ctx context.Context, v string) (string, any, bool, error) {
@@ -939,10 +951,6 @@ func (a *Adapter) ListReqToReqLinks(ctx context.Context, reqKeys []string) ([]ba
 
 // --- bugs ---
 
-func (a *Adapter) ListBugs(ctx context.Context, testProjectKey string, testKeys []string, issueType string, onProgress func(done, total int)) ([]backend.Bug, []backend.BugLink, error) {
-	return nil, nil, backend.ErrUnsupported // P4.3 — best-effort via TestExecution.get_links (spec §3.9)
-}
-
 func (a *Adapter) ListProjectBugs(ctx context.Context, projKey, issueType string) ([]backend.Bug, error) {
 	return nil, nil // P4.3 — EMPTY (spec §3.9)
 }
@@ -953,10 +961,6 @@ func (a *Adapter) GetBugCreateFields(ctx context.Context, projectKey, issueType 
 
 func (a *Adapter) CreateBug(ctx context.Context, projectKey, issueType, summary, description, priority string, labels []string, extraFields map[string]any) (string, error) {
 	return "", backend.ErrUnsupported // P4.3 (write)
-}
-
-func (a *Adapter) CreateBugLink(ctx context.Context, testKey, bugKey string) error {
-	return backend.ErrUnsupported // P4.3 (write)
 }
 
 func (a *Adapter) GetBugDetail(ctx context.Context, bugKey string) (backend.BugDetail, error) {
