@@ -23,10 +23,10 @@ type Precondition struct {
 	Type        string
 	Description string
 	// Condition is the Xray precondition definition text, distinct from the Jira
-	// issue description. NOTE(xtm): the condition text lives in an
-	// instance-specific Xray custom field; its field id varies per deployment, so
-	// Condition is left empty for live Jira until the field id can be verified on
-	// a real Xray Server/DC 8.4.0 instance. Demo mode populates it.
+	// issue description. It lives in an instance-specific custom field whose id
+	// varies per deployment, so it is resolved by name at read and write time
+	// (see conditionFieldID). An instance without the field leaves this empty
+	// rather than failing the sync.
 	Condition string
 }
 
@@ -98,7 +98,14 @@ func normalizeTypeName(s string) string {
 func (c *Client) ListPreconditions(ctx context.Context, projectKey string, onProgress func(done, total int)) ([]Precondition, map[string][]string, error) {
 	allPre := []Precondition{}
 	allLinks := map[string][]string{}
-	err := c.ListPreconditionsStream(ctx, projectKey, onProgress,
+	// This shape has no stage, so only the association phase is forwarded: it
+	// is the one whose counter this caller's bar was already showing.
+	staged := func(stage string, done, total int) {
+		if onProgress != nil && stage == PreconditionStageLinking {
+			onProgress(done, total)
+		}
+	}
+	err := c.ListPreconditionsStream(ctx, projectKey, staged,
 		func(pre []Precondition, links map[string][]string) error {
 			allPre = append(allPre, pre...)
 			for tk, pks := range links {
@@ -121,10 +128,20 @@ func (c *Client) ListPreconditions(ctx context.Context, projectKey string, onPro
 // store failure cannot be silently absorbed. An instance with no Precondition
 // issue type returns nil having called onBatch zero times, which callers read
 // as a benign skip rather than an empty project.
+// The two halves of a precondition sync, named so a caller can label them
+// apart. Finding a project's preconditions is one paged search per 100 of
+// them, and linking is one association read per precondition; on a 6,000
+// precondition project each half is minutes long, so a bar that only moves
+// during the second reads as a hang during the first.
+const (
+	PreconditionStageFinding = "finding"
+	PreconditionStageLinking = "linking"
+)
+
 func (c *Client) ListPreconditionsStream(
 	ctx context.Context,
 	projectKey string,
-	onProgress func(done, total int),
+	onProgress func(stage string, done, total int),
 	onBatch func(pre []Precondition, links map[string][]string) error,
 ) error {
 	if isDemoURL(c.baseURL) {
@@ -144,7 +161,11 @@ func (c *Client) ListPreconditionsStream(
 		return nil
 	}
 
-	preconditions, err := c.searchPreconditions(ctx, projectKey, typeID)
+	preconditions, err := c.searchPreconditions(ctx, projectKey, typeID, func(done, total int) {
+		if onProgress != nil {
+			onProgress(PreconditionStageFinding, done, total)
+		}
+	})
 	if err != nil {
 		return fmt.Errorf("search preconditions: %w", err)
 	}
@@ -189,7 +210,7 @@ func (c *Client) ListPreconditionsStream(
 				if onProgress != nil {
 					n := atomic.AddInt64(&done, 1)
 					progMu.Lock()
-					onProgress(int(n), total)
+					onProgress(PreconditionStageLinking, int(n), total)
 					progMu.Unlock()
 				}
 			}()
@@ -261,8 +282,21 @@ func (c *Client) listPreconditionTestsRetrying(ctx context.Context, key string) 
 // searchPreconditions finds every Precondition issue in a project via JQL,
 // matching by issue-type id (robust to renamed/localised types), paging until
 // the reported total is reached.
-func (c *Client) searchPreconditions(ctx context.Context, projectKey, typeID string) ([]Precondition, error) {
+func (c *Client) searchPreconditions(ctx context.Context, projectKey, typeID string, onPage func(done, total int)) ([]Precondition, error) {
 	jql := fmt.Sprintf(`project = "%s" AND issuetype = %s ORDER BY key ASC`, projectKey, typeID)
+
+	// Resolved once per search rather than per page. A lookup failure is not
+	// fatal: the search still returns summaries and descriptions, which is
+	// what this did before the condition was read at all.
+	condID, err := c.conditionFieldID(ctx)
+	if err != nil {
+		log.Printf("xtm: resolve precondition condition field: %v", err)
+		condID = ""
+	}
+	fields := "summary,description"
+	if condID != "" {
+		fields += "," + condID
+	}
 
 	out := []Precondition{}
 	startAt := 0
@@ -274,16 +308,17 @@ func (c *Client) searchPreconditions(ctx context.Context, projectKey, typeID str
 		q.Set("jql", jql)
 		q.Set("startAt", strconv.Itoa(startAt))
 		q.Set("maxResults", "100")
-		q.Set("fields", "summary,description")
+		q.Set("fields", fields)
 
+		// The condition arrives under an id only known at run time, so the
+		// whole fields object is decoded as a raw map and every column is
+		// pulled out by name. Two struct fields sharing the json tag "fields"
+		// would make encoding/json drop both.
 		var resp struct {
 			Total  int `json:"total"`
 			Issues []struct {
-				Key    string `json:"key"`
-				Fields struct {
-					Summary     string `json:"summary"`
-					Description string `json:"description"`
-				} `json:"fields"`
+				Key    string                     `json:"key"`
+				Fields map[string]json.RawMessage `json:"fields"`
 			} `json:"issues"`
 		}
 		if err := c.get(ctx, "/rest/api/2/search?"+q.Encode(), &resp); err != nil {
@@ -295,13 +330,23 @@ func (c *Client) searchPreconditions(ctx context.Context, projectKey, typeID str
 			return nil, err
 		}
 		for _, iss := range resp.Issues {
-			out = append(out, Precondition{
+			p := Precondition{
 				Key:         iss.Key,
-				Summary:     iss.Fields.Summary,
-				Description: iss.Fields.Description,
-			})
+				Summary:     stringifyFieldValue(iss.Fields["summary"]),
+				Description: stringifyFieldValue(iss.Fields["description"]),
+			}
+			if condID != "" {
+				p.Condition = stringifyFieldValue(iss.Fields[condID])
+			}
+			out = append(out, p)
 		}
 		startAt += len(resp.Issues)
+		// Reported per page rather than per issue: the page is the unit of work
+		// (one HTTP round trip), and Jira hands back the project's total with
+		// the first one, so the bar has a scale from the very first frame.
+		if onPage != nil {
+			onPage(startAt, resp.Total)
+		}
 		if len(resp.Issues) == 0 || startAt >= resp.Total {
 			break
 		}
@@ -509,10 +554,15 @@ func (c *Client) preconditionDetails(ctx context.Context, keys []string) (map[st
 // placeholder is reconciled on the next sync).
 //
 // Maps to POST /rest/api/2/issue with the resolved Precondition issue type id
-// (the type name varies per instance), summary and description. NOTE(xtm): Xray
-// stores the precondition type (Manual / Generic / Cucumber) in an
-// instance-specific custom field; setting it on create needs that field id, so
-// ptype is accepted but not sent until it can be verified on a live instance.
+// (the type name varies per instance), summary and description. The condition
+// is not sent here: the UI creates a precondition and then journals its
+// condition as a normal field edit, which the commit path pushes through the
+// resolved custom field (see ConditionFieldValue).
+//
+// NOTE(xtm): Xray stores the precondition type (Manual / Generic / Cucumber) in
+// an instance-specific custom field ("Pre-Condition Type", customfield_13988 on
+// the instance checked for RND_P_4TFINT_05-358). ptype is accepted and not
+// sent; wiring it needs the same name resolution the condition now uses.
 func (c *Client) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string) (string, error) {
 	_ = ptype
 	if isDemoURL(c.baseURL) {

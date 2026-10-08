@@ -198,6 +198,10 @@ export function DeallocateTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeallocateTests'](arg1, arg2, arg3);
 }
 
+export function DeleteBugConnection(arg1) {
+  return window['go']['main']['App']['DeleteBugConnection'](arg1);
+}
+
 export function DeleteCanonicalRequirement(arg1, arg2) {
   return window['go']['main']['App']['DeleteCanonicalRequirement'](arg1, arg2);
 }
@@ -352,6 +356,14 @@ export function ExportTraceability(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
 
 export function GetBridgeMapping(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetBridgeMapping'](arg1, arg2, arg3);
+}
+
+export function GetBugBrowseBase(arg1) {
+  return window['go']['main']['App']['GetBugBrowseBase'](arg1);
+}
+
+export function GetBugConnection(arg1) {
+  return window['go']['main']['App']['GetBugConnection'](arg1);
 }
 
 export function GetBugCreateFields(arg1) {
@@ -750,6 +762,10 @@ export function SaveBridgeMapping(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SaveBridgeMapping'](arg1, arg2, arg3, arg4);
 }
 
+export function SaveBugConnection(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['SaveBugConnection'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function ScanAllDuplicateSteps(arg1) {
   return window['go']['main']['App']['ScanAllDuplicateSteps'](arg1);
 }
@@ -876,6 +892,10 @@ export function SyncBugs(arg1) {
 
 export function SyncContainers(arg1) {
   return window['go']['main']['App']['SyncContainers'](arg1);
+}
+
+export function SyncPreconditions(arg1) {
+  return window['go']['main']['App']['SyncPreconditions'](arg1);
 }
 
 export function SyncProfile(arg1) {

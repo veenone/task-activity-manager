@@ -171,6 +171,11 @@ func (a *Adapter) ExecTypeFieldValue(ctx context.Context, execType string) (fiel
 	return a.c.ExecTypeFieldValue(ctx, execType)
 }
 
+// ConditionFieldValue resolves the Xray precondition condition custom field.
+func (a *Adapter) ConditionFieldValue(ctx context.Context, v string) (string, any, bool, error) {
+	return a.c.ConditionFieldValue(ctx, v)
+}
+
 func (a *Adapter) CucumberScenarioFieldValue(ctx context.Context, v string) (string, any, bool, error) {
 	return a.c.CucumberScenarioFieldValue(ctx, v)
 }
@@ -265,13 +270,31 @@ func (a *Adapter) ListPreconditions(ctx context.Context, projectKey string, onPr
 func (a *Adapter) ListPreconditionsStream(
 	ctx context.Context,
 	projectKey string,
-	onProgress func(done, total int),
+	onProgress func(stage string, done, total int),
 	onBatch func(pre []backend.Precondition, links map[string][]string) error,
 ) error {
-	return a.c.ListPreconditionsStream(ctx, projectKey, onProgress,
+	staged := func(stage string, done, total int) {
+		if onProgress != nil {
+			onProgress(preconditionStage(stage), done, total)
+		}
+	}
+	return a.c.ListPreconditionsStream(ctx, projectKey, staged,
 		func(jp []jira.Precondition, links map[string][]string) error {
 			return onBatch(toPreconditions(jp), links)
 		})
+}
+
+// preconditionStage translates the Jira client's stage name into the neutral
+// one. Written out rather than passed through so the two packages drifting
+// apart is a compile error here instead of an unlabelled bar in the UI.
+func preconditionStage(s string) string {
+	switch s {
+	case jira.PreconditionStageFinding:
+		return backend.PreconditionStageFinding
+	case jira.PreconditionStageLinking:
+		return backend.PreconditionStageLinking
+	}
+	return ""
 }
 
 // ListTestPreconditions implements backend.TestPreconditionReader. Xray exposes
@@ -367,6 +390,16 @@ func (a *Adapter) ListBugs(ctx context.Context, testProjectKey string, testKeys 
 
 func (a *Adapter) ListProjectBugs(ctx context.Context, projKey, issueType string) ([]backend.Bug, error) {
 	bugs, err := a.c.ListProjectBugs(ctx, projKey, issueType)
+	if err != nil {
+		return nil, err
+	}
+	return toBugs(bugs), nil
+}
+
+// ListBugsByKeys implements backend.BugKeyReader by delegating to the Jira
+// client's key lookup.
+func (a *Adapter) ListBugsByKeys(ctx context.Context, keys []string) ([]backend.Bug, error) {
+	bugs, err := a.c.ListBugsByKeys(ctx, keys)
 	if err != nil {
 		return nil, err
 	}
