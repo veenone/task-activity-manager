@@ -46,4 +46,9 @@ three in step and is gone with them. A clone from that era still carries the
 fan-out in `git remote -v`; `git remote set-url --push origin
 git@github.com:veenone/task-activity-manager.git` clears it.
 
-XTM releases are tagged `xtm/vX.Y.Z` (see `xtm/README.md`).
+Releases are tagged per app: `xtm/vX.Y.Z` for XTM (see `xtm/README.md`) and
+`tam/vX.Y.Z` for TAM. The tag's prefix is what tells
+`.github/workflows/release.yml` which app to build, and
+`scripts/release-app.ps1 -App <app> -Version X.Y.Z` is the same build run
+locally. XTM ships the user guide in `docs/user-guide`; TAM's documentation is
+kept outside this repository, so its releases carry binaries alone.

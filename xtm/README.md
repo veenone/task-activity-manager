@@ -81,15 +81,16 @@ Releases ship Windows and macOS artifacts plus checksums:
 > `MACOS_SIGNING_IDENTITY`, and for notarization `MACOS_NOTARY_APPLE_ID`,
 > `MACOS_NOTARY_TEAM_ID`, and `MACOS_NOTARY_PASSWORD` (an app-specific password).
 
-**Build locally** (`scripts/release.ps1` builds, version-stamps, bundles into
-`dist/`, and writes checksums):
+**Build locally** (`scripts/release-app.ps1` builds, version-stamps, bundles
+into `xtm/dist/`, and writes checksums). Run it from the repository root; it
+serves every app here and takes the app as a parameter:
 
 ```powershell
 # Stamp + build the portable exe and the installer (needs Inno Setup / ISCC.exe)
-./scripts/release.ps1 -Version 0.2.0
+./scripts/release-app.ps1 -App xtm -Version 0.2.0
 
 # Portable exe only (skip the installer)
-./scripts/release.ps1 -Version 0.2.0 -NoInstaller
+./scripts/release-app.ps1 -App xtm -Version 0.2.0 -NoInstaller
 ```
 
 The version is the single source of truth in `wails.json` (`info.productVersion`);
@@ -99,9 +100,10 @@ the script stamps it and Wails bakes it into the installer and the exe metadata.
 at the repository root) runs two jobs: `release-windows` (on `windows-latest`)
 builds the installer and portable exe, and `release-macos` (on `macos-latest`)
 builds the universal `.app`. Both publish to the same GitHub Release. The
-prefix says which app the tag belongs to; a bare `v1.10.0` builds nothing.
-(`scripts/release.ps1` is Windows-only; the macOS `.app` is built directly with
-`wails build`.)
+prefix says which app the tag belongs to, and the workflow's `resolve` job
+turns it into the directory, product name and binary name both jobs use; a bare
+`v1.10.0` builds nothing. (`scripts/release-app.ps1` is Windows-only; the macOS
+`.app` is built directly with `wails build`.)
 
 ```powershell
 git tag xtm/v1.10.0

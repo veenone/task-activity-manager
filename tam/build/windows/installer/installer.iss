@@ -1,13 +1,17 @@
-; Inno Setup script for Xray Test Manager.
+; Inno Setup script for Task Activity Manager.
 ;
-; Replaces the previous Wails/NSIS installer. Driven by
-; scripts/release-app.ps1, which compiles it with ISCC and passes the version +
-; build paths as /D defines:
-;   ISCC /DAppVersion=1.2.2 /DSourceDir=<build\bin> /DOutputDir=<dist> \
+; Driven by scripts/release-app.ps1, which compiles it with ISCC and passes the
+; version + build paths as /D defines:
+;   ISCC /DAppVersion=0.1.0 /DSourceDir=<build\bin> /DOutputDir=<dist> \
 ;        [/DWebView2Bootstrapper=<path to MicrosoftEdgeWebview2Setup.exe>] installer.iss
 ;
 ; The defines have sensible fallbacks so the script also compiles standalone
 ; (e.g. opening it in the Inno Setup IDE) after a `wails build`.
+;
+; This is the twin of xtm/build/windows/installer/installer.iss. The two are
+; deliberately separate files rather than one shared script: AppId must differ
+; between them and must never change once an app has shipped, so it belongs
+; beside the app it identifies, not in a flag passed from a build script.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -19,16 +23,16 @@
   #define OutputDir "..\..\..\dist"
 #endif
 
-#define AppName "Xray Test Manager"
+#define AppName "Task Activity Manager"
 #define AppPublisher "Achmad Fienan Rahardianto"
-#define AppExeName "xray-test-manager.exe"
-#define AppUrl "https://github.com/veenone/xray-testcase-manager"
+#define AppExeName "task-activity-manager.exe"
+#define AppUrl "https://github.com/veenone/task-activity-manager"
 
 [Setup]
 ; A stable AppId keeps upgrades and uninstall entries consistent across
-; versions — do not change it once released. TAM's installer carries its own,
-; which is why the two apps have separate .iss files rather than one shared.
-AppId={{70AFE0FB-5066-4CF2-8F3E-180CA778DB94}
+; versions — do not change it once released. It is TAM's own: sharing XTM's
+; would make each app's installer upgrade over the other.
+AppId={{2975C214-24CD-490B-BCD2-025C9B56C581}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
@@ -40,7 +44,7 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExeName}
 OutputDir={#OutputDir}
-OutputBaseFilename=xray-test-manager-{#AppVersion}-windows-amd64-installer
+OutputBaseFilename=task-activity-manager-{#AppVersion}-windows-amd64-installer
 SetupIconFile=..\icon.ico
 Compression=lzma2
 SolidCompression=yes
@@ -69,14 +73,13 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 
 [Run]
 #ifdef WebView2Bootstrapper
-; Install the Evergreen WebView2 runtime when it isn't already present (matches
-; the old NSIS installer's wails.webview2runtime behaviour).
+; Install the Evergreen WebView2 runtime when it isn't already present.
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2 runtime…"; Check: WebView2Missing
 #endif
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-; Remove the app's WebView2 user-data folder, as the NSIS uninstaller did.
+; Remove the app's WebView2 user-data folder.
 Type: filesandordirs; Name: "{localappdata}\{#AppExeName}"
 
 [Code]

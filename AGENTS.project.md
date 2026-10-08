@@ -74,7 +74,11 @@ Gate: `frontend/core/src/instruction-gate.test.ts` (every class a component sets
 - Backend logic lives in `internal/`; `app.go` only adapts it to Wails bindings. Gate: review.
 - Planned work is marked `TODO(tam)` or `TODO(xtm)` and names its phase or FR. Gate: the ratchet holds unscoped_todos.
 - Go source is gofmt-clean. Gate: CI only — `core.autocrlf` makes `gofmt -l` flag every file on a Windows checkout.
-- Release tags carry the app name: `xtm/v1.10.0`, `tam/v0.1.0`. The release workflow filters `xtm/v*`. Gate: review.
+- Release tags carry the app name: `xtm/v1.10.0`, `tam/v0.1.0`. The release
+  workflow filters on each app's prefix and resolves the app, product name and
+  binary name from the tag, so one tag releases one app. Gate:
+  `frontend/core/src/instruction-gate.test.ts` (every app with a `wails.json`
+  has a matching tag prefix in `release.yml`).
 - A `feat` PR links its spec or says in its `## Spec` section why it needs none. Gate: the `pr-acceptance` CI job.
 - No commit message, PR description or comment carries AI attribution: no `Co-Authored-By` naming an AI, no session link, no "Generated with" footer. Gate: `.githooks/commit-msg`, and the `no-ai-attribution` CI job over every commit in a PR and over its body.
 
