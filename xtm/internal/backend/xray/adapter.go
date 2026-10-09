@@ -21,6 +21,7 @@ func New(c *jira.Client) *Adapter { return &Adapter{c: c} }
 
 // Compile-time assertion that the adapter satisfies the interface.
 var _ backend.Backend = (*Adapter)(nil)
+var _ backend.ComponentManager = (*Adapter)(nil)
 
 // --- connection / auth ---
 
@@ -537,5 +538,61 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsBugCreation:         true,
 		SupportsBugLinks:            true,
 		SupportsTags:                false,
+		SupportsComponentAdmin:      true,
 	}
+}
+
+func toBackendComponent(c jira.Component) backend.Component {
+	return backend.Component{ID: c.ID, Name: c.Name, Description: c.Description,
+		LeadName: c.LeadName, LeadDisplayName: c.LeadDisplayName, AssigneeType: c.AssigneeType}
+}
+
+// ProjectComponentDetails lists the project's components with their ids.
+func (a *Adapter) ProjectComponentDetails(ctx context.Context, projectKey string) ([]backend.Component, error) {
+	list, err := a.c.ProjectComponentDetails(ctx, projectKey)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.Component, 0, len(list))
+	for _, c := range list {
+		out = append(out, toBackendComponent(c))
+	}
+	return out, nil
+}
+
+// CreateComponent creates a component in projectKey.
+func (a *Adapter) CreateComponent(ctx context.Context, projectKey string, in backend.ComponentInput) (backend.Component, error) {
+	c, err := a.c.CreateComponent(ctx, jira.ComponentInput{Project: projectKey, Name: in.Name,
+		Description: in.Description, LeadUserName: in.LeadUserName, AssigneeType: in.AssigneeType})
+	return toBackendComponent(c), err
+}
+
+// UpdateComponent edits a component.
+func (a *Adapter) UpdateComponent(ctx context.Context, id string, in backend.ComponentInput) (backend.Component, error) {
+	c, err := a.c.UpdateComponent(ctx, id, jira.ComponentInput{Name: in.Name,
+		Description: in.Description, LeadUserName: in.LeadUserName, AssigneeType: in.AssigneeType})
+	return toBackendComponent(c), err
+}
+
+// DeleteComponent deletes a component, optionally moving its issues first.
+func (a *Adapter) DeleteComponent(ctx context.Context, id, moveIssuesTo string) error {
+	return a.c.DeleteComponent(ctx, id, moveIssuesTo)
+}
+
+// ComponentIssueCount is how many issues carry a component.
+func (a *Adapter) ComponentIssueCount(ctx context.Context, id string) (int, error) {
+	return a.c.ComponentIssueCount(ctx, id)
+}
+
+// SearchUsers finds Jira users for the component lead picker.
+func (a *Adapter) SearchUsers(ctx context.Context, query string) ([]backend.User, error) {
+	users, err := a.c.SearchUsers(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.User, 0, len(users))
+	for _, u := range users {
+		out = append(out, backend.User{Name: u.Name, DisplayName: u.DisplayName, Email: u.Email})
+	}
+	return out, nil
 }
