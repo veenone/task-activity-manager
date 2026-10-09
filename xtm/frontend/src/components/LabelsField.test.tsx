@@ -25,7 +25,7 @@ function Harness({
       profileId="p1"
       value={value}
       onChange={setValue}
-      onSave={() => onSave(value)}
+      onSave={onSave}
       readOnly={readOnly}
     />
   );
@@ -51,6 +51,22 @@ describe("LabelsField", () => {
     await userEvent.click(screen.getByRole("button", { name: "elsewhere" }));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith("smoke login");
+  });
+
+  it("saves the remaining labels when a chip is removed with its button", async () => {
+    const onSave = vi.fn();
+    renderField({ onSave });
+    await userEvent.click(screen.getByRole("button", { name: "Remove smoke" }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith("");
+  });
+
+  it("saves typed text that was never confirmed when focus leaves", async () => {
+    const onSave = vi.fn();
+    renderField({ onSave });
+    await userEvent.type(screen.getByRole("combobox", { name: "Labels" }), "draft");
+    await userEvent.click(screen.getByRole("button", { name: "elsewhere" }));
+    expect(onSave).toHaveBeenLastCalledWith("smoke draft");
   });
 
   it("read-only shows the labels as text with no picker", () => {

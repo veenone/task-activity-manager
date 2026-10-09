@@ -485,7 +485,9 @@ labels separated by spaces adds them all.
 
 Jira labels cannot contain spaces and are limited to 255 characters, so the
 field refuses those with a message. Labels are case-sensitive: `Smoke` and
-`smoke` are different labels. The change is saved when you leave the field.
+`smoke` are different labels. Each add or remove is queued as a pending
+change straight away. Text you typed but did not confirm with Enter is added
+when you leave the field.
 
 ### Steps
 

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TokenPicker, validateLabel } from "./TokenPicker";
+import { Modal } from "@agile-suite/core";
 
 function Harness(props: {
   initial?: string[];
@@ -101,6 +102,29 @@ describe("TokenPicker", () => {
     await userEvent.click(input());
     await userEvent.keyboard("{Backspace}");
     expect(spy).toHaveBeenLastCalledWith(["a"]);
+  });
+
+  it("Escape closes the list without closing the modal around it", async () => {
+    const onClose = vi.fn();
+    render(
+      <Modal onClose={onClose} labelledBy="t">
+        <h2 id="t">Labels</h2>
+        <Harness />
+      </Modal>,
+    );
+    await userEvent.type(input(), "smo");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    // A second Escape, with the list already closed, is the modal's again.
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps focus in the picker after a chip is removed", async () => {
+    render(<Harness initial={["a", "b"]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Remove a" }));
+    expect(document.activeElement).toBe(input());
   });
 
   it("validateLabel rejects whitespace and over-long labels", () => {

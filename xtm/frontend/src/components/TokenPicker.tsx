@@ -97,7 +97,11 @@ export function TokenPicker({
       e.preventDefault();
       const o = options[active];
       if (o) void add([o.value], o.create);
-    } else if (e.key === "Escape") {
+    } else if (e.key === "Escape" && showList) {
+      // Close only the list. Without this the Escape reaches the Modal around
+      // a bulk dialog and closes it, discarding every pick.
+      e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
     } else if (e.key === "Backspace" && query === "" && value.length > 0) {
       onChange(value.slice(0, -1));
@@ -114,6 +118,10 @@ export function TokenPicker({
   function onWrapperBlur(e: FocusEvent<HTMLDivElement>) {
     if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
     setOpen(false);
+    // Text typed but never confirmed with Enter would otherwise vanish, and a
+    // "Replace all" applied without it would clear the field.
+    const pending = query.split(/\s+/).filter(Boolean);
+    if (pending.length > 0) void add(pending, true);
     onBlur?.();
   }
 
@@ -129,7 +137,11 @@ export function TokenPicker({
               type="button"
               className="token-chip-remove"
               aria-label={`Remove ${v}`}
-              onClick={() => onChange(value.filter((x) => x !== v))}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onChange(value.filter((x) => x !== v));
+                inputRef.current?.focus();
+              }}
             >
               ×
             </button>

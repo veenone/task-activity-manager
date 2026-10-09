@@ -48,4 +48,16 @@ describe("BulkEditModal labels", () => {
       value: "smoke fresh",
     });
   });
+
+  it("Replace all keeps a typed label that was not confirmed with Enter", async () => {
+    renderModal();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Field" }), "labels");
+    await userEvent.type(screen.getByRole("combobox", { name: "Labels" }), "regression");
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(bulkEdit).toHaveBeenCalledWith("p1", ["QA-1", "QA-2"], {
+      operation: "set",
+      field: "labels",
+      value: "regression",
+    });
+  });
 });

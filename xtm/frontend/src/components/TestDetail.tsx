@@ -1155,7 +1155,7 @@ export function TestDetail({
                 profileId={profileId}
                 value={labels}
                 onChange={setLabels}
-                onSave={() => saveField("labels", labels)}
+                onSave={(v) => saveField("labels", v)}
                 readOnly={!!readOnly}
               />
             </dd>
