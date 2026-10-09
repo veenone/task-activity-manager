@@ -474,6 +474,19 @@ A dot marks each field that has an uncommitted edit.
 *Figure 8 — The detail panel: summary, status, priority, labels, components, and
 other fields. Click a field to edit it inline.*
 
+### Labels
+
+The Labels field shows each label as a chip. Start typing and it suggests the
+labels already used on your synced tests; press Enter or click one to add it.
+If what you typed is not in the list, the last suggestion reads **Create
+"…"**, and Enter adds it as a new label. Remove a label with its **×**, or
+press Backspace in the empty field to remove the last one. Pasting several
+labels separated by spaces adds them all.
+
+Jira labels cannot contain spaces and are limited to 255 characters, so the
+field refuses those with a message. Labels are case-sensitive: `Smoke` and
+`smoke` are different labels. The change is saved when you leave the field.
+
 ### Steps
 
 Test steps load when you first open a test (to keep sync fast). You can add,
@@ -594,6 +607,11 @@ toolbar** appears above the grid:
 - **Bulk edit…** — set a field across all selected tests, including the
   **Execution Type** (Xray Test Type), priority, labels, components, and custom
   fields.
+- **Labels…** — add and remove several labels at once. Pick labels to add
+  (existing ones, or new ones you type) and labels to remove (existing ones
+  only). A line under the pickers tells you how many of the selected tests will
+  change. A label can't be in both lists. Tests that would end up with the same
+  labels are left alone, so they get no pending change.
 - **Bulk transition…** — move all selected tests through a workflow transition.
 - **Allocate…** — add the selected tests to a Test Set / Plan / Execution.
 - **Move to folder…** — re-file into a Test Repository folder.

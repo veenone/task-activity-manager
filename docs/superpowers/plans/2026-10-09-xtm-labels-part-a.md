@@ -406,7 +406,7 @@ Expected: PASS, including the existing `BulkEditTests` tests in `testrepo_test.g
 
 ```bash
 git add xtm/internal/testrepo/labels.go xtm/internal/testrepo/labels_test.go xtm/internal/testrepo/testrepo.go
-git commit -m "feat(xtm): list labels and bulk add or remove them (#<issue>)"
+git commit -m "feat(xtm): list labels and bulk add or remove them (#156)"
 ```
 
 ---
@@ -521,7 +521,7 @@ Expected: PASS and a clean build.
 
 ```bash
 git add xtm/app.go xtm/frontend/wailsjs/go/main/App.js xtm/frontend/wailsjs/go/main/App.d.ts xtm/frontend/src/api.ts xtm/frontend/src/queries
-git commit -m "feat(xtm): expose label list and bulk label edit to the frontend (#<issue>)"
+git commit -m "feat(xtm): expose label list and bulk label edit to the frontend (#156)"
 ```
 
 ---
@@ -967,7 +967,7 @@ Expected: tests PASS; no ratchet counter rises (watch `eslint_a11y`, `hardcoded_
 
 ```bash
 git add xtm/frontend/src/components/TokenPicker.tsx xtm/frontend/src/components/TokenPicker.test.tsx xtm/frontend/src/App.css
-git commit -m "feat(xtm): add a token picker with suggestions and inline create (#<issue>)"
+git commit -m "feat(xtm): add a token picker with suggestions and inline create (#156)"
 ```
 
 ---
@@ -1211,7 +1211,7 @@ Expected: PASS, including the existing TestDetail tests.
 
 ```bash
 git add xtm/frontend/src/components/TestDetail.tsx xtm/frontend/src/components/LabelsField.tsx xtm/frontend/src/components/LabelsField.test.tsx xtm/frontend/src/components/BulkEditModal.tsx xtm/frontend/src/components/BulkEditModal.test.tsx
-git commit -m "feat(xtm): pick labels from suggestions in test detail and bulk edit (#<issue>)"
+git commit -m "feat(xtm): pick labels from suggestions in test detail and bulk edit (#156)"
 ```
 
 ---
@@ -1585,7 +1585,7 @@ Expected: all PASS; no ratchet counter rises.
 
 ```bash
 git add xtm/internal/testrepo/labels.go xtm/internal/testrepo/labels_test.go xtm/app.go xtm/frontend/wailsjs/go/main/App.js xtm/frontend/wailsjs/go/main/App.d.ts xtm/frontend/src
-git commit -m "feat(xtm): add a Bulk Labels action that adds and removes labels (#<issue>)"
+git commit -m "feat(xtm): add a Bulk Labels action that adds and removes labels (#156)"
 ```
 
 ---
@@ -1608,7 +1608,7 @@ Expected: PASS. Read any failure and fix the cause (P4); do not commit after a f
 
 ```bash
 git add docs/user-guide/USER_GUIDE.md
-git commit -m "docs(xtm): describe the label picker and Bulk Labels (#<issue>)"
+git commit -m "docs(xtm): describe the label picker and Bulk Labels (#156)"
 ```
 
 - [ ] **Step 4: Open the PR**
