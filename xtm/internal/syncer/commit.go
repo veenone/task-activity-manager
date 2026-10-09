@@ -44,15 +44,15 @@ const (
 	// A precondition edit whose only field is one this instance cannot store
 	// (the condition custom field is absent), so there is nothing to push.
 	skipReasonPreconditionFields = "this instance has no field for the edited precondition value"
-	skipReasonRequirements  = "backend does not support requirement writes"
-	skipReasonReviews       = "backend does not support test reviews"
-	skipReasonContainerEdit = "backend does not support container rename"
-	skipReasonContainerEnv  = "backend does not support test-execution environments"
-	skipReasonBugCreate     = "backend cannot create bugs and no bug tracker is configured"
-	skipReasonComments      = "backend does not support issue comments"
-	skipReasonExecType      = "backend does not support the Test Type (exec_type) field"
-	skipReasonRunDefects    = "backend does not support run-level defect links"
-	skipReasonRunComments   = "backend does not support run-level comments"
+	skipReasonRequirements       = "backend does not support requirement writes"
+	skipReasonReviews            = "backend does not support test reviews"
+	skipReasonContainerEdit      = "backend does not support container rename"
+	skipReasonContainerEnv       = "backend does not support test-execution environments"
+	skipReasonBugCreate          = "backend cannot create bugs and no bug tracker is configured"
+	skipReasonComments           = "backend does not support issue comments"
+	skipReasonExecType           = "backend does not support the Test Type (exec_type) field"
+	skipReasonRunDefects         = "backend does not support run-level defect links"
+	skipReasonRunComments        = "backend does not support run-level comments"
 )
 
 // CreatedTest records that a locally-created Test (TempKey, "NEW-N") was created
