@@ -28,6 +28,9 @@ type Precondition struct {
 	// (see conditionFieldID). An instance without the field leaves this empty
 	// rather than failing the sync.
 	Condition string
+	// Status is the Jira workflow status name. Preconditions are ordinary Jira
+	// issues with a workflow, which is what makes them transitionable (#159).
+	Status string
 }
 
 // resolvePreconditionType finds the Jira issue type used for Xray Preconditions
@@ -293,7 +296,7 @@ func (c *Client) searchPreconditions(ctx context.Context, projectKey, typeID str
 		log.Printf("xtm: resolve precondition condition field: %v", err)
 		condID = ""
 	}
-	fields := "summary,description"
+	fields := "summary,description,status"
 	if condID != "" {
 		fields += "," + condID
 	}
@@ -334,6 +337,9 @@ func (c *Client) searchPreconditions(ctx context.Context, projectKey, typeID str
 				Key:         iss.Key,
 				Summary:     stringifyFieldValue(iss.Fields["summary"]),
 				Description: stringifyFieldValue(iss.Fields["description"]),
+				// Jira answers status as {"name": ...}, which
+				// stringifyFieldValue already reduces to the name.
+				Status: stringifyFieldValue(iss.Fields["status"]),
 			}
 			if condID != "" {
 				p.Condition = stringifyFieldValue(iss.Fields[condID])

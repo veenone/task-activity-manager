@@ -14,6 +14,7 @@ type preconditionDeleteSnapshot struct {
 	Type        string   `json:"type"`
 	Description string   `json:"description"`
 	Condition   string   `json:"condition"`
+	Status      string   `json:"status"`
 	Tests       []string `json:"tests"`
 }
 
@@ -27,6 +28,8 @@ type PreconditionUsage struct {
 	// Condition is the Xray precondition definition text (distinct from the Jira
 	// issue description). Empty when not set or when synced from live Jira.
 	Condition string `json:"condition"`
+	// Status is the Jira workflow status, so the view can show and sort by it.
+	Status    string `json:"status"`
 	TestCount int    `json:"testCount"`
 }
 
@@ -50,7 +53,7 @@ func (r *Repository) ListPreconditionsWithUsage(profileID string) ([]Preconditio
 	// permanent "Loading…". The subquery is one index seek per row and returns
 	// the same 6,028 rows in 48ms.
 	rows, err := r.db.Query(
-		`SELECT p.jira_key, p.summary, p.type, p.description, p.condition,
+		`SELECT p.jira_key, p.summary, p.type, p.description, p.condition, p.status,
 		        (SELECT COUNT(*) FROM test_precondition tp
 		          WHERE tp.profile_id = p.profile_id
 		            AND tp.precondition_key = p.jira_key) AS test_count
@@ -66,7 +69,7 @@ func (r *Repository) ListPreconditionsWithUsage(profileID string) ([]Preconditio
 	out := []PreconditionUsage{}
 	for rows.Next() {
 		var u PreconditionUsage
-		if err := rows.Scan(&u.Key, &u.Summary, &u.Type, &u.Description, &u.Condition, &u.TestCount); err != nil {
+		if err := rows.Scan(&u.Key, &u.Summary, &u.Type, &u.Description, &u.Condition, &u.Status, &u.TestCount); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -113,10 +116,10 @@ func (r *Repository) DeletePrecondition(profileID, key string) error {
 
 	var snap preconditionDeleteSnapshot
 	err = tx.QueryRow(
-		`SELECT summary, type, description, condition FROM precondition
+		`SELECT summary, type, description, condition, status FROM precondition
 		 WHERE profile_id = ? AND jira_key = ?`,
 		profileID, key,
-	).Scan(&snap.Summary, &snap.Type, &snap.Description, &snap.Condition)
+	).Scan(&snap.Summary, &snap.Type, &snap.Description, &snap.Condition, &snap.Status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("precondition %s not found", key)
 	}

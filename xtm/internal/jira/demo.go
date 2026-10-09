@@ -506,6 +506,11 @@ func demoStepsForKey(theme demoTheme, testKey string) []Step {
 // demoContainerStatuses / demoExecStatuses drive the issue status shown for
 // generated Test Sets, Plans and Executions.
 var demoContainerStatuses = []string{"Open", "In Progress", "Done"}
+
+// demoPreconditionStatuses rotates the workflow states a Precondition
+// realistically sits in, so the Preconditions view has something to show
+// and sort by in demo mode (#159).
+var demoPreconditionStatuses = []string{"Approved", "Draft", "In Review", "Approved", "Obsolete"}
 var demoExecStatuses = []string{"In Progress", "Done", "Open"}
 
 // demoContainerLabelSets rotates a few realistic Jira label sets across demo
@@ -915,6 +920,7 @@ func demoPreconditionsAndLinks(theme demoTheme, projectKey string) ([]Preconditi
 			Type:        def.Type,
 			Description: fmt.Sprintf("(Demo precondition: %s)", def.Summary),
 			Condition:   def.Condition,
+			Status:      demoPreconditionStatuses[i%len(demoPreconditionStatuses)],
 		})
 	}
 
@@ -931,6 +937,7 @@ func demoPreconditionsAndLinks(theme demoTheme, projectKey string) ([]Preconditi
 				Type:        "Manual",
 				Description: "(Demo duplicate precondition)",
 				Condition:   "A valid session token exists",
+				Status:      "Approved",
 			},
 			Precondition{
 				Key:         fmt.Sprintf("%s-PDUP-2", projectKey),
@@ -938,6 +945,7 @@ func demoPreconditionsAndLinks(theme demoTheme, projectKey string) ([]Preconditi
 				Type:        "Manual",
 				Description: "(Demo duplicate precondition)",
 				Condition:   "A valid session token exists", // identical definition
+				Status:      "Draft",
 			},
 			Precondition{
 				Key:         fmt.Sprintf("%s-PDUP-3", projectKey),
@@ -945,6 +953,7 @@ func demoPreconditionsAndLinks(theme demoTheme, projectKey string) ([]Preconditi
 				Type:        "Manual",
 				Description: "(Demo duplicate precondition)",
 				Condition:   "Cart item count >= 1",
+				Status:      "Approved",
 			},
 			Precondition{
 				Key:         fmt.Sprintf("%s-PDUP-4", projectKey),
@@ -952,6 +961,7 @@ func demoPreconditionsAndLinks(theme demoTheme, projectKey string) ([]Preconditi
 				Type:        "Manual",
 				Description: "(Demo duplicate precondition)",
 				Condition:   "The shopping cart has one or more products", // differing definition
+				Status:      "In Review",
 			},
 		)
 	}

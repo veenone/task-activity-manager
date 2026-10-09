@@ -167,6 +167,7 @@ func toPrecondition(p jira.Precondition) backend.Precondition {
 		Type:        p.Type,
 		Description: p.Description,
 		Condition:   p.Condition,
+		Status:      p.Status,
 	}
 }
 

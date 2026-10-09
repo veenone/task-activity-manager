@@ -47,8 +47,12 @@ function cmpPre(
   switch (field) {
     case "type":
       return cmpStr(a.type, b.type) || keyCompare(a.key, b.key);
+    case "status":
+      return cmpStr(a.status, b.status) || keyCompare(a.key, b.key);
     case "usage":
-      return (a.testCount ?? 0) - (b.testCount ?? 0) || keyCompare(a.key, b.key);
+      return (
+        (a.testCount ?? 0) - (b.testCount ?? 0) || keyCompare(a.key, b.key)
+      );
     default:
       return keyCompare(a.key, b.key);
   }
@@ -71,13 +75,35 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
   const listError = preconditionsQuery.error
     ? errMsg(preconditionsQuery.error)
     : "";
-  const [selected, setSelected] = useViewState(profileId, "preconditions", "selected", "");
+  const [selected, setSelected] = useViewState(
+    profileId,
+    "preconditions",
+    "selected",
+    "",
+  );
   const testsQuery = usePreconditionTests(profileId, selected);
   const tests = testsQuery.data ?? [];
-  const [filter, setFilter] = useViewState(profileId, "preconditions", "filter", "");
-  const [usageFilter, setUsageFilter] = useViewState<"all" | "with" | "without">(profileId, "preconditions", "usageFilter", "all");
-  const [sortField, setSortField] = useViewState(profileId, "preconditions", "sortField", "key");
-  const [sortDesc, setSortDesc] = useViewState(profileId, "preconditions", "sortDesc", true);
+  const [filter, setFilter] = useViewState(
+    profileId,
+    "preconditions",
+    "filter",
+    "",
+  );
+  const [usageFilter, setUsageFilter] = useViewState<
+    "all" | "with" | "without"
+  >(profileId, "preconditions", "usageFilter", "all");
+  const [sortField, setSortField] = useViewState(
+    profileId,
+    "preconditions",
+    "sortField",
+    "key",
+  );
+  const [sortDesc, setSortDesc] = useViewState(
+    profileId,
+    "preconditions",
+    "sortDesc",
+    true,
+  );
   const [error, setError] = useState("");
   // Said after a preconditions-only sync. Errors go to the detail pane's error
   // line with every other failure; a success has nowhere else to be reported,
@@ -88,7 +114,12 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
   const [showAdd, setShowAdd] = useState(false);
   // A test opened from the "Used by" list, docked as an inline detail beside the
   // precondition detail (mirrors the requirement / browse views, #4).
-  const [detailKey, setDetailKey] = useViewState(profileId, "preconditions", "detailKey", "");
+  const [detailKey, setDetailKey] = useViewState(
+    profileId,
+    "preconditions",
+    "detailKey",
+    "",
+  );
   const [detailVersion, setDetailVersion] = useState(0);
   const { confirm } = useConfirm();
   // A view-initiated sync has to register with the sync machine, not just call
@@ -176,10 +207,15 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
           (p) =>
             p.key.toLowerCase().includes(q) ||
             p.summary.toLowerCase().includes(q) ||
-            p.type.toLowerCase().includes(q),
+            p.type.toLowerCase().includes(q) ||
+            p.status.toLowerCase().includes(q),
         );
     const withTests = base.filter((p) => (p.testCount ?? 0) > 0).length;
-    return { all: base.length, with: withTests, without: base.length - withTests };
+    return {
+      all: base.length,
+      with: withTests,
+      without: base.length - withTests,
+    };
   }, [list, filter]);
 
   const filtered = useMemo(() => {
@@ -190,20 +226,35 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
           (p) =>
             p.key.toLowerCase().includes(q) ||
             p.summary.toLowerCase().includes(q) ||
-            p.type.toLowerCase().includes(q),
+            p.type.toLowerCase().includes(q) ||
+            p.status.toLowerCase().includes(q),
         );
     const usageFiltered =
       usageFilter === "all"
         ? base
         : base.filter((p) =>
-            usageFilter === "with" ? (p.testCount ?? 0) > 0 : (p.testCount ?? 0) === 0,
+            usageFilter === "with"
+              ? (p.testCount ?? 0) > 0
+              : (p.testCount ?? 0) === 0,
           );
-    return [...usageFiltered].sort((a, b) => applyDir(cmpPre(a, b, sortField), sortDesc));
+    return [...usageFiltered].sort((a, b) =>
+      applyDir(cmpPre(a, b, sortField), sortDesc),
+    );
   }, [list, filter, usageFilter, sortField, sortDesc]);
 
   // Pagination of the precondition master list.
-  const [listPage, setListPage] = useViewState(profileId, "preconditions", "listPage", 0);
-  const [listPageSize, setListPageSize] = useViewState(profileId, "preconditions", "listPageSize", 15);
+  const [listPage, setListPage] = useViewState(
+    profileId,
+    "preconditions",
+    "listPage",
+    0,
+  );
+  const [listPageSize, setListPageSize] = useViewState(
+    profileId,
+    "preconditions",
+    "listPageSize",
+    15,
+  );
   useEffect(() => {
     setListPage(0);
   }, [filter, usageFilter, sortField, sortDesc]);
@@ -232,8 +283,18 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
   }, [preconditionsQuery.data]);
 
   // Pagination of the "Used by" tests list.
-  const [testsPage, setTestsPage] = useViewState(profileId, "preconditions", "testsPage", 0);
-  const [testsPageSize, setTestsPageSize] = useViewState(profileId, "preconditions", "testsPageSize", 15);
+  const [testsPage, setTestsPage] = useViewState(
+    profileId,
+    "preconditions",
+    "testsPage",
+    0,
+  );
+  const [testsPageSize, setTestsPageSize] = useViewState(
+    profileId,
+    "preconditions",
+    "testsPageSize",
+    15,
+  );
   useEffect(() => {
     setTestsPage(0);
   }, [selected]);
@@ -346,6 +407,7 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
             fields={[
               { value: "key", label: "Key" },
               { value: "type", label: "Type" },
+              { value: "status", label: "Status" },
               { value: "usage", label: "Usage" },
             ]}
             field={sortField}
@@ -387,8 +449,7 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
           <p className="muted precond-empty">Loading…</p>
         ) : list.length === 0 ? (
           <p className="muted precond-empty">
-            No preconditions yet. Create one, or sync to pull them from
-            Jira.
+            No preconditions yet. Create one, or sync to pull them from Jira.
           </p>
         ) : filtered.length === 0 ? (
           <p className="muted precond-empty">No preconditions match.</p>
@@ -413,6 +474,9 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
                       {p.summary || "(untitled)"}
                     </div>
                     <div className="precond-item-meta muted">
+                      {p.status && (
+                        <span className="status-pill">{p.status}</span>
+                      )}
                       {p.testCount} test{p.testCount === 1 ? "" : "s"}
                     </div>
                   </button>
@@ -482,7 +546,10 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
                   </span>
                 )}
                 {isLocal && (
-                  <span className="pending-badge" title="Not yet created in Jira">
+                  <span
+                    className="pending-badge"
+                    title="Not yet created in Jira"
+                  >
                     new · uncommitted
                   </span>
                 )}
@@ -673,9 +740,7 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
             </div>
 
             {tests.length === 0 ? (
-              <p className="muted">
-                No tests reference this precondition yet.
-              </p>
+              <p className="muted">No tests reference this precondition yet.</p>
             ) : (
               <>
                 <table className="board-table precond-tests">
@@ -831,76 +896,76 @@ function CreatePreconditionModal({
 
   return (
     <Modal onClose={onCancel} className="modal" labelledBy="new-precond-title">
-        <div className="pending-head">
-          <h2 id="new-precond-title">New precondition</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
-            ✕
-          </button>
-        </div>
-        <div className="bulk-body">
-          <label className="precond-field">
-            <span>Summary</span>
-            <input
-              className="detail-input"
-              autoFocus
-              placeholder="e.g. User is logged in"
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") create();
-              }}
-            />
-          </label>
-          <label className="precond-field">
-            <span>Type</span>
-            <select
-              className="detail-input"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              {PRECOND_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="precond-field">
-            <span>Condition</span>
-            <MarkdownField
-              className="detail-input precond-desc"
-              value={condition}
-              onChange={setCondition}
-              onCommit={() => {}}
-              rows={3}
-              placeholder="e.g. Given the user is authenticated. Markdown supported."
-            />
-          </div>
-          <div className="precond-field">
-            <span>Description</span>
-            <MarkdownField
-              className="detail-input precond-desc"
-              value={description}
-              onChange={setDescription}
-              onCommit={() => {}}
-              rows={3}
-              placeholder="Optional. Markdown supported."
-            />
-          </div>
-          {error && <div className="error-text">{error}</div>}
-        </div>
-        <div className="pending-actions">
-          <button className="btn" onClick={onCancel} disabled={busy}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={create}
-            disabled={busy || !summary.trim()}
+      <div className="pending-head">
+        <h2 id="new-precond-title">New precondition</h2>
+        <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          ✕
+        </button>
+      </div>
+      <div className="bulk-body">
+        <label className="precond-field">
+          <span>Summary</span>
+          <input
+            className="detail-input"
+            autoFocus
+            placeholder="e.g. User is logged in"
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") create();
+            }}
+          />
+        </label>
+        <label className="precond-field">
+          <span>Type</span>
+          <select
+            className="detail-input"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
           >
-            {busy ? "Creating…" : "Create"}
-          </button>
+            {PRECOND_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="precond-field">
+          <span>Condition</span>
+          <MarkdownField
+            className="detail-input precond-desc"
+            value={condition}
+            onChange={setCondition}
+            onCommit={() => {}}
+            rows={3}
+            placeholder="e.g. Given the user is authenticated. Markdown supported."
+          />
         </div>
+        <div className="precond-field">
+          <span>Description</span>
+          <MarkdownField
+            className="detail-input precond-desc"
+            value={description}
+            onChange={setDescription}
+            onCommit={() => {}}
+            rows={3}
+            placeholder="Optional. Markdown supported."
+          />
+        </div>
+        {error && <div className="error-text">{error}</div>}
+      </div>
+      <div className="pending-actions">
+        <button className="btn" onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={create}
+          disabled={busy || !summary.trim()}
+        >
+          {busy ? "Creating…" : "Create"}
+        </button>
+      </div>
     </Modal>
   );
 }
