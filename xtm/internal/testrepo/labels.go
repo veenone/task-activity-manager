@@ -154,3 +154,28 @@ func removeLabels(labels, remove []string) []string {
 	}
 	return out
 }
+
+// ListTestLabels returns the labels of each requested Test, keyed by Jira key,
+// for the Bulk Labels preview. Keys the profile does not have are omitted.
+func (r *Repository) ListTestLabels(profileID string, testKeys []string) (map[string][]string, error) {
+	out := make(map[string][]string, len(testKeys))
+	for _, key := range testKeys {
+		var stored string
+		err := r.db.QueryRow(
+			`SELECT labels FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+			profileID, key,
+		).Scan(&stored)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("list test labels %s: %w", key, err)
+		}
+		labels := strings.Fields(stored)
+		if labels == nil {
+			labels = []string{}
+		}
+		out[key] = labels
+	}
+	return out, nil
+}

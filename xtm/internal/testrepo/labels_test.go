@@ -151,3 +151,17 @@ func TestBulkEditTestsAddLabelAcceptsSeveral(t *testing.T) {
 		t.Fatalf("labels %v", got)
 	}
 }
+
+func TestListTestLabelsReturnsRequestedKeys(t *testing.T) {
+	repo := newRepo(t)
+	seedLabelTests(t, repo)
+
+	got, err := repo.ListTestLabels(lblProfile, []string{"QA-1", "QA-4", "QA-99"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	want := map[string][]string{"QA-1": {"smoke", "login"}, "QA-4": {}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}

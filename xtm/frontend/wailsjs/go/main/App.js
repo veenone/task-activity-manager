@@ -678,6 +678,10 @@ export function ListTestCallLinks(arg1) {
   return window['go']['main']['App']['ListTestCallLinks'](arg1);
 }
 
+export function ListTestLabels(arg1, arg2) {
+  return window['go']['main']['App']['ListTestLabels'](arg1, arg2);
+}
+
 export function ListTests(arg1, arg2) {
   return window['go']['main']['App']['ListTests'](arg1, arg2);
 }

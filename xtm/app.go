@@ -4198,6 +4198,15 @@ func (a *App) ListLabels(profileID string) ([]testrepo.Bucket, error) {
 	return a.repo.ListLabels(profileID)
 }
 
+// ListTestLabels returns the labels of each given Test, for the Bulk Labels
+// preview.
+func (a *App) ListTestLabels(profileID string, testKeys []string) (map[string][]string, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListTestLabels(profileID, testKeys)
+}
+
 // ListStatuses returns the statuses for the browse filter: the Test issue
 // type's workflow statuses from Jira (in workflow order, cached per profile for
 // the session) unioned with the statuses actually present on synced Tests — so

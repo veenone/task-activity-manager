@@ -352,6 +352,8 @@ export function ListSyncLog(arg1:string,arg2:number):Promise<Array<testrepo.Sync
 
 export function ListTestCallLinks(arg1:string):Promise<Array<testrepo.TestCallLink>>;
 
+export function ListTestLabels(arg1:string,arg2:Array<string>):Promise<Record<string, Array<string>>>;
+
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 
 export function ListTestsForBug(arg1:string,arg2:string):Promise<Array<testrepo.BugTest>>;

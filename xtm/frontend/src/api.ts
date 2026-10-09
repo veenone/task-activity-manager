@@ -102,6 +102,7 @@ export {
   ListMatchingKeys,
   ListComponents,
   ListLabels,
+  ListTestLabels,
   ListStatuses,
   ListPriorities,
   ListProjectComponents,
