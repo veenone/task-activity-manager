@@ -28,7 +28,7 @@ const entityTypeTest = "test"
 // internal/bridge does not need to import internal/testrepo. *App's
 // HubReader adapter (bridge_publish.go) does the field-for-field conversion
 // at the boundary, the same pattern app.go's toJiraTransitions/
-// toJiraBugCreateFields already use for backend.* -> jira.*.
+// toJiraFieldDefs already use for backend.* -> jira.*.
 type HubTest struct {
 	Key         string
 	Summary     string

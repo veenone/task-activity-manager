@@ -206,8 +206,6 @@ export function GetBugBrowseBase(arg1:string):Promise<string>;
 
 export function GetBugConnection(arg1:string):Promise<connection.Connection>;
 
-export function GetBugCreateFields(arg1:string):Promise<Array<jira.BugCreateField>>;
-
 export function GetBugDetail(arg1:string,arg2:string):Promise<jira.BugDetail>;
 
 export function GetBulkTransitionOptions(arg1:string,arg2:Array<string>):Promise<main.BulkTransitionOptions>;
@@ -234,6 +232,8 @@ export function GetExecutionMembersWithRuns(arg1:string,arg2:string):Promise<Arr
 
 export function GetExecutionsForPlans(arg1:string,arg2:Array<string>):Promise<Array<testrepo.Container>>;
 
+export function GetFieldDefs(arg1:string):Promise<Array<jira.FieldDef>>;
+
 export function GetIgnoreWords():Promise<Array<string>>;
 
 export function GetParamModel(arg1:string,arg2:string):Promise<coverage.ParamModel>;
@@ -242,7 +242,7 @@ export function GetProfileCrossProjectSources(arg1:string):Promise<string>;
 
 export function GetProfileProjectKey(arg1:string):Promise<string>;
 
-export function GetRequirementCreateFields(arg1:string,arg2:string,arg3:string):Promise<Array<jira.BugCreateField>>;
+export function GetRequirementCreateFields(arg1:string,arg2:string,arg3:string):Promise<Array<jira.FieldDef>>;
 
 export function GetRequirementLinks(arg1:string,arg2:string):Promise<Array<testrepo.ReqReqLink>>;
 

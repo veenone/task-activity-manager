@@ -1,9 +1,9 @@
 // Shared helpers for createmeta-driven "extra required fields" on issue-create
 // forms (Create Bug, New Requirement). The backend returns each required field
-// as a BugCreateField descriptor (a generic createmeta field: id, name, type,
+// as a FieldDef descriptor (a generic createmeta field: id, name, type,
 // allowedValues); these helpers turn user input into the Jira-shaped values the
 // create payload expects, seed sensible defaults, and validate completeness.
-import type { BugCreateField } from "../api";
+import type { FieldDef } from "../api";
 
 // RawFieldValue is what the form holds per field: a string for single-value
 // fields, a string[] of ids for multi-value (versions / array) fields.
@@ -16,7 +16,7 @@ export type RawFieldValue = string | string[];
 //   versions / array      -> [{id: id1}, {id: id2}, ...]
 // Returns undefined when there is nothing to send (so the caller can omit it).
 export function buildCreateFieldValue(
-  field: BugCreateField,
+  field: FieldDef,
   raw: RawFieldValue,
 ): unknown {
   switch (field.type) {
@@ -45,7 +45,7 @@ export function buildCreateFieldValue(
 // initCreateFieldDefaults seeds the form state: first allowed value for single
 // selects, empty array for multi-selects, empty string for free text.
 export function initCreateFieldDefaults(
-  fields: BugCreateField[],
+  fields: FieldDef[],
 ): Record<string, RawFieldValue> {
   const defaults: Record<string, RawFieldValue> = {};
   for (const f of fields) {
@@ -65,7 +65,7 @@ export function initCreateFieldDefaults(
 
 // createFieldsValid reports whether every required field has a non-empty value.
 export function createFieldsValid(
-  fields: BugCreateField[],
+  fields: FieldDef[],
   values: Record<string, RawFieldValue>,
 ): boolean {
   for (const f of fields) {
@@ -83,7 +83,7 @@ export function createFieldsValid(
 // buildCreateFieldsPayload assembles the Jira-shaped {fieldId: value} object,
 // omitting fields with no value.
 export function buildCreateFieldsPayload(
-  fields: BugCreateField[],
+  fields: FieldDef[],
   values: Record<string, RawFieldValue>,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {};

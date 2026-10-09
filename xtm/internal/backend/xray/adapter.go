@@ -355,12 +355,12 @@ func (a *Adapter) CreateRequirement(ctx context.Context, projectKey, issueType, 
 	return a.c.CreateRequirement(ctx, projectKey, issueType, summary, description, priority, components, fixVersions, extraFields)
 }
 
-func (a *Adapter) GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]backend.BugCreateField, error) {
+func (a *Adapter) GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]backend.FieldDef, error) {
 	fields, err := a.c.GetRequirementCreateFields(ctx, projectKey, issueType)
 	if err != nil {
 		return nil, err
 	}
-	return toBugCreateFields(fields), nil
+	return toFieldDefs(fields), nil
 }
 
 func (a *Adapter) DeleteRequirement(ctx context.Context, requirementKey string) error {
@@ -407,12 +407,12 @@ func (a *Adapter) ListBugsByKeys(ctx context.Context, keys []string) ([]backend.
 	return toBugs(bugs), nil
 }
 
-func (a *Adapter) GetBugCreateFields(ctx context.Context, projectKey, issueType string) ([]backend.BugCreateField, error) {
-	fields, err := a.c.GetBugCreateFields(ctx, projectKey, issueType)
+func (a *Adapter) GetFieldDefs(ctx context.Context, projectKey, issueType string) ([]backend.FieldDef, error) {
+	fields, err := a.c.GetFieldDefs(ctx, projectKey, issueType)
 	if err != nil {
 		return nil, err
 	}
-	return toBugCreateFields(fields), nil
+	return toFieldDefs(fields), nil
 }
 
 func (a *Adapter) CreateBug(ctx context.Context, projectKey, issueType, summary, description, priority string, labels []string, extraFields map[string]any) (string, error) {

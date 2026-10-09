@@ -610,18 +610,18 @@ func toJiraTransitions(in []backend.Transition) []jira.Transition {
 	return out
 }
 
-// toJiraBugCreateFields converts backend bug-create-field descriptors to the
-// jira.BugCreateField shape GetBugCreateFields still exposes. A field-by-field
+// toJiraFieldDefs converts backend bug-create-field descriptors to the
+// jira.FieldDef shape GetFieldDefs still exposes. A field-by-field
 // copy is needed (rather than a single type conversion) because the nested
 // AllowedValues slice element type differs between the two packages.
-func toJiraBugCreateFields(in []backend.BugCreateField) []jira.BugCreateField {
-	out := make([]jira.BugCreateField, len(in))
+func toJiraFieldDefs(in []backend.FieldDef) []jira.FieldDef {
+	out := make([]jira.FieldDef, len(in))
 	for i, f := range in {
-		opts := make([]jira.BugFieldOption, len(f.AllowedValues))
+		opts := make([]jira.FieldOption, len(f.AllowedValues))
 		for j, o := range f.AllowedValues {
-			opts[j] = jira.BugFieldOption(o)
+			opts[j] = jira.FieldOption(o)
 		}
-		out[i] = jira.BugCreateField{
+		out[i] = jira.FieldDef{
 			ID: f.ID, Name: f.Name, Required: f.Required, Type: f.Type, AllowedValues: opts,
 		}
 	}
@@ -1858,7 +1858,7 @@ func (a *App) SetRequirementLinks(profileID, requirementKey, linkType string, li
 
 // --- Bug (defect) tracking ---
 
-// GetBugCreateFields returns the required fields for the bug issue type's
+// GetFieldDefs returns the required fields for the bug issue type's
 // create screen (beyond project/issuetype/summary/description/priority/
 // labels), so the Create Bug form can render and collect them before the
 // commit. When the profile has a bug connection, the fields come from that
@@ -1868,8 +1868,8 @@ func (a *App) SetRequirementLinks(profileID, requirementKey, linkType string, li
 // resolved the same way CreateBugForTest does (profile bug-project mode) when
 // there is no bug connection, with an empty execKey (the project key is
 // available from the profile before any specific execution is known).
-func (a *App) GetBugCreateFields(profileID string) (fields []jira.BugCreateField, err error) {
-	defer recoverToError("GetBugCreateFields", &err)
+func (a *App) GetFieldDefs(profileID string) (fields []jira.FieldDef, err error) {
+	defer recoverToError("GetFieldDefs", &err)
 	if err := a.requireStore(); err != nil {
 		return nil, err
 	}
@@ -1882,11 +1882,11 @@ func (a *App) GetBugCreateFields(profileID string) (fields []jira.BugCreateField
 	if err != nil {
 		return nil, err
 	}
-	bf, err := b.GetBugCreateFields(a.ctx, projKey, issueType)
+	bf, err := b.GetFieldDefs(a.ctx, projKey, issueType)
 	if err != nil {
 		return nil, err
 	}
-	return toJiraBugCreateFields(bf), nil
+	return toJiraFieldDefs(bf), nil
 }
 
 // CreateBugForTest queues a new Bug issue linked to a failed Test, committed to
@@ -1943,7 +1943,7 @@ func (a *App) bugCreateProjectAndIssueType(profileID string, p profile.Profile, 
 }
 
 // bugCreateTarget resolves the Backend a bug create-FIELDS lookup runs
-// against (GetBugCreateFields is the only caller — it genuinely needs a live
+// against (GetFieldDefs is the only caller — it genuinely needs a live
 // createmeta call), alongside the same project/issue type
 // bugCreateProjectAndIssueType would return: the profile's bug connection's
 // own backend when one is configured, otherwise the profile's own backend.
@@ -3661,7 +3661,7 @@ func (a *App) CreateRequirement(profileID, projectKey, issueType, summary, descr
 // issue. Without them, instances that mark a custom field required (e.g. "Req.
 // type") reject the create. Demo mode returns a preset list without a network
 // call.
-func (a *App) GetRequirementCreateFields(profileID, projectKey, issueType string) (fields []jira.BugCreateField, err error) {
+func (a *App) GetRequirementCreateFields(profileID, projectKey, issueType string) (fields []jira.FieldDef, err error) {
 	defer recoverToError("GetRequirementCreateFields", &err)
 	if err := a.requireStore(); err != nil {
 		return nil, err
@@ -3674,7 +3674,7 @@ func (a *App) GetRequirementCreateFields(profileID, projectKey, issueType string
 	if err != nil {
 		return nil, err
 	}
-	return toJiraBugCreateFields(bf), nil
+	return toJiraFieldDefs(bf), nil
 }
 
 // CreateTest queues a brand-new Test locally (temp NEW-N key) with optional

@@ -250,19 +250,23 @@ type BugLink struct {
 	LinkID  string
 }
 
-// BugFieldOption is one allowed value of a create-screen field.
-type BugFieldOption struct {
+// FieldOption is one allowed value of a FieldDef.
+type FieldOption struct {
 	ID    string `json:"id"`
 	Value string `json:"value"`
 }
 
-// BugCreateField describes a field on the bug create screen.
-type BugCreateField struct {
-	ID            string           `json:"id"`
-	Name          string           `json:"name"`
-	Required      bool             `json:"required"`
-	Type          string           `json:"type"`
-	AllowedValues []BugFieldOption `json:"allowedValues"`
+// FieldDef describes one Jira field as a screen offers it: its id, its
+// display name, whether the screen requires it, its type, and the values it
+// will accept. It is not specific to any one screen. Bug create and
+// requirement create use it today, and transition screens are next
+// (RND_P_4TFINT_05-451).
+type FieldDef struct {
+	ID            string        `json:"id"`
+	Name          string        `json:"name"`
+	Required      bool          `json:"required"`
+	Type          string        `json:"type"`
+	AllowedValues []FieldOption `json:"allowedValues"`
 }
 
 // BugDetail carries the extended fields of a single bug.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
-import { CreateBugForTest, GetBugCreateFields, errMsg } from "../api";
-import type { BugCreateField } from "../api";
+import { CreateBugForTest, GetFieldDefs, errMsg } from "../api";
+import type { FieldDef } from "../api";
 import { MultiSelect } from "./MultiSelect";
 import type { MultiOption } from "./MultiSelect";
 import {
@@ -24,7 +24,7 @@ const PRIORITIES = ["Highest", "High", "Medium", "Low", "Lowest"];
 // CreateBugModal files a Bug-type Jira issue against a test marked FAILED in an
 // execution. Local-first: the bug is queued and pushed on the next Commit.
 // Required fields beyond summary/priority/labels/description are fetched from
-// GetBugCreateFields (createmeta-driven) and rendered dynamically.
+// GetFieldDefs (createmeta-driven) and rendered dynamically.
 export function CreateBugModal({
   testKey,
   testSummary,
@@ -43,7 +43,7 @@ export function CreateBugModal({
   const [error, setError] = useState("");
 
   // Extra required fields loaded from createmeta.
-  const [extraFields, setExtraFields] = useState<BugCreateField[]>([]);
+  const [extraFields, setExtraFields] = useState<FieldDef[]>([]);
   const [extraLoading, setExtraLoading] = useState(true);
   // Raw user values: string for single-value fields, string[] for versions.
   const [extraValues, setExtraValues] = useState<Record<string, string | string[]>>({});
@@ -51,7 +51,7 @@ export function CreateBugModal({
   // Load required extra fields on mount.
   useEffect(() => {
     let cancelled = false;
-    GetBugCreateFields(profileId)
+    GetFieldDefs(profileId)
       .then((fields) => {
         if (cancelled) return;
         setExtraFields(fields ?? []);
@@ -105,7 +105,7 @@ export function CreateBugModal({
     setExtraValues((prev) => ({ ...prev, [id]: selected }));
   }
 
-  function renderExtraField(f: BugCreateField) {
+  function renderExtraField(f: FieldDef) {
     const rawVal = extraValues[f.id] ?? "";
 
     // "text" fields render as a multiline textarea so long-form inputs like
@@ -157,7 +157,7 @@ export function CreateBugModal({
 
     if (f.type === "versions" || f.type === "array") {
       const selected = Array.isArray(rawVal) ? rawVal : [];
-      // Map BugFieldOption {id, value} -> MultiOption {value, label} so the
+      // Map FieldOption {id, value} -> MultiOption {value, label} so the
       // checkbox-dropdown MultiSelect can render them. Selected ids flow back
       // via onChange; buildFieldValue converts them to [{id},...] for Jira.
       const opts: MultiOption[] = f.allowedValues.map((av) => ({

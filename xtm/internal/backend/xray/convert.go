@@ -402,33 +402,33 @@ func toBugLinks(in []jira.BugLink) []backend.BugLink {
 	return out
 }
 
-func toBugFieldOption(o jira.BugFieldOption) backend.BugFieldOption {
-	return backend.BugFieldOption{ID: o.ID, Value: o.Value}
+func toFieldOption(o jira.FieldOption) backend.FieldOption {
+	return backend.FieldOption{ID: o.ID, Value: o.Value}
 }
 
-func toBugCreateField(f jira.BugCreateField) backend.BugCreateField {
-	bf := backend.BugCreateField{
+func toFieldDef(f jira.FieldDef) backend.FieldDef {
+	bf := backend.FieldDef{
 		ID:       f.ID,
 		Name:     f.Name,
 		Required: f.Required,
 		Type:     f.Type,
 	}
 	if f.AllowedValues != nil {
-		bf.AllowedValues = make([]backend.BugFieldOption, len(f.AllowedValues))
+		bf.AllowedValues = make([]backend.FieldOption, len(f.AllowedValues))
 		for i, o := range f.AllowedValues {
-			bf.AllowedValues[i] = toBugFieldOption(o)
+			bf.AllowedValues[i] = toFieldOption(o)
 		}
 	}
 	return bf
 }
 
-func toBugCreateFields(in []jira.BugCreateField) []backend.BugCreateField {
+func toFieldDefs(in []jira.FieldDef) []backend.FieldDef {
 	if in == nil {
 		return nil
 	}
-	out := make([]backend.BugCreateField, len(in))
+	out := make([]backend.FieldDef, len(in))
 	for i, f := range in {
-		out[i] = toBugCreateField(f)
+		out[i] = toFieldDef(f)
 	}
 	return out
 }

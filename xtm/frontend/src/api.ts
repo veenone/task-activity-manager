@@ -188,7 +188,7 @@ export {
   ScanPreconditionDuplicates,
   ExcludePreconditionFromDuplicates,
   UnexcludePreconditionFromDuplicates,
-  GetBugCreateFields,
+  GetFieldDefs,
   CreateBugForTest,
   CreateRequirement,
   GetRequirementCreateFields,
@@ -1380,23 +1380,22 @@ export interface Sankey {
   links: SankeyLink[];
 }
 
-// BugFieldOption mirrors jira.BugFieldOption — one allowed value for a
-// BugCreateField select or version field.
-export interface BugFieldOption {
+// FieldOption mirrors jira.FieldOption, one allowed value of a FieldDef.
+export interface FieldOption {
   id: string;
   value: string;
 }
 
-// BugCreateField mirrors jira.BugCreateField — one required field on the bug
-// issue type's create screen beyond project/issuetype/summary/description/
-// priority/labels. Type is: "text" | "option" | "version" | "versions" |
-// "number" | "date" | "array".
-export interface BugCreateField {
+// FieldDef mirrors jira.FieldDef: one Jira field as a screen offers it, not
+// specific to any one screen. Bug create and requirement create use it today.
+// Type is: "text" | "option" | "version" | "versions" | "number" | "date" |
+// "array".
+export interface FieldDef {
   id: string;
   name: string;
   required: boolean;
   type: string;
-  allowedValues: BugFieldOption[];
+  allowedValues: FieldOption[];
 }
 
 // BugDetail mirrors jira.BugDetail - the extended fields for a defect issue

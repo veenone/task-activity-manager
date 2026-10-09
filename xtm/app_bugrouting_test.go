@@ -170,23 +170,23 @@ func TestCreateBugForTestUsesTheProfileWhenUnrouted(t *testing.T) {
 	}
 }
 
-// TestGetBugCreateFieldsAsksTheBugConnectionsBackendWhenRouted proves
-// GetBugCreateFields asks the BUG backend, not the profile's own Kiwi one, for
+// TestGetFieldDefsAsksTheBugConnectionsBackendWhenRouted proves
+// GetFieldDefs asks the BUG backend, not the profile's own Kiwi one, for
 // create-screen fields once routing is configured. The Kiwi adapter's
-// GetBugCreateFields always returns backend.ErrUnsupported (see
+// GetFieldDefs always returns backend.ErrUnsupported (see
 // internal/backend/kiwi/adapter.go), so a successful, non-empty result here
 // is only possible if the call reached the bug connection's (demo) Jira
 // backend instead.
-func TestGetBugCreateFieldsAsksTheBugConnectionsBackendWhenRouted(t *testing.T) {
+func TestGetFieldDefsAsksTheBugConnectionsBackendWhenRouted(t *testing.T) {
 	a, profileID := newTestAppWithKiwiProfile(t)
 
 	if _, err := a.SaveBugConnection(profileID, "demo", "DEF", "Bug", "tok", "", false); err != nil {
 		t.Fatalf("save bug connection: %v", err)
 	}
 
-	fields, err := a.GetBugCreateFields(profileID)
+	fields, err := a.GetFieldDefs(profileID)
 	if err != nil {
-		t.Fatalf("GetBugCreateFields: %v (want the demo bug connection's fields, not Kiwi's ErrUnsupported)", err)
+		t.Fatalf("GetFieldDefs: %v (want the demo bug connection's fields, not Kiwi's ErrUnsupported)", err)
 	}
 	if len(fields) == 0 {
 		t.Fatal("got no create fields; want the demo Jira bug connection's fields")

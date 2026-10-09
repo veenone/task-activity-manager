@@ -386,10 +386,6 @@ export function GetBugConnection(arg1) {
   return window['go']['main']['App']['GetBugConnection'](arg1);
 }
 
-export function GetBugCreateFields(arg1) {
-  return window['go']['main']['App']['GetBugCreateFields'](arg1);
-}
-
 export function GetBugDetail(arg1, arg2) {
   return window['go']['main']['App']['GetBugDetail'](arg1, arg2);
 }
@@ -440,6 +436,10 @@ export function GetExecutionMembersWithRuns(arg1, arg2) {
 
 export function GetExecutionsForPlans(arg1, arg2) {
   return window['go']['main']['App']['GetExecutionsForPlans'](arg1, arg2);
+}
+
+export function GetFieldDefs(arg1) {
+  return window['go']['main']['App']['GetFieldDefs'](arg1);
 }
 
 export function GetIgnoreWords() {
