@@ -53,6 +53,9 @@ func (w componentWire) component() Component {
 // ProjectComponentDetails lists a project's components with their ids, which
 // the write calls need, and their description, lead and assignee type.
 func (c *Client) ProjectComponentDetails(ctx context.Context, projectKey string) ([]Component, error) {
+	if isDemoURL(c.baseURL) {
+		return demoComponentDetails(), nil
+	}
 	var items []componentWire
 	path := fmt.Sprintf("/rest/api/2/project/%s/components", url.PathEscape(projectKey))
 	if err := c.get(ctx, path, &items); err != nil {
@@ -67,6 +70,9 @@ func (c *Client) ProjectComponentDetails(ctx context.Context, projectKey string)
 
 // CreateComponent creates a component in in.Project.
 func (c *Client) CreateComponent(ctx context.Context, in ComponentInput) (Component, error) {
+	if isDemoURL(c.baseURL) {
+		return demoCreateComponent(in)
+	}
 	body := map[string]string{
 		"project": in.Project, "name": in.Name, "description": in.Description,
 		"leadUserName": in.LeadUserName, "assigneeType": in.AssigneeType,
@@ -81,6 +87,9 @@ func (c *Client) CreateComponent(ctx context.Context, in ComponentInput) (Compon
 // UpdateComponent replaces a component's name, description, lead and assignee
 // type. An empty LeadUserName clears the lead.
 func (c *Client) UpdateComponent(ctx context.Context, id string, in ComponentInput) (Component, error) {
+	if isDemoURL(c.baseURL) {
+		return demoUpdateComponent(id, in)
+	}
 	body := map[string]string{
 		"name": in.Name, "description": in.Description,
 		"leadUserName": in.LeadUserName, "assigneeType": in.AssigneeType,
@@ -96,6 +105,9 @@ func (c *Client) UpdateComponent(ctx context.Context, id string, in ComponentInp
 // DeleteComponent deletes a component. With moveIssuesTo set, Jira first moves
 // the component's issues to that component.
 func (c *Client) DeleteComponent(ctx context.Context, id, moveIssuesTo string) error {
+	if isDemoURL(c.baseURL) {
+		return demoDeleteComponent(id)
+	}
 	path := "/rest/api/2/component/" + url.PathEscape(id)
 	if moveIssuesTo != "" {
 		path += "?moveIssuesTo=" + url.QueryEscape(moveIssuesTo)
@@ -121,6 +133,9 @@ func (c *Client) DeleteComponent(ctx context.Context, id, moveIssuesTo string) e
 // ComponentIssueCount is how many issues (of any type) carry the component,
 // shown before a delete.
 func (c *Client) ComponentIssueCount(ctx context.Context, id string) (int, error) {
+	if isDemoURL(c.baseURL) {
+		return 3, nil
+	}
 	var out struct {
 		IssueCount int `json:"issueCount"`
 	}
@@ -133,6 +148,9 @@ func (c *Client) ComponentIssueCount(ctx context.Context, id string) (int, error
 
 // SearchUsers finds users by username, name or email for the lead picker.
 func (c *Client) SearchUsers(ctx context.Context, query string) ([]User, error) {
+	if isDemoURL(c.baseURL) {
+		return demoSearchUsers(query), nil
+	}
 	var out []User
 	path := "/rest/api/2/user/search?maxResults=10&username=" + url.QueryEscape(query)
 	if err := c.get(ctx, path, &out); err != nil {

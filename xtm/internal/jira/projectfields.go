@@ -5,8 +5,12 @@ import (
 	"fmt"
 )
 
-// demoComponentList is the synthetic component list returned for demo profiles.
-var demoComponentList = []string{"Authentication", "Billing", "Core", "Reporting"}
+// demoComponentList seeds demo mode's project components. demo.go draws each
+// demo test's components from it, so the list and the tests agree.
+var demoComponentList = []string{
+	"Frontend", "Backend", "API", "Database", "Authentication",
+	"Payments", "Reporting", "User Management", "Infrastructure", "Mobile",
+}
 
 // demoVersionList is the synthetic fix-version list returned for demo profiles.
 var demoVersionList = []string{"1.5.0", "1.6.0", "1.7.0", "1.8.0"}
@@ -20,8 +24,11 @@ var demoVersionList = []string{"1.5.0", "1.6.0", "1.7.0", "1.8.0"}
 // instance. Verify before declaring the feature complete.
 func (c *Client) ProjectComponents(ctx context.Context, projectKey string) ([]string, error) {
 	if isDemoURL(c.baseURL) {
-		out := make([]string, len(demoComponentList))
-		copy(out, demoComponentList)
+		details := demoComponentDetails()
+		out := make([]string, 0, len(details))
+		for _, d := range details {
+			out = append(out, d.Name)
+		}
 		return out, nil
 	}
 

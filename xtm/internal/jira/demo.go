@@ -1339,11 +1339,7 @@ func demoTestFixVersionsForIndex(i int) []string {
 // issue field, distinct from the "Component" custom field in customfields.go).
 // Names deliberately include spaces ("User Management") so the grouping /
 // filtering path is exercised against multi-word component names.
-var demoComponentNames = []string{
-	"Frontend", "Backend", "API", "Database",
-	"Authentication", "Payments", "Reporting",
-	"User Management", "Infrastructure", "Mobile",
-}
+var demoComponentNames = demoComponentList
 
 // demoComponentsForIndex assigns a deterministic 1–2 component set to a demo
 // test so the same test always carries the same components.
