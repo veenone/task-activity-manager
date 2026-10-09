@@ -596,6 +596,7 @@ func (e *Engine) syncPreconditions(ctx context.Context, profileID, projectKey st
 				Type:        p.Type,
 				Description: p.Description,
 				Condition:   p.Condition,
+				Status:      p.Status,
 			}
 		}
 		if err := e.repo.UpsertPreconditions(profileID, repoPre); err != nil {

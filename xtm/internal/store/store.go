@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 50
+const schemaVersion = 51
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS precondition (
 	type        TEXT NOT NULL DEFAULT '',
 	description TEXT NOT NULL DEFAULT '',
 	condition   TEXT NOT NULL DEFAULT '',
+	status      TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, jira_key)
 );
 
@@ -1341,6 +1342,20 @@ func applyMigrations(db *sql.DB) error {
 		`ALTER TABLE sync_log ADD COLUMN stage_failures TEXT NOT NULL DEFAULT ''`,
 	); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return fmt.Errorf("v49 add sync_log.stage_failures: %w", err)
+	}
+
+	// v51: status on precondition. Preconditions are Jira issues with a
+	// workflow, but XTM asked Jira only for summary, description and the
+	// condition field, so their state was invisible and there was nothing for
+	// a transition to move them from (#159). syncPreconditions runs a full
+	// pass with a generation sweep rather than an incremental watermark, so
+	// an existing database fills this on its next precondition sync and needs
+	// no watermark clear. Applied unconditionally; tolerated when the column
+	// already exists.
+	if _, err := db.Exec(
+		`ALTER TABLE precondition ADD COLUMN status TEXT NOT NULL DEFAULT ''`,
+	); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		return fmt.Errorf("v51 add precondition.status: %w", err)
 	}
 	return nil
 }

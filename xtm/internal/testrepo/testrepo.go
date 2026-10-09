@@ -74,6 +74,10 @@ type Precondition struct {
 	// or when synced from a live Jira instance (the custom-field id is
 	// instance-specific; see NOTE(xtm) in internal/jira/preconditions.go).
 	Condition string `json:"condition"`
+	// Status is the Jira workflow status of the Precondition issue. Empty on a
+	// local draft that has not reached Jira yet, and on a row synced before
+	// schema 51 added the column, until the next precondition sync fills it.
+	Status string `json:"status"`
 }
 
 // Container is a cached Xray Test Set, Test Plan or Test Execution (FR-1.3).
@@ -638,20 +642,21 @@ func (r *Repository) UpsertPreconditions(profileID string, preconditions []Preco
 	defer func() { _ = tx.Rollback() }()
 
 	stmt, err := tx.Prepare(
-		`INSERT INTO precondition (profile_id, jira_key, summary, type, description, condition)
-		 VALUES (?, ?, ?, ?, ?, ?)
+		`INSERT INTO precondition (profile_id, jira_key, summary, type, description, condition, status)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(profile_id, jira_key) DO UPDATE SET
 		   summary     = excluded.summary,
 		   type        = excluded.type,
 		   description = excluded.description,
-		   condition   = excluded.condition`)
+		   condition   = excluded.condition,
+		   status      = excluded.status`)
 	if err != nil {
 		return fmt.Errorf("prepare upsert precondition: %w", err)
 	}
 	defer stmt.Close()
 
 	for _, p := range preconditions {
-		if _, err := stmt.Exec(profileID, p.Key, p.Summary, p.Type, p.Description, p.Condition); err != nil {
+		if _, err := stmt.Exec(profileID, p.Key, p.Summary, p.Type, p.Description, p.Condition, p.Status); err != nil {
 			return fmt.Errorf("upsert precondition %s: %w", p.Key, err)
 		}
 	}
@@ -849,7 +854,7 @@ func (r *Repository) ListTestSummaries(profileID string, testKeys []string) ([]T
 // ListTestPreconditions returns the Preconditions linked to a Test.
 func (r *Repository) ListTestPreconditions(profileID, testKey string) ([]Precondition, error) {
 	rows, err := r.db.Query(
-		`SELECT p.jira_key, p.summary, p.type, p.description, p.condition
+		`SELECT p.jira_key, p.summary, p.type, p.description, p.condition, p.status
 		 FROM test_precondition tp
 		 JOIN precondition p
 		   ON p.profile_id = tp.profile_id AND p.jira_key = tp.precondition_key
@@ -864,7 +869,7 @@ func (r *Repository) ListTestPreconditions(profileID, testKey string) ([]Precond
 	out := []Precondition{}
 	for rows.Next() {
 		var p Precondition
-		if err := rows.Scan(&p.Key, &p.Summary, &p.Type, &p.Description, &p.Condition); err != nil {
+		if err := rows.Scan(&p.Key, &p.Summary, &p.Type, &p.Description, &p.Condition, &p.Status); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -877,7 +882,7 @@ func (r *Repository) ListTestPreconditions(profileID, testKey string) ([]Precond
 // (FR-13.5 / 13.6).
 func (r *Repository) ListAllPreconditions(profileID string) ([]Precondition, error) {
 	rows, err := r.db.Query(
-		`SELECT jira_key, summary, type, description, condition FROM precondition
+		`SELECT jira_key, summary, type, description, condition, status FROM precondition
 		 WHERE profile_id = ? ORDER BY jira_key`, profileID)
 	if err != nil {
 		return nil, fmt.Errorf("list preconditions: %w", err)
@@ -887,7 +892,7 @@ func (r *Repository) ListAllPreconditions(profileID string) ([]Precondition, err
 	out := []Precondition{}
 	for rows.Next() {
 		var p Precondition
-		if err := rows.Scan(&p.Key, &p.Summary, &p.Type, &p.Description, &p.Condition); err != nil {
+		if err := rows.Scan(&p.Key, &p.Summary, &p.Type, &p.Description, &p.Condition, &p.Status); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -4150,9 +4155,9 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 			return fmt.Errorf("decode precondition snapshot: %w", err)
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO precondition (profile_id, jira_key, summary, type, description, condition)
-			   VALUES (?, ?, ?, ?, ?, ?)`,
-			profileID, entityKey, snap.Summary, snap.Type, snap.Description, snap.Condition,
+			`INSERT INTO precondition (profile_id, jira_key, summary, type, description, condition, status)
+			   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			profileID, entityKey, snap.Summary, snap.Type, snap.Description, snap.Condition, snap.Status,
 		); err != nil {
 			return fmt.Errorf("restore precondition: %w", err)
 		}

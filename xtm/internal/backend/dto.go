@@ -109,6 +109,10 @@ type Precondition struct {
 	// Condition is the precondition definition text, distinct from the issue
 	// description. May be empty on live until the field id is verified.
 	Condition string
+	// Status is the workflow status of the underlying issue. Empty on a
+	// backend whose preconditions have no workflow, and on a row cached
+	// before schema 51 until the next precondition sync.
+	Status string
 }
 
 // TestMeta carries created/updated audit metadata for a Test.

@@ -8,6 +8,19 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ## [Unreleased]
 
+### Added
+
+**Preconditions show their workflow status**
+- The Preconditions list shows each precondition's Jira status, and the list
+  can be sorted and searched by it. A reviewer working through a batch can see
+  which ones are still Draft without opening each in Jira.
+- The precondition sync now reads `status` from Jira and stores it. Schema
+  reaches v51. An existing database fills the column on its next precondition
+  sync; the stage runs a full pass with a generation sweep rather than an
+  incremental watermark, so nothing needs resyncing by hand.
+- This is the prerequisite for transitioning a precondition
+  (RND_P_4TFINT_05-451, v1.11.0): there was no status to move one from.
+
 ## [1.10.0] - 2026-09-11
 
 Stable **1.10.0**, finalizing the `1.10.0a` qualification build.

@@ -166,3 +166,59 @@ func TestListPreconditionsWithUsageIsIndexedAndProfileScoped(t *testing.T) {
 	}
 
 }
+
+// TestUpsertPreconditionsKeepsTheStatus is the prerequisite for transitioning
+// a Precondition (#159): there is nothing to move it from until the sync
+// stores what Jira says its status is. The management view reads it back,
+// because a status nobody can see is a column that cannot be checked.
+func TestUpsertPreconditionsKeepsTheStatus(t *testing.T) {
+	repo := newRepo(t)
+	if err := repo.UpsertPreconditions("p1", []testrepo.Precondition{
+		{Key: "QA-P-1", Summary: "card present", Type: "Manual", Status: "Approved"},
+		{Key: "QA-P-2", Summary: "card absent", Type: "Manual", Status: "Draft"},
+	}); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	usage, err := repo.ListPreconditionsWithUsage("p1")
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	got := map[string]string{}
+	for _, u := range usage {
+		got[u.Key] = u.Status
+	}
+	if got["QA-P-1"] != "Approved" {
+		t.Errorf("QA-P-1 status = %q, want Approved", got["QA-P-1"])
+	}
+	if got["QA-P-2"] != "Draft" {
+		t.Errorf("QA-P-2 status = %q, want Draft", got["QA-P-2"])
+	}
+}
+
+// TestUpsertPreconditionsUpdatesAChangedStatus is the case the sync hits on
+// every pass after the first: the row already exists and its status moved in
+// Jira. An upsert that inserted the status but left it alone on conflict
+// would read correctly on a fresh profile and go stale on every other one.
+func TestUpsertPreconditionsUpdatesAChangedStatus(t *testing.T) {
+	repo := newRepo(t)
+	first := []testrepo.Precondition{{Key: "QA-P-1", Summary: "card present", Status: "Draft"}}
+	if err := repo.UpsertPreconditions("p1", first); err != nil {
+		t.Fatalf("first upsert: %v", err)
+	}
+	second := []testrepo.Precondition{{Key: "QA-P-1", Summary: "card present", Status: "Approved"}}
+	if err := repo.UpsertPreconditions("p1", second); err != nil {
+		t.Fatalf("second upsert: %v", err)
+	}
+
+	usage, err := repo.ListPreconditionsWithUsage("p1")
+	if err != nil {
+		t.Fatalf("usage: %v", err)
+	}
+	if len(usage) != 1 {
+		t.Fatalf("got %d preconditions, want 1", len(usage))
+	}
+	if usage[0].Status != "Approved" {
+		t.Errorf("status = %q, want Approved after the second sync", usage[0].Status)
+	}
+}

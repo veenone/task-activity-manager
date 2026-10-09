@@ -778,6 +778,9 @@ export interface Precondition {
   // condition is the Xray precondition definition text, distinct from the Jira
   // issue description. Empty when not set or when synced from live Jira.
   condition: string;
+  // status is the Jira workflow status. Empty on a local draft that has not
+  // reached Jira, and on a row cached before schema 51 until the next sync.
+  status: string;
 }
 
 // PreconditionUsage mirrors testrepo.PreconditionUsage — a Precondition plus
@@ -790,6 +793,8 @@ export interface PreconditionUsage {
   // condition is the Xray precondition definition text, distinct from the Jira
   // issue description. Empty when not set or when synced from live Jira.
   condition: string;
+  // status is the Jira workflow status, so the view can show and sort by it.
+  status: string;
   testCount: number;
 }
 

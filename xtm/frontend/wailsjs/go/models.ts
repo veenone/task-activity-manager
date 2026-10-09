@@ -2473,6 +2473,7 @@ export namespace testrepo {
 	    type: string;
 	    description: string;
 	    condition: string;
+	    status: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Precondition(source);
@@ -2485,6 +2486,7 @@ export namespace testrepo {
 	        this.type = source["type"];
 	        this.description = source["description"];
 	        this.condition = source["condition"];
+	        this.status = source["status"];
 	    }
 	}
 	export class PreconditionDuplicateMember {
@@ -2610,6 +2612,7 @@ export namespace testrepo {
 	    type: string;
 	    description: string;
 	    condition: string;
+	    status: string;
 	    testCount: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2623,6 +2626,7 @@ export namespace testrepo {
 	        this.type = source["type"];
 	        this.description = source["description"];
 	        this.condition = source["condition"];
+	        this.status = source["status"];
 	        this.testCount = source["testCount"];
 	    }
 	}
