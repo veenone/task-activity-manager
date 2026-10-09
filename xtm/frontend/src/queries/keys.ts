@@ -59,6 +59,12 @@ export const keys = {
   folders: (profileId: string) => [profileId, "folders"] as const,
   components: (profileId: string) => [profileId, "components"] as const,
   labels: (profileId: string) => [profileId, "labels"] as const,
+  // Live list from Jira. Under the "components" prefix so
+  // invalidateProfileData refreshes it with the local counts.
+  projectComponents: (profileId: string) =>
+    [profileId, "components", "project"] as const,
+  userSearch: (profileId: string, q: string) =>
+    [profileId, "userSearch", q] as const,
   preconditions: (profileId: string) => [profileId, "preconditions"] as const,
   // The tests linked to one precondition (PreconditionsView's "Used by" list).
   // Nested under the "preconditions" prefix so invalidateProfileData refreshes

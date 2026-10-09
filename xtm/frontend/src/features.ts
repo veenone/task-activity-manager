@@ -25,6 +25,7 @@ export const defaultCapabilities: Capabilities = {
   supportsTestTypes: true,
   supportsFolders: true,
   supportsFolderWrites: true,
+  supportsComponentAdmin: true,
   supportsPreconditionObjects: true,
   supportsRequirementObjects: true,
   supportsIssueLinkTypes: true,

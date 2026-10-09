@@ -106,6 +106,12 @@ export {
   ListStatuses,
   ListPriorities,
   ListProjectComponents,
+  ListProjectComponentDetails,
+  CreateComponent,
+  UpdateComponent,
+  DeleteComponent,
+  ComponentIssueCount,
+  SearchUsers,
   ListProjectFixVersions,
   PreviewImport,
   ImportTests,
@@ -563,6 +569,33 @@ export interface Capabilities {
   // widen to cover routed creation, and vice versa.
   supportsBugRouting: boolean;
   supportsTags: boolean;
+  // Create, edit and delete project components (Jira only).
+  supportsComponentAdmin: boolean;
+}
+
+// ProjectComponent mirrors backend.Component: one Jira project component.
+export interface ProjectComponent {
+  id: string;
+  name: string;
+  description: string;
+  leadName: string;
+  leadDisplayName: string;
+  assigneeType: string;
+}
+
+// ComponentInput mirrors backend.ComponentInput, what a create or update sends.
+export interface ComponentInput {
+  name: string;
+  description: string;
+  leadUserName: string;
+  assigneeType: string;
+}
+
+// JiraUser mirrors backend.User, a user search result.
+export interface JiraUser {
+  name: string;
+  displayName: string;
+  emailAddress: string;
 }
 
 export interface Profile {

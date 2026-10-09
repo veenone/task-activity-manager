@@ -5,10 +5,10 @@ import {connection} from '../models';
 import {main} from '../models';
 import {syncer} from '../models';
 import {bridge} from '../models';
+import {backend} from '../models';
 import {profile} from '../models';
 import {coverage} from '../models';
 import {jira} from '../models';
-import {backend} from '../models';
 import {coveragepublish} from '../models';
 import {settings} from '../models';
 import {spellcheck} from '../models';
@@ -82,6 +82,8 @@ export function CommitPendingChanges(arg1:string):Promise<syncer.CommitResult>;
 
 export function CommitPendingChangesByIDs(arg1:string,arg2:Array<number>):Promise<syncer.CommitResult>;
 
+export function ComponentIssueCount(arg1:string,arg2:string):Promise<number>;
+
 export function ComputeBridgeGap(arg1:string,arg2:string):Promise<Array<bridge.Gap>>;
 
 export function CreateBugForTest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<string>,arg8:Record<string, any>):Promise<string>;
@@ -89,6 +91,8 @@ export function CreateBugForTest(arg1:string,arg2:string,arg3:string,arg4:string
 export function CreateCanonicalRequirement(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function CreateChangeRequest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string):Promise<string>;
+
+export function CreateComponent(arg1:string,arg2:backend.ComponentInput):Promise<backend.Component>;
 
 export function CreateContainerAndAllocate(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<testrepo.CreateContainerResult>;
 
@@ -119,6 +123,8 @@ export function DeleteBugConnection(arg1:string):Promise<void>;
 export function DeleteCanonicalRequirement(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteChangeRequest(arg1:string,arg2:string):Promise<void>;
+
+export function DeleteComponent(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function DeleteConnection(arg1:string):Promise<void>;
 
@@ -334,6 +340,8 @@ export function ListPriorities(arg1:string):Promise<Array<string>>;
 
 export function ListProfiles():Promise<Array<profile.Profile>>;
 
+export function ListProjectComponentDetails(arg1:string):Promise<Array<backend.Component>>;
+
 export function ListProjectComponents(arg1:string,arg2:string):Promise<Array<string>>;
 
 export function ListProjectFixVersions(arg1:string,arg2:string):Promise<Array<string>>;
@@ -414,6 +422,8 @@ export function SearchPreconditionsCrossProject(arg1:string,arg2:string,arg3:str
 
 export function SearchTestsCrossProject(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<main.CrossProjectTestPage>;
 
+export function SearchUsers(arg1:string,arg2:string):Promise<Array<backend.User>>;
+
 export function SeedDemoCoverageExample(arg1:string):Promise<string>;
 
 export function SeedEUICCReference(arg1:string):Promise<coverage.EUICCSeedSummary>;
@@ -491,6 +501,8 @@ export function UnexcludePreconditionFromDuplicates(arg1:string,arg2:string):Pro
 export function UnlinkBugFromRun(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function UpdateChangeRequest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string):Promise<void>;
+
+export function UpdateComponent(arg1:string,arg2:string,arg3:backend.ComponentInput):Promise<backend.Component>;
 
 export function UpdateConnection(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:boolean,arg13:string):Promise<connection.Connection>;
 

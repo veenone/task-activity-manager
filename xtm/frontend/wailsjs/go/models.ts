@@ -21,6 +21,7 @@ export namespace backend {
 	    supportsBugLinks: boolean;
 	    supportsBugRouting: boolean;
 	    supportsTags: boolean;
+	    supportsComponentAdmin: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Capabilities(source);
@@ -48,6 +49,47 @@ export namespace backend {
 	        this.supportsBugLinks = source["supportsBugLinks"];
 	        this.supportsBugRouting = source["supportsBugRouting"];
 	        this.supportsTags = source["supportsTags"];
+	        this.supportsComponentAdmin = source["supportsComponentAdmin"];
+	    }
+	}
+	export class Component {
+	    id: string;
+	    name: string;
+	    description: string;
+	    leadName: string;
+	    leadDisplayName: string;
+	    assigneeType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Component(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.leadName = source["leadName"];
+	        this.leadDisplayName = source["leadDisplayName"];
+	        this.assigneeType = source["assigneeType"];
+	    }
+	}
+	export class ComponentInput {
+	    name: string;
+	    description: string;
+	    leadUserName: string;
+	    assigneeType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ComponentInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.leadUserName = source["leadUserName"];
+	        this.assigneeType = source["assigneeType"];
 	    }
 	}
 	export class IssueLinkType {
@@ -64,6 +106,22 @@ export namespace backend {
 	        this.name = source["name"];
 	        this.inward = source["inward"];
 	        this.outward = source["outward"];
+	    }
+	}
+	export class User {
+	    name: string;
+	    displayName: string;
+	    emailAddress: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new User(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.emailAddress = source["emailAddress"];
 	    }
 	}
 
