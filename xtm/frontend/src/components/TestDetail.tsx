@@ -52,6 +52,7 @@ import type {
 } from "../api";
 
 import { usePrompt } from "./usePrompt";
+import { LabelsField } from "./LabelsField";
 import { useConfirm } from "./useConfirm";
 import { MarkdownField } from "./MarkdownField";
 import { MultiAddSelect } from "./MultiAddSelect";
@@ -1150,17 +1151,13 @@ export function TestDetail({
               Labels {isDirty("labels") && <DirtyDot />}
             </dt>
             <dd>
-              {readOnly ? (
-                <span>{labels || "—"}</span>
-              ) : (
-                <input
-                  className="detail-input detail-input-inline"
-                  value={labels}
-                  onChange={(e) => setLabels(e.target.value)}
-                  onBlur={() => saveField("labels", labels)}
-                  placeholder="space-separated"
-                />
-              )}
+              <LabelsField
+                profileId={profileId}
+                value={labels}
+                onChange={setLabels}
+                onSave={() => saveField("labels", labels)}
+                readOnly={!!readOnly}
+              />
             </dd>
 
             {caps.supportsTestTypes && (

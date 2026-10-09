@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { Modal } from "./Modal";
+import { TokenPicker, validateLabel } from "./TokenPicker";
+import { useLabels } from "../queries/app";
 import { BulkEditTests, errMsg } from "../api";
 import type { BulkEdit, BulkEditResult } from "../api";
 
@@ -68,6 +70,9 @@ export function BulkEditModal({
   const [error, setError] = useState("");
   const [result, setResult] = useState<BulkEditResult | null>(null);
 
+  const { data: labelBuckets = [] } = useLabels(profileId);
+  const labelSuggestions = labelBuckets.map((b) => b.label);
+
   const fieldDef = FIELDS.find((f) => f.value === field) ?? FIELDS[0];
 
   // Reset operation when the chosen field doesn't support the current one.
@@ -91,7 +96,7 @@ export function BulkEditModal({
       (operation === "add_label" || operation === "remove_label") &&
       value.trim() === ""
     ) {
-      setError("A label value is required.");
+      setError("Pick at least one label.");
       return;
     }
     setApplying(true);
@@ -115,9 +120,7 @@ export function BulkEditModal({
     }
   }
 
-  const useTextarea =
-    field === "description" ||
-    (field === "labels" && operation === "set");
+  const useTextarea = field === "description";
 
   return (
     <Modal onClose={onCancel} className="modal bulk-modal" labelledBy="bulk-edit-title">
@@ -158,7 +161,7 @@ export function BulkEditModal({
               </select>
             </label>
 
-            <label className="bulk-row bulk-row-value">
+            <div className="bulk-row bulk-row-value">
               <span>Value</span>
               {fieldDef.options ? (
                 <select
@@ -172,29 +175,31 @@ export function BulkEditModal({
                     </option>
                   ))}
                 </select>
+              ) : field === "labels" ? (
+                <TokenPicker
+                  label="Labels"
+                  value={value.split(/\s+/).filter(Boolean)}
+                  onChange={(next) => setValue(next.join(" "))}
+                  suggestions={labelSuggestions}
+                  allowCreate={operation !== "remove_label"}
+                  validate={validateLabel}
+                  placeholder="Type to search or create"
+                />
               ) : useTextarea ? (
                 <textarea
                   className="detail-input"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
                   rows={5}
-                  placeholder={
-                    field === "labels" ? "space-separated labels" : ""
-                  }
                 />
               ) : (
                 <input
                   className="detail-input"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  placeholder={
-                    operation === "add_label" || operation === "remove_label"
-                      ? "a single label"
-                      : ""
-                  }
                 />
               )}
-            </label>
+            </div>
 
             <p className="muted bulk-preview">
               Will queue a local pending change for {testKeys.length}{" "}
