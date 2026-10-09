@@ -131,6 +131,7 @@ func appMenu(app *App) *menu.Menu {
 	view.AddText("Dashboard", nil, emit("menu:view-dashboard"))
 	view.AddText("Traceability", nil, emit("menu:view-traceability"))
 	view.AddText("Containers", nil, emit("menu:view-plans"))
+	view.AddText("Components", nil, emit("menu:view-components"))
 
 	tools := m.AddSubmenu("Tools")
 	tools.AddText("Sync History", nil, emit("menu:sync-history"))

@@ -3237,6 +3237,12 @@ tr.row-selected td:first-child {
   padding: 16px;
   background: var(--surface-2);
 }
+.content-components {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 /* Requirements / coverage view */
 .content-requirements {

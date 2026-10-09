@@ -35,6 +35,12 @@ describe("NavProvider", () => {
     expect(result.current.groupBy).toBe("testplan");
   });
 
+  it("switches to the Components view", () => {
+    const { result } = renderHook(() => useNav(), { wrapper });
+    act(() => result.current.setView("components"));
+    expect(result.current.view).toBe("components");
+  });
+
   it("opens the New Test panel seeded with a folder", () => {
     const { result } = renderHook(() => useNav(), { wrapper });
     act(() => {
