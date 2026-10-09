@@ -577,7 +577,7 @@ func demoCustomFieldDefs() []CustomFieldDef {
 
 var demoTestTypes = []string{"Manual", "Generic", "Cucumber"}
 var demoAutomationStatuses = []string{"Not Automated", "In Progress", "Automated"}
-var demoComponents = []string{"Frontend", "Backend", "API", "Database", "Auth"}
+var demoComponents = demoComponentList
 
 // demoTestCustomFields produces deterministic custom field values for a Test so
 // repeated opens are stable.

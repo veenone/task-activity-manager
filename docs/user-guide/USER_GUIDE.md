@@ -866,6 +866,35 @@ tests — either plain `@pytest.mark.xray` functions or a `unittest`-style class
 ![Figure 24: Generate pytest](images/24-pytest.png)
 *Figure 24 — The Generate pytest menu and the resulting scaffold file.*
 
+### Project components (Components tab)
+
+On a Jira profile, the **Components** tab (also under **View → Components**)
+manages the project's Jira components. It is hidden on Kiwi profiles.
+
+The table lists each component with its description, lead, and the number of
+synced tests that carry it. The test count comes from your local copy, so it
+reflects the last sync.
+
+- **New component** opens a form for the name, a description, a lead, and the
+  default assignee (project default, component lead, project lead, or
+  unassigned). Find a lead by typing at least two characters of their name or
+  username and picking from the results.
+- **Edit** opens the same form for an existing component. **Clear lead**
+  removes the lead.
+- **Delete** first asks Jira how many issues use the component. If any do, you
+  can move them to another component as part of the delete, or just remove the
+  component from them.
+
+These changes go to Jira straight away. They do not wait for a commit and do
+not appear in pending changes. After each one the app reloads the component
+list, and a rename or delete also updates the components shown on your synced
+tests.
+
+The app refuses to rename or delete a component while pending changes edit
+components on tests that use it, because those edits would name a component
+Jira no longer has. Commit or discard them first. If your Jira account lacks
+project admin rights, Jira refuses the change and the tab says so.
+
 ---
 
 ## 12. Defect tracking

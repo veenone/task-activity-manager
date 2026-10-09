@@ -90,6 +90,10 @@ type Capabilities struct {
 	// flipping the adapter's own flag would make it lie.
 	SupportsBugRouting bool `json:"supportsBugRouting"`
 	SupportsTags       bool `json:"supportsTags"`
+
+	// SupportsComponentAdmin: the backend can create, edit and delete project
+	// components (it implements ComponentManager).
+	SupportsComponentAdmin bool `json:"supportsComponentAdmin"`
 }
 
 // Backend is the storage/tracker-agnostic contract the sync engine and app
@@ -306,4 +310,34 @@ type BugKeyReader interface {
 // Backend.CreateBugLink when the backend does not implement it.
 type RunScopedBugLinker interface {
 	CreateRunBugLink(ctx context.Context, execKey, testKey, bugKey string) error
+}
+
+// Component is one project component, as the Components view shows it.
+type Component struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	LeadName        string `json:"leadName"`
+	LeadDisplayName string `json:"leadDisplayName"`
+	AssigneeType    string `json:"assigneeType"`
+}
+
+// ComponentInput is what a component create or update sends.
+type ComponentInput struct {
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	LeadUserName string `json:"leadUserName"`
+	AssigneeType string `json:"assigneeType"`
+}
+
+// ComponentManager creates, edits and deletes project components. It is kept
+// off Backend because only Jira has it; callers type-assert and check
+// Capabilities().SupportsComponentAdmin.
+type ComponentManager interface {
+	ProjectComponentDetails(ctx context.Context, projectKey string) ([]Component, error)
+	CreateComponent(ctx context.Context, projectKey string, in ComponentInput) (Component, error)
+	UpdateComponent(ctx context.Context, id string, in ComponentInput) (Component, error)
+	DeleteComponent(ctx context.Context, id, moveIssuesTo string) error
+	ComponentIssueCount(ctx context.Context, id string) (int, error)
+	SearchUsers(ctx context.Context, query string) ([]User, error)
 }

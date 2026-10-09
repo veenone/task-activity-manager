@@ -138,6 +138,10 @@ export function CommitPendingChangesByIDs(arg1, arg2) {
   return window['go']['main']['App']['CommitPendingChangesByIDs'](arg1, arg2);
 }
 
+export function ComponentIssueCount(arg1, arg2) {
+  return window['go']['main']['App']['ComponentIssueCount'](arg1, arg2);
+}
+
 export function ComputeBridgeGap(arg1, arg2) {
   return window['go']['main']['App']['ComputeBridgeGap'](arg1, arg2);
 }
@@ -152,6 +156,10 @@ export function CreateCanonicalRequirement(arg1, arg2, arg3, arg4) {
 
 export function CreateChangeRequest(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['CreateChangeRequest'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function CreateComponent(arg1, arg2) {
+  return window['go']['main']['App']['CreateComponent'](arg1, arg2);
 }
 
 export function CreateContainerAndAllocate(arg1, arg2, arg3, arg4) {
@@ -212,6 +220,10 @@ export function DeleteCanonicalRequirement(arg1, arg2) {
 
 export function DeleteChangeRequest(arg1, arg2) {
   return window['go']['main']['App']['DeleteChangeRequest'](arg1, arg2);
+}
+
+export function DeleteComponent(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteComponent'](arg1, arg2, arg3);
 }
 
 export function DeleteConnection(arg1) {
@@ -642,6 +654,10 @@ export function ListProfiles() {
   return window['go']['main']['App']['ListProfiles']();
 }
 
+export function ListProjectComponentDetails(arg1) {
+  return window['go']['main']['App']['ListProjectComponentDetails'](arg1);
+}
+
 export function ListProjectComponents(arg1, arg2) {
   return window['go']['main']['App']['ListProjectComponents'](arg1, arg2);
 }
@@ -802,6 +818,10 @@ export function SearchTestsCrossProject(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SearchTestsCrossProject'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function SearchUsers(arg1, arg2) {
+  return window['go']['main']['App']['SearchUsers'](arg1, arg2);
+}
+
 export function SeedDemoCoverageExample(arg1) {
   return window['go']['main']['App']['SeedDemoCoverageExample'](arg1);
 }
@@ -956,6 +976,10 @@ export function UnlinkBugFromRun(arg1, arg2, arg3, arg4) {
 
 export function UpdateChangeRequest(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['UpdateChangeRequest'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function UpdateComponent(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateComponent'](arg1, arg2, arg3);
 }
 
 export function UpdateConnection(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13) {

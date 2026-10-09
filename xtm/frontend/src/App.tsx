@@ -77,6 +77,7 @@ import { BulkRequirementsModal } from "./components/BulkRequirementsModal";
 import { Dashboard } from "./components/Dashboard";
 import { TraceabilityTabs } from "./components/TraceabilityTabs";
 import { ContainersView } from "./components/ContainersView";
+import { ComponentsView } from "./components/components-admin/ComponentsView";
 import { PreconditionsView } from "./components/PreconditionsView";
 import { RequirementsView } from "./components/RequirementsView";
 import { CoverageView } from "./components/CoverageView";
@@ -527,6 +528,7 @@ function App() {
     "menu:view-dashboard": () => setView("dashboard"),
     "menu:view-traceability": () => setView("traceability"),
     "menu:view-plans": () => setView("plans"),
+    "menu:view-components": () => setView("components"),
     "menu:view-duplicates": () => setView("duplicates"),
     "menu:view-gapanalysis": () => setView("gapanalysis"),
     "menu:view-testcalls": () => setView("testcalls"),
@@ -1069,6 +1071,15 @@ function App() {
           >
             Containers
           </button>
+          {caps.supportsComponentAdmin && (
+            <button
+              data-tour="tab-components"
+              className={`view-tab${view === "components" ? " view-tab-active" : ""}`}
+              onClick={() => setView("components")}
+            >
+              Components
+            </button>
+          )}
           {showCoverage && (
             <button
               data-tour="tab-coverage"
@@ -1339,6 +1350,15 @@ function App() {
               setSelectedKey(k);
               setView("browse");
             }}
+            onChanged={() => {
+              refreshProfileData();
+              reloadPending();
+            }}
+          />
+        </main>
+      ) : view === "components" && caps.supportsComponentAdmin ? (
+        <main className="content content-components">
+          <ComponentsView
             onChanged={() => {
               refreshProfileData();
               reloadPending();

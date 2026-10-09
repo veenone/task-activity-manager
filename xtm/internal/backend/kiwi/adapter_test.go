@@ -114,9 +114,13 @@ func TestCapabilitiesBaseValues(t *testing.T) {
 		SupportsBugCreation:         false,
 		SupportsBugLinks:            true,
 		SupportsTags:                true,
+		SupportsComponentAdmin:      false,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Capabilities() = %#v, want %#v", got, want)
+	}
+	if _, ok := any(a).(backend.ComponentManager); ok {
+		t.Error("kiwi adapter should not implement ComponentManager")
 	}
 }
 
