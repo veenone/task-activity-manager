@@ -4723,30 +4723,18 @@ func applyBulkOperation(op BulkEdit, current string) (string, error) {
 		return current + "\n" + op.Value, nil
 
 	case "add_label":
-		if strings.TrimSpace(op.Value) == "" {
+		want := strings.Fields(op.Value)
+		if len(want) == 0 {
 			return "", fmt.Errorf("label value is required")
 		}
-		labels := strings.Fields(current)
-		for _, l := range labels {
-			if l == op.Value {
-				return current, nil
-			}
-		}
-		labels = append(labels, op.Value)
-		return strings.Join(labels, " "), nil
+		return strings.Join(addLabels(strings.Fields(current), want), " "), nil
 
 	case "remove_label":
-		if strings.TrimSpace(op.Value) == "" {
+		drop := strings.Fields(op.Value)
+		if len(drop) == 0 {
 			return "", fmt.Errorf("label value is required")
 		}
-		labels := strings.Fields(current)
-		out := make([]string, 0, len(labels))
-		for _, l := range labels {
-			if l != op.Value {
-				out = append(out, l)
-			}
-		}
-		return strings.Join(out, " "), nil
+		return strings.Join(removeLabels(strings.Fields(current), drop), " "), nil
 	}
 	return "", fmt.Errorf("unknown operation %q", op.Operation)
 }
