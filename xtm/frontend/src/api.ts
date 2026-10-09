@@ -16,6 +16,7 @@ export {
   ListRequirementLinkTypeDetails,
   GetCapabilities,
   SetShowCoverage,
+  SetNavRailVisible,
   SetTourSeenVersion,
   ListProfiles,
   CreateProfile,
@@ -422,11 +423,7 @@ export interface CoverageImportSummary {
 // (PublishGroups' per-run outcome). See reconcile.go's doc comments for exactly
 // what each state means before touching how these render.
 export type CoveragePublishState =
-  | "NotPublished"
-  | "InSync"
-  | "LocalChanges"
-  | "Drift"
-  | "Conflict";
+  "NotPublished" | "InSync" | "LocalChanges" | "Drift" | "Conflict";
 
 export interface CoveragePublishGroupStatus {
   groupId: string;
@@ -533,6 +530,9 @@ export interface Settings {
   // Version of the onboarding tour this user has already been through, 0 when
   // never. A later release re-offers a rewritten tour by bumping TOUR_VERSION.
   tourSeenVersion: number;
+  // showNavRail is the left navigation rail's visibility. One field shared
+  // with TAM: turning the rail on in one app turns it on in the other.
+  showNavRail: boolean;
 }
 
 // Capabilities mirrors backend.Capabilities — what the active profile's
@@ -909,13 +909,13 @@ export interface Container {
   kind: string;
   summary: string;
   status: string;
-  parentKey: string;  // parent issue key for a sub-task Test Execution; "" for standalone
-  parentSummary: string;  // parent issue summary; "" when no parent or not fetched
-  issueType: string;  // Jira issuetype name (e.g. "Sub Test Execution"); informational
+  parentKey: string; // parent issue key for a sub-task Test Execution; "" for standalone
+  parentSummary: string; // parent issue summary; "" when no parent or not fetched
+  issueType: string; // Jira issuetype name (e.g. "Sub Test Execution"); informational
   labels: string[]; // Standard Jira labels on the container issue (any kind)
   environments: string[]; // Xray Test Environments (Test Executions only; empty otherwise)
   fixVersions: string[]; // Jira Fix Version(s), read-only (Test Executions only; empty otherwise)
-  description: string;  // Jira issue description (plain text)
+  description: string; // Jira issue description (plain text)
 }
 
 // AllocateResult mirrors testrepo.AllocateResult — the outcome of a bulk
@@ -1659,7 +1659,9 @@ export { errMsg } from "@agile-suite/core";
 // the frontend — keep in sync with isDemoURL in the Go backend
 // (internal/jira/demo.go) and the validation in ProfileForm.tsx.
 export function isDemoUrl(url?: string): boolean {
-  return /^(demo|demo[-:].*|mock:.*|kiwi-demo|kiwi-demo[-:].*)$/i.test((url ?? "").trim());
+  return /^(demo|demo[-:].*|mock:.*|kiwi-demo|kiwi-demo[-:].*)$/i.test(
+    (url ?? "").trim(),
+  );
 }
 
 // isKiwiDemoUrl reports whether a profile's Jira URL selects the offline Kiwi

@@ -132,6 +132,13 @@ func appMenu(app *App) *menu.Menu {
 	view.AddText("Traceability", nil, emit("menu:view-traceability"))
 	view.AddText("Containers", nil, emit("menu:view-plans"))
 	view.AddText("Components", nil, emit("menu:view-components"))
+	view.AddSeparator()
+	// The checkbox owns the rail's state: Wails renders the tick from the
+	// value passed here, so the app reads the stored preference when it builds
+	// the menu and writes it back on every toggle.
+	view.AddCheckbox("Navigation Rail", app.showNavRail(), keys.CmdOrCtrl("b"), func(d *menu.CallbackData) {
+		app.setShowNavRail(d.MenuItem.Checked)
+	})
 
 	tools := m.AddSubmenu("Tools")
 	tools.AddText("Sync History", nil, emit("menu:sync-history"))

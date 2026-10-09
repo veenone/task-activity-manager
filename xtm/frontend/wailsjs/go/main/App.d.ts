@@ -448,6 +448,8 @@ export function SetDefaultProfile(arg1:string):Promise<void>;
 
 export function SetMemberVersion(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
+export function SetNavRailVisible(arg1:boolean):Promise<void>;
+
 export function SetProfileCrossProjectSources(arg1:string,arg2:string):Promise<void>;
 
 export function SetRequirementLinkType(arg1:string):Promise<void>;

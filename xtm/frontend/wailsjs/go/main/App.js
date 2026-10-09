@@ -870,6 +870,10 @@ export function SetMemberVersion(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SetMemberVersion'](arg1, arg2, arg3, arg4);
 }
 
+export function SetNavRailVisible(arg1) {
+  return window['go']['main']['App']['SetNavRailVisible'](arg1);
+}
+
 export function SetProfileCrossProjectSources(arg1, arg2) {
   return window['go']['main']['App']['SetProfileCrossProjectSources'](arg1, arg2);
 }
