@@ -62,6 +62,10 @@ export function BulkAssociateRequirements(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['BulkAssociateRequirements'](arg1, arg2, arg3, arg4);
 }
 
+export function BulkEditComponents(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['BulkEditComponents'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function BulkEditContainers(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkEditContainers'](arg1, arg2, arg3);
 }
@@ -694,6 +698,10 @@ export function ListTestCallLinks(arg1) {
   return window['go']['main']['App']['ListTestCallLinks'](arg1);
 }
 
+export function ListTestComponents(arg1, arg2) {
+  return window['go']['main']['App']['ListTestComponents'](arg1, arg2);
+}
+
 export function ListTestLabels(arg1, arg2) {
   return window['go']['main']['App']['ListTestLabels'](arg1, arg2);
 }
@@ -880,6 +888,10 @@ export function SetRequirementSource(arg1, arg2, arg3, arg4) {
 
 export function SetShowCoverage(arg1) {
   return window['go']['main']['App']['SetShowCoverage'](arg1);
+}
+
+export function SetTestComponents(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetTestComponents'](arg1, arg2, arg3);
 }
 
 export function SetTestPreconditions(arg1, arg2, arg3) {

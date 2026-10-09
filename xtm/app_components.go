@@ -6,6 +6,7 @@ import (
 
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/componentadmin"
+	"agile-suite/xtm/internal/testrepo"
 )
 
 // componentAdminBackend joins a backend's component writes with its
@@ -100,4 +101,34 @@ func (a *App) SearchUsers(profileID, query string) (out []backend.User, err erro
 		return nil, err
 	}
 	return cm.SearchUsers(a.ctx, query)
+}
+
+// SetTestComponents replaces one test's components, queued for the next
+// commit.
+func (a *App) SetTestComponents(profileID, testKey string, names []string) (err error) {
+	defer recoverToError("SetTestComponents", &err)
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.SetTestComponents(profileID, testKey, names)
+}
+
+// BulkEditComponents adds, removes or replaces components across tests,
+// queued for the next commit.
+func (a *App) BulkEditComponents(profileID string, testKeys, add, remove []string, replace bool) (result testrepo.BulkEditResult, err error) {
+	defer recoverToError("BulkEditComponents", &err)
+	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkEditComponents(profileID, testKeys, add, remove, replace)
+}
+
+// ListTestComponents returns each given test's components, for the Bulk
+// Components preview.
+func (a *App) ListTestComponents(profileID string, testKeys []string) (map[string][]string, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListTestComponents(profileID, testKeys)
 }

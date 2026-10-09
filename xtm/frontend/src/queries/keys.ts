@@ -63,6 +63,9 @@ export const keys = {
   // invalidateProfileData refreshes it with the local counts.
   projectComponents: (profileId: string) =>
     [profileId, "components", "project"] as const,
+  // Cached option list for pickers; under "components" so creates refresh it.
+  componentOptions: (profileId: string, projectKey: string) =>
+    [profileId, "components", "options", projectKey] as const,
   userSearch: (profileId: string, q: string) =>
     [profileId, "userSearch", q] as const,
   preconditions: (profileId: string) => [profileId, "preconditions"] as const,

@@ -11,6 +11,9 @@ export interface TokenPickerProps {
   label: string;
   placeholder?: string;
   onBlur?: () => void;
+  // How pasted or unconfirmed text splits into values; null keeps it whole
+  // (component names contain spaces).
+  separator?: RegExp | null;
 }
 
 const MAX_LABEL = 255;
@@ -43,6 +46,7 @@ export function TokenPicker({
   label,
   placeholder,
   onBlur,
+  separator = /\s+/,
 }: TokenPickerProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -108,8 +112,12 @@ export function TokenPicker({
     }
   }
 
+  const splitText = (t: string) =>
+    separator ? t.split(separator).filter(Boolean) : t.trim() ? [t.trim()] : [];
+
   function onPaste(e: ClipboardEvent<HTMLInputElement>) {
-    const parts = e.clipboardData.getData("text").split(/\s+/).filter(Boolean);
+    if (!separator) return;
+    const parts = splitText(e.clipboardData.getData("text"));
     if (parts.length < 2) return;
     e.preventDefault();
     void add(parts, true);
@@ -120,7 +128,7 @@ export function TokenPicker({
     setOpen(false);
     // Text typed but never confirmed with Enter would otherwise vanish, and a
     // "Replace all" applied without it would clear the field.
-    const pending = query.split(/\s+/).filter(Boolean);
+    const pending = splitText(query);
     if (pending.length > 0) void add(pending, true);
     onBlur?.();
   }

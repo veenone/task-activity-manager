@@ -44,6 +44,8 @@ export function BulkAssociatePreconditions(arg1:string,arg2:Array<string>,arg3:A
 
 export function BulkAssociateRequirements(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:boolean):Promise<testrepo.BulkEditResult>;
 
+export function BulkEditComponents(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:Array<string>,arg5:boolean):Promise<testrepo.BulkEditResult>;
+
 export function BulkEditContainers(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
 export function BulkEditLabels(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:Array<string>):Promise<testrepo.BulkEditResult>;
@@ -360,6 +362,8 @@ export function ListSyncLog(arg1:string,arg2:number):Promise<Array<testrepo.Sync
 
 export function ListTestCallLinks(arg1:string):Promise<Array<testrepo.TestCallLink>>;
 
+export function ListTestComponents(arg1:string,arg2:Array<string>):Promise<Record<string, Array<string>>>;
+
 export function ListTestLabels(arg1:string,arg2:Array<string>):Promise<Record<string, Array<string>>>;
 
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
@@ -453,6 +457,8 @@ export function SetRequirementLinks(arg1:string,arg2:string,arg3:string,arg4:Arr
 export function SetRequirementSource(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function SetShowCoverage(arg1:boolean):Promise<void>;
+
+export function SetTestComponents(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SetTestPreconditions(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
