@@ -26,8 +26,8 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 - Every change is queued in the pending-change journal and reaches Jira on
   Commit, like every other edit.
 
-This is part A of the labels and components work. Part C, the Components
-view, is below. Part B, editing components on tests, is not built.
+This is part A of the labels and components work. Parts B and C, components
+on tests and the Components view, are below.
 
 **A Components view for the project's Jira components**
 - The view lists a project's components with their description, lead and test
@@ -46,6 +46,18 @@ view, is below. Part B, editing components on tests, is not built.
   re-fetched, the cached options refreshed, and for a rename or delete the
   components on cached tests rewritten.
 - The view is hidden on a Kiwi profile, which has no components.
+
+**Components on a test, edited like labels**
+- A test's components are a picker below Labels, suggesting the project's
+  components, and a **Components** bulk action adds, removes or replaces them
+  across a selection with a preview of how many tests change.
+- A component name with a space stays one name. The picker splits labels on
+  whitespace, which is right for labels and wrong for "User Management", so
+  component pickers do not split at all.
+- An unknown component can be created from the picker. It asks first, and the
+  option only appears where the profile can manage components.
+- Edits are queued in the pending-change journal and commit as Jira component
+  objects. An empty list clears the field.
 
 **Preconditions show their workflow status**
 - The Preconditions list shows each precondition's Jira status, and the list
