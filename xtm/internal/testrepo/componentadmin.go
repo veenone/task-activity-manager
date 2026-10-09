@@ -2,10 +2,12 @@ package testrepo
 
 import "fmt"
 
-// ComponentEditsPending counts pending components edits on tests that carry
-// name, either in the synced value or in the queued one. A rename or delete
-// of that component would leave those edits naming a component Jira no
-// longer has, so the Components view refuses while any exist.
+// ComponentEditsPending counts pending components edits that involve name:
+// the value Jira holds (before_val), the queued value (after_val, which
+// EditTestField also writes into test_case.components), or the cached test.
+// A rename or delete of that component would leave such an edit, or the value
+// a discard restores, naming a component Jira no longer has, so the
+// Components view refuses while any exist.
 func (r *Repository) ComponentEditsPending(profileID, name string) (int, error) {
 	pattern := componentFilterPattern(name)
 	var n int
@@ -13,8 +15,8 @@ func (r *Repository) ComponentEditsPending(profileID, name string) (int, error) 
 		SELECT COUNT(*) FROM pending_change pc
 		LEFT JOIN test_case tc ON tc.profile_id = pc.profile_id AND tc.jira_key = pc.entity_key
 		WHERE pc.profile_id = ? AND pc.entity_type = ? AND pc.field = 'components'
-		  AND (tc.components LIKE ? OR pc.after_val LIKE ?)`,
-		profileID, entityTestCase, pattern, pattern,
+		  AND (tc.components LIKE ? OR pc.after_val LIKE ? OR pc.before_val LIKE ?)`,
+		profileID, entityTestCase, pattern, pattern, pattern,
 	).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("pending component edits: %w", err)

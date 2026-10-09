@@ -73,9 +73,14 @@ func (c *Client) CreateComponent(ctx context.Context, in ComponentInput) (Compon
 	if isDemoURL(c.baseURL) {
 		return demoCreateComponent(in)
 	}
-	body := map[string]string{
-		"project": in.Project, "name": in.Name, "description": in.Description,
-		"leadUserName": in.LeadUserName, "assigneeType": in.AssigneeType,
+	// Empty optional fields are left out: Jira may read leadUserName "" as a
+	// lookup of a user named "" and refuse the create.
+	body := map[string]string{"project": in.Project, "name": in.Name, "assigneeType": in.AssigneeType}
+	if in.Description != "" {
+		body["description"] = in.Description
+	}
+	if in.LeadUserName != "" {
+		body["leadUserName"] = in.LeadUserName
 	}
 	var out componentWire
 	if err := c.componentWrite(ctx, http.MethodPost, "/rest/api/2/component", body, &out); err != nil {

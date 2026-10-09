@@ -135,3 +135,31 @@ func TestComponentEditsPendingCountsMatchingEdits(t *testing.T) {
 		t.Fatalf("want 2, got %d", n)
 	}
 }
+
+// A queued edit that drops a component still blocks: discarding it would
+// restore the old value, naming a component Jira no longer has. The seed
+// mirrors what EditTestField leaves behind: the cache holds the queued value
+// and before_val holds Jira's.
+func TestComponentEditsPendingCountsEditsThatDropTheComponent(t *testing.T) {
+	repo, st := newRepoAndStore(t)
+	seedComponentAdmin(t, repo)
+	db := st.DB()
+	if _, err := db.Exec(`UPDATE test_case SET components = ? WHERE profile_id = ? AND jira_key = 'QA-1'`,
+		"\nAPI\n", caProfile); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO pending_change
+		(profile_id, entity_type, entity_key, field, before_val, after_val, base_version, created_at)
+		VALUES (?, 'test_case', 'QA-1', 'components', ?, ?, '', '2026-10-09T00:00:00Z')`,
+		caProfile, "\ncore\nAPI\n", "\nAPI\n"); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	n, err := repo.ComponentEditsPending(caProfile, "core")
+	if err != nil {
+		t.Fatalf("pending: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("want 1, got %d", n)
+	}
+}

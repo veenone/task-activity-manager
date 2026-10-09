@@ -163,3 +163,22 @@ func TestComponentIssueCountAndUserSearch(t *testing.T) {
 		t.Fatalf("users %+v err %v", users, err)
 	}
 }
+
+func TestCreateComponentOmitsEmptyOptionalFields(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"id":"12","name":"Bare"}`)
+	}))
+	defer srv.Close()
+
+	if _, err := newTestClient(srv).CreateComponent(context.Background(),
+		ComponentInput{Project: "QA", Name: "Bare", AssigneeType: "PROJECT_DEFAULT"}); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	want := map[string]any{"project": "QA", "name": "Bare", "assigneeType": "PROJECT_DEFAULT"}
+	if !reflect.DeepEqual(body, want) {
+		t.Fatalf("body %v, want no empty leadUserName or description", body)
+	}
+}
