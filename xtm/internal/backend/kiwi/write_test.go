@@ -52,7 +52,7 @@ func TestFieldsForJiraMapsNeutralNames(t *testing.T) {
 		"priority":    "P1",
 		"labels":      "smoke regression",
 		"status":      "CONFIRMED",
-		"components":  "Login, Backend",
+		"components":  "\nLogin\nBackend\n",
 		"unsupported": "should be dropped",
 	})
 	want := map[string]any{
@@ -61,7 +61,7 @@ func TestFieldsForJiraMapsNeutralNames(t *testing.T) {
 		"priority":    "P1",
 		"labels":      "smoke regression",
 		"case_status": "CONFIRMED",
-		"components":  "Login, Backend",
+		"components":  "\nLogin\nBackend\n",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("FieldsForJira = %#v, want %#v", got, want)
@@ -224,7 +224,7 @@ func TestUpdateIssueComponentDiffRemovesByName(t *testing.T) {
 	a, closeFn := newTestAdapter(t, mock)
 	defer closeFn()
 
-	fields := a.FieldsForJira(map[string]string{"components": "Login"})
+	fields := a.FieldsForJira(map[string]string{"components": "\nLogin\n"})
 	if err := a.UpdateIssue(context.Background(), "1", fields); err != nil {
 		t.Fatalf("UpdateIssue: %v", err)
 	}

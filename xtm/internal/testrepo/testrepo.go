@@ -300,6 +300,7 @@ var editableFields = map[string]string{
 	"description":        "description",
 	"priority":           "priority",
 	"labels":             "labels",
+	"components":         "components",
 	"exec_type":          "exec_type",
 	"cucumber_scenario":  "cucumber_scenario",
 	"cucumber_type":      "cucumber_type",

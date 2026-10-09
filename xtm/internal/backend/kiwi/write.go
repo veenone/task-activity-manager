@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"agile-suite/xtm/internal/fieldcodec"
 )
 
 // This file is P5.1's deliverable: the Kiwi TestCase WRITE surface
@@ -178,24 +180,11 @@ func parseLabelSet(v string) []string {
 }
 
 // parseComponentSet splits a FieldsForJira "components" value back into
-// names. Unlike labels, component names CAN contain spaces (e.g. "User
-// Management" — see internal/testrepo's CSV export), so this uses a
-// comma-separated convention instead (mirroring exportcsv.go/gapanalysis.go's
-// `strings.Join(components, ", ")`), trimming surrounding whitespace on each
-// name. There is no existing pending-change producer for a "components"
-// field yet (EditTestField's whitelist has no "components" entry today), so
-// this format is this task's documented design choice for when one is
-// added, kept consistent with the rest of the codebase's CSV convention
-// rather than invented from nothing.
+// names. The value is the newline-bounded form test_case.components uses
+// (internal/fieldcodec), because EditTestField writes the queued value into
+// that column; component names can contain spaces and commas.
 func parseComponentSet(v string) []string {
-	parts := strings.Split(v, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if s := strings.TrimSpace(p); s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
+	return fieldcodec.DecodeComponents(v)
 }
 
 // diffNames computes the add/remove sets to turn current into wanted,
