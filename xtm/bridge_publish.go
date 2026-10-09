@@ -64,7 +64,7 @@ func (a *App) PublishToTarget(workspaceID, sourceConnectionID, targetConnectionI
 // testrepo.go) behind a single "every hub test" read, and narrows
 // testrepo.TestCase/Step down to bridge's neutral HubTest/HubStep shapes —
 // the same boundary-conversion pattern app.go's toJiraTransitions/
-// toJiraBugCreateFields already use for backend.* -> jira.*.
+// toJiraFieldDefs already use for backend.* -> jira.*.
 type appHubReader struct {
 	repo *testrepo.Repository
 }

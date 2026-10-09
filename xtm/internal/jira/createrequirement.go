@@ -87,12 +87,12 @@ var requirementCreateSkipFields = map[string]bool{
 // issue type's create screen beyond the ones the New Requirement form already
 // collects (project / issuetype / summary / description / priority / components
 // / fixVersions), so the form can render and collect them before commit. The
-// result reuses BugCreateField as a generic createmeta field descriptor.
+// result reuses FieldDef as a generic createmeta field descriptor.
 // Demo URLs return a representative set without a network call.
 //
 // NOTE(xtm): the available required fields vary per project/issuetype; verify
 // against the live Xray Server/DC 8.4.0 instance.
-func (c *Client) GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]BugCreateField, error) {
+func (c *Client) GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]FieldDef, error) {
 	if isDemoURL(c.baseURL) {
 		return demoRequirementCreateFields(), nil
 	}
@@ -126,7 +126,7 @@ func (c *Client) GetRequirementCreateFields(ctx context.Context, projectKey, iss
 		return nil, err
 	}
 
-	var out []BugCreateField
+	var out []FieldDef
 	for _, proj := range meta.Projects {
 		for _, it := range proj.IssueTypes {
 			for id, fd := range it.Fields {
@@ -134,15 +134,15 @@ func (c *Client) GetRequirementCreateFields(ctx context.Context, projectKey, iss
 					continue
 				}
 				typ := bugCreateFieldKind(fd.Schema.Type, fd.Schema.Items)
-				avs := make([]BugFieldOption, 0, len(fd.AllowedValues))
+				avs := make([]FieldOption, 0, len(fd.AllowedValues))
 				for _, av := range fd.AllowedValues {
 					v := av.Value
 					if v == "" {
 						v = av.Name
 					}
-					avs = append(avs, BugFieldOption{ID: av.ID, Value: v})
+					avs = append(avs, FieldOption{ID: av.ID, Value: v})
 				}
-				out = append(out, BugCreateField{
+				out = append(out, FieldDef{
 					ID:            id,
 					Name:          fd.Name,
 					Required:      true,
@@ -158,14 +158,14 @@ func (c *Client) GetRequirementCreateFields(ctx context.Context, projectKey, iss
 // demoRequirementCreateFields returns a representative required custom field for
 // demo mode (mirroring a "Req. type" select), so the full create flow works
 // offline.
-func demoRequirementCreateFields() []BugCreateField {
-	return []BugCreateField{
+func demoRequirementCreateFields() []FieldDef {
+	return []FieldDef{
 		{
 			ID:       "customfield_14312",
 			Name:     "Req. type",
 			Required: true,
 			Type:     "option",
-			AllowedValues: []BugFieldOption{
+			AllowedValues: []FieldOption{
 				{ID: "15201", Value: "Functional"},
 				{ID: "15202", Value: "Non-Functional"},
 				{ID: "15203", Value: "Security"},

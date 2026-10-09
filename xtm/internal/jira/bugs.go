@@ -283,17 +283,18 @@ func chunkKeys(keys []string, size int) [][]string {
 	return out
 }
 
-// BugFieldOption is one allowed value for a BugCreateField select or version
+// FieldOption is one allowed value for a FieldDef select or version
 // field. ID is the Jira internal id sent in the POST body; Value is the
 // human-readable label shown in the form.
-type BugFieldOption struct {
+type FieldOption struct {
 	ID    string `json:"id"`
 	Value string `json:"value"`
 }
 
-// BugCreateField describes one required field on the bug issue type's create
-// screen (beyond project/issuetype/summary/description/priority/labels which the
-// form always handles). Type is a simplified kind:
+// FieldDef describes one Jira field as a screen offers it. The bug create
+// screen was the first caller, requirement create the second, and transition
+// screens are next (RND_P_4TFINT_05-451); nothing in it is specific to a
+// screen or an issue type. Type is a simplified kind:
 //
 //	"text"     plain string input
 //	"option"   single-select with AllowedValues (POST as {"id": ...})
@@ -302,15 +303,15 @@ type BugFieldOption struct {
 //	"number"   numeric input (POST as string)
 //	"date"     date input (POST as string)
 //	"array"    generic array of option objects
-type BugCreateField struct {
-	ID            string           `json:"id"`
-	Name          string           `json:"name"`
-	Required      bool             `json:"required"`
-	Type          string           `json:"type"`
-	AllowedValues []BugFieldOption `json:"allowedValues"`
+type FieldDef struct {
+	ID            string        `json:"id"`
+	Name          string        `json:"name"`
+	Required      bool          `json:"required"`
+	Type          string        `json:"type"`
+	AllowedValues []FieldOption `json:"allowedValues"`
 }
 
-// GetBugCreateFields returns the required fields on the bug issue type's create
+// GetFieldDefs returns the required fields on the bug issue type's create
 // screen for the given project, beyond project/issuetype/summary/description/
 // priority/labels (which the Create Bug form always collects). The caller renders
 // them dynamically so the user can supply values before the commit.
@@ -328,9 +329,9 @@ type BugCreateField struct {
 // shape) follows Jira DC REST v2 conventions and must be verified against the
 // live Xray Server/DC 8.4.0 instance. Some instances disable the fields
 // expansion, in which case the method returns an empty slice without an error.
-func (c *Client) GetBugCreateFields(ctx context.Context, projectKey, issueType string) ([]BugCreateField, error) {
+func (c *Client) GetFieldDefs(ctx context.Context, projectKey, issueType string) ([]FieldDef, error) {
 	if isDemoURL(c.baseURL) {
-		return demoBugCreateFields(), nil
+		return demoFieldDefs(), nil
 	}
 	if strings.TrimSpace(issueType) == "" {
 		issueType = "Bug"
@@ -367,7 +368,7 @@ func (c *Client) GetBugCreateFields(ctx context.Context, projectKey, issueType s
 		"project": true, "issuetype": true, "summary": true,
 		"description": true, "priority": true, "labels": true,
 	}
-	var out []BugCreateField
+	var out []FieldDef
 	for _, proj := range meta.Projects {
 		for _, it := range proj.IssueTypes {
 			for id, fd := range it.Fields {
@@ -375,15 +376,15 @@ func (c *Client) GetBugCreateFields(ctx context.Context, projectKey, issueType s
 					continue
 				}
 				typ := bugCreateFieldKind(fd.Schema.Type, fd.Schema.Items)
-				avs := make([]BugFieldOption, 0, len(fd.AllowedValues))
+				avs := make([]FieldOption, 0, len(fd.AllowedValues))
 				for _, av := range fd.AllowedValues {
 					v := av.Value
 					if v == "" {
 						v = av.Name
 					}
-					avs = append(avs, BugFieldOption{ID: av.ID, Value: v})
+					avs = append(avs, FieldOption{ID: av.ID, Value: v})
 				}
-				out = append(out, BugCreateField{
+				out = append(out, FieldDef{
 					ID:            id,
 					Name:          fd.Name,
 					Required:      true,
@@ -425,23 +426,23 @@ func bugCreateFieldKind(schemaType, items string) string {
 	}
 }
 
-// demoBugCreateFields returns a representative set of required extra create
+// demoFieldDefs returns a representative set of required extra create
 // fields for the demo mode, so the full create-bug flow works offline.
-func demoBugCreateFields() []BugCreateField {
-	return []BugCreateField{
+func demoFieldDefs() []FieldDef {
+	return []FieldDef{
 		{
 			ID:            "customfield_10300",
 			Name:          "Steps to Reproduce",
 			Required:      true,
 			Type:          "text",
-			AllowedValues: []BugFieldOption{},
+			AllowedValues: []FieldOption{},
 		},
 		{
 			ID:       "customfield_10301",
 			Name:     "Frequency",
 			Required: true,
 			Type:     "option",
-			AllowedValues: []BugFieldOption{
+			AllowedValues: []FieldOption{
 				{ID: "10401", Value: "Always"},
 				{ID: "10402", Value: "Sometimes"},
 				{ID: "10403", Value: "Rarely"},
@@ -453,7 +454,7 @@ func demoBugCreateFields() []BugCreateField {
 			Name:     "Affects Version/s",
 			Required: true,
 			Type:     "versions",
-			AllowedValues: []BugFieldOption{
+			AllowedValues: []FieldOption{
 				{ID: "10000", Value: "1.0"},
 				{ID: "10001", Value: "1.1"},
 				{ID: "10002", Value: "2.0"},
@@ -464,7 +465,7 @@ func demoBugCreateFields() []BugCreateField {
 			Name:     "Real Detection Phase",
 			Required: true,
 			Type:     "option",
-			AllowedValues: []BugFieldOption{
+			AllowedValues: []FieldOption{
 				{ID: "10501", Value: "Unit"},
 				{ID: "10502", Value: "Integration"},
 				{ID: "10503", Value: "System"},
@@ -524,7 +525,7 @@ func (c *Client) CreateBug(ctx context.Context, projectKey, issueType, summary, 
 	// Merge extra fields collected from the createmeta-driven form. Extra fields
 	// do not override the basic fields above (project / issuetype / summary /
 	// description / priority / labels / reporter), since those are skipped in
-	// GetBugCreateFields.
+	// GetFieldDefs.
 	for k, v := range extraFields {
 		if _, exists := fields[k]; !exists {
 			fields[k] = v

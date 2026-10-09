@@ -933,7 +933,7 @@ func (a *Adapter) CreateRequirement(ctx context.Context, projectKey, issueType, 
 	return "", backend.ErrUnsupported // Phase 5 (write)
 }
 
-func (a *Adapter) GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]backend.BugCreateField, error) {
+func (a *Adapter) GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]backend.FieldDef, error) {
 	return nil, backend.ErrUnsupported // Phase 5 (write); Kiwi has no requirement create screen
 }
 
@@ -955,7 +955,7 @@ func (a *Adapter) ListProjectBugs(ctx context.Context, projKey, issueType string
 	return nil, nil // P4.3 — EMPTY (spec §3.9)
 }
 
-func (a *Adapter) GetBugCreateFields(ctx context.Context, projectKey, issueType string) ([]backend.BugCreateField, error) {
+func (a *Adapter) GetFieldDefs(ctx context.Context, projectKey, issueType string) ([]backend.FieldDef, error) {
 	return nil, backend.ErrUnsupported // P4.3 (write)
 }
 

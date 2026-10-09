@@ -9,7 +9,7 @@ import {
   ListProjectFixVersions,
   errMsg,
 } from "../api";
-import type { BugCreateField, RequirementSource } from "../api";
+import type { FieldDef, RequirementSource } from "../api";
 import { MarkdownField } from "./MarkdownField";
 import { MultiSelect } from "./MultiSelect";
 import type { MultiOption } from "./MultiSelect";
@@ -48,7 +48,7 @@ export function NewRequirementPanel({ onCreated, onCancel }: Props) {
 
   // Required custom fields on the requirement create screen (createmeta-driven),
   // e.g. "Req. type". Loaded per project + issue type; blocked create until set.
-  const [extraFields, setExtraFields] = useState<BugCreateField[]>([]);
+  const [extraFields, setExtraFields] = useState<FieldDef[]>([]);
   const [extraLoading, setExtraLoading] = useState(false);
   const [extraValues, setExtraValues] = useState<Record<string, RawFieldValue>>({});
 
@@ -191,7 +191,7 @@ export function NewRequirementPanel({ onCreated, onCancel }: Props) {
   }
 
   // Render one required custom field using the panel's field styles.
-  function renderExtraField(f: BugCreateField) {
+  function renderExtraField(f: FieldDef) {
     const raw = extraValues[f.id] ?? "";
     const label = `${f.name}${f.required ? " *" : ""}`;
     if (f.type === "text") {

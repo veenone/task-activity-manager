@@ -198,7 +198,7 @@ type Backend interface {
 	ListIssueLinkTypes(ctx context.Context) ([]string, error)
 	ListIssueLinkTypeDetails(ctx context.Context) ([]IssueLinkType, error)
 	CreateRequirement(ctx context.Context, projectKey, issueType, summary, description, priority, components, fixVersions string, extraFields map[string]any) (string, error)
-	GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]BugCreateField, error)
+	GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]FieldDef, error)
 	DeleteRequirement(ctx context.Context, requirementKey string) error
 	UpdateRequirementLinks(ctx context.Context, fromKey string, add []string, removeLinkIDs []string) error
 	ListReqToReqLinks(ctx context.Context, reqKeys []string) ([]ReqToReqLink, error)
@@ -206,7 +206,7 @@ type Backend interface {
 	// --- bugs ---
 	ListBugs(ctx context.Context, testProjectKey string, testKeys []string, issueType string, onProgress func(done, total int)) ([]Bug, []BugLink, error)
 	ListProjectBugs(ctx context.Context, projKey, issueType string) ([]Bug, error)
-	GetBugCreateFields(ctx context.Context, projectKey, issueType string) ([]BugCreateField, error)
+	GetFieldDefs(ctx context.Context, projectKey, issueType string) ([]FieldDef, error)
 	CreateBug(ctx context.Context, projectKey, issueType, summary, description, priority string, labels []string, extraFields map[string]any) (string, error)
 	CreateBugLink(ctx context.Context, testKey, bugKey string) error
 	GetBugDetail(ctx context.Context, bugKey string) (BugDetail, error)
