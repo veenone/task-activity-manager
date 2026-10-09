@@ -88,8 +88,9 @@ characters. The error text lives in the component, per the UI copy contract.
   and a preview line ("12 of 20 selected tests will change") worked out on
   the client from the loaded tests. Apply calls a new
   `BulkEditLabels(testKeys, add, remove []string)` binding, which queues one
-  labels edit per changed test in one transaction and returns the existing
-  `BulkEditResult`. A label in both lists is an error the modal reports
+  labels edit per changed test and returns the existing `BulkEditResult`.
+  Each test is edited on its own, as `BulkEditTests` does, so one failure
+  does not block the rest. A label in both lists is an error the modal reports
   before calling the backend.
 
 ## C. Components view
