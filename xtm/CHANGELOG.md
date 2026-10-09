@@ -10,6 +10,43 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Label picker and Bulk Labels**
+- The Labels field on a test is a picker rather than a space-separated text
+  box. It suggests labels already on synced tests, so a typo no longer
+  silently creates a new label, and an unknown value is created deliberately
+  by pressing Enter. Chips are removed with a click or with Backspace.
+- A **Labels…** button in the bulk toolbar adds and removes several labels
+  across the selection at once, previewing how many tests each change
+  touches. A label in both the add and remove lists is refused rather than
+  applied in an order nobody chose.
+- Bulk Edit's `add_label` and `remove_label` operations now accept several
+  labels at once and use the same picker.
+- A label containing a space, or longer than 255 characters, is refused with
+  a message. Jira would reject it on commit otherwise.
+- Every change is queued in the pending-change journal and reaches Jira on
+  Commit, like every other edit.
+
+This is part A of the labels and components work. Part C, the Components
+view, is below. Part B, editing components on tests, is not built.
+
+**A Components view for the project's Jira components**
+- The view lists a project's components with their description, lead and test
+  count, and creates, edits and deletes them without leaving XTM.
+- Deleting shows how many issues carry the component and offers to move them
+  to another one, so a delete does not quietly strip them.
+- A rename or a delete is refused while pending changes edit components on
+  tests carrying that name. The queued edits name the component, and letting
+  it be renamed underneath them would commit edits nobody wrote.
+- Without project admin rights in Jira, the failure says so rather than
+  reporting a generic error.
+- Unlike every other write in XTM, these go straight to Jira rather than
+  through the pending-change journal. The journal holds pending edits to
+  issues, and a component belongs to the project; there is nothing local to
+  preview for a component Jira has not created. After each write the list is
+  re-fetched, the cached options refreshed, and for a rename or delete the
+  components on cached tests rewritten.
+- The view is hidden on a Kiwi profile, which has no components.
+
 **Preconditions show their workflow status**
 - The Preconditions list shows each precondition's Jira status, and the list
   can be sorted and searched by it. A reviewer working through a batch can see
