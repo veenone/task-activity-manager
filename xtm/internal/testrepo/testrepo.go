@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"agile-suite/core/journal"
+	"agile-suite/xtm/internal/fieldcodec"
 	"agile-suite/xtm/internal/store"
 )
 
@@ -4890,44 +4891,9 @@ func scanTest(s scanner) (TestCase, error) {
 	return t, nil
 }
 
-// componentSep separates component names in the stored, newline-bounded
-// components string. A newline can't appear in a Jira component name, and
-// bounding the whole value with separators lets a `components LIKE
-// '%\nName\n%'` filter match one component exactly without a multi-word name
-// like "User Management" colliding with "User".
-const componentSep = "\n"
-
-// encodeComponents joins component names into the bounded storage form, or ""
-// for none. Empty / whitespace-only names are dropped.
-func encodeComponents(names []string) string {
-	clean := make([]string, 0, len(names))
-	for _, n := range names {
-		if s := strings.TrimSpace(n); s != "" {
-			clean = append(clean, s)
-		}
-	}
-	if len(clean) == 0 {
-		return ""
-	}
-	return componentSep + strings.Join(clean, componentSep) + componentSep
-}
-
-// decodeComponents parses the stored components string back into a slice.
-func decodeComponents(stored string) []string {
-	out := []string{}
-	for _, n := range strings.Split(stored, componentSep) {
-		if s := strings.TrimSpace(n); s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// componentFilterPattern builds the LIKE pattern that matches a single
-// component name within the bounded storage form.
-func componentFilterPattern(name string) string {
-	return "%" + componentSep + name + componentSep + "%"
-}
+func encodeComponents(names []string) string    { return fieldcodec.EncodeComponents(names) }
+func decodeComponents(stored string) []string   { return fieldcodec.DecodeComponents(stored) }
+func componentFilterPattern(name string) string { return fieldcodec.ComponentFilterPattern(name) }
 
 // TypeConversion reports the outcome of a ChangeTestType call.
 type TypeConversion struct {
