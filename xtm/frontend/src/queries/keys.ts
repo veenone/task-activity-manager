@@ -17,8 +17,7 @@ export const keys = {
   // in a different order reuses one entry.
   testSummaries: (profileId: string, testKeys: string[]) =>
     [profileId, "testSummaries", [...testKeys].sort().join(",")] as const,
-  test: (profileId: string, key: string) =>
-    [profileId, "test", key] as const,
+  test: (profileId: string, key: string) => [profileId, "test", key] as const,
   testMeta: (profileId: string, key: string) =>
     [profileId, "test", key, "meta"] as const,
   testRunHistory: (profileId: string, key: string) =>
@@ -66,6 +65,14 @@ export const keys = {
   // Cached option list for pickers; under "components" so creates refresh it.
   componentOptions: (profileId: string, projectKey: string) =>
     [profileId, "components", "options", projectKey] as const,
+  // The tests carrying one component, one page at a time. Under "components"
+  // so a rename or delete refreshes it with everything else.
+  componentTests: (
+    profileId: string,
+    name: string,
+    page: number,
+    size: number,
+  ) => [profileId, "components", "tests", name, page, size] as const,
   userSearch: (profileId: string, q: string) =>
     [profileId, "userSearch", q] as const,
   preconditions: (profileId: string) => [profileId, "preconditions"] as const,
@@ -93,7 +100,11 @@ export const keys = {
   // CoverageView's per-selection detail bundle (model/report/gaps/reuse/stale
   // for one canonical + version). Nested under the "canonicalRequirements"
   // prefix so invalidateProfileData refreshes it with the list.
-  coverageDetail: (profileId: string, canonicalKey: string, versionId: string) =>
+  coverageDetail: (
+    profileId: string,
+    canonicalKey: string,
+    versionId: string,
+  ) =>
     [
       profileId,
       "canonicalRequirements",

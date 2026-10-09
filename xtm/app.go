@@ -1219,7 +1219,7 @@ func (a *App) runPartialSync(profileID, stage string, fn func(*syncer.Engine, st
 	// Always clear the status bar when the phase ends, success or failure.
 	defer runtime.EventsEmit(a.ctx, "sync:progress", syncer.Progress{Done: true})
 
-	return fn(engine, p.ProjectKey, onProgress)
+	return syncFailure(fn(engine, p.ProjectKey, onProgress))
 }
 
 // SyncRequirements refreshes just the requirement coverage from Jira (#7).
@@ -1405,6 +1405,21 @@ func (a *App) SyncProfileFull(profileID string) error {
 // runSync is the shared sync path behind SyncProfile (incremental) and
 // SyncProfileFull (forced full). forceFull blanks the watermark so the engine
 // treats the run as a full pull.
+// syncFailure is what a sync error reads as on screen. internal/jira turns an
+// HTTP failure into something actionable; anything it does not recognise is
+// passed through unchanged, and the original is logged either way so support
+// still has the step that failed (#170).
+func syncFailure(err error) error {
+	if err == nil {
+		return nil
+	}
+	if human := jira.Humanize(err); human != "" {
+		log.Printf("xtm: sync failed: %v", err)
+		return errors.New(human)
+	}
+	return err
+}
+
 func (a *App) runSync(profileID string, forceFull bool) error {
 	if err := a.requireStore(); err != nil {
 		return err
@@ -1462,7 +1477,7 @@ func (a *App) runSync(profileID string, forceFull bool) error {
 	); logErr != nil {
 		log.Printf("xtm: record sync log: %v", logErr)
 	}
-	return syncErr
+	return syncFailure(syncErr)
 }
 
 // ListSyncLog returns a profile's recent sync runs with success / failure

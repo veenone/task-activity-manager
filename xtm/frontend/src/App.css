@@ -7949,29 +7949,169 @@ tr.row-checked:hover {
 }
 
 /* Components view */
-.components-view {
+/* The Components view is laid out like the Preconditions and Containers
+   views: a paged master list beside a detail pane. The column width matches
+   .precond-view so the compact pager wraps the same way in both. */
+.components-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 12px 16px;
-  overflow: auto;
+  gap: 10px;
 }
-.components-head {
+/* Every other write in XTM is queued and committed. These are not, and the
+   difference is invisible without saying so. */
+.components-live-note {
+  border: 1px solid var(--warn-border);
+  background: var(--warn-soft);
+  color: var(--warn-text);
+  border-radius: 6px;
+  padding: 8px 11px;
+  font-size: 12.5px;
+}
+.components-view {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  width: 100%;
+  min-height: 0;
+}
+.components-with-detail {
+  grid-template-columns: minmax(280px, 360px) 1fr;
+}
+.components-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.components-list-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.components-search {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.components-new {
+  white-space: nowrap;
+}
+.components-items {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.components-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.components-item:hover {
+  border-color: var(--border-strong);
+}
+.components-item-active,
+.components-item-active:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.components-item-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.components-item-name {
+  font-weight: 600;
+}
+.components-item-count {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.components-item-meta {
+  font-size: 12px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.components-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.components-detail-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.components-detail-name {
+  margin: 0;
+  font-size: 16px;
+}
+.components-detail-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+.components-detail-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 18px;
+  margin: 0 0 14px;
+}
+.components-detail-fields dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.components-detail-fields dd {
+  margin: 0;
+  font-size: 13px;
+}
+.components-tests-head {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+/* The scroll lives here rather than on the pane, so the table's own header
+   is what sticks: rows used to pass over it (issue 170). */
+.components-tests-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   margin-bottom: 8px;
 }
-.components-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.components-table th,
-.components-table td {
-  text-align: left;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-}
-.components-actions {
-  white-space: nowrap;
-  text-align: right;
+.components-tests thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
 }
 .component-lead {
   display: flex;
