@@ -10,6 +10,25 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Label picker and Bulk Labels**
+- The Labels field on a test is a picker rather than a space-separated text
+  box. It suggests labels already on synced tests, so a typo no longer
+  silently creates a new label, and an unknown value is created deliberately
+  by pressing Enter. Chips are removed with a click or with Backspace.
+- A **Labels…** button in the bulk toolbar adds and removes several labels
+  across the selection at once, previewing how many tests each change
+  touches. A label in both the add and remove lists is refused rather than
+  applied in an order nobody chose.
+- Bulk Edit's `add_label` and `remove_label` operations now accept several
+  labels at once and use the same picker.
+- A label containing a space, or longer than 255 characters, is refused with
+  a message. Jira would reject it on commit otherwise.
+- Every change is queued in the pending-change journal and reaches Jira on
+  Commit, like every other edit.
+
+This is part A of the labels and components work. Editing components on
+tests, and a view for managing a project's components, are parts B and C.
+
 **Preconditions show their workflow status**
 - The Preconditions list shows each precondition's Jira status, and the list
   can be sorted and searched by it. A reviewer working through a batch can see
