@@ -1404,6 +1404,78 @@
   overflow-y: auto;
 }
 /* Single-select option rows (SearchableSelect) reuse the multiselect panel. */
+/* TokenPicker: chips plus a combobox input, used for labels. */
+.token-picker {
+  position: relative;
+  flex: 1;
+}
+.token-picker-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 3px 4px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  cursor: text;
+}
+.token-picker-field:focus-within {
+  border-color: var(--accent);
+}
+.token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-size: 0.9em;
+}
+.token-chip-remove {
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.token-picker .token-picker-input {
+  flex: 1;
+  min-width: 8ch;
+  width: auto;
+  border: 0;
+  padding: 2px;
+  background: transparent;
+  color: inherit;
+  outline: none;
+}
+.token-picker-list {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  margin: 2px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.token-option {
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.token-option-active {
+  background: var(--row-hover);
+}
+.token-picker-error {
+  margin: 4px 0 0;
+  color: var(--danger-text);
+  font-size: 0.9em;
+}
+
 .searchable-select .multiselect-btn {
   width: 100%;
   max-width: none;
