@@ -25,6 +25,7 @@ export function invalidateProfileData(qc: QueryClient, profileId: string) {
     keys.syncState(profileId),
     keys.syncLog(profileId),
     keys.components(profileId),
+    keys.labels(profileId),
     keys.containers(profileId),
     keys.preconditions(profileId),
     keys.requirements(profileId),

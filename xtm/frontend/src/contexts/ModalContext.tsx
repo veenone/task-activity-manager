@@ -17,6 +17,7 @@ export type ModalId =
   | "bridge"
   | "pending"
   | "bulkEdit"
+  | "bulkLabels"
   | "bulkRename"
   | "bulkTransition"
   | "bulkAllocate"

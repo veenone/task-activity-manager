@@ -7,6 +7,7 @@ import {
   useFolders,
   useComponents,
   useGroupContainers,
+  useLabels,
 } from "./app";
 import * as api from "../api";
 
@@ -14,6 +15,7 @@ vi.mock("../api", () => ({
   GetSyncState: vi.fn(),
   ListFolders: vi.fn(),
   ListComponents: vi.fn(),
+  ListLabels: vi.fn(),
   ListContainers: vi.fn(),
   errMsg: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }));
@@ -122,5 +124,22 @@ describe("useGroupContainers", () => {
     );
     expect(result.current.fetchStatus).toBe("idle");
     expect(api.ListContainers).not.toHaveBeenCalled();
+  });
+});
+
+describe("useLabels", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns the profile's labels from ListLabels", async () => {
+    (api.ListLabels as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { label: "login", count: 1 },
+      { label: "smoke", count: 2 },
+    ]);
+    const { result } = renderHook(() => useLabels("p1"), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(api.ListLabels).toHaveBeenCalledWith("p1");
+    expect(result.current.data?.map((b) => b.label)).toEqual(["login", "smoke"]);
   });
 });

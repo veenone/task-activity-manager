@@ -67,6 +67,7 @@ import {
 import { invalidateProfileData } from "./queries/invalidate";
 import { keys } from "./queries/keys";
 import { BulkEditModal } from "./components/BulkEditModal";
+import { BulkLabelsModal } from "./components/BulkLabelsModal";
 import { BulkRenameModal } from "./components/BulkRenameModal";
 import { BulkTransitionModal } from "./components/BulkTransitionModal";
 import { BulkAllocateModal } from "./components/BulkAllocateModal";
@@ -1209,6 +1210,12 @@ function App() {
           </button>
           <button
             className="btn btn-primary"
+            onClick={() => openModal("bulkLabels")}
+          >
+            Labels…
+          </button>
+          <button
+            className="btn btn-primary"
             onClick={() => openModal("bulkRename")}
           >
             Rename summaries…
@@ -1571,6 +1578,14 @@ function App() {
 
       {isOpen("bulkEdit") && (
         <BulkEditModal
+          testKeys={[...selectedSet]}
+          onComplete={() => afterMutation({ clearSelection: true })}
+          onCancel={() => afterMutation()}
+        />
+      )}
+
+      {isOpen("bulkLabels") && (
+        <BulkLabelsModal
           testKeys={[...selectedSet]}
           onComplete={() => afterMutation({ clearSelection: true })}
           onCancel={() => afterMutation()}

@@ -4,6 +4,7 @@ import {
   ListComponents,
   ListContainers,
   ListFolders,
+  ListLabels,
   ListSyncLog,
 } from "../api";
 import { call } from "../lib/apiCall";
@@ -52,6 +53,17 @@ export function useComponents(profileId: string, groupBy: string) {
     queryKey: keys.components(profileId),
     queryFn: () => call(() => ListComponents(profileId)),
     enabled: !!profileId && groupBy === "component",
+    placeholderData: (prev) => prev,
+  });
+}
+
+// useLabels loads the distinct labels on the profile's Tests, the label
+// picker's suggestions.
+export function useLabels(profileId: string) {
+  return useQuery({
+    queryKey: keys.labels(profileId),
+    queryFn: () => call(() => ListLabels(profileId)),
+    enabled: !!profileId,
     placeholderData: (prev) => prev,
   });
 }

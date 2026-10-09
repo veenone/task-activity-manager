@@ -46,6 +46,8 @@ export function BulkAssociateRequirements(arg1:string,arg2:Array<string>,arg3:Ar
 
 export function BulkEditContainers(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
+export function BulkEditLabels(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:Array<string>):Promise<testrepo.BulkEditResult>;
+
 export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
 export function BulkMoveToFolder(arg1:string,arg2:Array<string>,arg3:string):Promise<testrepo.BulkEditResult>;
@@ -318,6 +320,8 @@ export function ListCoverageProjects(arg1:string):Promise<Array<coverage.Project
 
 export function ListFolders(arg1:string):Promise<Array<testrepo.Folder>>;
 
+export function ListLabels(arg1:string):Promise<Array<testrepo.Bucket>>;
+
 export function ListMatchingKeys(arg1:string,arg2:testrepo.Query):Promise<Array<string>>;
 
 export function ListMisspellings(arg1:string):Promise<Array<spellcheck.Finding>>;
@@ -347,6 +351,8 @@ export function ListStatuses(arg1:string):Promise<Array<string>>;
 export function ListSyncLog(arg1:string,arg2:number):Promise<Array<testrepo.SyncLogEntry>>;
 
 export function ListTestCallLinks(arg1:string):Promise<Array<testrepo.TestCallLink>>;
+
+export function ListTestLabels(arg1:string,arg2:Array<string>):Promise<Record<string, Array<string>>>;
 
 export function ListTests(arg1:string,arg2:testrepo.Query):Promise<testrepo.Page>;
 
