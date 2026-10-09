@@ -3,6 +3,8 @@ package jira
 import (
 	"context"
 	"strings"
+
+	"agile-suite/xtm/internal/fieldcodec"
 )
 
 // UpdateIssue PUTs field updates for a Jira issue (FR-2.3 / Phase 2 commit).
@@ -62,6 +64,13 @@ func FieldsForJira(updates map[string]string) map[string]any {
 				labels = []string{}
 			}
 			out["labels"] = labels
+		case "components":
+			names := fieldcodec.DecodeComponents(v)
+			objs := make([]map[string]string, 0, len(names))
+			for _, n := range names {
+				objs = append(objs, map[string]string{"name": n})
+			}
+			out["components"] = objs
 		}
 	}
 	return out

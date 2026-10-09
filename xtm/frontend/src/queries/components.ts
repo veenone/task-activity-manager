@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { ListComponents, ListProjectComponentDetails, SearchUsers } from "../api";
+import {
+  ListComponents,
+  ListProjectComponentDetails,
+  ListProjectComponents,
+  SearchUsers,
+} from "../api";
 import { call } from "../lib/apiCall";
 import { keys } from "./keys";
 
@@ -33,5 +38,15 @@ export function useUserSearch(profileId: string, query: string) {
     queryFn: () => call(() => SearchUsers(profileId, q)),
     enabled: !!profileId && q.length >= 2,
     staleTime: 60_000,
+  });
+}
+
+// useComponentOptions loads the project's cached component names for the
+// component pickers.
+export function useComponentOptions(profileId: string, projectKey: string) {
+  return useQuery({
+    queryKey: keys.componentOptions(profileId, projectKey),
+    queryFn: () => call(() => ListProjectComponents(profileId, projectKey)),
+    enabled: !!profileId && !!projectKey,
   });
 }

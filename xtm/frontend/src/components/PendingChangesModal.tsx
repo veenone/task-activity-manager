@@ -6,6 +6,7 @@ import type {
 } from "../api";
 import { useConfirm } from "./useConfirm";
 import { Modal } from "./Modal";
+import { formatComponentsValue } from "../lib/components";
 
 interface Props {
   changes: PendingChange[];
@@ -466,6 +467,15 @@ function describeChange(c: PendingChange): {
   after: string;
 } {
   switch (c.entityType) {
+    case "test_case":
+      if (c.field === "components") {
+        return {
+          field: "components",
+          before: formatComponentsValue(c.beforeVal),
+          after: formatComponentsValue(c.afterVal),
+        };
+      }
+      return { field: c.field, before: c.beforeVal, after: c.afterVal };
     case "test_step":
       return { field: `step:${c.field}`, before: c.beforeVal, after: c.afterVal };
     case "test_step_add": {

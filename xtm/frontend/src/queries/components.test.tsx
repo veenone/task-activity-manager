@@ -2,12 +2,13 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useComponentCounts, useProjectComponents } from "./components";
+import { useComponentCounts, useComponentOptions, useProjectComponents } from "./components";
 import * as api from "../api";
 
 vi.mock("../api", () => ({
   ListProjectComponentDetails: vi.fn(),
   ListComponents: vi.fn(),
+  ListProjectComponents: vi.fn(),
   SearchUsers: vi.fn(),
   errMsg: (e: unknown) => String(e),
 }));
@@ -37,5 +38,13 @@ describe("component queries", () => {
     const { result } = renderHook(() => useComponentCounts("p1"), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.get("Core")).toBe(4);
+  });
+
+  it("useComponentOptions returns the cached project components", async () => {
+    (api.ListProjectComponents as ReturnType<typeof vi.fn>).mockResolvedValue(["API", "Core"]);
+    const { result } = renderHook(() => useComponentOptions("p1", "QA"), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(api.ListProjectComponents).toHaveBeenCalledWith("p1", "QA");
+    expect(result.current.data).toEqual(["API", "Core"]);
   });
 });

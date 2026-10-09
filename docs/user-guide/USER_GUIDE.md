@@ -489,6 +489,17 @@ field refuses those with a message. Labels are case-sensitive: `Smoke` and
 change straight away. Text you typed but did not confirm with Enter is added
 when you leave the field.
 
+### Components
+
+The Components field works like Labels, with three differences. It only
+offers the project's components, so you cannot attach a name Jira does not
+know. Names keep their spaces: typing or pasting "User Management" adds one
+component, not two. If your Jira account can manage components (the
+Components tab is visible), typing a new name and pressing Enter asks whether
+to create it in the project, then adds it once Jira has. Each change is queued
+as a pending change straight away, and the pending list shows it as a plain
+list of names.
+
 ### Steps
 
 Test steps load when you first open a test (to keep sync fast). You can add,
@@ -614,6 +625,10 @@ toolbar** appears above the grid:
   only). A line under the pickers tells you how many of the selected tests will
   change. A label can't be in both lists. Tests that would end up with the same
   labels are left alone, so they get no pending change.
+- **Components…** — change components on all selected tests. **Add and
+  remove** works like Labels…. **Replace all** sets every selected test to the
+  components you pick; picking none clears them. The line under the pickers
+  says how many tests will change.
 - **Bulk transition…** — move all selected tests through a workflow transition.
 - **Allocate…** — add the selected tests to a Test Set / Plan / Execution.
 - **Move to folder…** — re-file into a Test Repository folder.

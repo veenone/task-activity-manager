@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"agile-suite/xtm/internal/backend"
+	"agile-suite/xtm/internal/testrepo"
 )
 
 func TestComponentBindingsInDemo(t *testing.T) {
@@ -38,5 +39,23 @@ func TestComponentBindingsUnsupportedOnKiwi(t *testing.T) {
 	_, err := a.CreateComponent(profileID, backend.ComponentInput{Name: "X"})
 	if !errors.Is(err, backend.ErrUnsupported) {
 		t.Fatalf("want ErrUnsupported, got %v", err)
+	}
+}
+
+func TestSetTestComponentsBindingQueuesEdit(t *testing.T) {
+	a := newTestApp(t)
+	p, err := a.CreateProfile("Demo", "demo", "DEMO", "", "", "", "", "tok", "", false, "xray")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.repo.UpsertTests(p.ID, []testrepo.TestCase{{Key: "DEMO-1", Summary: "a"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetTestComponents(p.ID, "DEMO-1", []string{"User Management"}); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	got, err := a.ListTestComponents(p.ID, []string{"DEMO-1"})
+	if err != nil || len(got["DEMO-1"]) != 1 || got["DEMO-1"][0] != "User Management" {
+		t.Fatalf("got %v err %v", got, err)
 	}
 }

@@ -23,6 +23,7 @@ import {
   TransitionTest,
   AddTestComment,
   EditTestField,
+  SetTestComponents,
   EditTestStepField,
   DeleteTestStep,
   AddTestStep,
@@ -53,6 +54,7 @@ import type {
 
 import { usePrompt } from "./usePrompt";
 import { LabelsField } from "./LabelsField";
+import { ComponentsField } from "./ComponentsField";
 import { useConfirm } from "./useConfirm";
 import { MarkdownField } from "./MarkdownField";
 import { MultiAddSelect } from "./MultiAddSelect";
@@ -122,7 +124,7 @@ export function TestDetail({
   onCloned,
   readOnly,
 }: Props) {
-  const { activeId: profileId } = useProfile();
+  const { activeId: profileId, activeProfile } = useProfile();
   const { prompt } = usePrompt();
   const { confirm } = useConfirm();
   // Gates the Xray-shaped sections below (preconditions, requirements, exec
@@ -620,6 +622,21 @@ export function TestDetail({
         keys.test(profileId, testKey),
         updated,
       );
+      onEdited();
+    } catch (e) {
+      setSaveError(`Save failed: ${errMsg(e)}`);
+    }
+  }
+
+  // saveComponents queues a components edit. The value is encoded in Go
+  // (SetTestComponents), so it bypasses saveField's string path.
+  async function saveComponents(names: string[]) {
+    if (readOnly || !test) return;
+    if (JSON.stringify(names) === JSON.stringify(test.components ?? [])) return;
+    setSaveError("");
+    try {
+      await SetTestComponents(profileId, testKey, names);
+      queryClient.setQueryData(keys.test(profileId, testKey), { ...test, components: names });
       onEdited();
     } catch (e) {
       setSaveError(`Save failed: ${errMsg(e)}`);
@@ -1157,6 +1174,19 @@ export function TestDetail({
                 onChange={setLabels}
                 onSave={(v) => saveField("labels", v)}
                 readOnly={!!readOnly}
+              />
+            </dd>
+
+            <dt>
+              Components {isDirty("components") && <DirtyDot />}
+            </dt>
+            <dd>
+              <ComponentsField
+                profileId={profileId}
+                projectKey={activeProfile?.projectKey ?? ""}
+                value={test.components ?? []}
+                readOnly={!!readOnly}
+                onSave={saveComponents}
               />
             </dd>
 

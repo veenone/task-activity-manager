@@ -11,6 +11,8 @@ function Harness(props: {
   allowCreate?: boolean;
   onCreate?: (v: string) => Promise<boolean>;
   spy?: (v: string[]) => void;
+  separator?: RegExp | null;
+  validate?: (v: string) => string | null;
 }) {
   const [value, setValue] = useState(props.initial ?? []);
   return (
@@ -24,7 +26,8 @@ function Harness(props: {
       suggestions={props.suggestions ?? ["smoke", "Smoke", "login"]}
       allowCreate={props.allowCreate ?? true}
       onCreate={props.onCreate}
-      validate={validateLabel}
+      validate={props.validate ?? validateLabel}
+      separator={props.separator}
     />
   );
 }
@@ -133,5 +136,24 @@ describe("TokenPicker", () => {
     expect(validateLabel("x".repeat(256))).toBe(
       "A label can be at most 255 characters.",
     );
+  });
+
+  it("with separator null, keeps pasted and blurred text whole", async () => {
+    const spy = vi.fn();
+    render(
+      <>
+        <Harness
+          spy={spy}
+          separator={null}
+          suggestions={["User Management"]}
+          validate={() => null}
+        />
+        <button>elsewhere</button>
+      </>,
+    );
+    await userEvent.click(input());
+    await userEvent.paste("Data Platform");
+    await userEvent.click(screen.getByRole("button", { name: "elsewhere" }));
+    expect(spy).toHaveBeenLastCalledWith(["Data Platform"]);
   });
 });

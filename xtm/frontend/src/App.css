@@ -7992,3 +7992,12 @@ tr.row-checked:hover {
   border: 1px solid var(--border);
   border-radius: 5px;
 }
+
+/* Bulk Components mode switch: a fieldset laid out as a bulk row. */
+.bulk-row-radios {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  gap: 16px;
+}
