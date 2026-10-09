@@ -1,6 +1,8 @@
 package testrepo
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -56,4 +58,86 @@ func (r *Repository) SetTestComponents(profileID, testKey string, names []string
 		return nil
 	}
 	return r.EditTestField(profileID, testKey, "components", next)
+}
+
+// BulkEditComponents changes components across tests, one pending edit per
+// test that changes. Without replace it removes then adds; with replace each
+// test's components become add, and an empty add clears them.
+func (r *Repository) BulkEditComponents(profileID string, testKeys, add, remove []string, replace bool) (BulkEditResult, error) {
+	result := BulkEditResult{Succeeded: []string{}, Failed: []BulkFailure{}}
+	addClean, err := cleanComponents(add)
+	if err != nil {
+		return result, fmt.Errorf("bulk components: %w", err)
+	}
+	removeClean, err := cleanComponents(remove)
+	if err != nil {
+		return result, fmt.Errorf("bulk components: %w", err)
+	}
+	switch {
+	case replace && len(removeClean) > 0:
+		return result, fmt.Errorf("bulk components: replace takes no remove list")
+	case !replace && len(addClean) == 0 && len(removeClean) == 0:
+		return result, fmt.Errorf("bulk components: nothing to add or remove")
+	}
+	adding := map[string]bool{}
+	for _, n := range addClean {
+		adding[n] = true
+	}
+	for _, n := range removeClean {
+		if adding[n] {
+			return result, fmt.Errorf("bulk components: %q is in both add and remove", n)
+		}
+	}
+
+	for _, key := range testKeys {
+		var current string
+		err := r.db.QueryRow(
+			`SELECT components FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+			profileID, key).Scan(&current)
+		if errors.Is(err, sql.ErrNoRows) {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: "not found"})
+			continue
+		}
+		if err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
+			continue
+		}
+		var next []string
+		if replace {
+			next = addClean
+		} else {
+			next = addLabels(removeLabels(decodeComponents(current), removeClean), addClean)
+		}
+		encoded := encodeComponents(next)
+		if encoded == current {
+			result.Succeeded = append(result.Succeeded, key)
+			continue
+		}
+		if err := r.EditTestField(profileID, key, "components", encoded); err != nil {
+			result.Failed = append(result.Failed, BulkFailure{TestKey: key, Error: err.Error()})
+			continue
+		}
+		result.Succeeded = append(result.Succeeded, key)
+	}
+	return result, nil
+}
+
+// ListTestComponents returns each requested test's components, keyed by Jira
+// key, for the Bulk Components preview. Unknown keys are omitted.
+func (r *Repository) ListTestComponents(profileID string, testKeys []string) (map[string][]string, error) {
+	out := make(map[string][]string, len(testKeys))
+	for _, key := range testKeys {
+		var stored string
+		err := r.db.QueryRow(
+			`SELECT components FROM test_case WHERE profile_id = ? AND jira_key = ?`,
+			profileID, key).Scan(&stored)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("list test components %s: %w", key, err)
+		}
+		out[key] = decodeComponents(stored)
+	}
+	return out, nil
 }
