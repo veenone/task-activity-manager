@@ -58,6 +58,7 @@ export const keys = {
   syncLog: (profileId: string) => [profileId, "syncLog"] as const,
   folders: (profileId: string) => [profileId, "folders"] as const,
   components: (profileId: string) => [profileId, "components"] as const,
+  labels: (profileId: string) => [profileId, "labels"] as const,
   preconditions: (profileId: string) => [profileId, "preconditions"] as const,
   // The tests linked to one precondition (PreconditionsView's "Used by" list).
   // Nested under the "preconditions" prefix so invalidateProfileData refreshes

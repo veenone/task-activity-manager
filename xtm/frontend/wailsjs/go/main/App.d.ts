@@ -46,6 +46,8 @@ export function BulkAssociateRequirements(arg1:string,arg2:Array<string>,arg3:Ar
 
 export function BulkEditContainers(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
+export function BulkEditLabels(arg1:string,arg2:Array<string>,arg3:Array<string>,arg4:Array<string>):Promise<testrepo.BulkEditResult>;
+
 export function BulkEditTests(arg1:string,arg2:Array<string>,arg3:testrepo.BulkEdit):Promise<testrepo.BulkEditResult>;
 
 export function BulkMoveToFolder(arg1:string,arg2:Array<string>,arg3:string):Promise<testrepo.BulkEditResult>;
@@ -317,6 +319,8 @@ export function ListCoverageGaps(arg1:string,arg2:string):Promise<Array<coverage
 export function ListCoverageProjects(arg1:string):Promise<Array<coverage.ProjectConfig>>;
 
 export function ListFolders(arg1:string):Promise<Array<testrepo.Folder>>;
+
+export function ListLabels(arg1:string):Promise<Array<testrepo.Bucket>>;
 
 export function ListMatchingKeys(arg1:string,arg2:testrepo.Query):Promise<Array<string>>;
 

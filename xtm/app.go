@@ -2649,6 +2649,17 @@ func (a *App) BulkEditTests(profileID string, testKeys []string, op testrepo.Bul
 	return a.repo.BulkEditTests(profileID, testKeys, op)
 }
 
+// BulkEditLabels adds and removes labels across a batch of Tests, queueing one
+// labels edit per Test that changes. The Bulk Labels modal calls it.
+func (a *App) BulkEditLabels(profileID string, testKeys, add, remove []string) (result testrepo.BulkEditResult, err error) {
+	defer recoverToError("BulkEditLabels", &err)
+	empty := testrepo.BulkEditResult{Succeeded: []string{}, Failed: []testrepo.BulkFailure{}}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	return a.repo.BulkEditLabels(profileID, testKeys, add, remove)
+}
+
 // GetTestSummaries returns the current summary of each given Test, in the order
 // requested, for the bulk-rename preview (RND_P_4TFINT_05-354). Keys this
 // profile does not have are omitted.
@@ -4176,6 +4187,15 @@ func (a *App) ListComponents(profileID string) ([]testrepo.Bucket, error) {
 		return nil, err
 	}
 	return a.repo.ListComponents(profileID)
+}
+
+// ListLabels returns the distinct labels across a profile's Tests with a count
+// each, for the label picker's suggestions.
+func (a *App) ListLabels(profileID string) ([]testrepo.Bucket, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	return a.repo.ListLabels(profileID)
 }
 
 // ListStatuses returns the statuses for the browse filter: the Test issue

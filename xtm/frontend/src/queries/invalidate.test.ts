@@ -20,6 +20,7 @@ describe("invalidateProfileData", () => {
         "syncState",
         "syncLog",
         "components",
+        "labels",
         "containers",
         "preconditions",
         "requirements",

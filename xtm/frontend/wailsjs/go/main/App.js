@@ -66,6 +66,10 @@ export function BulkEditContainers(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkEditContainers'](arg1, arg2, arg3);
 }
 
+export function BulkEditLabels(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['BulkEditLabels'](arg1, arg2, arg3, arg4);
+}
+
 export function BulkEditTests(arg1, arg2, arg3) {
   return window['go']['main']['App']['BulkEditTests'](arg1, arg2, arg3);
 }
@@ -608,6 +612,10 @@ export function ListCoverageProjects(arg1) {
 
 export function ListFolders(arg1) {
   return window['go']['main']['App']['ListFolders'](arg1);
+}
+
+export function ListLabels(arg1) {
+  return window['go']['main']['App']['ListLabels'](arg1);
 }
 
 export function ListMatchingKeys(arg1, arg2) {
