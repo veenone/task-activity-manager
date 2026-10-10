@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContainersView } from "./ContainersView";
@@ -191,5 +191,40 @@ describe("ContainersView Create bug gate", () => {
     expect(
       screen.queryByRole("button", { name: /create bug for this failed test/i }),
     ).toBeNull();
+  });
+});
+
+describe("ContainersView keyboard", () => {
+  it("starts renaming the container from the keyboard, as a click does", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+
+    const heading = await screen.findByRole("heading", { name: "Nightly run" });
+    within(heading).getByRole("button").focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(screen.getByDisplayValue("Nightly run")).toBeInTheDocument();
+  });
+
+  it("filters the members by run status with Enter on a run badge", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+
+    const badge = await screen.findByRole("button", { name: "FAIL 1" });
+    badge.focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(badge).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("names the Set env panel and closes it on Escape", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+
+    await userEvent.click(await screen.findByRole("button", { name: /Set env on shown/ }));
+    expect(screen.getByRole("dialog", { name: /Set environment on the 1 shown/ })).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

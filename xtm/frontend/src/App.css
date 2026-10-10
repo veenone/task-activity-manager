@@ -2269,6 +2269,15 @@ button.defect-chip-key:hover {
 .container-card-name:hover {
   color: var(--accent);
 }
+.container-card-name > button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: text;
+}
 .container-card-name-edit {
   font-size: 18px;
   font-weight: 600;

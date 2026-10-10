@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { onActivateKey } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { useViewState } from "../lib/viewState";
 import {
@@ -99,6 +100,15 @@ export function ContainersView({
   // The batch-environment controls live in a popover so the filter bar stays a
   // single compact row instead of a dedicated tools strip (#310 follow-up).
   const [envToolsOpen, setEnvToolsOpen] = useState(false);
+  // Escape closes the Set env panel from anywhere, as it does a core Menu.
+  useEffect(() => {
+    if (!envToolsOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setEnvToolsOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [envToolsOpen]);
   const [cSortField, setCSortField] = useViewState(profileId, "containers", "cSortField", "key");
   const [cSortDesc, setCSortDesc] = useViewState(profileId, "containers", "cSortDesc", false);
   const [rowSortField, setRowSortField] = useState("key");
@@ -1046,10 +1056,15 @@ export function ContainersView({
                 <>
                   <div
                     className="menu-backdrop"
+                    role="presentation"
                     onClick={() => setEnvToolsOpen(false)}
                   />
-                  <div className="env-tools-panel menu-panel-right" role="dialog">
-                    <span className="env-tools-title">
+                  <div
+                    className="env-tools-panel menu-panel-right"
+                    role="dialog"
+                    aria-labelledby="env-tools-title"
+                  >
+                    <span className="env-tools-title" id="env-tools-title">
                       Set environment on the {viewContainers.length} shown
                     </span>
                     <div className="env-tools-row">
@@ -1260,15 +1275,17 @@ export function ContainersView({
               }}
             />
           ) : (
-            <h2
-              className="container-card-name"
-              title="Click to rename"
-              onClick={() => {
-                setNameDraft(selectedContainer.summary);
-                setEditingName(true);
-              }}
-            >
-              {selectedContainer.summary || "(untitled)"}
+            <h2 className="container-card-name">
+              <button
+                type="button"
+                title="Click to rename"
+                onClick={() => {
+                  setNameDraft(selectedContainer.summary);
+                  setEditingName(true);
+                }}
+              >
+                {selectedContainer.summary || "(untitled)"}
+              </button>
             </h2>
           )}
 
@@ -1923,7 +1940,11 @@ function RunBar({
           style={{ width: `${(b.count / sum) * 100}%` }}
           title={`${b.label}: ${b.count}${onPick ? " (click to filter)" : ""}`}
           role={onPick ? "button" : undefined}
+          tabIndex={onPick ? 0 : undefined}
+          aria-label={onPick ? `${b.label}: ${b.count}` : undefined}
+          aria-pressed={onPick ? active === b.label : undefined}
           onClick={onPick ? () => onPick(b.label) : undefined}
+          onKeyDown={onPick ? onActivateKey(() => onPick(b.label)) : undefined}
         />
       ))}
     </div>
@@ -1960,7 +1981,10 @@ function RunBadge({
     <span
       className={cls}
       role={onPick ? "button" : undefined}
+      tabIndex={onPick ? 0 : undefined}
+      aria-pressed={onPick ? !!active : undefined}
       onClick={onPick}
+      onKeyDown={onPick ? onActivateKey(onPick) : undefined}
       title={onPick ? (pickHint ?? `Filter the list to ${label}`) : undefined}
     >
       {label} {count}
