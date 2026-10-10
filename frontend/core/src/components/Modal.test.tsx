@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Modal } from "./Modal";
@@ -34,6 +34,14 @@ function openFrom(named: boolean): HTMLElement {
   return opener;
 }
 
+// GrabsFocus moves focus to itself from its own mount effect, which runs before
+// the Modal's, the way an autoFocus attribute or a child's focus effect does.
+function GrabsFocus() {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return <input ref={ref} aria-label="Eager" />;
+}
+
 describe("Modal initial focus", () => {
   it("focuses the element named by initialFocus when it opens", () => {
     openFrom(true);
@@ -63,5 +71,27 @@ describe("Modal initial focus", () => {
     expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(
       true,
     );
+  });
+
+  it("returns focus to the opener even when a child took focus while mounting", () => {
+    function EagerOpener() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>Open</button>
+          {open && (
+            <Modal onClose={() => setOpen(false)} label="Eager">
+              <GrabsFocus />
+            </Modal>
+          )}
+        </>
+      );
+    }
+    render(<EagerOpener />);
+    const opener = screen.getByRole("button", { name: "Open" });
+    opener.focus();
+    fireEvent.click(opener);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(document.activeElement).toBe(opener);
   });
 });

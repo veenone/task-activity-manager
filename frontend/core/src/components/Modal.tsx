@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
 
 // Modal is the shared dialog primitive (audit X1/X2/X3). Every dialog in the app
@@ -57,14 +57,17 @@ export function Modal({
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   // The element focused before the dialog opened, restored on unmount so the
-  // user lands back where they were instead of at the top of the page.
-  const restoreRef = useRef<HTMLElement | null>(null);
+  // user lands back where they were instead of at the top of the page. Read
+  // during the first render: by the time this component's effect runs, a
+  // child's mount effect may already have moved focus into the dialog.
+  const [opener] = useState(
+    () => document.activeElement as HTMLElement | null,
+  );
   // Initial focus is decided once, at mount; a caller passing a different ref
   // later must not pull focus away from wherever the user has moved it.
   const initialFocusAtMount = useRef(initialFocus);
 
   useEffect(() => {
-    restoreRef.current = document.activeElement as HTMLElement | null;
     const node = dialogRef.current;
     if (node) {
       const target =
@@ -74,9 +77,9 @@ export function Modal({
     }
     return () => {
       // Guard: the trigger may have unmounted while the dialog was open.
-      restoreRef.current?.focus?.();
+      opener?.focus?.();
     };
-  }, []);
+  }, [opener]);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (closeOnEsc && e.key === "Escape") {
