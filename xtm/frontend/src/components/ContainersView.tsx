@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { onActivateKey } from "@agile-suite/core";
+import { onActivateKey, useEscapeKey } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { useViewState } from "../lib/viewState";
 import {
@@ -100,15 +100,7 @@ export function ContainersView({
   // The batch-environment controls live in a popover so the filter bar stays a
   // single compact row instead of a dedicated tools strip (#310 follow-up).
   const [envToolsOpen, setEnvToolsOpen] = useState(false);
-  // Escape closes the Set env panel from anywhere, as it does a core Menu.
-  useEffect(() => {
-    if (!envToolsOpen) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setEnvToolsOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [envToolsOpen]);
+  useEscapeKey(envToolsOpen, () => setEnvToolsOpen(false));
   const [cSortField, setCSortField] = useViewState(profileId, "containers", "cSortField", "key");
   const [cSortDesc, setCSortDesc] = useViewState(profileId, "containers", "cSortDesc", false);
   const [rowSortField, setRowSortField] = useState("key");

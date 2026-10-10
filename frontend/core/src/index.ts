@@ -6,6 +6,7 @@ export type { ViewApi } from "./contexts/createViewContext";
 export { ProfileProvider, useProfile } from "./contexts/ProfileContext";
 export type { ProfileBackend, ProfileState } from "./contexts/ProfileContext";
 export { Modal } from "./components/Modal";
+export { useEscapeKey } from "./components/useEscapeKey";
 export { Menu } from "./components/Menu";
 export type { MenuItem } from "./components/Menu";
 export { LiveRegion, announce } from "./components/LiveRegion";
