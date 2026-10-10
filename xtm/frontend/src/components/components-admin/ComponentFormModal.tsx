@@ -21,13 +21,23 @@ interface Props {
 
 // ComponentFormModal creates or edits one component. Name checks run here so
 // a blank or duplicate name never reaches Jira; Jira checks again.
-export function ComponentFormModal({ initial, takenNames, onSubmit, onCancel }: Props) {
+export function ComponentFormModal({
+  initial,
+  takenNames,
+  onSubmit,
+  onCancel,
+}: Props) {
   const { activeId: profileId } = useProfile();
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [lead, setLead] = useState({ name: initial?.leadName ?? "", display: initial?.leadDisplayName ?? "" });
+  const [lead, setLead] = useState({
+    name: initial?.leadName ?? "",
+    display: initial?.leadDisplayName ?? "",
+  });
   const [leadQuery, setLeadQuery] = useState("");
-  const [assigneeType, setAssigneeType] = useState(initial?.assigneeType || "PROJECT_DEFAULT");
+  const [assigneeType, setAssigneeType] = useState(
+    initial?.assigneeType || "PROJECT_DEFAULT",
+  );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const users = useUserSearch(profileId, leadQuery);
@@ -46,7 +56,12 @@ export function ComponentFormModal({ initial, takenNames, onSubmit, onCancel }: 
     setSaving(true);
     setError("");
     try {
-      await onSubmit({ name: trimmed, description: description.trim(), leadUserName: lead.name, assigneeType });
+      await onSubmit({
+        name: trimmed,
+        description: description.trim(),
+        leadUserName: lead.name,
+        assigneeType,
+      });
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -57,7 +72,9 @@ export function ComponentFormModal({ initial, takenNames, onSubmit, onCancel }: 
   return (
     <Modal onClose={onCancel} className="modal bulk-modal" labelledBy={titleId}>
       <div className="pending-head">
-        <h2 id={titleId}>{initial ? `Edit ${initial.name}` : "New component"}</h2>
+        <h2 id={titleId}>
+          {initial ? `Edit ${initial.name}` : "New component"}
+        </h2>
         <button className="btn btn-ghost" onClick={onCancel} title="Close">
           ✕
         </button>
@@ -69,7 +86,11 @@ export function ComponentFormModal({ initial, takenNames, onSubmit, onCancel }: 
         </label>
         <label className="bulk-row">
           <span>Description</span>
-          <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <textarea
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </label>
         <div className="bulk-row">
           <span>Lead</span>
@@ -77,7 +98,10 @@ export function ComponentFormModal({ initial, takenNames, onSubmit, onCancel }: 
             {lead.name && (
               <p className="component-lead-current">
                 {lead.display || lead.name}
-                <button className="btn btn-ghost" onClick={() => setLead({ name: "", display: "" })}>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setLead({ name: "", display: "" })}
+                >
                   Clear lead
                 </button>
               </p>
@@ -110,7 +134,10 @@ export function ComponentFormModal({ initial, takenNames, onSubmit, onCancel }: 
         </div>
         <label className="bulk-row">
           <span>Default assignee</span>
-          <select value={assigneeType} onChange={(e) => setAssigneeType(e.target.value)}>
+          <select
+            value={assigneeType}
+            onChange={(e) => setAssigneeType(e.target.value)}
+          >
             {ASSIGNEE_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -125,7 +152,13 @@ export function ComponentFormModal({ initial, takenNames, onSubmit, onCancel }: 
           Cancel
         </button>
         <button className="btn btn-primary" onClick={submit} disabled={saving}>
-          {initial ? "Save" : "Create"}
+          {saving
+            ? initial
+              ? "Saving…"
+              : "Creating…"
+            : initial
+              ? "Save"
+              : "Create"}
         </button>
       </div>
     </Modal>

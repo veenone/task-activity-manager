@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   ListComponents,
+  ListTests,
   ListProjectComponentDetails,
   ListProjectComponents,
   SearchUsers,
@@ -26,6 +27,41 @@ export function useComponentCounts(profileId: string) {
     queryFn: () => call(() => ListComponents(profileId)),
     enabled: !!profileId,
     select: (buckets) => new Map(buckets.map((b) => [b.label, b.count])),
+  });
+}
+
+// useComponentTests lists the tests carrying one component, a page at a time.
+//
+// It reuses the ordinary test query: `Query.Component` has filtered on the
+// stored component list since before the Components view existed, so the
+// detail pane needs no backend of its own. Paging is the server's, not a
+// slice of everything, because a component on a large project carries
+// thousands of tests.
+export function useComponentTests(
+  profileId: string,
+  name: string,
+  page: number,
+  pageSize: number,
+) {
+  return useQuery({
+    queryKey: keys.componentTests(profileId, name, page, pageSize),
+    queryFn: () =>
+      call(() =>
+        ListTests(profileId, {
+          search: "",
+          status: "",
+          folderId: "",
+          containerKey: "",
+          component: name,
+          execType: "",
+          review: "",
+          sortBy: "key",
+          desc: false,
+          limit: pageSize,
+          offset: page * pageSize,
+        }),
+      ),
+    enabled: !!profileId && !!name,
   });
 }
 
