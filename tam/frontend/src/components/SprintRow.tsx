@@ -117,6 +117,7 @@ export function SprintRow({
   return (
     <div
       role="treeitem"
+      aria-selected={false}
       aria-expanded={open}
       aria-label={name}
       tabIndex={focused ? 0 : -1}
@@ -128,6 +129,7 @@ export function SprintRow({
     >
       <span
         className="folder-caret folder-caret-toggle"
+        role="presentation"
         onClick={(e) => { e.stopPropagation(); onToggle(); }}
       >
         {open ? "▾" : "▸"}
@@ -158,6 +160,7 @@ export function SprintRow({
           // clicks, since a trigger the Menu primitive owns has no other.
           <span
             className="board-card-menu-wrap"
+            role="presentation"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
