@@ -1,3 +1,4 @@
+import { onActivateKey } from "@agile-suite/core";
 import type { Container } from "../api";
 
 interface Props {
@@ -21,7 +22,11 @@ export function ContainerList({
     <nav className="folder-tree">
       <div
         className={"folder-item" + (selected === "" ? " folder-selected" : "")}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected === ""}
         onClick={() => onSelect("")}
+        onKeyDown={onActivateKey(() => onSelect(""))}
       >
         <span className="folder-caret" />
         <span className="folder-name">All tests</span>
@@ -36,7 +41,11 @@ export function ContainerList({
               "folder-item" + (selected === c.key ? " folder-selected" : "")
             }
             style={{ paddingLeft: 24 }}
+            role="button"
+            tabIndex={0}
+            aria-pressed={selected === c.key}
             onClick={() => onSelect(c.key)}
+            onKeyDown={onActivateKey(() => onSelect(c.key))}
             title={`${c.key} — ${c.summary}`}
           >
             <span className="folder-name">

@@ -26,6 +26,7 @@ export type { PromptOptions } from "./components/usePrompt";
 export { call } from "./lib/apiCall";
 export { ApiError, normalizeError } from "./lib/apiError";
 export { errMsg } from "./lib/errMsg";
+export { onActivateKey } from "./lib/activate";
 export { applyTheme } from "./lib/theme";
 export { createQueryClient } from "./lib/queryClient";
 export {

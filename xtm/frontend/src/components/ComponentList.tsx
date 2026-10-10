@@ -1,3 +1,4 @@
+import { onActivateKey } from "@agile-suite/core";
 import type { Bucket } from "../api";
 
 interface Props {
@@ -21,7 +22,11 @@ export function ComponentList({
     <nav className="folder-tree">
       <div
         className={"folder-item" + (selected === "" ? " folder-selected" : "")}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selected === ""}
         onClick={() => onSelect("")}
+        onKeyDown={onActivateKey(() => onSelect(""))}
       >
         <span className="folder-caret" />
         <span className="folder-name">All tests</span>
@@ -36,7 +41,11 @@ export function ComponentList({
               "folder-item" + (selected === c.label ? " folder-selected" : "")
             }
             style={{ paddingLeft: 24 }}
+            role="button"
+            tabIndex={0}
+            aria-pressed={selected === c.label}
             onClick={() => onSelect(c.label)}
+            onKeyDown={onActivateKey(() => onSelect(c.label))}
             title={`${c.label} — ${c.count} test(s)`}
           >
             <span className="folder-name">{c.label}</span>
