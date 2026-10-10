@@ -129,7 +129,10 @@ func TestGetBytesStatusReturnsBodyAndStatus(t *testing.T) {
 		t.Fatalf("raw: %q %d %v", body, code, err)
 	}
 	_, code, err = c.GetBytesStatus(context.Background(), "/bad")
-	if code != 400 || err == nil || err.Error() != "jira: GET /bad -> 400 Bad Request: not a test" {
+	// An *HTTPError now, like Get's, so errors.As and Humanize reach it
+	// (#176). "not a test" is not a Jira error object, so Message stays empty
+	// and Error() falls back to the form that names the endpoint.
+	if code != 400 || err == nil || err.Error() != "jira: GET /bad -> 400 Bad Request" {
 		t.Errorf("bad: %d %v", code, err)
 	}
 }
@@ -203,5 +206,39 @@ func TestWriteErrorCarriesJirasPerFieldMessages(t *testing.T) {
 		"customfield_10253: Field 'customfield_10253' cannot be set. It is not on the appropriate screen, or unknown."
 	if err.Error() != want {
 		t.Errorf("Error() = %q\nwant       %q", err.Error(), want)
+	}
+}
+
+// TestBothGetPathsReportFailureTheSameWay is the defect #176 records: Get
+// returned a structured *HTTPError while GetBytesStatus returned a bare
+// fmt.Errorf with the raw body pasted in. errors.As found one and not the
+// other, so jira.Humanize improved a failure from one read path and left the
+// other as it was, which is why a container, folder or precondition sync
+// still showed raw JSON after the humanised message shipped.
+func TestBothGetPathsReportFailureTheSameWay(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errorMessages":["Issue Does Not Exist"]}`))
+	}))
+	defer srv.Close()
+	c := NewClientWithHTTP(srv.URL, "tok", srv.Client())
+
+	var decoded *HTTPError
+	if !errors.As(c.Get(context.Background(), "/x", &struct{}{}), &decoded) {
+		t.Fatal("Get did not return an *HTTPError")
+	}
+
+	_, raw := c.GetBytes(context.Background(), "/x")
+	var bytesErr *HTTPError
+	if !errors.As(raw, &bytesErr) {
+		t.Fatalf("GetBytes error is not an *HTTPError, so Humanize cannot read it: %v", raw)
+	}
+	if bytesErr.Code != decoded.Code || bytesErr.Status != decoded.Status {
+		t.Errorf("the two paths disagree: GetBytes %d %q, Get %d %q",
+			bytesErr.Code, bytesErr.Status, decoded.Code, decoded.Status)
+	}
+	// Jira's message, not the response body it arrived in.
+	if bytesErr.Message != "Issue Does Not Exist" {
+		t.Errorf("message = %q, want Jira's own text rather than the raw body", bytesErr.Message)
 	}
 }
