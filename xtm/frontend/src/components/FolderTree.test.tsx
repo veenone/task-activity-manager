@@ -60,3 +60,40 @@ describe("FolderTree", () => {
     expect(screen.getByText("7")).toBeInTheDocument();
   });
 });
+
+describe("FolderTree keyboard", () => {
+  const tree = [
+    folder({ id: "1", parentId: "", name: "Regression" }),
+    folder({ id: "2", parentId: "1", name: "Login" }),
+  ];
+
+  it("selects a folder with Enter, as a click does", async () => {
+    const onSelect = vi.fn();
+    render(<FolderTree folders={tree} selected="" onSelect={onSelect} readOnly />);
+
+    screen.getByRole("treeitem", { name: /Regression/ }).focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(onSelect).toHaveBeenCalledWith("1");
+  });
+
+  it("collapses with ArrowLeft and expands with ArrowRight", async () => {
+    render(<FolderTree folders={tree} selected="" onSelect={() => {}} readOnly />);
+
+    screen.getByRole("treeitem", { name: /Regression/ }).focus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(screen.queryByText("Login")).toBeNull();
+
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getByText("Login")).toBeInTheDocument();
+  });
+
+  it("moves to the next visible folder with ArrowDown", async () => {
+    render(<FolderTree folders={tree} selected="" onSelect={() => {}} readOnly />);
+
+    screen.getByRole("treeitem", { name: /Regression/ }).focus();
+    await userEvent.keyboard("{ArrowDown}");
+
+    expect(document.activeElement).toHaveTextContent("Login");
+  });
+});

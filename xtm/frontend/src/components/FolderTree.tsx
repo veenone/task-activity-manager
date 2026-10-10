@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import type { KeyboardEvent } from "react";
+import { onActivateKey } from "@agile-suite/core";
 import type { Folder } from "../api";
 
 interface Props {
@@ -37,6 +39,22 @@ function FolderIcon({ open }: { open: boolean }) {
       )}
     </svg>
   );
+}
+
+// moveFocus implements the tree's Up, Down, Home and End keys over the items
+// currently drawn, so a collapsed branch is skipped without tracking state.
+function moveFocus(e: KeyboardEvent<HTMLElement>) {
+  const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+  if (step === undefined && e.key !== "Home" && e.key !== "End") return;
+  const items = Array.from(
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]'),
+  );
+  const at = items.indexOf(document.activeElement as HTMLElement);
+  if (at < 0) return;
+  e.preventDefault();
+  const next =
+    e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : at + (step ?? 0);
+  items[Math.max(0, Math.min(items.length - 1, next))].focus();
 }
 
 // folderCount renders the per-folder test count the way Xray's tree does: the
@@ -83,10 +101,14 @@ export function FolderTree({
   const allCount = totalTests ?? summed;
 
   return (
-    <nav className="folder-tree">
+    <div className="folder-tree" role="tree" aria-label="Folders" tabIndex={-1} onKeyDown={moveFocus}>
       <div
         className={"folder-item" + (selected === "" ? " folder-selected" : "")}
+        role="treeitem"
+        aria-selected={selected === ""}
+        tabIndex={selected === "" ? 0 : -1}
         onClick={() => onSelect("")}
+        onKeyDown={onActivateKey(() => onSelect(""))}
       >
         <span className="folder-caret" />
         <FolderIcon open={selected === ""} />
@@ -119,7 +141,7 @@ export function FolderTree({
           readOnly={readOnly}
         />
       ))}
-    </nav>
+    </div>
   );
 }
 
@@ -151,17 +173,40 @@ function FolderNode({
   const hasChildren = children.length > 0;
   const count = folderCount(folder);
   const isSelected = selected === folder.id;
+  const activate = onActivateKey(() => onSelect(folder.id));
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget && hasChildren) {
+      if (e.key === "ArrowLeft" && open) {
+        e.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (e.key === "ArrowRight" && !open) {
+        e.preventDefault();
+        setOpen(true);
+        return;
+      }
+    }
+    activate(e);
+  }
 
   return (
     <div className="folder-node">
       <div
         className={"folder-item" + (isSelected ? " folder-selected" : "")}
+        role="treeitem"
+        aria-selected={isSelected}
+        aria-expanded={hasChildren ? open : undefined}
+        tabIndex={isSelected ? 0 : -1}
         onClick={() => onSelect(folder.id)}
+        onKeyDown={onKeyDown}
         title={folder.name}
       >
         {hasChildren ? (
           <span
             className="folder-caret folder-caret-toggle"
+            role="presentation"
             onClick={(e) => {
               e.stopPropagation();
               setOpen((o) => !o);
@@ -223,7 +268,7 @@ function FolderNode({
         )}
       </div>
       {hasChildren && open && (
-        <div className="folder-children">
+        <div className="folder-children" role="group">
           {children.map((c) => (
             <FolderNode
               key={c.id}
