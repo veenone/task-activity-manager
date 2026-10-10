@@ -41,6 +41,7 @@
   --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
   --ghost-hover: rgba(0, 0, 0, 0.08);
   --on-accent: #fff;
+  --font-mono: ui-monospace, "Consolas", "SF Mono", "Menlo", monospace;
   /* The instrument chrome: the band the view tabs sit in and the detail
      panel's head, with the raised fill, borders and text that ride on them.
      It is the same dark blue in both themes, the way XTM's topbar is, so the

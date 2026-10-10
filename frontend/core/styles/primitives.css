@@ -611,7 +611,7 @@
   cursor: pointer;
 }
 .profiles-list-row:hover {
-  background: var(--hover-bg, rgba(127, 127, 127, 0.12));
+  background: var(--ghost-hover);
 }
 .profiles-list-row-selected,
 .profiles-list-row-selected:hover {
