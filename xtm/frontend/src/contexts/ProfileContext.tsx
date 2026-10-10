@@ -34,6 +34,9 @@ interface ProfileApi {
   defaultProfileId: string;
   theme: string;
   showCoverage: boolean;
+  // showNavRail is the left navigation rail's visibility, shared with TAM
+  // through core settings and toggled from the View menu (#171).
+  showNavRail: boolean;
   loadingProfiles: boolean;
   activeProfile: Profile | undefined;
   // Transitional raw setters — composite handlers in App still drive these.
@@ -41,6 +44,7 @@ interface ProfileApi {
   setActiveId: Dispatch<SetStateAction<string>>;
   setDefaultProfileId: Dispatch<SetStateAction<string>>;
   setShowCoverage: Dispatch<SetStateAction<boolean>>;
+  setShowNavRail: Dispatch<SetStateAction<boolean>>;
   // Self-contained persistence actions.
   setTheme: (next: string) => Promise<void>;
   setDefault: (id: string) => Promise<void>;
@@ -67,6 +71,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<string>("light");
   // The Coverage module is opt-in; its top-nav tab is hidden until enabled.
   const [showCoverage, setShowCoverage] = useState(false);
+  const [showNavRail, setShowNavRail] = useState(false);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
 
   // setTheme applies + persists a colour-theme preference (FR-12.2).
@@ -105,6 +110,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setThemeState(t);
       applyTheme(t);
       setShowCoverage(!!s.showCoverage);
+      setShowNavRail(!!s.showNavRail);
       if (ps.length > 0) {
         const def =
           s.defaultProfileId && ps.some((p) => p.id === s.defaultProfileId)
@@ -133,12 +139,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       defaultProfileId,
       theme,
       showCoverage,
+      showNavRail,
       loadingProfiles,
       activeProfile,
       setProfiles,
       setActiveId,
       setDefaultProfileId,
       setShowCoverage,
+      setShowNavRail,
       setTheme,
       setDefault,
       reloadProfiles,
@@ -149,6 +157,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       defaultProfileId,
       theme,
       showCoverage,
+      showNavRail,
       loadingProfiles,
       activeProfile,
       setTheme,

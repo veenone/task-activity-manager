@@ -94,6 +94,75 @@
   flex-direction: column;
   height: 100%;
 }
+/* The navigation rail, optional and off by default, toggled from the View
+   menu and with Ctrl+B. Its rules mirror TAM's so the two apps' rails look
+   the same; the setting behind them is one shared field (issue 171). */
+.app-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+.nav-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 8px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  /* The rail scrolls on its own if it ever outgrows a short window, rather
+     than stretching .app-body past the viewport. */
+  flex: none;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* The rail is optional, so it says what it is and offers its own way out: a
+   panel opened from a menu should be closable where it is. */
+.nav-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 6px 6px 14px;
+}
+.nav-rail-head .nav-section {
+  padding: 0;
+}
+.nav-rail-hide {
+  padding: 2px 6px;
+  line-height: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.nav-rail-hide:hover:not(:disabled) {
+  color: var(--text);
+}
+.nav-section {
+  padding: 0 14px 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.nav-item {
+  text-align: left;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.nav-item:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+/* The selected row reads like the selected tab, which is the same treatment
+   under a different shape. */
+.nav-item-active {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
 :root[data-theme="dark"] .app {
   background: var(--surface-2);
 }

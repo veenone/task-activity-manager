@@ -12,6 +12,7 @@ import {
   ImportProfile,
   UpdateProfileToken,
   SetShowCoverage,
+  SetNavRailVisible,
   SetTourSeenVersion,
   ResolveConflictOverride,
   ResolveConflictKeepRemote,
@@ -50,7 +51,11 @@ import { ContainerList } from "./components/ContainerList";
 import { ComponentList } from "./components/ComponentList";
 import { PendingChangesModal } from "./components/PendingChangesModal";
 import { BulkReviewModal } from "./components/BulkReviewModal";
-import { REVIEW_ENABLED, invalidateCapabilities, useCapabilities } from "./features";
+import {
+  REVIEW_ENABLED,
+  invalidateCapabilities,
+  useCapabilities,
+} from "./features";
 import { clearViewState } from "./lib/viewState";
 import { useProfile } from "./contexts/ProfileContext";
 import { useSync } from "./contexts/SyncContext";
@@ -79,6 +84,7 @@ import { Dashboard } from "./components/Dashboard";
 import { TraceabilityTabs } from "./components/TraceabilityTabs";
 import { ContainersView } from "./components/ContainersView";
 import { ComponentsView } from "./components/components-admin/ComponentsView";
+import { visibleViews } from "./views";
 import { PreconditionsView } from "./components/PreconditionsView";
 import { RequirementsView } from "./components/RequirementsView";
 import { CoverageView } from "./components/CoverageView";
@@ -114,6 +120,8 @@ function App() {
     theme,
     showCoverage,
     setShowCoverage,
+    showNavRail: navRail,
+    setShowNavRail: setNavRail,
     loadingProfiles,
     activeProfile,
     setTheme: chooseTheme,
@@ -193,7 +201,6 @@ function App() {
     null,
   );
 
-
   // The onboarding tour (-335). Steps target Browse-only elements and the tour
   // can be replayed from any view, so it switches to Browse before starting.
   const { start: startTour } = useTour({
@@ -218,7 +225,9 @@ function App() {
     const startX = e.clientX;
     const startW = sidebarWidth;
     const onMove = (ev: MouseEvent) =>
-      setSidebarWidth(Math.min(640, Math.max(160, startW + ev.clientX - startX)));
+      setSidebarWidth(
+        Math.min(640, Math.max(160, startW + ev.clientX - startX)),
+      );
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -385,7 +394,9 @@ function App() {
   async function createFolder(parentPath: string) {
     if (!activeId) return;
     const name = await prompt({
-      title: parentPath ? `New subfolder under ${parentPath}` : "New top-level folder",
+      title: parentPath
+        ? `New subfolder under ${parentPath}`
+        : "New top-level folder",
       placeholder: "Folder name",
       submitLabel: "Create",
     });
@@ -395,7 +406,11 @@ function App() {
       refreshProfileData();
       reloadPending();
     } catch (e) {
-      await notice({ title: "Create folder failed", message: errMsg(e), tone: "error" });
+      await notice({
+        title: "Create folder failed",
+        message: errMsg(e),
+        tone: "error",
+      });
     }
   }
 
@@ -415,20 +430,36 @@ function App() {
       refreshProfileData();
       reloadPending();
     } catch (e) {
-      await notice({ title: "Rename failed", message: errMsg(e), tone: "error" });
+      await notice({
+        title: "Rename failed",
+        message: errMsg(e),
+        tone: "error",
+      });
     }
   }
 
   async function deleteFolder(path: string) {
     if (!activeId) return;
-    if (!(await confirm({ title: "Delete folder", message: `Delete folder "${path}"? It must be empty.`, confirmLabel: "Delete", danger: true }))) return;
+    if (
+      !(await confirm({
+        title: "Delete folder",
+        message: `Delete folder "${path}"? It must be empty.`,
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     try {
       await DeleteFolder(activeId, path);
       if (selectedFolder === path) setSelectedFolder("");
       refreshProfileData();
       reloadPending();
     } catch (e) {
-      await notice({ title: "Delete failed", message: errMsg(e), tone: "error" });
+      await notice({
+        title: "Delete failed",
+        message: errMsg(e),
+        tone: "error",
+      });
     }
   }
 
@@ -465,7 +496,8 @@ function App() {
       // Start the tour on the FIRST successful sync rather than at launch:
       // before a sync the grid is empty, so half the steps would spotlight
       // elements with no data behind them and teach nothing (-335).
-      if (tourSeenVersion < TOUR_VERSION) startTour("browse", () => setView("browse"));
+      if (tourSeenVersion < TOUR_VERSION)
+        startTour("browse", () => setView("browse"));
     } catch (e) {
       failSync(errMsg(e));
     } finally {
@@ -542,8 +574,14 @@ function App() {
     const unsubs = Object.keys(menuActions.current).map((event) =>
       EventsOn(event, () => menuActions.current[event]?.()),
     );
+    // Subscribed on its own because it carries the new state: the menu
+    // checkbox is the source of truth for the rail, not a toggle of whatever
+    // the frontend last had.
+    unsubs.push(
+      EventsOn("menu:nav-rail", (visible: boolean) => setNavRail(visible)),
+    );
     return () => unsubs.forEach((u) => u && u());
-  }, []);
+  }, [setNavRail]);
 
   // toggleCoverage shows/hides the opt-in Coverage tab and persists it. Leaving
   // the Coverage view when hiding so a hidden view isn't left on screen.
@@ -566,7 +604,11 @@ function App() {
       const path = await ExportProfile(id);
       if (path) await notice({ title: "Profile exported", message: path });
     } catch (e) {
-      await notice({ title: "Export failed", message: errMsg(e), tone: "error" });
+      await notice({
+        title: "Export failed",
+        message: errMsg(e),
+        tone: "error",
+      });
     }
   }
 
@@ -591,7 +633,11 @@ function App() {
       }
       return p;
     } catch (e) {
-      await notice({ title: "Import failed", message: errMsg(e), tone: "error" });
+      await notice({
+        title: "Import failed",
+        message: errMsg(e),
+        tone: "error",
+      });
       return null;
     }
   }
@@ -605,7 +651,11 @@ function App() {
     try {
       await DeleteProfile(id);
     } catch (e) {
-      await notice({ title: "Delete failed", message: errMsg(e), tone: "error" });
+      await notice({
+        title: "Delete failed",
+        message: errMsg(e),
+        tone: "error",
+      });
       return;
     }
     const remaining = profiles.filter((p) => p.id !== id);
@@ -615,7 +665,7 @@ function App() {
       const next =
         defaultProfileId && defaultProfileId !== id
           ? defaultProfileId
-          : remaining[0]?.id ?? "";
+          : (remaining[0]?.id ?? "");
       setActiveId(next);
       setSelectedKey(null);
       refreshProfileData();
@@ -792,7 +842,10 @@ function App() {
 
   // resolveConflictOverride re-bases a conflicting Test onto the remote version
   // (keep mine) and immediately re-commits so the override takes effect.
-  async function resolveConflictOverride(testKey: string, remoteVersion: string) {
+  async function resolveConflictOverride(
+    testKey: string,
+    remoteVersion: string,
+  ) {
     if (!activeId) return;
     try {
       await ResolveConflictOverride(activeId, testKey, remoteVersion);
@@ -883,6 +936,19 @@ function App() {
   // actually supports (Kiwi, etc.) — defaultCapabilities (all true) while
   // loading, so an Xray profile is never affected (P6.2a).
   const caps = useCapabilities(activeId);
+
+  // The tab bar and the navigation rail render this same list, so a view can
+  // never appear in one and not the other (#171).
+  const shownViews = useMemo(
+    () =>
+      visibleViews({
+        supportsPreconditionObjects: caps.supportsPreconditionObjects,
+        supportsRequirementObjects: caps.supportsRequirementObjects,
+        supportsComponentAdmin: caps.supportsComponentAdmin,
+        showCoverage,
+      }),
+    [caps, showCoverage],
+  );
 
   // A sync is in flight when the main Sync is running (syncing) OR any partial
   // per-view refresh is emitting progress. Both a full pull and a partial sync
@@ -983,7 +1049,8 @@ function App() {
                 key: "profiles",
                 label: "Manage Profiles…",
                 onClick: () => openModal("profiles"),
-                title: "Manage profiles: add, edit, set default, export, or delete",
+                title:
+                  "Manage profiles: add, edit, set default, export, or delete",
               },
               {
                 key: "connections",
@@ -1005,98 +1072,16 @@ function App() {
         </div>
 
         <nav data-tour="views" className="view-tabs topbar-zone topbar-center">
-          <button
-            data-tour="tab-browse"
-            className={`view-tab${view === "browse" ? " view-tab-active" : ""}`}
-            onClick={() => setView("browse")}
-          >
-            Browse
-          </button>
-          {caps.supportsPreconditionObjects && (
+          {shownViews.map((v) => (
             <button
-              data-tour="tab-preconditions"
-              className={`view-tab${view === "preconditions" ? " view-tab-active" : ""}`}
-              onClick={() => setView("preconditions")}
+              key={v.id}
+              data-tour={v.tour}
+              className={`view-tab${view === v.id ? " view-tab-active" : ""}`}
+              onClick={() => setView(v.id)}
             >
-              Preconditions
+              {v.label}
             </button>
-          )}
-          {caps.supportsRequirementObjects && (
-            <button
-              data-tour="tab-requirements"
-              className={`view-tab${view === "requirements" ? " view-tab-active" : ""}`}
-              onClick={() => setView("requirements")}
-            >
-              Requirements
-            </button>
-          )}
-          <button
-            data-tour="tab-duplicates"
-            className={`view-tab${view === "duplicates" ? " view-tab-active" : ""}`}
-            onClick={() => setView("duplicates")}
-          >
-            Duplicates
-          </button>
-          <button
-            data-tour="tab-gapanalysis"
-            className={`view-tab${view === "gapanalysis" ? " view-tab-active" : ""}`}
-            onClick={() => setView("gapanalysis")}
-          >
-            Gap Analysis
-          </button>
-          <button
-            data-tour="tab-testcalls"
-            className={`view-tab${view === "testcalls" ? " view-tab-active" : ""}`}
-            onClick={() => setView("testcalls")}
-          >
-            Test Calls
-          </button>
-          <button
-            data-tour="tab-dashboard"
-            className={`view-tab${view === "dashboard" ? " view-tab-active" : ""}`}
-            onClick={() => setView("dashboard")}
-          >
-            Dashboard
-          </button>
-          <button
-            data-tour="tab-traceability"
-            className={`view-tab${view === "traceability" ? " view-tab-active" : ""}`}
-            onClick={() => setView("traceability")}
-          >
-            Traceability
-          </button>
-          <button
-            data-tour="tab-plans"
-            className={`view-tab${view === "plans" ? " view-tab-active" : ""}`}
-            onClick={() => setView("plans")}
-          >
-            Containers
-          </button>
-          {caps.supportsComponentAdmin && (
-            <button
-              data-tour="tab-components"
-              className={`view-tab${view === "components" ? " view-tab-active" : ""}`}
-              onClick={() => setView("components")}
-            >
-              Components
-            </button>
-          )}
-          {showCoverage && (
-            <button
-              data-tour="tab-coverage"
-              className={`view-tab${view === "coverage" ? " view-tab-active" : ""}`}
-              onClick={() => setView("coverage")}
-            >
-              Coverage
-            </button>
-          )}
-          <button
-            data-tour="tab-misspellings"
-            className={`view-tab${view === "misspellings" ? " view-tab-active" : ""}`}
-            onClick={() => setView("misspellings")}
-          >
-            Spellcheck
-          </button>
+          ))}
         </nav>
 
         <div data-tour="pending" className="topbar-zone topbar-right">
@@ -1290,244 +1275,274 @@ function App() {
         </div>
       )}
 
-      {view === "preconditions" && caps.supportsPreconditionObjects ? (
-        <main className="content content-preconditions">
-          <PreconditionsView
-            jiraUrl={activeProfile?.jiraUrl ?? ""}
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "requirements" && caps.supportsRequirementObjects ? (
-        <main className="content content-requirements">
-          <RequirementsView
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "duplicates" ? (
-        <main className="content content-dashboard">
-          <DuplicatesView
-            folders={folders}
-            pendingByTestKey={pendingByTestKey}
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "gapanalysis" ? (
-        <main className="content content-gapanalysis">
-          <GapAnalysisView
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "testcalls" ? (
-        <main className="content content-dashboard">
-          <TestCallsView
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "dashboard" ? (
-        <main className="content content-dashboard">
-          <Dashboard onOpenDuplicates={() => setView("duplicates")} />
-        </main>
-      ) : view === "traceability" ? (
-        <main className="content content-dashboard">
-          <TraceabilityTabs
-            jiraUrl={activeProfile?.jiraUrl ?? ""}
-          />
-        </main>
-      ) : view === "plans" ? (
-        <main className="content content-containers">
-          <ContainersView
-            isDemo={isDemo}
-            jiraUrl={activeProfile?.jiraUrl ?? ""}
-            onOpenTest={(k) => {
-              setSelectedKey(k);
-              setView("browse");
-            }}
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "components" && caps.supportsComponentAdmin ? (
-        <main className="content content-components">
-          <ComponentsView
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "coverage" ? (
-        <main className="content content-coverage">
-          <CoverageView
-            isDemo={isDemo}
-            demoVariant={demoVar}
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : view === "misspellings" ? (
-        <main className="content">
-          <MisspellingsView
-            onChanged={() => {
-              refreshProfileData();
-              reloadPending();
-            }}
-          />
-        </main>
-      ) : (
-        <main className="content">
-          <div className="browse-sidebar" style={{ width: sidebarWidth }}>
-            <select
-              className="groupby-select"
-              value={groupBy}
-              onChange={(e) => {
-                setGroupBy(
-                  e.target.value as
-                    | "folder"
-                    | "testset"
-                    | "testplan"
-                    | "component",
-                );
-                setSelectedFolder("");
-                setSelectedKey(null);
+      <div className="app-body">
+        {navRail && (
+          <nav className="nav-rail" aria-label="Navigation rail">
+            <div className="nav-rail-head">
+              <span className="nav-section">Views</span>
+              <button
+                type="button"
+                className="btn btn-ghost nav-rail-hide"
+                title="Hide the navigation rail (View menu, Ctrl+B)"
+                aria-label="Hide the navigation rail"
+                onClick={() => {
+                  setNavRail(false);
+                  // Persisting through the bound method rebuilds the native
+                  // menu, so the View menu's tick follows a rail hidden from
+                  // here rather than going stale.
+                  void SetNavRailVisible(false).catch(() => {});
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            {shownViews.map((v) => (
+              <button
+                key={v.id}
+                className={`nav-item${v.id === view ? " nav-item-active" : ""}`}
+                aria-current={v.id === view ? "page" : undefined}
+                onClick={() => setView(v.id)}
+              >
+                {v.label}
+              </button>
+            ))}
+          </nav>
+        )}
+
+        {view === "preconditions" && caps.supportsPreconditionObjects ? (
+          <main className="content content-preconditions">
+            <PreconditionsView
+              jiraUrl={activeProfile?.jiraUrl ?? ""}
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
               }}
-            >
-              {caps.supportsFolders && (
-                <option value="folder">Group by: Folder</option>
-              )}
-              <option value="testset">Group by: Test Set</option>
-              <option value="testplan">Group by: Test Plan</option>
-              <option value="component">Group by: Component</option>
-            </select>
-            {groupBy === "component" ? (
-              <ComponentList
-                components={components}
-                selected={selectedComponent}
-                emptyLabel="No components synced."
-                onSelect={(name) => {
-                  setSelectedComponent(name);
-                  setSelectedKey(null);
-                }}
-              />
-            ) : groupBy === "folder" ? (
-              !caps.supportsFolders ? (
-                <div className="browse-sidebar-empty">
-                  <p className="muted">
-                    Folders are not supported by this backend.
-                  </p>
-                </div>
-              ) : (
-                // The tree is rendered even with nothing in it. Xray reports no
-                // folders for a repository whose tests were never filed into
-                // one, and replacing the tree with "No folders synced." left
-                // those tests with no "All tests" row to reach them through.
-                <>
-                  <FolderTree
-                    folders={folders}
-                    selected={selectedFolder}
-                    onSelect={(id) => {
-                      setSelectedFolder(id);
-                      setSelectedKey(null);
-                    }}
-                    onCreate={createFolder}
-                    onRename={renameFolder}
-                    onDelete={deleteFolder}
-                    onNewTest={(folderId) => openNewTest(folderId)}
-                    totalTests={syncState?.testCount}
-                    // Kiwi reports categories as folders but cannot reshape
-                    // them, so the create/rename/delete actions are hidden
-                    // rather than offered and then failing.
-                    readOnly={!caps.supportsFolderWrites}
-                  />
-                  {folders.length === 0 && (
-                    <div className="browse-sidebar-empty">
-                      <p className="muted">No folders synced.</p>
-                      {caps.supportsFolderWrites && (
-                        <button
-                          className="link-btn"
-                          onClick={() => createFolder("")}
-                        >
-                          ＋ New folder
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </>
-              )
-            ) : (
-              <ContainerList
-                containers={groupContainers}
-                selected={selectedContainer}
-                emptyLabel={
-                  groupBy === "testset"
-                    ? "No Test Sets synced."
-                    : "No Test Plans synced."
-                }
-                onSelect={(key) => {
-                  setSelectedContainer(key);
-                  setSelectedKey(null);
-                }}
-              />
-            )}
-          </div>
-          <div
-            className="sidebar-resizer"
-            onMouseDown={startSidebarResize}
-            title="Drag to resize the sidebar"
-          />
-          <TestTable
-            folderId={groupBy === "folder" ? selectedFolder : ""}
-            containerKey={
-              groupBy === "testset" || groupBy === "testplan"
-                ? selectedContainer
-                : ""
-            }
-            component={groupBy === "component" ? selectedComponent : ""}
-            pendingByTestKey={pendingByTestKey}
-            onSync={syncTests}
-            syncing={pulling}
-          />
-          {showNewTest ? (
-            <NewTestPanel
-              folders={folders}
-              initialFolderId={newTestFolder}
-              onCreated={handleTestCreated}
-              onCancel={() => setShowNewTest(false)}
             />
-          ) : (
-            selectedKey && (
-              <TestDetail
-                testKey={selectedKey}
-                version={detailVersion}
-                pendingForTest={pendingByTestKey.get(selectedKey) ?? []}
+          </main>
+        ) : view === "requirements" && caps.supportsRequirementObjects ? (
+          <main className="content content-requirements">
+            <RequirementsView
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : view === "duplicates" ? (
+          <main className="content content-dashboard">
+            <DuplicatesView
+              folders={folders}
+              pendingByTestKey={pendingByTestKey}
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : view === "gapanalysis" ? (
+          <main className="content content-gapanalysis">
+            <GapAnalysisView
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : view === "testcalls" ? (
+          <main className="content content-dashboard">
+            <TestCallsView
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : view === "dashboard" ? (
+          <main className="content content-dashboard">
+            <Dashboard onOpenDuplicates={() => setView("duplicates")} />
+          </main>
+        ) : view === "traceability" ? (
+          <main className="content content-dashboard">
+            <TraceabilityTabs jiraUrl={activeProfile?.jiraUrl ?? ""} />
+          </main>
+        ) : view === "plans" ? (
+          <main className="content content-containers">
+            <ContainersView
+              isDemo={isDemo}
+              jiraUrl={activeProfile?.jiraUrl ?? ""}
+              onOpenTest={(k) => {
+                setSelectedKey(k);
+                setView("browse");
+              }}
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : view === "components" && caps.supportsComponentAdmin ? (
+          <main className="content content-components">
+            <ComponentsView
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : view === "coverage" ? (
+          <main className="content content-coverage">
+            <CoverageView
+              isDemo={isDemo}
+              demoVariant={demoVar}
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : view === "misspellings" ? (
+          <main className="content">
+            <MisspellingsView
+              onChanged={() => {
+                refreshProfileData();
+                reloadPending();
+              }}
+            />
+          </main>
+        ) : (
+          <main className="content">
+            <div className="browse-sidebar" style={{ width: sidebarWidth }}>
+              <select
+                className="groupby-select"
+                value={groupBy}
+                onChange={(e) => {
+                  setGroupBy(
+                    e.target.value as
+                      "folder" | "testset" | "testplan" | "component",
+                  );
+                  setSelectedFolder("");
+                  setSelectedKey(null);
+                }}
+              >
+                {caps.supportsFolders && (
+                  <option value="folder">Group by: Folder</option>
+                )}
+                <option value="testset">Group by: Test Set</option>
+                <option value="testplan">Group by: Test Plan</option>
+                <option value="component">Group by: Component</option>
+              </select>
+              {groupBy === "component" ? (
+                <ComponentList
+                  components={components}
+                  selected={selectedComponent}
+                  emptyLabel="No components synced."
+                  onSelect={(name) => {
+                    setSelectedComponent(name);
+                    setSelectedKey(null);
+                  }}
+                />
+              ) : groupBy === "folder" ? (
+                !caps.supportsFolders ? (
+                  <div className="browse-sidebar-empty">
+                    <p className="muted">
+                      Folders are not supported by this backend.
+                    </p>
+                  </div>
+                ) : (
+                  // The tree is rendered even with nothing in it. Xray reports no
+                  // folders for a repository whose tests were never filed into
+                  // one, and replacing the tree with "No folders synced." left
+                  // those tests with no "All tests" row to reach them through.
+                  <>
+                    <FolderTree
+                      folders={folders}
+                      selected={selectedFolder}
+                      onSelect={(id) => {
+                        setSelectedFolder(id);
+                        setSelectedKey(null);
+                      }}
+                      onCreate={createFolder}
+                      onRename={renameFolder}
+                      onDelete={deleteFolder}
+                      onNewTest={(folderId) => openNewTest(folderId)}
+                      totalTests={syncState?.testCount}
+                      // Kiwi reports categories as folders but cannot reshape
+                      // them, so the create/rename/delete actions are hidden
+                      // rather than offered and then failing.
+                      readOnly={!caps.supportsFolderWrites}
+                    />
+                    {folders.length === 0 && (
+                      <div className="browse-sidebar-empty">
+                        <p className="muted">No folders synced.</p>
+                        {caps.supportsFolderWrites && (
+                          <button
+                            className="link-btn"
+                            onClick={() => createFolder("")}
+                          >
+                            ＋ New folder
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )
+              ) : (
+                <ContainerList
+                  containers={groupContainers}
+                  selected={selectedContainer}
+                  emptyLabel={
+                    groupBy === "testset"
+                      ? "No Test Sets synced."
+                      : "No Test Plans synced."
+                  }
+                  onSelect={(key) => {
+                    setSelectedContainer(key);
+                    setSelectedKey(null);
+                  }}
+                />
+              )}
+            </div>
+            <div
+              className="sidebar-resizer"
+              onMouseDown={startSidebarResize}
+              title="Drag to resize the sidebar"
+            />
+            <TestTable
+              folderId={groupBy === "folder" ? selectedFolder : ""}
+              containerKey={
+                groupBy === "testset" || groupBy === "testplan"
+                  ? selectedContainer
+                  : ""
+              }
+              component={groupBy === "component" ? selectedComponent : ""}
+              pendingByTestKey={pendingByTestKey}
+              onSync={syncTests}
+              syncing={pulling}
+            />
+            {showNewTest ? (
+              <NewTestPanel
                 folders={folders}
-                jiraUrl={activeProfile?.jiraUrl ?? ""}
-                onClose={() => setSelectedKey(null)}
-                onEdited={handleEdited}
-                onCloned={handleTestCreated}
+                initialFolderId={newTestFolder}
+                onCreated={handleTestCreated}
+                onCancel={() => setShowNewTest(false)}
               />
-            )
-          )}
-        </main>
-      )}
+            ) : (
+              selectedKey && (
+                <TestDetail
+                  testKey={selectedKey}
+                  version={detailVersion}
+                  pendingForTest={pendingByTestKey.get(selectedKey) ?? []}
+                  folders={folders}
+                  jiraUrl={activeProfile?.jiraUrl ?? ""}
+                  onClose={() => setSelectedKey(null)}
+                  onEdited={handleEdited}
+                  onCloned={handleTestCreated}
+                />
+              )
+            )}
+          </main>
+        )}
+      </div>
 
       {isOpen("form") && (
         <Modal
@@ -1538,15 +1553,15 @@ function App() {
           className="modal"
           label="Profile"
         >
-            <ProfileForm
-              profile={editingProfile ?? undefined}
-              profiles={profiles}
-              onCreated={handleCreated}
-              onCancel={() => {
-                closeModal();
-                setEditingProfile(null);
-              }}
-            />
+          <ProfileForm
+            profile={editingProfile ?? undefined}
+            profiles={profiles}
+            onCreated={handleCreated}
+            onCancel={() => {
+              closeModal();
+              setEditingProfile(null);
+            }}
+          />
         </Modal>
       )}
 
@@ -1565,10 +1580,7 @@ function App() {
       )}
 
       {isOpen("connections") && activeId && (
-        <ConnectionsModal
-          activeId={activeId}
-          onClose={() => closeModal()}
-        />
+        <ConnectionsModal activeId={activeId} onClose={() => closeModal()} />
       )}
 
       {isOpen("bridge") && activeId && (
@@ -1672,9 +1684,7 @@ function App() {
       )}
 
       {isOpen("syncHistory") && (
-        <SyncHistoryModal
-          onClose={() => closeModal()}
-        />
+        <SyncHistoryModal onClose={() => closeModal()} />
       )}
 
       {isOpen("import") && (

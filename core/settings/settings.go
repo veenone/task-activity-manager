@@ -41,10 +41,11 @@ type Settings struct {
 	// than a bool lets a later release re-offer a rewritten tour by bumping
 	// the frontend's TOUR_VERSION constant.
 	TourSeenVersion int `json:"tourSeenVersion"`
-	// ShowNavRail reveals TAM's left navigation rail. Views are switched from
-	// the View menu, so the rail is a second, optional way to do the same
-	// thing and stays hidden until asked for; the zero value is that default.
-	// XTM does not render a rail and ignores this.
+	// ShowNavRail reveals the left navigation rail. Views are switched from
+	// the View menu and the tab bar, so the rail is a second, optional way to
+	// do the same thing and stays hidden until asked for; the zero value is
+	// that default. Both apps render one and share this field, so turning the
+	// rail on in one turns it on in the other.
 	ShowNavRail bool `json:"showNavRail"`
 	// ReportExportDir is the folder TAM's export save dialog starts in.
 	// Empty means the app data directory, which is where exports went before

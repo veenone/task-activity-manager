@@ -1131,6 +1131,58 @@ func (a *App) SetShowCoverage(show bool) error {
 	return a.settings.SetShowCoverage(show)
 }
 
+// showNavRail reads the stored rail preference for the menu checkbox's tick.
+// A missing store or a read failure reads as off rather than failing the menu
+// build: a menu that will not open is worse than a rail that starts hidden.
+func (a *App) showNavRail() bool {
+	if a.settings == nil {
+		return false
+	}
+	s, err := a.settings.Get()
+	if err != nil {
+		return false
+	}
+	return s.ShowNavRail
+}
+
+// setShowNavRail stores the preference and tells the frontend, which is how
+// the menu checkbox moves the rail.
+func (a *App) setShowNavRail(v bool) {
+	if a.settings != nil {
+		if err := a.settings.SetShowNavRail(v); err != nil {
+			log.Printf("xtm: save nav rail preference: %v", err)
+		}
+	}
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "menu:nav-rail", v)
+	}
+}
+
+// SetNavRailVisible is the frontend's way to store the preference, used when
+// the rail is hidden from its own button rather than from the menu. It
+// rebuilds the menu so the checkbox's tick follows (#171).
+func (a *App) SetNavRailVisible(v bool) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	if err := a.settings.SetShowNavRail(v); err != nil {
+		return err
+	}
+	a.refreshMenu()
+	return nil
+}
+
+// refreshMenu rebuilds the native menu from the current settings. Wails
+// renders a checkbox's tick from the value the item was built with, so a
+// preference change has to rebuild rather than mutate.
+func (a *App) refreshMenu() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.MenuSetApplicationMenu(a.ctx, appMenu(a))
+	runtime.MenuUpdateApplicationMenu(a.ctx)
+}
+
 // SetTourSeenVersion records that the user has completed or skipped the
 // onboarding tour at the given version (RND_P_4TFINT_05-335).
 func (a *App) SetTourSeenVersion(v int) error {
