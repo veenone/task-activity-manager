@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -132,12 +133,14 @@ function NoticeModal({
   tone = "info",
   onClose,
 }: NoticeOptions & { onClose: () => void }) {
+  const okRef = useRef<HTMLButtonElement>(null);
   return (
     <Modal
       onClose={onClose}
       className="modal confirm-modal"
       role="alertdialog"
       labelledBy="notice-title"
+      initialFocus={okRef}
     >
       <div className="pending-head">
         <h2 id="notice-title">{title}</h2>
@@ -158,7 +161,7 @@ function NoticeModal({
         </div>
       )}
       <div className="pending-actions">
-        <button className="btn btn-primary" onClick={onClose} autoFocus>
+        <button ref={okRef} className="btn btn-primary" onClick={onClose}>
           OK
         </button>
       </div>
@@ -178,9 +181,11 @@ function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
   return (
     <Modal
       onClose={onCancel}
+      initialFocus={cancelRef}
       className="modal confirm-modal"
       role="alertdialog"
       labelledBy="confirm-title"
@@ -198,7 +203,7 @@ function ConfirmModal({
       </div>
       {message && <div className="bulk-body confirm-message">{message}</div>}
       <div className="pending-actions">
-        <button className="btn" onClick={onCancel} autoFocus>
+        <button ref={cancelRef} className="btn" onClick={onCancel}>
           {cancelLabel ?? "Cancel"}
         </button>
         <button
@@ -225,9 +230,11 @@ function PromptModal({
   onCancel: () => void;
 }) {
   const [value, setValue] = useState(defaultValue ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <Modal
       onClose={onCancel}
+      initialFocus={inputRef}
       className="modal prompt-modal"
       labelledBy="prompt-modal-title"
     >
@@ -239,8 +246,8 @@ function PromptModal({
       </div>
       <div className="bulk-body">
         <input
+          ref={inputRef}
           className="detail-input"
-          autoFocus
           type={password ? "password" : "text"}
           value={value}
           placeholder={placeholder}
