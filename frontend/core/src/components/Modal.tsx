@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { KeyboardEvent, ReactNode, RefObject } from "react";
 
 // Modal is the shared dialog primitive (audit X1/X2/X3). Every dialog in the app
 // used to hand-roll its own `.modal-overlay` + `.modal` pair, which meant none of
@@ -14,6 +14,11 @@ import type { KeyboardEvent, ReactNode } from "react";
 // with
 //   <Modal onClose={close} className="modal X" labelledBy={titleId}> … </Modal>
 // and give the dialog's <h2> an id matching `labelledBy`.
+//
+// Initial focus belongs to the dialog, not to an `autoFocus` attribute on a
+// child: pass a ref to the control that should take focus as `initialFocus`.
+// Without it, or while the ref is still empty, the first focusable control
+// takes focus, and the dialog itself when there is none.
 
 interface ModalProps {
   onClose: () => void;
@@ -28,6 +33,8 @@ interface ModalProps {
   overlayClassName?: string;
   closeOnOverlayClick?: boolean;
   closeOnEsc?: boolean;
+  // The control to focus when the dialog opens. Read once, after mount.
+  initialFocus?: RefObject<HTMLElement | null>;
 }
 
 // Elements that can receive keyboard focus, for the Tab trap and initial focus.
@@ -46,18 +53,24 @@ export function Modal({
   overlayClassName = "modal-overlay",
   closeOnOverlayClick = true,
   closeOnEsc = true,
+  initialFocus,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   // The element focused before the dialog opened, restored on unmount so the
   // user lands back where they were instead of at the top of the page.
   const restoreRef = useRef<HTMLElement | null>(null);
+  // Initial focus is decided once, at mount; a caller passing a different ref
+  // later must not pull focus away from wherever the user has moved it.
+  const initialFocusAtMount = useRef(initialFocus);
 
   useEffect(() => {
     restoreRef.current = document.activeElement as HTMLElement | null;
     const node = dialogRef.current;
     if (node) {
-      const first = node.querySelector<HTMLElement>(FOCUSABLE);
-      (first ?? node).focus();
+      const target =
+        initialFocusAtMount.current?.current ??
+        node.querySelector<HTMLElement>(FOCUSABLE);
+      (target ?? node).focus();
     }
     return () => {
       // Guard: the trigger may have unmounted while the dialog was open.
