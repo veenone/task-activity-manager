@@ -44,6 +44,15 @@ Path: plain text in the component that renders it.
 Never: an em dash in a user-visible string.
 Gate: the ratchet holds ui_em_dashes; comments and docs are exempt.
 
+### Colour and type in CSS
+Owns: the colours and font sizes a stylesheet sets.
+Path: the tokens in `frontend/core/styles/tokens.css`, through `var(--token)`.
+Never: a hex colour or a `px` font size written into a rule. A colour that is
+not a token cannot follow the theme, and one of the two themes will be wrong.
+Gate: the ratchet holds hardcoded_hex and hardcoded_px_font. Both strip CSS
+comments before counting, so an issue reference like `(#170)` is not read as a
+colour; it was, six times, before anyone noticed.
+
 ### Modals
 Owns: dialogs, overlays, and their stacking against the app chrome.
 Path: the primitives in `frontend/core/src/components/Modal.tsx` and the `useConfirm`, `usePrompt`, `useNotice` hooks beside it.
