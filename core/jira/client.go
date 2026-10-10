@@ -164,64 +164,6 @@ func (c *Client) Myself(ctx context.Context) (User, error) {
 	return u, nil
 }
 
-// Get performs an authenticated GET and decodes a JSON response into out. Any
-// status other than 200 becomes an *HTTPError carrying Jira's message.
-func (c *Client) Get(ctx context.Context, path string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		msg := jiraErrorMessage(body)
-		return &HTTPError{Method: http.MethodGet, Path: path, Code: resp.StatusCode, Status: resp.Status, Message: msg}
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
-}
-
-// GetBytes performs an authenticated GET and returns the raw body, for
-// responses whose shape has to be sniffed before decoding.
-func (c *Client) GetBytes(ctx context.Context, path string) ([]byte, error) {
-	body, _, err := c.GetBytesStatus(ctx, path)
-	return body, err
-}
-
-// GetBytesStatus is GetBytes plus the HTTP status code, for callers that treat
-// a particular status as data rather than failure. The error text stays what
-// GetBytes has always produced.
-func (c *Client) GetBytesStatus(ctx context.Context, path string) ([]byte, int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, resp.StatusCode, fmt.Errorf("jira: GET %s -> %s: %s", path, resp.Status, snippet(body, 1024))
-	}
-	return body, resp.StatusCode, nil
-}
-
 // Put performs an authenticated JSON PUT.
 func (c *Client) Put(ctx context.Context, path string, body any) error {
 	return c.WriteJSON(ctx, http.MethodPut, path, body)
