@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 
 export interface MultiOption {
   value: string;
@@ -26,6 +27,7 @@ export function MultiSelect({
   title,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const focusRef = useFocusWhen<HTMLInputElement>(open);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
@@ -82,7 +84,7 @@ export function MultiSelect({
             <input
               className="multiselect-search"
               type="search"
-              autoFocus
+              ref={focusRef}
               placeholder="Search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

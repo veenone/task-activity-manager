@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { ListTests, SearchTestsCrossProject, GetTestSteps, errMsg } from "../api";
 import type { Step, StepDraft } from "../api";
@@ -68,6 +69,7 @@ export function CloneStepsModal({
 
   // Stage 2 — step selection for the chosen source.
   const [source, setSource] = useState<SourceRow | null>(null);
+  const focusRef = useFocusWhen<HTMLInputElement>(!source);
   const [sourceSteps, setSourceSteps] = useState<Step[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -201,7 +203,7 @@ export function CloneStepsModal({
                 </p>
                 <input
                   className="detail-input"
-                  autoFocus
+                  ref={focusRef}
                   placeholder={
                     crossProject
                       ? "Search other projects by key or summary…"

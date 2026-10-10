@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { SearchPreconditionsCrossProject, errMsg } from "../api";
 import type { Precondition } from "../api";
@@ -30,6 +30,7 @@ export function PickPreconditionModal({
   onPick,
   onCancel,
 }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Precondition[]>([]);
@@ -101,6 +102,7 @@ export function PickPreconditionModal({
 
   return (
     <Modal
+      initialFocus={focusRef}
       onClose={onCancel}
       className="modal pending-modal"
       labelledBy="pick-precondition-title"
@@ -124,7 +126,7 @@ export function PickPreconditionModal({
           <div className="add-tests-main">
             <input
               className="detail-input"
-              autoFocus
+              ref={focusRef}
               placeholder="Search other projects by key or summary…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}

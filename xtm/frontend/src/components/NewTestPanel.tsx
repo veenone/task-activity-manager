@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 
 import {
@@ -38,6 +39,7 @@ export function NewTestPanel({
 }: Props) {
   const { activeId: profileId } = useProfile();
   const [summary, setSummary] = useState("");
+  const focusRef = useFocusWhen<HTMLInputElement>(true);
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("");
   const [labels, setLabels] = useState("");
@@ -166,7 +168,7 @@ export function NewTestPanel({
           onChange={(e) => setSummary(e.target.value)}
           placeholder="What does this test verify?"
           spellCheck
-          autoFocus
+          ref={focusRef}
         />
 
         <div className="field-label">Description</div>

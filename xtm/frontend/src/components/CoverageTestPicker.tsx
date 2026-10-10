@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { ListTests, errMsg } from "../api";
 import type { TestCase } from "../api";
@@ -17,6 +17,7 @@ const PAGE_SIZE = 50;
 // user can pick tests visually and add them to the Coverage "Other test keys"
 // field without typing keys by hand.
 export function BrowseTestsPicker({ excludeKeys, onClose, onAdd }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<TestCase[]>([]);
@@ -85,6 +86,7 @@ export function BrowseTestsPicker({ excludeKeys, onClose, onAdd }: Props) {
 
   return (
     <Modal
+      initialFocus={focusRef}
       onClose={onClose}
       className="modal cov-picker-modal"
       labelledBy="browse-tests-title"
@@ -99,7 +101,7 @@ export function BrowseTestsPicker({ excludeKeys, onClose, onAdd }: Props) {
         <div className="cov-picker-body">
           <input
             className="detail-input"
-            autoFocus
+            ref={focusRef}
             placeholder="Search key, summary, description…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

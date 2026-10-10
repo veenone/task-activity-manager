@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { useViewState } from "../lib/viewState";
 import {
@@ -136,6 +137,7 @@ export function ContainersView({
   const [selectedRuns, setSelectedRuns] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("PASS");
   const [editingName, setEditingName] = useState(false);
+  const focusRef = useFocusWhen<HTMLInputElement>(editingName);
   const [nameDraft, setNameDraft] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showJUnitImport, setShowJUnitImport] = useState(false);
@@ -1250,7 +1252,7 @@ export function ContainersView({
           {editingName ? (
             <input
               className="container-card-name-edit"
-              autoFocus
+              ref={focusRef}
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
               onBlur={commitInlineRename}
