@@ -51,7 +51,7 @@
   background: #243349;
   border: 1px solid #3a4a66;
   border-radius: 8px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--e-2);
   animation: menu-in 0.12s ease;
 }
 .menu-panel-left {
@@ -119,6 +119,7 @@
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 4px;
+  min-height: var(--hit-min);
   padding: 5px 12px;
   cursor: pointer;
   color: var(--text);
