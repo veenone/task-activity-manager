@@ -1,4 +1,3 @@
-const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 
 const overlayMarkup = /className\s*=\s*["'][^"']*(?:modal|overlay|backdrop)/;
@@ -26,21 +25,16 @@ function isBespokeModal(source) {
   return overlayMarkup.test(code) && !importsSharedModal(code);
 }
 
-function bespokeModalFiles() {
-  const output = execFileSync(
-    "git",
-    ["ls-files", "-z", "*/frontend/src/*.tsx"],
-    { encoding: "utf8" },
-  );
-  return output
-    .split("\0")
-    .filter(Boolean)
-    .filter((file) => isBespokeModal(fs.readFileSync(file, "utf8")));
-}
-
 if (require.main === module) {
-  const files = bespokeModalFiles();
-  process.stdout.write(files.length ? `${files.join("\n")}\n` : "");
+  const files = fs
+    .readFileSync(0, "utf8")
+    .split("\n")
+    .map((file) => file.replace(/\r$/, ""))
+    .filter(Boolean);
+  const count = files.filter((file) =>
+    isBespokeModal(fs.readFileSync(file, "utf8")),
+  ).length;
+  process.stdout.write(`${count}\n`);
 }
 
-module.exports = { bespokeModalFiles, isBespokeModal };
+module.exports = { isBespokeModal };

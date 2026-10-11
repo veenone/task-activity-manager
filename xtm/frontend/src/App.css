@@ -2982,6 +2982,12 @@ tr.row-selected td:first-child {
 .folder-item:hover {
   background: var(--row-hover);
 }
+.folder-filter-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
 .folder-selected {
   background: #e1e8ff !important;
   color: var(--accent-hover);

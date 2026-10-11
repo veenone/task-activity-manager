@@ -1,31 +1,41 @@
-import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
 import { ComponentList } from "./ComponentList";
 
-// The sidebar rows were divs with only a click handler, so a keyboard user
-// could neither reach nor pick one. Each row has to answer Enter and Space
-// the way it answers a click.
-describe("ComponentList keyboard", () => {
-  const components = [{ label: "Payments", count: 3 }];
+function ComponentListHarness() {
+  const [selected, setSelected] = useState("");
 
-  it("picks a component with Enter", async () => {
-    const onSelect = vi.fn();
-    render(<ComponentList components={components} selected="" emptyLabel="None" onSelect={onSelect} />);
+  return (
+    <ComponentList
+      components={[{ label: "Payments", count: 3 }]}
+      selected={selected}
+      emptyLabel="No components"
+      onSelect={setSelected}
+    />
+  );
+}
 
-    screen.getByRole("button", { name: /Payments/ }).focus();
-    await userEvent.keyboard("{Enter}");
+describe("ComponentList", () => {
+  it("selects a focused component with Enter and Space", async () => {
+    const user = userEvent.setup();
+    render(<ComponentListHarness />);
 
-    expect(onSelect).toHaveBeenCalledWith("Payments");
-  });
+    const allTests = screen.getByRole("button", { name: "All tests" });
+    const payments = screen.getByRole("button", { name: /^Payments\s*3$/ });
+    expect(allTests).toBeInstanceOf(HTMLButtonElement);
+    expect(payments).toBeInstanceOf(HTMLButtonElement);
 
-  it("goes back to All tests with Space", async () => {
-    const onSelect = vi.fn();
-    render(<ComponentList components={components} selected="Payments" emptyLabel="None" onSelect={onSelect} />);
+    for (const key of ["{Enter}", " "]) {
+      payments.focus();
+      expect(payments).toHaveFocus();
 
-    screen.getByRole("button", { name: /All tests/ }).focus();
-    await userEvent.keyboard(" ");
+      await user.keyboard(key);
 
-    expect(onSelect).toHaveBeenCalledWith("");
+      expect(payments).toHaveAttribute("aria-pressed", "true");
+      expect(allTests).toHaveAttribute("aria-pressed", "false");
+      await user.click(allTests);
+    }
   });
 });

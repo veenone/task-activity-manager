@@ -1,32 +1,58 @@
-import { describe, it, expect, vi } from "vitest";
+import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ContainerList } from "./ContainerList";
+import { describe, expect, it } from "vitest";
 import type { Container } from "../api";
+import { ContainerList } from "./ContainerList";
 
-// The sidebar rows were divs with only a click handler, so a keyboard user
-// could neither reach nor pick one. Each row has to answer Enter and Space
-// the way it answers a click.
-describe("ContainerList keyboard", () => {
-  const containers = [{ key: "TP-1", summary: "Payments" } as Container];
+const testSet: Container = {
+  key: "XTM-42",
+  kind: "testset",
+  summary: "Checkout tests",
+  status: "Open",
+  parentKey: "",
+  parentSummary: "",
+  issueType: "Test Set",
+  labels: [],
+  environments: [],
+  fixVersions: [],
+  description: "",
+};
 
-  it("picks a container with Enter", async () => {
-    const onSelect = vi.fn();
-    render(<ContainerList containers={containers} selected="" emptyLabel="None" onSelect={onSelect} />);
+function ContainerListHarness() {
+  const [selected, setSelected] = useState("");
 
-    screen.getByRole("button", { name: /Payments/ }).focus();
-    await userEvent.keyboard("{Enter}");
+  return (
+    <ContainerList
+      containers={[testSet]}
+      selected={selected}
+      emptyLabel="No test sets"
+      onSelect={setSelected}
+    />
+  );
+}
 
-    expect(onSelect).toHaveBeenCalledWith("TP-1");
-  });
+describe("ContainerList", () => {
+  it("selects a focused container with Enter and Space", async () => {
+    const user = userEvent.setup();
+    render(<ContainerListHarness />);
 
-  it("goes back to All tests with Space", async () => {
-    const onSelect = vi.fn();
-    render(<ContainerList containers={containers} selected="TP-1" emptyLabel="None" onSelect={onSelect} />);
+    const allTests = screen.getByRole("button", { name: "All tests" });
+    const checkoutTests = screen.getByRole("button", {
+      name: "XTM-42 Checkout tests",
+    });
+    expect(allTests).toBeInstanceOf(HTMLButtonElement);
+    expect(checkoutTests).toBeInstanceOf(HTMLButtonElement);
 
-    screen.getByRole("button", { name: /All tests/ }).focus();
-    await userEvent.keyboard(" ");
+    for (const key of ["{Enter}", " "]) {
+      checkoutTests.focus();
+      expect(checkoutTests).toHaveFocus();
 
-    expect(onSelect).toHaveBeenCalledWith("");
+      await user.keyboard(key);
+
+      expect(checkoutTests).toHaveAttribute("aria-pressed", "true");
+      expect(allTests).toHaveAttribute("aria-pressed", "false");
+      await user.click(allTests);
+    }
   });
 });
