@@ -2273,6 +2273,15 @@ button.defect-chip-key:hover {
 .container-card-name:hover {
   color: var(--accent);
 }
+.container-card-name > button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: text;
+}
 .container-card-name-edit {
   font-size: 18px;
   font-weight: 600;
@@ -7590,7 +7599,6 @@ tr.row-checked:hover {
   border-radius: 6px;
   padding: 8px 12px;
   background: var(--surface);
-  cursor: pointer;
   transition: background 0.1s;
 }
 .cov-cr-item:hover { background: var(--row-hover); }
@@ -7602,7 +7610,10 @@ tr.row-checked:hover {
   flex-wrap: wrap;
 }
 .cov-cr-key { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); min-width: 60px; }
-.cov-cr-title { font-size: 13px; font-weight: 500; flex: 1; }
+.cov-cr-title {
+  font: inherit; font-size: 13px; font-weight: 500; flex: 1;
+  background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: pointer;
+}
 .cov-cr-version { font-size: 12px; color: var(--accent); }
 .cov-cr-desc { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
 

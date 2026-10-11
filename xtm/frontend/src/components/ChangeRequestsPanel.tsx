@@ -264,11 +264,17 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
           <div
             key={cr.id}
             className={`cov-cr-item${selectedCR === cr.id ? " cov-cr-item-active" : ""}`}
-            onClick={() => setSelectedCR(selectedCR === cr.id ? "" : cr.id)}
           >
             <div className="cov-cr-item-head">
               <span className="cov-cr-key">{cr.crKey || cr.id.slice(0, 8)}</span>
-              <span className="cov-cr-title">{cr.title}</span>
+              <button
+                type="button"
+                className="cov-cr-title"
+                aria-expanded={selectedCR === cr.id}
+                onClick={() => setSelectedCR(selectedCR === cr.id ? "" : cr.id)}
+              >
+                {cr.title}
+              </button>
               <span className={`cov-badge cov-badge-cr-${cr.status}`}>{cr.status}</span>
               <span className={`cov-badge cov-badge-risk-${cr.risk}`}>{cr.risk}</span>
               {cr.targetVersionId && (
@@ -276,14 +282,14 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
                   → {versions.find((v) => v.id === cr.targetVersionId)?.name ?? cr.targetVersionId}
                 </span>
               )}
-              <button className="btn" onClick={(e) => { e.stopPropagation(); openEdit(cr); }}>Edit</button>
-              <button className="btn" onClick={(e) => { e.stopPropagation(); void deleteCR(cr); }}>Del</button>
+              <button className="btn" onClick={() => openEdit(cr)}>Edit</button>
+              <button className="btn" onClick={() => void deleteCR(cr)}>Del</button>
             </div>
             {cr.description && <p className="cov-cr-desc">{cr.description}</p>}
 
             {/* Impact grid for selected CR */}
             {selectedCR === cr.id && (
-              <div className="cov-cr-impact" onClick={(e) => e.stopPropagation()}>
+              <div className="cov-cr-impact">
                 {impactLoading && <p className="cov-empty">Loading impact…</p>}
                 {impact && (
                   <>

@@ -6,6 +6,7 @@ export type { ViewApi } from "./contexts/createViewContext";
 export { ProfileProvider, useProfile } from "./contexts/ProfileContext";
 export type { ProfileBackend, ProfileState } from "./contexts/ProfileContext";
 export { Modal } from "./components/Modal";
+export { useEscapeKey } from "./components/useEscapeKey";
 export { useFocusWhen } from "./components/useFocusWhen";
 export { Menu } from "./components/Menu";
 export type { MenuItem } from "./components/Menu";
@@ -27,6 +28,7 @@ export type { PromptOptions } from "./components/usePrompt";
 export { call } from "./lib/apiCall";
 export { ApiError, normalizeError } from "./lib/apiError";
 export { errMsg } from "./lib/errMsg";
+export { onActivateKey } from "./lib/activate";
 export { applyTheme } from "./lib/theme";
 export { createQueryClient } from "./lib/queryClient";
 export {

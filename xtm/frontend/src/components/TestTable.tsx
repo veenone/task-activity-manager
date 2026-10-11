@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useEscapeKey } from "@agile-suite/core";
 import { useSelection } from "../contexts/SelectionContext";
 import { useProfile } from "../contexts/ProfileContext";
 import type { CSSProperties } from "react";
@@ -316,6 +317,7 @@ export function TestTable({
 
   const [columns, setColumns] = useState<ColState[]>(loadColumns);
   const [showColumns, setShowColumns] = useState(false);
+  useEscapeKey(showColumns, () => setShowColumns(false));
   useEffect(() => {
     localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(columns));
   }, [columns]);
@@ -686,6 +688,8 @@ export function TestTable({
             className="btn"
             onClick={() => setShowColumns((s) => !s)}
             title="Show / hide / reorder columns"
+            aria-haspopup="dialog"
+            aria-expanded={showColumns}
           >
             Columns
           </button>
@@ -693,9 +697,10 @@ export function TestTable({
             <>
               <div
                 className="columns-backdrop"
+                role="presentation"
                 onClick={() => setShowColumns(false)}
               />
-              <div className="columns-panel">
+              <div className="columns-panel" role="dialog" aria-label="Columns">
                 {columns.map((c, i) => (
                   <div key={c.key} className="columns-row">
                     <label className="columns-label">
