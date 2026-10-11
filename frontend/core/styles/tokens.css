@@ -33,12 +33,31 @@
   --card-border: var(--border);
   --accent-strong: #2b6cb0;
   --bg-subtle: var(--surface-2);
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-4: 14px;
+  --r-full: 999px;
+  --e-0: none;
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --e-2: 0 2px 6px rgba(0, 0, 0, 0.12), 0 12px 28px rgba(0, 0, 0, 0.28);
+  --e-3: 0 4px 10px rgba(0, 0, 0, 0.12), 0 16px 40px rgba(0, 0, 0, 0.32);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 240ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 2px;
+  --focus-offset-inset: -2px;
+  --hit-min: 24px;
+  --hit-desktop: 40px;
+  --hit-touch: 44px;
   /* Dialog chrome. These were literals in primitives.css and so were the same
      in both themes: a black scrim and a black drop shadow read as depth on a
      light ground and as nothing on a dark one, and the ghost button's black
      hover wash darkened the surface it was meant to lift. */
   --overlay-scrim: rgba(0, 0, 0, 0.4);
-  --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  --modal-shadow: var(--e-3);
   --ghost-hover: rgba(0, 0, 0, 0.08);
   --on-accent: #fff;
   --font-mono: ui-monospace, "Consolas", "SF Mono", "Menlo", monospace;
@@ -177,8 +196,10 @@
   --card-border: var(--border);
   --accent-strong: #6ea8fe;
   --bg-subtle: var(--surface-2);
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.16);
+  --e-2: 0 2px 6px rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.56);
+  --e-3: 0 4px 10px rgba(0, 0, 0, 0.24), 0 16px 40px rgba(0, 0, 0, 0.64);
   --overlay-scrim: rgba(0, 0, 0, 0.6);
-  --modal-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   --ghost-hover: rgba(255, 255, 255, 0.10);
   --on-accent: #fff;
   /* The chrome band keeps its colour: it is the app's instrument panel, and

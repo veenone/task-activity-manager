@@ -8,3 +8,10 @@ eslint_no_console 23
 eslint_problems 138
 hardcoded_hex 479
 hardcoded_px_font 455
+raw_radius 287
+raw_shadow 11
+bare_focus 9
+outline_none 13
+raw_duration 12
+unguarded_motion 1
+transition_all 0
