@@ -1,10 +1,10 @@
 files_over_400 106
 ui_em_dashes 113
 unscoped_todos 43
-bespoke_modals 38
+bespoke_modals 2
 eslint_a11y 67
 eslint_max_lines 23
 eslint_no_console 23
 eslint_problems 168
-hardcoded_hex 434
-hardcoded_px_font 58
+hardcoded_hex 479
+hardcoded_px_font 455
