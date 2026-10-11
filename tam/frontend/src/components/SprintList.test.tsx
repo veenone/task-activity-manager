@@ -144,7 +144,10 @@ describe("SprintList", () => {
   it("orders the bands by points and puts the cards nobody owns last", async () => {
     renderList();
     await screen.findByText("Apply promo code");
-    const bands = screen.getAllByRole("presentation").map((b) => b.textContent);
+    const bands = screen
+      .getAllByRole("presentation")
+      .filter((b) => b.classList.contains("sprint-group"))
+      .map((b) => b.textContent);
     expect(bands[0]).toContain("R. Anand");
     expect(bands[1]).toContain("M. Ortiz");
     expect(bands[2]).toContain("Unassigned");
