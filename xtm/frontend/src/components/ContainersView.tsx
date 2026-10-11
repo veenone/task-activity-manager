@@ -368,10 +368,14 @@ export function ContainersView({
     if (batchEnvOp !== "set_env" && !name) return;
     if (
       batchEnvOp === "set_env" &&
-      !window.confirm(
-        `Set environments to "${name || "(none)"}" on ${keys.length} execution${keys.length === 1 ? "" : "s"}? ` +
+      !(await confirm({
+        title: "Replace environments",
+        message:
+          `Set environments to "${name || "(none)"}" on ${keys.length} execution${keys.length === 1 ? "" : "s"}? ` +
           "This will replace their current environments.",
-      )
+        confirmLabel: "Replace",
+        danger: true,
+      }))
     )
       return;
     setBatchEnvBusy(true);
