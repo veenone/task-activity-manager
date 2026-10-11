@@ -1,4 +1,3 @@
-import { onActivateKey } from "@agile-suite/core";
 import type { Bucket } from "../api";
 
 interface Props {
@@ -20,37 +19,37 @@ export function ComponentList({
 }: Props) {
   return (
     <nav className="folder-tree">
-      <div
-        className={"folder-item" + (selected === "" ? " folder-selected" : "")}
-        role="button"
-        tabIndex={0}
+      <button
+        type="button"
+        className={
+          "folder-item folder-filter-button" +
+          (selected === "" ? " folder-selected" : "")
+        }
         aria-pressed={selected === ""}
         onClick={() => onSelect("")}
-        onKeyDown={onActivateKey(() => onSelect(""))}
       >
         <span className="folder-caret" />
         <span className="folder-name">All tests</span>
-      </div>
+      </button>
       {components.length === 0 ? (
         <div className="folder-item muted">{emptyLabel}</div>
       ) : (
         components.map((c) => (
-          <div
+          <button
+            type="button"
             key={c.label}
             className={
-              "folder-item" + (selected === c.label ? " folder-selected" : "")
+              "folder-item folder-filter-button" +
+              (selected === c.label ? " folder-selected" : "")
             }
-            style={{ paddingLeft: 24 }}
-            role="button"
-            tabIndex={0}
             aria-pressed={selected === c.label}
+            style={{ paddingLeft: 24 }}
             onClick={() => onSelect(c.label)}
-            onKeyDown={onActivateKey(() => onSelect(c.label))}
             title={`${c.label} — ${c.count} test(s)`}
           >
             <span className="folder-name">{c.label}</span>
             <span className="folder-count">{c.count}</span>
-          </div>
+          </button>
         ))
       )}
     </nav>
