@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { useSync } from "../contexts/SyncContext";
 import {
@@ -864,6 +864,7 @@ function CreatePreconditionModal({
   onCancel: () => void;
   onCreated: (key: string) => void;
 }) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const [summary, setSummary] = useState("");
   const [type, setType] = useState("Manual");
   const [description, setDescription] = useState("");
@@ -895,7 +896,7 @@ function CreatePreconditionModal({
   }
 
   return (
-    <Modal onClose={onCancel} className="modal" labelledBy="new-precond-title">
+    <Modal initialFocus={focusRef} onClose={onCancel} className="modal" labelledBy="new-precond-title">
       <div className="pending-head">
         <h2 id="new-precond-title">New precondition</h2>
         <button className="btn btn-ghost" onClick={onCancel} title="Close">
@@ -907,7 +908,7 @@ function CreatePreconditionModal({
           <span>Summary</span>
           <input
             className="detail-input"
-            autoFocus
+            ref={focusRef}
             placeholder="e.g. User is logged in"
             value={summary}
             onChange={(e) => setSummary(e.target.value)}

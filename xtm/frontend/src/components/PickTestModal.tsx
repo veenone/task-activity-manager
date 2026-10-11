@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { ListTests, SearchTestsCrossProject, errMsg } from "../api";
 import { ProjectSidebar } from "./ProjectSidebar";
@@ -41,6 +41,7 @@ export function PickTestModal({
   onPick,
   onCancel,
 }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PickRow[]>([]);
@@ -128,6 +129,7 @@ export function PickTestModal({
 
   return (
     <Modal
+      initialFocus={focusRef}
       onClose={onCancel}
       className="modal pending-modal"
       labelledBy="pick-test-title"
@@ -149,7 +151,7 @@ export function PickTestModal({
           <div className="add-tests-main">
             <input
               className="detail-input"
-              autoFocus
+              ref={focusRef}
               placeholder={
                 crossProject
                   ? "Search other projects by key or summary…"

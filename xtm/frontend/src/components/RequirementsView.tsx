@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { useViewState } from "../lib/viewState";
 import {
@@ -96,6 +97,7 @@ export function RequirementsView({ onChanged }: Props) {
   const [showCreateReq, setShowCreateReq] = useState(false);
   const [showImportReqs, setShowImportReqs] = useState(false);
   const [editing, setEditing] = useState(false);
+  const focusRef = useFocusWhen<HTMLInputElement>(editing);
   const [draftSummary, setDraftSummary] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftPriority, setDraftPriority] = useState("");
@@ -541,7 +543,7 @@ export function RequirementsView({ onChanged }: Props) {
                   <input
                     className="detail-input"
                     value={draftSummary}
-                    autoFocus
+                    ref={focusRef}
                     disabled={busy}
                     onChange={(e) => setDraftSummary(e.target.value)}
                     onKeyDown={(e) => {

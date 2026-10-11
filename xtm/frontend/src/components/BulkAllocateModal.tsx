@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { Modal } from "./Modal";
 import {
@@ -79,6 +80,7 @@ export function BulkAllocateModal({
   const kindLabel = KINDS.find((k) => k.value === kind)?.label ?? "container";
 
   const useCreateNew = action === "allocate" && createNew;
+  const focusRef = useFocusWhen<HTMLInputElement>(useCreateNew);
 
   async function apply() {
     setApplying(true);
@@ -177,7 +179,7 @@ export function BulkAllocateModal({
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder={`New ${kindLabel} name`}
-                  autoFocus
+                  ref={focusRef}
                 />
               </label>
             ) : (

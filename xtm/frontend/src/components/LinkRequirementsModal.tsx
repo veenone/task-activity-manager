@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   ListRequirementsWithCoverage,
@@ -28,6 +28,7 @@ export function LinkRequirementsModal({
   onClose,
   onDone,
 }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [all, setAll] = useState<RequirementCoverage[]>([]);
   const [filter, setFilter] = useState("");
@@ -92,6 +93,7 @@ export function LinkRequirementsModal({
 
   return (
     <Modal
+      initialFocus={focusRef}
       onClose={onClose}
       className="modal pending-modal"
       labelledBy="link-requirements-title"
@@ -115,7 +117,7 @@ export function LinkRequirementsModal({
               placeholder="Filter by key or summary…"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              autoFocus
+              ref={focusRef}
             />
             <ul className="add-test-list">
               {pageItems.length === 0 ? (

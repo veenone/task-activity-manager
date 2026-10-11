@@ -54,4 +54,36 @@ describe("DialogProvider", () => {
     // Dialog is dismissed after resolving.
     expect(screen.queryByText("Delete it?")).not.toBeInTheDocument();
   });
+
+  it("opens a confirm on its Cancel button and a prompt on its input", async () => {
+    function Trigger() {
+      const { confirm, prompt, notice } = useDialogs();
+      return (
+        <>
+          <button onClick={() => void confirm({ title: "Delete it?" })}>c</button>
+          <button onClick={() => void prompt({ title: "Name?" })}>p</button>
+          <button onClick={() => void notice({ title: "Done" })}>n</button>
+        </>
+      );
+    }
+    render(
+      <DialogProvider>
+        <Trigger />
+      </DialogProvider>,
+    );
+
+    fireEvent.click(screen.getByText("c"));
+    await screen.findByText("Delete it?");
+    expect(document.activeElement).toBe(screen.getByText("Cancel"));
+    fireEvent.click(screen.getByText("Cancel"));
+
+    fireEvent.click(screen.getByText("p"));
+    await screen.findByText("Name?");
+    expect(document.activeElement).toBe(screen.getByRole("textbox"));
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
+
+    fireEvent.click(screen.getByText("n"));
+    await screen.findByText("Done");
+    expect(document.activeElement).toBe(screen.getByText("OK"));
+  });
 });
