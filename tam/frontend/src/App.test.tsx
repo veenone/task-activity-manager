@@ -284,14 +284,15 @@ describe("App shell", () => {
   });
 
   it("says what is cached against what the project holds", async () => {
+    const projectTotal = 2943;
     vi.mocked(api.GetSyncState).mockResolvedValue({
-      lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 38, projectTotal: 2943,
+      lastSynced: new Date().toISOString(), lastFull: "", lastError: "", issueCount: 38, projectTotal,
     });
     renderApp();
-    // 38 of 2,943 is what a scope JQL, or a type the backend holds back,
-    // leaves cached. "38 issues" alone read as a project of 38 (#68).
+    // A scope JQL, or a type the backend holds back, can leave only part of
+    // the project cached. "38 issues" alone reads as a project of 38 (#68).
     await waitFor(() =>
-      expect(screen.getByTestId("sync-summary")).toHaveTextContent(/38 of 2,943 issues, last synced today/),
+      expect(screen.getByTestId("sync-summary")).toHaveTextContent(`38 of ${projectTotal.toLocaleString()} issues, last synced today`),
     );
   });
 
