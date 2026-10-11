@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContainersView } from "./ContainersView";
 import type { Capabilities } from "../api";
 import { clearViewState } from "../lib/viewState";
+import { BulkEditContainers } from "../api";
 
 // ContainersView pulls a lot in (containers/board/members queries, several
 // modal children, three dialog hooks). This test only cares about the "Create
@@ -99,13 +100,14 @@ vi.mock("./usePrompt", () => ({
   usePrompt: () => ({ prompt: vi.fn(async () => null) }),
 }));
 vi.mock("./useConfirm", () => ({
-  useConfirm: () => ({ confirm: vi.fn(async () => false) }),
+  useConfirm: () => ({ confirm: mockConfirm }),
 }));
 vi.mock("./useNotice", () => ({
   useNotice: () => ({ notice: vi.fn(async () => {}) }),
 }));
 
 const mockUseCapabilities = vi.fn();
+const mockConfirm = vi.hoisted(() => vi.fn(async (_opts: unknown) => false));
 vi.mock("../features", () => ({
   useCapabilities: (...args: unknown[]) => mockUseCapabilities(...args),
 }));
@@ -157,6 +159,10 @@ async function selectTestExecutions() {
 
 beforeEach(() => {
   mockUseCapabilities.mockReset();
+  mockConfirm.mockReset();
+  mockConfirm.mockResolvedValue(false);
+  vi.mocked(BulkEditContainers).mockClear();
+  vi.restoreAllMocks();
   // useViewState persists selections in a module-level store keyed by
   // profileId, which otherwise leaks the "testexec" kind chosen by one test
   // into the next (all tests share profileId "p1").
@@ -226,5 +232,40 @@ describe("ContainersView keyboard", () => {
 
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("ContainersView Set env on shown", () => {
+  async function applySetEnv() {
+    renderWithCaps({});
+    await selectTestExecutions();
+    await screen.findByText("TE-1");
+    await userEvent.click(screen.getByRole("button", { name: /set env on shown/i }));
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: /batch environment operation/i }),
+      "set_env",
+    );
+    await userEvent.type(screen.getByPlaceholderText("Environment…"), "staging");
+    await userEvent.click(screen.getByRole("button", { name: /^apply to \d+$/i }));
+  }
+
+  it("leaves the executions alone when the confirm is cancelled", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await applySetEnv();
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(BulkEditContainers).not.toHaveBeenCalled();
+  });
+
+  it("sets the environment on every shown execution once confirmed", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    mockConfirm.mockResolvedValue(true);
+    await applySetEnv();
+    await vi.waitFor(() =>
+      expect(BulkEditContainers).toHaveBeenCalledWith("p1", ["TE-1"], {
+        operation: "set_env",
+        field: "",
+        value: "staging",
+      }),
+    );
   });
 });

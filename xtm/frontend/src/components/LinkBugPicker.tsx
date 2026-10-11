@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { ListBugsWithTests, LinkExistingBugToRun, errMsg } from "../api";
 import type { BugWithTests } from "../api";
@@ -33,6 +33,7 @@ export function LinkBugPicker({
   onClose,
   onLinked,
 }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [bugs, setBugs] = useState<BugWithTests[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +94,7 @@ export function LinkBugPicker({
   const freeValid = BUG_KEY_RE.test(freeKey.trim().toUpperCase());
 
   return (
-    <Modal onClose={onClose} className="modal" labelledBy="link-bug-title">
+    <Modal initialFocus={focusRef} onClose={onClose} className="modal" labelledBy="link-bug-title">
         <div className="pending-head">
           <h2 id="link-bug-title">Link bug to {testKey}</h2>
           <button
@@ -111,7 +112,7 @@ export function LinkBugPicker({
             <input
               className="multiselect-search"
               type="search"
-              autoFocus
+              ref={focusRef}
               placeholder="Key or summary…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

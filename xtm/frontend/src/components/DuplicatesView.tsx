@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { useViewState } from "../lib/viewState";
 
@@ -92,6 +93,7 @@ export function DuplicatesView({
   const [editing, setEditing] = useState<{ key: string; value: string } | null>(
     null,
   );
+  const focusRef = useFocusWhen<HTMLInputElement>(editing?.key);
   const [detailVersion, setDetailVersion] = useState(0);
   const cancelEditRef = useRef(false);
 
@@ -408,7 +410,7 @@ export function DuplicatesView({
                               <input
                                 className="detail-input dup-edit"
                                 value={editing.value}
-                                autoFocus
+                                ref={focusRef}
                                 onChange={(e) =>
                                   setEditing({ key: m.key, value: e.target.value })
                                 }

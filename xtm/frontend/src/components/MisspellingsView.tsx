@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   ListMisspellings,
@@ -722,6 +722,7 @@ function IgnoreListModal({
   onClose: () => void;
   onChangedList: () => void;
 }) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const [words, setWords] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState("");
@@ -781,7 +782,7 @@ function IgnoreListModal({
   }
 
   return (
-    <Modal onClose={close} className="modal pending-modal ignore-modal" labelledBy="ignore-list-title">
+    <Modal initialFocus={focusRef} onClose={close} className="modal pending-modal ignore-modal" labelledBy="ignore-list-title">
         <div className="pending-head">
           <h2 id="ignore-list-title">Spellcheck ignore list</h2>
           <button className="btn btn-ghost" onClick={close} title="Close">
@@ -808,7 +809,7 @@ function IgnoreListModal({
                   void add();
                 }
               }}
-              autoFocus
+              ref={focusRef}
             />
             <button
               className="btn btn-primary"

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   CreateVersion,
@@ -44,6 +45,9 @@ export function VersionBar({
 
   // Edit status inline form
   const [showStatus, setShowStatus] = useState(false);
+  const newRef = useFocusWhen<HTMLInputElement>(showNew);
+  const cloneRef = useFocusWhen<HTMLInputElement>(showClone);
+  const statusRef = useFocusWhen<HTMLSelectElement>(showStatus);
   const [editStatus, setEditStatus] = useState(value ? (versions.find((v) => v.id === value)?.status ?? "planning") : "planning");
 
   const { confirm } = useConfirm();
@@ -155,7 +159,7 @@ export function VersionBar({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void createVersion(); }}
-              autoFocus
+              ref={newRef}
             />
             <select className="cov-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
               <option value="planning">Planning</option>
@@ -241,7 +245,7 @@ export function VersionBar({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void createVersion(); }}
-            autoFocus
+            ref={newRef}
           />
           <select className="cov-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
             <option value="planning">Planning</option>
@@ -262,7 +266,7 @@ export function VersionBar({
             value={cloneName}
             onChange={(e) => setCloneName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void cloneVersion(); }}
-            autoFocus
+            ref={cloneRef}
           />
           <select className="cov-select" value={cloneStatus} onChange={(e) => setCloneStatus(e.target.value)}>
             <option value="planning">Planning</option>
@@ -277,7 +281,7 @@ export function VersionBar({
 
       {showStatus && (
         <div className="cov-version-inline-form">
-          <select className="cov-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)} autoFocus>
+          <select className="cov-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)} ref={statusRef}>
             <option value="planning">Planning</option>
             <option value="beta">Beta</option>
             <option value="stable">Stable</option>

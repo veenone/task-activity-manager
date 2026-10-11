@@ -14,6 +14,7 @@ interface Props {
 // Flow: (1) params step — enter execution summary, toggle create-missing, pick
 // a file; (2) preview step — review the row table and skipped list; (3) apply.
 export function JUnitNewExecModal({ onCancel, onApplied }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [summary, setSummary] = useState("");
   const [createMissing, setCreateMissing] = useState(true);
@@ -69,7 +70,7 @@ export function JUnitNewExecModal({ onCancel, onApplied }: Props) {
   const canApply = !!preview && preview.rows.length > 0 && !!summaryTrimmed && !applying;
 
   return (
-    <Modal onClose={onCancel} className="modal bulk-modal" labelledBy="junit-newexec-title">
+    <Modal initialFocus={focusRef} onClose={onCancel} className="modal bulk-modal" labelledBy="junit-newexec-title">
         {/* Hidden file input */}
         <input
           ref={inputRef}
@@ -98,7 +99,7 @@ export function JUnitNewExecModal({ onCancel, onApplied }: Props) {
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
                 disabled={applying}
-                autoFocus
+                ref={focusRef}
               />
             </label>
             <label className="junit-new-exec-checkbox">

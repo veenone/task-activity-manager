@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { Modal } from "./Modal";
 import { announce } from "./LiveRegion";
@@ -25,6 +26,7 @@ const TITLE_ID = "bulk-rename-title";
 export function BulkRenameModal({ testKeys, onComplete, onCancel }: Props) {
   const { activeId } = useProfile();
   const [mode, setMode] = useState<Mode>("prefix");
+  const focusRef = useFocusWhen<HTMLInputElement>(mode !== "suffix");
   const [prefix, setPrefix] = useState("");
   const [suffix, setSuffix] = useState("");
   const [busy, setBusy] = useState(false);
@@ -120,7 +122,7 @@ export function BulkRenameModal({ testKeys, onComplete, onCancel }: Props) {
             <span>Prefix</span>
             <input
               className="detail-input"
-              autoFocus
+              ref={focusRef}
               placeholder="[SMOKE] "
               value={prefix}
               onChange={(e) => setPrefix(e.target.value)}

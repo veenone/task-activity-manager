@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   ListChangeRequests,
@@ -31,6 +31,7 @@ const EMPTY_FORM = {
 // ChangeRequestsPanel lists change requests for a canonical requirement,
 // supports create/edit/delete, and shows the per-member impact + decisions.
 export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [crs, setCrs] = useState<ChangeRequest[]>([]);
   const [loading, setLoading] = useState(false);
@@ -179,7 +180,7 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
 
       {/* CR Form */}
       {editing && (
-        <Modal onClose={() => setEditing(false)} className="modal cr-form-modal" labelledBy="cr-form-title">
+        <Modal initialFocus={focusRef} onClose={() => setEditing(false)} className="modal cr-form-modal" labelledBy="cr-form-title">
             <div className="pending-head">
               <h2 id="cr-form-title">{editId ? "Edit Change Request" : "New Change Request"}</h2>
               <button className="btn btn-ghost" onClick={() => setEditing(false)} title="Close">✕</button>
@@ -202,7 +203,7 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
                   placeholder="Change request title…"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  autoFocus
+                  ref={focusRef}
                 />
               </label>
 

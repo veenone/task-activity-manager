@@ -31,6 +31,9 @@
   --card-border: var(--border);
   --accent-strong: #2b6cb0;
   --bg-subtle: var(--surface-2);
+  --ghost-hover: rgba(0, 0, 0, 0.08);
+  --on-accent: #fff;
+  --font-mono: ui-monospace, "Consolas", "SF Mono", "Menlo", monospace;
 }
 
 :root[data-theme="dark"] {
@@ -60,6 +63,7 @@
   --card-border: var(--border);
   --accent-strong: #6ea8fe;
   --bg-subtle: var(--surface-2);
+  --ghost-hover: rgba(255, 255, 255, 0.10);
 }
 
 /* Visually-hidden but screen-reader-available. Used by the aria-live region
@@ -1830,7 +1834,7 @@ i.sankey-node-l2 {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .container-env-chips {
   display: flex;
@@ -1852,7 +1856,7 @@ i.sankey-node-l2 {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 .container-bugs-count {
   color: var(--text-strong);
@@ -6338,7 +6342,7 @@ tr.row-checked:hover {
   cursor: pointer;
 }
 .profiles-list-row:hover {
-  background: var(--hover-bg, rgba(127, 127, 127, 0.12));
+  background: var(--ghost-hover);
 }
 .profiles-list-row-selected,
 .profiles-list-row-selected:hover {
@@ -6397,7 +6401,7 @@ tr.row-checked:hover {
   cursor: pointer;
 }
 .connections-list-row:hover {
-  background: var(--hover-bg, rgba(127, 127, 127, 0.12));
+  background: var(--ghost-hover);
 }
 .connections-row-top {
   display: flex;
@@ -7285,7 +7289,7 @@ tr.row-checked:hover {
 }
 .gap-item-folder {
   font-size: 11px;
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7401,7 +7405,7 @@ tr.row-checked:hover {
 .cov-group-pct { font-size: 12px; color: var(--text-muted); }
 .cov-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .cov-table td, .cov-table th { padding: 4px 8px; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
-.cov-vlabel { font-family: var(--mono, monospace); }
+.cov-vlabel { font-family: var(--font-mono); }
 .cov-kind {
   margin-left: 6px; font-size: 10px; text-transform: uppercase; padding: 1px 5px;
   border-radius: 8px; background: var(--surface-sunken); color: var(--text-muted);
@@ -7437,7 +7441,7 @@ tr.row-checked:hover {
 .cov-welcome h2 { margin: 0 0 8px; font-size: 18px; }
 .cov-welcome p { color: var(--text-muted); line-height: 1.5; }
 .cov-welcome ol { margin: 12px 0; padding-left: 20px; line-height: 1.7; }
-.cov-welcome code { background: var(--surface-sunken); padding: 1px 5px; border-radius: 4px; font-family: var(--mono, monospace); }
+.cov-welcome code { background: var(--surface-sunken); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); }
 .cov-muted { color: var(--text-muted); font-size: 13px; }
 .cov-welcome-actions { display: flex; gap: 10px; margin: 16px 0 8px; flex-wrap: wrap; }
 .cov-addgroup { display: flex; gap: 6px; margin-top: 8px; max-width: 360px; }
@@ -7474,7 +7478,7 @@ tr.row-checked:hover {
 
 .cov-cands { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: 4px; margin: 8px 0; }
 .cov-cand { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--border-subtle); }
-.cov-cand-key { font-family: var(--mono, monospace); font-size: 12px; min-width: 90px; }
+.cov-cand-key { font-family: var(--font-mono); font-size: 12px; min-width: 90px; }
 .cov-cand-sum { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cov-manual { display: block; font-size: 12px; color: var(--text-muted); margin: 8px 0; }
 .cov-manual .cov-input { width: 100%; margin-top: 4px; }
@@ -7605,7 +7609,7 @@ tr.row-checked:hover {
   gap: 8px;
   flex-wrap: wrap;
 }
-.cov-cr-key { font-family: var(--mono, monospace); font-size: 12px; color: var(--text-muted); min-width: 60px; }
+.cov-cr-key { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); min-width: 60px; }
 .cov-cr-title {
   font: inherit; font-size: 13px; font-weight: 500; flex: 1;
   background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: pointer;
@@ -7757,7 +7761,7 @@ tr.row-checked:hover {
   border: 1px solid var(--border-subtle);
   border-radius: 3px;
   padding: 1px 5px;
-  font-family: var(--mono, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 .cov-guide-list {
@@ -7898,7 +7902,7 @@ tr.row-checked:hover {
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--text);
   line-height: 1.5;
 }
@@ -7911,8 +7915,8 @@ tr.row-checked:hover {
 .prefill-notice {
   margin: 6px 0 10px;
   padding: 6px 10px;
-  background: var(--bg-hover, #f5f5f5);
-  border-left: 3px solid var(--accent, #4a90e2);
+  background: var(--row-hover);
+  border-left: 3px solid var(--accent);
   border-radius: 2px;
   font-size: 12px;
   color: var(--text-muted);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { onActivateKey, useEscapeKey } from "@agile-suite/core";
+import { onActivateKey, useEscapeKey, useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { useViewState } from "../lib/viewState";
 import {
@@ -138,6 +138,7 @@ export function ContainersView({
   const [selectedRuns, setSelectedRuns] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("PASS");
   const [editingName, setEditingName] = useState(false);
+  const focusRef = useFocusWhen<HTMLInputElement>(editingName);
   const [nameDraft, setNameDraft] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showJUnitImport, setShowJUnitImport] = useState(false);
@@ -368,10 +369,14 @@ export function ContainersView({
     if (batchEnvOp !== "set_env" && !name) return;
     if (
       batchEnvOp === "set_env" &&
-      !window.confirm(
-        `Set environments to "${name || "(none)"}" on ${keys.length} execution${keys.length === 1 ? "" : "s"}? ` +
+      !(await confirm({
+        title: "Replace environments",
+        message:
+          `Set environments to "${name || "(none)"}" on ${keys.length} execution${keys.length === 1 ? "" : "s"}? ` +
           "This will replace their current environments.",
-      )
+        confirmLabel: "Replace",
+        danger: true,
+      }))
     )
       return;
     setBatchEnvBusy(true);
@@ -1257,7 +1262,7 @@ export function ContainersView({
           {editingName ? (
             <input
               className="container-card-name-edit"
-              autoFocus
+              ref={focusRef}
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
               onBlur={commitInlineRename}

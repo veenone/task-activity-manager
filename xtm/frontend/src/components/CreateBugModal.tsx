@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import { CreateBugForTest, GetFieldDefs, errMsg } from "../api";
 import type { FieldDef } from "../api";
@@ -32,6 +32,7 @@ export function CreateBugModal({
   onClose,
   onCreated,
 }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [summary, setSummary] = useState("");
   const [priority, setPriority] = useState("Medium");
@@ -193,7 +194,7 @@ export function CreateBugModal({
   const canSubmit = !busy && !!summary.trim() && !extraLoading && extraValid();
 
   return (
-    <Modal onClose={onClose} className="modal" labelledBy="create-bug-title">
+    <Modal initialFocus={focusRef} onClose={onClose} className="modal" labelledBy="create-bug-title">
         <div className="pending-head">
           <h2 id="create-bug-title">Create bug for {testKey}</h2>
           <button className="btn btn-ghost" onClick={onClose} title="Cancel" aria-label="Cancel">
@@ -205,7 +206,7 @@ export function CreateBugModal({
             Summary
             <input
               value={summary}
-              autoFocus
+              ref={focusRef}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Short defect title"
             />

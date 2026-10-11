@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProfile } from "../contexts/ProfileContext";
 import {
   ListTests,
@@ -34,6 +34,7 @@ export function AddTestsModal({
   onAdd,
   targetLabel,
 }: Props) {
+  const focusRef = useRef<HTMLInputElement>(null);
   const { activeId: profileId } = useProfile();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<TestCase[]>([]);
@@ -172,7 +173,7 @@ export function AddTestsModal({
   }
 
   return (
-    <Modal onClose={onCancel} className="modal pending-modal" labelledBy="add-tests-title">
+    <Modal initialFocus={focusRef} onClose={onCancel} className="modal pending-modal" labelledBy="add-tests-title">
         <div className="pending-head">
           <h2 id="add-tests-title">Add tests to {targetLabel ?? containerKey}</h2>
           <button className="btn btn-ghost" onClick={onCancel} title="Close">
@@ -194,7 +195,7 @@ export function AddTestsModal({
           <div className="add-tests-main">
             <input
               className="detail-input"
-              autoFocus
+              ref={focusRef}
               placeholder="Search key, summary, description…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
