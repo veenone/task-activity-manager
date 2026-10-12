@@ -115,6 +115,20 @@ describe("SprintList", () => {
     expect(screen.queryByText("Unscheduled")).not.toBeInTheDocument();
   });
 
+  it("closes a sprint with Enter and reopens it with a click, the same toggle", async () => {
+    const user = userEvent.setup();
+    renderList();
+    await screen.findByText("Apply promo code");
+    const sprint = screen
+      .getAllByRole("treeitem")
+      .find((row) => row.getAttribute("aria-expanded") === "true")!;
+    sprint.focus();
+    await user.keyboard("{Enter}");
+    expect(screen.queryByText("Apply promo code")).not.toBeInTheDocument();
+    await user.click(sprint);
+    expect(await screen.findByText("Apply promo code")).toBeInTheDocument();
+  });
+
   it("renders the goal under the sprint, and says so when the column is still empty", async () => {
     const user = userEvent.setup();
     renderList();
