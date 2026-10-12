@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { onActivateKey, useEscapeKey, useFocusWhen } from "@agile-suite/core";
+import { onActivateKey, useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import { useViewState } from "../lib/viewState";
 import {
@@ -43,6 +43,7 @@ import {
   useContainerRollup,
 } from "../queries/containers";
 import { useConfirm } from "./useConfirm";
+import { Modal } from "./Modal";
 import { useNotice } from "./useNotice";
 import { useCapabilities } from "../features";
 
@@ -100,7 +101,6 @@ export function ContainersView({
   // The batch-environment controls live in a popover so the filter bar stays a
   // single compact row instead of a dedicated tools strip (#310 follow-up).
   const [envToolsOpen, setEnvToolsOpen] = useState(false);
-  useEscapeKey(envToolsOpen, () => setEnvToolsOpen(false));
   const [cSortField, setCSortField] = useViewState(profileId, "containers", "cSortField", "key");
   const [cSortDesc, setCSortDesc] = useViewState(profileId, "containers", "cSortDesc", false);
   const [rowSortField, setRowSortField] = useState("key");
@@ -1050,20 +1050,25 @@ export function ContainersView({
                 </span>
               </button>
               {envToolsOpen && (
-                <>
-                  <div
-                    className="menu-backdrop"
-                    role="presentation"
-                    onClick={() => setEnvToolsOpen(false)}
-                  />
-                  <div
-                    className="env-tools-panel menu-panel-right"
-                    role="dialog"
-                    aria-labelledby="env-tools-title"
-                  >
-                    <span className="env-tools-title" id="env-tools-title">
+                <Modal
+                  onClose={() => setEnvToolsOpen(false)}
+                  className="modal bulk-modal"
+                  labelledBy="env-tools-title"
+                >
+                  <div className="pending-head">
+                    <h2 id="env-tools-title">
                       Set environment on the {viewContainers.length} shown
-                    </span>
+                    </h2>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => setEnvToolsOpen(false)}
+                      aria-label="Close"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="bulk-body">
                     <div className="env-tools-row">
                       <select
                         className="container-status-filter app-select"
@@ -1092,8 +1097,13 @@ export function ContainersView({
                         ))}
                       </datalist>
                     </div>
+                  </div>
+                  <div className="pending-actions">
+                    <button className="btn" onClick={() => setEnvToolsOpen(false)}>
+                      Cancel
+                    </button>
                     <button
-                      className="btn btn-primary env-tools-apply"
+                      className="btn btn-primary"
                       onClick={async () => {
                         await applyBatchEnv();
                         setEnvToolsOpen(false);
@@ -1110,7 +1120,7 @@ export function ContainersView({
                         : `Apply to ${viewContainers.length}`}
                     </button>
                   </div>
-                </>
+                </Modal>
               )}
             </div>
           )}

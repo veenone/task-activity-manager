@@ -62,4 +62,18 @@ describe("TestTable Columns panel", () => {
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("takes focus in, keeps Tab inside, and hands focus back to Columns", async () => {
+    render(
+      <TestTable folderId="" containerKey="" component="" pendingByTestKey={new Map()} />,
+    );
+    const trigger = screen.getByRole("button", { name: "Columns" });
+    await userEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Columns" });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    for (let i = 0; i < 40; i++) await userEvent.tab();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    await userEvent.keyboard("{Escape}");
+    expect(document.activeElement).toBe(trigger);
+  });
 });

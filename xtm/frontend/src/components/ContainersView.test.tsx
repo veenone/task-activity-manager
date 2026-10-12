@@ -233,6 +233,21 @@ describe("ContainersView keyboard", () => {
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("takes focus into the Set env dialog and hands it back on close", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+
+    const trigger = await screen.findByRole("button", { name: /Set env on shown/ });
+    await userEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: /Set environment on the 1 shown/ });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    for (let i = 0; i < 12; i++) await userEvent.tab();
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    await userEvent.keyboard("{Escape}");
+    expect(document.activeElement).toBe(trigger);
+  });
 });
 
 describe("ContainersView Set env on shown", () => {

@@ -34,12 +34,12 @@ describe("ratchet counters", () => {
     expect(isBespokeModal(`${modalImport}\n<Modal className="modal example" />`)).toBe(false);
   });
 
-  it("counts the two app files that still build bespoke overlays", () => {
+  it("counts no app file building its own overlay", () => {
     const count = execFileSync("sh", ["-c", counterCommand("bespoke_modals")], {
       cwd: repoRoot,
       encoding: "utf8",
     }).trim();
 
-    expect(Number(count)).toBe(2);
+    expect(Number(count)).toBe(0);
   }, 30_000);
 });
