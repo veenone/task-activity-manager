@@ -1125,31 +1125,10 @@
 /* Themed form popover for the batch-environment action, anchored under its
    trigger. Reuses the Menu backdrop/anchor primitives but takes card surface
    colours (not the dark bar-native menu) since it holds content-area inputs. */
-.env-tools-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  z-index: 41;
-  min-width: 260px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
-}
-.env-tools-title {
-  font-size: 12px;
-  color: var(--text-muted);
-}
 .env-tools-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-.env-tools-apply {
-  align-self: flex-start;
 }
 /* Only the member table scrolls; the pager stays pinned beneath it. */
 .board-scroll {
@@ -2596,23 +2575,6 @@ button.defect-chip-key:hover {
 .columns-menu {
   position: relative;
 }
-.columns-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
-.columns-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 21;
-  background: #243349;
-  border: 1px solid #3a4a66;
-  border-radius: 8px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
-  padding: 5px;
-  min-width: 210px;
-}
 .columns-row {
   display: flex;
   align-items: center;
@@ -2623,17 +2585,17 @@ button.defect-chip-key:hover {
   font-size: 13px;
 }
 .columns-row:hover {
-  background: #2c3e5c;
+  background: var(--row-hover);
 }
 .columns-label {
   display: flex;
   align-items: center;
   gap: 7px;
   cursor: pointer;
-  color: #d7dce6;
+  color: var(--text);
 }
 .columns-label input {
-  accent-color: #6ea8fe;
+  accent-color: var(--accent);
 }
 .columns-reorder {
   display: flex;
@@ -2642,14 +2604,14 @@ button.defect-chip-key:hover {
 .columns-reorder .btn {
   background: transparent;
   border-color: transparent;
-  color: #9aa7bd;
+  color: var(--text-muted);
   font-size: 9px;
   padding: 1px 5px;
   line-height: 1;
 }
 .columns-reorder .btn:not(:disabled):hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--ghost-hover);
+  color: var(--text);
 }
 .columns-reorder .btn:disabled {
   opacity: 0.3;
@@ -7043,7 +7005,7 @@ tr.row-checked:hover {
   font-size: 12px;
   white-space: nowrap;
 }
-.env-tools-panel .container-env-add {
+.env-tools-row .container-env-add {
   flex: 1 1 150px;
   min-width: 140px;
 }

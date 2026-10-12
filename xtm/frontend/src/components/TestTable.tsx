@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useEscapeKey } from "@agile-suite/core";
 import { useSelection } from "../contexts/SelectionContext";
 import { useProfile } from "../contexts/ProfileContext";
 import type { CSSProperties } from "react";
@@ -15,6 +14,7 @@ import {
   errMsg,
 } from "../api";
 import { usePrompt } from "./usePrompt";
+import { Modal } from "./Modal";
 import { useNotice } from "./useNotice";
 import { formatDate } from "../dates";
 import { REVIEW_ENABLED, useCapabilities } from "../features";
@@ -317,7 +317,6 @@ export function TestTable({
 
   const [columns, setColumns] = useState<ColState[]>(loadColumns);
   const [showColumns, setShowColumns] = useState(false);
-  useEscapeKey(showColumns, () => setShowColumns(false));
   useEffect(() => {
     localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(columns));
   }, [columns]);
@@ -694,13 +693,23 @@ export function TestTable({
             Columns
           </button>
           {showColumns && (
-            <>
-              <div
-                className="columns-backdrop"
-                role="presentation"
-                onClick={() => setShowColumns(false)}
-              />
-              <div className="columns-panel" role="dialog" aria-label="Columns">
+            <Modal
+              onClose={() => setShowColumns(false)}
+              className="modal bulk-modal"
+              labelledBy="columns-title"
+            >
+              <div className="pending-head">
+                <h2 id="columns-title">Columns</h2>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setShowColumns(false)}
+                  aria-label="Close"
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="bulk-body">
                 {columns.map((c, i) => (
                   <div key={c.key} className="columns-row">
                     <label className="columns-label">
@@ -732,7 +741,7 @@ export function TestTable({
                   </div>
                 ))}
               </div>
-            </>
+            </Modal>
           )}
         </div>
         )}
