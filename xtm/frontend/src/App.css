@@ -5494,8 +5494,27 @@ tr.row-checked:hover {
 
 .dup-list { flex: 1; min-height: 0; overflow: auto; }
 .dup-group { border-bottom: 1px solid var(--border); }
-.dup-ghead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; }
+.dup-ghead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
 .dup-ghead:hover { background: var(--row-hover); }
+.dup-ghead-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: var(--hit-min);
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dup-ghead-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset-inset);
+}
 .dup-caret { color: var(--text-muted); }
 .dup-gtitle { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dup-cmp { font-size: 11px; padding: 3px 8px; }
