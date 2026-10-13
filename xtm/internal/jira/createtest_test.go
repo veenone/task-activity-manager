@@ -39,7 +39,7 @@ func TestCreateTestUsesResolvedTypeAndPostsIssue(t *testing.T) {
 
 	key, err := newTestClient(srv).CreateTest(
 		context.Background(), "QA", "New login test", "A description",
-		"High", []string{"smoke", "api"}, []string{"Auth"})
+		"High", []string{"smoke", "api"}, []string{"Auth"}, nil)
 	if err != nil {
 		t.Fatalf("CreateTest: %v", err)
 	}

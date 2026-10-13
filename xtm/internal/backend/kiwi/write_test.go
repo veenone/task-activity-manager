@@ -264,7 +264,7 @@ func TestCreateTestSendsRequiredFieldsAndAttaches(t *testing.T) {
 	defer closeFn()
 
 	key, err := a.CreateTest(context.Background(), "DEMO", "New test", "step text", "P1",
-		[]string{"smoke"}, []string{"Login"})
+		[]string{"smoke"}, []string{"Login"}, nil)
 	if err != nil {
 		t.Fatalf("CreateTest: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestCreateTestNoCategoryErrorsWithoutCreating(t *testing.T) {
 	a, closeFn := newTestAdapter(t, mock)
 	defer closeFn()
 
-	if _, err := a.CreateTest(context.Background(), "EMPTY-PRODUCT", "New test", "", "P1", nil, nil); err == nil {
+	if _, err := a.CreateTest(context.Background(), "EMPTY-PRODUCT", "New test", "", "P1", nil, nil, nil); err == nil {
 		t.Fatal("expected an error when no Category is resolvable")
 	}
 	if callCount(mock, "TestCase.create") != 0 {
@@ -335,7 +335,7 @@ func TestCreateTestEmptyProjectKeyErrors(t *testing.T) {
 	a, closeFn := newTestAdapter(t, mock)
 	defer closeFn()
 
-	if _, err := a.CreateTest(context.Background(), "", "New test", "", "P1", nil, nil); err == nil {
+	if _, err := a.CreateTest(context.Background(), "", "New test", "", "P1", nil, nil, nil); err == nil {
 		t.Fatal("expected an error when projectKey is empty")
 	}
 	if callCount(mock, "Category.filter") != 0 {

@@ -3447,6 +3447,7 @@ export namespace testrepo {
 	    folderId: string;
 	    steps: StepDraft[];
 	    precondKeys: string[];
+	    fields?: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
 	        return new TestDraft(source);
@@ -3466,6 +3467,7 @@ export namespace testrepo {
 	        this.folderId = source["folderId"];
 	        this.steps = this.convertValues(source["steps"], StepDraft);
 	        this.precondKeys = source["precondKeys"];
+	        this.fields = source["fields"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -1460,7 +1460,8 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 			Description string `json:"description"`
 			Priority    string `json:"priority"`
 			Labels      string `json:"labels"`
-			Components  string `json:"components"`
+			Components  string         `json:"components"`
+			Fields      map[string]any `json:"fields"`
 			Steps       []struct {
 				Action   string `json:"action"`
 				Data     string `json:"data"`
@@ -1481,7 +1482,7 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 				components = append(components, s)
 			}
 		}
-		realKey, err := e.backend.CreateTest(ctx, projectKey, p.Summary, p.Description, p.Priority, labels, components)
+		realKey, err := e.backend.CreateTest(ctx, projectKey, p.Summary, p.Description, p.Priority, labels, components, p.Fields)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: "create test: " + sanitizeError(err.Error())})
 			continue
@@ -1759,8 +1760,9 @@ func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, proje
 		var payload struct {
 			Summary     string `json:"summary"`
 			Type        string `json:"type"`
-			Description string `json:"description"`
-			ProjectKey  string `json:"projectKey"`
+			Description string         `json:"description"`
+			ProjectKey  string         `json:"projectKey"`
+			Fields      map[string]any `json:"fields"`
 		}
 		if err := json.Unmarshal([]byte(c.AfterVal), &payload); err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
@@ -1773,7 +1775,7 @@ func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, proje
 		if pk == "" {
 			pk = projectKey
 		}
-		realKey, err := e.backend.CreatePrecondition(ctx, pk, payload.Summary, payload.Type, payload.Description)
+		realKey, err := e.backend.CreatePrecondition(ctx, pk, payload.Summary, payload.Type, payload.Description, payload.Fields)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,

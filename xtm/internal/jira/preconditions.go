@@ -565,12 +565,11 @@ func (c *Client) preconditionDetails(ctx context.Context, keys []string) (map[st
 // condition as a normal field edit, which the commit path pushes through the
 // resolved custom field (see ConditionFieldValue).
 //
-// NOTE(xtm): Xray stores the precondition type (Manual / Generic / Cucumber) in
-// an instance-specific custom field ("Pre-Condition Type", customfield_13988 on
-// the instance checked for RND_P_4TFINT_05-358). ptype is accepted and not
-// sent; wiring it needs the same name resolution the condition now uses.
-func (c *Client) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string) (string, error) {
-	_ = ptype
+// ptype (Manual / Generic / Cucumber) goes to Xray's Pre-Condition Type field,
+// resolved per instance, and is left out when the instance has no such field.
+// extraFields carries the create screen's required fields, Jira-shaped and
+// keyed by field id, and never overrides a field set here.
+func (c *Client) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string, extraFields map[string]any) (string, error) {
 	if isDemoURL(c.baseURL) {
 		return "", nil
 	}
@@ -589,6 +588,16 @@ func (c *Client) CreatePrecondition(ctx context.Context, projectKey, summary, pt
 	if strings.TrimSpace(description) != "" {
 		fields["description"] = description
 	}
+	if strings.TrimSpace(ptype) != "" {
+		id, err := c.preconditionTypeFieldID(ctx)
+		if err != nil {
+			return "", fmt.Errorf("resolve Pre-Condition Type field: %w", err)
+		}
+		if id != "" {
+			fields[id] = map[string]string{"value": ptype}
+		}
+	}
+	mergeExtraFields(fields, extraFields)
 	body := map[string]any{"fields": fields}
 	var resp struct {
 		Key string `json:"key"`

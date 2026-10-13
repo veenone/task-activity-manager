@@ -1180,7 +1180,9 @@ func applyReplaceDelta(current, toRemove, toAdd []string) []string {
 // POSTs the issue and learns the real one; associations made against the temp
 // key are rewritten to the real key on commit (see RenamePrecondition).
 // Returns the temporary key so the caller can associate it immediately.
-func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, description string) (string, error) {
+// fields holds the create screen's required fields, Jira-shaped and keyed by
+// field id, sent with the create POST.
+func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, description string, fields map[string]any) (string, error) {
 	if strings.TrimSpace(summary) == "" {
 		return "", fmt.Errorf("a summary is required for the new precondition")
 	}
@@ -1214,8 +1216,9 @@ func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, d
 		Summary     string `json:"summary"`
 		Type        string `json:"type"`
 		Description string `json:"description"`
-		ProjectKey  string `json:"projectKey"`
-	}{summary, ptype, description, projectKey})
+		ProjectKey  string         `json:"projectKey"`
+		Fields      map[string]any `json:"fields,omitempty"`
+	}{summary, ptype, description, projectKey, fields})
 	if err != nil {
 		return "", fmt.Errorf("encode precondition payload: %w", err)
 	}
