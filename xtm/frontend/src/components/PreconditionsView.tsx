@@ -29,6 +29,7 @@ import { SortControl } from "./SortControl";
 import { keyCompare, cmpStr, applyDir } from "../sort";
 import { Modal } from "./Modal";
 import { CreateFieldInputs, useCreateScreenFields } from "./CreateFieldInputs";
+import { ImportPreconditionsModal } from "./ImportPreconditionsModal";
 
 interface Props {
   onChanged: () => void;
@@ -113,6 +114,7 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
   // did something.
   const [notice, setNotice] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   // A test opened from the "Used by" list, docked as an inline detail beside the
   // precondition detail (mirrors the requirement / browse views, #4).
@@ -424,6 +426,9 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
             onClick={() => setShowCreate(true)}
           >
             New precondition
+          </button>
+          <button className="btn precond-new" onClick={() => setShowImport(true)}>
+            Import…
           </button>
         </div>
         <div className="filter-pill-row">
@@ -825,6 +830,16 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
           onCreated={(key) => {
             setShowCreate(false);
             setSelected(key);
+            onChanged();
+          }}
+        />
+      )}
+
+      {showImport && (
+        <ImportPreconditionsModal
+          onCancel={() => setShowImport(false)}
+          onComplete={() => {
+            setShowImport(false);
             onChanged();
           }}
         />
