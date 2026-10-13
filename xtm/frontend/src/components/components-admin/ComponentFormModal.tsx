@@ -4,13 +4,7 @@ import { useProfile } from "../../contexts/ProfileContext";
 import { useUserSearch } from "../../queries/components";
 import type { ComponentInput, ProjectComponent } from "../../api";
 import { errMsg } from "../../api";
-
-const ASSIGNEE_TYPES = [
-  { value: "PROJECT_DEFAULT", label: "Project default" },
-  { value: "COMPONENT_LEAD", label: "Component lead" },
-  { value: "PROJECT_LEAD", label: "Project lead" },
-  { value: "UNASSIGNED", label: "Unassigned" },
-];
+import { ASSIGNEE_TYPES } from "./assigneeTypes";
 
 interface Props {
   initial?: ProjectComponent;

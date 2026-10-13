@@ -17,12 +17,14 @@ import {
 import type { ComponentInput, ProjectComponent } from "../../api";
 import { Pager } from "../Pager";
 import { SortControl } from "../SortControl";
+import { BulkCreateComponentsModal } from "./BulkCreateComponentsModal";
 import { ComponentFormModal } from "./ComponentFormModal";
 import { DeleteComponentModal } from "./DeleteComponentModal";
 
 type Dialog =
   | { kind: "none" }
   | { kind: "new" }
+  | { kind: "bulk" }
   | { kind: "edit"; component: ProjectComponent }
   | { kind: "delete"; component: ProjectComponent; issueCount: number };
 
@@ -203,6 +205,12 @@ export function ComponentsView({ onChanged }: { onChanged: () => void }) {
             >
               New component
             </button>
+            <button
+              className="btn components-new"
+              onClick={() => setDialog({ kind: "bulk" })}
+            >
+              Bulk create…
+            </button>
           </div>
 
           {list.isLoading ? (
@@ -346,6 +354,12 @@ export function ComponentsView({ onChanged }: { onChanged: () => void }) {
             write(() => CreateComponent(profileId, input))
           }
           onCancel={() => setDialog({ kind: "none" })}
+        />
+      )}
+      {dialog.kind === "bulk" && (
+        <BulkCreateComponentsModal
+          onCreated={() => void reload()}
+          onClose={() => setDialog({ kind: "none" })}
         />
       )}
       {dialog.kind === "edit" && (

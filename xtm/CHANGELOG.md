@@ -10,6 +10,18 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Bulk create components**
+- **Bulk create…** in the Components view creates several Jira components in
+  one go, from names typed one per line or from an `.xlsx` workbook with Name,
+  Description, Lead username and Default assignee columns. A template with
+  those columns can be downloaded from the same dialog.
+- A preview marks each row that will be skipped before anything is sent:
+  blank names, names the project already has, and names repeated within the
+  batch, compared without regard to case. A row Jira refuses does not stop
+  the others.
+- The component list and the cached component options reload after the
+  batch. Legacy `.xls` files are not supported.
+
 **Label picker and Bulk Labels**
 - The Labels field on a test is a picker rather than a space-separated text
   box. It suggests labels already on synced tests, so a typo no longer

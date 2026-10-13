@@ -894,6 +894,20 @@ reflects the last sync.
   default assignee (project default, component lead, project lead, or
   unassigned). Find a lead by typing at least two characters of their name or
   username and picking from the results.
+- **Bulk create…** creates several components at once. Type the names one per
+  line, or load an `.xlsx` workbook with Name, Description, Lead username and
+  Default assignee columns. **Download template** saves a workbook with those
+  columns and two example rows. Default assignee takes the wording the form
+  uses (Project default, Component lead, Project lead, Unassigned). Older
+  `.xls` files are not read; save them as `.xlsx` first.
+
+  Before anything reaches Jira, a preview lists every row and marks the ones
+  that will be skipped: a blank name, a name the project already has, a name
+  another row also creates, or an unknown default assignee. Names compare
+  without regard to case, as Jira's do. **Create** then creates the rest, one
+  at a time. If Jira refuses a row, for example because the lead username does
+  not exist, the other rows are still created, and the result lists each
+  refusal with Jira's reason.
 - **Edit** opens the same form for an existing component. **Clear lead**
   removes the lead.
 - **Delete** first asks Jira how many issues use the component. If any do, you

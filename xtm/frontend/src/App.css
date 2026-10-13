@@ -8038,14 +8038,18 @@ tr.row-checked:hover {
   flex-direction: column;
   min-height: 0;
 }
+/* The search takes the first row to itself; sort and the two create buttons
+   share the second. All four on one row leave no room for the search in a
+   pane as narrow as this one. */
 .components-list-head {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
 }
 .components-search {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
   padding: 5px 8px;
   border: 1px solid var(--border-strong);
