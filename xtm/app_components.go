@@ -4,13 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"os"
 
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/componentadmin"
 	"agile-suite/xtm/internal/testrepo"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // componentAdminBackend joins a backend's component writes with its
@@ -126,21 +123,7 @@ func (a *App) DownloadComponentTemplate() (path string, err error) {
 	if err != nil {
 		return "", err
 	}
-	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Save component import template",
-		DefaultFilename: "component-import-template.xlsx",
-		Filters:         []runtime.FileFilter{{DisplayName: "Excel Workbook", Pattern: "*.xlsx"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if dest == "" {
-		return "", nil
-	}
-	if err := os.WriteFile(dest, data, 0o644); err != nil {
-		return "", fmt.Errorf("write template: %w", err)
-	}
-	return dest, nil
+	return a.saveTemplate("Save component import template", "component-import-template.xlsx", xlsxFilter, data)
 }
 
 // ComponentIssueCount is how many issues carry a component, for the delete

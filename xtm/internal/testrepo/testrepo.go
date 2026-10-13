@@ -1189,16 +1189,29 @@ func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, d
 	if projectKey == "" {
 		projectKey = "PRECOND"
 	}
-	if ptype == "" {
-		ptype = "Manual"
-	}
-
 	tx, err := r.db.Begin()
 	if err != nil {
 		return "", fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	tempKey, err := createPreconditionTx(tx, profileID, projectKey, summary, ptype, description, fields)
+	if err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("commit create-precondition: %w", err)
+	}
+	return tempKey, nil
+}
+
+// createPreconditionTx inserts a local precondition under a temporary key and
+// journals its create, inside tx, so an import can queue many and keep all or
+// none of them.
+func createPreconditionTx(tx *sql.Tx, profileID, projectKey, summary, ptype, description string, fields map[string]any) (string, error) {
+	if ptype == "" {
+		ptype = "Manual"
+	}
 	tempKey, err := nextTempPreconditionKey(tx, profileID)
 	if err != nil {
 		return "", err
@@ -1236,9 +1249,6 @@ func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, d
 		"create-precondition-local", "precondition", "", summary, "",
 	); err != nil {
 		return "", err
-	}
-	if err := tx.Commit(); err != nil {
-		return "", fmt.Errorf("commit create-precondition: %w", err)
 	}
 	return tempKey, nil
 }

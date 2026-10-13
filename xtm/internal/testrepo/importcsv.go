@@ -103,17 +103,7 @@ func groupImportRows(records [][]string, mapping ImportMapping) (tests []testCre
 		return nil, nil, 0, fmt.Errorf("the file has no data rows")
 	}
 	header := records[0]
-	col := func(name string) int {
-		if name == "" {
-			return -1
-		}
-		for i, h := range header {
-			if strings.EqualFold(strings.TrimSpace(h), strings.TrimSpace(name)) {
-				return i
-			}
-		}
-		return -1
-	}
+	col := func(name string) int { return headerColumn(header, name) }
 	summaryIdx := col(mapping.Summary)
 	if summaryIdx < 0 {
 		return nil, nil, 0, fmt.Errorf("the Summary field must be mapped to a column")

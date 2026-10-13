@@ -193,6 +193,8 @@ export function ExportGapReport(arg1:testrepo.GapResult,arg2:string):Promise<str
 
 export function ExportImportTemplate():Promise<string>;
 
+export function ExportPreconditionImportTemplate():Promise<string>;
+
 export function ExportProfile(arg1:string):Promise<string>;
 
 export function ExportPytest(arg1:string,arg2:string,arg3:string):Promise<string>;
@@ -304,6 +306,8 @@ export function GetVersionDistribution(arg1:string,arg2:string):Promise<Array<co
 export function Health():Promise<main.HealthInfo>;
 
 export function ImportCoverageTemplate(arg1:string,arg2:string):Promise<coverage.ImportSummary>;
+
+export function ImportPreconditions(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.PreconditionImportMapping,arg5:boolean,arg6:Record<string, any>):Promise<testrepo.PreconditionImportResult>;
 
 export function ImportProfile():Promise<profile.Profile>;
 

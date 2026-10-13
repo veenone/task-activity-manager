@@ -2733,6 +2733,85 @@ export namespace testrepo {
 		    return a;
 		}
 	}
+	export class PreconditionImportMapping {
+	    summary: string;
+	    type: string;
+	    condition: string;
+	    description: string;
+	    labels: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreconditionImportMapping(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.summary = source["summary"];
+	        this.type = source["type"];
+	        this.condition = source["condition"];
+	        this.description = source["description"];
+	        this.labels = source["labels"];
+	    }
+	}
+	export class PreconditionImportRow {
+	    row: number;
+	    summary: string;
+	    type: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreconditionImportRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = source["row"];
+	        this.summary = source["summary"];
+	        this.type = source["type"];
+	        this.status = source["status"];
+	    }
+	}
+	export class PreconditionImportResult {
+	    created: number;
+	    newCount: number;
+	    existingCount: number;
+	    rows: PreconditionImportRow[];
+	    errors: ImportError[];
+	    unknownTypes: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PreconditionImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.created = source["created"];
+	        this.newCount = source["newCount"];
+	        this.existingCount = source["existingCount"];
+	        this.rows = this.convertValues(source["rows"], PreconditionImportRow);
+	        this.errors = this.convertValues(source["errors"], ImportError);
+	        this.unknownTypes = source["unknownTypes"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class PreconditionTest {
 	    key: string;
 	    summary: string;
