@@ -98,6 +98,8 @@ func TestCreatePreconditionUsesResolvedTypeID(t *testing.T) {
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"id": "77", "name": "Pre-Condition"}, // renamed type, contains-match
 			})
+		case "/rest/api/2/field":
+			_ = json.NewEncoder(w).Encode([]map[string]any{})
 		case "/rest/api/2/issue":
 			body, _ := io.ReadAll(r.Body)
 			var payload struct {
@@ -114,7 +116,7 @@ func TestCreatePreconditionUsesResolvedTypeID(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	key, err := newTestClient(srv).CreatePrecondition(context.Background(), "PROJ", "New PC", "Manual", "desc")
+	key, err := newTestClient(srv).CreatePrecondition(context.Background(), "PROJ", "New PC", "Manual", "desc", nil)
 	if err != nil {
 		t.Fatalf("CreatePrecondition: %v", err)
 	}

@@ -395,7 +395,7 @@ func TestEditPreconditionFieldRejectsUnknownField(t *testing.T) {
 func TestCreatePreconditionQueuesAddAndAppearsInList(t *testing.T) {
 	repo := seedTestWithPreconditions(t)
 
-	tempKey, err := repo.CreatePrecondition("p1", "QA", "Network is up", "", "")
+	tempKey, err := repo.CreatePrecondition("p1", "QA", "Network is up", "", "", nil)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -428,7 +428,7 @@ func TestCreatePreconditionQueuesAddAndAppearsInList(t *testing.T) {
 
 func TestRenamePreconditionRewritesAssociations(t *testing.T) {
 	repo := seedTestWithPreconditions(t)
-	tempKey, err := repo.CreatePrecondition("p1", "QA", "New cond", "", "")
+	tempKey, err := repo.CreatePrecondition("p1", "QA", "New cond", "", "", nil)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -455,7 +455,7 @@ func TestRenamePreconditionRewritesAssociations(t *testing.T) {
 
 func TestDiscardPreconditionAddRemovesItEverywhere(t *testing.T) {
 	repo := seedTestWithPreconditions(t)
-	tempKey, err := repo.CreatePrecondition("p1", "QA", "New cond", "", "")
+	tempKey, err := repo.CreatePrecondition("p1", "QA", "New cond", "", "", nil)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}

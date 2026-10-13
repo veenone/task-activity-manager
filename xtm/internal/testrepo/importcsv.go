@@ -84,6 +84,8 @@ type testCreatePayload struct {
 	GenericDefinition string       `json:"genericDefinition"`
 	Folder            string       `json:"folder"`
 	Steps             []importStep `json:"steps,omitempty"`
+	// Fields holds the create screen's required fields, keyed by field id.
+	Fields map[string]any `json:"fields,omitempty"`
 }
 
 // ParseImportPreview reads the header row and counts data rows (FR-10.2 / 10.5).
@@ -101,17 +103,7 @@ func groupImportRows(records [][]string, mapping ImportMapping) (tests []testCre
 		return nil, nil, 0, fmt.Errorf("the file has no data rows")
 	}
 	header := records[0]
-	col := func(name string) int {
-		if name == "" {
-			return -1
-		}
-		for i, h := range header {
-			if strings.EqualFold(strings.TrimSpace(h), strings.TrimSpace(name)) {
-				return i
-			}
-		}
-		return -1
-	}
+	col := func(name string) int { return headerColumn(header, name) }
 	summaryIdx := col(mapping.Summary)
 	if summaryIdx < 0 {
 		return nil, nil, 0, fmt.Errorf("the Summary field must be mapped to a column")

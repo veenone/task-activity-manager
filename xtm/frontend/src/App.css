@@ -3655,8 +3655,11 @@ tr.row-selected td:first-child {
   flex-direction: column;
   min-height: 0;
 }
+/* The search takes the first row; Sync, sort, New precondition and Import…
+   share the second, as in the Components view. */
 .precond-list-head {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
@@ -3670,6 +3673,9 @@ tr.row-selected td:first-child {
   border-radius: 5px;
   background: var(--surface-2);
   color: var(--text);
+}
+.precond-list-head .precond-search {
+  flex: 1 1 100%;
 }
 .precond-search:focus {
   border-color: var(--accent);

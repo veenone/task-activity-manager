@@ -1183,23 +1183,38 @@ func applyReplaceDelta(current, toRemove, toAdd []string) []string {
 // POSTs the issue and learns the real one; associations made against the temp
 // key are rewritten to the real key on commit (see RenamePrecondition).
 // Returns the temporary key so the caller can associate it immediately.
-func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, description string) (string, error) {
+// fields holds the create screen's required fields, Jira-shaped and keyed by
+// field id, sent with the create POST.
+func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, description string, fields map[string]any) (string, error) {
 	if strings.TrimSpace(summary) == "" {
 		return "", fmt.Errorf("a summary is required for the new precondition")
 	}
 	if projectKey == "" {
 		projectKey = "PRECOND"
 	}
-	if ptype == "" {
-		ptype = "Manual"
-	}
-
 	tx, err := r.db.Begin()
 	if err != nil {
 		return "", fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	tempKey, err := createPreconditionTx(tx, profileID, projectKey, summary, ptype, description, fields)
+	if err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("commit create-precondition: %w", err)
+	}
+	return tempKey, nil
+}
+
+// createPreconditionTx inserts a local precondition under a temporary key and
+// journals its create, inside tx, so an import can queue many and keep all or
+// none of them.
+func createPreconditionTx(tx *sql.Tx, profileID, projectKey, summary, ptype, description string, fields map[string]any) (string, error) {
+	if ptype == "" {
+		ptype = "Manual"
+	}
 	tempKey, err := nextTempPreconditionKey(tx, profileID)
 	if err != nil {
 		return "", err
@@ -1214,11 +1229,12 @@ func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, d
 	}
 
 	payload, err := json.Marshal(struct {
-		Summary     string `json:"summary"`
-		Type        string `json:"type"`
-		Description string `json:"description"`
-		ProjectKey  string `json:"projectKey"`
-	}{summary, ptype, description, projectKey})
+		Summary     string         `json:"summary"`
+		Type        string         `json:"type"`
+		Description string         `json:"description"`
+		ProjectKey  string         `json:"projectKey"`
+		Fields      map[string]any `json:"fields,omitempty"`
+	}{summary, ptype, description, projectKey, fields})
 	if err != nil {
 		return "", fmt.Errorf("encode precondition payload: %w", err)
 	}
@@ -1236,9 +1252,6 @@ func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, d
 		"create-precondition-local", "precondition", "", summary, "",
 	); err != nil {
 		return "", err
-	}
-	if err := tx.Commit(); err != nil {
-		return "", fmt.Errorf("commit create-precondition: %w", err)
 	}
 	return tempKey, nil
 }

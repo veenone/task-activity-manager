@@ -1715,7 +1715,7 @@ func (a *App) CreatePrecondition(profileID, summary string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, "", "")
+	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, "", "", nil)
 }
 
 // BulkAssociatePreconditions adds (add=true) or removes (add=false) the given
@@ -1762,8 +1762,10 @@ func (a *App) ListTestsForPrecondition(profileID, preconditionKey string) ([]tes
 
 // CreatePreconditionDetailed creates a new Precondition locally with a type and
 // description and queues it for creation in Jira on commit (FR-13.4 / 13.5),
-// returning its temporary key. Project key comes from the profile.
-func (a *App) CreatePreconditionDetailed(profileID, summary, ptype, description string) (string, error) {
+// returning its temporary key. Project key comes from the profile. fields are
+// the create screen's required fields (see GetPreconditionCreateFields),
+// Jira-shaped and keyed by field id.
+func (a *App) CreatePreconditionDetailed(profileID, summary, ptype, description string, fields map[string]any) (string, error) {
 	if err := a.requireStore(); err != nil {
 		return "", err
 	}
@@ -1771,7 +1773,7 @@ func (a *App) CreatePreconditionDetailed(profileID, summary, ptype, description 
 	if err != nil {
 		return "", err
 	}
-	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, ptype, description)
+	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, ptype, description, fields)
 }
 
 // DeletePrecondition removes a Precondition and its Test links and queues the
@@ -3744,6 +3746,47 @@ func (a *App) GetRequirementCreateFields(profileID, projectKey, issueType string
 	return toJiraFieldDefs(bf), nil
 }
 
+// GetPreconditionCreateFields returns the required fields the precondition
+// create screen adds to the New precondition dialog, so the dialog can ask for
+// them before commit instead of the create failing at commit. Demo mode
+// returns a preset list.
+func (a *App) GetPreconditionCreateFields(profileID string) (fields []jira.FieldDef, err error) {
+	defer recoverToError("GetPreconditionCreateFields", &err)
+	return a.createScreenFields(profileID, func(b backend.Backend, projectKey string) ([]backend.FieldDef, error) {
+		return b.GetPreconditionCreateFields(a.ctx, projectKey)
+	})
+}
+
+// GetTestCreateFields returns the required fields the Test create screen adds
+// to the New Test panel.
+func (a *App) GetTestCreateFields(profileID string) (fields []jira.FieldDef, err error) {
+	defer recoverToError("GetTestCreateFields", &err)
+	return a.createScreenFields(profileID, func(b backend.Backend, projectKey string) ([]backend.FieldDef, error) {
+		return b.GetTestCreateFields(a.ctx, projectKey)
+	})
+}
+
+// createScreenFields runs a create-screen field lookup against the profile's
+// backend and project.
+func (a *App) createScreenFields(profileID string, get func(backend.Backend, string) ([]backend.FieldDef, error)) ([]jira.FieldDef, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	b, err := a.backendFor(profileID)
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return nil, err
+	}
+	bf, err := get(b, p.ProjectKey)
+	if err != nil {
+		return nil, err
+	}
+	return toJiraFieldDefs(bf), nil
+}
+
 // CreateTest queues a brand-new Test locally (temp NEW-N key) with optional
 // steps, folder and precondition links, pushed to Jira on commit (FR-1).
 // Returns the temp key so the frontend can open the new Test in the detail panel.
@@ -4111,13 +4154,19 @@ func (a *App) ExportDashboard(profileID, folder, component, status string) (stri
 	return path, nil
 }
 
-// ExportImportTemplate writes a starter CSV import template to a user-chosen
-// file (FR-10.3). Returns the saved path, or "" if cancelled.
-func (a *App) ExportImportTemplate() (string, error) {
+// csvFilter and xlsxFilter are the save-dialog filters for template downloads.
+var (
+	csvFilter  = runtime.FileFilter{DisplayName: "CSV", Pattern: "*.csv"}
+	xlsxFilter = runtime.FileFilter{DisplayName: "Excel Workbook", Pattern: "*.xlsx"}
+)
+
+// saveTemplate asks where to save an import template and writes data there.
+// Returns the saved path, or "" when the user cancels.
+func (a *App) saveTemplate(title, filename string, filter runtime.FileFilter, data []byte) (string, error) {
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Save import template",
-		DefaultFilename: exportFilename("test-import-template.csv"),
-		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
+		Title:           title,
+		DefaultFilename: filename,
+		Filters:         []runtime.FileFilter{filter},
 	})
 	if err != nil {
 		return "", fmt.Errorf("save dialog: %w", err)
@@ -4125,51 +4174,59 @@ func (a *App) ExportImportTemplate() (string, error) {
 	if path == "" {
 		return "", nil
 	}
-	if err := os.WriteFile(path, []byte(testrepo.ImportTemplateCSV()), 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return "", fmt.Errorf("write template: %w", err)
 	}
 	return path, nil
+}
+
+// ExportPreconditionImportTemplate writes a starter CSV precondition import
+// template to a user-chosen file. Returns the saved path, or "" if cancelled.
+func (a *App) ExportPreconditionImportTemplate() (string, error) {
+	return a.saveTemplate("Save precondition import template",
+		exportFilename("precondition-import-template.csv"), csvFilter,
+		[]byte(testrepo.PreconditionImportTemplateCSV()))
+}
+
+// ImportPreconditions parses an uploaded CSV or XLSX of preconditions and,
+// unless dryRun, queues each new row as a pending create. fields are the
+// precondition create screen's required fields, applied to every row.
+func (a *App) ImportPreconditions(profileID, contentB64 string, isXlsx bool, mapping testrepo.PreconditionImportMapping, dryRun bool, fields map[string]any) (result testrepo.PreconditionImportResult, err error) {
+	defer recoverToError("ImportPreconditions", &err)
+	empty := testrepo.PreconditionImportResult{
+		Rows: []testrepo.PreconditionImportRow{}, Errors: []testrepo.ImportError{}, UnknownTypes: []string{},
+	}
+	if err := a.requireStore(); err != nil {
+		return empty, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return empty, err
+	}
+	records, err := decodeImport(contentB64, isXlsx)
+	if err != nil {
+		return empty, err
+	}
+	return a.repo.ImportPreconditions(profileID, p.ProjectKey, records, mapping, dryRun, fields)
+}
+
+// ExportImportTemplate writes a starter CSV import template to a user-chosen
+// file (FR-10.3). Returns the saved path, or "" if cancelled.
+func (a *App) ExportImportTemplate() (string, error) {
+	return a.saveTemplate("Save import template", exportFilename("test-import-template.csv"), csvFilter, []byte(testrepo.ImportTemplateCSV()))
 }
 
 // ExportSummaryTemplate writes the summary-only gap-analysis template (just a
 // Summary column) to a user-chosen file. Returns the saved path, or "" if
 // cancelled.
 func (a *App) ExportSummaryTemplate() (string, error) {
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Save summary-only template",
-		DefaultFilename: exportFilename("gap-summary-template.csv"),
-		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
-	}
-	if err := os.WriteFile(path, []byte(testrepo.SummaryTemplateCSV()), 0o644); err != nil {
-		return "", fmt.Errorf("write template: %w", err)
-	}
-	return path, nil
+	return a.saveTemplate("Save summary-only template", exportFilename("gap-summary-template.csv"), csvFilter, []byte(testrepo.SummaryTemplateCSV()))
 }
 
 // ExportSummaryFolderTemplate writes the summary + folder gap-analysis template
 // to a user-chosen file. Returns the saved path, or "" if cancelled.
 func (a *App) ExportSummaryFolderTemplate() (string, error) {
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Save summary + folder template",
-		DefaultFilename: exportFilename("gap-summary-folder-template.csv"),
-		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
-	}
-	if err := os.WriteFile(path, []byte(testrepo.SummaryFolderTemplateCSV()), 0o644); err != nil {
-		return "", fmt.Errorf("write template: %w", err)
-	}
-	return path, nil
+	return a.saveTemplate("Save summary + folder template", exportFilename("gap-summary-folder-template.csv"), csvFilter, []byte(testrepo.SummaryFolderTemplateCSV()))
 }
 
 // --- Requirement import (-267) ---
@@ -4177,21 +4234,7 @@ func (a *App) ExportSummaryFolderTemplate() (string, error) {
 // ExportRequirementImportTemplate writes a starter CSV requirement import
 // template to a user-chosen file. Returns the saved path, or "" if cancelled.
 func (a *App) ExportRequirementImportTemplate() (string, error) {
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Save requirement import template",
-		DefaultFilename: exportFilename("requirement-import-template.csv"),
-		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if path == "" {
-		return "", nil
-	}
-	if err := os.WriteFile(path, []byte(testrepo.RequirementImportTemplateCSV()), 0o644); err != nil {
-		return "", fmt.Errorf("write template: %w", err)
-	}
-	return path, nil
+	return a.saveTemplate("Save requirement import template", exportFilename("requirement-import-template.csv"), csvFilter, []byte(testrepo.RequirementImportTemplateCSV()))
 }
 
 // AnalyzeRequirementImport parses an uploaded file and classifies each row as

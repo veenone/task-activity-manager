@@ -799,7 +799,7 @@ func (a *Adapter) ListPreconditions(ctx context.Context, projectKey string, onPr
 	return nil, nil, nil // P4.2 — EMPTY: Kiwi core has no precondition object (spec §3.6)
 }
 
-func (a *Adapter) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string) (string, error) {
+func (a *Adapter) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string, extraFields map[string]any) (string, error) {
 	return "", backend.ErrUnsupported // P4.2 (write)
 }
 
@@ -931,6 +931,16 @@ func (a *Adapter) ListIssueLinkTypeDetails(ctx context.Context) ([]backend.Issue
 
 func (a *Adapter) CreateRequirement(ctx context.Context, projectKey, issueType, summary, description, priority, components, fixVersions string, extraFields map[string]any) (string, error) {
 	return "", backend.ErrUnsupported // Phase 5 (write)
+}
+
+// GetPreconditionCreateFields and GetTestCreateFields return nothing: Kiwi has
+// no create screens, so there is never a required field to ask for.
+func (a *Adapter) GetPreconditionCreateFields(ctx context.Context, projectKey string) ([]backend.FieldDef, error) {
+	return nil, nil
+}
+
+func (a *Adapter) GetTestCreateFields(ctx context.Context, projectKey string) ([]backend.FieldDef, error) {
+	return nil, nil
 }
 
 func (a *Adapter) GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]backend.FieldDef, error) {

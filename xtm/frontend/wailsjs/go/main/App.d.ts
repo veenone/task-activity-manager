@@ -107,7 +107,7 @@ export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<testre
 
 export function CreatePrecondition(arg1:string,arg2:string):Promise<string>;
 
-export function CreatePreconditionDetailed(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+export function CreatePreconditionDetailed(arg1:string,arg2:string,arg3:string,arg4:string,arg5:Record<string, any>):Promise<string>;
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:boolean,arg11:string):Promise<profile.Profile>;
 
@@ -193,6 +193,8 @@ export function ExportGapReport(arg1:testrepo.GapResult,arg2:string):Promise<str
 
 export function ExportImportTemplate():Promise<string>;
 
+export function ExportPreconditionImportTemplate():Promise<string>;
+
 export function ExportProfile(arg1:string):Promise<string>;
 
 export function ExportPytest(arg1:string,arg2:string,arg3:string):Promise<string>;
@@ -247,6 +249,8 @@ export function GetIgnoreWords():Promise<Array<string>>;
 
 export function GetParamModel(arg1:string,arg2:string):Promise<coverage.ParamModel>;
 
+export function GetPreconditionCreateFields(arg1:string):Promise<Array<jira.FieldDef>>;
+
 export function GetProfileCrossProjectSources(arg1:string):Promise<string>;
 
 export function GetProfileProjectKey(arg1:string):Promise<string>;
@@ -275,6 +279,8 @@ export function GetTestBugs(arg1:string,arg2:string):Promise<Array<testrepo.Test
 
 export function GetTestContainers(arg1:string,arg2:string):Promise<Array<testrepo.ContainerMembership>>;
 
+export function GetTestCreateFields(arg1:string):Promise<Array<jira.FieldDef>>;
+
 export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.CustomFieldValue>>;
 
 export function GetTestMeta(arg1:string,arg2:string):Promise<jira.TestMeta>;
@@ -300,6 +306,8 @@ export function GetVersionDistribution(arg1:string,arg2:string):Promise<Array<co
 export function Health():Promise<main.HealthInfo>;
 
 export function ImportCoverageTemplate(arg1:string,arg2:string):Promise<coverage.ImportSummary>;
+
+export function ImportPreconditions(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.PreconditionImportMapping,arg5:boolean,arg6:Record<string, any>):Promise<testrepo.PreconditionImportResult>;
 
 export function ImportProfile():Promise<profile.Profile>;
 

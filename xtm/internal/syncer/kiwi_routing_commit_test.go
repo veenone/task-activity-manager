@@ -102,7 +102,7 @@ func (b *kiwiFakeBackend) UpdateIssue(ctx context.Context, key string, fields ma
 // configured createTestKey (a plain integer string, e.g. "42", not a
 // "PROJ-123" Jira key) and records the call so the test can assert exactly
 // one create happened.
-func (b *kiwiFakeBackend) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string) (string, error) {
+func (b *kiwiFakeBackend) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string, extraFields map[string]any) (string, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.createTestCalls++
