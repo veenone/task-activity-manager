@@ -216,6 +216,8 @@ export {
   ApplyJUnitImportNewExec,
   AnalyzeRequirementImport,
   ExportRequirementImportTemplate,
+  ExportPreconditionImportTemplate,
+  ImportPreconditions,
   ImportRequirements,
   // Coverage module (parameter-level coverage + canonical requirement reuse)
   ListCanonicalRequirements,
@@ -1285,6 +1287,26 @@ export interface PreconditionDuplicateReport {
 export interface ImportPreview {
   headers: string[];
   rowCount: number;
+}
+
+// PreconditionImportMapping mirrors testrepo.PreconditionImportMapping: the
+// column header each precondition field reads from ("" when unmapped).
+export interface PreconditionImportMapping {
+  summary: string;
+  type: string;
+  condition: string;
+  description: string;
+  labels: string;
+}
+
+// PreconditionImportResult mirrors testrepo.PreconditionImportResult.
+export interface PreconditionImportResult {
+  created: number;
+  newCount: number;
+  existingCount: number;
+  rows: { row: number; summary: string; type: string; status: string }[];
+  errors: { row: number; message: string }[];
+  unknownTypes: string[];
 }
 
 export interface ImportMapping {

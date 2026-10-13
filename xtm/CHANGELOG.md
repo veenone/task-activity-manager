@@ -10,6 +10,18 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Precondition import**
+- **Import…** in the Preconditions view reads a CSV or XLSX of preconditions
+  (Summary, Type, Condition, Description, Labels) and queues the new rows as
+  pending creates. A template is downloadable from the dialog.
+- Validate reports the new and existing rows and the per-row errors without
+  writing anything. Rows whose summary already exists are skipped, so a
+  re-import creates nothing.
+- An empty summary or an unknown Type stops the whole import, validated or
+  not, and the rows that pass are queued in one transaction, so a partial
+  import cannot happen. Required create fields (see below) are asked once and
+  applied to every row.
+
 **Required fields on precondition and test create**
 - The New precondition dialog and the New Test panel ask for any field the
   Jira project marks required on its create screen, as Create Bug and New

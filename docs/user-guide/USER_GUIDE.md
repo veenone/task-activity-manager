@@ -705,6 +705,32 @@ Jira once committed. If your Jira project marks other fields as required when a
 precondition is created, the dialog asks for them under Description, and
 **Create** stays disabled until each one is filled.
 
+### Importing preconditions
+
+**Import…** beside **New precondition** reads a `.csv` or `.xlsx` file with
+the columns Summary, Type, Condition, Description and Labels. **Download
+template** saves a CSV with those columns and two example rows. After you
+pick a file, each field is matched to a column by its header name; change
+any match with its dropdown. Only Summary is required.
+
+- **Type** is Manual, Generic or Cucumber, in any case. A blank Type means
+  Manual.
+- **Labels** are separated by spaces, as in the Labels field.
+- If Jira requires other fields when a precondition is created, the dialog
+  asks for them once and applies the answers to every row.
+
+**Validate** checks the file without changing anything. It reports how many
+rows are new, how many already exist, and the rows that need fixing. A row is
+treated as already existing when its summary matches an existing precondition,
+ignoring case and extra spaces, or matches an earlier row in the same file.
+Those rows are skipped, so importing the same file twice creates nothing the
+second time.
+
+**Import** queues each new row as a pending create, committed from the Pending
+list. If any row has an error, such as an empty summary or a Type Xray does
+not have, nothing is imported, whether or not you pressed Validate first. Fix
+the rows and import again.
+
 ---
 
 ## 9. Requirements & coverage

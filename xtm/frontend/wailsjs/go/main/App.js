@@ -358,6 +358,10 @@ export function ExportImportTemplate() {
   return window['go']['main']['App']['ExportImportTemplate']();
 }
 
+export function ExportPreconditionImportTemplate() {
+  return window['go']['main']['App']['ExportPreconditionImportTemplate']();
+}
+
 export function ExportProfile(arg1) {
   return window['go']['main']['App']['ExportProfile'](arg1);
 }
@@ -580,6 +584,10 @@ export function Health() {
 
 export function ImportCoverageTemplate(arg1, arg2) {
   return window['go']['main']['App']['ImportCoverageTemplate'](arg1, arg2);
+}
+
+export function ImportPreconditions(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['ImportPreconditions'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function ImportProfile() {

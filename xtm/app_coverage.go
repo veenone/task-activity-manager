@@ -250,21 +250,7 @@ func (a *App) DownloadCoverageTemplate() (path string, err error) {
 	if err != nil {
 		return "", err
 	}
-	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "Download coverage template",
-		DefaultFilename: "parameter-coverage-template.xlsx",
-		Filters:         []runtime.FileFilter{{DisplayName: "Excel Workbook", Pattern: "*.xlsx"}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("save dialog: %w", err)
-	}
-	if dest == "" {
-		return "", nil // cancelled
-	}
-	if err := os.WriteFile(dest, data, 0o644); err != nil {
-		return "", fmt.Errorf("write file: %w", err)
-	}
-	return dest, nil
+	return a.saveTemplate("Download coverage template", "parameter-coverage-template.xlsx", xlsxFilter, data)
 }
 
 // SeedPKCS11Reference seeds a complete, cross-linked PKCS#11 reference dataset

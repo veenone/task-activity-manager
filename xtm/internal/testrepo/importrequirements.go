@@ -51,14 +51,7 @@ type reqImportCols struct {
 // reqImportMapping maps canonical requirement import column names to header
 // positions, case-insensitively.
 func reqImportMapping(header []string) reqImportCols {
-	find := func(name string) int {
-		for i, h := range header {
-			if strings.EqualFold(strings.TrimSpace(h), name) {
-				return i
-			}
-		}
-		return -1
-	}
+	find := func(name string) int { return headerColumn(header, name) }
 	return reqImportCols{
 		summary:     find("Summary"),
 		description: find("Description"),

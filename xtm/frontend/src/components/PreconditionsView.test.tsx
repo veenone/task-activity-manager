@@ -77,6 +77,7 @@ vi.mock("./TestDetail", () => ({
     return null;
   },
 }));
+vi.mock("./useNotice", () => ({ useNotice: () => ({ notice: vi.fn() }) }));
 vi.mock("./useConfirm", () => ({
   useConfirm: () => ({ confirm: vi.fn(async () => false) }),
 }));
@@ -147,6 +148,14 @@ describe("PreconditionsView", () => {
       customfield_20000: { id: "2" },
       customfield_20001: "OPS-1",
     });
+  });
+
+  it("opens the import dialog from Import…", async () => {
+    renderView("https://jira.example.com/");
+    await userEvent.click(screen.getByRole("button", { name: "Import…" }));
+    expect(
+      screen.getByRole("dialog", { name: "Import preconditions (CSV or XLSX)" }),
+    ).toBeInTheDocument();
   });
 
   it("opens the precondition in Jira from its key", async () => {
