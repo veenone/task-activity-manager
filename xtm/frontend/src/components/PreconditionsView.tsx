@@ -9,6 +9,7 @@ import { useViewState } from "../lib/viewState";
 import {
   CreatePreconditionDetailed,
   EditPreconditionField,
+  GetPreconditionCreateFields,
   DeletePrecondition,
   BulkAssociatePreconditions,
   SyncPreconditions,
@@ -27,6 +28,7 @@ import { Pager } from "./Pager";
 import { SortControl } from "./SortControl";
 import { keyCompare, cmpStr, applyDir } from "../sort";
 import { Modal } from "./Modal";
+import { CreateFieldInputs, useCreateScreenFields } from "./CreateFieldInputs";
 
 interface Props {
   onChanged: () => void;
@@ -870,9 +872,13 @@ function CreatePreconditionModal({
   const [condition, setCondition] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const extra = useCreateScreenFields(
+    () => GetPreconditionCreateFields(profileId),
+    profileId,
+  );
 
   async function create() {
-    if (!summary.trim()) return;
+    if (!summary.trim() || !extra.valid) return;
     setBusy(true);
     setError("");
     try {
@@ -881,9 +887,10 @@ function CreatePreconditionModal({
         summary.trim(),
         type,
         description,
+        extra.payload(),
       );
-      // Apply the condition via EditPreconditionField so the create signature
-      // stays unchanged (no wails binding regen needed).
+      // The condition is journaled as an ordinary field edit, which the commit
+      // pushes through Xray's resolved condition field.
       if (condition.trim()) {
         await EditPreconditionField(profileId, key, "condition", condition);
       }
@@ -952,6 +959,7 @@ function CreatePreconditionModal({
             placeholder="Optional. Markdown supported."
           />
         </div>
+        <CreateFieldInputs fields={extra.fields} values={extra.values} onChange={extra.setValue} />
         {error && <div className="error-text">{error}</div>}
       </div>
       <div className="pending-actions">
@@ -961,7 +969,7 @@ function CreatePreconditionModal({
         <button
           className="btn btn-primary"
           onClick={create}
-          disabled={busy || !summary.trim()}
+          disabled={busy || !summary.trim() || !extra.valid}
         >
           {busy ? "Creating…" : "Create"}
         </button>

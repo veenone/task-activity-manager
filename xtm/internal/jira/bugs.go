@@ -336,65 +336,9 @@ func (c *Client) GetFieldDefs(ctx context.Context, projectKey, issueType string)
 	if strings.TrimSpace(issueType) == "" {
 		issueType = "Bug"
 	}
-	path := "/rest/api/2/issue/createmeta?projectKeys=" + url.QueryEscape(projectKey) +
-		"&issuetypeNames=" + url.QueryEscape(issueType) +
-		"&expand=projects.issuetypes.fields"
-
-	var meta struct {
-		Projects []struct {
-			IssueTypes []struct {
-				Fields map[string]struct {
-					Name     string `json:"name"`
-					Required bool   `json:"required"`
-					Schema   struct {
-						Type  string `json:"type"`
-						Items string `json:"items"`
-					} `json:"schema"`
-					AllowedValues []struct {
-						ID    string `json:"id"`
-						Value string `json:"value"`
-						Name  string `json:"name"`
-					} `json:"allowedValues"`
-				} `json:"fields"`
-			} `json:"issuetypes"`
-		} `json:"projects"`
-	}
-	if err := c.get(ctx, path, &meta); err != nil {
-		return nil, err
-	}
-
-	// Fields already handled by the Create Bug form — skip them.
-	skip := map[string]bool{
-		"project": true, "issuetype": true, "summary": true,
-		"description": true, "priority": true, "labels": true,
-	}
-	var out []FieldDef
-	for _, proj := range meta.Projects {
-		for _, it := range proj.IssueTypes {
-			for id, fd := range it.Fields {
-				if skip[id] || !fd.Required {
-					continue
-				}
-				typ := bugCreateFieldKind(fd.Schema.Type, fd.Schema.Items)
-				avs := make([]FieldOption, 0, len(fd.AllowedValues))
-				for _, av := range fd.AllowedValues {
-					v := av.Value
-					if v == "" {
-						v = av.Name
-					}
-					avs = append(avs, FieldOption{ID: av.ID, Value: v})
-				}
-				out = append(out, FieldDef{
-					ID:            id,
-					Name:          fd.Name,
-					Required:      true,
-					Type:          typ,
-					AllowedValues: avs,
-				})
-			}
-		}
-	}
-	return out, nil
+	// Fields already handled by the Create Bug form.
+	return c.GetCreateScreenFields(ctx, projectKey, "", issueType,
+		[]string{"project", "issuetype", "summary", "description", "priority", "labels"})
 }
 
 // bugCreateFieldKind maps a createmeta schema type (and its items, when the

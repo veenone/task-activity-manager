@@ -4,6 +4,7 @@ import { useProfile } from "../contexts/ProfileContext";
 
 import {
   CreateTest,
+  GetTestCreateFields,
   ListComponents,
   ListPriorities,
   ListAllPreconditions,
@@ -11,6 +12,7 @@ import {
 } from "../api";
 import type { Folder, Precondition, TestDraft, StepDraft } from "../api";
 import { CloneStepsModal } from "./CloneStepsModal";
+import { CreateFieldInputs, useCreateScreenFields } from "./CreateFieldInputs";
 import { MarkdownField } from "./MarkdownField";
 
 interface Props {
@@ -51,6 +53,7 @@ export function NewTestPanel({
   const [genericDefinition, setGenericDefinition] = useState("");
   const [steps, setSteps] = useState<StepRow[]>([]);
   const [precondKeys, setPrecondKeys] = useState<string[]>([]);
+  const extra = useCreateScreenFields(() => GetTestCreateFields(profileId), profileId);
 
   const [stepsOpen, setStepsOpen] = useState(false);
   const [showClone, setShowClone] = useState(false);
@@ -115,6 +118,10 @@ export function NewTestPanel({
       setError("Enter a summary before creating the test.");
       return;
     }
+    if (!extra.valid) {
+      setError("Fill in all required fields.");
+      return;
+    }
     setSaving(true);
     setError("");
     const isBodyType = execType === "Cucumber" || execType === "Generic";
@@ -133,6 +140,7 @@ export function NewTestPanel({
         ? []
         : steps.map(({ action, data, expected }) => ({ action, data, expected })),
       precondKeys,
+      fields: extra.payload(),
     };
     try {
       // Cast to any: the Wails-generated binding expects its own class type but
@@ -170,6 +178,8 @@ export function NewTestPanel({
           spellCheck
           ref={focusRef}
         />
+
+        <CreateFieldInputs fields={extra.fields} values={extra.values} onChange={extra.setValue} />
 
         <div className="field-label">Description</div>
         <textarea
@@ -419,7 +429,7 @@ export function NewTestPanel({
         <button
           className="btn btn-primary"
           onClick={submit}
-          disabled={saving || !summary.trim()}
+          disabled={saving || !summary.trim() || !extra.valid}
         >
           {saving ? "Creating…" : "Create →"}
         </button>

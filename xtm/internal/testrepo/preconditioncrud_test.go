@@ -109,7 +109,7 @@ func TestDeletePreconditionQueuesDeleteAndUnlinks(t *testing.T) {
 // Precondition cancels its create instead of queuing a remote delete.
 func TestDeleteLocalPreconditionCancelsCreate(t *testing.T) {
 	repo := seedTestWithPreconditions(t)
-	tempKey, err := repo.CreatePrecondition("p1", "QA", "Brand new", "Manual", "")
+	tempKey, err := repo.CreatePrecondition("p1", "QA", "Brand new", "Manual", "", nil)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}

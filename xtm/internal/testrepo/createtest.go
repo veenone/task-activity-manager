@@ -28,6 +28,9 @@ type TestDraft struct {
 	FolderID          string      `json:"folderId"`
 	Steps             []StepDraft `json:"steps"`
 	PrecondKeys       []string    `json:"precondKeys"`
+	// Fields holds the create screen's required fields, Jira-shaped and keyed
+	// by field id, sent with the create POST.
+	Fields map[string]any `json:"fields,omitempty"`
 }
 
 // CreateTest queues a brand-new local Test (temp "NEW-N" key) with its steps,
@@ -47,6 +50,7 @@ func (r *Repository) CreateTest(profileID string, d TestDraft) (string, error) {
 		CucumberScenario:  d.CucumberScenario,
 		CucumberType:      d.CucumberType,
 		GenericDefinition: d.GenericDefinition,
+		Fields:            d.Fields,
 	}
 	for _, s := range d.Steps {
 		if s.Action == "" && s.Data == "" && s.Expected == "" {

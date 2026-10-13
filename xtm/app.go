@@ -1715,7 +1715,7 @@ func (a *App) CreatePrecondition(profileID, summary string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, "", "")
+	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, "", "", nil)
 }
 
 // BulkAssociatePreconditions adds (add=true) or removes (add=false) the given
@@ -1762,8 +1762,10 @@ func (a *App) ListTestsForPrecondition(profileID, preconditionKey string) ([]tes
 
 // CreatePreconditionDetailed creates a new Precondition locally with a type and
 // description and queues it for creation in Jira on commit (FR-13.4 / 13.5),
-// returning its temporary key. Project key comes from the profile.
-func (a *App) CreatePreconditionDetailed(profileID, summary, ptype, description string) (string, error) {
+// returning its temporary key. Project key comes from the profile. fields are
+// the create screen's required fields (see GetPreconditionCreateFields),
+// Jira-shaped and keyed by field id.
+func (a *App) CreatePreconditionDetailed(profileID, summary, ptype, description string, fields map[string]any) (string, error) {
 	if err := a.requireStore(); err != nil {
 		return "", err
 	}
@@ -1771,7 +1773,7 @@ func (a *App) CreatePreconditionDetailed(profileID, summary, ptype, description 
 	if err != nil {
 		return "", err
 	}
-	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, ptype, description)
+	return a.repo.CreatePrecondition(profileID, p.ProjectKey, summary, ptype, description, fields)
 }
 
 // DeletePrecondition removes a Precondition and its Test links and queues the
@@ -3738,6 +3740,47 @@ func (a *App) GetRequirementCreateFields(profileID, projectKey, issueType string
 		return nil, err
 	}
 	bf, err := b.GetRequirementCreateFields(a.ctx, projectKey, issueType)
+	if err != nil {
+		return nil, err
+	}
+	return toJiraFieldDefs(bf), nil
+}
+
+// GetPreconditionCreateFields returns the required fields the precondition
+// create screen adds to the New precondition dialog, so the dialog can ask for
+// them before commit instead of the create failing at commit. Demo mode
+// returns a preset list.
+func (a *App) GetPreconditionCreateFields(profileID string) (fields []jira.FieldDef, err error) {
+	defer recoverToError("GetPreconditionCreateFields", &err)
+	return a.createScreenFields(profileID, func(b backend.Backend, projectKey string) ([]backend.FieldDef, error) {
+		return b.GetPreconditionCreateFields(a.ctx, projectKey)
+	})
+}
+
+// GetTestCreateFields returns the required fields the Test create screen adds
+// to the New Test panel.
+func (a *App) GetTestCreateFields(profileID string) (fields []jira.FieldDef, err error) {
+	defer recoverToError("GetTestCreateFields", &err)
+	return a.createScreenFields(profileID, func(b backend.Backend, projectKey string) ([]backend.FieldDef, error) {
+		return b.GetTestCreateFields(a.ctx, projectKey)
+	})
+}
+
+// createScreenFields runs a create-screen field lookup against the profile's
+// backend and project.
+func (a *App) createScreenFields(profileID string, get func(backend.Backend, string) ([]backend.FieldDef, error)) ([]jira.FieldDef, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	b, err := a.backendFor(profileID)
+	if err != nil {
+		return nil, err
+	}
+	p, err := a.profiles.Get(profileID)
+	if err != nil {
+		return nil, err
+	}
+	bf, err := get(b, p.ProjectKey)
 	if err != nil {
 		return nil, err
 	}

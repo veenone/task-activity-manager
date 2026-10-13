@@ -159,6 +159,7 @@ const (
 	xrayCucumberTestTypeType   = "com.xpandit.plugins.xray:automated-test-type-custom-field"
 	xrayGenericDefinitionType  = "com.xpandit.plugins.xray:path-editor-custom-field"
 	xrayPreconditionEditorType = "com.xpandit.plugins.xray:precondition-editor-custom-field"
+	xrayPreconditionTypeType   = "com.xpandit.plugins.xray:precondition-type-custom-field"
 	xrayTestEnvironmentsType   = "com.xpandit.plugins.xray:test-environments-custom-field"
 	xrayTestPlanType           = "com.xpandit.plugins.xray:test-plan-custom-field"
 )
@@ -220,6 +221,16 @@ func (c *Client) genericDefinitionFieldID(ctx context.Context) (string, error) {
 // 8.4.0 and "Condition" on older versions, so both remain as the fallback.
 func (c *Client) conditionFieldID(ctx context.Context) (string, error) {
 	return c.xrayFieldID(ctx, xrayPreconditionEditorType, "Conditions", "Condition")
+}
+
+// preconditionTypeFieldID resolves the custom field id of the Xray
+// "Pre-Condition Type" field (Manual, Generic or Cucumber).
+//
+// NOTE(xtm): the plugin key is not yet read off the live instance; the name
+// fallback is what the instance checked for RND_P_4TFINT_05-358 calls it
+// (customfield_13988 there).
+func (c *Client) preconditionTypeFieldID(ctx context.Context) (string, error) {
+	return c.xrayFieldID(ctx, xrayPreconditionTypeType, "Pre-Condition Type", "Precondition Type")
 }
 
 // testEnvironmentsFieldID resolves the custom field id of the Xray "Test

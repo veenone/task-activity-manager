@@ -396,7 +396,7 @@ func (a *Adapter) UpdateIssue(ctx context.Context, key string, fields map[string
 // pre-existing; the multi-RPC create-then-attach shape that can trip it is
 // Kiwi-specific. Reconciling it needs an engine change (out of this
 // Kiwi-only task's scope) — flagging it for the P5.4/P5.5 engine work.
-func (a *Adapter) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string) (string, error) {
+func (a *Adapter) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string, extraFields map[string]any) (string, error) {
 	priorityID, err := a.resolvePriorityID(ctx, priority)
 	if err != nil {
 		return "", fmt.Errorf("resolve priority: %w", err)

@@ -79,8 +79,8 @@ func (a *Adapter) GetTestFields(ctx context.Context, key string) (backend.Test, 
 	return toTest(t), nil
 }
 
-func (a *Adapter) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string) (string, error) {
-	return a.c.CreateTest(ctx, projectKey, summary, description, priority, labels, components)
+func (a *Adapter) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string, extraFields map[string]any) (string, error) {
+	return a.c.CreateTest(ctx, projectKey, summary, description, priority, labels, components, extraFields)
 }
 
 func (a *Adapter) UpdateIssue(ctx context.Context, key string, fields map[string]any) error {
@@ -309,8 +309,24 @@ func (a *Adapter) ListTestPreconditions(ctx context.Context, testKey string) ([]
 	return toPreconditions(pcs), nil
 }
 
-func (a *Adapter) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string) (string, error) {
-	return a.c.CreatePrecondition(ctx, projectKey, summary, ptype, description)
+func (a *Adapter) CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string, extraFields map[string]any) (string, error) {
+	return a.c.CreatePrecondition(ctx, projectKey, summary, ptype, description, extraFields)
+}
+
+func (a *Adapter) GetPreconditionCreateFields(ctx context.Context, projectKey string) ([]backend.FieldDef, error) {
+	fields, err := a.c.GetPreconditionCreateFields(ctx, projectKey)
+	if err != nil {
+		return nil, err
+	}
+	return toFieldDefs(fields), nil
+}
+
+func (a *Adapter) GetTestCreateFields(ctx context.Context, projectKey string) ([]backend.FieldDef, error) {
+	fields, err := a.c.GetTestCreateFields(ctx, projectKey)
+	if err != nil {
+		return nil, err
+	}
+	return toFieldDefs(fields), nil
 }
 
 func (a *Adapter) UpdateTestPreconditions(ctx context.Context, testKey string, add, remove []string) error {

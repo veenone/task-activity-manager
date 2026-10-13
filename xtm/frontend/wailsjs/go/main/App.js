@@ -186,8 +186,8 @@ export function CreatePrecondition(arg1, arg2) {
   return window['go']['main']['App']['CreatePrecondition'](arg1, arg2);
 }
 
-export function CreatePreconditionDetailed(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['CreatePreconditionDetailed'](arg1, arg2, arg3, arg4);
+export function CreatePreconditionDetailed(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreatePreconditionDetailed'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function CreateProfile(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
@@ -466,6 +466,10 @@ export function GetParamModel(arg1, arg2) {
   return window['go']['main']['App']['GetParamModel'](arg1, arg2);
 }
 
+export function GetPreconditionCreateFields(arg1) {
+  return window['go']['main']['App']['GetPreconditionCreateFields'](arg1);
+}
+
 export function GetProfileCrossProjectSources(arg1) {
   return window['go']['main']['App']['GetProfileCrossProjectSources'](arg1);
 }
@@ -520,6 +524,10 @@ export function GetTestBugs(arg1, arg2) {
 
 export function GetTestContainers(arg1, arg2) {
   return window['go']['main']['App']['GetTestContainers'](arg1, arg2);
+}
+
+export function GetTestCreateFields(arg1) {
+  return window['go']['main']['App']['GetTestCreateFields'](arg1);
 }
 
 export function GetTestCustomFields(arg1, arg2, arg3) {

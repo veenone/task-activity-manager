@@ -631,7 +631,9 @@ func (c *Client) resolveTestType(ctx context.Context) (id, name string, err erro
 // CreateTest creates a new Xray Test issue and returns its key (FR-1). Demo URLs
 // short-circuit to a no-op (the local NEW-N key is kept). Priority is sent only
 // when non-empty; labels and components are sent as Jira expects them.
-func (c *Client) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string) (string, error) {
+// extraFields carries the create screen's required fields, Jira-shaped and
+// keyed by field id, and never overrides a field set here.
+func (c *Client) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string, extraFields map[string]any) (string, error) {
 	if isDemoURL(c.baseURL) {
 		return "", nil
 	}
@@ -667,6 +669,7 @@ func (c *Client) CreateTest(ctx context.Context, projectKey, summary, descriptio
 			fields["components"] = comps
 		}
 	}
+	mergeExtraFields(fields, extraFields)
 	var resp struct {
 		Key string `json:"key"`
 	}

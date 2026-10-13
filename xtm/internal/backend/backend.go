@@ -124,7 +124,7 @@ type Backend interface {
 	// empty slice and zero total.
 	SearchTestsAcrossProjects(ctx context.Context, projectKeys []string, query string, offset, limit int) ([]TestBasic, int, error)
 	SearchPreconditionsAcrossProjects(ctx context.Context, projectKeys []string, query string, offset, limit int) ([]Precondition, int, error)
-	CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string) (string, error)
+	CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string, extraFields map[string]any) (string, error)
 	UpdateIssue(ctx context.Context, key string, fields map[string]any) error
 	GetTestMeta(ctx context.Context, key string) (TestMeta, error)
 
@@ -188,7 +188,10 @@ type Backend interface {
 
 	// --- preconditions ---
 	ListPreconditions(ctx context.Context, projectKey string, onProgress func(done, total int)) ([]Precondition, map[string][]string, error)
-	CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string) (string, error)
+	CreatePrecondition(ctx context.Context, projectKey, summary, ptype, description string, extraFields map[string]any) (string, error)
+	// GetPreconditionCreateFields returns the required fields the precondition
+	// create screen adds to what the New precondition dialog collects.
+	GetPreconditionCreateFields(ctx context.Context, projectKey string) ([]FieldDef, error)
 	UpdateTestPreconditions(ctx context.Context, testKey string, add, remove []string) error
 	DeletePrecondition(ctx context.Context, preconditionKey string) error
 
@@ -199,6 +202,9 @@ type Backend interface {
 	ListIssueLinkTypeDetails(ctx context.Context) ([]IssueLinkType, error)
 	CreateRequirement(ctx context.Context, projectKey, issueType, summary, description, priority, components, fixVersions string, extraFields map[string]any) (string, error)
 	GetRequirementCreateFields(ctx context.Context, projectKey, issueType string) ([]FieldDef, error)
+	// GetTestCreateFields returns the required fields the Test create screen
+	// adds to what the New Test panel collects.
+	GetTestCreateFields(ctx context.Context, projectKey string) ([]FieldDef, error)
 	DeleteRequirement(ctx context.Context, requirementKey string) error
 	UpdateRequirementLinks(ctx context.Context, fromKey string, add []string, removeLinkIDs []string) error
 	ListReqToReqLinks(ctx context.Context, reqKeys []string) ([]ReqToReqLink, error)

@@ -104,7 +104,7 @@ func newFakeTarget(caps backend.Capabilities) *fakeTarget {
 
 func (f *fakeTarget) Capabilities() backend.Capabilities { return f.caps }
 
-func (f *fakeTarget) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string) (string, error) {
+func (f *fakeTarget) CreateTest(ctx context.Context, projectKey, summary, description, priority string, labels, components []string, extraFields map[string]any) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err, ok := f.failFor[summary]; ok {

@@ -623,6 +623,11 @@ Click **New Test** (top-right, Browse view). The New Test panel collects the
 summary, folder, steps, and fields. The new test gets a temporary key locally
 and is created in Jira on the next commit.
 
+If your Jira project marks other fields as required when a test is created,
+the panel asks for them below the summary, marked with an asterisk, and
+**Create** stays disabled until each one is filled. The values are sent when
+the test is created on commit, so the commit does not fail for want of them.
+
 ![Figure 12: New Test panel](images/12-new-test.png)
 *Figure 12 — Creating a test. If a folder is selected in the sidebar it is
 pre-filled.*
@@ -694,6 +699,11 @@ Create a new precondition with **New precondition**:
 
 ![Figure 17: New precondition dialog](images/17-precondition-create.png)
 *Figure 17 — Creating a precondition. It is created in Jira on the next commit.*
+
+The type you pick (Manual, Generic or Cucumber) is the precondition's type in
+Jira once committed. If your Jira project marks other fields as required when a
+precondition is created, the dialog asks for them under Description, and
+**Create** stays disabled until each one is filled.
 
 ---
 

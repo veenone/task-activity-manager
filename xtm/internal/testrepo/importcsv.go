@@ -84,6 +84,8 @@ type testCreatePayload struct {
 	GenericDefinition string       `json:"genericDefinition"`
 	Folder            string       `json:"folder"`
 	Steps             []importStep `json:"steps,omitempty"`
+	// Fields holds the create screen's required fields, keyed by field id.
+	Fields map[string]any `json:"fields,omitempty"`
 }
 
 // ParseImportPreview reads the header row and counts data rows (FR-10.2 / 10.5).

@@ -239,7 +239,7 @@ func (p *Publisher) publishOne(ctx context.Context, workspaceID, targetConnectio
 		return
 	}
 
-	targetKey, err := p.Target.CreateTest(ctx, p.TargetProjectKey, t.Summary, t.Description, t.Priority, t.Labels, t.Components)
+	targetKey, err := p.Target.CreateTest(ctx, p.TargetProjectKey, t.Summary, t.Description, t.Priority, t.Labels, t.Components, nil)
 	if err != nil {
 		result.Failed = append(result.Failed, PublishFailure{LocalKey: t.Key, Error: fmt.Sprintf("create test: %v", err)})
 		return

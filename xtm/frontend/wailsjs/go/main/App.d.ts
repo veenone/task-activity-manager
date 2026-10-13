@@ -107,7 +107,7 @@ export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<testre
 
 export function CreatePrecondition(arg1:string,arg2:string):Promise<string>;
 
-export function CreatePreconditionDetailed(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+export function CreatePreconditionDetailed(arg1:string,arg2:string,arg3:string,arg4:string,arg5:Record<string, any>):Promise<string>;
 
 export function CreateProfile(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:boolean,arg11:string):Promise<profile.Profile>;
 
@@ -247,6 +247,8 @@ export function GetIgnoreWords():Promise<Array<string>>;
 
 export function GetParamModel(arg1:string,arg2:string):Promise<coverage.ParamModel>;
 
+export function GetPreconditionCreateFields(arg1:string):Promise<Array<jira.FieldDef>>;
+
 export function GetProfileCrossProjectSources(arg1:string):Promise<string>;
 
 export function GetProfileProjectKey(arg1:string):Promise<string>;
@@ -274,6 +276,8 @@ export function GetTest(arg1:string,arg2:string):Promise<testrepo.TestCase>;
 export function GetTestBugs(arg1:string,arg2:string):Promise<Array<testrepo.TestBug>>;
 
 export function GetTestContainers(arg1:string,arg2:string):Promise<Array<testrepo.ContainerMembership>>;
+
+export function GetTestCreateFields(arg1:string):Promise<Array<jira.FieldDef>>;
 
 export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.CustomFieldValue>>;
 
