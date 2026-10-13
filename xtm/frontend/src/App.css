@@ -8070,7 +8070,8 @@ tr.row-checked:hover {
   align-items: center;
   margin-bottom: 8px;
 }
-.components-search {
+.components-search,
+.labels-admin-search {
   flex: 1 1 100%;
   min-width: 0;
   padding: 5px 8px;
@@ -8218,4 +8219,17 @@ tr.row-checked:hover {
   padding: 0;
   min-width: 0;
   gap: 16px;
+}
+
+/* Labels dialog (More > Labels…): a filter and sort above the label table,
+   and the row actions kept on one line. The filter shares .components-search. */
+.labels-admin-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+.labels-admin-actions {
+  white-space: nowrap;
+  text-align: right;
 }

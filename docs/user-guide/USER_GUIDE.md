@@ -489,6 +489,31 @@ field refuses those with a message. Labels are case-sensitive: `Smoke` and
 change straight away. Text you typed but did not confirm with Enter is added
 when you leave the field.
 
+#### Renaming, merging and deleting labels
+
+**More → Labels…** lists every label on your synced tests with the number of
+tests that carry it. Filter the list by typing, and sort it by label or by
+test count.
+
+- **Rename…** asks for a new name. If a label with that name already exists,
+  the rename becomes a merge: the old label is replaced by the existing one,
+  and a test that already had both keeps a single copy.
+- **Delete** removes the label from every test that carries it.
+
+Jira has no way to manage labels on their own, because a label exists only
+as a value on issues. Each action is therefore an edit to every test carrying
+the label, one pending change per test, and it reaches Jira on Commit as that
+many issue updates. Before anything is queued, the confirmation says how many
+changes it will be. Renaming a label used by 2,000 tests queues 2,000 pending
+changes.
+
+Only tests you have synced are changed. A test in Jira that is not in your
+local copy keeps the old label. The app also refuses to rename or delete a
+label while pending label edits on tests that use it are waiting to be
+committed, and says how many. Commit or discard those first. A new name with
+a space in it, or longer than 255 characters, is refused as in the Labels
+field.
+
 ### Components
 
 The Components field works like Labels, with three differences. It only

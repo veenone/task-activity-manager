@@ -29,7 +29,8 @@ export type ModalId =
   | "diagnostics"
   | "about"
   | "syncHistory"
-  | "import";
+  | "import"
+  | "labels";
 
 import { createModalContext } from "@agile-suite/core";
 
