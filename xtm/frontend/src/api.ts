@@ -104,6 +104,8 @@ export {
   ListComponents,
   ListLabels,
   ListTestLabels,
+  RenameLabel,
+  DeleteLabel,
   ListStatuses,
   ListPriorities,
   ListProjectComponents,

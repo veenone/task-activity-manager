@@ -10,6 +10,17 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Label admin**
+- **More → Labels…** lists every label on synced tests with its test count,
+  searchable and sortable, and renames, merges or deletes one across all the
+  tests carrying it.
+- Each action queues one pending change per carrying test and reaches Jira
+  on Commit as that many issue updates. The confirmation states the count
+  before anything is queued.
+- Only synced tests change. A rename or delete is refused while pending
+  label edits name the label, and a merge never leaves a label on a test
+  twice.
+
 **Label picker and Bulk Labels**
 - The Labels field on a test is a picker rather than a space-separated text
   box. It suggests labels already on synced tests, so a typo no longer

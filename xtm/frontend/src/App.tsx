@@ -95,6 +95,7 @@ import MisspellingsView from "./components/MisspellingsView";
 import { DiagnosticsModal } from "./components/DiagnosticsModal";
 import { SyncHistoryModal } from "./components/SyncHistoryModal";
 import { ImportTestsModal } from "./components/ImportTestsModal";
+import { LabelsModal } from "./components/labels-admin/LabelsModal";
 import { Menu } from "./components/Menu";
 import { AboutModal } from "./components/AboutModal";
 import { LiveRegion } from "./components/LiveRegion";
@@ -1125,6 +1126,12 @@ function App() {
                   title: "Import tests from a CSV or XLSX file",
                 },
                 {
+                  key: "labels",
+                  label: "Labels…",
+                  onClick: () => openModal("labels"),
+                  title: "Rename, merge or delete a label across synced tests",
+                },
+                {
                   key: "fullsync",
                   label: "Full resync (re-pull folders)",
                   onClick: runFullSync,
@@ -1685,6 +1692,16 @@ function App() {
 
       {isOpen("syncHistory") && (
         <SyncHistoryModal onClose={() => closeModal()} />
+      )}
+
+      {isOpen("labels") && (
+        <LabelsModal
+          onChanged={() => {
+            refreshProfileData();
+            reloadPending();
+          }}
+          onClose={() => closeModal()}
+        />
       )}
 
       {isOpen("import") && (
