@@ -420,9 +420,8 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
           <button
             className="btn btn-primary precond-new"
             onClick={() => setShowCreate(true)}
-            title="Create a new precondition"
           >
-            + New
+            New precondition
           </button>
         </div>
         <div className="filter-pill-row">
