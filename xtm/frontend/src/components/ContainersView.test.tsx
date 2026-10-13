@@ -169,6 +169,16 @@ beforeEach(() => {
   clearViewState("p1");
 });
 
+describe("ContainersView create button", () => {
+  it("names the kind it creates", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+    expect(
+      screen.getByRole("button", { name: "New Test Execution" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("ContainersView Create bug gate", () => {
   it("offers Create bug when the backend can create one directly (Xray)", async () => {
     renderWithCaps({ supportsBugCreation: true, supportsBugRouting: false });

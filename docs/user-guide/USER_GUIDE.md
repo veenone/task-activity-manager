@@ -665,7 +665,7 @@ it. In edit mode you can:
 - **+ Add tests** to link more tests.
 - Delete the precondition (queued for commit).
 
-Create a new precondition with **+ New**:
+Create a new precondition with **New precondition**:
 
 ![Figure 17: New precondition dialog](images/17-precondition-create.png)
 *Figure 17 — Creating a precondition. It is created in Jira on the next commit.*
@@ -706,7 +706,7 @@ requirement detail.*
 
 ### Creating, importing & linking requirements
 
-- **+ New requirement** drafts a requirement in a left-docked panel: pick the
+- **New requirement** drafts a requirement in a left-docked panel: pick the
   project and issue type and write a markdown summary. It gets a temporary key
   locally and is created in Jira on the next commit.
 - **Import…** loads requirements from a CSV or XLSX file, de-duplicating by
@@ -762,7 +762,8 @@ tests. Tables default to 15 rows per page.*
 
 You can:
 
-- **Create** a container and allocate tests to it.
+- Create a container with **New Test Set**, **New Test Plan** or **New Test
+  Execution** (the button follows the kind selector), and allocate tests to it.
 - Add or remove member tests.
 - For a **Test Execution**, set each member's **run result** inline (e.g. PASS /
   FAIL / TODO), or apply one result to many selected members at once. A compact

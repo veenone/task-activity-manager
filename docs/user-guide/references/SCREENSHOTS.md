@@ -72,7 +72,7 @@ columns: date / tester / environment), **44** (Plan / Set run roll-up), **45**
 | 14 | `14-bulk-toolbar.png` | Browse → tick 2–3 rows | The bulk toolbar visible above the grid |
 | 15 | `15-bulk-edit.png` | Bulk toolbar → **Bulk edit…** | The Bulk edit dialog open |
 | 16 | `16-preconditions.png` | **Preconditions** tab | Card list (left) + a selected precondition's detail (right) |
-| 17 | `17-precondition-create.png` | Preconditions → **+ New** | The New precondition dialog |
+| 17 | `17-precondition-create.png` | Preconditions → **New precondition** | The New precondition dialog |
 | 18 | `18-requirements.png` | **Requirements** tab | Card list with coverage pills + a selected requirement's covering-tests detail |
 | 19 | `19-requirement-sources.png` | Requirements → **Sources…** | The Requirement Sources dialog (with the add-source fields) |
 | 20 | `20-duplicates.png` | **Duplicates** tab | A duplicate group selected, list + detail visible |

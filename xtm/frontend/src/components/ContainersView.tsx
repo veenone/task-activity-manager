@@ -838,8 +838,8 @@ export function ContainersView({
           >
             {syncing ? "Syncing…" : "Sync"}
           </button>
-          <button className="btn btn-primary" onClick={newContainer} title={`New ${kindLabel}`} data-tour="plans-new">
-            + New
+          <button className="btn btn-primary" onClick={newContainer} data-tour="plans-new">
+            New {kindLabel}
           </button>
           {kind === "testexec" && (
             <button
