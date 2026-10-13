@@ -222,7 +222,7 @@ type Backend interface {
 
 	// --- workflow ---
 	GetTransitions(ctx context.Context, key, currentStatus string) ([]Transition, error)
-	PostTransition(ctx context.Context, key, transitionID string) error
+	PostTransition(ctx context.Context, key, transitionID string, fields map[string]any) error
 
 	// --- metadata ---
 	ListStatuses(ctx context.Context, projectKey string) ([]string, error)

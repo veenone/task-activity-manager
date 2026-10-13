@@ -209,7 +209,7 @@ func toTestRuns(in []jira.TestRun) []backend.TestRun {
 }
 
 func toTransition(t jira.Transition) backend.Transition {
-	return backend.Transition{ID: t.ID, Name: t.Name, To: t.To}
+	return backend.Transition{ID: t.ID, Name: t.Name, To: t.To, Fields: toFieldDefs(t.Fields)}
 }
 
 func toTransitions(in []jira.Transition) []backend.Transition {

@@ -139,9 +139,10 @@ type TestRun struct {
 
 // Transition is an available workflow transition from the current status.
 type Transition struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	To   string `json:"to"`
+	ID     string     `json:"id"`
+	Name   string     `json:"name"`
+	To     string     `json:"to"`
+	Fields []FieldDef `json:"fields"`
 }
 
 // CustomFieldDef describes a custom field available on the backend.

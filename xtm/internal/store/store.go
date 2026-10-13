@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 51
+const schemaVersion = 52
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -1356,6 +1356,17 @@ func applyMigrations(db *sql.DB) error {
 		`ALTER TABLE precondition ADD COLUMN status TEXT NOT NULL DEFAULT ''`,
 	); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return fmt.Errorf("v51 add precondition.status: %w", err)
+	}
+
+	// v52: the field values a queued workflow transition carries (#164), as
+	// JSON keyed by field id, NULL when it carries none. They live on the
+	// transition's own row so it is reviewed and discarded as a unit; a row per
+	// field would let a partial discard leave a transition Jira rejects.
+	// Applied unconditionally; tolerated when the column already exists.
+	if _, err := db.Exec(
+		`ALTER TABLE pending_change ADD COLUMN transition_fields TEXT`,
+	); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		return fmt.Errorf("v52 add pending_change.transition_fields: %w", err)
 	}
 	return nil
 }

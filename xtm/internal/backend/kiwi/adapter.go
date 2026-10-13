@@ -1156,7 +1156,7 @@ func (a *Adapter) GetTransitions(ctx context.Context, key, currentStatus string)
 	return nil, nil // P4.2 — EMPTY: status is settable directly, not transitioned (spec §3.11)
 }
 
-func (a *Adapter) PostTransition(ctx context.Context, key, transitionID string) error {
+func (a *Adapter) PostTransition(ctx context.Context, key, transitionID string, fields map[string]any) error {
 	return backend.ErrUnsupported // P4.2 — use TestCase.update({"case_status":id}) in the write phase (spec §3.11)
 }
 
