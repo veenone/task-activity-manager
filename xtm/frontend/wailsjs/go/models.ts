@@ -230,6 +230,91 @@ export namespace bridge {
 
 }
 
+export namespace componentadmin {
+	
+	export class BatchFailure {
+	    row: number;
+	    name: string;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchFailure(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = source["row"];
+	        this.name = source["name"];
+	        this.error = source["error"];
+	    }
+	}
+	export class BatchResult {
+	    created: backend.Component[];
+	    failed: BatchFailure[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.created = this.convertValues(source["created"], backend.Component);
+	        this.failed = this.convertValues(source["failed"], BatchFailure);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class BatchRow {
+	    input: backend.ComponentInput;
+	    problem: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BatchRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.input = this.convertValues(source["input"], backend.ComponentInput);
+	        this.problem = source["problem"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace connection {
 	
 	export class Connection {

@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"os"
 
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/componentadmin"
 	"agile-suite/xtm/internal/testrepo"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // componentAdminBackend joins a backend's component writes with its
@@ -80,6 +84,63 @@ func (a *App) DeleteComponent(profileID, id, moveIssuesTo string) (err error) {
 		return err
 	}
 	return svc.Delete(a.ctx, id, moveIssuesTo)
+}
+
+// CheckComponents says which rows of a batch create cannot be created and
+// why, for the preview before CreateComponents.
+func (a *App) CheckComponents(profileID string, rows []backend.ComponentInput) (out []componentadmin.BatchRow, err error) {
+	defer recoverToError("CheckComponents", &err)
+	svc, _, err := a.componentAdmin(profileID)
+	if err != nil {
+		return nil, err
+	}
+	return svc.Check(a.ctx, rows)
+}
+
+// CreateComponents creates several project components in Jira, carrying on
+// past rows that fail.
+func (a *App) CreateComponents(profileID string, rows []backend.ComponentInput) (out componentadmin.BatchResult, err error) {
+	defer recoverToError("CreateComponents", &err)
+	svc, _, err := a.componentAdmin(profileID)
+	if err != nil {
+		return componentadmin.BatchResult{}, err
+	}
+	return svc.CreateMany(a.ctx, rows)
+}
+
+// ParseComponentWorkbook reads component rows from an uploaded XLSX file.
+func (a *App) ParseComponentWorkbook(contentB64 string) (out []backend.ComponentInput, err error) {
+	defer recoverToError("ParseComponentWorkbook", &err)
+	data, err := base64.StdEncoding.DecodeString(contentB64)
+	if err != nil {
+		return nil, fmt.Errorf("decode upload: %w", err)
+	}
+	return componentadmin.ParseWorkbook(data)
+}
+
+// DownloadComponentTemplate saves the component import template where the
+// user chooses. Returns the path written, or "" when cancelled.
+func (a *App) DownloadComponentTemplate() (path string, err error) {
+	defer recoverToError("DownloadComponentTemplate", &err)
+	data, err := componentadmin.TemplateWorkbook()
+	if err != nil {
+		return "", err
+	}
+	dest, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save component import template",
+		DefaultFilename: "component-import-template.xlsx",
+		Filters:         []runtime.FileFilter{{DisplayName: "Excel Workbook", Pattern: "*.xlsx"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if dest == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(dest, data, 0o644); err != nil {
+		return "", fmt.Errorf("write template: %w", err)
+	}
+	return dest, nil
 }
 
 // ComponentIssueCount is how many issues carry a component, for the delete
