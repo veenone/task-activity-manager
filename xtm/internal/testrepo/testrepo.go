@@ -195,6 +195,9 @@ type PendingChange struct {
 	AfterVal    string `json:"afterVal"`
 	BaseVersion string `json:"baseVersion"`
 	CreatedAt   string `json:"createdAt"`
+	// TransitionFields is the JSON of the field values a queued status
+	// transition carries, keyed by field id; "" when it carries none.
+	TransitionFields string `json:"transitionFields"`
 }
 
 // AuditEntry is one row of the local audit trail (FR-12.6 / NFR-13). Every
@@ -4302,6 +4305,22 @@ func (r *Repository) DiscardAllPendingChanges(profileID string) (int, error) {
 // remote workflow at commit time. A future slice could record the
 // transition path instead of just the target status.
 func (r *Repository) TransitionTest(profileID, testKey, targetStatus string) error {
+	return r.TransitionTestWithFields(profileID, testKey, targetStatus, nil)
+}
+
+// TransitionTestWithFields is TransitionTest for a transition whose screen
+// asks for field values. They are stored on the transition's own pending row,
+// so the transition is reviewed and discarded as one unit, and commit sends
+// them in the same transition request. A later transition replaces them.
+func (r *Repository) TransitionTestWithFields(profileID, testKey, targetStatus string, fields map[string]any) error {
+	var fieldsJSON any // NULL unless there are fields
+	if len(fields) > 0 {
+		b, err := json.Marshal(fields)
+		if err != nil {
+			return fmt.Errorf("encode transition fields: %w", err)
+		}
+		fieldsJSON = string(b)
+	}
 	tx, err := r.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -4332,6 +4351,13 @@ func (r *Repository) TransitionTest(profileID, testKey, targetStatus string) err
 		tx, profileID, entityTestCase, testKey, "status", currentVal, targetStatus, baseVersion,
 	); err != nil {
 		return err
+	}
+	if _, err := tx.Exec(
+		`UPDATE pending_change SET transition_fields = ?
+		 WHERE profile_id = ? AND entity_type = ? AND entity_key = ? AND field = 'status'`,
+		fieldsJSON, profileID, entityTestCase, testKey,
+	); err != nil {
+		return fmt.Errorf("store transition fields: %w", err)
 	}
 	if err := writeAudit(
 		tx, profileID, entityTestCase, testKey,
@@ -4509,7 +4535,8 @@ func (r *Repository) DiscardTestChanges(profileID, testKey string) error {
 // newest first.
 func (r *Repository) ListPendingChanges(profileID string) ([]PendingChange, error) {
 	rows, err := r.db.Query(
-		`SELECT id, entity_type, entity_key, field, before_val, after_val, base_version, created_at
+		`SELECT id, entity_type, entity_key, field, before_val, after_val, base_version, created_at,
+		        COALESCE(transition_fields, '')
 		 FROM pending_change WHERE profile_id = ?
 		 ORDER BY created_at DESC, id DESC`,
 		profileID,
@@ -4524,7 +4551,7 @@ func (r *Repository) ListPendingChanges(profileID string) ([]PendingChange, erro
 		var p PendingChange
 		if err := rows.Scan(
 			&p.ID, &p.EntityType, &p.EntityKey, &p.Field,
-			&p.BeforeVal, &p.AfterVal, &p.BaseVersion, &p.CreatedAt,
+			&p.BeforeVal, &p.AfterVal, &p.BaseVersion, &p.CreatedAt, &p.TransitionFields,
 		); err != nil {
 			return nil, err
 		}

@@ -10,6 +10,14 @@ The version is single-sourced in `wails.json` (`info.productVersion`).
 
 ### Added
 
+**Transition field metadata**
+- Workflow transitions now carry the fields their screen asks for, fetched in
+  the same request as the transitions themselves, and a queued transition
+  stores the values it is given on its own pending row (schema 52) and sends
+  them with the transition on commit. Discarding the row discards the
+  transition and its fields together. No screen fills them in yet; that is a
+  later phase.
+
 **Precondition import**
 - **Import…** in the Preconditions view reads a CSV or XLSX of preconditions
   (Summary, Type, Condition, Description, Labels) and queues the new rows as

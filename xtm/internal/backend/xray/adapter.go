@@ -495,8 +495,8 @@ func (a *Adapter) GetTransitions(ctx context.Context, key, currentStatus string)
 	return toTransitions(ts), nil
 }
 
-func (a *Adapter) PostTransition(ctx context.Context, key, transitionID string) error {
-	return a.c.PostTransition(ctx, key, transitionID)
+func (a *Adapter) PostTransition(ctx context.Context, key, transitionID string, fields map[string]any) error {
+	return a.c.PostTransition(ctx, key, transitionID, fields)
 }
 
 // --- metadata ---

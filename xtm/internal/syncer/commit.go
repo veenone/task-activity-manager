@@ -2192,7 +2192,13 @@ func (e *Engine) applyTransition(ctx context.Context, testKey string, change *te
 			change.AfterVal, change.BeforeVal,
 		)
 	}
-	if err := e.backend.PostTransition(ctx, testKey, transitionID); err != nil {
+	var fields map[string]any
+	if change.TransitionFields != "" {
+		if err := json.Unmarshal([]byte(change.TransitionFields), &fields); err != nil {
+			return fmt.Errorf("malformed transition fields: %s", err)
+		}
+	}
+	if err := e.backend.PostTransition(ctx, testKey, transitionID, fields); err != nil {
 		return fmt.Errorf("post transition: %s", sanitizeError(err.Error()))
 	}
 	return nil

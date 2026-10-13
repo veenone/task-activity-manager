@@ -605,7 +605,7 @@ func (a *App) backendForConnection(connectionID string) (backend.Backend, error)
 func toJiraTransitions(in []backend.Transition) []jira.Transition {
 	out := make([]jira.Transition, len(in))
 	for i, t := range in {
-		out[i] = jira.Transition(t)
+		out[i] = jira.Transition{ID: t.ID, Name: t.Name, To: t.To, Fields: toJiraFieldDefs(t.Fields)}
 	}
 	return out
 }

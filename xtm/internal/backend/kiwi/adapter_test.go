@@ -181,7 +181,7 @@ func TestUnimplementedMethodsReturnErrUnsupported(t *testing.T) {
 	if err := a.CreateFolder(ctx, "PROJ", "", "New"); !errors.Is(err, backend.ErrUnsupported) {
 		t.Errorf("CreateFolder: expected ErrUnsupported, got %v", err)
 	}
-	if err := a.PostTransition(ctx, "1", "11"); !errors.Is(err, backend.ErrUnsupported) {
+	if err := a.PostTransition(ctx, "1", "11", nil); !errors.Is(err, backend.ErrUnsupported) {
 		t.Errorf("PostTransition: expected ErrUnsupported, got %v", err)
 	}
 }
