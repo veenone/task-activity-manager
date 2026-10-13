@@ -114,6 +114,10 @@ export {
   UpdateComponent,
   DeleteComponent,
   ComponentIssueCount,
+  CheckComponents,
+  CreateComponents,
+  ParseComponentWorkbook,
+  DownloadComponentTemplate,
   SearchUsers,
   SetTestComponents,
   BulkEditComponents,
@@ -594,6 +598,20 @@ export interface ComponentInput {
   description: string;
   leadUserName: string;
   assigneeType: string;
+}
+
+// ComponentBatchRow mirrors componentadmin.BatchRow: one row of a batch
+// create, cleaned, with why it cannot be created ("" when it can).
+export interface ComponentBatchRow {
+  input: ComponentInput;
+  problem: string;
+}
+
+// ComponentBatchResult mirrors componentadmin.BatchResult. A failure's row
+// counts from 1 within the rows sent.
+export interface ComponentBatchResult {
+  created: ProjectComponent[];
+  failed: { row: number; name: string; error: string }[];
 }
 
 // JiraUser mirrors backend.User, a user search result.

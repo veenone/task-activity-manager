@@ -690,7 +690,7 @@ it. In edit mode you can:
 - **+ Add tests** to link more tests.
 - Delete the precondition (queued for commit).
 
-Create a new precondition with **+ New**:
+Create a new precondition with **New precondition**:
 
 ![Figure 17: New precondition dialog](images/17-precondition-create.png)
 *Figure 17 — Creating a precondition. It is created in Jira on the next commit.*
@@ -731,7 +731,7 @@ requirement detail.*
 
 ### Creating, importing & linking requirements
 
-- **+ New requirement** drafts a requirement in a left-docked panel: pick the
+- **New requirement** drafts a requirement in a left-docked panel: pick the
   project and issue type and write a markdown summary. It gets a temporary key
   locally and is created in Jira on the next commit.
 - **Import…** loads requirements from a CSV or XLSX file, de-duplicating by
@@ -787,7 +787,8 @@ tests. Tables default to 15 rows per page.*
 
 You can:
 
-- **Create** a container and allocate tests to it.
+- Create a container with **New Test Set**, **New Test Plan** or **New Test
+  Execution** (the button follows the kind selector), and allocate tests to it.
 - Add or remove member tests.
 - For a **Test Execution**, set each member's **run result** inline (e.g. PASS /
   FAIL / TODO), or apply one result to many selected members at once. A compact
@@ -919,6 +920,20 @@ reflects the last sync.
   default assignee (project default, component lead, project lead, or
   unassigned). Find a lead by typing at least two characters of their name or
   username and picking from the results.
+- **Bulk create…** creates several components at once. Type the names one per
+  line, or load an `.xlsx` workbook with Name, Description, Lead username and
+  Default assignee columns. **Download template** saves a workbook with those
+  columns and two example rows. Default assignee takes the wording the form
+  uses (Project default, Component lead, Project lead, Unassigned). Older
+  `.xls` files are not read; save them as `.xlsx` first.
+
+  Before anything reaches Jira, a preview lists every row and marks the ones
+  that will be skipped: a blank name, a name the project already has, a name
+  another row also creates, or an unknown default assignee. Names compare
+  without regard to case, as Jira's do. **Create** then creates the rest, one
+  at a time. If Jira refuses a row, for example because the lead username does
+  not exist, the other rows are still created, and the result lists each
+  refusal with Jira's reason.
 - **Edit** opens the same form for an existing component. **Clear lead**
   removes the lead.
 - **Delete** first asks Jira how many issues use the component. If any do, you

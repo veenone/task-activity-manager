@@ -31,6 +31,9 @@
   --card-border: var(--border);
   --accent-strong: #2b6cb0;
   --bg-subtle: var(--surface-2);
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset-inset: -2px;
+  --hit-min: 24px;
   --ghost-hover: rgba(0, 0, 0, 0.08);
   --on-accent: #fff;
   --font-mono: ui-monospace, "Consolas", "SF Mono", "Menlo", monospace;
@@ -5456,8 +5459,27 @@ tr.row-checked:hover {
 
 .dup-list { flex: 1; min-height: 0; overflow: auto; }
 .dup-group { border-bottom: 1px solid var(--border); }
-.dup-ghead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer; }
+.dup-ghead { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
 .dup-ghead:hover { background: var(--row-hover); }
+.dup-ghead-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: var(--hit-min);
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dup-ghead-toggle:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset-inset);
+}
 .dup-caret { color: var(--text-muted); }
 .dup-gtitle { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dup-cmp { font-size: 11px; padding: 3px 8px; }
@@ -8038,15 +8060,19 @@ tr.row-checked:hover {
   flex-direction: column;
   min-height: 0;
 }
+/* The search takes the first row to itself; sort and the two create buttons
+   share the second. All four on one row leave no room for the search in a
+   pane as narrow as this one. */
 .components-list-head {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
 }
 .components-search,
 .labels-admin-search {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
   padding: 5px 8px;
   border: 1px solid var(--border-strong);

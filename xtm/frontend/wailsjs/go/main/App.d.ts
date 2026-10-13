@@ -3,9 +3,10 @@
 import {testrepo} from '../models';
 import {connection} from '../models';
 import {main} from '../models';
+import {backend} from '../models';
+import {componentadmin} from '../models';
 import {syncer} from '../models';
 import {bridge} from '../models';
-import {backend} from '../models';
 import {profile} from '../models';
 import {coverage} from '../models';
 import {jira} from '../models';
@@ -70,6 +71,8 @@ export function CacheExternalPreconditions(arg1:string,arg2:Array<testrepo.Preco
 
 export function ChangeTestType(arg1:string,arg2:string,arg3:string):Promise<testrepo.TypeConversion>;
 
+export function CheckComponents(arg1:string,arg2:Array<backend.ComponentInput>):Promise<Array<componentadmin.BatchRow>>;
+
 export function CheckJiraTestSteps(arg1:string,arg2:string):Promise<main.JiraStepInfo>;
 
 export function CleanSampleData(arg1:string):Promise<number>;
@@ -95,6 +98,8 @@ export function CreateCanonicalRequirement(arg1:string,arg2:string,arg3:string,a
 export function CreateChangeRequest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string):Promise<string>;
 
 export function CreateComponent(arg1:string,arg2:backend.ComponentInput):Promise<backend.Component>;
+
+export function CreateComponents(arg1:string,arg2:Array<backend.ComponentInput>):Promise<componentadmin.BatchResult>;
 
 export function CreateContainerAndAllocate(arg1:string,arg2:string,arg3:string,arg4:Array<string>):Promise<testrepo.CreateContainerResult>;
 
@@ -155,6 +160,8 @@ export function DetectStaleCoverageMappings(arg1:string,arg2:string):Promise<Arr
 export function DiscardAllPendingChanges(arg1:string):Promise<number>;
 
 export function DiscardPendingChange(arg1:string,arg2:number):Promise<void>;
+
+export function DownloadComponentTemplate():Promise<string>;
 
 export function DownloadCoverageTemplate():Promise<string>;
 
@@ -381,6 +388,8 @@ export function ListValueTests(arg1:string,arg2:string):Promise<Array<string>>;
 export function ListVersions(arg1:string,arg2:string):Promise<Array<coverage.Version>>;
 
 export function MoveTestToFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function ParseComponentWorkbook(arg1:string):Promise<Array<backend.ComponentInput>>;
 
 export function PreviewImport(arg1:string,arg2:boolean):Promise<importfile.Preview>;
 

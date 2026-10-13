@@ -114,6 +114,10 @@ export function ChangeTestType(arg1, arg2, arg3) {
   return window['go']['main']['App']['ChangeTestType'](arg1, arg2, arg3);
 }
 
+export function CheckComponents(arg1, arg2) {
+  return window['go']['main']['App']['CheckComponents'](arg1, arg2);
+}
+
 export function CheckJiraTestSteps(arg1, arg2) {
   return window['go']['main']['App']['CheckJiraTestSteps'](arg1, arg2);
 }
@@ -164,6 +168,10 @@ export function CreateChangeRequest(arg1, arg2, arg3, arg4, arg5, arg6, arg7, ar
 
 export function CreateComponent(arg1, arg2) {
   return window['go']['main']['App']['CreateComponent'](arg1, arg2);
+}
+
+export function CreateComponents(arg1, arg2) {
+  return window['go']['main']['App']['CreateComponents'](arg1, arg2);
 }
 
 export function CreateContainerAndAllocate(arg1, arg2, arg3, arg4) {
@@ -284,6 +292,10 @@ export function DiscardAllPendingChanges(arg1) {
 
 export function DiscardPendingChange(arg1, arg2) {
   return window['go']['main']['App']['DiscardPendingChange'](arg1, arg2);
+}
+
+export function DownloadComponentTemplate() {
+  return window['go']['main']['App']['DownloadComponentTemplate']();
 }
 
 export function DownloadCoverageTemplate() {
@@ -736,6 +748,10 @@ export function ListVersions(arg1, arg2) {
 
 export function MoveTestToFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveTestToFolder'](arg1, arg2, arg3);
+}
+
+export function ParseComponentWorkbook(arg1) {
+  return window['go']['main']['App']['ParseComponentWorkbook'](arg1);
 }
 
 export function PreviewImport(arg1, arg2) {

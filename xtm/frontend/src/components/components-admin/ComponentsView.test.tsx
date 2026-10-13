@@ -13,6 +13,8 @@ const api = vi.hoisted(() => ({
   DeleteComponent: vi.fn(),
   ComponentIssueCount: vi.fn(),
   SearchUsers: vi.fn(async () => []),
+  CheckComponents: vi.fn(),
+  CreateComponents: vi.fn(),
 }));
 vi.mock("../../api", () => ({
   ...api,
@@ -89,6 +91,28 @@ beforeEach(() => {
 });
 
 describe("ComponentsView", () => {
+  it("creates several components from Bulk create and reloads the list", async () => {
+    api.CheckComponents.mockResolvedValue([
+      { input: { name: "UI", description: "", leadUserName: "", assigneeType: "PROJECT_DEFAULT" }, problem: "" },
+    ]);
+    api.CreateComponents.mockResolvedValue({ created: [{ id: "3", name: "UI" }], failed: [] });
+    const onChanged = renderView();
+    await listPane();
+    const loads = api.ListProjectComponentDetails.mock.calls.length;
+
+    await userEvent.click(screen.getByRole("button", { name: "Bulk create…" }));
+    const dialog = screen.getByRole("dialog", { name: "Create components" });
+    await userEvent.type(within(dialog).getByLabelText("Names, one per line"), "UI");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Preview" }));
+    await userEvent.click(
+      await within(dialog).findByRole("button", { name: "Create 1 component" }),
+    );
+
+    expect(await within(dialog).findByText("Created 1 component.")).toBeTruthy();
+    expect(api.ListProjectComponentDetails.mock.calls.length).toBeGreaterThan(loads);
+    expect(onChanged).toHaveBeenCalled();
+  });
+
   it("lists components with their local test count", async () => {
     renderView();
     const list = await listPane();

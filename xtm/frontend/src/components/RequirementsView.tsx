@@ -362,7 +362,7 @@ export function RequirementsView({ onChanged }: Props) {
               onClick={() => setShowCreateReq(true)}
               title="Create a new requirement here. It's pushed to Jira when you commit"
             >
-              + Create
+              New requirement
             </button>
             <button
               className="btn"

@@ -345,38 +345,38 @@ export function DuplicatesView({
       <div className="dup-body">
         <div className="dup-list-col">
           <div className="dup-list">
-            {pageGroups.map((g) => {
+            {pageGroups.map((g, groupIndex) => {
               const open = expanded.has(g.normalizedSummary);
+              const memberListId = `duplicate-tests-${safePage}-${groupIndex}`;
               return (
                 <div className="dup-group" key={g.normalizedSummary}>
-                  <div
-                    className="dup-ghead"
-                    onClick={() => toggle(g.normalizedSummary)}
-                  >
-                    <span className="dup-caret">{open ? "▾" : "▸"}</span>
-                    <span className="dup-gtitle">"{g.displaySummary}"</span>
-                    <span className="dup-pill p-n">
-                      {g.members.length} tests
-                    </span>
-                    <span className="dup-pill p-sum">summary identical</span>
-                    <span className={`dup-pill p-${g.stepsVerdict}`}>
-                      {VERDICT_LABEL[g.stepsVerdict]}
-                    </span>
+                  <div className="dup-ghead">
+                    <button
+                      type="button"
+                      className="dup-ghead-toggle"
+                      aria-expanded={open}
+                      aria-controls={memberListId}
+                      onClick={() => toggle(g.normalizedSummary)}
+                    >
+                      <span className="dup-caret">{open ? "▾" : "▸"}</span>
+                      <span className="dup-gtitle">"{g.displaySummary}"</span>
+                      <span className="dup-pill p-n">
+                        {g.members.length} tests
+                      </span>
+                      <span className="dup-pill p-sum">summary identical</span>
+                      <span className={`dup-pill p-${g.stepsVerdict}`}>
+                        {VERDICT_LABEL[g.stepsVerdict]}
+                      </span>
+                    </button>
                     <button
                       className="btn dup-cmp"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        compareSummaries(g);
-                      }}
+                      onClick={() => compareSummaries(g)}
                     >
                       Compare summaries
                     </button>
                     <button
                       className="btn dup-cmp"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        compareSteps(g);
-                      }}
+                      onClick={() => compareSteps(g)}
                       disabled={scanningGroup === g.normalizedSummary}
                     >
                       {scanningGroup === g.normalizedSummary
@@ -385,7 +385,7 @@ export function DuplicatesView({
                     </button>
                   </div>
                   {open && (
-                    <div className="dup-members">
+                    <div className="dup-members" id={memberListId}>
                       {g.members.map((m) => {
                         const dirty =
                           (pendingByTestKey.get(m.key) ?? []).length > 0;

@@ -105,6 +105,13 @@ describe("PreconditionsView", () => {
     canSync = true;
   });
 
+  it("names its create button after what it creates", async () => {
+    renderView("https://jira.example.com/");
+    expect(
+      screen.getByRole("button", { name: "New precondition" }),
+    ).toBeInTheDocument();
+  });
+
   it("opens the precondition in Jira from its key", async () => {
     renderView("https://jira.example.com/");
     await openPrecondition();
