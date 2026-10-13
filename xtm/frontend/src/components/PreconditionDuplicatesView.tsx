@@ -147,35 +147,38 @@ export function PreconditionDuplicatesView() {
       <div className="dup-body">
         <div className="dup-list-col">
           <div className="dup-list">
-            {pageGroups.map((g) => {
+            {pageGroups.map((g, groupIndex) => {
               const open = expanded.has(g.normalizedSummary);
+              const memberListId = `duplicate-preconditions-${safePage}-${groupIndex}`;
               return (
                 <div className="dup-group" key={g.normalizedSummary}>
-                  <div
-                    className="dup-ghead"
-                    onClick={() => toggle(g.normalizedSummary)}
-                  >
-                    <span className="dup-caret">{open ? "▾" : "▸"}</span>
-                    <span className="dup-gtitle">"{g.displaySummary}"</span>
-                    <span className="dup-pill p-n">
-                      {g.members.length} preconditions
-                    </span>
-                    <span className="dup-pill p-sum">summary identical</span>
-                    <span className={`dup-pill p-${g.definitionVerdict}`}>
-                      {VERDICT_LABEL[g.definitionVerdict]}
-                    </span>
+                  <div className="dup-ghead">
+                    <button
+                      type="button"
+                      className="dup-ghead-toggle"
+                      aria-expanded={open}
+                      aria-controls={memberListId}
+                      onClick={() => toggle(g.normalizedSummary)}
+                    >
+                      <span className="dup-caret">{open ? "▾" : "▸"}</span>
+                      <span className="dup-gtitle">"{g.displaySummary}"</span>
+                      <span className="dup-pill p-n">
+                        {g.members.length} preconditions
+                      </span>
+                      <span className="dup-pill p-sum">summary identical</span>
+                      <span className={`dup-pill p-${g.definitionVerdict}`}>
+                        {VERDICT_LABEL[g.definitionVerdict]}
+                      </span>
+                    </button>
                     <button
                       className="btn dup-cmp"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCompare(g);
-                      }}
+                      onClick={() => setCompare(g)}
                     >
                       Compare definitions
                     </button>
                   </div>
                   {open && (
-                    <div className="dup-members">
+                    <div className="dup-members" id={memberListId}>
                       {g.members.map((m) => (
                         <div className="dup-mrow" key={m.key}>
                           <span className="dup-mkey">{m.key}</span>
