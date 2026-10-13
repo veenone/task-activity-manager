@@ -246,6 +246,10 @@ export function DeleteFolder(arg1, arg2) {
   return window['go']['main']['App']['DeleteFolder'](arg1, arg2);
 }
 
+export function DeleteLabel(arg1, arg2) {
+  return window['go']['main']['App']['DeleteLabel'](arg1, arg2);
+}
+
 export function DeletePrecondition(arg1, arg2) {
   return window['go']['main']['App']['DeletePrecondition'](arg1, arg2);
 }
@@ -768,6 +772,10 @@ export function RenameCanonicalRequirement(arg1, arg2, arg3, arg4, arg5) {
 
 export function RenameFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['RenameFolder'](arg1, arg2, arg3);
+}
+
+export function RenameLabel(arg1, arg2, arg3) {
+  return window['go']['main']['App']['RenameLabel'](arg1, arg2, arg3);
 }
 
 export function RenameVersion(arg1, arg2, arg3, arg4, arg5) {

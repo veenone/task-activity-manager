@@ -136,6 +136,8 @@ export function DeleteCoverageNode(arg1:string,arg2:string,arg3:string):Promise<
 
 export function DeleteFolder(arg1:string,arg2:string):Promise<void>;
 
+export function DeleteLabel(arg1:string,arg2:string):Promise<testrepo.BulkEditResult>;
+
 export function DeletePrecondition(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
@@ -397,6 +399,8 @@ export function RemoveRequirementSource(arg1:string,arg2:string):Promise<void>;
 export function RenameCanonicalRequirement(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function RenameLabel(arg1:string,arg2:string,arg3:string):Promise<testrepo.BulkEditResult>;
 
 export function RenameVersion(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
