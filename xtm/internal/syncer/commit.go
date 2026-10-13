@@ -1456,10 +1456,10 @@ func (e *Engine) commitTestCreates(ctx context.Context, profileID, projectKey st
 	caps := e.backend.Capabilities()
 	for _, c := range rows {
 		var p struct {
-			Summary     string `json:"summary"`
-			Description string `json:"description"`
-			Priority    string `json:"priority"`
-			Labels      string `json:"labels"`
+			Summary     string         `json:"summary"`
+			Description string         `json:"description"`
+			Priority    string         `json:"priority"`
+			Labels      string         `json:"labels"`
 			Components  string         `json:"components"`
 			Fields      map[string]any `json:"fields"`
 			Steps       []struct {
@@ -1758,8 +1758,8 @@ func (e *Engine) commitPreconditionCreates(ctx context.Context, profileID, proje
 			continue
 		}
 		var payload struct {
-			Summary     string `json:"summary"`
-			Type        string `json:"type"`
+			Summary     string         `json:"summary"`
+			Type        string         `json:"type"`
 			Description string         `json:"description"`
 			ProjectKey  string         `json:"projectKey"`
 			Fields      map[string]any `json:"fields"`

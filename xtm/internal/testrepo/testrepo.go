@@ -1213,9 +1213,9 @@ func (r *Repository) CreatePrecondition(profileID, projectKey, summary, ptype, d
 	}
 
 	payload, err := json.Marshal(struct {
-		Summary     string `json:"summary"`
-		Type        string `json:"type"`
-		Description string `json:"description"`
+		Summary     string         `json:"summary"`
+		Type        string         `json:"type"`
+		Description string         `json:"description"`
 		ProjectKey  string         `json:"projectKey"`
 		Fields      map[string]any `json:"fields,omitempty"`
 	}{summary, ptype, description, projectKey, fields})
