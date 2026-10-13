@@ -38,6 +38,8 @@ type fakeBackend struct {
 	backend.ComponentManager
 	list    []backend.Component
 	err     error
+	failOn  map[string]error
+	created []backend.ComponentInput
 	deleted []string
 }
 
@@ -55,6 +57,10 @@ func (f *fakeBackend) CreateComponent(_ context.Context, _ string, in backend.Co
 	if f.err != nil {
 		return backend.Component{}, f.err
 	}
+	if err := f.failOn[in.Name]; err != nil {
+		return backend.Component{}, err
+	}
+	f.created = append(f.created, in)
 	c := backend.Component{ID: "new", Name: in.Name}
 	f.list = append(f.list, c)
 	return c, nil
