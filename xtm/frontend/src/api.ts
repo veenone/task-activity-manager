@@ -199,6 +199,8 @@ export {
   CreateBugForTest,
   CreateRequirement,
   GetRequirementCreateFields,
+  GetPreconditionCreateFields,
+  GetTestCreateFields,
   GetBugDetail,
   ListBugsWithTests,
   ListBugsForContainer,
@@ -1370,6 +1372,8 @@ export interface TestDraft {
   folderId: string;
   steps: StepDraft[];
   precondKeys: string[];
+  // The create screen's required fields, Jira-shaped and keyed by field id.
+  fields?: Record<string, unknown>;
 }
 
 // Review mirrors testrepo.Review — a Test's review state. An empty verdict

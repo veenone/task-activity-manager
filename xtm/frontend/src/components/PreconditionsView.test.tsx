@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PreconditionsView } from "./PreconditionsView";
@@ -17,8 +17,12 @@ const beginSync = vi.fn();
 const endSync = vi.fn();
 let canSync = true;
 
+const createFields = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => [] as unknown[]));
+const createPrecondition = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => "NEW-PC-1"));
+
 vi.mock("../api", () => ({
-  CreatePreconditionDetailed: vi.fn(),
+  CreatePreconditionDetailed: (...args: unknown[]) => createPrecondition(...args),
+  GetPreconditionCreateFields: (...args: unknown[]) => createFields(...args),
   EditPreconditionField: vi.fn(),
   DeletePrecondition: vi.fn(),
   BulkAssociatePreconditions: vi.fn(),
@@ -110,6 +114,39 @@ describe("PreconditionsView", () => {
     expect(
       screen.getByRole("button", { name: "New precondition" }),
     ).toBeInTheDocument();
+  });
+
+  it("asks for the create screen's required fields and sends them", async () => {
+    createFields.mockResolvedValueOnce([
+      {
+        id: "customfield_20000",
+        name: "Team",
+        required: true,
+        type: "option",
+        allowedValues: [
+          { id: "1", value: "Core" },
+          { id: "2", value: "Payments" },
+        ],
+      },
+      { id: "customfield_20001", name: "Ticket", required: true, type: "text", allowedValues: [] },
+    ]);
+    renderView("https://jira.example.com/");
+    await userEvent.click(screen.getByRole("button", { name: "New precondition" }));
+    const dialog = screen.getByRole("dialog", { name: "New precondition" });
+
+    await userEvent.type(within(dialog).getByLabelText("Summary"), "Net up");
+    await userEvent.selectOptions(await within(dialog).findByLabelText("Team *"), "2");
+    const create = within(dialog).getByRole("button", { name: "Create" });
+    expect(create).toBeDisabled();
+
+    await userEvent.type(within(dialog).getByLabelText("Ticket *"), "OPS-1");
+    expect(create).toBeEnabled();
+    await userEvent.click(create);
+
+    expect(createPrecondition).toHaveBeenCalledWith("p1", "Net up", "Manual", "", {
+      customfield_20000: { id: "2" },
+      customfield_20001: "OPS-1",
+    });
   });
 
   it("opens the precondition in Jira from its key", async () => {
