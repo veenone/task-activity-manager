@@ -226,7 +226,7 @@
 .syncbar-fill {
   height: 100%;
   background: var(--chrome-progress);
-  transition: width 0.2s ease;
+  transition: width var(--dur-2) ease;
 }
 
 /* Layout primitives */
@@ -1252,7 +1252,7 @@
   padding: 2px;
   background: transparent;
   color: inherit;
-  outline: none;
+  outline: 2px solid transparent;
 }
 .token-picker-list {
   position: absolute;
@@ -1442,7 +1442,7 @@ i.sankey-node-l2 {
    its flows and dims the rest. */
 .sankey-link {
   fill-opacity: 0.3;
-  transition: fill-opacity 0.12s ease;
+  transition: fill-opacity var(--dur-1) ease;
 }
 .sankey-link:hover,
 .sankey-links.has-hover .sankey-link.lit {
@@ -1648,7 +1648,7 @@ i.sankey-node-l2 {
   background: var(--slate-solid);
   border: none;
   cursor: pointer;
-  transition: background 0.1s, box-shadow 0.1s;
+  transition: background var(--dur-1), box-shadow var(--dur-1);
 }
 .fix-version-chip:hover {
   background: var(--slate-solid-hover);
@@ -1795,10 +1795,10 @@ button.defect-chip-key:hover {
 .remarks-input:hover {
   border-color: var(--border);
 }
-.remarks-input:focus {
+.remarks-input:focus-visible {
   border-color: var(--border-strong);
   background: var(--surface);
-  outline: none;
+  outline: 2px solid transparent;
 }
 /* Add-tests modal: folder tree (filter) on the left, search + list on the right. */
 .add-tests-body {
@@ -2024,7 +2024,7 @@ button.defect-chip-key:hover {
   border-radius: 5px;
   padding: 3px 7px;
   margin: 0 0 12px;
-  outline: none;
+  outline: 2px solid transparent;
 }
 /* Bar and its count badges share one row (bar grows, badges sit beside it) so
    the run summary costs a single line in the card instead of two (#311
@@ -2072,7 +2072,7 @@ button.defect-chip-key:hover {
    overflow:hidden clip. */
 .run-bar--clickable .run-seg {
   cursor: pointer;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--dur-1) ease;
 }
 .run-bar--filtering .run-seg {
   opacity: 0.3;
@@ -2598,7 +2598,7 @@ tr.row-selected td:first-child {
   flex: 0 0 5px;
   cursor: col-resize;
   background: var(--border);
-  transition: background 0.12s;
+  transition: background var(--dur-1);
 }
 .sidebar-resizer:hover,
 .sidebar-resizer:active {
@@ -2844,7 +2844,7 @@ tr.row-selected td:first-child {
 .detail-collapse-chevron {
   font-size: var(--fs-2xs);
   display: inline-block;
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-2) ease;
 }
 .detail-collapse-count {
   font-weight: 600;
@@ -2961,10 +2961,10 @@ tr.row-selected td:first-child {
 .pre-summary-edit:hover {
   border-color: var(--border);
 }
-.pre-summary-edit:focus {
+.pre-summary-edit:focus-visible {
   border-color: var(--accent);
   background: var(--surface);
-  outline: none;
+  outline: 2px solid transparent;
 }
 
 /* Dedicated Preconditions management view (FR-13.4) — master list + detail.
@@ -3067,11 +3067,8 @@ tr.row-selected td:first-child {
 /* The list is focusable for Up/Down arrow navigation (RND_P_4TFINT_05-320).
    The selected row's highlight is the position indicator, so suppress the
    full-list focus ring; keep a subtle inset ring for keyboard focus. */
-.reqs-items:focus {
-  outline: none;
-}
 .reqs-items:focus-visible {
-  outline: none;
+  outline: 2px solid transparent;
   box-shadow: inset 0 0 0 1px var(--border-subtle, var(--border));
   border-radius: 8px;
 }
@@ -3374,9 +3371,9 @@ tr.row-selected td:first-child {
 .precond-list-head .precond-search {
   flex: 1 1 100%;
 }
-.precond-search:focus {
+.precond-search:focus-visible {
   border-color: var(--accent);
-  outline: none;
+  outline: 2px solid transparent;
 }
 .precond-new {
   flex-shrink: 0;
@@ -3577,7 +3574,7 @@ tr.row-selected td:first-child {
   width: 100%;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .precond-view {
     grid-template-columns: 1fr;
   }
@@ -3819,7 +3816,7 @@ tr.row-selected td:first-child {
   cursor: pointer;
   font-size: var(--fs-sm);
   line-height: 1;
-  transition: background 0.12s;
+  transition: background var(--dur-1);
 }
 .about-close:hover {
   background: rgba(255, 255, 255, 0.22);
@@ -4216,8 +4213,8 @@ tr.row-checked:hover {
 .md-view:hover {
   border-color: var(--accent);
 }
-.md-view:focus {
-  outline: none;
+.md-view:focus-visible {
+  outline: 2px solid transparent;
   border-color: var(--accent);
 }
 .md-placeholder {
@@ -5166,7 +5163,7 @@ tr.row-checked:hover {
   margin-bottom: 2px;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 720px) {
   .rs-grid {
     grid-template-columns: 1fr;
   }
@@ -6533,7 +6530,7 @@ tr.row-checked:hover {
   gap: 16px;
   align-items: start;
 }
-@media (max-width: 880px) {
+@media (max-width: 900px) {
   .gap-cols { grid-template-columns: 1fr; }
 }
 .gap-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -6663,7 +6660,7 @@ tr.row-checked:hover {
 .tp-bugs-chevron {
   font-size: var(--fs-2xs);
   display: inline-block;
-  transition: transform 0.15s ease;
+  transition: transform var(--dur-2) ease;
 }
 .tp-bugs-body {
   max-height: 160px;
@@ -6910,7 +6907,7 @@ tr.row-checked:hover {
   border-radius: 6px;
   padding: 8px 12px;
   background: var(--surface);
-  transition: background 0.1s;
+  transition: background var(--dur-1);
 }
 .cov-cr-item:hover { background: var(--row-hover); }
 .cov-cr-item-active { border-color: var(--accent); background: var(--surface-sunken); }
@@ -6968,7 +6965,7 @@ tr.row-checked:hover {
   background: var(--accent);
   border-radius: 6px;
   min-width: 4px;
-  transition: width 0.3s ease;
+  transition: width var(--dur-3) ease;
 }
 .cov-dist-count { font-size: var(--fs-sm); color: var(--text-muted); min-width: 24px; text-align: right; }
 
@@ -7217,8 +7214,8 @@ tr.row-checked:hover {
   color: var(--text);
   line-height: 1.5;
 }
-.cuke-scenario:focus,
-.generic-def:focus {
+.cuke-scenario:focus-visible,
+.generic-def:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
@@ -7553,4 +7550,21 @@ tr.row-checked:hover {
 .labels-admin-actions {
   white-space: nowrap;
   text-align: right;
+}
+
+/* Motion off for readers who ask for it (#221): every transition in this
+   sheet, listed so a new one is added here too. */
+@media (prefers-reduced-motion: reduce) {
+  .syncbar-fill,
+  .sankey-link,
+  .fix-version-chip,
+  .run-bar--clickable .run-seg,
+  .sidebar-resizer,
+  .detail-collapse-chevron,
+  .about-close,
+  .tp-bugs-chevron,
+  .cov-cr-item,
+  .cov-dist-bar {
+    transition: none;
+  }
 }

@@ -10,9 +10,10 @@ hardcoded_hex 30
 hardcoded_px_font 0
 raw_radius 274
 raw_shadow 7
-bare_focus 9
-outline_none 13
-raw_duration 12
-unguarded_motion 1
+bare_focus 0
+outline_none 0
+raw_duration 0
+unguarded_motion 0
 transition_all 0
 raw_z_index 0
+offscale_breakpoints 0
