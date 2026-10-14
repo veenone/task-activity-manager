@@ -111,7 +111,7 @@ export function PickPreconditionModal({
           <h2 id="pick-precondition-title">
             Link preconditions from another project
           </h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -136,7 +136,7 @@ export function PickPreconditionModal({
               <p className="muted">Loading…</p>
             ) : (
               <div className="pick-table-wrap">
-                <table className="pick-table">
+                <table aria-label="Preconditions to link" className="pick-table">
                   <tbody>
                     {results.map((p) => {
                       const already = exclude.has(p.key);

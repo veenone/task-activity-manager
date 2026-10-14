@@ -50,8 +50,8 @@ export function MacroPreview({ xml }: { xml: string }) {
       {shown.length === 0 ? (
         <p className="muted small">No cached issues match.</p>
       ) : (
-        <table className="ritual-macro-table">
-          <thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Assignee</th></tr></thead>
+        <table aria-label="Issues the macro lists" className="ritual-macro-table">
+          <thead><tr><th scope="col">Key</th><th scope="col">Summary</th><th scope="col">Status</th><th scope="col">Assignee</th></tr></thead>
           <tbody>
             {shown.map((i) => <tr key={i.key}><td>{i.key}</td><td>{toPlainText(i.summary, "summary")}</td><td>{i.status}</td><td>{i.assignee}</td></tr>)}
           </tbody>

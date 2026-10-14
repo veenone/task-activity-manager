@@ -550,12 +550,12 @@ export function CoverageView({ isDemo, demoVariant, onChanged }: Props) {
                   ) : reuse.length === 0 ? (
                     <p className="cov-muted">No member requirements linked to this canonical.</p>
                   ) : (
-                    <table className="cov-member-locks-table">
+                    <table aria-label="Locked versions" className="cov-member-locks-table">
                       <thead>
                         <tr>
-                          <th>Requirement</th>
-                          <th>Project</th>
-                          <th>Locked version</th>
+                          <th scope="col">Requirement</th>
+                          <th scope="col">Project</th>
+                          <th scope="col">Locked version</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -622,7 +622,7 @@ export function CoverageView({ isDemo, demoVariant, onChanged }: Props) {
                             ×
                           </button>
                         </div>
-                        <table className="cov-table">
+                        <table aria-label={`Values in ${g.name}`} className="cov-table">
                           <tbody>
                             {grp?.parameters.flatMap((p) => {
                               const paramTested = p.values.filter((v) => report.values[v.id]?.tested === true).length;
@@ -679,13 +679,13 @@ export function CoverageView({ isDemo, demoVariant, onChanged }: Props) {
                 )}
               </div>
             ) : tab === "gaps" ? (
-              <table className="cov-table cov-gaps">
+              <table aria-label="Coverage gaps" className="cov-table cov-gaps">
                 <thead>
                   <tr>
-                    <th>Group</th>
-                    <th>Parameter</th>
-                    <th>Value</th>
-                    <th>Kind</th>
+                    <th scope="col">Group</th>
+                    <th scope="col">Parameter</th>
+                    <th scope="col">Value</th>
+                    <th scope="col">Kind</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -705,13 +705,13 @@ export function CoverageView({ isDemo, demoVariant, onChanged }: Props) {
                 </tbody>
               </table>
             ) : (
-              <table className="cov-table cov-reuse">
+              <table aria-label="Reusable tests" className="cov-table cov-reuse">
                 <thead>
                   <tr>
-                    <th>Project</th>
-                    <th>Requirement</th>
-                    <th>Summary</th>
-                    <th>Status</th>
+                    <th scope="col">Project</th>
+                    <th scope="col">Requirement</th>
+                    <th scope="col">Summary</th>
+                    <th scope="col">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -856,7 +856,7 @@ function MapTestsModal({
       <Modal onClose={onClose} className="modal map-tests-modal" labelledBy="cov-map-tests-title">
           <div className="pending-head">
             <h2 id="cov-map-tests-title">Map tests to "{valueLabel}"</h2>
-            <button className="btn btn-ghost" onClick={onClose} title="Close">✕</button>
+            <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">✕</button>
           </div>
           <div className="cov-body">
             {error && <div className="cov-error">{error}</div>}
@@ -964,7 +964,7 @@ function MembersModal({
     <Modal onClose={onClose} className="modal members-modal" labelledBy="cov-members-title">
         <div className="pending-head">
           <h2 id="cov-members-title">Member requirements</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">✕</button>
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">✕</button>
         </div>
         <div className="cov-body">
           {error && <div className="cov-error">{error}</div>}

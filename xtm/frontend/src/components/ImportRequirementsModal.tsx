@@ -110,7 +110,7 @@ export function ImportRequirementsModal({ onComplete, onCancel }: Props) {
     <Modal onClose={onCancel} className="modal pending-modal" labelledBy="import-requirements-title">
         <div className="pending-head">
           <h2 id="import-requirements-title">Import requirements (CSV or XLSX)</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -179,13 +179,13 @@ export function ImportRequirementsModal({ onComplete, onCancel }: Props) {
 
               {preview && preview.rows.length > 0 && (
                 <div className="import-validation">
-                  <table className="board-table">
+                  <table aria-label="Rows to import" className="board-table">
                     <thead>
                       <tr>
-                        <th>Status</th>
-                        <th>Summary</th>
-                        <th>Priority</th>
-                        <th>Components</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Summary</th>
+                        <th scope="col">Priority</th>
+                        <th scope="col">Components</th>
                       </tr>
                     </thead>
                     <tbody>

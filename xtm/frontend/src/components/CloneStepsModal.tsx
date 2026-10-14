@@ -182,7 +182,7 @@ export function CloneStepsModal({
     <Modal onClose={onCancel} className="modal pending-modal" labelledBy="clone-steps-title">
         <div className="pending-head">
           <h2 id="clone-steps-title">Clone steps into {targetLabel}</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -226,7 +226,7 @@ export function CloneStepsModal({
                   <p className="muted">Searching…</p>
                 ) : (
                   <div className="pick-table-wrap">
-                    <table className="pick-table">
+                    <table aria-label="Tests to clone steps from" className="pick-table">
                       <tbody>
                         {visibleResults.map((t) => (
                           <tr

@@ -1407,11 +1407,11 @@ export function ContainersView({
 
       <div className="board-scroll">
       {board && containers.length > 0 && (
-        <table className="board-table">
+        <table aria-label="Run history" className="board-table">
           <thead>
             <tr>
               {kind === "testexec" && (
-                <th className="board-check-col">
+                <th scope="col" className="board-check-col">
                   <input
                     type="checkbox"
                     checked={
@@ -1434,41 +1434,41 @@ export function ContainersView({
                   />
                 </th>
               )}
-              <th
+              <th scope="col"
                 className="board-sort-th"
                 onClick={() => toggleRowSort("key")}
                 title="Sort by test key"
               >
                 Test{rowSortIndicator("key")}
               </th>
-              <th
+              <th scope="col"
                 className="board-sort-th"
                 onClick={() => toggleRowSort("summary")}
                 title="Sort by summary"
               >
                 Summary{rowSortIndicator("summary")}
               </th>
-              <th
+              <th scope="col"
                 className="board-sort-th"
                 onClick={() => toggleRowSort("status")}
                 title="Sort by status"
               >
                 Status{rowSortIndicator("status")}
               </th>
-              <th
+              <th scope="col"
                 className="board-sort-th"
                 onClick={() => toggleRowSort("result")}
                 title="Sort by run result"
               >
                 Execution{rowSortIndicator("result")}
               </th>
-              {kind === "testexec" && <th title="Run date (finished or started)">Date</th>}
-              {kind === "testexec" && <th title="Executed by">By</th>}
-              {kind === "testexec" && <th title="Environment">Environment</th>}
-              {kind === "testexec" && <th title="Member test's own Fix Version(s)">Fix Version</th>}
-              {kind === "testexec" && <th title="Defects linked to this run">Defects</th>}
-              {kind === "testexec" && <th title="Remark / comment on this run">Remarks</th>}
-              <th aria-label="Remove" />
+              {kind === "testexec" && <th scope="col" title="Run date (finished or started)">Date</th>}
+              {kind === "testexec" && <th scope="col" title="Executed by">By</th>}
+              {kind === "testexec" && <th scope="col" title="Environment">Environment</th>}
+              {kind === "testexec" && <th scope="col" title="Member test's own Fix Version(s)">Fix Version</th>}
+              {kind === "testexec" && <th scope="col" title="Defects linked to this run">Defects</th>}
+              {kind === "testexec" && <th scope="col" title="Remark / comment on this run">Remarks</th>}
+              <th scope="col" aria-label="Remove" />
             </tr>
           </thead>
           <tbody>

@@ -51,7 +51,7 @@ export function SyncHistoryModal({ onClose }: Props) {
     <Modal onClose={onClose} className="modal pending-modal" labelledBy="sync-history-title">
         <div className="pending-head">
           <h2 id="sync-history-title">Sync history</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -63,14 +63,14 @@ export function SyncHistoryModal({ onClose }: Props) {
           ) : entries.length === 0 ? (
             <p className="muted pending-empty">No syncs recorded yet.</p>
           ) : (
-            <table className="pending-table synchist-table">
+            <table aria-label="Sync history" className="pending-table synchist-table">
               <thead>
                 <tr>
-                  <th>Started</th>
-                  <th>Duration</th>
-                  <th>Outcome</th>
-                  <th className="synchist-num">Fetched</th>
-                  <th aria-label="Detail" />
+                  <th scope="col">Started</th>
+                  <th scope="col">Duration</th>
+                  <th scope="col">Outcome</th>
+                  <th scope="col" className="synchist-num">Fetched</th>
+                  <th scope="col" aria-label="Detail" />
                 </tr>
               </thead>
               <tbody>

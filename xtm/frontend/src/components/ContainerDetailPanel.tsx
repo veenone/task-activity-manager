@@ -110,7 +110,7 @@ export function ContainerDetailPanel({ containerKey, kind, jiraUrl, onClose }: P
           <span className="detail-head-status">{kindLabel}</span>
         </div>
         <div className="detail-head-actions">
-          <button className="btn-icon detail-close" onClick={onClose} title="Close">✕</button>
+          <button className="btn-icon detail-close" onClick={onClose} title="Close" aria-label="Close">✕</button>
         </div>
       </div>
 
@@ -153,13 +153,13 @@ export function ContainerDetailPanel({ containerKey, kind, jiraUrl, onClose }: P
             {board.rows.length === 0 ? (
               <p className="muted">No members.</p>
             ) : (
-              <table className="board-table">
+              <table aria-label="Member tests" className="board-table">
                 <thead>
                   <tr>
-                    <th>Key</th>
-                    <th>Summary</th>
-                    <th>Status</th>
-                    <th>Result</th>
+                    <th scope="col">Key</th>
+                    <th scope="col">Summary</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Result</th>
                   </tr>
                 </thead>
                 <tbody>

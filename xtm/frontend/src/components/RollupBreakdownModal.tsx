@@ -67,7 +67,7 @@ export function RollupBreakdownModal({
             {title}: {shown.length} test{shown.length === 1 ? "" : "s"} in{" "}
             {containerKey}
           </h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

@@ -99,7 +99,7 @@ export function LabelsModal({ onChanged, onClose }: Props) {
     <Modal onClose={onClose} className="modal pending-modal" labelledBy={titleId}>
       <div className="pending-head">
         <h2 id={titleId}>Labels</h2>
-        <button className="btn btn-ghost" onClick={onClose} title="Close">
+        <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
           ✕
         </button>
       </div>
@@ -145,12 +145,12 @@ export function LabelsModal({ onChanged, onClose }: Props) {
           <p className="muted">No label matches that filter.</p>
         ) : (
           <>
-            <table className="board-table">
+            <table aria-label="Labels" className="board-table">
               <thead>
                 <tr>
-                  <th>Label</th>
-                  <th>Tests</th>
-                  <th>
+                  <th scope="col">Label</th>
+                  <th scope="col">Tests</th>
+                  <th scope="col">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>

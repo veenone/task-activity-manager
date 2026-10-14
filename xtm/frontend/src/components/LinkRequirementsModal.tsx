@@ -100,7 +100,7 @@ export function LinkRequirementsModal({
     >
         <div className="pending-head">
           <h2 id="link-requirements-title">Link requirements to {fromKey}</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

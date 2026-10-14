@@ -176,7 +176,7 @@ export function AddTestsModal({
     <Modal initialFocus={focusRef} onClose={onCancel} className="modal pending-modal" labelledBy="add-tests-title">
         <div className="pending-head">
           <h2 id="add-tests-title">Add tests to {targetLabel ?? containerKey}</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

@@ -56,7 +56,7 @@ export function BulkReviewModal({ testKeys, onComplete, onCancel }: Props) {
     <Modal onClose={onCancel} className="modal bulk-modal" labelledBy="bulk-review-title">
         <div className="pending-head">
           <h2 id="bulk-review-title">Review {testKeys.length} test{testKeys.length === 1 ? "" : "s"}</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

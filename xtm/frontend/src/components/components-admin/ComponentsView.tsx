@@ -311,12 +311,12 @@ export function ComponentsView({ onChanged }: { onChanged: () => void }) {
             ) : (
               <>
                 <div className="components-tests-scroll">
-                  <table className="board-table components-tests">
+                  <table aria-label="Tests carrying this component" className="board-table components-tests">
                     <thead>
                       <tr>
-                        <th>Key</th>
-                        <th>Summary</th>
-                        <th>Status</th>
+                        <th scope="col">Key</th>
+                        <th scope="col">Summary</th>
+                        <th scope="col">Status</th>
                       </tr>
                     </thead>
                     <tbody>

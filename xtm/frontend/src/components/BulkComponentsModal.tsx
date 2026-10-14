@@ -75,7 +75,7 @@ export function BulkComponentsModal({ testKeys, onComplete, onCancel }: Props) {
         <h2 id="bulk-components-title">
           Components ({n} {n === 1 ? "test" : "tests"})
         </h2>
-        <button className="btn btn-ghost" onClick={onCancel} title="Close">
+        <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
           ✕
         </button>
       </div>

@@ -161,7 +161,7 @@ export function NewTestPanel({
           <span className="detail-key">New Test</span>
           <span className="ntp-badge">unsaved</span>
         </div>
-        <button className="btn btn-ghost detail-close" onClick={onCancel} title="Cancel">
+        <button className="btn btn-ghost detail-close" onClick={onCancel} title="Cancel" aria-label="Cancel">
           ✕
         </button>
       </div>

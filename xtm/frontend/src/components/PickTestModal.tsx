@@ -136,7 +136,7 @@ export function PickTestModal({
     >
         <div className="pending-head">
           <h2 id="pick-test-title">{heading}</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -176,7 +176,7 @@ export function PickTestModal({
               <p className="muted">Searching…</p>
             ) : (
               <div className="pick-table-wrap">
-                <table className="pick-table">
+                <table aria-label="Tests to pick" className="pick-table">
                   <tbody>
                     {visible.map((t) => (
                       <tr

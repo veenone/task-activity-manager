@@ -51,7 +51,7 @@ export function ConflictCard({ profileId, conflict, disabled }: Props) {
         <span className="pending-card-summary">{conflict.summary}</span>
         <span className="chip chip-conflict">Conflict</span>
       </div>
-      <table className="conflict-table">
+      <table aria-label="Conflicting fields" className="conflict-table">
         <thead>
           <tr><th scope="col">Field</th><th scope="col">Base</th><th scope="col">Mine</th><th scope="col">Remote</th></tr>
         </thead>

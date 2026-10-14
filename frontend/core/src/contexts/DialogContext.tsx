@@ -240,7 +240,7 @@ function PromptModal({
     >
       <div className="pending-head">
         <h2 id="prompt-modal-title">{title}</h2>
-        <button className="btn btn-ghost" onClick={onCancel} title="Cancel">
+        <button className="btn btn-ghost" onClick={onCancel} title="Cancel" aria-label="Cancel">
           ✕
         </button>
       </div>

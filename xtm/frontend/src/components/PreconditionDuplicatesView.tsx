@@ -249,7 +249,7 @@ function DefinitionCompareModal({
     <Modal onClose={onClose} className="modal dup-compare-modal" labelledBy="precond-dup-compare-title">
         <div className="pending-head">
           <h2 id="precond-dup-compare-title">Compare definitions — "{group.displaySummary}"</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -259,12 +259,12 @@ function DefinitionCompareModal({
             These preconditions share the same normalized summary,
             "{group.normalizedSummary}". Their definition text can still differ.
           </p>
-          <table className="dup-compare-table">
+          <table aria-label="Fields side by side" className="dup-compare-table">
             <thead>
               <tr>
-                <th className="dup-compare-idx">field</th>
+                <th scope="col" className="dup-compare-idx">field</th>
                 {members.map((m) => (
-                  <th key={m.key} className="mono">
+                  <th scope="col" key={m.key} className="mono">
                     {m.key}
                   </th>
                 ))}

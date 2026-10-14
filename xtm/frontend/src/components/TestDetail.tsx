@@ -1057,7 +1057,7 @@ export function TestDetail({
             className="btn btn-ghost detail-close"
             onClick={onClose}
             title="Close"
-          >
+           aria-label="Close">
             ✕
           </button>
         </div>
@@ -1610,36 +1610,36 @@ export function TestDetail({
             runHistory.length === 0 ? (
               <p className="muted">No run history yet.</p>
             ) : (
-              <table className="run-history-table">
+              <table aria-label="Run history" className="run-history-table">
                 <thead>
                   <tr>
-                    <th>Execution</th>
-                    <th
+                    <th scope="col">Execution</th>
+                    <th scope="col"
                       style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
                       onClick={() => toggleRunHistorySort("runStatus")}
                       title="Sort by result"
                     >
                       Result{runHistorySort.field === "runStatus" ? (runHistorySort.desc ? " ▾" : " ▴") : ""}
                     </th>
-                    <th>By</th>
-                    <th>Environment</th>
-                    <th>Plan(s)</th>
-                    <th>Fix Version(s)</th>
-                    <th
+                    <th scope="col">By</th>
+                    <th scope="col">Environment</th>
+                    <th scope="col">Plan(s)</th>
+                    <th scope="col">Fix Version(s)</th>
+                    <th scope="col"
                       style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
                       onClick={() => toggleRunHistorySort("createdAt")}
                       title="Sort by created date"
                     >
                       Created{runHistorySort.field === "createdAt" ? (runHistorySort.desc ? " ▾" : " ▴") : ""}
                     </th>
-                    <th
+                    <th scope="col"
                       style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
                       onClick={() => toggleRunHistorySort("updatedAt")}
                       title="Sort by updated date"
                     >
                       Updated{runHistorySort.field === "updatedAt" ? (runHistorySort.desc ? " ▾" : " ▴") : ""}
                     </th>
-                    <th>Defects</th>
+                    <th scope="col">Defects</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2113,7 +2113,7 @@ function SwapModal({
     <Modal onClose={onCancel} className="modal bulk-modal" labelledBy="bulk-swap-title">
         <div className="pending-head">
           <h2 id="bulk-swap-title">{title}</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -2326,7 +2326,7 @@ function StepRow({
                 className="btn btn-ghost step-delete"
                 onClick={deleteStep}
                 title={isNew ? "Discard this call" : "Delete this call"}
-              >
+               aria-label={isNew ? "Discard this call" : "Delete this call"}>
                 ✕
               </button>
             </>
@@ -2384,7 +2384,7 @@ function StepRow({
               className="btn btn-ghost step-delete"
               onClick={deleteStep}
               title={isNew ? "Discard this new step" : "Delete this step"}
-            >
+             aria-label={isNew ? "Discard this new step" : "Delete this step"}>
               ✕
             </button>
           </>

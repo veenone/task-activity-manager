@@ -860,16 +860,16 @@ export function BugsPanel({ jiraUrl, onOpenTest }: Props) {
             {tests.length === 0 ? (
               <p className="muted">No affected tests.</p>
             ) : (
-              <table className="board-table">
+              <table aria-label="Tests linked to this bug" className="board-table">
                 <thead>
                   <tr>
-                    <th style={{ width: "1.5rem" }} />
-                    <th>Test</th>
-                    <th style={{ width: "1.5rem" }} />
-                    <th>Project</th>
-                    <th>Summary</th>
-                    <th>Status</th>
-                    <th>Latest result</th>
+                    <th scope="col" style={{ width: "1.5rem" }} />
+                    <th scope="col">Test</th>
+                    <th scope="col" style={{ width: "1.5rem" }} />
+                    <th scope="col">Project</th>
+                    <th scope="col">Summary</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Latest result</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -941,7 +941,7 @@ export function BugsPanel({ jiraUrl, onOpenTest }: Props) {
                                   function SortTh({ field, children }: { field: string; children: React.ReactNode }) {
                                     const active = sort.field === field;
                                     return (
-                                      <th
+                                      <th scope="col"
                                         style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}
                                         onClick={() => toggleRunSort(t.key, field)}
                                         title={`Sort by ${field}`}
@@ -1063,7 +1063,7 @@ export function BugsPanel({ jiraUrl, onOpenTest }: Props) {
                                   );
                                   };
                                   return (
-                                    <table className="board-table" style={{ fontSize: "0.85em" }}>
+                                    <table aria-label={`Test runs of ${t.key}`} className="board-table" style={{ fontSize: "0.85em" }}>
                                       <thead>
                                         <tr>
                                           <SortTh field="execKey">Execution</SortTh>
