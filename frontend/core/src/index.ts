@@ -11,6 +11,7 @@ export { DiagnosticsDialog } from "./components/about/DiagnosticsDialog";
 export type { DiagnosticsInfo, InfoRow } from "./components/about/diagnostics";
 export { ProfilesDialog } from "./components/profile/ProfilesDialog";
 export type { ProfileFormSlot } from "./components/profile/ProfilesDialog";
+export { jiraUrlError, normalizeJiraUrl, projectKeyError } from "./components/profile/profileValidation";
 export { useFocusWhen } from "./components/useFocusWhen";
 export { Menu } from "./components/Menu";
 export type { MenuItem } from "./components/Menu";
