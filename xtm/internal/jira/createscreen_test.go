@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -167,5 +169,76 @@ func TestCreateTestSendsExtraFields(t *testing.T) {
 	}
 	if got["customfield_20000"] != "Payments" || got["summary"] != "Login" {
 		t.Fatalf("fields %v", got)
+	}
+}
+
+// A field offered on two issue types comes back from createmeta once per type.
+// Without a guard the dialog renders it twice and the second copy overwrites
+// the first value the user typed.
+func TestCreateScreenFieldsReturnsAFieldOfferedTwiceOnlyOnce(t *testing.T) {
+	team := required("Team")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/rest/api/2/issue/createmeta" {
+			t.Errorf("unexpected request %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"projects": []any{map[string]any{"issuetypes": []any{
+				map[string]any{"fields": map[string]any{"customfield_20000": team}},
+				map[string]any{"fields": map[string]any{"customfield_20000": team}},
+			}}},
+		})
+	}))
+	defer srv.Close()
+
+	got, err := newTestClient(srv).GetCreateScreenFields(
+		context.Background(), "QA", "", "Test", nil)
+	if err != nil {
+		t.Fatalf("fields: %v", err)
+	}
+	if want := []string{"customfield_20000"}; !reflect.DeepEqual(ids(got), want) {
+		t.Fatalf("ids = %v, want %v", ids(got), want)
+	}
+}
+
+// An instance whose field catalogue cannot be read must still create the
+// precondition. Losing the type is worth a log line; losing the ability to
+// create preconditions at all is not.
+func TestCreatePreconditionSurvivesAnUnreadableFieldCatalogue(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/rest/api/2/issuetype":
+			_ = json.NewEncoder(w).Encode([]map[string]any{{"id": "77", "name": "Pre-Condition"}})
+		case "/rest/api/2/field":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/rest/api/2/issue":
+			body, _ := io.ReadAll(r.Body)
+			var payload struct {
+				Fields map[string]any `json:"fields"`
+			}
+			_ = json.Unmarshal(body, &payload)
+			got = payload.Fields
+			_ = json.NewEncoder(w).Encode(map[string]string{"key": "PC-9"})
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	key, err := newTestClient(srv).CreatePrecondition(
+		context.Background(), "QA", "Net up", "Generic", "", nil)
+	if err != nil {
+		t.Fatalf("create must survive an unreadable field catalogue, got %v", err)
+	}
+	if key != "PC-9" {
+		t.Fatalf("key = %q, want PC-9", key)
+	}
+	for k := range got {
+		if strings.HasPrefix(k, "customfield_") {
+			t.Fatalf("no custom field should be sent when the catalogue is unreadable, got %s", k)
+		}
 	}
 }

@@ -239,6 +239,13 @@ func (p *Publisher) publishOne(ctx context.Context, workspaceID, targetConnectio
 		return
 	}
 
+	// TODO(xtm): #187 taught the create dialogs to ask Jira which fields its
+	// create screen marks required, but only on the interactive paths. A
+	// target instance that marks a field required will still reject this
+	// create. nil is the right value rather than a placeholder: the fields a
+	// dialog collected were resolved against the SOURCE instance and would be
+	// meaningless, or wrong, sent to another one. A fix has to ask the target,
+	// through p.Target.GetTestCreateFields.
 	targetKey, err := p.Target.CreateTest(ctx, p.TargetProjectKey, t.Summary, t.Description, t.Priority, t.Labels, t.Components, nil)
 	if err != nil {
 		result.Failed = append(result.Failed, PublishFailure{LocalKey: t.Key, Error: fmt.Sprintf("create test: %v", err)})
