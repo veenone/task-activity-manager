@@ -47,6 +47,16 @@ describe('core design tokens', () => {
     expect(dark.get('--e-3')).toContain('rgba(0, 0, 0, 0.64)');
   });
 
+  // The status palette (#214): a colour a rule needs for danger, warn, ok,
+  // info or violet is one of these, never a literal, and each has a dark value
+  // so it follows the theme.
+  it('gives every status palette token a light and a dark value', () => {
+    const families = ['danger', 'warn', 'ok', 'info', 'indigo', 'cyan', 'violet'];
+    const status = [...light.keys()].filter((name) => families.some((f) => name.startsWith(`--${f}-`)));
+    expect(status.length).toBeGreaterThanOrEqual(families.length * 2);
+    expect(status.filter((name) => !dark.has(name))).toEqual([]);
+  });
+
   it('applies the elevation and hit-area tokens to shared primitives', () => {
     expect(declarations(primitivesCss, '.menu-panel').get('box-shadow')).toBe('var(--e-2)');
     expect(declarations(primitivesCss, '.btn').get('min-height')).toBe('var(--hit-min)');
