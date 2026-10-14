@@ -2,7 +2,7 @@
 html, body, #root { height: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text);
   background: var(--surface-2);
   -webkit-font-smoothing: antialiased;
@@ -38,7 +38,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   padding: 4px 12px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-md);
   white-space: nowrap;
 }
 .view-tab:hover { color: var(--chrome-text); }
@@ -51,7 +51,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    overflow: hidden, in a row locked at 34px, that left the top and bottom
    border cut off. An inline-flex box is atomic, so the line box is its
    full height and there is nothing to clip. */
-.chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9px; font-size: 10px; font-weight: 600; }
+.chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9px; font-size: var(--fs-2xs); font-weight: 600; }
 
 .nav-rail {
   display: flex;
@@ -79,7 +79,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    out; a panel the user opened from a menu should be closable where it is. */
 .nav-rail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 6px 6px 14px; }
 .nav-rail-head .nav-section { padding: 0; }
-.nav-rail-hide { padding: 2px 6px; line-height: 1; font-size: 11px; color: var(--text-muted); }
+.nav-rail-hide { padding: 2px 6px; line-height: 1; font-size: var(--fs-xs); color: var(--text-muted); }
 .nav-rail-hide:hover:not(:disabled) { color: var(--text); }
 .nav-item:hover:not(:disabled) { background: var(--row-hover); }
 .nav-item:disabled { color: var(--text-muted); cursor: default; }
@@ -87,8 +87,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
    accent, white text) so the rail's selection state reads like XTM's tabs. */
 .nav-item-active { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .nav-divider { height: 1px; margin: 12px 8px; background: var(--border); }
-.nav-section { padding: 0 14px 4px; font-size: 11px; color: var(--text-muted); }
-.nav-hint { padding: 0 14px; font-size: 10px; color: var(--text-muted); }
+.nav-section { padding: 0 14px 4px; font-size: var(--fs-xs); color: var(--text-muted); }
+.nav-hint { padding: 0 14px; font-size: var(--fs-2xs); color: var(--text-muted); }
 
 /* The window never scrolls as a whole: the shell is one flex chain from .app
    down, and only the tree, the table body, and the detail panel scroll, each
@@ -101,7 +101,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    refuses to shrink below its content, so one missing declaration anywhere in
    the chain lets the table push the pager off the bottom of the window. */
 .main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
-.small { font-size: 11px; }
+.small { font-size: var(--fs-xs); }
 
 /* .app-statusbar's frame (height, background, border, font-size) comes from
    core; TAM's footer holds several children, so it adds the gap XTM's single-
@@ -120,7 +120,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   background: var(--warn-soft);
   border-radius: 8px;
 }
-.startup-error h2 { font-size: 14px; margin-bottom: 8px; }
+.startup-error h2 { font-size: var(--fs-lg); margin-bottom: 8px; }
 
 /* The Manage Profiles dialog is entirely the shared master-detail one in
    @agile-suite/core's primitives.css now, so TAM adds nothing to it. */
@@ -156,7 +156,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The chips stay their own size. They are the grid's type chips, and a
    reader matches them to the column, not to the controls either side. */
 .type-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.chip-type { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-type { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 8px; border-radius: 8px; border: 1px solid transparent; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The chip palette lives in tokens.css: these fills were literals, so a chip
    kept its pastel ground when the window went dark and the text on it was
    the only thing that moved. */
@@ -181,7 +181,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    hovering an unselected type filter made it look selected. */
 .chip-toggle:hover { opacity: 0.8; }
 .chip-toggle.chip-on { opacity: 1; border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; font-weight: 600; }
-.chip-status { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
+.chip-status { font-size: var(--fs-2xs); font-weight: 600; padding: 2px 6px; border-radius: 3px; }
 .chip-status-todo { background: var(--surface-3); color: var(--text); }
 .chip-status-active { background: var(--chip-blue-bg); color: var(--chip-blue-text); }
 .chip-status-done { background: var(--chip-green-bg); color: var(--chip-green-text); }
@@ -204,7 +204,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .backlog-body:has(.detail-panel) .backlog-grid { border-right: none; border-radius: 6px 0 0 6px; }
 .backlog-body:not(:has(.detail-panel)) .backlog-grid { border-radius: 6px; }
 .backlog-empty { flex: 1; display: grid; place-content: center; padding: 32px; text-align: center; }
-.issue-table { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: 12px; }
+.issue-table { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: var(--fs-sm); }
 /* Track 1 is --issue-key-w, measured from the keys on the page by
    lib/keyColumn.ts, not a fixed width: a fixed 84px held about eleven
    characters, and Jira DC allows a ten-character project key, so a legal key
@@ -251,7 +251,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    content box as the rows (no scrollbar-width drift between the two grids)
    and its sticky positioning finally has the scrolling ancestor it always
    assumed. z-index keeps it over the rows it pins above. */
-.issue-head { height: 30px; background: var(--surface-2); color: var(--text-muted); font-size: 11px; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+.issue-head { height: 30px; background: var(--surface-2); color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; position: sticky; top: 0; z-index: var(--z-sticky); }
 /* Owns both axes: the header is inside it, so a sideways scroll takes the
    column labels with the rows. */
 .issue-body { flex: 1; min-height: 0; overflow: auto; }
@@ -264,7 +264,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .issue-sort-active { color: var(--accent); }
 /* The caret is always present so the header does not reflow on sort, and is
    dimmed until its column is the active one. */
-.issue-sort-caret { flex: none; font-size: 9px; opacity: 0.35; }
+.issue-sort-caret { flex: none; font-size: var(--fs-2xs); opacity: 0.35; }
 .issue-sort-active .issue-sort-caret { opacity: 1; }
 /* Rank order is the point of a backlog and was the one thing the grid never
    said out loud. */
@@ -284,7 +284,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .subtask-toggle:hover { background: var(--surface-2); color: var(--text); }
 .subtask-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .board-card-subtask { margin-inline-start: var(--subtask-indent); border-inline-start: 2px solid var(--border); }
-.board-card-parent { display: flex; align-items: center; color: var(--text-muted); font-size: 11px; margin-top: 6px; }
+.board-card-parent { display: flex; align-items: center; color: var(--text-muted); font-size: var(--fs-xs); margin-top: 6px; }
 /* The detail panel's title is the one key that links out to the instance:
    in a grid the row already owns the click. */
 .issue-key-link {
@@ -306,7 +306,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .issue-key-link:hover { color: var(--accent-hover); }
 .issue-key-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px; }
-.issue-key-ext { font-size: 9px; opacity: 0.75; flex: none; }
+.issue-key-ext { font-size: var(--fs-2xs); opacity: 0.75; flex: none; }
 /* On the panel's dark head the link reads light, not accent-blue. */
 .detail-head .issue-key-link { color: var(--chrome-text); }
 .detail-head .issue-key-link:hover { color: var(--chrome-text-strong); }
@@ -330,7 +330,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .detail-panel { width: 352px; min-width: 300px; max-width: 900px; flex: none; align-self: stretch; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 0 6px 6px 0; overflow: hidden; position: relative; }
 /* The draggable divider on the panel's left edge, mirrored from XTM's. It
    sits over the seam rather than beside it, so the two panes stay flush. */
-.detail-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; margin-left: -3px; cursor: col-resize; z-index: 5; }
+.detail-resizer { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; margin-left: -3px; cursor: col-resize; z-index: var(--z-float); }
 .detail-resizer:hover { background: var(--accent); opacity: 0.35; }
 .detail-head {
   flex: none;
@@ -345,11 +345,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 }
 .detail-head-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .detail-head-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.detail-key { font-size: 13px; font-weight: 600; color: var(--chrome-text); }
+.detail-key { font-size: var(--fs-md); font-weight: 600; color: var(--chrome-text); }
 /* The status reads as a chip on the bar rather than as a row in the grid,
    which is what makes the key and its state one statement. */
 .detail-head-status {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   background: var(--chrome-raised);
   color: var(--chrome-chip-text);
   border: 1px solid var(--chrome-chip-border);
@@ -362,12 +362,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .detail-close { color: var(--chrome-text-muted); flex-shrink: 0; }
 .detail-close:hover:not(:disabled) { background: var(--chrome-hover); color: var(--chrome-text-strong); }
 .detail-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 18px; }
-.detail-summary { font-size: 14px; margin: 0 0 12px; }
+.detail-summary { font-size: var(--fs-lg); margin: 0 0 12px; }
 /* The label/value grid XTM uses for the read-only facts above the editor. */
 /* align-items: start, not center: a value that wraps to two lines (a sprint
    called "Sprint 12 - Checkout polish", a long path) used to sit centred
    against its label and read as though it belonged to neither row. */
-.detail-fields { display: grid; grid-template-columns: 84px 1fr; gap: 8px 10px; align-items: start; margin-bottom: 4px; font-size: 12px; }
+.detail-fields { display: grid; grid-template-columns: 84px 1fr; gap: 8px 10px; align-items: start; margin-bottom: 4px; font-size: var(--fs-sm); }
 .detail-fields dt { color: var(--text-muted); padding-top: 1px; }
 /* The value wraps rather than clipping: the panel is resizeable and these
    are facts a reader needs whole, so the column gives way, not the text. */
@@ -384,7 +384,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   margin: 20px 0 9px;
   padding-top: 15px;
   border-top: 1px solid var(--border-subtle);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -404,7 +404,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   letter-spacing: inherit;
 }
 .detail-section-toggle:hover { color: var(--text); }
-.detail-section-chevron { font-size: 9px; }
+.detail-section-chevron { font-size: var(--fs-2xs); }
 .detail-section-count {
   background: var(--surface-sunken);
   border-radius: 8px;
@@ -412,7 +412,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   letter-spacing: 0;
   font-weight: 600;
 }
-.detail-section-action { margin-left: auto; font-size: 11px; }
+.detail-section-action { margin-left: auto; font-size: var(--fs-xs); }
 /* The cached stamp sits where a section's action would, but is a fact and
    not a control, so it takes the same place without the button styling. */
 .detail-section-note { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -424,11 +424,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
    beside it. It spans the whole row instead. */
 .edit-row-head { display: flex; align-items: center; gap: 8px; grid-column: 1 / -1; flex-wrap: wrap; min-width: 0; }
 .edit-row-head > label.muted { padding-top: 0; }
-.edit-description-action { margin-left: auto; font-size: 11px; }
+.edit-description-action { margin-left: auto; font-size: var(--fs-xs); }
 /* One comment: an initials avatar, the author, then the time on the right,
    over the rendered body. */
 .comment-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-.comment-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface-2); font-size: 12px; }
+.comment-card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--surface-2); font-size: var(--fs-sm); }
 .comment-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .comment-avatar {
   flex: none;
@@ -437,16 +437,16 @@ input, button, select { font-family: inherit; font-size: inherit; }
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
-.comment-author { font-size: 12px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-author { font-size: var(--fs-sm); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .comment-when { margin-left: auto; white-space: nowrap; }
 .chip-restricted { background: var(--warn-soft); color: var(--warn-text); border: 1px solid var(--warn-border); }
-.chip-label { background: var(--surface-3); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 8px; margin-right: 4px; }
+.chip-label { background: var(--surface-3); color: var(--text); font-size: var(--fs-2xs); padding: 2px 8px; border-radius: 8px; margin-right: 4px; }
 .accent-text { color: var(--accent); }
 /* The description is a field like the others in the panel, so it is drawn in
    a box like the others: the border, radius and ground of .detail-input,
@@ -456,10 +456,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .detail-description { padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); }
 .detail-note { margin-top: 16px; }
 .linked-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.linked-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
+.linked-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; font-size: var(--fs-sm); }
 .linked-key { font-weight: 600; min-width: 64px; }
 .link-group { margin-bottom: 12px; }
-.link-group-title { font-size: 12px; margin-bottom: 6px; }
+.link-group-title { font-size: var(--fs-sm); margin-bottom: 6px; }
 
 /* Plan 1b: pending changes */
 /* --warn-bg and --warn-fg were defined nowhere, so every rule below drew
@@ -468,7 +468,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-draft { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
 .chip-held { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
 .pending-held { margin: 4px 0 0; color: var(--warning-text); }
-.chip-conflict { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); text-transform: uppercase; font-size: 10px; }
+.chip-conflict { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); text-transform: uppercase; font-size: var(--fs-2xs); }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }
 /* --warn-soft is the token; the --warn-bg this used to name is defined
@@ -501,11 +501,11 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .btn-discard:focus-visible { outline: 2px solid var(--danger-text); outline-offset: 1px; }
 /* The row-level ones sit inside dense rows, so they stay ghost-quiet until
    hovered and carry the mark rather than the word. */
-.btn-discard-row { padding: 2px 7px; font-size: 11px; border-color: transparent; }
-.discard-mark { font-size: 11px; line-height: 1; }
+.btn-discard-row { padding: 2px 7px; font-size: var(--fs-xs); border-color: transparent; }
+.discard-mark { font-size: var(--fs-xs); line-height: 1; }
 .pending-discard { margin-left: auto; }
 .pending-rows { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.pending-row { display: grid; grid-template-columns: 110px 1fr auto 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+.pending-row { display: grid; grid-template-columns: 110px 1fr auto 1fr auto; gap: 8px; align-items: center; font-size: var(--fs-md); }
 /* An unpushable row explains itself under its values, with the Discard it
    qualifies still on the first line. The note comes first in the markup, so
    a reader meets the reason before the action; the grid puts each where it
@@ -527,7 +527,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .edit-form .edit-row > .detail-input, .edit-form .edit-row > .edit-cell > .detail-input { margin-bottom: 0; }
 .edit-sprint-modal { width: min(600px, 92vw); }
 .edit-sprint-title { min-width: 0; }
-.edit-sprint-title p { margin: 2px 0 0; color: var(--text-muted); font-size: 11px; }
+.edit-sprint-title p { margin: 2px 0 0; color: var(--text-muted); font-size: var(--fs-xs); }
 .edit-row { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: start; }
 /* A row whose control is an editor stacks. A 96px label beside a tabbed
    editor leaves the editor about 214px wide in the default panel. */
@@ -538,10 +538,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .edit-row > label.muted { padding-top: 6px; }
 .edit-row .detail-input { width: 100%; box-sizing: border-box; }
 .edit-date-changed { padding: 6px; border: 1px solid var(--accent); border-radius: 5px; background: var(--accent-soft); }
-.edit-date-note { display: block; margin-top: 5px; color: var(--accent); font-size: 11px; line-height: 1.4; }
+.edit-date-note { display: block; margin-top: 5px; color: var(--accent); font-size: var(--fs-xs); line-height: 1.4; }
 .edit-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .activity-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.activity-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; }
+.activity-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: var(--fs-md); }
 .activity-row .small:last-child { grid-column: 2; }
 
 /* Plan 1b: new issue */
@@ -572,7 +572,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .detail-input[aria-invalid="true"] { border-color: var(--danger-text); }
 
 /* Plan 1b: conflicts */
-.conflict-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.conflict-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: var(--fs-md); }
 .conflict-table th { text-align: left; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 8px 4px 0; }
 .conflict-table td { padding: 4px 8px 4px 0; vertical-align: top; }
 .danger-text { color: var(--danger-text); }
@@ -623,7 +623,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .board-filter input { width: 200px; border: 1px solid var(--border-strong); border-radius: 4px; padding: 4px 8px; background: var(--surface); color: var(--text); }
 /* A commit's outcome, before its sentence is read. */
 .commit-line { display: flex; align-items: baseline; gap: 7px; }
-.commit-mark { flex: none; font-size: 13px; }
+.commit-mark { flex: none; font-size: var(--fs-md); }
 .commit-line-ok .commit-mark { color: var(--ok-text); }
 .commit-line-warn .commit-mark { color: var(--warn-text); }
 .boards-pane .board-scroll { min-width: 0; }
@@ -635,7 +635,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    drift from it. */
 .add-worklog { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
 .add-link h3,
-.add-worklog h3 { margin: 0; font-size: 13px; }
+.add-worklog h3 { margin: 0; font-size: var(--fs-md); }
 .add-link-key { display: flex; gap: 6px; }
 .add-link-key .detail-input { flex: 1; }
 /* The total above the entries: the one number a reader of a work log came
@@ -666,7 +666,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 
 /* One scrum board is named rather than picked, so the heading sits where the
    picker would have and reads at the same weight as its label. */
-.board-head-name { font-size: 13px; font-weight: 600; color: var(--text-strong); margin: 0; }
+.board-head-name { font-size: var(--fs-md); font-weight: 600; color: var(--text-strong); margin: 0; }
 
 /* Both row shapes fill the pane and clip, rather than sizing to their
    content the way the Epics tree's rows do, and that is why nothing here
@@ -697,7 +697,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .sprint-cell-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
 .sprint-cell-stack > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sprint-cell-badges { display: flex; align-items: center; gap: 4px; }
-.sprint-cell-dates, .sprint-goal-line { color: var(--text-muted); font-size: 11px; }
+.sprint-cell-dates, .sprint-goal-line { color: var(--text-muted); font-size: var(--fs-xs); }
 .sprint-timeline-scope { font-variant-numeric: tabular-nums; }
 /* The timeline cell owns its own two lines and two bars, so it is the one
    cell that does not clip: a bar has to reach the end of its track. */
@@ -723,7 +723,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
   align-items: baseline;
   gap: 8px;
   padding: 4px 10px 2px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   background: var(--surface-2);
   border-bottom: 1px solid var(--border-subtle);
@@ -745,12 +745,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .multi-select { position: relative; min-width: 0; }
 .assignee-field { display: flex; align-items: stretch; gap: 0; }
 .assignee-field .detail-input { flex: 1; min-width: 0; margin-bottom: 0; }
-.assignee-clear { padding: 2px 7px; font-size: 11px; color: var(--text-muted); flex: none; }
+.assignee-clear { padding: 2px 7px; font-size: var(--fs-xs); color: var(--text-muted); flex: none; }
 .assignee-clear:hover:not(:disabled) { color: var(--text); }
 .assignee-list,
 .multi-select-list {
   position: absolute;
-  z-index: 70;
+  z-index: var(--z-modal-popover);
   top: calc(100% + 2px);
   left: 0;
   right: 0;
@@ -814,12 +814,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
   flex: 1; display: grid; place-content: center; padding: 32px; text-align: center;
 }
 .report-summary { max-width: 78ch; }
-.report-heading { margin: 18px 0 6px; font-size: 15px; font-weight: 600; }
+.report-heading { margin: 18px 0 6px; font-size: var(--fs-lg); font-weight: 600; }
 .report-summary .report-heading { margin-top: 0; }
 /* The one line a review is read off, so it carries the weight the muted
    qualifications under it deliberately do not. */
-.report-sentence { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
-.report-mode { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+.report-sentence { margin: 0 0 8px; font-size: var(--fs-lg); line-height: 1.5; }
+.report-mode { margin: 0 0 6px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
 .report-mode-live { color: var(--accent); }
 .report-mode-closed { color: var(--text-muted); }
 /* One line, not a callout. Both of its raw figures are already tiles and
@@ -827,12 +827,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
    to carry a percentage was the largest single piece of the overrun. */
 .report-completion { margin: 0 0 8px; font-weight: 600; }
 .report-metric { min-width: 0; border-top: 2px solid var(--border); padding-top: 6px; }
-.report-metric dt { color: var(--text-muted); font-size: 11px; font-weight: 600; }
-.report-metric dd { margin: 3px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; }
-.report-metric dd span { color: var(--text-muted); font-size: 11px; }
+.report-metric dt { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
+.report-metric dd { margin: 3px 0 0; font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+.report-metric dd span { color: var(--text-muted); font-size: var(--fs-xs); }
 .report-summary p.muted, .report-summary p.warn-text { margin: 0 0 6px; line-height: 1.45; }
 .report-details { margin: 8px 0; max-width: 70ch; }
-.report-details summary { color: var(--text-muted); cursor: pointer; font-size: 12px; }
+.report-details summary { color: var(--text-muted); cursor: pointer; font-size: var(--fs-sm); }
 .report-details p:first-of-type { margin-top: 8px; }
 .report-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; max-width: 70ch; }
 .report-unavailable, .report-loading { max-width: 70ch; line-height: 1.45; }
@@ -849,10 +849,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
    now the only thing on the view that scrolls. */
 .report-table-wrap { flex: 1; min-height: 0; max-width: 100%; overflow: auto; scrollbar-gutter: stable; }
 .report-table-wrap:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
-.report-table { border-collapse: collapse; margin-top: 8px; font-size: 13px; width: 100%; }
+.report-table { border-collapse: collapse; margin-top: 8px; font-size: var(--fs-md); width: 100%; }
 /* Sticky inside the panel, so scrolling the rows does not scroll away what
    the columns are. */
-.report-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+.report-table thead th { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--surface); }
 .report-table th { text-align: left; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); padding: 2px 16px 4px 0; }
 .report-table tbody th { color: var(--text); font-weight: 500; border-bottom: none; }
 .report-table td { padding: 4px 16px 4px 0; vertical-align: top; white-space: nowrap; }
@@ -998,7 +998,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chart-hit:focus-visible { fill: var(--chart-hit); stroke: var(--accent); stroke-width: 2; }
 .chart-tooltip {
   position: absolute;
-  z-index: 5;
+  z-index: var(--z-float);
   max-width: 34ch;
   transform: translate(-50%, calc(-100% - 10px));
   padding: 5px 8px;
@@ -1062,7 +1062,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    the same kind of surface. */
 .ritual-page { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .ritual-page-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
-.ritual-page-head h3 { margin: 0; font-size: 15px; }
+.ritual-page-head h3 { margin: 0; font-size: var(--fs-lg); }
 .ritual-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .ritual-editor .editor-toolbar-group[data-group="ritual"] { margin-left: auto; border-right: 0; }
 /* An outlined box, the way every other field the app takes text in is drawn,
@@ -1096,8 +1096,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .rich-text ul, .rich-text ol { padding-inline-start: 1.4em; }
 .ritual-editor-content p, .ritual-page-body p, .rich-text p { margin-block: 0.6em; }
 .ritual-editor-content li, .ritual-page-body li, .rich-text li { margin-block: 0.2em; }
-.ritual-editor-content h2, .ritual-page-body h2, .rich-text h2 { font-size: 17px; margin: 1.2em 0 0.4em; }
-.ritual-editor-content h3, .ritual-page-body h3, .rich-text h3 { font-size: 15px; margin: 1em 0 0.35em; }
+.ritual-editor-content h2, .ritual-page-body h2, .rich-text h2 { font-size: var(--fs-xl); margin: 1.2em 0 0.4em; }
+.ritual-editor-content h3, .ritual-page-body h3, .rich-text h3 { font-size: var(--fs-lg); margin: 1em 0 0.35em; }
 .ritual-editor-content blockquote, .ritual-page-body blockquote { margin: 0.6em 0; padding-left: 10px; border-left: 3px solid var(--border-strong); color: var(--text-muted); }
 .ritual-editor-content pre, .ritual-page-body pre { margin: 0.6em 0; padding: 8px 10px; border-radius: 4px; background: var(--surface-sunken); overflow-x: auto; }
 .ritual-editor-content hr, .ritual-page-body hr { margin: 1em 0; border: 0; border-top: 1px solid var(--border); }
@@ -1110,12 +1110,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-editor-content:focus-within { box-shadow: inset 0 0 0 2px var(--accent); }
 .ritual-opaque { display: block; border: 1px dashed var(--border-strong); border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: var(--surface-sunken); }
 .ritual-opaque.is-selected { outline: 2px solid var(--accent); }
-.ritual-opaque-label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 4px; color: var(--text-strong); }
-.ritual-opaque-inline { border: 1px dashed var(--border-strong); border-radius: 4px; padding: 0 4px; font-size: 12px; background: var(--surface-sunken); }
+.ritual-opaque-label { display: block; font-weight: 600; font-size: var(--fs-sm); margin-bottom: 4px; color: var(--text-strong); }
+.ritual-opaque-inline { border: 1px dashed var(--border-strong); border-radius: 4px; padding: 0 4px; font-size: var(--fs-sm); background: var(--surface-sunken); }
 .ritual-status-line { margin: 0; padding: 4px 16px; border-top: 1px solid var(--border-subtle); }
 .ritual-notice { margin: 0; padding: 4px 16px; }
 .ritual-readonly { padding: 12px 16px; overflow: auto; min-height: 0; }
-.ritual-macro-table { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+.ritual-macro-table { border-collapse: collapse; margin: 6px 0; font-size: var(--fs-sm); }
 .ritual-macro-table th, .ritual-macro-table td { border: 1px solid var(--border-subtle); padding: 2px 6px; text-align: left; }
 
 .rituals-view { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 8px; }
@@ -1125,7 +1125,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .ritual-docs { border-right: 1px solid var(--border); overflow: auto; min-height: 0; padding: 4px 0; }
 .ritual-docs ul { list-style: none; margin: 0; padding: 0; }
 .ritual-doc { justify-content: space-between; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
-.ritual-chip { font-size: 11px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--border); color: var(--text-muted); }
+.ritual-chip { font-size: var(--fs-xs); padding: 0 6px; border-radius: 8px; border: 1px solid var(--border); color: var(--text-muted); }
 .ritual-chip-synced { color: var(--ok-text); }
 .ritual-chip-unsynced, .ritual-chip-local { color: var(--text-strong); }
 .ritual-chip-conflict, .ritual-chip-gone { color: var(--warn-text); border-color: var(--warn-border); background: var(--warn-soft); }

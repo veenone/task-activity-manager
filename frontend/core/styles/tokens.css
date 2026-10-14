@@ -221,6 +221,23 @@
   /* Borders and highlights that follow the theme. */
   --indigo-border: #a5b4fc;
   --highlight-bg: #fde047;
+  /* Type scale (#217). Small text keeps a 10px step so chips and table
+     columns keep their width. */
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
+  --fs-2xl: 26px;
+  /* Layer scale (#217), lowest to highest. Something that must sit directly
+     above a neighbour on the same layer uses calc(var(--z-...) + 1). */
+  --z-sticky: 1;
+  --z-float: 5;
+  --z-popover: 20;
+  --z-menu: 40;
+  --z-modal: 60;
+  --z-modal-popover: 70;
 }
 
 :root[data-theme="dark"] {
