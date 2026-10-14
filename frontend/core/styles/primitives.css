@@ -33,19 +33,19 @@
   display: inline-flex;
 }
 .menu-caret {
-  font-size: 9px;
+  font-size: var(--fs-2xs);
   color: var(--chrome-text-muted);
   margin-top: 1px;
 }
 .menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-menu);
 }
 .menu-panel {
   position: absolute;
   top: calc(100% + 6px);
-  z-index: 41;
+  z-index: calc(var(--z-menu) + 1);
   min-width: 210px;
   padding: 5px;
   background: var(--chrome-menu-bg);
@@ -81,7 +81,7 @@
   padding: 7px 9px;
   cursor: pointer;
   color: var(--chrome-menu-text);
-  font-size: 13px;
+  font-size: var(--fs-md);
   text-align: left;
 }
 .menu-item:hover:not(:disabled) {
@@ -103,7 +103,7 @@
   width: 13px;
   flex-shrink: 0;
   color: var(--chrome-check);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 .menu-label {
   flex: 1;
@@ -164,7 +164,7 @@
   justify-content: center;
   gap: 8px;
   padding: 9px;
-  font-size: 14px;
+  font-size: var(--fs-lg);
 }
 
 .form-actions {
@@ -191,7 +191,7 @@
      so the column header painted over every dialog opened from that view and
      obscured its title. Sits above the menus (41) and below the multiselect
      panel (70), which opens from inside dialogs. */
-  z-index: 60;
+  z-index: var(--z-modal);
   background: var(--overlay-scrim);
   display: flex;
   justify-content: center;
@@ -208,7 +208,7 @@
 
 /* Editable fields in the detail panel */
 .field-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-strong);
   margin: 4px 0 4px;
@@ -219,7 +219,7 @@
   border-radius: 4px;
   padding: 6px 8px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text);
   background: var(--surface);
   margin-bottom: 12px;
@@ -227,7 +227,7 @@
 .detail-input-inline {
   margin-bottom: 0;
   padding: 3px 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* A pair of dates on one line, each behind its own small label. One rule
@@ -246,7 +246,7 @@
 }
 
 .confirm-message {
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text-strong);
   line-height: 1.5;
 }
@@ -264,7 +264,7 @@
   border-bottom: 1px solid var(--border);
 }
 .pending-head h2 {
-  font-size: 15px;
+  font-size: var(--fs-lg);
   margin: 0;
 }
 
@@ -311,7 +311,7 @@
   border-radius: 5px;
   padding: 5px 11px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-md);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -332,7 +332,7 @@
   padding: 5px 11px;
   cursor: pointer;
   color: var(--chrome-text);
-  font-size: 13px;
+  font-size: var(--fs-md);
   white-space: nowrap;
 }
 .topbar-btn:hover:not(:disabled) {
@@ -382,7 +382,7 @@
 }
 .brand {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--fs-lg);
   white-space: nowrap;
   letter-spacing: 0.2px;
 }
@@ -404,7 +404,7 @@
 .demo-chip {
   background: var(--chrome-pending);
   color: var(--chrome-bg);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
@@ -421,7 +421,7 @@
   padding: 0 14px;
   background: var(--surface-2);
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .muted {
   color: var(--text-muted);
@@ -449,7 +449,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 .bulk-row span {
@@ -458,7 +458,7 @@
 .bulk-row select,
 .bulk-row input,
 .bulk-row textarea {
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text);
 }
 .bulk-row select {
@@ -488,12 +488,12 @@
   }
 }
 .import-validation {
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 .commit-fail-list {
   margin: 4px 0 0 16px;
   padding: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .link-btn {
   background: none;
@@ -516,7 +516,7 @@
 }
 .mono {
   font-family: "Consolas", "SF Mono", "Menlo", monospace;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* Profile management dialog, mirrored from XTM's App.css */
@@ -545,7 +545,7 @@
   flex-wrap: wrap;
 }
 .profiles-modal-sub {
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 /* Sits under the profile list, for whatever an app has to say about which
@@ -584,11 +584,11 @@
 }
 /* Quieter than the accent Create button: importing is the rarer path. */
 .profiles-import-btn {
-  font-size: 13px;
+  font-size: var(--fs-md);
   padding: 7px 9px;
 }
 .profiles-list-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -625,20 +625,20 @@
   white-space: nowrap;
 }
 .profiles-row-key {
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .profiles-star {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   line-height: 1;
   padding: 0 2px;
   color: var(--accent);
 }
 .profiles-badge-active {
   flex: 0 0 auto;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -656,7 +656,7 @@
   margin-bottom: 4px;
 }
 .profiles-mode-kicker {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 700;
@@ -668,7 +668,7 @@
   color: var(--text-muted);
 }
 .profiles-mode-title {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-weight: 620;
   color: var(--text-strong);
   letter-spacing: -0.01em;
@@ -711,7 +711,7 @@
   border: 1px solid var(--warn-border);
   border-radius: 8px;
   padding: 9px 11px;
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   color: var(--warn-text);
   line-height: 1.45;
 }
@@ -743,13 +743,13 @@
 }
 .profiles-empty h3 {
   margin: 0 0 6px;
-  font-size: 15.5px;
+  font-size: var(--fs-lg);
   color: var(--text-strong);
   font-weight: 600;
 }
 .profiles-empty p {
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text-muted);
 }
 .profile-form {
@@ -762,13 +762,13 @@
   text-align: left;
 }
 .profile-form h2 {
-  font-size: 15px;
+  font-size: var(--fs-lg);
 }
 .profile-form label {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 .profile-form input,
@@ -780,7 +780,7 @@
   background: var(--surface);
   color: var(--text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 /* The checkbox row is the one label that reads left to right. */
 .profile-form-checkbox {
@@ -794,7 +794,7 @@
 }
 .profile-form-advanced summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   padding: 4px 0;
 }
@@ -838,7 +838,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 0 4px 4px 0;
   padding: 4px 8px;
-  font-size: 14px;
+  font-size: var(--fs-lg);
   line-height: 1;
   flex-shrink: 0;
 }
@@ -846,13 +846,13 @@
 .field-error {
   display: block;
   color: var(--danger-text);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   margin-top: 3px;
 }
 .field-hint {
   display: block;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 .field-hint-warn {
@@ -866,7 +866,7 @@
   color: var(--text);
   border-radius: 6px;
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   margin: 4px 0;
 }
 
@@ -911,7 +911,7 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 2;
+  z-index: calc(var(--z-sticky) + 1);
   width: 26px;
   height: 26px;
   border: none;
@@ -919,7 +919,7 @@
   background: rgba(255, 255, 255, 0.12);
   color: var(--chrome-menu-text);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   line-height: 1;
   transition: background 0.12s;
 }
@@ -969,7 +969,7 @@
 }
 .about-name {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-xl);
   font-weight: 650;
   letter-spacing: -0.015em;
   color: var(--on-accent);
@@ -977,7 +977,7 @@
 }
 .about-kicker {
   margin: 4px 0 0;
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -992,7 +992,7 @@
 }
 .about-tagline {
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: var(--fs-md);
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -1007,7 +1007,7 @@
 .about-plate-label {
   display: block;
   margin: 8px 0 2px;
-  font-size: 9.5px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1028,13 +1028,13 @@
   border-top: none;
 }
 .about-row dt {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 .about-row dd {
   margin: 0;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: var(--fs-xs);
   color: var(--text-strong);
   /* One line each, with the full value on hover and in a copy. CSS
      truncation does not truncate the text itself, so selecting the readout
@@ -1070,7 +1070,7 @@
 }
 .about-arrow {
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .about-foot {
@@ -1078,7 +1078,7 @@
   padding: 11px 24px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-2);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   text-align: center;
   color: var(--text-muted);
   letter-spacing: 0.01em;
@@ -1095,7 +1095,7 @@
   border-right: 1px solid var(--border);
   overflow: auto;
   padding: 6px 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .folder-actions {
   display: none;
@@ -1111,7 +1111,7 @@
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 0 3px;
   line-height: 1;
 }
@@ -1159,7 +1159,7 @@
 }
 .folder-count {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-left: 8px;
   font-variant-numeric: tabular-nums;
@@ -1249,7 +1249,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--fs-md);
   color: var(--text-strong);
 }
 .board-picker select {
@@ -1262,7 +1262,7 @@
   margin-left: auto;
 }
 .board-head-actions .btn {
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* ===== The board itself ===== */
@@ -1293,16 +1293,16 @@
 /* The whole header row anchors, not each cell: sticking the cells alone
    left the 12px gaps between them transparent, so cards scrolled through the
    header. The row carries the ground and the cells sit on it. */
-.board-columns-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-bottom: 8px; }
+.board-columns-head { position: sticky; top: 0; z-index: calc(var(--z-sticky) + 1); background: var(--surface); padding-bottom: 8px; }
 /* Wraps, so the limit clause below takes a line of its own rather than
    crowding the card count out of the head on a narrow column. */
 .board-column-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 6px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; }
-.board-column-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.board-column-count { margin-left: auto; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 /* The column's WIP limit, on the line under the name so it never competes
    with the card count for the head's one right-hand slot. A breach takes the
    warn colour, and the clause itself names it, so the colour is the second
    signal and never the only one. */
-.board-column-limit { flex-basis: 100%; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.board-column-limit { flex-basis: 100%; font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .board-column-limit-breached { color: var(--warn-text); font-weight: 600; }
 /* A hit area a mouse can find on the one that is a button, taken straight
    back out with a matching negative margin so the head is laid out at the
@@ -1321,7 +1321,7 @@
    count has not reached sits at the end of the track. */
 .board-column-meter { flex-basis: 100%; --bar-track: var(--surface); --bar-marker: var(--surface); }
 .board-lane { display: flex; flex-direction: column; gap: 6px; }
-.board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: 12px; }
+.board-lane-head { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px; background: var(--row-hover); border-radius: 4px; font-size: var(--fs-sm); }
 .board-cell { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
 /* A lane's cells stretch to the tallest of them, so a column emptied by a
    drag is still a full-height drop target: a 40px strip is not something a
@@ -1339,13 +1339,13 @@
    row-selected and row-checked. */
 .board-card-checked, .board-card-checked:hover { background: var(--row-hover); box-shadow: inset 3px 0 0 var(--accent); }
 .board-card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.board-summary { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+.board-summary { font-size: var(--fs-sm); color: var(--text-muted); margin: 0 0 10px; }
 .board-picker select.board-select-narrow { min-width: 0; width: auto; }
 .board-card-head { display: flex; align-items: center; gap: 6px; }
 /* Phase 3b: a card is moved by dragging it, by the keyboard, or from its
    own menu, and it says which of those is in flight and how it went. */
 .board-card-menu-wrap { margin-left: auto; position: relative; }
-.board-card-menu { padding: 0 6px; font-size: 11px; color: var(--text-muted); }
+.board-card-menu { padding: 0 6px; font-size: var(--fs-xs); color: var(--text-muted); }
 .board-card-menu:hover:not(:disabled) { color: var(--text); }
 /* A card being dragged reads as lifted rather than merely faded: it keeps
    its substance, tilts, and casts a shadow, so the thing under the cursor is
@@ -1411,9 +1411,9 @@
 .board-selection-bar .bulk-count { color: var(--accent); }
 .board-selection-bar .board-picker { margin: 0; }
 .board-selection-clear { margin-left: auto; }
-.board-card-foot { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-muted); }
+.board-card-foot { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-muted); }
 .board-unmapped { margin-top: 12px; }
-.board-overflow { font-size: 11px; color: var(--text-muted); padding: 2px 4px; }
+.board-overflow { font-size: var(--fs-xs); color: var(--text-muted); padding: 2px 4px; }
 .boards-body { display: flex; gap: 0; align-items: stretch; min-height: 0; flex: 1; }
 
 /* Editor toolbar: grouped icon buttons, a tooltip on each, and the link
@@ -1422,15 +1422,15 @@
 .editor-toolbar-group { display: inline-flex; align-items: center; gap: 2px; padding-right: 4px; border-right: 1px solid var(--border-subtle); }
 .editor-toolbar-group:last-child { border-right: 0; }
 .editor-toolbar-slot, .editor-toolbar-link { position: relative; display: inline-flex; }
-.editor-toolbar-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.editor-toolbar-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); font: inherit; font-size: var(--fs-md); cursor: pointer; }
 .editor-toolbar-button:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--ghost-hover); }
 .editor-toolbar-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .editor-toolbar-button[aria-pressed="true"], .editor-toolbar-button[data-active="true"] { background: var(--accent-soft); color: var(--accent); }
 .editor-toolbar-button:disabled, .editor-toolbar-button[aria-disabled="true"] { opacity: 0.45; cursor: default; }
-.editor-toolbar-tooltip { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); z-index: 20; padding: 2px 6px; border-radius: 4px; background: var(--text-strong); color: var(--surface); font-size: 11px; white-space: nowrap; pointer-events: none; }
-.editor-link-popover { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 280px; padding: 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); box-shadow: var(--modal-shadow); }
+.editor-toolbar-tooltip { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); z-index: var(--z-popover); padding: 2px 6px; border-radius: 4px; background: var(--text-strong); color: var(--surface); font-size: var(--fs-xs); white-space: nowrap; pointer-events: none; }
+.editor-link-popover { position: absolute; top: calc(100% + 4px); left: 0; z-index: calc(var(--z-popover) + 1); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 280px; padding: 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); box-shadow: var(--modal-shadow); }
 .editor-link-popover input { flex: 1; min-width: 180px; }
-.editor-link-error { flex-basis: 100%; margin: 0; font-size: 12px; }
+.editor-link-error { flex-basis: 100%; margin: 0; font-size: var(--fs-sm); }
 @media (forced-colors: active) {
   .editor-toolbar-button[aria-pressed="true"], .editor-toolbar-button[data-active="true"] { outline: 2px solid CanvasText; }
 }
@@ -1441,7 +1441,7 @@
    panel around them. */
 .rich-text > :first-child, .rich-text-inline > :first-child { margin-top: 0; }
 .rich-text > :last-child, .rich-text-inline > :last-child { margin-bottom: 0; }
-.rich-text-truncated { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--warn-border); border-radius: 4px; background: var(--warn-soft); color: var(--warn-text); font-size: 12px; }
+.rich-text-truncated { margin: 0 0 8px; padding: 6px 8px; border: 1px solid var(--warn-border); border-radius: 4px; background: var(--warn-soft); color: var(--warn-text); font-size: var(--fs-sm); }
 .rich-link, .rich-issue-key { display: inline; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 .rich-link { text-decoration: underline; }
 .rich-link:hover, .rich-issue-key:hover { color: var(--accent-hover); }
@@ -1464,12 +1464,12 @@
    attribute) so an outside <label htmlFor> can still reach and focus it. */
 .richfield-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .richfield-tabs { display: inline-flex; gap: 2px; }
-.richfield-tab { padding: 4px 10px; border: 1px solid var(--border); border-bottom: 0; border-radius: 4px 4px 0 0; background: var(--surface-2); color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.richfield-tab { padding: 4px 10px; border: 1px solid var(--border); border-bottom: 0; border-radius: 4px 4px 0 0; background: var(--surface-2); color: var(--text-muted); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
 .richfield-tab:hover { background: var(--ghost-hover); }
 .richfield-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .richfield-tab[aria-selected="true"] { background: var(--surface); color: var(--text); font-weight: 600; }
 .richfield-syntax { display: inline-flex; gap: 2px; }
-.richfield-syntax button { padding: 3px 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.richfield-syntax button { padding: 3px 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); font: inherit; font-size: var(--fs-sm); cursor: pointer; }
 .richfield-syntax button:first-child { border-radius: 4px 0 0 4px; }
 .richfield-syntax button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
 .richfield-syntax button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
@@ -1477,7 +1477,7 @@
 .richfield-hint { margin: 4px 0; }
 .richfield-panel { border: 1px solid var(--border); border-radius: 0 4px 4px 4px; }
 .richfield-panel .rich-text { padding: 8px; }
-.richfield-textarea { display: block; width: 100%; box-sizing: border-box; border: 0; padding: 8px; background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px; resize: vertical; }
+.richfield-textarea { display: block; width: 100%; box-sizing: border-box; border: 0; padding: 8px; background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--fs-md); resize: vertical; }
 .richfield-textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Row lead (RowLead.tsx): the fixed start of every row that belongs to a
@@ -1516,7 +1516,7 @@
   border: 1px solid var(--border);
   border-radius: 3px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 .row-summary { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
@@ -1533,7 +1533,7 @@
   gap: 4px;
   padding: 2px 6px;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;

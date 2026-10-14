@@ -47,6 +47,26 @@ describe('core design tokens', () => {
     expect(dark.get('--e-3')).toContain('rgba(0, 0, 0, 0.64)');
   });
 
+  // Type and layer scales (#217). A rule sets a size or a stacking level
+  // through these, never a literal, so the steps stay few and in order.
+  it('defines the type and layer scales', () => {
+    expect(Object.fromEntries([...light].filter(([name]) => /^(--fs-|--z-)/.test(name)))).toEqual({
+      '--fs-2xs': '10px',
+      '--fs-xs': '11px',
+      '--fs-sm': '12px',
+      '--fs-md': '13px',
+      '--fs-lg': '15px',
+      '--fs-xl': '18px',
+      '--fs-2xl': '26px',
+      '--z-sticky': '1',
+      '--z-float': '5',
+      '--z-popover': '20',
+      '--z-menu': '40',
+      '--z-modal': '60',
+      '--z-modal-popover': '70',
+    });
+  });
+
   // The status palette (#214): a colour a rule needs for danger, warn, ok,
   // info or violet is one of these, never a literal, and each has a dark value
   // so it follows the theme.
