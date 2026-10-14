@@ -129,7 +129,7 @@ export function BulkEditModal({
             Bulk edit ({testKeys.length}{" "}
             {testKeys.length === 1 ? "test" : "tests"})
           </h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

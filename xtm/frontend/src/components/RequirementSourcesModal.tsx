@@ -188,7 +188,7 @@ export function RequirementSourcesModal({ onClose }: Props) {
     >
         <div className="pending-head">
           <h2 id="req-sources-title">Requirement sources</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

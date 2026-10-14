@@ -68,14 +68,14 @@ export function VersionDashboard({ canonicalId }: Props) {
       {crAdoption.length > 0 && (
         <section className="cov-dash-section">
           <h4 className="cov-section-title">CR adoption</h4>
-          <table className="cov-table">
+          <table aria-label="Change request adoption" className="cov-table">
             <thead>
               <tr>
-                <th>Change request</th>
-                <th>Status</th>
-                <th className="cov-pass">Can accept</th>
-                <th className="cov-fail">Cannot</th>
-                <th className="cov-notrun">Pending</th>
+                <th scope="col">Change request</th>
+                <th scope="col">Status</th>
+                <th scope="col" className="cov-pass">Can accept</th>
+                <th scope="col" className="cov-fail">Cannot</th>
+                <th scope="col" className="cov-notrun">Pending</th>
               </tr>
             </thead>
             <tbody>

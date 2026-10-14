@@ -725,13 +725,13 @@ export function RequirementsView({ onChanged }: Props) {
               <p className="muted">No tests cover this requirement.</p>
             ) : (
               <>
-                <table className="board-table">
+                <table aria-label="Tests covering this requirement" className="board-table">
                   <thead>
                     <tr>
-                      <th>Test</th>
-                      <th>Summary</th>
-                      <th>Status</th>
-                      <th>Result</th>
+                      <th scope="col">Test</th>
+                      <th scope="col">Summary</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Result</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -87,7 +87,7 @@ export function JUnitImportModal({ execKey, onCancel, onApplied }: Props) {
 
         <div className="pending-head">
           <h2 id="junit-import-title">Import results (JUnit XML)</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -115,14 +115,14 @@ export function JUnitImportModal({ execKey, onCancel, onApplied }: Props) {
               {matchedCount > 0 && (
                 <section>
                   <h3 style={{ margin: "0.75rem 0 0.4rem" }}>Matched ({matchedCount})</h3>
-                  <table className="board-table" style={{ fontSize: "0.85rem" }}>
+                  <table aria-label="Results to import" className="board-table" style={{ fontSize: "0.85rem" }}>
                     <thead>
                       <tr>
-                        <th>Testcase</th>
-                        <th>Test</th>
-                        <th>Summary</th>
-                        <th>Current</th>
-                        <th>New result</th>
+                        <th scope="col">Testcase</th>
+                        <th scope="col">Test</th>
+                        <th scope="col">Summary</th>
+                        <th scope="col">Current</th>
+                        <th scope="col">New result</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -155,11 +155,11 @@ export function JUnitImportModal({ execKey, onCancel, onApplied }: Props) {
               {skippedCount > 0 && (
                 <section>
                   <h3 style={{ margin: "0.75rem 0 0.4rem" }}>Skipped ({skippedCount})</h3>
-                  <table className="board-table" style={{ fontSize: "0.85rem" }}>
+                  <table aria-label="Testcases that will be skipped" className="board-table" style={{ fontSize: "0.85rem" }}>
                     <thead>
                       <tr>
-                        <th>Testcase</th>
-                        <th>Reason</th>
+                        <th scope="col">Testcase</th>
+                        <th scope="col">Reason</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -443,9 +443,9 @@ export function GapAnalysisView({ onChanged }: Props) {
                   <span className="gap-count">{result.folderMismatches.length}</span>
                 </div>
                 <p className="muted gap-panel-sub">These tests match by summary but live in different folders.</p>
-                <table className="board-table gap-folder-table">
+                <table aria-label="Folder mismatches" className="board-table gap-folder-table">
                   <thead>
-                    <tr><th>Summary</th><th>Reference folder</th><th>Target folder</th></tr>
+                    <tr><th scope="col">Summary</th><th scope="col">Reference folder</th><th scope="col">Target folder</th></tr>
                   </thead>
                   <tbody>
                     {result.folderMismatches.map((m, i) => (

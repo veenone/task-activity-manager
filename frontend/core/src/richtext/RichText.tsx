@@ -175,13 +175,13 @@ function renderBlock(block: Block, opts: RenderOpts, key: string): ReactNode {
     case "table":
       return (
         <div key={key} className="rich-table-scroll">
-          <table>
+          <table aria-label="Table">
             <tbody>
               {block.rows.map((row, i) => (
                 <tr key={`${key}-${i}`}>
                   {row.map((cell, j) =>
                     cell.header ? (
-                      <th key={`${key}-${i}-${j}`}>{renderInlineList(cell.children, opts, `${key}-${i}-${j}`)}</th>
+                      <th scope="col" key={`${key}-${i}-${j}`}>{renderInlineList(cell.children, opts, `${key}-${i}-${j}`)}</th>
                     ) : (
                       <td key={`${key}-${i}-${j}`}>{renderInlineList(cell.children, opts, `${key}-${i}-${j}`)}</td>
                     )

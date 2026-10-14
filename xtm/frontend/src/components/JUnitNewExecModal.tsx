@@ -82,7 +82,7 @@ export function JUnitNewExecModal({ onCancel, onApplied }: Props) {
 
         <div className="pending-head">
           <h2 id="junit-newexec-title">New execution from JUnit XML</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close">
+          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -146,13 +146,13 @@ export function JUnitNewExecModal({ onCancel, onApplied }: Props) {
                   <h3 style={{ margin: "0.75rem 0 0.4rem" }}>
                     Rows ({preview.rows.length})
                   </h3>
-                  <table className="board-table" style={{ fontSize: "0.85rem" }}>
+                  <table aria-label="Results to import" className="board-table" style={{ fontSize: "0.85rem" }}>
                     <thead>
                       <tr>
-                        <th>Testcase</th>
-                        <th>Test</th>
-                        <th>Summary</th>
-                        <th>Result</th>
+                        <th scope="col">Testcase</th>
+                        <th scope="col">Test</th>
+                        <th scope="col">Summary</th>
+                        <th scope="col">Result</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -196,11 +196,11 @@ export function JUnitNewExecModal({ onCancel, onApplied }: Props) {
                   <h3 style={{ margin: "0.75rem 0 0.4rem" }}>
                     Skipped ({skippedCount})
                   </h3>
-                  <table className="board-table" style={{ fontSize: "0.85rem" }}>
+                  <table aria-label="Testcases that will be skipped" className="board-table" style={{ fontSize: "0.85rem" }}>
                     <thead>
                       <tr>
-                        <th>Testcase</th>
-                        <th>Reason</th>
+                        <th scope="col">Testcase</th>
+                        <th scope="col">Reason</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -89,7 +89,7 @@ export function PendingChangesModal({
           <h2 id="pending-changes-title">
             Pending changes ({changes.length})
           </h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -179,12 +179,12 @@ export function PendingChangesModal({
                               </button>
                             </span>
                           </div>
-                          <table className="conflict-table">
+                          <table aria-label="Conflicting fields" className="conflict-table">
                             <thead>
                               <tr>
-                                <th>Field</th>
-                                <th>Theirs (remote)</th>
-                                <th>Mine (local)</th>
+                                <th scope="col">Field</th>
+                                <th scope="col">Theirs (remote)</th>
+                                <th scope="col">Mine (local)</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -337,14 +337,14 @@ export function PendingChangesModal({
           <p className="muted pending-empty">No pending changes.</p>
         ) : (
           <div className="pending-table-wrap">
-            <table className="pending-table">
+            <table aria-label="Pending changes" className="pending-table">
               <thead>
                 <tr>
-                  <th>Test</th>
-                  <th>Field</th>
-                  <th>Before</th>
-                  <th>After</th>
-                  <th />
+                  <th scope="col">Test</th>
+                  <th scope="col">Field</th>
+                  <th scope="col">Before</th>
+                  <th scope="col">After</th>
+                  <th scope="col" />
                 </tr>
               </thead>
               <tbody>

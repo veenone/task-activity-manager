@@ -84,7 +84,7 @@ export function BulkLabelsModal({ testKeys, onComplete, onCancel }: Props) {
         <h2 id="bulk-labels-title">
           Labels ({n} {n === 1 ? "test" : "tests"})
         </h2>
-        <button className="btn btn-ghost" onClick={onCancel} title="Close">
+        <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
           ✕
         </button>
       </div>

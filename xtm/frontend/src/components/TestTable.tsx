@@ -655,7 +655,7 @@ export function TestTable({
               className="btn btn-ghost view-del"
               onClick={deleteActiveView}
               title="Delete this saved view"
-            >
+             aria-label="Delete this saved view">
               ✕
             </button>
           )}
@@ -772,10 +772,10 @@ export function TestTable({
       )}
 
       <div data-tour="grid" className="table-scroll" ref={scrollRef}>
-        <table className="grid-table" style={{ minWidth: gridMinWidth }}>
+        <table aria-label="Tests" className="grid-table" style={{ minWidth: gridMinWidth }}>
           <thead>
             <tr>
-              <th className="select-col" style={SELECT_STYLE}>
+              <th scope="col" className="select-col" style={SELECT_STYLE}>
                 <input
                   type="checkbox"
                   checked={allOnPageSelected}
@@ -809,7 +809,7 @@ export function TestTable({
                     style={colStyle(c.key)}
                   />
                 ) : (
-                  <th key={c.key} style={colStyle(c.key)}>
+                  <th scope="col" key={c.key} style={colStyle(c.key)}>
                     {COL_LABEL[c.key]}
                   </th>
                 );
@@ -988,7 +988,7 @@ function SortHeader({
 }) {
   const active = sortBy === col;
   return (
-    <th
+    <th scope="col"
       className="sortable"
       style={style}
       aria-sort={active ? (desc ? "descending" : "ascending") : "none"}

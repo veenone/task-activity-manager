@@ -185,7 +185,7 @@ export function ImportIssuesModal({ onClose, onImported }: Props) {
     <Modal onClose={onClose} className="modal pending-modal" labelledBy="import-issues-title">
       <div className="pending-head">
         <h2 id="import-issues-title">Import issues (CSV or XLSX)</h2>
-        <button className="btn btn-ghost" onClick={onClose} title="Close">
+        <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
           ✕
         </button>
       </div>

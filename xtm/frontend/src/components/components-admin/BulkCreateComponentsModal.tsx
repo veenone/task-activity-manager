@@ -104,7 +104,7 @@ export function BulkCreateComponentsModal({ onCreated, onClose }: Props) {
     <Modal onClose={onClose} className="modal pending-modal" labelledBy={titleId}>
       <div className="pending-head">
         <h2 id={titleId}>Create components</h2>
-        <button className="btn btn-ghost" onClick={onClose} title="Close">
+        <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
           ✕
         </button>
       </div>
@@ -137,14 +137,14 @@ export function BulkCreateComponentsModal({ onCreated, onClose }: Props) {
               .
             </p>
             <div className="import-validation">
-              <table className="board-table">
+              <table aria-label="Components to create" className="board-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Lead</th>
-                    <th>Default assignee</th>
-                    <th>Check</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Lead</th>
+                    <th scope="col">Default assignee</th>
+                    <th scope="col">Check</th>
                   </tr>
                 </thead>
                 <tbody>

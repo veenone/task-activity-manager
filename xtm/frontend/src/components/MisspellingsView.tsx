@@ -359,10 +359,10 @@ export default function MisspellingsView({ onChanged }: Props) {
           )}
 
           {findings.length > 0 && (
-            <table className="board-table msp-table">
+            <table aria-label="Misspellings" className="board-table msp-table">
               <thead>
                 <tr>
-                  <th className="msp-check-col">
+                  <th scope="col" className="msp-check-col">
                     <input
                       type="checkbox"
                       checked={allChecked}
@@ -371,7 +371,7 @@ export default function MisspellingsView({ onChanged }: Props) {
                     />
                   </th>
                   {columns.map((c) => (
-                    <th
+                    <th scope="col"
                       key={c.key}
                       className="sortable"
                       onClick={() => toggleSort(c.key)}
@@ -381,8 +381,8 @@ export default function MisspellingsView({ onChanged }: Props) {
                       {sortIndicator(c.key)}
                     </th>
                   ))}
-                  <th>Suggestions</th>
-                  <th aria-label="Actions" />
+                  <th scope="col">Suggestions</th>
+                  <th scope="col" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
@@ -619,7 +619,7 @@ function MisspellingDrawer({
             {FIELD_LABEL[finding.field] ?? finding.field}
           </span>
         </div>
-        <button className="btn btn-ghost" onClick={onClose} title="Close">
+        <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
           ✕
         </button>
       </div>
@@ -785,7 +785,7 @@ function IgnoreListModal({
     <Modal initialFocus={focusRef} onClose={close} className="modal pending-modal ignore-modal" labelledBy="ignore-list-title">
         <div className="pending-head">
           <h2 id="ignore-list-title">Spellcheck ignore list</h2>
-          <button className="btn btn-ghost" onClick={close} title="Close">
+          <button className="btn btn-ghost" onClick={close} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

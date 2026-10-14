@@ -19,3 +19,4 @@ unguarded_motion	git ls-files "tam/frontend/src/*.css" "xtm/frontend/src/*.css" 
 transition_all	git ls-files "tam/frontend/src/*.css" "xtm/frontend/src/*.css" "frontend/core/*.css" ":!frontend/core/styles/tokens.css" | xargs cat | perl -0pe 's{/\*.*?\*/}{}gs' | grep -oE "transition: *all\b" | wc -l
 raw_z_index	git ls-files "tam/frontend/src/*.css" "xtm/frontend/src/*.css" "frontend/core/*.css" ":!frontend/core/styles/tokens.css" | xargs cat | perl -0pe 's{/\*.*?\*/}{}gs' | grep -oE "z-index: *-?[0-9]+" | wc -l
 offscale_breakpoints	git ls-files "tam/frontend/src/*.css" "xtm/frontend/src/*.css" "frontend/core/*.css" ":!frontend/core/styles/tokens.css" | xargs cat | perl -0pe 's{/\*.*?\*/}{}gs' | grep -oE "(max|min)-width: *[0-9]+px\)" | grep -vE ": *(560|720|900)px\)" | wc -l
+a11y_markup	git ls-files "*/frontend/src/*.tsx" "frontend/core/src/*.tsx" | node scripts/a11y-markup.js

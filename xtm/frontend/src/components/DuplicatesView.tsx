@@ -563,7 +563,7 @@ function StepCompareModal({
     <Modal onClose={onClose} className="modal dup-compare-modal" labelledBy="dup-steps-compare-title">
         <div className="pending-head">
           <h2 id="dup-steps-compare-title">Compare steps — "{title}"</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -572,12 +572,12 @@ function StepCompareModal({
           {maxSteps === 0 ? (
             <p className="muted">None of these tests have steps to compare.</p>
           ) : (
-            <table className="dup-compare-table">
+            <table aria-label="Steps side by side" className="dup-compare-table">
               <thead>
                 <tr>
-                  <th className="dup-compare-idx">#</th>
+                  <th scope="col" className="dup-compare-idx">#</th>
                   {members.map((m) => (
-                    <th key={m.key} className="mono">
+                    <th scope="col" key={m.key} className="mono">
                       {m.key}
                     </th>
                   ))}
@@ -667,7 +667,7 @@ function SummaryCompareModal({
     <Modal onClose={onClose} className="modal dup-compare-modal" labelledBy="dup-summaries-compare-title">
         <div className="pending-head">
           <h2 id="dup-summaries-compare-title">Compare summaries — "{title}"</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>
@@ -677,12 +677,12 @@ function SummaryCompareModal({
             These tests share the same normalized summary, "{title}". Their raw
             text can still differ in case, whitespace, or punctuation.
           </p>
-          <table className="dup-compare-table">
+          <table aria-label="Fields side by side" className="dup-compare-table">
             <thead>
               <tr>
-                <th className="dup-compare-idx">field</th>
+                <th scope="col" className="dup-compare-idx">field</th>
                 {members.map((m) => (
-                  <th key={m.key} className="mono">
+                  <th scope="col" key={m.key} className="mono">
                     {m.key}
                   </th>
                 ))}

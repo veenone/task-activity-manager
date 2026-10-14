@@ -301,12 +301,12 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
                     {impact.decisions.length === 0 ? (
                       <p className="cov-empty">No member requirements linked to this canonical. Link members to collect decisions.</p>
                     ) : (
-                      <table className="cov-table cov-cr-grid">
+                      <table aria-label="Impact of this change request" className="cov-table cov-cr-grid">
                         <thead>
                           <tr>
-                            <th>Project</th>
-                            <th>Requirement</th>
-                            <th>Decision</th>
+                            <th scope="col">Project</th>
+                            <th scope="col">Requirement</th>
+                            <th scope="col">Decision</th>
                           </tr>
                         </thead>
                         <tbody>

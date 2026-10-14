@@ -69,7 +69,7 @@ export function ComponentFormModal({
         <h2 id={titleId}>
           {initial ? `Edit ${initial.name}` : "New component"}
         </h2>
-        <button className="btn btn-ghost" onClick={onCancel} title="Close">
+        <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
           ✕
         </button>
       </div>

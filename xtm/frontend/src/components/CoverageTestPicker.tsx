@@ -93,7 +93,7 @@ export function BrowseTestsPicker({ excludeKeys, onClose, onAdd }: Props) {
     >
         <div className="pending-head">
           <h2 id="browse-tests-title">Browse tests</h2>
-          <button className="btn btn-ghost" onClick={onClose} title="Close">
+          <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

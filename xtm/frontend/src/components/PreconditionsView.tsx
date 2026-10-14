@@ -749,13 +749,13 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
               <p className="muted">No tests reference this precondition yet.</p>
             ) : (
               <>
-                <table className="board-table precond-tests">
+                <table aria-label="Tests using this precondition" className="board-table precond-tests">
                   <thead>
                     <tr>
-                      <th>Test</th>
-                      <th>Summary</th>
-                      <th>Status</th>
-                      <th aria-label="Remove" />
+                      <th scope="col">Test</th>
+                      <th scope="col">Summary</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" aria-label="Remove" />
                     </tr>
                   </thead>
                   <tbody>
@@ -920,7 +920,7 @@ function CreatePreconditionModal({
     <Modal initialFocus={focusRef} onClose={onCancel} className="modal" labelledBy="new-precond-title">
       <div className="pending-head">
         <h2 id="new-precond-title">New precondition</h2>
-        <button className="btn btn-ghost" onClick={onCancel} title="Close">
+        <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
           ✕
         </button>
       </div>
