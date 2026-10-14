@@ -362,6 +362,7 @@ export function CoverageView({ isDemo, demoVariant, onChanged }: Props) {
                   e.stopPropagation();
                   void deleteCanonical(c);
                 }}
+                aria-label="Delete"
               >
                 ×
               </button>
@@ -618,7 +619,7 @@ export function CoverageView({ isDemo, demoVariant, onChanged }: Props) {
                           <span className="cov-group-pct">
                             {g.tested}/{g.total} ({g.percent}%)
                           </span>
-                          <button className="cov-x" title="Delete group" onClick={() => void deleteNode("group", g.groupId)}>
+                          <button className="cov-x" title="Delete group" onClick={() => void deleteNode("group", g.groupId)} aria-label="Delete group">
                             ×
                           </button>
                         </div>

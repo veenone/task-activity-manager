@@ -183,7 +183,7 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
         <Modal initialFocus={focusRef} onClose={() => setEditing(false)} className="modal cr-form-modal" labelledBy="cr-form-title">
             <div className="pending-head">
               <h2 id="cr-form-title">{editId ? "Edit Change Request" : "New Change Request"}</h2>
-              <button className="btn btn-ghost" onClick={() => setEditing(false)} title="Close">✕</button>
+              <button className="btn btn-ghost" onClick={() => setEditing(false)} title="Close" aria-label="Close">✕</button>
             </div>
             <div className="cov-body">
               {error && <div className="cov-error">{error}</div>}

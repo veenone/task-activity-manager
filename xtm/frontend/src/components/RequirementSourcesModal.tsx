@@ -284,6 +284,7 @@ export function RequirementSourcesModal({ onClose }: Props) {
                           className="btn btn-ghost src-remove"
                           onClick={() => remove(s.projectKey)}
                           title="Remove source"
+                          aria-label="Remove source"
                         >
                           ✕
                         </button>

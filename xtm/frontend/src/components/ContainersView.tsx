@@ -1583,6 +1583,7 @@ export function ContainersView({
                       className="btn btn-ghost board-remove"
                       onClick={() => removeTest(r.testKey)}
                       title={`Remove from this ${kindLabel}`}
+                      aria-label={`Remove from this ${kindLabel}`}
                     >
                       ✕
                     </button>
