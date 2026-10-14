@@ -215,7 +215,7 @@ export function CoveragePublishPanel({ versionId }: Props) {
               Publish complete: {result.created} created, {result.updated} updated
               {result.failed > 0 ? `, ${result.failed} failed` : ""}.
             </span>
-            <button className="btn btn-ghost" onClick={() => setResult(null)} title="Dismiss">
+            <button className="btn btn-ghost" onClick={() => setResult(null)} title="Dismiss" aria-label="Dismiss">
               ✕
             </button>
           </div>

@@ -199,6 +199,7 @@ export function CoverageMap({ isDemo, demoVariant }: Props) {
                 className="cov-x"
                 title="Remove row"
                 onClick={() => removeRow(i)}
+                aria-label="Remove row"
               >
                 ×
               </button>

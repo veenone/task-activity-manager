@@ -1537,6 +1537,7 @@ export function TestDetail({
                           className="btn btn-ghost pre-remove"
                           onClick={() => removeRequirement(rq.key)}
                           title="Unlink this requirement"
+                          aria-label="Unlink this requirement"
                         >
                           ✕
                         </button>
@@ -2618,6 +2619,7 @@ function PreconditionRow({
           className="btn btn-ghost pre-remove"
           onClick={() => onRemove(precondition.key)}
           title="Remove this precondition"
+          aria-label="Remove this precondition"
         >
           ✕
         </button>
@@ -2660,6 +2662,7 @@ function ContainerSection({
                   className="btn btn-ghost pre-remove"
                   onClick={() => onRemove(c.key)}
                   title="Remove this test from the container"
+                  aria-label="Remove this test from the container"
                 >
                   ✕
                 </button>

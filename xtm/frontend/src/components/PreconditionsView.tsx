@@ -782,6 +782,7 @@ export function PreconditionsView({ onChanged, jiraUrl }: Props) {
                             className="btn btn-ghost board-remove"
                             onClick={() => removeTest(t.key)}
                             title="Unlink from this precondition"
+                            aria-label="Unlink from this precondition"
                           >
                             ✕
                           </button>

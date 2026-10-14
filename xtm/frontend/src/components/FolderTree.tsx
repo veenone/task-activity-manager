@@ -261,6 +261,7 @@ function FolderNode({
                 e.stopPropagation();
                 onDelete?.(folder.id);
               }}
+              aria-label="Delete folder"
             >
               ✕
             </button>

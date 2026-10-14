@@ -320,6 +320,7 @@ export function NewTestPanel({
                       onClick={() => setSteps((prev) => prev.filter((_, j) => j !== i))}
                       title="Remove step"
                       type="button"
+                      aria-label="Remove step"
                     >
                       ✕
                     </button>
@@ -395,6 +396,7 @@ export function NewTestPanel({
                       onClick={() => setPrecondKeys((prev) => prev.filter((x) => x !== k))}
                       title="Unlink"
                       type="button"
+                      aria-label="Unlink"
                     >
                       ✕
                     </button>

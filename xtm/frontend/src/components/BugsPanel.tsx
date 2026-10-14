@@ -1158,6 +1158,7 @@ export function BugsPanel({ jiraUrl, onOpenTest }: Props) {
                 onClick={() => setAddToExecOpen(false)}
                 disabled={addToExecWorking}
                 title="Close"
+                aria-label="Close"
               >
                 ✕
               </button>
