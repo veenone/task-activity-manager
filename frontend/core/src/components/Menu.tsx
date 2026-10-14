@@ -61,7 +61,8 @@ export function Menu({ label, items, title, align = "left", triggerClassName, tr
       </button>
       {open && (
         <>
-          <div className="menu-backdrop" onClick={() => setOpen(false)} />
+          {/* A pointer shortcut only: Escape closes the menu from the keyboard. */}
+          <div className="menu-backdrop" role="presentation" onClick={() => setOpen(false)} />
           <div className={`menu-panel menu-panel-${align}`} role="menu">
             {items.map((it) =>
               it.divider ? (

@@ -233,7 +233,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
               </span>
             </h4>
             {reqOptions.length > 0 && (
-              <label className="sankey-filter">
+              <div className="sankey-filter">
                 <span className="muted">Requirements</span>
                 <MultiSelect
                   allLabel="All requirements"
@@ -245,7 +245,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
                     label: r.summary ? `${r.key} — ${r.summary}` : r.key,
                   }))}
                 />
-              </label>
+              </div>
             )}
           </div>
           {reqSankeyErr ? (
@@ -383,7 +383,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
             </h4>
             <div className="sankey-filters">
               {parents.length > 0 && (
-                <label className="sankey-filter">
+                <div className="sankey-filter">
                   <span className="muted">Parents</span>
                   <MultiSelect
                     allLabel={`All parents (${parents.length})`}
@@ -395,7 +395,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
                       label: p.summary ? `${p.key} — ${p.summary}` : p.key,
                     }))}
                   />
-                </label>
+                </div>
               )}
               <label
                 className="sankey-crossproject"

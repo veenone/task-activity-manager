@@ -50,7 +50,7 @@ export function EpicRow({
       onClick={onActivate}
       onKeyDown={onKeyDown}
     >
-      <span className="folder-caret folder-caret-toggle" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+      <span className="folder-caret folder-caret-toggle" role="presentation" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
         {open ? "▾" : "▸"}
       </span>
       {typeIcon}

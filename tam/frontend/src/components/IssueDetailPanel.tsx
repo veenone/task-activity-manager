@@ -211,7 +211,7 @@ export function IssueDetailPanel({ profileId, issue, jiraUrl, sprints, emptyNote
 
   return (
     <aside className="detail-panel" style={{ width }} aria-labelledby="detail-title">
-      <div className="detail-resizer" onMouseDown={startResize} title="Drag to resize" />
+      <div className="detail-resizer" role="presentation" onMouseDown={startResize} title="Drag to resize" />
       {/* The dark instrument bar XTM's detail sidebar carries: the key and
           its status on the left, the actions on the right. */}
       <div className="detail-head">

@@ -116,15 +116,11 @@ export function ConnectionsModal({ activeId, onClose }: Props) {
                   {connections.map((c) => (
                     <li
                       key={c.id}
-                      className={`connections-list-row${
+                      className={`connections-list-row row-stretch${
                         !creating && c.id === selectedId
                           ? " profiles-list-row-selected"
                           : ""
                       }`}
-                      onClick={() => {
-                        setCreating(false);
-                        setSelectedId(c.id);
-                      }}
                     >
                       <div className="connections-row-top">
                         <span
@@ -132,7 +128,16 @@ export function ConnectionsModal({ activeId, onClose }: Props) {
                         >
                           {BACKEND_LABEL[c.backend] ?? c.backend}
                         </span>
-                        <span className="profiles-row-name">{c.name}</span>
+                        <button
+                          className="row-select profiles-row-name"
+                          aria-current={!creating && c.id === selectedId ? "true" : undefined}
+                          onClick={() => {
+                            setCreating(false);
+                            setSelectedId(c.id);
+                          }}
+                        >
+                          {c.name}
+                        </button>
                       </div>
                       <div className="connections-row-meta muted">
                         {c.url}

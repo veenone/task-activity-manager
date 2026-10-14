@@ -157,6 +157,16 @@ describe("ProfilesModal", () => {
     expect(api.SetProfileSetting).toHaveBeenCalledWith("p1", "requirement_issue_type", "Req");
   });
 
+  it("opens a profile from the keyboard, as a click does", async () => {
+    vi.mocked(api.ListProfiles).mockResolvedValue([acme]);
+    renderModal();
+    const row = await screen.findByRole("button", { name: /Acme Platform/ });
+    row.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(row).toHaveAttribute("aria-current", "true");
+    expect(await screen.findByRole("button", { name: "Save changes" })).toBeInTheDocument();
+  });
+
   it("warns that changing the project key clears the cache", async () => {
     vi.mocked(api.ListProfiles).mockResolvedValue([acme]);
     renderModal();

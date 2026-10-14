@@ -404,10 +404,23 @@ export function RequirementsView({ onChanged }: Props) {
           </p>
         ) : (
           <>
+            {/* A listbox (#219): the list takes focus and the arrows move the
+                selection, which the active descendant names to a screen
+                reader. A click on an option selects it. */}
             <ul
               className="reqs-items"
               ref={listRef}
+              role="listbox"
+              aria-label="Requirements"
+              aria-activedescendant={selected ? `req-opt-${selected}` : undefined}
               tabIndex={0}
+              onClick={(e) => {
+                const key = (e.target as HTMLElement).closest<HTMLElement>("[data-req-key]")?.dataset.reqKey;
+                if (key) {
+                  setSelected(key);
+                  listRef.current?.focus({ preventScroll: true });
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
@@ -421,11 +434,11 @@ export function RequirementsView({ onChanged }: Props) {
               {pageItems.map((r) => (
                 <li
                   key={r.key}
+                  id={`req-opt-${r.key}`}
+                  role="option"
+                  aria-selected={r.key === selected}
+                  data-req-key={r.key}
                   className={`reqs-item${r.key === selected ? " reqs-item-selected" : ""}`}
-                  onClick={() => {
-                    setSelected(r.key);
-                    listRef.current?.focus({ preventScroll: true });
-                  }}
                 >
                   <div className="reqs-item-top">
                     <span className="mono reqs-key">{r.key}</span>

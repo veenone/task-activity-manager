@@ -59,7 +59,7 @@ export function SprintList({
   movedRowId, busyRowId, waiting, onStart, onComplete, onEdit, onDelete,
   collapsedIssues, onCollapsedIssuesChange,
 }: Props) {
-  const rootRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [flashId, setFlashId] = useState("");
@@ -352,10 +352,11 @@ export function SprintList({
   }
 
   return (
-    <nav
+    <div
       className="folder-tree sprint-tree"
       aria-label="Sprints"
       role="tree"
+      tabIndex={-1}
       ref={rootRef}
       style={{ "--sprint-key-w": keyWidth, "--type-col-w": typeWidth } as CSSProperties}
     >
@@ -386,6 +387,6 @@ export function SprintList({
           </div>
         );
       })}
-    </nav>
+    </div>
   );
 }

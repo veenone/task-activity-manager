@@ -125,15 +125,11 @@ export function ProfilesModal({
               {profiles.map((p) => (
                 <li
                   key={p.id}
-                  className={`profiles-list-row${
+                  className={`profiles-list-row row-stretch${
                     !creating && p.id === selectedId
                       ? " profiles-list-row-selected"
                       : ""
                   }`}
-                  onClick={() => {
-                    setCreating(false);
-                    setSelectedId(p.id);
-                  }}
                 >
                   <button
                     className="profiles-star"
@@ -152,10 +148,17 @@ export function ProfilesModal({
                   >
                     {defaultProfileId === p.id ? "★" : "☆"}
                   </button>
-                  <span className="profiles-row-name">{p.name}</span>
-                  <span className="profiles-row-key muted">
-                    ({p.projectKey})
-                  </span>
+                  <button
+                    className="row-select profiles-row-select"
+                    aria-current={!creating && p.id === selectedId ? "true" : undefined}
+                    onClick={() => {
+                      setCreating(false);
+                      setSelectedId(p.id);
+                    }}
+                  >
+                    <span className="profiles-row-name">{p.name}</span>
+                    <span className="profiles-row-key muted">({p.projectKey})</span>
+                  </button>
                   {p.id === activeId && (
                     <span className="profiles-badge-active">Active</span>
                   )}

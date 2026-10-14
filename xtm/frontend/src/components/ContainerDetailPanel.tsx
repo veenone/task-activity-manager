@@ -89,6 +89,7 @@ export function ContainerDetailPanel({ containerKey, kind, jiraUrl, onClose }: P
     <div className="detail" style={{ width }}>
       <div
         className="detail-resizer"
+        role="presentation"
         onMouseDown={startResize}
         title="Drag to resize"
       />
