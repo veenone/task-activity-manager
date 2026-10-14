@@ -167,6 +167,36 @@
   --chart-axis: var(--border-strong);
   --chart-label: var(--text-muted);
   --chart-hit: rgba(0, 0, 0, 0.06);
+  /* Status palette (#214). */
+  /* Danger: errors, failed runs, destructive actions. */
+  --danger-solid: #dc2626;
+  --danger-solid-hover: #b91c1c;
+  --danger-fg: #dc2626;
+  --danger-fg-strong: #b91c1c;
+  --danger-border: #fca5a5;
+  --danger-tint: rgba(180, 36, 36, 0.13);
+  /* Warn: in-progress runs, pending reviews, attention without danger. */
+  --warn-fg: #b45309;
+  --warn-solid: #f59e0b;
+  --warn-accent: #a97400;
+  /* Ok: passed runs, healthy coverage, in-sync states. */
+  --ok-fg: #1f7a3d;
+  --ok-solid: #22c55e;
+  --ok-border: #86efac;
+  --ok-tint: rgba(31, 122, 61, 0.13);
+  /* Info: links, informational tiles, cross-project markers. */
+  --info-fg: #2563eb;
+  --info-fg-strong: #1d4ed8;
+  --info-solid: #3884de;
+  --info-border: #93c5fd;
+  /* Indigo, cyan and violet: the categorical hues for kinds and types. */
+  --indigo-fg: #4338ca;
+  --indigo-solid: #6366f1;
+  --cyan-fg: #0e7490;
+  --violet-fg: #7c3aed;
+  --violet-fg-strong: #6d28d9;
+  --violet-solid: #a855f7;
+  --violet-border: #d8b4fe;
 }
 
 :root[data-theme="dark"] {
@@ -272,4 +302,29 @@
   --chart-axis: var(--border-strong);
   --chart-label: var(--text-muted);
   --chart-hit: rgba(255, 255, 255, 0.08);
+  /* Status palette (#214). */
+  --danger-solid: #dc2626;
+  --danger-solid-hover: #b91c1c;
+  --danger-fg: #f87171;
+  --danger-fg-strong: #fca5a5;
+  --danger-border: #991b1b;
+  --danger-tint: rgba(248, 113, 113, 0.16);
+  --warn-fg: #fbbf24;
+  --warn-solid: #f59e0b;
+  --warn-accent: #e0b062;
+  --ok-fg: #4ade80;
+  --ok-solid: #22c55e;
+  --ok-border: #14532d;
+  --ok-tint: rgba(74, 222, 128, 0.14);
+  --info-fg: #60a5fa;
+  --info-fg-strong: #93c5fd;
+  --info-solid: #3884de;
+  --info-border: #1e3a8a;
+  --indigo-fg: #a5b4fc;
+  --indigo-solid: #818cf8;
+  --cyan-fg: #67e8f9;
+  --violet-fg: #c4b5fd;
+  --violet-fg-strong: #ddd6fe;
+  --violet-solid: #a855f7;
+  --violet-border: #5b21b6;
 }
