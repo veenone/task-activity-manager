@@ -33,6 +33,6 @@ select {
 input:focus,
 select:focus {
   outline: none;
-  border-color: #3b5bdb;
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(59, 91, 219, 0.2);
 }

@@ -100,8 +100,8 @@
   white-space: nowrap;
 }
 .topbar-btn:hover:not(:disabled) {
-  background: #344563;
-  border-color: #4a5d80;
+  background: var(--chrome-btn-hover);
+  border-color: var(--chrome-btn-hover-border);
 }
 
 .menu-panel {
@@ -110,7 +110,7 @@
   z-index: 41;
   min-width: 210px;
   padding: 5px;
-  background: var(--chrome-raised);
+  background: var(--chrome-menu-bg);
   border: 1px solid var(--chrome-chip-border);
   border-radius: 8px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
@@ -136,12 +136,12 @@
   border-radius: 5px;
   padding: 7px 9px;
   cursor: pointer;
-  color: #d7dce6;
+  color: var(--chrome-menu-text);
   font-size: 13px;
   text-align: left;
 }
 .menu-item:hover:not(:disabled) {
-  background: #34507e;
+  background: var(--chrome-menu-hover);
   color: var(--on-accent);
 }
 .menu-item:disabled {
@@ -149,10 +149,10 @@
   cursor: default;
 }
 .menu-item-danger {
-  color: #f0a0a0;
+  color: var(--chrome-danger-text);
 }
 .menu-item-danger:hover:not(:disabled) {
-  background: #5a2b2b;
+  background: var(--chrome-danger-hover);
   color: var(--on-accent);
 }
 .sync-info {
@@ -225,7 +225,7 @@
 }
 .syncbar-fill {
   height: 100%;
-  background: #4c8dff;
+  background: var(--chrome-progress);
   transition: width 0.2s ease;
 }
 
@@ -253,13 +253,13 @@
    matching the current filter (FR-3.1). Sits between the filter row and
    the table headers. */
 .select-all-banner {
-  background: #fff8e1;
-  border: 1px solid #f0d97d;
+  background: var(--warning-bg);
+  border: 1px solid var(--warn-border);
   border-radius: 4px;
   margin: 0 12px 6px;
   padding: 6px 10px;
   font-size: 12px;
-  color: #5a4500;
+  color: var(--warning-text);
 }
 .link-btn {
   background: none;
@@ -271,7 +271,7 @@
   text-decoration: underline;
 }
 .link-btn:disabled {
-  color: #888;
+  color: var(--text-muted);
   cursor: default;
 }
 
@@ -395,8 +395,8 @@
   margin: 4px 0;
   border-radius: 4px;
   color: var(--text);
-  background: color-mix(in srgb, #e8a33d 16%, transparent);
-  border: 1px solid color-mix(in srgb, #e8a33d 45%, transparent);
+  background: color-mix(in srgb, var(--warn-solid) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn-solid) 45%, transparent);
 }
 .step-suffix {
   font-size: 11px;
@@ -499,7 +499,7 @@
 }
 .run-todo {
   background: var(--chip-blue-bg);
-  color: #3730a3;
+  color: var(--indigo-fg);
 }
 .run-executing {
   background: var(--warning-bg);
@@ -523,7 +523,7 @@
   border-top: 1px solid var(--border-subtle);
 }
 :root[data-theme="dark"] .run-plan-group-header td {
-  background: var(--surface-2, #1e2535);
+  background: var(--surface-2);
 }
 
 /* Sub-task execution badge (Bugs panel run-history breakdown). */
@@ -570,7 +570,7 @@
 .run-select.run-pass {
   background: var(--chip-green-bg);
   color: var(--ok-text);
-  border-color: #6ee7b7;
+  border-color: var(--ok-border);
 }
 .run-select.run-fail {
   background: var(--chip-red-bg);
@@ -579,13 +579,13 @@
 }
 .run-select.run-todo {
   background: var(--chip-blue-bg);
-  color: #3730a3;
-  border-color: #a5b4fc;
+  color: var(--indigo-fg);
+  border-color: var(--indigo-border);
 }
 .run-select.run-executing {
   background: var(--warning-bg);
   color: var(--warn-fg);
-  border-color: #fcd34d;
+  border-color: var(--warn-border);
 }
 .run-select.run-aborted {
   background: var(--chip-purple-bg);
@@ -595,22 +595,19 @@
 .run-select.run-blocked {
   background: var(--row-hover);
   color: var(--text-strong);
-  border-color: #9ca3af;
+  border-color: var(--border-strong);
 }
-/* Dark theme: lift the pastel fills slightly to remain readable on dark surfaces. */
+/* Dark theme: the run select keeps its own tuned dark values, literals on
+   purpose. It sits where a chip's dark fill reads too strong, so where the
+   chip token's dark value differs, the value here stays (#214). Where they
+   matched, the line is gone and the token does the work. */
 :root[data-theme="dark"] .run-select.run-pass {
   background: #064e3b;
   color: #6ee7b7;
   border-color: #065f46;
 }
-:root[data-theme="dark"] .run-select.run-fail {
-  color: #fca5a5;
-  border-color: #991b1b;
-}
 :root[data-theme="dark"] .run-select.run-todo {
   background: #1e1b4b;
-  color: #a5b4fc;
-  border-color: #3730a3;
 }
 :root[data-theme="dark"] .run-select.run-executing {
   background: #451a03;
@@ -681,8 +678,8 @@
   padding: 14px 16px;
 }
 .stat-tile-accent {
-  border-color: #f4b942;
-  background: #fffaf0;
+  border-color: var(--chrome-pending);
+  background: var(--warning-bg);
 }
 .stat-tile-value {
   font-size: 26px;
@@ -788,19 +785,19 @@
   color: var(--text-muted);
 }
 .stat-bar-fill.run-pass {
-  background: #34d399;
+  background: var(--ok-solid);
 }
 .stat-bar-fill.run-fail {
-  background: #f87171;
+  background: var(--danger-solid);
 }
 .stat-bar-fill.run-todo {
-  background: #818cf8;
+  background: var(--indigo-solid);
 }
 .stat-bar-fill.run-executing {
-  background: #fbbf24;
+  background: var(--warn-solid);
 }
 .stat-bar-fill.run-aborted {
-  background: #c084fc;
+  background: var(--violet-solid);
 }
 .stat-trend-panel {
   margin-top: 14px;
@@ -1423,8 +1420,8 @@ i.sankey-node-l1 {
 }
 .sankey-node-l2,
 i.sankey-node-l2 {
-  fill: #475569;
-  background: #475569;
+  fill: var(--slate-solid);
+  background: var(--slate-solid);
 }
 .node-hover .sankey-node {
   stroke: var(--accent);
@@ -1459,17 +1456,17 @@ i.sankey-node-l2 {
 }
 .link-status.link-pass,
 .link-status.link-passed {
-  fill: #22c55e;
+  fill: var(--ok-solid);
 }
 .link-status.link-fail,
 .link-status.link-failed {
-  fill: #ef4444;
+  fill: var(--danger-solid);
 }
 .link-status.link-todo {
-  fill: #6366f1;
+  fill: var(--indigo-solid);
 }
 .link-status.link-executing {
-  fill: #f59e0b;
+  fill: var(--warn-solid);
 }
 .link-status.link-aborted {
   fill: var(--text-muted);
@@ -1478,7 +1475,7 @@ i.sankey-node-l2 {
   fill: var(--violet-solid);
 }
 .link-status {
-  fill: #94a3b8;
+  fill: var(--text-muted);
 }
 
 /* Container detail card (Sets / Plans / Executions) */
@@ -1535,7 +1532,7 @@ i.sankey-node-l2 {
   color: var(--on-accent);
 }
 .kind-testset {
-  background: #0e7490;
+  background: var(--cyan-solid);
 }
 .kind-testplan {
   background: var(--violet-fg);
@@ -1554,7 +1551,7 @@ i.sankey-node-l2 {
   padding: 1px 5px;
   border-radius: 3px;
   color: var(--on-accent);
-  background: #64748b;
+  background: var(--slate-muted);
   vertical-align: middle;
 }
 .container-environments {
@@ -1648,17 +1645,17 @@ i.sankey-node-l2 {
    state uses an accent ring + brighter background so the selected filter is
    immediately obvious. */
 .fix-version-chip {
-  background: #475569;
+  background: var(--slate-solid);
   border: none;
   cursor: pointer;
   transition: background 0.1s, box-shadow 0.1s;
 }
 .fix-version-chip:hover {
-  background: #334155;
+  background: var(--slate-solid-hover);
 }
 .fix-version-chip--active {
   background: var(--info-fg);
-  box-shadow: 0 0 0 2px #93c5fd;
+  box-shadow: 0 0 0 2px var(--info-border);
 }
 .fix-version-chip--active:hover {
   background: var(--info-fg-strong);
@@ -1666,11 +1663,11 @@ i.sankey-node-l2 {
 /* "All" chip shown when a filter is active — slightly muted to indicate it
    clears the current selection rather than being a data value. */
 .fix-version-chip--all {
-  background: #64748b;
+  background: var(--slate-muted);
   font-weight: 400;
 }
 .fix-version-chip--all:hover {
-  background: #475569;
+  background: var(--slate-solid);
 }
 /* Highlight the Fix Version cell of a row whose fix version matches the active
    filter, so it is easy to confirm which row qualified. */
@@ -1740,7 +1737,7 @@ i.sankey-node-l2 {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 10px;
-  background: var(--danger-text, #c0392b);
+  background: var(--danger-text);
   color: var(--on-accent);
 }
 .defect-chip-key {
@@ -2050,7 +2047,7 @@ button.defect-chip-key:hover {
 }
 .run-seg {
   height: 100%;
-  background: #cbd5e1;
+  background: var(--border-strong);
 }
 .run-bar .run-pass,
 .run-bar .run-passed {
@@ -2058,7 +2055,7 @@ button.defect-chip-key:hover {
 }
 .run-bar .run-fail,
 .run-bar .run-failed {
-  background: #ef4444;
+  background: var(--danger-solid);
 }
 .run-bar .run-todo {
   background: var(--indigo-solid);
@@ -2195,7 +2192,7 @@ button.defect-chip-key:hover {
   max-height: 320px;
   overflow: auto;
   background: var(--chrome-bg);
-  color: #d8dee9;
+  color: var(--chrome-text);
   border-radius: 6px;
   padding: 10px 12px;
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
@@ -2820,7 +2817,7 @@ tr.row-selected td:first-child {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #7a8494;
+  color: var(--text-muted);
 }
 /* Collapsible section header inside the detail panel (RND_P_4TFINT_05-321):
    keeps the .detail-body h4 look (border-top, uppercase) but the whole heading
@@ -2889,7 +2886,7 @@ tr.row-selected td:first-child {
 }
 .backend-error {
   background: var(--chip-red-bg);
-  border: 1px solid #f1c1c1;
+  border: 1px solid var(--danger-border);
   border-radius: 4px;
   padding: 10px;
   white-space: pre-wrap;
@@ -3155,7 +3152,7 @@ tr.row-selected td:first-child {
   margin: 0 0 14px;
 }
 .req-kind {
-  background: #0e7490;
+  background: var(--cyan-solid);
 }
 /* Covering-test rows open the test detail in a right-side panel (#5). */
 .reqs-test-row {
@@ -3324,7 +3321,7 @@ tr.row-selected td:first-child {
 .cov-uncovered,
 .cov-pill.cov-uncovered {
   background: var(--row-hover);
-  color: #4b5563;
+  color: var(--text-strong);
 }
 .precond-view {
   flex: 1;
@@ -3449,18 +3446,18 @@ tr.row-selected td:first-child {
 }
 .pre-type-manual {
   color: var(--info-fg);
-  border-color: #bfdbfe;
+  border-color: var(--info-border);
   background: var(--chip-sky-bg);
 }
 .pre-type-generic {
   color: var(--violet-fg);
-  border-color: #ddd6fe;
-  background: #f5f3ff;
+  border-color: var(--violet-border);
+  background: var(--chip-purple-bg);
 }
 .pre-type-cucumber {
   color: var(--ok-fg);
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+  border-color: var(--ok-border);
+  background: var(--chip-green-bg);
 }
 :root[data-theme="dark"] .pre-type-manual,
 :root[data-theme="dark"] .pre-type-generic,
@@ -3636,7 +3633,7 @@ tr.row-selected td:first-child {
   cursor: pointer;
 }
 .transition-select:hover {
-  border-color: #5b6273;
+  border-color: var(--text-muted);
 }
 .detail-desc-edit {
   width: 100%;
@@ -3711,7 +3708,7 @@ tr.row-selected td:first-child {
   background: var(--chip-green-bg);
 }
 .review-reject {
-  border-color: #ef4444;
+  border-color: var(--danger-solid);
   color: var(--chip-red-text);
 }
 .review-reject:hover:not(:disabled) {
@@ -3723,12 +3720,12 @@ tr.row-selected td:first-child {
 
 /* Dirty markers */
 .dirty-dot {
-  color: #f59e0b;
+  color: var(--warn-solid);
   font-size: 10px;
   margin-left: 4px;
 }
 .row-dirty-dot {
-  color: #f59e0b;
+  color: var(--warn-solid);
   font-size: 10px;
   margin-right: 6px;
 }
@@ -3739,8 +3736,8 @@ tr.row-selected td:first-child {
   align-items: center;
   gap: 6px;
   background: rgba(244, 185, 66, 0.14);
-  border: 1px solid #f4b942;
-  color: #f4b942;
+  border: 1px solid var(--chrome-pending);
+  color: var(--chrome-pending);
   border-radius: 5px;
   padding: 5px 11px;
   cursor: pointer;
@@ -3818,7 +3815,7 @@ tr.row-selected td:first-child {
   border: none;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.12);
-  color: #d6deea;
+  color: var(--chrome-menu-text);
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
@@ -3842,7 +3839,7 @@ tr.row-selected td:first-child {
       color-mix(in srgb, var(--accent) 38%, transparent),
       transparent 60%
     ),
-    linear-gradient(135deg, #1d2942 0%, #141b29 100%);
+    linear-gradient(135deg, var(--chrome-banner-from) 0%, var(--chrome-banner-to) 100%);
   color: var(--on-accent);
   overflow: hidden;
 }
@@ -3938,8 +3935,8 @@ tr.row-selected td:first-child {
 }
 .conflict-text {
   color: var(--warning-text);
-  background: #fff7e6;
-  border-left: 3px solid #fbbf24;
+  background: var(--warning-bg);
+  border-left: 3px solid var(--warn-solid);
   padding: 6px 8px;
   margin: 6px 0;
   border-radius: 2px;
@@ -3981,6 +3978,7 @@ tr.row-selected td:first-child {
   font-size: 12px;
   padding: 3px 10px;
 }
+/* Kept on purpose (#214): a quieter amber than --warning-bg in dark. */
 :root[data-theme="dark"] .conflict-text {
   color: #e8d9a0;
   background: #2c2a1a;
@@ -3993,8 +3991,8 @@ tr.row-selected td:first-child {
   align-items: center;
   gap: 10px;
   padding: 8px 14px;
-  background: #fff7e6;
-  border-bottom: 1px solid #fbbf24;
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warn-border);
   color: var(--warning-text);
   flex-shrink: 0;
   font-size: 13px;
@@ -4013,10 +4011,10 @@ tr.row-selected td:first-child {
   cursor: pointer;
 }
 tr.row-checked {
-  background: #fff8e1;
+  background: var(--warning-bg);
 }
 tr.row-checked.row-selected {
-  background: #ffe9a8;
+  background: color-mix(in srgb, var(--warn-solid) 30%, var(--surface));
 }
 tr.row-checked:hover {
   background: var(--warning-bg);
@@ -4157,8 +4155,10 @@ tr.row-checked:hover {
   text-decoration: underline;
 }
 
-/* Dark-theme overrides for elements whose light values are baked in (selection
-   highlights, status pills, amber selection rows, sunken/pastel surfaces). */
+/* Dark-theme overrides kept as literals on purpose (#214). Their base rules
+   now use tokens, but those tokens' dark values are chip fills, too strong
+   for a table row's hover, selection and checked tints, so these quieter
+   values stay until rows get their own tokens. */
 :root[data-theme="dark"] tbody tr:hover {
   background: #1f2a3c;
 }
@@ -4790,15 +4790,15 @@ tr.row-checked:hover {
 }
 /* Yellow highlight of the flagged word inside the drawer context. */
 .typo-hl {
-  background: #fde047;
+  background: var(--highlight-bg);
   color: var(--text);
   border-radius: 2px;
   padding: 0 1px;
 }
 /* Green highlight of the replacement in the before/after preview. */
 .typo-hl-after {
-  background: #86efac;
-  color: #14532d;
+  background: var(--ok-border);
+  color: var(--chip-green-text);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -5006,7 +5006,7 @@ tr.row-checked:hover {
 .dup-members { background: var(--surface-2); }
 .dup-mrow { display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 32px; border-top: 1px solid var(--border); }
 .dup-mkey { font-family: "Consolas", "SF Mono", monospace; color: var(--accent); width: 130px; }
-.dup-dot { color: #f59e0b; }
+.dup-dot { color: var(--warn-solid); }
 .dup-mstatus { font-size: 10px; background: var(--surface-3); color: var(--text-muted); border-radius: 8px; padding: 1px 7px; }
 .dup-mfolder { flex: 1; min-width: 0; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dup-edit { flex: 1; min-width: 0; }
@@ -5272,7 +5272,7 @@ tr.row-checked:hover {
 .req-kind-story { background: color-mix(in srgb, var(--info-fg) 16%, transparent); color: var(--info-fg); }
 .req-kind-epic { background: color-mix(in srgb, var(--violet-fg) 16%, transparent); color: var(--violet-fg); }
 .req-kind-bug { background: color-mix(in srgb, var(--danger-solid) 16%, transparent); color: var(--danger-fg); }
-.req-kind-task { background: color-mix(in srgb, #0891b2 16%, transparent); color: #0891b2; }
+.req-kind-task { background: color-mix(in srgb, var(--cyan-fg) 16%, transparent); color: var(--cyan-fg); }
 
 /* Pager manual "go to page" input (#4). */
 .pager-goto {
@@ -5494,8 +5494,8 @@ tr.row-checked:hover {
   padding: 10px 14px;
 }
 .testcalls-card-cycle {
-  border-color: #e88;
-  box-shadow: inset 3px 0 0 #dc2626;
+  border-color: var(--danger-border);
+  box-shadow: inset 3px 0 0 var(--danger-fg);
 }
 .testcalls-caller {
   display: flex;
@@ -5756,7 +5756,7 @@ tr.row-checked:hover {
   width: 240px;
   flex: 0 0 240px;
   min-height: 0;
-  border-right: 1px solid var(--card-border, #2a3a4f);
+  border-right: 1px solid var(--card-border);
   padding-right: 12px;
 }
 .profiles-list-row-selected,
@@ -5809,8 +5809,8 @@ tr.row-checked:hover {
   color: var(--on-accent);
 }
 .backend-chip-kiwi {
-  background: #6ec177;
-  color: #0d2b12;
+  background: var(--kiwi-bg);
+  color: var(--kiwi-text);
 }
 /* The detail pane reuses ProfileForm, which carries its own card padding /
    background for standalone use; inside the modal the modal already provides
@@ -5952,7 +5952,7 @@ tr.row-checked:hover {
   display: inline-flex;
   gap: 0;
   margin-bottom: 10px;
-  border: 1px solid var(--border, #2a3a4f);
+  border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -6199,7 +6199,7 @@ tr.row-checked:hover {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   margin-bottom: 3px;
 }
 .bugs-md-detail-extra-text {
@@ -6259,6 +6259,7 @@ tr.row-checked:hover {
   color: var(--warning-text);
   letter-spacing: 0.02em;
 }
+/* Kept on purpose (#214): a quieter amber than --warning-bg in dark. */
 :root[data-theme="dark"] .bugs-md-no-tests {
   background: #3a2a00;
   color: #fcd34d;
@@ -6289,7 +6290,7 @@ tr.row-checked:hover {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   margin-bottom: 3px;
 }
 .bugs-md-desc-toggle:hover {
@@ -6360,7 +6361,7 @@ tr.row-checked:hover {
 }
 .crossproject-bugs {
   margin-top: 12px;
-  border-top: 1px solid var(--border, #2a2f3a);
+  border-top: 1px solid var(--border);
   padding-top: 10px;
 }
 .crossproject-bugs h5 {
@@ -6511,7 +6512,7 @@ tr.row-checked:hover {
 }
 .gap-tile-l {
   font-size: 12px;
-  color: var(--text-muted, #889);
+  color: var(--text-muted);
 }
 .gap-tile-total { border-color: var(--accent, var(--info-solid)); }
 .gap-tile-total .gap-tile-n,
@@ -6729,7 +6730,7 @@ tr.row-checked:hover {
 .cov-gap { background: var(--surface-sunken); color: var(--text-muted); }
 .cov-stale-dot { margin-left: 4px; color: var(--warn-accent); cursor: help; }
 .cov-stale {
-  background: var(--warn-soft); border: 1px solid #a9740044; color: var(--text);
+  background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn-accent) 27%, transparent); color: var(--text);
   padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; font-size: 13px;
 }
 /* Parameter sub-header row inside the coverage matrix table */
@@ -6744,7 +6745,7 @@ tr.row-checked:hover {
 /* Value rows — indented under their parameter header */
 .cov-vrow .cov-vlabel { padding-left: 22px; }
 .cov-vrow-bullet { margin-right: 4px; color: var(--text-muted); user-select: none; }
-.cov-error { background: var(--danger-tint); border: 1px solid #b4242444; color: var(--danger-text); padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; }
+.cov-error { background: var(--danger-tint); border: 1px solid color-mix(in srgb, var(--danger-fg-strong) 27%, transparent); color: var(--danger-text); padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; }
 .cov-notice { background: var(--surface-sunken); border: 1px solid var(--border); padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; font-size: 13px; }
 .cov-empty { color: var(--text-muted); padding: 12px; font-size: 13px; }
 .cov-welcome { max-width: 620px; padding: 8px 4px; color: var(--text); }
@@ -6760,7 +6761,7 @@ tr.row-checked:hover {
 .cov-publish { margin-bottom: 8px; }
 .cov-publish-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
 .cov-publish-head .cov-muted { flex: 1; min-width: 120px; }
-.cov-badge-pub-notpublished { background: #6b728022; color: var(--text-muted); }
+.cov-badge-pub-notpublished { background: color-mix(in srgb, var(--text-muted) 13%, transparent); color: var(--text-muted); }
 .cov-badge-pub-insync       { background: var(--ok-tint); color: var(--ok-fg); }
 .cov-badge-pub-local        { background: var(--accent-soft); color: var(--accent); }
 .cov-badge-pub-drift        { background: var(--warn-soft); color: var(--warn-accent); }
@@ -6836,13 +6837,13 @@ tr.row-checked:hover {
 .cov-badge-planning  { background: var(--accent-soft); color: var(--accent); }
 .cov-badge-beta      { background: var(--warn-soft); color: var(--warn-accent); }
 .cov-badge-stable    { background: var(--ok-tint); color: var(--ok-fg); }
-.cov-badge-deprecated { background: #6b728022; color: var(--text-muted); }
+.cov-badge-deprecated { background: color-mix(in srgb, var(--text-muted) 13%, transparent); color: var(--text-muted); }
 
 /* CR status badges */
 .cov-badge-cr-open       { background: var(--accent-soft); color: var(--accent); }
 .cov-badge-cr-accepted   { background: var(--ok-tint); color: var(--ok-fg); }
 .cov-badge-cr-rejected   { background: var(--danger-tint); color: var(--danger-fg-strong); }
-.cov-badge-cr-withdrawn  { background: #6b728022; color: var(--text-muted); }
+.cov-badge-cr-withdrawn  { background: color-mix(in srgb, var(--text-muted) 13%, transparent); color: var(--text-muted); }
 
 /* Risk badges */
 .cov-badge-risk-low    { background: var(--ok-tint); color: var(--ok-fg); }
@@ -6878,13 +6879,13 @@ tr.row-checked:hover {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .04em;
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   border-bottom: 1px solid var(--border, var(--border));
 }
 .cov-member-locks-table td { padding: 6px 8px; border-bottom: 1px solid var(--border, var(--border)); }
 .cov-member-key { font-family: monospace; font-size: 12px; }
 .cov-member-current { background: var(--surface-sunken, rgba(0,0,0,.03)); }
-.cov-member-current td:first-child { border-left: 3px solid var(--accent, #1a73e8); }
+.cov-member-current td:first-child { border-left: 3px solid var(--accent); }
 .cov-member-badge {
   display: inline-block;
   margin-left: 6px;
@@ -6894,7 +6895,7 @@ tr.row-checked:hover {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .04em;
-  background: var(--accent, #1a73e8);
+  background: var(--accent);
   color: var(--on-accent);
   vertical-align: middle;
 }
