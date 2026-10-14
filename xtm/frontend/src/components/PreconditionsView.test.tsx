@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PreconditionsView } from "./PreconditionsView";
 import { clearViewState } from "../lib/viewState";
+import { BulkAssociatePreconditions, DeletePrecondition, EditPreconditionField } from "../api";
 
 // PreconditionsView pulls in two queries, three dialog hooks and several modal
 // children. These tests only cover the detail header's Jira link, so every
@@ -18,6 +19,7 @@ const endSync = vi.fn();
 let canSync = true;
 
 const createFields = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => [] as unknown[]));
+const confirmAnswer = vi.hoisted(() => ({ value: false }));
 const createPrecondition = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => "NEW-PC-1"));
 
 vi.mock("../api", () => ({
@@ -50,7 +52,17 @@ const PRECONDITIONS = [
     type: "Manual",
     description: "",
     condition: "snmpget -v3 ... $BOARD sysName.0",
+    status: "Open",
     testCount: 2,
+  },
+  {
+    key: "PC-2",
+    summary: "Database seeded",
+    type: "Generic",
+    description: "",
+    condition: "",
+    status: "Open",
+    testCount: 0,
   },
 ];
 const LINKED_TESTS = [
@@ -79,7 +91,7 @@ vi.mock("./TestDetail", () => ({
 }));
 vi.mock("./useNotice", () => ({ useNotice: () => ({ notice: vi.fn() }) }));
 vi.mock("./useConfirm", () => ({
-  useConfirm: () => ({ confirm: vi.fn(async () => false) }),
+  useConfirm: () => ({ confirm: vi.fn(async () => confirmAnswer.value) }),
 }));
 
 const onChanged = vi.fn();
@@ -108,6 +120,7 @@ describe("PreconditionsView", () => {
     vi.clearAllMocks();
     clearViewState("p1");
     canSync = true;
+    confirmAnswer.value = false;
   });
 
   it("names its create button after what it creates", async () => {
@@ -223,5 +236,47 @@ describe("PreconditionsView", () => {
     expect(button).toBeDisabled();
     await userEvent.click(button);
     expect(syncPreconditions).not.toHaveBeenCalled();
+  });
+
+  // Pinned before the view was split into a folder (#242).
+  it("narrows the list by text and by usage", async () => {
+    renderView("https://jira.example.com/");
+    await userEvent.type(screen.getByPlaceholderText("Filter preconditions…"), "snmp");
+    expect(screen.queryByRole("button", { name: /Database seeded/ })).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByPlaceholderText("Filter preconditions…"));
+    await userEvent.click(screen.getByRole("button", { name: "Without tests 1" }));
+    expect(screen.getByRole("button", { name: /Database seeded/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /SNMP client tools reachable/ })).not.toBeInTheDocument();
+  });
+
+  it("saves only the fields an edit changed", async () => {
+    renderView("https://jira.example.com/");
+    await openPrecondition();
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.selectOptions(screen.getByLabelText("Type"), "Cucumber");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(EditPreconditionField).toHaveBeenCalledTimes(1);
+    expect(EditPreconditionField).toHaveBeenCalledWith("p1", "PC-1", "type", "Cucumber");
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  it("unlinks a test from the precondition", async () => {
+    renderView("https://jira.example.com/");
+    await openPrecondition();
+    await userEvent.click(screen.getByRole("button", { name: "Unlink from this precondition" }));
+    expect(BulkAssociatePreconditions).toHaveBeenCalledWith("p1", ["QA-7"], ["PC-1"], false);
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("deletes the precondition only once confirmed", async () => {
+    renderView("https://jira.example.com/");
+    await openPrecondition();
+    await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /Delete precondition/ }));
+    expect(DeletePrecondition).not.toHaveBeenCalled();
+    confirmAnswer.value = true;
+    await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /Delete precondition/ }));
+    expect(DeletePrecondition).toHaveBeenCalledWith("p1", "PC-1");
   });
 });
