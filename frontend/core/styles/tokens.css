@@ -197,6 +197,30 @@
   --violet-fg-strong: #6d28d9;
   --violet-solid: #a855f7;
   --violet-border: #d8b4fe;
+  /* Hand-mapped colours (#214). */
+  /* The topbar and its menus are dark in both themes, so these hold one value. */
+  --chrome-btn-hover: #344563;
+  --chrome-btn-hover-border: #4a5d80;
+  --chrome-menu-bg: #243349;
+  --chrome-menu-text: #d7dce6;
+  --chrome-menu-hover: #34507e;
+  --chrome-danger-text: #f0a0a0;
+  --chrome-danger-hover: #5a2b2b;
+  --chrome-check: #6ea8fe;
+  --chrome-progress: #4c8dff;
+  --chrome-pending: #f4b942;
+  --chrome-banner-from: #1d2942;
+  --chrome-banner-to: #141b29;
+  /* Solid fills that carry white text keep their value in dark mode. */
+  --slate-solid: #475569;
+  --slate-solid-hover: #334155;
+  --slate-muted: #64748b;
+  --cyan-solid: #0e7490;
+  --kiwi-bg: #6ec177;
+  --kiwi-text: #0d2b12;
+  /* Borders and highlights that follow the theme. */
+  --indigo-border: #a5b4fc;
+  --highlight-bg: #fde047;
 }
 
 :root[data-theme="dark"] {
@@ -327,4 +351,25 @@
   --violet-fg-strong: #ddd6fe;
   --violet-solid: #a855f7;
   --violet-border: #5b21b6;
+  /* Hand-mapped colours (#214). */
+  --chrome-btn-hover: #344563;
+  --chrome-btn-hover-border: #4a5d80;
+  --chrome-menu-bg: #243349;
+  --chrome-menu-text: #d7dce6;
+  --chrome-menu-hover: #34507e;
+  --chrome-danger-text: #f0a0a0;
+  --chrome-danger-hover: #5a2b2b;
+  --chrome-check: #6ea8fe;
+  --chrome-progress: #4c8dff;
+  --chrome-pending: #f4b942;
+  --chrome-banner-from: #1d2942;
+  --chrome-banner-to: #141b29;
+  --slate-solid: #475569;
+  --slate-solid-hover: #334155;
+  --slate-muted: #64748b;
+  --cyan-solid: #0e7490;
+  --kiwi-bg: #6ec177;
+  --kiwi-text: #0d2b12;
+  --indigo-border: #3730a3;
+  --highlight-bg: #854d0e;
 }

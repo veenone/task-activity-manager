@@ -34,7 +34,7 @@
 }
 .menu-caret {
   font-size: 9px;
-  color: #9aa7bd;
+  color: var(--chrome-text-muted);
   margin-top: 1px;
 }
 .menu-backdrop {
@@ -48,8 +48,8 @@
   z-index: 41;
   min-width: 210px;
   padding: 5px;
-  background: #243349;
-  border: 1px solid #3a4a66;
+  background: var(--chrome-menu-bg);
+  border: 1px solid var(--chrome-chip-border);
   border-radius: 8px;
   box-shadow: var(--e-2);
   animation: menu-in 0.12s ease;
@@ -80,29 +80,29 @@
   border-radius: 5px;
   padding: 7px 9px;
   cursor: pointer;
-  color: #d7dce6;
+  color: var(--chrome-menu-text);
   font-size: 13px;
   text-align: left;
 }
 .menu-item:hover:not(:disabled) {
-  background: #34507e;
-  color: #fff;
+  background: var(--chrome-menu-hover);
+  color: var(--chrome-text-strong);
 }
 .menu-item:disabled {
   opacity: 0.4;
   cursor: default;
 }
 .menu-item-danger {
-  color: #f0a0a0;
+  color: var(--chrome-danger-text);
 }
 .menu-item-danger:hover:not(:disabled) {
-  background: #5a2b2b;
-  color: #fff;
+  background: var(--chrome-danger-hover);
+  color: var(--chrome-text-strong);
 }
 .menu-check {
   width: 13px;
   flex-shrink: 0;
-  color: #6ea8fe;
+  color: var(--chrome-check);
   font-size: 11px;
 }
 .menu-label {
@@ -111,7 +111,7 @@
 .menu-divider {
   height: 1px;
   margin: 5px 7px;
-  background: #3a4a66;
+  background: var(--chrome-chip-border);
 }
 
 /* Buttons */
@@ -150,12 +150,12 @@
   background: var(--ghost-hover);
 }
 .btn-danger {
-  background: #dc2626;
-  border-color: #dc2626;
-  color: #fff;
+  background: var(--danger-solid);
+  border-color: var(--danger-solid);
+  color: var(--on-accent);
 }
 .btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
-  background: #b91c1c;
+  background: var(--danger-solid-hover);
 }
 .btn-block {
   width: 100%;
@@ -210,7 +210,7 @@
 .field-label {
   font-size: 12px;
   font-weight: 600;
-  color: #4b5563;
+  color: var(--text-strong);
   margin: 4px 0 4px;
 }
 .detail-input {
@@ -306,8 +306,8 @@
   align-items: center;
   gap: 6px;
   background: rgba(244, 185, 66, 0.14);
-  border: 1px solid #f4b942;
-  color: #f4b942;
+  border: 1px solid var(--chrome-pending);
+  color: var(--chrome-pending);
   border-radius: 5px;
   padding: 5px 11px;
   cursor: pointer;
@@ -319,25 +319,25 @@
   background: rgba(244, 185, 66, 0.24);
 }
 .btn-pending .pending-dot {
-  background: #f4b942;
+  background: var(--chrome-pending);
 }
 
 .topbar-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #2a3850;
-  border: 1px solid #3a4a66;
+  background: var(--chrome-raised);
+  border: 1px solid var(--chrome-chip-border);
   border-radius: 5px;
   padding: 5px 11px;
   cursor: pointer;
-  color: #e8eaed;
+  color: var(--chrome-text);
   font-size: 13px;
   white-space: nowrap;
 }
 .topbar-btn:hover:not(:disabled) {
-  background: #344563;
-  border-color: #4a5d80;
+  background: var(--chrome-btn-hover);
+  border-color: var(--chrome-btn-hover-border);
 }
 
 /* Application shell, mirrored from XTM's App.css */
@@ -357,10 +357,10 @@
   gap: 12px;
   row-gap: 8px;
   padding: 8px 14px;
-  background: #1b2638;
-  color: #e8eaed;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
   flex-shrink: 0;
-  border-bottom: 1px solid #0f1722;
+  border-bottom: 1px solid var(--chrome-border);
   /* Wrap the zones onto a second row when the window is too narrow to hold
      them side by side, instead of letting them shrink and overlap. */
   flex-wrap: wrap;
@@ -387,9 +387,9 @@
   letter-spacing: 0.2px;
 }
 .profile-select {
-  background: #2a3850;
-  color: #e8eaed;
-  border: 1px solid #3a4a66;
+  background: var(--chrome-raised);
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-chip-border);
   border-radius: 5px;
   padding: 5px 8px;
   max-width: 220px;
@@ -402,8 +402,8 @@
   cursor: not-allowed;
 }
 .demo-chip {
-  background: #f4b942;
-  color: #1b2638;
+  background: var(--chrome-pending);
+  color: var(--chrome-bg);
   font-size: 10px;
   font-weight: 700;
   padding: 2px 6px;
@@ -505,14 +505,14 @@
   text-decoration: underline;
 }
 .link-btn:disabled {
-  color: #888;
+  color: var(--text-muted);
   cursor: default;
 }
 .ok-text {
-  color: #1e7e34;
+  color: var(--ok-text);
 }
 .warn-text {
-  color: #a06000;
+  color: var(--warn-text);
 }
 .mono {
   font-family: "Consolas", "SF Mono", "Menlo", monospace;
@@ -634,7 +634,7 @@
   font-size: 15px;
   line-height: 1;
   padding: 0 2px;
-  color: var(--accent, #f5b301);
+  color: var(--accent);
 }
 .profiles-badge-active {
   flex: 0 0 auto;
@@ -917,7 +917,7 @@
   border: none;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.12);
-  color: #d6deea;
+  color: var(--chrome-menu-text);
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
@@ -925,7 +925,7 @@
 }
 .about-close:hover {
   background: rgba(255, 255, 255, 0.22);
-  color: #fff;
+  color: var(--chrome-text-strong);
 }
 
 /* Header "scan panel": dark instrument band with a faint grid and accent glow. */
@@ -942,8 +942,8 @@
       color-mix(in srgb, var(--accent) 38%, transparent),
       transparent 60%
     ),
-    linear-gradient(135deg, #1d2942 0%, #141b29 100%);
-  color: #fff;
+    linear-gradient(135deg, var(--chrome-banner-from) 0%, var(--chrome-banner-to) 100%);
+  color: var(--on-accent);
   overflow: hidden;
 }
 .about-banner-grid {
@@ -953,7 +953,7 @@
     linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 22px 22px;
-  mask-image: linear-gradient(105deg, #000 18%, transparent 78%);
+  mask-image: linear-gradient(105deg, black 18%, transparent 78%);
   pointer-events: none;
 }
 .about-logo {
@@ -972,7 +972,7 @@
   font-size: 20px;
   font-weight: 650;
   letter-spacing: -0.015em;
-  color: #fff;
+  color: var(--on-accent);
   line-height: 1.15;
 }
 .about-kicker {
@@ -981,7 +981,7 @@
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--accent) 55%, #cdd6e6);
+  color: color-mix(in srgb, var(--accent) 55%, var(--chrome-chip-text));
 }
 
 .about-body {
@@ -1116,7 +1116,7 @@
   line-height: 1;
 }
 .folder-action:hover {
-  color: #2563eb;
+  color: var(--info-fg);
 }
 .folder-item {
   display: flex;

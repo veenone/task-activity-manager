@@ -6,7 +6,7 @@ eslint_a11y 33
 eslint_max_lines 23
 eslint_no_console 23
 eslint_problems 134
-hardcoded_hex 173
+hardcoded_hex 30
 hardcoded_px_font 427
 raw_radius 274
 raw_shadow 7
