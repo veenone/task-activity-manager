@@ -33,7 +33,7 @@ export function AboutDialog({
     ["Schema", d ? `v${d.schemaVersion}` : "…"],
     ["Runtime", d ? `${d.goVersion} · ${d.os}/${d.arch}` : "…"],
     ["Targets", targets],
-    ["Database", d?.dbPath || "—", true],
+    ["Database", d?.dbPath || "not known", true],
     ...extraRows,
   ];
 

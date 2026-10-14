@@ -25,8 +25,8 @@ export function AboutModal({ onClose }: { onClose: () => void }) {
       docsUrl="https://docs.atlassian.com/software/jira/docs/api/REST/latest/"
       diagnostics={diag}
       extraRows={[
-        ["Profiles", diag?.sharedPath || "—", true],
-        ["Log", diag?.logPath || "—", true],
+        ["Profiles", diag?.sharedPath || "not known", true],
+        ["Log", diag?.logPath || "not known", true],
       ]}
       onOpenUrl={BrowserOpenURL}
       onClose={onClose}
