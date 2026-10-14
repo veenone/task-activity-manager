@@ -146,7 +146,7 @@
   border-color: transparent;
   color: inherit;
 }
-.btn-ghost:hover:not(:disabled) {
+.btn-ghost:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--ghost-hover);
 }
 .btn-danger {
@@ -154,7 +154,7 @@
   border-color: #dc2626;
   color: #fff;
 }
-.btn-danger:hover:not(:disabled) {
+.btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
   background: #b91c1c;
 }
 .btn-block {
@@ -315,7 +315,7 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.btn-pending:hover:not(:disabled) {
+.btn-pending:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(244, 185, 66, 0.24);
 }
 .btn-pending .pending-dot {
