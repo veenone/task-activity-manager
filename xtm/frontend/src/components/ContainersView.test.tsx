@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ContainersView } from "./ContainersView";
 import type { Capabilities } from "../api";
 import { clearViewState } from "../lib/viewState";
-import { BulkEditContainers } from "../api";
+import { BulkEditContainers, BulkSetTestRunStatus, DeallocateTests, EditContainer } from "../api";
 
 // ContainersView pulls a lot in (containers/board/members queries, several
 // modal children, three dialog hooks). This test only cares about the "Create
@@ -292,5 +292,41 @@ describe("ContainersView Set env on shown", () => {
         value: "staging",
       }),
     );
+  });
+});
+
+// Pins for the T3.2 split (#231): what the view does with its members has to
+// survive the code moving into smaller files.
+describe("ContainersView members", () => {
+  it("sets the result of the selected members in one go", async () => {
+    vi.mocked(BulkSetTestRunStatus).mockResolvedValue({ succeeded: ["QA-1"], failed: [] });
+    renderWithCaps({});
+    await selectTestExecutions();
+    await screen.findByText("Login works");
+    const boxes = screen.getAllByRole("checkbox");
+    await userEvent.click(boxes[boxes.length - 1]);
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getAllByRole("combobox").find((c) => c.className === "run-select" && c.closest(".board-bulk"))!, "PASS");
+    await userEvent.click(screen.getByRole("button", { name: "Apply to selected" }));
+    expect(BulkSetTestRunStatus).toHaveBeenCalledWith("p1", "TE-1", ["QA-1"], "PASS");
+  });
+
+  it("removes a member from the container", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+    await screen.findByText("Login works");
+    await userEvent.click(screen.getByRole("button", { name: "Remove from this Test Execution" }));
+    expect(DeallocateTests).toHaveBeenCalledWith("p1", "TE-1", ["QA-1"]);
+  });
+
+  it("renames the container with Enter", async () => {
+    renderWithCaps({});
+    await selectTestExecutions();
+    const heading = await screen.findByRole("heading", { name: "Nightly run" });
+    await userEvent.click(within(heading).getByRole("button"));
+    const input = screen.getByDisplayValue("Nightly run");
+    await userEvent.clear(input);
+    await userEvent.type(input, "Weekly run{Enter}");
+    expect(EditContainer).toHaveBeenCalledWith("p1", "TE-1", "Weekly run");
   });
 });
