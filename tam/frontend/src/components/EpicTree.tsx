@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, onExpandedChange, movedKey }: Props) {
-  const rootRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const [flashKey, setFlashKey] = useState("");
   const [focusKey, setFocusKey] = useState(selectedKey);
@@ -208,10 +208,11 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
   }
 
   return (
-    <nav
+    <div
       className="folder-tree"
       aria-label="Epics"
       role="tree"
+      tabIndex={-1}
       ref={rootRef}
       style={{ "--epic-key-w": keyWidth, "--type-col-w": typeWidth } as CSSProperties}
     >
@@ -235,6 +236,6 @@ export function EpicTree({ tree, subtaskLabel, selectedKey, onSelect, expanded, 
 
       {tree.orphans.length > 0 &&
         branch("noepic", NO_EPIC_KEY, expanded.has(NO_EPIC_KEY), tree.orphans.slice(0, MAX_ORPHAN_ROWS), undefined, tree.orphans.length)}
-    </nav>
+    </div>
   );
 }

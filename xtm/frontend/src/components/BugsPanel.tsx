@@ -674,8 +674,7 @@ export function BugsPanel({ jiraUrl, onOpenTest }: Props) {
               {paged.map((b) => (
                 <li
                   key={b.key}
-                  className={`bugs-md-item${b.key === selected ? " bugs-md-item-selected" : ""}`}
-                  onClick={() => setSelected(b.key)}
+                  className={`bugs-md-item row-stretch${b.key === selected ? " bugs-md-item-selected" : ""}`}
                 >
                   <div className="bugs-md-item-top">
                     <input
@@ -683,13 +682,16 @@ export function BugsPanel({ jiraUrl, onOpenTest }: Props) {
                       className="bugs-md-check"
                       checked={checked.has(b.key)}
                       title="Include this bug's linked tests when creating a Test Execution"
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleChecked(b.key);
-                      }}
+                      onChange={() => toggleChecked(b.key)}
                     />
-                    <span className="mono bugs-md-key">{b.key}</span>
+                    <button
+                      className="row-select mono bugs-md-key"
+                      aria-current={b.key === selected ? "true" : undefined}
+                      aria-label={`${b.key} ${b.summary}`}
+                      onClick={() => setSelected(b.key)}
+                    >
+                      {b.key}
+                    </button>
                     <span className="muted">{b.projectKey}</span>
                     {b.status && <span className="status-pill">{b.status}</span>}
                   </div>

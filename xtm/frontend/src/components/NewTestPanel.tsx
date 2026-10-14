@@ -155,7 +155,7 @@ export function NewTestPanel({
 
   return (
     <aside className="detail new-test-panel" style={{ width }}>
-      <div className="detail-resizer" onMouseDown={startResize} title="Drag to resize" />
+      <div className="detail-resizer" role="presentation" onMouseDown={startResize} title="Drag to resize" />
       <div className="detail-head">
         <div className="detail-head-id">
           <span className="detail-key">New Test</span>

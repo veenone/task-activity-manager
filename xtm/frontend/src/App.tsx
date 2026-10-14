@@ -1511,6 +1511,7 @@ function App() {
             </div>
             <div
               className="sidebar-resizer"
+              role="presentation"
               onMouseDown={startSidebarResize}
               title="Drag to resize the sidebar"
             />

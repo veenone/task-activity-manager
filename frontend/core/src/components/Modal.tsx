@@ -111,8 +111,10 @@ export function Modal({
   }
 
   return (
+    // The overlay click is a pointer shortcut; Escape closes from the keyboard.
     <div
       className={overlayClassName}
+      role="presentation"
       onClick={closeOnOverlayClick ? onClose : undefined}
     >
       <div

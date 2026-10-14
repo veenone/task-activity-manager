@@ -78,6 +78,7 @@ export function BoardGrid({
       style={{ "--board-cols": view.columns.length } as CSSProperties}
       role="grid"
       aria-label="Board"
+      tabIndex={-1}
       // Two selections live on this grid: the one card the detail panel is
       // about, and the run a bulk action would touch.
       aria-multiselectable

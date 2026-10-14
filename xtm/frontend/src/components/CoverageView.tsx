@@ -345,10 +345,15 @@ export function CoverageView({ isDemo, demoVariant, onChanged }: Props) {
           {canon.map((c) => (
             <li
               key={c.id}
-              className={`cov-canon${selected === c.id ? " cov-canon-active" : ""}`}
-              onClick={() => setSelected(c.id)}
+              className={`cov-canon row-stretch${selected === c.id ? " cov-canon-active" : ""}`}
             >
-              <span className="cov-canon-name">{c.name}</span>
+              <button
+                className="row-select cov-canon-name"
+                aria-current={selected === c.id ? "true" : undefined}
+                onClick={() => setSelected(c.id)}
+              >
+                {c.name}
+              </button>
               <span className="cov-canon-meta">{c.memberCount} proj</span>
               <button
                 className="cov-x"

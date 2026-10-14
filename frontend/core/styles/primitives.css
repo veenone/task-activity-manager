@@ -1597,3 +1597,41 @@
   margin-left: -1px;
   background: var(--bar-marker);
 }
+
+/* A list row whose primary action is one button (#219). The row's label is a
+   real <button>, so it takes focus and Enter, and its ::after stretches over
+   the whole row so a pointer can still click anywhere on it. The row's other
+   controls sit above that layer. */
+.row-stretch {
+  position: relative;
+}
+.row-select {
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.row-select::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.row-stretch :is(button, input, a, select):not(.row-select) {
+  position: relative;
+  z-index: var(--z-sticky);
+}
+.row-stretch:has(.row-select:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset-inset);
+}
+.profiles-row-select {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

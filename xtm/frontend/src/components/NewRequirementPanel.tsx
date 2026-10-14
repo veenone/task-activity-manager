@@ -291,7 +291,7 @@ export function NewRequirementPanel({ onCreated, onCancel }: Props) {
     // #2: new-req-panel class for left-dock overrides; new-test-panel for shared
     // form styles (ntp-* rules); detail for base panel structure.
     <aside className="detail new-test-panel new-req-panel" style={{ width }}>
-      <div className="detail-resizer" onMouseDown={startResize} title="Drag to resize" />
+      <div className="detail-resizer" role="presentation" onMouseDown={startResize} title="Drag to resize" />
       <div className="detail-head">
         <div className="detail-head-id">
           <span className="detail-key">New Requirement</span>

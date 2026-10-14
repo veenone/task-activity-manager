@@ -62,6 +62,7 @@ export function CardMoveMenu({ issueKey, columns, col, sprints, sprintId, disabl
     // not be read as Enter on the card.
     <span
       className="board-card-menu-wrap"
+      role="presentation"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >

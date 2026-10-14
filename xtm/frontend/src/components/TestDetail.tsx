@@ -1016,6 +1016,7 @@ export function TestDetail({
     <aside className="detail" style={{ width }}>
       <div
         className="detail-resizer"
+        role="presentation"
         onMouseDown={startResize}
         title="Drag to resize"
       />

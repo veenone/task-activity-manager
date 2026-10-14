@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../contexts/ProfileContext";
 import {
@@ -30,6 +30,7 @@ export function VersionBar({
   onChanged,
 }: VersionBarProps) {
   const { activeId: profileId } = useProfile();
+  const versionSelectId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -178,8 +179,9 @@ export function VersionBar({
 
   return (
     <div className="cov-version-bar">
-      <label className="cov-version-label">Version:</label>
+      <label className="cov-version-label" htmlFor={versionSelectId}>Version:</label>
       <select
+        id={versionSelectId}
         className="cov-select"
         value={value}
         onChange={(e) => {
