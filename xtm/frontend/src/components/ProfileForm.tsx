@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { jiraUrlError, normalizeJiraUrl, projectKeyError } from "@agile-suite/core";
 import {
   CreateProfile,
   CreateProfileReusingToken,
@@ -49,57 +50,11 @@ interface Props {
   onSaved?: (c: Connection) => void;
 }
 
-// projectKeyError validates a Jira project key, rejecting trailing slashes,
-// spaces, and other invalid characters. Jira DC project keys start with a letter
-// and contain letters, digits, and underscores (e.g. RND_P_4TFINT_05) — we
-// accept any case and upper-case on input.
-function projectKeyError(key: string): string {
-  const k = key.trim();
-  if (k === "") return "";
-  if (!/^[A-Z][A-Z0-9_]+$/.test(k)) {
-    return "Project key must start with a letter and contain only letters, digits, and underscores — no spaces, slashes, or other special characters.";
-  }
-  return "";
-}
-
-// normalizeJiraUrl trims surrounding whitespace and strips trailing slashes so
-// the stored base URL is clean (e.g. "https://jira.example.com/" or a pasted
-// ".../secure/Dashboard.jspa " is reduced to the bare origin/base). The backend
-// also TrimRights "/", but normalizing here keeps the stored value tidy and the
-// connection test honest.
-function normalizeJiraUrl(url: string): string {
-  return url.trim().replace(/[\s/]+$/, "");
-}
-
-// jiraUrlError validates the Jira base URL. Demo URLs are allowed — "demo", a
-// "demo:" / "mock:" prefix, or a "demo-" suffixed variant like "demo-pkcs" (used
-// to pick a specific built-in demo dataset); otherwise it must be a well-formed
-// http(s) URL with a host and no spaces. Keep in sync with isDemoURL in the Go
-// backend (internal/jira/demo.go). "kiwi-demo" (and "kiwi-demo:"/"kiwi-demo-"
-// variants) is also allowed — the offline Kiwi demo, routed by app.go's
-// backend factory to kiwi.New instead of the Xray path (kiwi.IsKiwiDemoURL,
-// internal/backend/kiwi/demo.go).
-function jiraUrlError(url: string): string {
-  const u = normalizeJiraUrl(url);
-  if (u === "") return "";
-  if (/^(demo|demo[-:].*|mock:.*|kiwi-demo|kiwi-demo[-:].*)$/i.test(u)) return "";
-  if (/\s/.test(u)) {
-    return "The URL must not contain spaces.";
-  }
-  let parsed: URL;
-  try {
-    parsed = new URL(u);
-  } catch {
-    return "Enter a full base URL, e.g. https://jira.example.com (or 'demo').";
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return "The URL must start with http:// or https:// (or be 'demo').";
-  }
-  if (!parsed.hostname) {
-    return "The URL must include a host, e.g. https://jira.example.com.";
-  }
-  return "";
-}
+// isXtmDemoUrl is what XTM accepts as a demo base URL: "demo", a "demo:" or
+// "mock:" prefix, a "demo-" variant naming a built-in dataset (demo-pkcs), and
+// the offline Kiwi demo in the same forms. Keep in sync with isDemoURL in
+// internal/jira/demo.go and kiwi.IsKiwiDemoURL.
+const isXtmDemoUrl = (u: string) => /^(demo|demo[-:].*|mock:.*|kiwi-demo|kiwi-demo[-:].*)$/i.test(u);
 
 export function ProfileForm({
   onCreated,
@@ -244,12 +199,12 @@ export function ProfileForm({
   // Kiwi has no Jira-style project key -- "Product" is a free-form name, not
   // validated against the strict key format.
   const keyError = backendIsKiwi ? "" : projectKeyError(projectKey);
-  const urlError = jiraUrlError(jiraUrl);
+  const urlError = jiraUrlError(jiraUrl, isXtmDemoUrl);
 
   // Bug tracker validation. Reuses jiraUrlError -- the bug tracker's target
   // is always a Jira instance, same as the main URL field above.
   const bugTrackerUrlError =
-    backendIsKiwi && !isConnection ? jiraUrlError(bugTrackerUrl) : "";
+    backendIsKiwi && !isConnection ? jiraUrlError(bugTrackerUrl, isXtmDemoUrl) : "";
   // Exactly one of URL/project key filled is an edit in progress, not a
   // removal request -- block Save rather than guess what the user meant
   // (RND_P_4TFINT_05-359 review, Important 1).

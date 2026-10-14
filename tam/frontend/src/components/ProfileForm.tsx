@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { errMsg } from "@agile-suite/core";
+import { errMsg, jiraUrlError, normalizeJiraUrl, projectKeyError } from "@agile-suite/core";
 import {
   CreateProfile,
   CreateProfileReusingToken,
@@ -50,52 +50,6 @@ interface Props {
   profiles?: Profile[];
   // Extra footer controls (Export / Delete) rendered left of Cancel / Save.
   extraActions?: ReactNode;
-}
-
-// projectKeyError checks a Jira project key against the shape Jira documents:
-// a letter first, then letters, digits and underscores (e.g. RND_P_4TFINT_05);
-// any case is accepted and upper-cased on input. That shape is a convention of
-// an instance rather than a rule, and things like the minimum key length are
-// configurable, so the check is switchable from application settings (#99);
-// off, the field takes whatever the instance accepts and Jira decides. Blank
-// is left to the Save button, which is disabled without a key.
-function projectKeyError(key: string, checkPattern: boolean): string {
-  const k = key.trim();
-  if (k === "" || !checkPattern) return "";
-  if (!/^[A-Z][A-Z0-9_]+$/.test(k)) {
-    return "Project key must start with a letter and use only letters, digits, and underscores. No spaces, slashes, or other special characters.";
-  }
-  return "";
-}
-
-// normalizeJiraUrl trims surrounding whitespace and strips trailing slashes so
-// the stored base URL is clean: "https://jira.example.com/" or a pasted
-// ".../secure/Dashboard.jspa " reduces to the bare base.
-export function normalizeJiraUrl(url: string): string {
-  return url.trim().replace(/[\s/]+$/, "");
-}
-
-// jiraUrlError validates the Jira base URL. A demo URL is allowed, in the
-// forms suiteprofiles.IsDemoURL accepts ("demo", "demo:…", "demo-…");
-// otherwise it must be a well-formed http(s) URL with a host and no spaces.
-function jiraUrlError(url: string): string {
-  const u = normalizeJiraUrl(url);
-  if (u === "") return "";
-  if (isDemoUrl(u)) return "";
-  if (/\s/.test(u)) return "The URL must not contain spaces.";
-  let parsed: URL;
-  try {
-    parsed = new URL(u);
-  } catch {
-    return "Enter a full base URL, e.g. https://jira.example.com (or 'demo').";
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return "The URL must start with http:// or https:// (or be 'demo').";
-  }
-  if (!parsed.hostname) {
-    return "The URL must include a host, e.g. https://jira.example.com.";
-  }
-  return "";
 }
 
 // ProfileForm creates or edits one profile. It mirrors XTM's ProfileForm --
@@ -209,7 +163,7 @@ export function ProfileForm({
   }, [profile]);
 
   const keyError = projectKeyError(projectKey, checkKeyPattern);
-  const urlError = jiraUrlError(jiraUrl);
+  const urlError = jiraUrlError(jiraUrl, isDemoUrl);
   // Each field error is the description of its input, so a screen reader
   // reads it with the field rather than only where it sits on the page.
   const urlErrorId = useId();
