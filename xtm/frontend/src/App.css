@@ -110,7 +110,7 @@
   z-index: 41;
   min-width: 210px;
   padding: 5px;
-  background: #243349;
+  background: var(--chrome-raised);
   border: 1px solid var(--chrome-chip-border);
   border-radius: 8px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
@@ -426,8 +426,8 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #047857;
-  background: #d1fae5;
+  color: var(--ok-text);
+  background: var(--chip-green-bg);
   border-radius: 4px;
   padding: 1px 6px;
 }
@@ -475,12 +475,12 @@
   padding: 1px 6px;
   border-radius: 3px;
   vertical-align: middle;
-  background: #e5e7eb;
+  background: var(--row-hover);
   color: var(--text-strong);
 }
 .run-pass {
-  background: #d1fae5;
-  color: #047857;
+  background: var(--chip-green-bg);
+  color: var(--ok-text);
 }
 .run-fail {
   background: var(--chip-red-bg);
@@ -498,7 +498,7 @@
   font-size: 12px;
 }
 .run-todo {
-  background: #e0e7ff;
+  background: var(--chip-blue-bg);
   color: #3730a3;
 }
 .run-executing {
@@ -506,17 +506,17 @@
   color: #b45309;
 }
 .run-aborted {
-  background: #f3e8ff;
+  background: var(--chip-purple-bg);
   color: #7e22ce;
 }
 .run-blocked {
-  background: #e5e7eb;
+  background: var(--row-hover);
   color: var(--text-strong);
 }
 
 /* Run history plan-group sub-header row (Bugs panel nested breakdown). */
 .run-plan-group-header td {
-  background: var(--surface-2, #f1f5f9);
+  background: var(--surface-2, var(--surface-sunken));
   font-size: 0.82em;
   font-weight: 600;
   padding: 3px 6px;
@@ -568,8 +568,8 @@
   color: var(--text);
 }
 .run-select.run-pass {
-  background: #d1fae5;
-  color: #047857;
+  background: var(--chip-green-bg);
+  color: var(--ok-text);
   border-color: #6ee7b7;
 }
 .run-select.run-fail {
@@ -578,7 +578,7 @@
   border-color: #fca5a5;
 }
 .run-select.run-todo {
-  background: #e0e7ff;
+  background: var(--chip-blue-bg);
   color: #3730a3;
   border-color: #a5b4fc;
 }
@@ -588,12 +588,12 @@
   border-color: #fcd34d;
 }
 .run-select.run-aborted {
-  background: #f3e8ff;
+  background: var(--chip-purple-bg);
   color: #7e22ce;
   border-color: #d8b4fe;
 }
 .run-select.run-blocked {
-  background: #e5e7eb;
+  background: var(--row-hover);
   color: var(--text-strong);
   border-color: #9ca3af;
 }
@@ -743,7 +743,7 @@
   color: var(--text-strong);
 }
 .stat-bar-track {
-  background: #eef1f6;
+  background: var(--row-hover);
   border-radius: 3px;
   height: 14px;
   overflow: hidden;
@@ -1984,7 +1984,7 @@ button.defect-chip-key:hover {
 }
 .add-test-list li {
   padding: 5px 4px;
-  border-bottom: 1px solid #f0f1f4;
+  border-bottom: 1px solid var(--border-subtle);
   font-size: 13px;
 }
 .add-test-list li label {
@@ -2046,7 +2046,7 @@ button.defect-chip-key:hover {
   height: 8px;
   border-radius: 5px;
   overflow: hidden;
-  background: #eef1f5;
+  background: var(--row-hover);
 }
 .run-seg {
   height: 100%;
@@ -2113,7 +2113,7 @@ button.defect-chip-key:hover {
 .board-table td {
   text-align: left;
   padding: 7px 12px;
-  border-bottom: 1px solid #eef1f6;
+  border-bottom: 1px solid var(--border-subtle);
 }
 .board-table th {
   background: var(--surface-2);
@@ -2433,7 +2433,7 @@ th.sortable {
   user-select: none;
 }
 th.sortable:hover {
-  background: #e3e6eb;
+  background: var(--row-hover);
 }
 .sort-caret {
   color: var(--accent);
@@ -2526,7 +2526,7 @@ tbody tr:hover {
   background: #f0f4ff;
 }
 tr.row-selected {
-  background: #e1e8ff;
+  background: var(--chip-blue-bg);
 }
 /* Non-colour cue for the open row so selection isn't signalled by background
    alone (X6 / WCAG 1.4.1). */
@@ -2567,7 +2567,7 @@ tr.row-selected td:first-child {
 }
 .status-pill {
   display: inline-block;
-  background: #eaf1fb;
+  background: var(--chip-sky-bg);
   color: var(--accent-hover);
   border-radius: 10px;
   padding: 1px 9px;
@@ -2689,7 +2689,7 @@ tr.row-selected td:first-child {
   text-align: left;
 }
 .folder-selected {
-  background: #e1e8ff !important;
+  background: var(--chip-blue-bg) !important;
   color: var(--accent-hover);
   font-weight: 500;
 }
@@ -2815,7 +2815,7 @@ tr.row-selected td:first-child {
 .detail-body h4 {
   margin: 20px 0 9px;
   padding-top: 15px;
-  border-top: 1px solid #eceef2;
+  border-top: 1px solid var(--border-subtle);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -2852,7 +2852,7 @@ tr.row-selected td:first-child {
 .detail-collapse-count {
   font-weight: 600;
   color: var(--text-muted);
-  background: var(--surface-2, #eceef2);
+  background: var(--surface-2, var(--row-hover));
   border-radius: 8px;
   padding: 0 6px;
   letter-spacing: 0;
@@ -3308,8 +3308,8 @@ tr.row-selected td:first-child {
 }
 .cov-passed,
 .cov-pill.cov-passed {
-  background: #d1fae5;
-  color: #047857;
+  background: var(--chip-green-bg);
+  color: var(--ok-text);
 }
 .cov-failed,
 .cov-pill.cov-failed {
@@ -3323,7 +3323,7 @@ tr.row-selected td:first-child {
 }
 .cov-uncovered,
 .cov-pill.cov-uncovered {
-  background: #e5e7eb;
+  background: var(--row-hover);
   color: #4b5563;
 }
 .precond-view {
@@ -3450,7 +3450,7 @@ tr.row-selected td:first-child {
 .pre-type-manual {
   color: #2563eb;
   border-color: #bfdbfe;
-  background: #eff6ff;
+  background: var(--chip-sky-bg);
 }
 .pre-type-generic {
   color: #7c3aed;
@@ -3676,7 +3676,7 @@ tr.row-selected td:first-child {
   border-radius: 5px;
 }
 .review-none {
-  background: #eef1f5;
+  background: var(--row-hover);
   color: var(--text-muted);
 }
 .review-approved {
@@ -4019,7 +4019,7 @@ tr.row-checked.row-selected {
   background: #ffe9a8;
 }
 tr.row-checked:hover {
-  background: #ffeec0;
+  background: var(--warning-bg);
 }
 
 /* In-app prompt (replaces window.prompt, unsupported in WebView2) */
@@ -4346,7 +4346,7 @@ tr.row-checked:hover {
 }
 .new-test-panel .ntp-section {
   margin-top: 14px;
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border, var(--border));
   border-radius: 8px;
 }
 .new-test-panel .ntp-section-head {
@@ -4363,10 +4363,10 @@ tr.row-checked:hover {
 }
 .new-test-panel .ntp-section-body {
   padding: 8px 10px;
-  border-top: 1px solid var(--border, #e2e8f0);
+  border-top: 1px solid var(--border, var(--border));
 }
 .new-test-panel .ntp-step {
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border, var(--border));
   border-radius: 6px;
   padding: 7px;
   margin-bottom: 8px;
@@ -4409,7 +4409,7 @@ tr.row-checked:hover {
   justify-content: flex-end;
   gap: 10px;
   padding: 12px 14px;
-  border-top: 1px solid var(--border, #e2e8f0);
+  border-top: 1px solid var(--border, var(--border));
 }
 
 /* New Requirement Panel (FR-13) — left-docked creation form.
@@ -5880,7 +5880,7 @@ tr.row-checked:hover {
   font: inherit;
 }
 .bug-link-key:hover {
-  color: var(--accent-strong, #2b6cb0);
+  color: var(--accent-strong, var(--accent-strong));
 }
 .bug-form {
   display: flex;
@@ -6552,7 +6552,7 @@ tr.row-checked:hover {
 .gap-dir-in { background: rgba(56, 132, 222, 0.14); color: var(--accent, #3884de); }
 .gap-dir-out { background: rgba(127, 127, 127, 0.14); color: var(--text); }
 .gap-dir-proj { background: rgba(56, 132, 222, 0.14); color: var(--accent, #3884de); }
-.gap-dir-folder { background: rgba(214, 158, 46, 0.16); color: var(--warning, #b7791f); }
+.gap-dir-folder { background: rgba(214, 158, 46, 0.16); color: var(--warning, var(--warning)); }
 .gap-count {
   margin-left: auto;
   font-weight: 700;
@@ -6879,9 +6879,9 @@ tr.row-checked:hover {
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--text-muted, #888);
-  border-bottom: 1px solid var(--border, #e0e0e0);
+  border-bottom: 1px solid var(--border, var(--border));
 }
-.cov-member-locks-table td { padding: 6px 8px; border-bottom: 1px solid var(--border, #e0e0e0); }
+.cov-member-locks-table td { padding: 6px 8px; border-bottom: 1px solid var(--border, var(--border)); }
 .cov-member-key { font-family: monospace; font-size: 12px; }
 .cov-member-current { background: var(--surface-sunken, rgba(0,0,0,.03)); }
 .cov-member-current td:first-child { border-left: 3px solid var(--accent, #1a73e8); }
