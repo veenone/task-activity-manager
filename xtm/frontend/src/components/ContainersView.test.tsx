@@ -299,7 +299,7 @@ describe("ContainersView Set env on shown", () => {
 // survive the code moving into smaller files.
 describe("ContainersView members", () => {
   it("sets the result of the selected members in one go", async () => {
-    vi.mocked(BulkSetTestRunStatus).mockResolvedValue({ succeeded: ["QA-1"], failed: [] });
+    vi.mocked(BulkSetTestRunStatus).mockResolvedValue({ succeeded: ["QA-1"], failed: [] } as never);
     renderWithCaps({});
     await selectTestExecutions();
     await screen.findByText("Login works");
