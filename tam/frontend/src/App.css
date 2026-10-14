@@ -133,7 +133,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    the two tokens keep it legible in both themes. */
 .syncbar { display: flex; align-items: center; gap: 8px; }
 .syncbar-track { width: 160px; height: 8px; background: var(--surface-sunken); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
-.syncbar-fill { height: 100%; background: var(--accent); transition: width 0.2s ease; }
+.syncbar-fill { height: 100%; background: var(--accent); transition: width var(--dur-2) ease; }
 @media (prefers-reduced-motion: reduce) { .syncbar-fill { transition: none; } }
 
 /* Backlog: filter bar, grid, pager */
@@ -848,7 +848,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    with overflow is not reachable from the keyboard in WebView2, and it is
    now the only thing on the view that scrolls. */
 .report-table-wrap { flex: 1; min-height: 0; max-width: 100%; overflow: auto; scrollbar-gutter: stable; }
-.report-table-wrap:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.report-table-wrap:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
 .report-table { border-collapse: collapse; margin-top: 8px; font-size: var(--fs-md); width: 100%; }
 /* Sticky inside the panel, so scrolling the rows does not scroll away what
    the columns are. */
@@ -932,7 +932,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    14em ceiling it used to carry was there to stop it eating velocity, and
    the band is what does that now. */
 .report-capacity { min-height: 0; overflow-y: auto; }
-.report-capacity:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.report-capacity:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
 
 /* The outputs bar: the foot of the frame, a sibling of .report-body rather
    than a row inside it.
@@ -993,7 +993,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chart-bar-carried { fill: var(--chart-carried); }
 /* The hit target takes the hover and the focus for a mark too small to aim
    at. It is invisible until it has one of them. */
-.chart-hit { fill: transparent; cursor: default; outline: none; }
+.chart-hit { fill: transparent; cursor: default; outline: 2px solid transparent; }
 .chart-hit:hover { fill: var(--chart-hit); }
 .chart-hit:focus-visible { fill: var(--chart-hit); stroke: var(--accent); stroke-width: 2; }
 .chart-tooltip {
@@ -1070,7 +1070,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    the editor was a bare area: no edge, and #56's 72 character measure left a
    band of empty pane beside the text that read as a huge left indent. */
 .ritual-editor-content { flex: 1; min-height: 0; overflow: auto; margin: 8px 12px; padding: 12px 16px; border: 1px solid var(--border-strong); border-radius: 4px; }
-.ritual-editor-content .ProseMirror { outline: none; min-height: 100%; }
+.ritual-editor-content .ProseMirror { outline: 2px solid transparent; min-height: 100%; }
 .ritual-editor-content table { border-collapse: collapse; margin: 8px 0; }
 .ritual-editor-content th, .ritual-editor-content td { border: 1px solid var(--border); padding: 4px 8px; min-width: 64px; vertical-align: top; }
 .ritual-editor-content th { background: var(--surface-2); }

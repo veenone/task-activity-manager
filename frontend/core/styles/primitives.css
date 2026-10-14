@@ -906,6 +906,9 @@
   .about-card {
     animation: none;
   }
+  .about-close {
+    transition: none;
+  }
 }
 .about-close {
   position: absolute;
@@ -921,7 +924,7 @@
   cursor: pointer;
   font-size: var(--fs-sm);
   line-height: 1;
-  transition: background 0.12s;
+  transition: background var(--dur-1);
 }
 .about-close:hover {
   background: rgba(255, 255, 255, 0.22);
