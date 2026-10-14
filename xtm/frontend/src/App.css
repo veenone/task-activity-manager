@@ -2158,49 +2158,6 @@ button.defect-chip-key:hover {
 }
 
 /* Diagnostics (FR-12.4) */
-.diag-body {
-  padding: 14px 16px;
-  overflow-y: auto;
-}
-.diag-fields {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 4px 10px;
-  margin: 0 0 12px;
-  font-size: var(--fs-md);
-}
-.diag-fields dt {
-  color: var(--text-muted);
-  font-weight: 600;
-}
-.diag-fields dd {
-  margin: 0;
-  color: var(--text);
-}
-.diag-path {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: var(--fs-sm);
-  word-break: break-all;
-}
-.diag-log-head {
-  margin: 8px 0 6px;
-  font-size: var(--fs-md);
-  color: var(--text-strong);
-}
-.diag-log {
-  margin: 0;
-  max-height: 320px;
-  overflow: auto;
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-  border-radius: 6px;
-  padding: 10px 12px;
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: var(--fs-xs);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 
 /* Onboarding */
 .onboard {
