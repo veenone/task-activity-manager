@@ -1,1 +1,2 @@
 tam/internal/ritualtemplate/testdata/*.xml -text
+*.pen -text
