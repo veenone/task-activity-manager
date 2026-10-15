@@ -165,6 +165,14 @@ describe("App shell", () => {
     expect(tabs.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-current", "page");
   });
 
+  // The dot is a shape the stylesheet draws; a glyph inside it showed as a
+  // square under the button's background (#255).
+  it("marks the pending button with an empty dot, not a glyph", async () => {
+    renderApp();
+    const button = await screen.findByRole("button", { name: "2 pending" });
+    expect(button.querySelector(".pending-dot")?.textContent).toBe("");
+  });
+
   it("shows the synced test count in the status bar", async () => {
     const { container } = renderApp();
     const count = (1234).toLocaleString();

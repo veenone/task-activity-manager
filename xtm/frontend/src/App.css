@@ -3665,10 +3665,6 @@ tr.row-selected td:first-child {
 .btn-pending:hover:not(:disabled) {
   background: rgba(244, 185, 66, 0.24);
 }
-.pending-dot {
-  font-size: var(--fs-2xs);
-  line-height: 1;
-}
 .pending-modal {
   width: min(840px, 92vw);
   max-height: 80vh;
