@@ -51,4 +51,6 @@ Releases are tagged per app: `xtm/vX.Y.Z` for XTM (see `xtm/README.md`) and
 `.github/workflows/release.yml` which app to build, and
 `scripts/release-app.ps1 -App <app> -Version X.Y.Z` is the same build run
 locally. XTM ships the user guide in `docs/user-guide`; TAM's documentation is
-kept outside this repository, so its releases carry binaries alone.
+kept outside this repository, so its releases carry binaries alone. The
+per-view XTM guides, one file for each View menu entry, are in
+[`docs/user-guide/xtm`](docs/user-guide/xtm/README.md).
