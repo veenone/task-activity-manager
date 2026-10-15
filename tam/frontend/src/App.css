@@ -110,7 +110,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .statusbar-right { margin-left: auto; }
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot-ok { background: var(--ok-text); }
-.dot-warn { background: var(--warning); }
+.dot-warn { background: var(--warn-fg); }
 
 .startup-error {
   min-height: 0;
@@ -164,7 +164,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .chip-type-story { background: var(--chip-green-bg); color: var(--chip-green-text); }
 .chip-type-bug { background: var(--chip-red-bg); color: var(--chip-red-text); }
 .chip-type-epic { background: var(--chip-purple-bg); color: var(--chip-purple-text); }
-.chip-type-requirement { background: var(--warning-bg); color: var(--warning-text); }
+.chip-type-requirement { background: var(--warn-bg); color: var(--warn-text); }
 .chip-type-subtask { background: var(--chip-sky-bg); color: var(--chip-sky-text); }
 .chip-type-none { background: var(--surface-3); color: var(--text-muted); }
 /* A type TAM has no concept of. Since #68 the sync fetches every type the
@@ -462,13 +462,10 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .link-group-title { font-size: var(--fs-sm); margin-bottom: 6px; }
 
 /* Plan 1b: pending changes */
-/* --warn-bg and --warn-fg were defined nowhere, so every rule below drew
-   its fallback and nothing else, in both themes. --warning-bg and
-   --warning-text are the real tokens and hold the same light values. */
-.chip-draft { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
-.chip-held { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); }
-.pending-held { margin: 4px 0 0; color: var(--warning-text); }
-.chip-conflict { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warn-border); text-transform: uppercase; font-size: var(--fs-2xs); }
+.chip-draft { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+.chip-held { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+.pending-held { margin: 4px 0 0; color: var(--warn-text); }
+.chip-conflict { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); text-transform: uppercase; font-size: var(--fs-2xs); }
 .pending-banner { border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; margin: 12px 0 4px; }
 .pending-banner p { margin: 2px 0; }
 /* --warn-soft is the token; the --warn-bg this used to name is defined
@@ -480,7 +477,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    It used to set a near-white fill and no colour at all, so in dark mode the
    inherited text token landed on it at 1.15 to 1 and the card could not be
    read. Both ends are stated now, and both themes clear 4.5 to 1. */
-.pending-card-conflict { background: var(--warning-bg); border-color: var(--warn-border); color: var(--text); }
+.pending-card-conflict { background: var(--warn-bg); border-color: var(--warn-border); color: var(--text); }
 .pending-card-head { display: flex; align-items: center; gap: 10px; }
 .pending-card-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Discard throws local work away. It is not the dangerous button on this
@@ -518,7 +515,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 .b { font-weight: 600; }
 
 /* Plan 1b: editable details, activity, grid markers */
-.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warning); margin-left: 6px; vertical-align: middle; }
+.pending-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warn-fg); margin-left: 6px; vertical-align: middle; }
 /* .detail-input carries margin-bottom for the detail panel's stacked fields;
    inside a gap-spaced form that margin doubled the rhythm and left dead space
    under the last row. */
