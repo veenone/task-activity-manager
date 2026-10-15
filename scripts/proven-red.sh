@@ -54,6 +54,23 @@ run_tests() {   # $@ = changed unit test paths relative to APP_DIR
   done
   return $run_status
 }
+# ADAPT: the tests that ALREADY cover a changed source file, read at the fork
+# point. AGENTS.md P2 lets a change an existing gate covers fully rely on that
+# gate instead of a bespoke new test, and this is how that sentence is checked:
+# the existing test still has to go red on the pre-change code, so relying on
+# it proves as much as changing it would. Go tests live beside their package,
+# vitest specs beside their module.
+existing_tests_for() {
+  for f in $1; do
+    case "$f" in
+      *.go)
+        git ls-tree --name-only "$fork" "$(dirname "$f")/" 2>/dev/null           | grep -E '_test\.go$' || true ;;
+      *.ts|*.tsx|*.js|*.jsx)
+        cand="${f%.*}.test.${f##*.}"
+        git cat-file -e "$fork:$cand" 2>/dev/null && echo "$cand" ;;
+    esac
+  done | sort -u
+}
 # Symptoms of a missing symbol rather than a wrong value, across runners.
 MISSING_RE='undefined: |is not a function|Cannot find module|ImportError|ModuleNotFoundError|AttributeError: module|NameError|cannot find symbol|unresolved import|is not defined|no member named'
 ASSERTION_RE='AssertionError|assert|expected|Expected|--- FAIL|assertion failed|panic:'
@@ -102,9 +119,18 @@ for t in $SKIP_TYPES; do
   [ "$type" = "$t" ] && { echo "proven-red: skipped, title type \"$type\" carries no behavior change."; exit 0; }
 done
 
+from_existing=''
 if [ -z "$unit" ]; then
   if [ -n "$support" ]; then echo "proven-red: skipped, only test-support or gate files changed; gates are proven red by scratch violation."; exit 0; fi
-  echo "proven-red: a behavior change arrived with no changed test (P2)."; exit 1
+  # No test file changed. Before refusing, look for tests that already cover
+  # the changed source: P2 says a change an existing gate covers fully relies
+  # on that gate rather than growing a duplicate. They are proven exactly as a
+  # changed test would be, by having to fail on the pre-change code below.
+  unit=$(existing_tests_for "$source")
+  if [ -z "$unit" ]; then
+    echo "proven-red: a behavior change arrived with no changed test (P2), and no existing test sits beside the changed files."; exit 1
+  fi
+  from_existing=1
 fi
 
 worktree=$(mktemp -d "${TMPDIR:-/tmp}/proven-red-XXXXXX")
@@ -125,7 +151,11 @@ relative=$(printf '%s\n' "$unit" | sed "s|^$APP_DIR/||")
 out=$(cd "$worktree/$APP_DIR" && run_tests $relative 2>&1); code=$?
 printf '%s\n' "$out"
 if [ "$code" -eq 0 ]; then
-  echo "proven-red: $(printf '%s\n' "$unit" | grep -c .) changed test file(s) pass on the pre-change code; they cannot catch the bug they claim to."
+  if [ -n "$from_existing" ]; then
+    echo "proven-red: no test file changed, and the existing test file(s) beside the changed code pass on the pre-change code. Nothing here could have caught the bug (P2)."
+  else
+    echo "proven-red: $(printf '%s\n' "$unit" | grep -c .) changed test file(s) pass on the pre-change code; they cannot catch the bug they claim to."
+  fi
   exit 1
 fi
 if printf '%s\n' "$out" | grep -qE "$MISSING_RE" && ! printf '%s\n' "$out" | grep -qE "$ASSERTION_RE"; then
@@ -133,5 +163,9 @@ if printf '%s\n' "$out" | grep -qE "$MISSING_RE" && ! printf '%s\n' "$out" | gre
   [ -n "${GITHUB_ACTIONS:-}" ] && echo "::warning title=Red by missing symbol only::$msg" || echo "$msg"
   exit 0
 fi
-echo "proven-red: changed tests fail on the pre-change code, as they should."
+if [ -n "$from_existing" ]; then
+  echo "proven-red: no test file changed, but existing tests beside the changed code fail on it, as P2 allows."
+else
+  echo "proven-red: changed tests fail on the pre-change code, as they should."
+fi
 exit 0
