@@ -99,7 +99,7 @@ export function useCoverageActions(s: CoverageState, p: CoverageViewProps) {
       await loadList();
       setSelected(id);
       onChanged?.();
-      setNotice("Loaded the Login demo example (10/12 = 83.3%), aligned with the demo's Login tests.");
+      setNotice("Loaded the Login demo example, mapped to the demo's Login tests. Its coverage is in the header.");
     } catch (e) {
       setError(errMsg(e));
     } finally {

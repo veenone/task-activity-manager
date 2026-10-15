@@ -123,6 +123,9 @@ describe("CoverageView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Load demo example (Login)" }));
     await waitFor(() => expect(SeedDemoCoverageExample).toHaveBeenCalledWith("p1"));
     expect(await screen.findByText(/Loaded the Login demo example/)).toBeInTheDocument();
+    // The figure is the header's to report: the seed maps what the profile's
+    // tests allow, so a fixed "10/12" in the notice can be wrong (#263).
+    expect(screen.queryByText(/10\/12|83\.3%/)).not.toBeInTheDocument();
   });
 
   it("shows the headline and each value's status in the matrix", async () => {

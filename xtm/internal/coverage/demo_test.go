@@ -102,3 +102,36 @@ func TestSeedDemoExampleAlignedWithDemoData(t *testing.T) {
 		t.Errorf("demo canonicals = %d, want 1", demoCount)
 	}
 }
+
+// A local draft has a temporary NEW-N key and no Jira id, and NEW sorts
+// before most project keys. The seed must take the project prefix from synced
+// tests only; guessing it from the first key mapped NEW-1 and nothing else,
+// so the example landed at 1/12 (#263).
+func TestSeedDemoExampleIgnoresLocalDrafts(t *testing.T) {
+	m, st := newTestModule(t)
+	const p = "p1"
+	for i := 1; i <= 400; i++ {
+		seedTest(t, st, p, fmt.Sprintf("QA-%d", i), "PASS", "")
+	}
+	if _, err := st.DB().Exec(
+		`INSERT INTO test_case (profile_id, jira_key, jira_id, summary) VALUES (?, 'NEW-1', '', 'Login with valid credentials')`,
+		p); err != nil {
+		t.Fatal(err)
+	}
+
+	cid, err := m.SeedDemoExample(p)
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	vers, err := m.ListVersions(p, cid)
+	if err != nil || len(vers) == 0 {
+		t.Fatalf("list versions: %v (%d)", err, len(vers))
+	}
+	rep, err := m.ComputeCoverage(p, vers[0].ID)
+	if err != nil {
+		t.Fatalf("compute: %v", err)
+	}
+	if rep.TestedValues != 10 || rep.TotalValues != 12 {
+		t.Fatalf("coverage = %d/%d, want 10/12", rep.TestedValues, rep.TotalValues)
+	}
+}

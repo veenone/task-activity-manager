@@ -100,7 +100,7 @@ type FailedCommit struct {
 // Failures and conflicts leave pending rows in place so the user can
 // resolve and retry.
 func (e *Engine) CommitChanges(ctx context.Context, profileID, projectKey string) (CommitResult, error) {
-	return e.commitChanges(ctx, profileID, projectKey, nil)
+	return succeededOnce(e.commitChanges(ctx, profileID, projectKey, nil))
 }
 
 // CommitChangesForIDs commits only the pending changes whose ids are in the
@@ -113,7 +113,25 @@ func (e *Engine) CommitChangesForIDs(ctx context.Context, profileID, projectKey 
 	for _, id := range ids {
 		only[id] = true
 	}
-	return e.commitChanges(ctx, profileID, projectKey, only)
+	return succeededOnce(e.commitChanges(ctx, profileID, projectKey, only))
+}
+
+// succeededOnce keeps the first mention of each key in Succeeded. One Test can
+// succeed in two passes of a commit: a new Test is created, then its folder
+// move or field edits go out under the real key. Succeeded is a set of Test
+// keys, and the UI counts it, so a key listed twice counted the Test twice
+// (#263).
+func succeededOnce(r CommitResult, err error) (CommitResult, error) {
+	seen := make(map[string]bool, len(r.Succeeded))
+	keys := r.Succeeded[:0]
+	for _, k := range r.Succeeded {
+		if !seen[k] {
+			seen[k] = true
+			keys = append(keys, k)
+		}
+	}
+	r.Succeeded = keys
+	return r, err
 }
 
 // commitChanges is the shared commit core. When only is non-nil, pending
