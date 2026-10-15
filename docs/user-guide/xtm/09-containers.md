@@ -1,0 +1,124 @@
+# Containers
+
+Containers are the Xray issues that group tests: Test Sets, Test Plans and Test Executions. This view lets you pick one, see its tests and their results, create and rename containers, record run results, import JUnit reports, and work with the bugs found during testing. Open it with the **Containers** tab or Ctrl+9.
+
+![The Containers view](images/containers-01-view.png)
+
+The toggle at the top left switches between **Containers** and [Bugs](#work-with-bugs).
+
+## Pick a container
+
+1. Set **Type** to Test Set, Test Plan or Test Execution.
+2. Optionally narrow the list with **Status**, and with **Label** when containers have labels.
+3. Open the picker next to the filters (it is named after the type, for example **Test Execution**) and choose a container. Type to filter the list. Each entry reads `KEY · summary`.
+
+![Picking a Test Execution](images/containers-02-pick-execution.png)
+
+The card under the filters shows the container's key, status and test count. For an execution it also shows the parent issue, the **Environments** and **Fix version(s)**, and a bar with the result counts. **Related bugs** expands to list the defects linked to its runs.
+
+![A Test Execution and its runs](images/containers-03-execution-card.png)
+
+The table lists the member tests. For a Test Execution it adds the run columns: Execution, Date, By, Environment, Fix Version, Defects and Remarks.
+
+**Sync** at the right of the filters refreshes only the containers from Jira.
+
+## Record run results
+
+These steps apply to Test Executions.
+
+### One test at a time
+
+Pick a result in the test's **Execution** column: TODO, EXECUTING, PASS, FAIL, ABORTED or BLOCKED. The change is a pending change.
+
+![Setting one test's result](images/containers-04-set-result.png)
+
+In the same row you can:
+
+- Type in **Add remark…** to record a note on the run.
+- Click **+** under **Defects** to link an existing bug to the run.
+- On a FAIL row, click the bug button to create a bug for the failed test.
+- Click **✕** to remove the test from the execution.
+
+### Many tests at once
+
+1. Tick the tests to update.
+2. A bar appears above the table with the number selected.
+3. Pick a result under **Set result:** and click **Apply to selected**.
+
+![Setting a result for three tests](images/containers-05-bulk-result.png)
+
+**Clear** deselects the tests.
+
+### Set environments
+
+Type in **Add environment…** on the card to add an environment to the execution, and click **✕** on an environment to remove it. To change many executions at once, filter them with **All executions** and **All environments**, then use **Set env on shown**.
+
+## See results across a Test Plan or Set
+
+Pick a Test Plan or Test Set. A line above the card shows **Consolidated results across N executions**, with a badge per result. Click a badge to see which tests and executions it counts. The table shows each test's latest result.
+
+![A Test Plan with results from 13 executions](images/containers-11-plan-rollup.png)
+
+## Create, rename and delete containers
+
+1. Click **New Test Set**, **New Test Plan** or **New Test Execution** (the button follows the type).
+2. Enter a name and click **Create**.
+
+![Creating a Test Execution](images/containers-07-new-container.png)
+
+To add tests to the selected container, click **+ Add tests** on its card. Find tests by folder or search, tick them, and click **Add tests**.
+
+![Adding tests to an execution](images/containers-08-add-tests.png)
+
+The **Actions** menu holds the rest:
+
+- **Rename Test Execution…** (or Set or Plan). Clicking the container's title on the card renames it too.
+- **Generate pytest…** and **Generate pytest (unittest class)…** save a pytest skeleton with one test per member. XTM asks where to save the file, then shows its path.
+- **Delete Test Execution…** deletes the container after you confirm.
+
+On a demo profile, **Regenerate sample data** and **Clean sample data…** reset the generated containers.
+
+![The Actions menu](images/containers-06-actions-menu.png)
+
+## Import JUnit results
+
+### Into an existing execution
+
+1. Pick the Test Execution.
+2. Click **Import results (JUnit XML)** on its card and choose the report.
+3. Check the preview. It lists the results it will apply and the testcases it skipped, with the reason.
+4. Click **Apply N results**.
+
+### Into a new execution
+
+1. Set **Type** to Test Execution and click **Import JUnit**.
+2. Enter the **Execution summary**, for example `Nightly run 2026-10-15`.
+3. Tick **Create missing tests** if testcases with no matching test should become new tests.
+4. Click **Choose JUnit XML file…** and pick the report.
+
+   ![The new execution dialog](images/containers-09-junit-new-exec.png)
+
+5. Check the preview. The summary line says how many tests the execution will hold and how many results of each kind it carries. New tests are marked NEW. **Skipped** lists the testcases XTM could not use and why, for example a name that matches several tests.
+
+   ![The preview, with three testcases skipped as ambiguous](images/containers-10-junit-preview.png)
+
+6. Click **Create execution & apply**.
+
+XTM matches each testcase to a test by its summary. Both imports end as pending changes, so commit them from the Pending list.
+
+## Work with bugs
+
+Click **Bugs** in the toggle at the top left to list the defects linked to your tests.
+
+![The Bugs list and one bug's detail](images/containers-12-bugs.png)
+
+- Filter with **Filter bugs by key, summary, project, status…** and the pills **All bugs**, **With tests** and **Without tests**.
+- Click a bug to see its details and the **Affected tests** with their latest results. The arrow on a test opens its detail.
+- Tick bugs and click **Create Test Execution** to build an execution from the tests they affect, or **Add to execution** to add those tests to an existing one.
+- **Export…** saves the list.
+
+## Troubleshooting
+
+- **"You don't have any Test Sets yet."** Create one, or sync, or generate sample data on a demo profile.
+- **The run columns are missing.** They only show for Test Executions.
+- **A JUnit testcase is skipped as ambiguous.** Several tests share that summary. Rename the duplicates (see [Duplicates](04-duplicates.md)) and import again.
