@@ -116,6 +116,7 @@ vi.mock("../features", () => ({
 // only need to spell out the two fields under test.
 const fullCaps: Capabilities = {
   name: "xray",
+  supportsDatasets: true,
   idStyle: "opaque",
   supportsJqlScope: true,
   stepModel: "objects",

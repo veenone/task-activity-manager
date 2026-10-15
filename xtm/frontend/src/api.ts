@@ -584,6 +584,10 @@ export interface Capabilities {
   supportsTags: boolean;
   // Create, edit and delete project components (Jira only).
   supportsComponentAdmin: boolean;
+  // The backend models parameterized tests as a dataset GetTestDataset can
+  // read. Means the backend HAS the concept, not that this instance permits
+  // it: an Xray below 5.1 has no dataset endpoint and reads as no dataset.
+  supportsDatasets: boolean;
 }
 
 // ProjectComponent mirrors backend.Component: one Jira project component.

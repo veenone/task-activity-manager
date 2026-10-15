@@ -26,6 +26,7 @@ export const defaultCapabilities: Capabilities = {
   supportsFolders: true,
   supportsFolderWrites: true,
   supportsComponentAdmin: true,
+  supportsDatasets: true,
   supportsPreconditionObjects: true,
   supportsRequirementObjects: true,
   supportsIssueLinkTypes: true,

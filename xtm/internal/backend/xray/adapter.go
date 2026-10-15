@@ -555,7 +555,22 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsBugLinks:            true,
 		SupportsTags:                false,
 		SupportsComponentAdmin:      true,
+		SupportsDatasets:            true,
 	}
+}
+
+// GetDataset reads the test's Xray dataset (#267). Xray answers 404 below
+// 5.1, which the client turns into an empty dataset.
+func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (backend.Dataset, error) {
+	ds, err := a.c.GetDataset(ctx, testKey, contextKey)
+	if err != nil {
+		return backend.Dataset{}, err
+	}
+	params := make([]backend.DatasetParameter, len(ds.Parameters))
+	for i, p := range ds.Parameters {
+		params[i] = backend.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+	}
+	return backend.Dataset{Parameters: params, Rows: ds.Rows}, nil
 }
 
 func toBackendComponent(c jira.Component) backend.Component {
