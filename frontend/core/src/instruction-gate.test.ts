@@ -217,12 +217,16 @@ describe('instruction gate', () => {
   // comment that the two have to agree, and Dashboards shipped in one of
   // them and not the other (#147): a rule a script can check needs a
   // gate, not a comment.
-  it('the View menu and the view tabs name the same views, in the same order', () => {
-    const go = read('tam/main.go');
-    const nav = read('tam/frontend/src/nav.ts');
-    const menu = [...go.matchAll(/\{"(\w+)", "([^"]+)", "(\w+)"\}/g)].map(([, id, label]) => `${id}:${label}`);
-    const tabs = [...nav.matchAll(/\{ id: "(\w+)", label: "([^"]+)" \}/g)].map(([, id, label]) => `${id}:${label}`);
-    expect(tabs.length, 'read no views out of nav.ts').toBeGreaterThan(0);
+  // XTM's menu had no such pairing, and Coverage and Spellcheck were
+  // missing from it (#253).
+  it.each([
+    ['tam/main.go', 'tam/frontend/src/nav.ts'],
+    ['xtm/main.go', 'xtm/frontend/src/views.ts'],
+  ])('the View menu in %s and the view tabs in %s name the same views, in the same order', (goFile, viewsFile) => {
+    const go = read(goFile).split('var menuViews')[1] ?? '';
+    const menu = [...go.matchAll(/\{"(\w+)", "([^"]+)", "(\w*)"\}/g)].map(([, id, label]) => `${id}:${label}`);
+    const tabs = [...read(viewsFile).matchAll(/id: "(\w+)",\s*label: "([^"]+)"/g)].map(([, id, label]) => `${id}:${label}`);
+    expect(tabs.length, `read no views out of ${viewsFile}`).toBeGreaterThan(0);
     expect(menu, 'the View menu and the tabs have drifted').toEqual(tabs);
   });
 

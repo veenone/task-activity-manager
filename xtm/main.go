@@ -72,6 +72,28 @@ func main() {
 	}
 }
 
+// menuViews is the View menu's list of views, in the order the menu shows
+// them, and has to agree with VIEWS in frontend/src/views.ts: the id is what
+// the menu:view event carries and what the frontend routes on. A gate in
+// frontend/core/src/instruction-gate.test.ts pairs the two lists, as it does
+// for TAM's. The menu is built once and lists every view; the frontend
+// ignores the ones the current profile hides. The first nine take Ctrl+1..9
+// by position.
+var menuViews = []struct{ id, label, accelerator string }{
+	{"browse", "Browse", "1"},
+	{"preconditions", "Preconditions", "2"},
+	{"requirements", "Requirements", "3"},
+	{"duplicates", "Duplicates", "4"},
+	{"gapanalysis", "Gap Analysis", "5"},
+	{"testcalls", "Test Calls", "6"},
+	{"dashboard", "Dashboard", "7"},
+	{"traceability", "Traceability", "8"},
+	{"plans", "Containers", "9"},
+	{"components", "Components", ""},
+	{"coverage", "Coverage", ""},
+	{"misspellings", "Spellcheck", ""},
+}
+
 // appMenu builds the native menu bar. Most items emit an event the React
 // frontend listens for (so the menu drives the same actions as the in-app
 // buttons); Quit and Documentation are handled directly via the Wails runtime,
@@ -90,10 +112,10 @@ func main() {
 // name, (b) Cmd+C/V/X/A work in every text input, and (c) Cmd+Z/Shift+Cmd+Z
 // undo/redo work in the markdown editor.
 func appMenu(app *App) *menu.Menu {
-	emit := func(event string) func(*menu.CallbackData) {
+	emit := func(event string, data ...any) func(*menu.CallbackData) {
 		return func(*menu.CallbackData) {
 			if app.ctx != nil {
-				runtime.EventsEmit(app.ctx, event)
+				runtime.EventsEmit(app.ctx, event, data...)
 			}
 		}
 	}
@@ -122,16 +144,13 @@ func appMenu(app *App) *menu.Menu {
 	})
 
 	view := m.AddSubmenu("View")
-	view.AddText("Browse", nil, emit("menu:view-browse"))
-	view.AddText("Preconditions", nil, emit("menu:view-preconditions"))
-	view.AddText("Requirements", nil, emit("menu:view-requirements"))
-	view.AddText("Duplicates", nil, emit("menu:view-duplicates"))
-	view.AddText("Gap Analysis", nil, emit("menu:view-gapanalysis"))
-	view.AddText("Test Calls", nil, emit("menu:view-testcalls"))
-	view.AddText("Dashboard", nil, emit("menu:view-dashboard"))
-	view.AddText("Traceability", nil, emit("menu:view-traceability"))
-	view.AddText("Containers", nil, emit("menu:view-plans"))
-	view.AddText("Components", nil, emit("menu:view-components"))
+	for _, v := range menuViews {
+		var accel *keys.Accelerator
+		if v.accelerator != "" {
+			accel = keys.CmdOrCtrl(v.accelerator)
+		}
+		view.AddText(v.label, accel, emit("menu:view", v.id))
+	}
 	view.AddSeparator()
 	// The checkbox owns the rail's state: Wails renders the tick from the
 	// value passed here, so the app reads the stored preference when it builds

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
@@ -10,6 +10,10 @@ import { SelectionProvider } from "./contexts/SelectionContext";
 import { NavProvider } from "./contexts/NavContext";
 import { ModalProvider } from "./contexts/ModalContext";
 import { Health, ListProfiles, SyncProfile, SyncProfileFull } from "./api";
+
+// The native menu talks to the frontend through EventsOn; the tests keep the
+// handlers so they can play the part of the menu.
+const menu = vi.hoisted(() => ({ handlers: {} as Record<string, (...args: unknown[]) => void> }));
 
 // App is the shell: it waits for the backend, loads profiles, and lays out the
 // top bar, the view host, the dialogs and the status bar. These tests pin what
@@ -39,7 +43,10 @@ vi.mock("./api", async (importOriginal) => ({
   GetCapabilities: vi.fn(async () => {
     throw new Error("use defaults");
   }),
-  EventsOn: vi.fn(() => () => {}),
+  EventsOn: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
+    menu.handlers[event] = cb;
+    return () => {};
+  }),
   SyncProfile: vi.fn(async () => {}),
   SyncProfileFull: vi.fn(async () => {}),
   SetTourSeenVersion: vi.fn(async () => {}),
@@ -127,13 +134,35 @@ describe("App shell", () => {
     await waitFor(() => expect(SyncProfileFull).toHaveBeenCalledWith("p1"));
   });
 
-  it("switches views from the tab bar", async () => {
+  it("switches views from the tab bar and marks the current tab", async () => {
     const user = userEvent.setup();
     renderApp();
     expect(await screen.findByText("test table")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Dashboard" }));
+    const tabs = within(screen.getByRole("navigation", { name: "Views" }));
+    await user.click(tabs.getByRole("button", { name: "Dashboard" }));
     expect(screen.getByText("dashboard view")).toBeInTheDocument();
     expect(screen.queryByText("test table")).not.toBeInTheDocument();
+    expect(tabs.getByRole("button", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(tabs.getByRole("button", { name: "Browse" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("switches views from the View menu", async () => {
+    renderApp();
+    expect(await screen.findByText("test table")).toBeInTheDocument();
+    act(() => menu.handlers["menu:view"]("dashboard"));
+    expect(await screen.findByText("dashboard view")).toBeInTheDocument();
+  });
+
+  // The menu is built once in Go and lists every view; which ones this
+  // profile shows is the frontend's call, so it ignores the rest.
+  it("ignores a View menu id that is unknown or hidden for this profile", async () => {
+    renderApp();
+    expect(await screen.findByText("test table")).toBeInTheDocument();
+    act(() => menu.handlers["menu:view"]("nonsense"));
+    act(() => menu.handlers["menu:view"]("coverage"));
+    expect(screen.getByText("test table")).toBeInTheDocument();
+    const tabs = within(screen.getByRole("navigation", { name: "Views" }));
+    expect(tabs.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-current", "page");
   });
 
   it("shows the synced test count in the status bar", async () => {

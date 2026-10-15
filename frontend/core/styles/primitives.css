@@ -1652,3 +1652,35 @@
   background: var(--chrome-bg); color: var(--chrome-text); font-family: "Consolas", "SF Mono", "Menlo", monospace;
   font-size: 0.85em; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .pending-footer-buttons { margin-left: auto; display: flex; gap: 8px; }
+
+/* ViewTabs: the view tab row in its own band under the topbar, tabs centred,
+   on the topbar's dark ground so the two read as one header. */
+.view-tabs-bar {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 6px 14px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+  overflow-x: auto;
+}
+.view-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--chrome-raised);
+  border-radius: var(--r-1);
+  padding: 2px;
+}
+.view-tab {
+  background: transparent;
+  border: none;
+  color: var(--chrome-text-muted);
+  padding: 4px 12px;
+  border-radius: var(--r-1);
+  cursor: pointer;
+  font-size: var(--fs-md);
+  white-space: nowrap;
+}
+.view-tab:hover { color: var(--chrome-text); }
+.view-tab-active { background: var(--accent); color: var(--on-accent); }
+.view-tab:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }

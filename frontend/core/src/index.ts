@@ -14,6 +14,8 @@ export type { ProfileFormSlot } from "./components/profile/ProfilesDialog";
 export { jiraUrlError, normalizeJiraUrl, projectKeyError } from "./components/profile/profileValidation";
 export { useFocusWhen } from "./components/useFocusWhen";
 export { Menu } from "./components/Menu";
+export { ViewTabs } from "./components/ViewTabs";
+export type { ViewTab } from "./components/ViewTabs";
 export type { MenuItem } from "./components/Menu";
 export { LiveRegion, announce } from "./components/LiveRegion";
 export { RowLead, BRANCH_GLYPH, DETACHED_TEXT } from "./components/RowLead";

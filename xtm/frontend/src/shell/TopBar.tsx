@@ -5,7 +5,7 @@ import type { AppActions } from "./useAppActions";
 // TopBar is the header: brand, profile switcher and Manage menu on the left,
 // the view tabs in the middle, and pending, New Test, More and Sync on the right.
 export function TopBar({ s, a }: { s: AppState; a: AppActions }) {
-  const { profiles, activeId, setActiveId, theme, showCoverage, chooseTheme, openModal, pulling, view, setView, groupBy, selectedFolder, setSelectedKey, startTour, pendingChanges, isDemo, shownViews, syncActive } = s;
+  const { profiles, activeId, setActiveId, theme, showCoverage, chooseTheme, openModal, pulling, view, groupBy, selectedFolder, setSelectedKey, startTour, pendingChanges, isDemo, syncActive } = s;
   const { runSync, runFullSync, toggleCoverage, openNewTest } = a;
   return (
     <header className="topbar">
@@ -68,19 +68,6 @@ export function TopBar({ s, a }: { s: AppState; a: AppActions }) {
           ]}
         />
       </div>
-
-      <nav data-tour="views" className="view-tabs topbar-zone topbar-center">
-        {shownViews.map((v) => (
-          <button
-            key={v.id}
-            data-tour={v.tour}
-            className={`view-tab${view === v.id ? " view-tab-active" : ""}`}
-            onClick={() => setView(v.id)}
-          >
-            {v.label}
-          </button>
-        ))}
-      </nav>
 
       <div data-tour="pending" className="topbar-zone topbar-right">
         {pendingChanges.length > 0 && (

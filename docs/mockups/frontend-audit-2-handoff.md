@@ -46,7 +46,8 @@ measures, taken the same way on `main` (75a875b):
 | Dialogs drawn in the mockups | XTM 7 of 36, TAM 3 of 15 | XTM 16 of 36, TAM 9 of 15 (#249) |
 
 Open decision 1 is settled: T1.3 added a 10px `--fs-2xs` step for dense
-tables rather than an 11px floor. Decisions 2 and 3 are still open.
+tables rather than an 11px floor. Decision 2 merged `--warning-*` into
+`--warn-*` (#252). Decision 3 has XTM follow TAM's View menu (#253).
 
 ## 1. Improvement points
 
@@ -199,11 +200,13 @@ No separate test project. Each T2 and T3 task adds the behaviour test it needs; 
 **T4.2 Draw the missing dialogs (gap list in section 2).**
 XTM first: `ConnectionsModal`, `ProfilesModal`, `SyncHistoryModal`, `BridgeWizard`, `CreateBugModal`, `ImportTestsModal`, `JUnitImportModal`, `BulkMoveModal`, `BulkTransitionModal`. TAM: `SettingsModal`, `ProfilesModal`, `StartSprintModal`, `CompleteSprintModal`, `ImportIssuesModal`, `CreateSprintModal`.
 
-## Open decisions
+## Decisions
 
-1. Text floor: 11px, which moves roughly 41 declarations up, or keep 10px for dense tables.
-2. Whether `--warn-*` and `--warning-*` merge, and which name wins.
-3. Whether XTM keeps its top tab bar plus rail or follows TAM's View menu.
+All three were settled on or before 2026-10-15.
+
+1. Text floor: 10px stays for dense tables as `--fs-2xs`; 11px and up elsewhere (T1.3, #218).
+2. `--warning-*` merges into `--warn-*`, the name the other status families use (#252).
+3. XTM follows TAM's View menu: one `menu:view` event carrying the view id, Ctrl+1..9 shortcuts, a gate pairing the menu with the tabs, and the tabs in their own band through core's `ViewTabs` (#253).
 
 ## Do not
 
