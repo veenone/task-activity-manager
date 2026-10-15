@@ -3,7 +3,9 @@ package testrepo
 import "fmt"
 
 // profileScopedTables lists every table whose rows belong to a single profile,
-// so a profile delete can remove all of its cached data (FR-5.3).
+// so a profile delete can remove all of its cached data (FR-5.3). It must name
+// every table in the schema carrying a profile_id; the instruction gate fails
+// when one is missing, and purge_test.go proves the rows actually go.
 var profileScopedTables = []string{
 	"sync_state",
 	"test_folder",
@@ -20,6 +22,48 @@ var profileScopedTables = []string{
 	"test_custom_field",
 	"sync_log",
 	"test_review",
+
+	// Requirements and the canonical set built from them.
+	"requirement",
+	"test_requirement",
+	"requirement_source",
+	"requirement_link",
+	"canonical_requirement",
+	"canonical_requirement_member",
+	"canonical_version",
+	"change_request",
+	"cr_member_decision",
+
+	// Duplicate scans and the pairs a reviewer dismissed.
+	"duplicate_ignore",
+	"duplicate_step_scan",
+	"precondition_duplicate_ignore",
+
+	// Bugs and their links to tests.
+	"bug",
+	"test_bug",
+
+	// Execution data pulled back from the backend.
+	"external_test",
+	"test_run",
+	"exec_plan",
+
+	// Coverage parameters, their values and what they publish to.
+	"coverage_project",
+	"coverage_param_group",
+	"coverage_parameter",
+	"coverage_param_value",
+	"coverage_value_test",
+	"coverage_group_publication",
+
+	"project_field_option",
+
+	// external_ref maps this profile's local entities to the keys a publish
+	// gave them on another instance. It goes with the profile: every local id
+	// it points at is deleted here, so a kept row maps nothing to something,
+	// and a profile recreated against the same project would inherit a
+	// stranger's mappings for ids it reuses.
+	"external_ref",
 }
 
 // PurgeProfile deletes every cached row belonging to a profile (FR-5.3) so its
