@@ -74,7 +74,8 @@ describe("ui_em_dashes ratchet counter", () => {
     tempDirs.push(dir);
     const source = path.join(dir, "View.tsx");
     const test = path.join(dir, "View.test.tsx");
-    fs.writeFileSync(source, 'const label = "Wait — retry";\n// ignored — comment\n');
+    // A JSX comment is no more visible than a line comment (#260).
+    fs.writeFileSync(source, 'const label = "Wait — retry";\n// ignored — comment\n      {/* ignored — JSX comment */}\n');
     fs.writeFileSync(test, 'const label = "Test — copy";\n');
 
     expect(runCounter("ui_em_dashes", [source, test], lineEnding)).toBe("1");

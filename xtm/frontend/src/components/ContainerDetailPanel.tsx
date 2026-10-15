@@ -174,14 +174,14 @@ export function ContainerDetailPanel({ containerKey, kind, jiraUrl, onClose }: P
                         )}
                       </td>
                       <td>{r.summary}</td>
-                      <td>{r.status || <span className="muted">—</span>}</td>
+                      <td>{r.status || <span className="muted">(none)</span>}</td>
                       <td>
                         {r.runStatus ? (
                           <span className={`run-badge run-${r.runStatus.toLowerCase()}`}>
                             {r.runStatus}
                           </span>
                         ) : (
-                          <span className="muted">—</span>
+                          <span className="muted">(none)</span>
                         )}
                       </td>
                     </tr>

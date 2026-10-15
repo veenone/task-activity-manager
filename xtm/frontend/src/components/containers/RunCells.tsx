@@ -16,17 +16,17 @@ export function ExecRunCells({
 }) {
   const dateStr = run?.finishedAt || run?.startedAt || "";
   const fvs = run?.fixVersions ?? [];
-  const fvLabel = fvs.length > 0 ? fvs.join(", ") : "—";
+  const fvLabel = fvs.length > 0 ? fvs.join(", ") : "(none)";
   return (
     <>
       <td className="muted board-run-date">
-        {dateStr ? formatRunDate(dateStr) : "—"}
+        {dateStr ? formatRunDate(dateStr) : "(none)"}
       </td>
       <td className="muted board-run-by">
-        {run?.executedBy || "—"}
+        {run?.executedBy || "(none)"}
       </td>
       <td className="muted board-run-env">
-        {run?.environment || "—"}
+        {run?.environment || "(none)"}
       </td>
       <td
         className={`muted board-run-fv${activeFixVersion && fvs.includes(activeFixVersion) ? " board-run-fv--match" : ""}`}

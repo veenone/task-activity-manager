@@ -138,7 +138,7 @@ export function BulkPreconditionsModal({
                     }
                     options={preconditions.map((p) => ({
                       value: p.key,
-                      label: `${p.key} — ${p.summary}`,
+                      label: `${p.key}: ${p.summary}`,
                     }))}
                   />
                 )}
@@ -164,7 +164,7 @@ export function BulkPreconditionsModal({
                             }
                           />
                           <span>
-                            {p.key} — {p.summary}
+                            {p.key}: {p.summary}
                           </span>
                         </label>
                       </li>
@@ -188,7 +188,7 @@ export function BulkPreconditionsModal({
                             }
                           />
                           <span>
-                            {p.key} — {p.summary}
+                            {p.key}: {p.summary}
                           </span>
                         </label>
                       </li>

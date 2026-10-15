@@ -415,7 +415,7 @@ export function NewTestPanel({
                 <option value="">＋ link precondition…</option>
                 {availablePreconditions.map((p) => (
                   <option key={p.key} value={p.key}>
-                    {p.key} — {p.summary}
+                    {p.key}: {p.summary}
                   </option>
                 ))}
               </select>

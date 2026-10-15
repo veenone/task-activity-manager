@@ -137,7 +137,7 @@ export function JUnitImportModal({ execKey, onCancel, onApplied }: Props) {
                                 {m.currentRun}
                               </span>
                             ) : (
-                              <span className="muted">—</span>
+                              <span className="muted">(none)</span>
                             )}
                           </td>
                           <td>

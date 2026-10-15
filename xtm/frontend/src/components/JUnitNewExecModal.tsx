@@ -177,7 +177,7 @@ export function JUnitNewExecModal({ onCancel, onApplied }: Props) {
                                 {row.result}
                               </span>
                             ) : (
-                              <span className="muted">—</span>
+                              <span className="muted">(none)</span>
                             )}
                           </td>
                         </tr>

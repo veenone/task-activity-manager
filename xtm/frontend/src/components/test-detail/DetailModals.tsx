@@ -98,11 +98,11 @@ export function DetailModals({ s, a, p }: { s: TestDetailState; a: TestDetailAct
           title="Swap preconditions"
           current={preconditions.map((p) => ({
             key: p.key,
-            label: `${p.key} — ${p.summary}`,
+            label: `${p.key}: ${p.summary}`,
           }))}
           candidates={allPreconditions
             .filter((p) => !preconditions.some((lp) => lp.key === p.key))
-            .map((p) => ({ key: p.key, label: `${p.key} — ${p.summary}` }))}
+            .map((p) => ({ key: p.key, label: `${p.key}: ${p.summary}` }))}
           onCancel={() => setSwapKind(null)}
           onConfirm={async (next) => {
             await applyPreconditions(next);
@@ -115,11 +115,11 @@ export function DetailModals({ s, a, p }: { s: TestDetailState; a: TestDetailAct
           title="Swap requirements"
           current={requirements.map((rq) => ({
             key: rq.key,
-            label: `${rq.key} — ${rq.summary}`,
+            label: `${rq.key}: ${rq.summary}`,
           }))}
           candidates={allRequirements
             .filter((r) => !requirements.some((lr) => lr.key === r.key))
-            .map((r) => ({ key: r.key, label: `${r.key} — ${r.summary}` }))}
+            .map((r) => ({ key: r.key, label: `${r.key}: ${r.summary}` }))}
           onCancel={() => setSwapKind(null)}
           onConfirm={async (next) => {
             await applyRequirements(next);

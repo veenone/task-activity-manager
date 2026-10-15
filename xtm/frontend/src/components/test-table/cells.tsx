@@ -45,14 +45,14 @@ export function renderCell(
           {t.status ? (
             <span className="status-pill">{t.status}</span>
           ) : (
-            <span className="muted">—</span>
+            <span className="muted">(none)</span>
           )}
         </td>
       );
     case "priority":
       return (
         <td key="priority" style={style}>
-          {t.priority || "—"}
+          {t.priority || "(none)"}
         </td>
       );
     case "labels":
@@ -65,7 +65,7 @@ export function renderCell(
               </span>
             ))
           ) : (
-            <span className="muted">—</span>
+            <span className="muted">(none)</span>
           )}
         </td>
       );
@@ -79,14 +79,14 @@ export function renderCell(
               </span>
             ))
           ) : (
-            <span className="muted">—</span>
+            <span className="muted">(none)</span>
           )}
         </td>
       );
     case "execType":
       return (
         <td key="execType" style={style}>
-          {t.execType || "—"}
+          {t.execType || "(none)"}
         </td>
       );
     case "updated":

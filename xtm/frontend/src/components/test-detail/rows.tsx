@@ -51,7 +51,7 @@ export function CustomFieldRow({
       </dt>
       <dd>
         {readOnly ? (
-          <span>{value || "—"}</span>
+          <span>{value || "(none)"}</span>
         ) : (
           <input
             className="detail-input detail-input-inline"
@@ -151,7 +151,7 @@ export function ContainerSection({
         <ul className="pre-list">
           {items.map((c) => (
             <li key={c.key}>
-              <span className="mono">{c.key}</span> — {c.summary}
+              <span className="mono">{c.key}</span>: {c.summary}
               {showRunStatus && c.runStatus && (
                 <RunStatusBadge status={c.runStatus} />
               )}

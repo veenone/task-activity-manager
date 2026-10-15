@@ -42,7 +42,7 @@ export function FieldsSection({ s, a, p }: { s: TestDetailState; a: TestDetailAc
         </dt>
         <dd>
           <div className="status-row">
-            <span className="status-pill">{test.status || "—"}</span>
+            <span className="status-pill">{test.status || "(none)"}</span>
             {caps.supportsWorkflowTransitions ? (
               // Xray: the existing workflow-transition picker, unchanged.
               !readOnly &&
@@ -94,7 +94,7 @@ export function FieldsSection({ s, a, p }: { s: TestDetailState; a: TestDetailAc
         </dt>
         <dd>
           {readOnly ? (
-            <span>{priority || "—"}</span>
+            <span>{priority || "(none)"}</span>
           ) : (
             <input
               className="detail-input detail-input-inline"
@@ -138,7 +138,7 @@ export function FieldsSection({ s, a, p }: { s: TestDetailState; a: TestDetailAc
             </dt>
             <dd>
               {readOnly ? (
-                <span>{execType || "—"}</span>
+                <span>{execType || "(none)"}</span>
               ) : (
                 <select
                   className="detail-input detail-input-inline"
@@ -158,7 +158,7 @@ export function FieldsSection({ s, a, p }: { s: TestDetailState; a: TestDetailAc
                     }
                   }}
                 >
-                  <option value="">—</option>
+                  <option value="">(none)</option>
                   {EXEC_TYPE_OPTIONS.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -200,13 +200,13 @@ export function FieldsSection({ s, a, p }: { s: TestDetailState; a: TestDetailAc
         <dd>{formatDateTime(meta?.created)}</dd>
 
         <dt>Creator</dt>
-        <dd>{meta?.creator || "—"}</dd>
+        <dd>{meta?.creator || "(none)"}</dd>
 
         <dt>Updated</dt>
         <dd>{formatDateTime(meta?.updated || test.updated)}</dd>
 
         <dt>Updated by</dt>
-        <dd>{meta?.updatedBy || "—"}</dd>
+        <dd>{meta?.updatedBy || "(none)"}</dd>
       </dl>
     </>
   );

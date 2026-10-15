@@ -45,7 +45,7 @@ export function ContainerList({
             aria-pressed={selected === c.key}
             style={{ paddingLeft: 24 }}
             onClick={() => onSelect(c.key)}
-            title={`${c.key} — ${c.summary}`}
+            title={`${c.key}: ${c.summary}`}
           >
             <span className="folder-name">
               <span className="mono">{c.key}</span> {c.summary}

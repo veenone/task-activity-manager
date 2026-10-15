@@ -242,7 +242,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
                   onChange={setReqSel}
                   options={reqOptions.map((r) => ({
                     value: r.key,
-                    label: r.summary ? `${r.key} — ${r.summary}` : r.key,
+                    label: r.summary ? `${r.key}: ${r.summary}` : r.key,
                   }))}
                 />
               </div>
@@ -281,7 +281,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
                 onChange={setPlanSel}
                 options={plans.map((p) => ({
                   value: p.key,
-                  label: p.summary ? `${p.key} — ${p.summary}` : p.key,
+                  label: p.summary ? `${p.key}: ${p.summary}` : p.key,
                 }))}
               />
               <MultiSelect
@@ -291,7 +291,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
                 onChange={setExecSel}
                 options={execs.map((x) => ({
                   value: x.key,
-                  label: x.summary ? `${x.key} — ${x.summary}` : x.key,
+                  label: x.summary ? `${x.key}: ${x.summary}` : x.key,
                 }))}
               />
               <label
@@ -392,7 +392,7 @@ export function TraceabilityTabs({ jiraUrl }: Props) {
                     onChange={setParentSel}
                     options={parents.map((p) => ({
                       value: p.key,
-                      label: p.summary ? `${p.key} — ${p.summary}` : p.key,
+                      label: p.summary ? `${p.key}: ${p.summary}` : p.key,
                     }))}
                   />
                 </div>

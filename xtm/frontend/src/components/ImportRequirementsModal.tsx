@@ -197,8 +197,8 @@ export function ImportRequirementsModal({ onComplete, onCancel }: Props) {
                             </span>
                           </td>
                           <td>{row.summary || <em>(blank)</em>}</td>
-                          <td>{row.priority || "—"}</td>
-                          <td>{row.components || "—"}</td>
+                          <td>{row.priority || "(none)"}</td>
+                          <td>{row.components || "(none)"}</td>
                         </tr>
                       ))}
                     </tbody>

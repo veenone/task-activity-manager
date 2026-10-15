@@ -67,9 +67,9 @@ export function AffectedTests({ s, p }: { s: BugsState; p: BugsPanelProps }) {
                         ↗
                       </button>
                     </td>
-                    <td className="muted">{t.project || "—"}</td>
+                    <td className="muted">{t.project || "(none)"}</td>
                     <td>{t.summary}</td>
-                    <td>{t.status || "—"}</td>
+                    <td>{t.status || "(none)"}</td>
                     <td>
                       {t.runStatus ? (
                         <span
@@ -138,7 +138,7 @@ export function AffectedTests({ s, p }: { s: BugsState; p: BugsPanelProps }) {
                                         {r.execKey}
                                       </button>
                                     ) : (
-                                      <span className="muted">—</span>
+                                      <span className="muted">(none)</span>
                                     )}
                                     {isSubTask && (
                                       <span
@@ -167,7 +167,7 @@ export function AffectedTests({ s, p }: { s: BugsState; p: BugsPanelProps }) {
                                         <span className="mono">{r.execParentKey}</span>
                                       )}
                                       {r.execParentSummary && (
-                                        <span className="muted exec-parent-summary"> — {r.execParentSummary}</span>
+                                        <span className="muted exec-parent-summary">: {r.execParentSummary}</span>
                                       )}
                                     </span>
                                   )}
@@ -176,16 +176,16 @@ export function AffectedTests({ s, p }: { s: BugsState; p: BugsPanelProps }) {
                                   {r.runStatus ? (
                                     <span className={`run-badge run-${r.runStatus.toLowerCase()}`}>{r.runStatus}</span>
                                   ) : (
-                                    <span className="muted">—</span>
+                                    <span className="muted">(none)</span>
                                   )}
                                 </td>
-                                <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">—</span>}</td>
-                                <td>{r.environment || <span className="muted">—</span>}</td>
+                                <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">(none)</span>}</td>
+                                <td>{r.environment || <span className="muted">(none)</span>}</td>
                                 <td className="muted">{formatDateTime(r.finishedAt || r.startedAt)}</td>
-                                <td className="muted" style={{ whiteSpace: "nowrap" }}>{formatDateTime(r.execCreated) || <span className="muted">—</span>}</td>
-                                <td className="muted" style={{ whiteSpace: "nowrap" }}>{formatDateTime(r.execUpdated) || <span className="muted">—</span>}</td>
-                                <td className="muted" style={{ whiteSpace: "nowrap" }}>{formatDateTime(r.execResolved) || <span className="muted">—</span>}</td>
-                                <td>{r.executedBy || <span className="muted">—</span>}</td>
+                                <td className="muted" style={{ whiteSpace: "nowrap" }}>{formatDateTime(r.execCreated) || <span className="muted">(none)</span>}</td>
+                                <td className="muted" style={{ whiteSpace: "nowrap" }}>{formatDateTime(r.execUpdated) || <span className="muted">(none)</span>}</td>
+                                <td className="muted" style={{ whiteSpace: "nowrap" }}>{formatDateTime(r.execResolved) || <span className="muted">(none)</span>}</td>
+                                <td>{r.executedBy || <span className="muted">(none)</span>}</td>
                                 <td>
                                   {r.defects?.length ? (
                                     <span>
@@ -210,7 +210,7 @@ export function AffectedTests({ s, p }: { s: BugsState; p: BugsPanelProps }) {
                                       ))}
                                     </span>
                                   ) : (
-                                    <span className="muted">—</span>
+                                    <span className="muted">(none)</span>
                                   )}
                                 </td>
                               </tr>

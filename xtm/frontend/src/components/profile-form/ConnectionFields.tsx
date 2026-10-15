@@ -12,7 +12,7 @@ export function ConnectionFields({ s }: { s: ProfileFormState }) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={isConnection ? "Kiwi target" : "QA — Project X"}
+          placeholder={isConnection ? "Kiwi target" : "QA: Project X"}
         />
       </label>
       {isConnection && (

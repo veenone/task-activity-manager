@@ -40,7 +40,7 @@ const BROWSE_STEPS: TourStep[] = [
     id: "views",
     target: "views",
     title: "The views",
-    body: "Tests, preconditions, requirements, test plans and coverage each get their own view. Each one has its own quick tour — open it from the More menu while you're on that view.",
+    body: "Tests, preconditions, requirements, test plans and coverage each get their own view. Each one has its own quick tour; open it from the More menu while you're on that view.",
     side: "bottom",
   },
   {
@@ -132,7 +132,7 @@ const CONTAINERS_STEPS: TourStep[] = [
     id: "plans-intro",
     target: "tab-plans",
     title: "Containers",
-    body: "Test Sets, Test Plans and Test Executions — the containers that group your tests. Create them and allocate tests here.",
+    body: "Test Sets, Test Plans and Test Executions: the containers that group your tests. Create them and allocate tests here.",
     side: "bottom",
   },
   {
@@ -146,7 +146,7 @@ const CONTAINERS_STEPS: TourStep[] = [
     id: "plans-type",
     target: "plans-type",
     title: "Pick a container type",
-    body: "Choose whether you're working with Test Sets, Test Plans or Test Executions — each type has its own board.",
+    body: "Choose whether you're working with Test Sets, Test Plans or Test Executions. Each type has its own board.",
     side: "bottom",
   },
   {
@@ -211,7 +211,7 @@ export const TOURS: Record<string, TourStep[]> = {
     view: "gapanalysis",
     title: "Gap Analysis",
     purpose:
-      "Requirements that no test covers yet — your coverage gaps, listed so you can close them.",
+      "Requirements that no test covers yet: your coverage gaps, listed so you can close them.",
     body: "Set up the analysis at the top; the uncovered requirements appear below.",
     tools: "Run the analysis to find requirements with no covering tests.",
   }),
@@ -227,7 +227,7 @@ export const TOURS: Record<string, TourStep[]> = {
     view: "dashboard",
     title: "Dashboard",
     purpose:
-      "A live overview — test counts, status breakdowns, and a traceability Sankey.",
+      "A live overview: test counts, status breakdowns, and a traceability Sankey.",
     body: "Summary tiles and charts for the current selection fill this panel.",
     tools: "Narrow every panel by folder, component or status here.",
   }),
@@ -237,7 +237,7 @@ export const TOURS: Record<string, TourStep[]> = {
     purpose:
       "Follow the thread from requirements to tests to executions across the project.",
     body: "Sankey diagrams tracing coverage render in this panel.",
-    tools: "Switch between the Requirement, Execution and Sub-task views — and export to XLSX — here.",
+    tools: "Switch between the Requirement, Execution and Sub-task views, and export to XLSX, here.",
   }),
   plans: CONTAINERS_STEPS,
   coverage: viewTour({

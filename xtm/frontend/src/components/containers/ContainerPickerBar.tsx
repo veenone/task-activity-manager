@@ -38,7 +38,7 @@ export function ContainerPickerBar({ s, a, p }: { s: ContainerState; a: Containe
         </label>
         {/* Status filter: a compact dropdown between Type and the item picker
             (replaces the old pill row to save horizontal space). It reads as the
-            tertiary control — recessed until a status is applied, when it adopts
+            tertiary control, recessed until a status is applied, when it adopts
             the accent so an active filter is obvious at a glance. */}
         <label className="board-picker board-picker--tertiary">
           <span>Status</span>

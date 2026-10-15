@@ -138,7 +138,7 @@ export function BulkRequirementsModal({
                     }
                     options={requirements.map((r) => ({
                       value: r.key,
-                      label: `${r.key} — ${r.summary}`,
+                      label: `${r.key}: ${r.summary}`,
                     }))}
                   />
                 )}
@@ -164,7 +164,7 @@ export function BulkRequirementsModal({
                             }
                           />
                           <span>
-                            {r.key} — {r.summary}
+                            {r.key}: {r.summary}
                           </span>
                         </label>
                       </li>
@@ -188,7 +188,7 @@ export function BulkRequirementsModal({
                             }
                           />
                           <span>
-                            {r.key} — {r.summary}
+                            {r.key}: {r.summary}
                           </span>
                         </label>
                       </li>

@@ -79,7 +79,7 @@ export function AddToExecModal({ s, a }: { s: BugsState; a: BugsActions }) {
                           >
                             {filtered.map((c) => (
                               <option key={c.key} value={c.key}>
-                                {c.key} — {c.summary}
+                                {c.key}: {c.summary}
                               </option>
                             ))}
                           </select>

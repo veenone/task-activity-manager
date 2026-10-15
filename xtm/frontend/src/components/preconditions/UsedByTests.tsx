@@ -52,7 +52,7 @@ export function UsedByTests({ s, a }: { s: PreconditionsState; a: PreconditionsA
                     </button>
                   </td>
                   <td>{t.summary}</td>
-                  <td>{t.status || "—"}</td>
+                  <td>{t.status || "(none)"}</td>
                   <td className="board-remove-cell">
                     <button
                       className="btn btn-ghost board-remove"

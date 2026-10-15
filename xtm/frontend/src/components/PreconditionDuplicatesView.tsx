@@ -182,7 +182,7 @@ export function PreconditionDuplicatesView() {
                       {g.members.map((m) => (
                         <div className="dup-mrow" key={m.key}>
                           <span className="dup-mkey">{m.key}</span>
-                          <span className="dup-mstatus">{m.type || "—"}</span>
+                          <span className="dup-mstatus">{m.type || "(none)"}</span>
                           <span className="dup-mfolder">
                             {m.testCount} test{m.testCount === 1 ? "" : "s"}
                           </span>
@@ -248,7 +248,7 @@ function DefinitionCompareModal({
   return (
     <Modal onClose={onClose} className="modal dup-compare-modal" labelledBy="precond-dup-compare-title">
         <div className="pending-head">
-          <h2 id="precond-dup-compare-title">Compare definitions — "{group.displaySummary}"</h2>
+          <h2 id="precond-dup-compare-title">Compare definitions: "{group.displaySummary}"</h2>
           <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
@@ -285,7 +285,7 @@ function DefinitionCompareModal({
                         {v && v.trim() !== "" ? (
                           <div className="dup-compare-step">{v}</div>
                         ) : (
-                          <span className="muted">—</span>
+                          <span className="muted">(none)</span>
                         )}
                       </td>
                     ))}

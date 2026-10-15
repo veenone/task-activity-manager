@@ -63,7 +63,7 @@ export function VersionsTab({ s, a }: { s: CoverageState; a: CoverageActions }) 
                     }
                   >
                     <td className="cov-member-key">{row.requirementKey}</td>
-                    <td className="cov-muted">{row.projectKey || "—"}</td>
+                    <td className="cov-muted">{row.projectKey || "(none)"}</td>
                     <td>
                       <select
                         className="cov-select"
@@ -77,7 +77,7 @@ export function VersionsTab({ s, a }: { s: CoverageState; a: CoverageActions }) 
                           ).then(() => reload());
                         }}
                       >
-                        <option value="">— Unassigned —</option>
+                        <option value="">(unassigned)</option>
                         {versions.map((v) => (
                           <option key={v.id} value={v.id}>
                             {v.name}

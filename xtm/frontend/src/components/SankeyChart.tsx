@@ -94,7 +94,7 @@ export function SankeyChart({
   const cols = columns ?? ["Test Plans", "Test Executions", "Run Status"];
   const emptyMsg =
     emptyHint ??
-    "No execution data to trace yet — sync test executions to populate the traceability flow.";
+    "No execution data to trace yet. Sync test executions to populate the traceability flow.";
   const filteredMsg =
     filteredHint ??
     "No execution runs match the selected Test Plan / Execution. The chosen plan's tests may not be in any execution yet.";

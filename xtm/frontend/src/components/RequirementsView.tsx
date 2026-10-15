@@ -744,7 +744,7 @@ export function RequirementsView({ onChanged }: Props) {
                       >
                         <td className="mono">{t.key}</td>
                         <td>{t.summary}</td>
-                        <td>{t.status || "—"}</td>
+                        <td>{t.status || "(none)"}</td>
                         <td>
                           {t.runStatus ? (
                             <span
