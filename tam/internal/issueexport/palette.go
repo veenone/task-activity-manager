@@ -43,8 +43,8 @@ var paletteTokens = map[string]string{
 	"--chip-pink-text":   pinkText,
 	"--chip-orange-bg":   orangeBG,
 	"--chip-orange-text": orangeText,
-	"--warning-bg":       warningBG,
-	"--warning-text":     warningText,
+	"--warn-bg":          warningBG,
+	"--warn-text":        warningText,
 }
 
 const (
@@ -74,7 +74,7 @@ const (
 	orangeText = "#9a3412"
 
 	warningBG   = "#fef3c7"
-	warningText = "#92400e"
+	warningText = "#925b0a"
 )
 
 // chip is one chip's pair, the way a .chip-* rule sets them.
