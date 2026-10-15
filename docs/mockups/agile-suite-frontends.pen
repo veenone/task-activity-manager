@@ -212147,7 +212147,6 @@
       "y": 8600,
       "name": "1. Frontend Audit",
       "width": 1440,
-      "height": 4215,
       "fill": "$a1-ground",
       "layout": "vertical",
       "children": [
@@ -212307,6 +212306,18 @@
                       "fontFamily": "$a1-font",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JydH4",
+                      "name": "Now",
+                      "fill": "$a1-ok",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Unchanged",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 },
@@ -212366,6 +212377,18 @@
                       "fontFamily": "$a1-font",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ZX8VE",
+                      "name": "Now",
+                      "fill": "$a1-ok",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now 56% · 45 of 80 (#249)",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 },
@@ -212425,6 +212448,18 @@
                       "fontFamily": "$a1-font",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "NjpkG",
+                      "name": "Now",
+                      "fill": "$a1-ok",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now 69 of 90",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 },
@@ -212484,6 +212519,18 @@
                       "fontFamily": "$a1-font",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "xQx9c",
+                      "name": "Now",
+                      "fill": "$a1-ok",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now 0 (#199, #200)",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -213951,6 +213998,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "IzJqv",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · counter rewritten, 0 bespoke modals (#199, #200, #201)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -214078,6 +214137,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "OBooH",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · reads XTM, now 0 px font sizes (#199, #218)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -214205,6 +214276,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "vv4pp",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · shared styles gated (#199)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -214375,6 +214458,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "sLU9L",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · eslint_a11y 0 (#194, #220)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -214502,6 +214597,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "c8q3IU",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · 0 autoFocus (#191)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -214629,6 +214736,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "DPnYB",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · both on core Modal (#201)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -214756,6 +214875,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "FzxlB",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · shared focus ring in core (#222)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -214926,6 +215057,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "NYTMt",
+                          "name": "Status now",
+                          "fill": "$a2-med",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Partly · App.css 7,527 lines · 15 max-lines · 98 files over 400 (#233 to #247)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215053,6 +215196,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "LPSx4",
+                          "name": "Status now",
+                          "fill": "$a2-med",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Partly · About, Diagnostics, Profiles and validation in core; PendingChangesModal stays per app (#224, #226, #230)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215180,6 +215335,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "VvCGI",
+                          "name": "Status now",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Open",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215307,6 +215474,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "TsAZf",
+                          "name": "Status now",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Open · still 40",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215477,6 +215656,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "rPhvx",
+                          "name": "Status now",
+                          "fill": "$a2-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Fixed · every screen bound to themed variables (#248)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215604,6 +215795,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "V26ur",
+                          "name": "Status now",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Open",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215731,6 +215934,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "IQ8CQ",
+                          "name": "Status now",
+                          "fill": "$a2-med",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Partly · 108, gated (#200)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215858,6 +216073,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "B8qL7y",
+                          "name": "Status now",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: Open · 23 no-console, 8 any",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -215994,6 +216221,16 @@
                           "fill": "$a1-ink-2",
                           "content": "11 drawn  ·  18 undrawn",
                           "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "f5aA7g",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "content": "Now 17 drawn · 12 undrawn (#249)",
+                          "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "600"
                         }
@@ -216478,6 +216715,16 @@
                           "fill": "$a1-ink-2",
                           "content": "15 drawn  ·  36 undrawn",
                           "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "b2c4WA",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "content": "Now 24 drawn · 27 undrawn (#249)",
+                          "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "600"
                         }
@@ -217187,7 +217434,7 @@
                       "fill": "$a1-accent",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "XTM · 36 undrawn",
+                      "content": "XTM · 36 undrawn → now 27",
                       "fontFamily": "$a1-font",
                       "fontSize": 13,
                       "fontWeight": "700",
@@ -217252,6 +217499,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "HktEB",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now 5 left: Allocate · Preconditions · Rename · Requirements · Review",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217314,6 +217573,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "P13iiw",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now 2 left: ImportRequirements · JUnitNewExec",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217376,6 +217647,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "KHjOG",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: all 6 still undrawn",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217438,6 +217721,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "CDqSk",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: all 5 still undrawn",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217500,6 +217795,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "GSK5f",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now 9 left; CreateBug and Profiles drawn (#249)",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -217530,7 +217837,7 @@
                       "fill": "$a1-ok",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "TAM · 18 undrawn",
+                      "content": "TAM · 18 undrawn → now 12",
                       "fontFamily": "$a1-font",
                       "fontSize": 13,
                       "fontWeight": "700",
@@ -217595,6 +217902,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "R6SQVQ",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now 1 left: EditSprint",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217657,6 +217976,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "FP6v9",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now 2 left: AddIssues · NewBoard",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217719,6 +218050,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "yEvGa",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: all 5 still undrawn",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217781,6 +218124,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "D5V4DF",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: still undrawn",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -217843,6 +218198,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "M9fzj",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now 3 left; Profiles drawn (#249)",
+                          "fontFamily": "$a1-font",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -217977,6 +218344,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "eEolt",
+                          "name": "Now",
+                          "fill": "$a1-ok",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Now: every screen themed through variables (#248)",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -218061,6 +218440,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "YZriT",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Still undrawn",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -218145,6 +218536,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "G9VpDd",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Still undrawn",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -218229,6 +218632,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "J0PI4U",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Still undrawn",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -218313,6 +218728,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "EsxFh",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Still undrawn",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     },
@@ -218397,6 +218824,18 @@
                           "fontFamily": "$a1-font",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "NKZ5e",
+                          "name": "Now",
+                          "fill": "$a1-ink-2",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Ring is shared in core (#222); no specimen yet",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
                         }
                       ]
                     }
@@ -219942,14 +220381,6 @@
                   "fill": "$a1-chrome-line",
                   "width": "fill_container",
                   "height": 1
-                },
-                {
-                  "type": "text",
-                  "id": "Y7MBL",
-                  "fill": "#ffffff",
-                  "fontFamily": "Inter",
-                  "fontSize": 16,
-                  "fontWeight": "normal"
                 }
               ]
             },
@@ -221621,6 +222052,143 @@
                           "fontWeight": "normal"
                         }
                       ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "nAc29",
+                      "name": "STATUS",
+                      "fill": "$a2-text-subtle",
+                      "content": "STATUS · 2026-10-15",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "600",
+                      "letterSpacing": 0.6
+                    },
+                    {
+                      "type": "frame",
+                      "id": "t6JTlv",
+                      "name": "Status legend Done",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Vg1Lo",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "O8UYN1",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "UdIT2",
+                          "name": "Note",
+                          "fill": "$a2-text-strong",
+                          "content": "10 of 12",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "vE0yr",
+                      "name": "Status legend Partly",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "OLnAQ",
+                          "name": "Pill",
+                          "fill": "$a2-med-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "m5XjF",
+                              "name": "Label",
+                              "fill": "$a2-med",
+                              "content": "Partly",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "oJVoh",
+                          "name": "Note",
+                          "fill": "$a2-text-strong",
+                          "content": "IP-09, IP-10",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "CnkE9",
+                      "name": "Status legend In review",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "k8weiV",
+                          "name": "Pill",
+                          "fill": "$a2-accent-soft",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "OlbUZ",
+                              "name": "Label",
+                              "fill": "$a2-accent",
+                              "content": "In review",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "bJU84",
+                          "name": "Note",
+                          "fill": "$a2-text-strong",
+                          "content": "IP-12",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -221715,6 +222283,19 @@
                       "fontSize": 11,
                       "fontWeight": "700",
                       "letterSpacing": 0.9
+                    },
+                    {
+                      "type": "text",
+                      "id": "N1F9S",
+                      "name": "Col STATUS",
+                      "fill": "$a2-text-subtle",
+                      "textGrowth": "fixed-width",
+                      "width": 170,
+                      "content": "STATUS",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "600",
+                      "letterSpacing": 0.6
                     }
                   ]
                 },
@@ -221835,6 +222416,51 @@
                               "fontWeight": "700"
                             }
                           ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "gkHTC",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "C2BLN",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "C6xef",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "qewHs",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#199, #200, #231",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -221959,6 +222585,51 @@
                           ]
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "mqa3P",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "aOMDT",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "GAuoW",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "y9c75Q",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#193",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -222079,6 +222750,51 @@
                               "fontWeight": "700"
                             }
                           ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KDfCY",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "TygbX",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ibElv",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "l0PZEa",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#213",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -222203,6 +222919,51 @@
                           ]
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "r8Jci",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "zGgKJ",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "o2BLW",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "UTT6i",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "439 → 30 (#215, #216)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -222323,6 +223084,51 @@
                               "fontWeight": "700"
                             }
                           ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Y0E2Mc",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "n8RU1",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "d4r91Y",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "I8SQG9",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#218",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -222447,6 +223253,51 @@
                           ]
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "e7wPt",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "aHSBQ",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "T3Naw",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "u90mPB",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "38 → 0 (#200, #201)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -222567,6 +223418,51 @@
                               "fontWeight": "700"
                             }
                           ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "MhkXz",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "m8O3X",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "asNUC",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "AdL8o",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "95 → 0 (#220, #228)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -222691,6 +223587,51 @@
                           ]
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KoYKN",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "aQeNC",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "aLeOF",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "AUfgr",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#222",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -222811,6 +223752,51 @@
                               "fontWeight": "700"
                             }
                           ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "DIBN8",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "CmrjS",
+                          "name": "Pill",
+                          "fill": "$a2-med-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Aw3aP",
+                              "name": "Label",
+                              "fill": "$a2-med",
+                              "content": "Partly",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "C7OLDr",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "3 of 5 in core (#224, #226, #230)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -222935,6 +223921,51 @@
                           ]
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EElPh",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "fmnwi",
+                          "name": "Pill",
+                          "fill": "$a2-med-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "OrYju",
+                              "name": "Label",
+                              "fill": "$a2-med",
+                              "content": "Partly",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "h5TfG",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "8 split, 27 → 11 (#233 to #247)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -223057,6 +224088,51 @@
                           ]
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zH7FZ",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "BybWX",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "qvtDa",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Done",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "vB20b",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "every touched file; 28 of 116",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -223177,6 +224253,51 @@
                               "fontWeight": "700"
                             }
                           ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "y5LbBN",
+                      "name": "Status",
+                      "width": 170,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Spk6P",
+                          "name": "Pill",
+                          "fill": "$a2-accent-soft",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "mt1EX",
+                              "name": "Label",
+                              "fill": "$a2-accent",
+                              "content": "In review",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "r7PJA",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#248, #249",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -223472,7 +224593,7 @@
                                   "id": "wTl8X",
                                   "name": "Value",
                                   "fill": "$a2-danger",
-                                  "content": "439",
+                                  "content": "439 → 30",
                                   "fontFamily": "Inter",
                                   "fontSize": 12,
                                   "fontWeight": "700"
@@ -223532,7 +224653,7 @@
                                   "id": "Qv1ty",
                                   "name": "Value",
                                   "fill": "$a2-accent",
-                                  "content": "58",
+                                  "content": "58 → 0",
                                   "fontFamily": "Inter",
                                   "fontSize": 12,
                                   "fontWeight": "700"
@@ -223560,7 +224681,7 @@
                                   "id": "jgy6W",
                                   "name": "Value",
                                   "fill": "$a2-danger",
-                                  "content": "396",
+                                  "content": "396 → 0",
                                   "fontFamily": "Inter",
                                   "fontSize": 12,
                                   "fontWeight": "700"
@@ -223648,7 +224769,7 @@
                                   "id": "D0h9j",
                                   "name": "Value",
                                   "fill": "$a2-danger",
-                                  "content": "28",
+                                  "content": "28 → 24",
                                   "fontFamily": "Inter",
                                   "fontSize": 12,
                                   "fontWeight": "700"
@@ -223736,7 +224857,7 @@
                                   "id": "r6sfB",
                                   "name": "Value",
                                   "fill": "$a2-danger",
-                                  "content": "38",
+                                  "content": "38 → 0",
                                   "fontFamily": "Inter",
                                   "fontSize": 12,
                                   "fontWeight": "700"
@@ -223754,7 +224875,7 @@
                       "fill": "$a2-text-muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "Lower is better. Counts use the ratchet's own commands, with the px font counter pointed at XTM as well as TAM.",
+                      "content": "Lower is better. Audit value → value on 2026-10-15. Counts use the ratchet's own commands, with the px font counter pointed at XTM as well as TAM.",
                       "lineHeight": 1.4,
                       "fontFamily": "Inter",
                       "fontSize": 12,
@@ -223836,7 +224957,7 @@
                           "fill": "$a2-text-subtle",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "GAP",
+                          "content": "GAP → NOW",
                           "fontFamily": "Inter",
                           "fontSize": 11,
                           "fontWeight": "700",
@@ -223902,10 +225023,10 @@
                           "type": "text",
                           "id": "grNOj",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-ok",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "439 literals",
+                          "content": "439 literals → now 30, commented dark overrides (#216)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -223971,10 +225092,10 @@
                           "type": "text",
                           "id": "FRp9H",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-ok",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "scale missing",
+                          "content": "scale missing → now closed, --fs-2xs to --fs-2xl (#218)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224040,10 +225161,10 @@
                           "type": "text",
                           "id": "WWPXL",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-med",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "3,619 duplicated lines",
+                          "content": "3,619 duplicated lines → now 2 pairs left; 48 XTM files use core (#224 to #230)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224109,10 +225230,10 @@
                           "type": "text",
                           "id": "JWwRg",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-ok",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "25 vs 174 tokens",
+                          "content": "25 vs 174 tokens → now closed, XTM loads core (#213)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224178,10 +225299,10 @@
                           "type": "text",
                           "id": "D9B6iC",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-ok",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "95 findings",
+                          "content": "95 findings → now 0 (#191, #194, #220, #228)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224247,10 +225368,10 @@
                           "type": "text",
                           "id": "wXzMx",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-ok",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "both missing",
+                          "content": "both missing → now closed (#222)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224316,10 +225437,10 @@
                           "type": "text",
                           "id": "NTxIf",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-ok",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "4 counters",
+                          "content": "4 counters → now 0 (#199, #200, #231)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224385,10 +225506,10 @@
                           "type": "text",
                           "id": "SHqmY",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-med",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "3 largest untested",
+                          "content": "3 largest untested → now tested; 28 of 116 files (#235 to #241)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224454,10 +225575,10 @@
                           "type": "text",
                           "id": "Wzgjd",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-med",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "29 + 12 frames",
+                          "content": "29 + 12 frames → now 20 + 6 (#249)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224519,10 +225640,10 @@
                           "type": "text",
                           "id": "aOYKl",
                           "name": "Gap",
-                          "fill": "$a2-danger",
+                          "fill": "$a2-ok",
                           "textGrowth": "fixed-width",
                           "width": 140,
-                          "content": "rebuild",
+                          "content": "rebuild → now done, 153 variables, 13 components (#248)",
                           "lineHeight": 1.45,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -224767,6 +225888,146 @@
                           "fontWeight": "normal"
                         }
                       ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "TvsE2",
+                      "name": "BY STATUS",
+                      "fill": "$a2-text-subtle",
+                      "content": "BY STATUS · 2026-10-15",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "600",
+                      "letterSpacing": 0.6
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ERyng",
+                      "name": "Status count Closed",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Tsldg",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "UPS9N",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed 12",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "Z5aXe",
+                          "name": "Note",
+                          "fill": "$a2-text-strong",
+                          "content": "resolved, with the PR",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "O9syt",
+                      "name": "Status count Partly",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "tUY7i",
+                          "name": "Pill",
+                          "fill": "$a2-med-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "IP2uU",
+                              "name": "Label",
+                              "fill": "$a2-med",
+                              "content": "Partly 3",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "HBQLY",
+                          "name": "Note",
+                          "fill": "$a2-text-strong",
+                          "content": "ISS-11, ISS-12, ISS-13",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "mAbUg",
+                      "name": "Status count Open",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "qWb6I",
+                          "name": "Pill",
+                          "fill": "$a2-high-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "V5ylFq",
+                              "name": "Label",
+                              "fill": "$a2-high",
+                              "content": "Open 1",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "xZ7uY",
+                          "name": "Note",
+                          "fill": "$a2-text-strong",
+                          "content": "ISS-15, waits on decision 2",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -224861,6 +226122,19 @@
                       "fontSize": 11,
                       "fontWeight": "700",
                       "letterSpacing": 0.9
+                    },
+                    {
+                      "type": "text",
+                      "id": "qQbhw",
+                      "name": "Col STATUS",
+                      "fill": "$a2-text-subtle",
+                      "textGrowth": "fixed-width",
+                      "width": 150,
+                      "content": "STATUS",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "600",
+                      "letterSpacing": 0.6
                     }
                   ]
                 },
@@ -224961,6 +226235,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "VmEhi",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "YTFga",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "dKUyE",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "iKbtS",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#192",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225061,6 +226380,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AXIb9",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "etpvm",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "W2tI1",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "yX9bJ",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#199, #200",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225161,6 +226525,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "A1ufKn",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "g3EpL",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Cb3Ed",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "XYbbk",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#193",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225261,6 +226670,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ZQalP",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "i2P0n",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "mqVoG",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "eSF5m",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "literals gated; 24 commented overrides (#215, #216)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225361,6 +226815,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "xbdAK",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "mmmTe",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "G6pvaM",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "IPn9p",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#191, #194, #220",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225461,6 +226960,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "FBdqZ",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "yzKlA",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "K0ujMP",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "d9YyZ",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#213",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225561,6 +227105,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "uCdeF",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "P0Z4s",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "IfwF9",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "oNbEg",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "10px step; mockups raised (#218, #248)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225661,6 +227250,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "JpQVu",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "u8rcF",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "R7YBp6",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "r3kZcn",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#222",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225761,6 +227395,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "GOn3U",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "NIUup",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ooPhv",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "Wbucs",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#228, #231",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225861,6 +227540,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "YvmTl",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Jj6kR",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "E7sBFD",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "fArRl",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#222",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -225961,6 +227685,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "i3jXWw",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "LQsOd",
+                          "name": "Pill",
+                          "fill": "$a2-med-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "E0aEav",
+                              "name": "Label",
+                              "fill": "$a2-med",
+                              "content": "Partly",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "Z3NNLW",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "3 of 5 in core (#224, #226, #230)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -226061,6 +227830,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "BhJCN",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "IjX6z",
+                          "name": "Pill",
+                          "fill": "$a2-med-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "bTI8Q",
+                              "name": "Label",
+                              "fill": "$a2-med",
+                              "content": "Partly",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "YxCaE",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "27 → 11 (#233 to #247)",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -226161,6 +227975,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "tHGDp",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "DOxwk",
+                          "name": "Pill",
+                          "fill": "$a2-med-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "SMVxA",
+                              "name": "Label",
+                              "fill": "$a2-med",
+                              "content": "Partly",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "h7sqz",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "113 → 108; mockups 0",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -226261,6 +228120,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "IzRxp",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "vqePw",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ooGU9",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "E6sOLX",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#228",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -226361,6 +228265,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KLXUv",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "mZoGT",
+                          "name": "Pill",
+                          "fill": "$a2-high-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "eAfo9",
+                              "name": "Label",
+                              "fill": "$a2-high",
+                              "content": "Open",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "Y5G4v",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "waits on decision 2",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
@@ -226461,6 +228410,51 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AR6kw",
+                      "name": "Status",
+                      "width": 150,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "C5DIx",
+                          "name": "Pill",
+                          "fill": "$a2-low-bg",
+                          "cornerRadius": 9,
+                          "padding": [
+                            2,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "BM0Iw",
+                              "name": "Label",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "W6Of7G",
+                          "name": "Detail",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "#248",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -228279,7 +230273,6 @@
       "name": "3. Frontend Audit",
       "clip": true,
       "width": 1440,
-      "height": 3400,
       "fill": "#F4F6F8",
       "layout": "vertical",
       "gap": 20,
@@ -228381,7 +230374,6 @@
           "id": "RpYBf",
           "name": "Audit Snapshot",
           "width": "fill_container",
-          "height": 180,
           "fill": "#FFFFFF",
           "cornerRadius": 16,
           "stroke": "#D9E0E7",
@@ -228394,7 +230386,6 @@
               "id": "neRUe",
               "name": "04 Metric",
               "width": "fill_container",
-              "height": 140,
               "fill": "#F7F9FB",
               "cornerRadius": 12,
               "stroke": "#D9E0E7",
@@ -228441,6 +230432,16 @@
                   "fontFamily": "Inter",
                   "fontSize": 11,
                   "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "b27Tjm",
+                  "name": "Now",
+                  "fill": "$a2-ok",
+                  "content": "Now 1 of 4 closed",
+                  "fontFamily": "$a2-font",
+                  "fontSize": 12,
+                  "fontWeight": "600"
                 }
               ]
             },
@@ -228616,7 +230617,6 @@
           "id": "Wv1sP",
           "name": "1. Improvement Points",
           "width": "fill_container",
-          "height": 560,
           "fill": "#FFFFFF",
           "cornerRadius": 16,
           "stroke": "#D9E0E7",
@@ -228656,7 +230656,7 @@
               "id": "Nf6aw",
               "name": "Improvement 01",
               "width": "fill_container",
-              "height": 92,
+              "height": 114,
               "fill": "#F7F9FB",
               "cornerRadius": 12,
               "gap": 16,
@@ -228738,6 +230738,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "k764vu",
+                      "name": "Now",
+                      "fill": "$a2-text-muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: open",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -228748,7 +230760,7 @@
               "id": "bPlQb",
               "name": "Improvement 02",
               "width": "fill_container",
-              "height": 92,
+              "height": 114,
               "fill": "#F7F9FB",
               "cornerRadius": 12,
               "gap": 16,
@@ -228830,6 +230842,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kEI1f",
+                      "name": "Now",
+                      "fill": "$a2-med",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: partly. Stable column widths in the virtualized grid; no sticky context bar yet",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -228840,7 +230864,7 @@
               "id": "VyPZH",
               "name": "Improvement 03",
               "width": "fill_container",
-              "height": 92,
+              "height": 114,
               "fill": "#F7F9FB",
               "cornerRadius": 12,
               "gap": 16,
@@ -228922,6 +230946,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "i7RrF",
+                      "name": "Now",
+                      "fill": "$a2-ok",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: done in code and mockups (#201, #249)",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -228932,7 +230968,7 @@
               "id": "FhKWk",
               "name": "Improvement 04",
               "width": "fill_container",
-              "height": 92,
+              "height": 114,
               "fill": "#F7F9FB",
               "cornerRadius": 12,
               "gap": 16,
@@ -229014,6 +231050,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "gJG9C",
+                      "name": "Now",
+                      "fill": "$a2-text-muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: open",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -229026,7 +231074,6 @@
           "id": "bdta0",
           "name": "2. Gap Analysis",
           "width": "fill_container",
-          "height": 560,
           "fill": "#102A43",
           "cornerRadius": 16,
           "stroke": "#D9E0E7",
@@ -229118,7 +231165,7 @@
                   "fill": "#FFCF8A",
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "content": "Users lose orientation",
+                  "content": "Users lose orientation · now: open",
                   "lineHeight": 1.25,
                   "fontFamily": "Inter",
                   "fontSize": 11,
@@ -229180,10 +231227,10 @@
                   "type": "text",
                   "id": "SnTSZ",
                   "name": "Impact Tables",
-                  "fill": "#FFCF8A",
+                  "fill": "$a2-med",
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "content": "Slower triage",
+                  "content": "Slower triage · now: partly, rows are one TableRow component (#248)",
                   "lineHeight": 1.25,
                   "fontFamily": "Inter",
                   "fontSize": 11,
@@ -229248,7 +231295,7 @@
                   "fill": "#FFCF8A",
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "content": "Lower confidence",
+                  "content": "Lower confidence · now: open",
                   "lineHeight": 1.25,
                   "fontFamily": "Inter",
                   "fontSize": 11,
@@ -229261,7 +231308,6 @@
               "id": "mUqwV",
               "name": "Gap Dialogs",
               "width": "fill_container",
-              "height": 82,
               "fill": "#193750",
               "cornerRadius": 10,
               "gap": 14,
@@ -229310,10 +231356,10 @@
                   "type": "text",
                   "id": "I7t59V",
                   "name": "Impact Dialogs",
-                  "fill": "#FFCF8A",
+                  "fill": "$a2-ok",
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "content": "Higher error rate",
+                  "content": "Higher error rate · now: closed (#201, #249)",
                   "lineHeight": 1.25,
                   "fontFamily": "Inter",
                   "fontSize": 11,
@@ -229328,7 +231374,6 @@
           "id": "gw7Nz",
           "name": "3. Identified Issues",
           "width": "fill_container",
-          "height": 560,
           "fill": "#FFFFFF",
           "cornerRadius": 16,
           "stroke": "#D9E0E7",
@@ -229368,7 +231413,6 @@
               "id": "kXFke",
               "name": "Issue Action ambiguity",
               "width": "fill_container",
-              "height": 84,
               "fill": "#FFF4F2",
               "cornerRadius": 10,
               "stroke": "#F0B5AA",
@@ -229450,6 +231494,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "MTFvl",
+                      "name": "Now",
+                      "fill": "$a2-text-muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: open. Topbars are one component now (#248), but the primary-action slot is not defined yet",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -229460,7 +231516,6 @@
               "id": "SNQgf",
               "name": "Issue No resilient state contract",
               "width": "fill_container",
-              "height": 84,
               "fill": "#FFF4F2",
               "cornerRadius": 10,
               "stroke": "#F0B5AA",
@@ -229542,6 +231597,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "W8n8qz",
+                      "name": "Now",
+                      "fill": "$a2-text-muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: open. Loading, empty and error states are still undrawn",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -229552,7 +231619,6 @@
               "id": "X6wRA",
               "name": "Issue Pattern drift across dialogs",
               "width": "fill_container",
-              "height": 84,
               "fill": "#F7F9FB",
               "cornerRadius": 10,
               "stroke": "#D9E0E7",
@@ -229634,6 +231700,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ta62Y",
+                      "name": "Now",
+                      "fill": "$a2-ok",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: done. One Modal in code (#201) and one Modal shell in the mockups, with 21 dialogs drawn from it (#248, #249)",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -229644,7 +231722,6 @@
               "id": "L4WBgy",
               "name": "Issue Table scan burden",
               "width": "fill_container",
-              "height": 84,
               "fill": "#F7F9FB",
               "cornerRadius": 10,
               "stroke": "#D9E0E7",
@@ -229726,6 +231803,18 @@
                       "fontFamily": "Inter",
                       "fontSize": 11,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ZVab4",
+                      "name": "Now",
+                      "fill": "$a2-text-muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Now: open. Rows are one TableRow component (#248); density tiers are not defined",
+                      "fontFamily": "$a2-font",
+                      "fontSize": 12,
+                      "fontWeight": "600"
                     }
                   ]
                 }
