@@ -13,6 +13,7 @@ var profileScopedTables = []string{
 	"pending_change",
 	"audit_log",
 	"test_step",
+	"test_dataset",
 	"test_container",
 	"test_container_test",
 	"saved_view",
