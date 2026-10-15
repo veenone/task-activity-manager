@@ -144,12 +144,17 @@ export function ImportTestsModal({ onComplete, onCancel }: Props) {
 
   const canRun = headers.length > 0 && mapping.summary !== "";
 
+  // Once something was imported, closing the dialog any way at all is Done:
+  // the caller refreshes the pending list on onComplete, and the ✕ or Escape
+  // skipping it left the imported rows out of that list (#263).
+  const close = result ? onComplete : onCancel;
+
   return (
     <>
-    <Modal onClose={onCancel} className="modal pending-modal" labelledBy="import-tests-title">
+    <Modal onClose={close} className="modal pending-modal" labelledBy="import-tests-title">
         <div className="pending-head">
           <h2 id="import-tests-title">Import tests (CSV or XLSX)</h2>
-          <button className="btn btn-ghost" onClick={onCancel} title="Close" aria-label="Close">
+          <button className="btn btn-ghost" onClick={close} title="Close" aria-label="Close">
             ✕
           </button>
         </div>

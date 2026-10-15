@@ -42,8 +42,8 @@ const result = (over = {}) => ({
   ...over,
 });
 
-async function loadFile() {
-  render(<ImportPreconditionsModal onComplete={vi.fn()} onCancel={vi.fn()} />);
+async function loadFile(onComplete = vi.fn(), onCancel = vi.fn()) {
+  render(<ImportPreconditionsModal onComplete={onComplete} onCancel={onCancel} />);
   await userEvent.upload(
     screen.getByLabelText("CSV or XLSX file"),
     new File(["x"], "pre.csv"),
@@ -104,5 +104,20 @@ describe("ImportPreconditionsModal", () => {
     ).toBeTruthy();
     expect(screen.queryByText(/Imported/)).toBeNull();
     expect(screen.getByText(/Nothing was imported/)).toBeTruthy();
+  });
+
+  // Done refreshes the pending list. Closing with the ✕ after an import has
+  // to do the same, or the imported rows stay out of the list (#263).
+  it("treats closing after an import as Done", async () => {
+    api.GetPreconditionCreateFields.mockResolvedValue([]);
+    api.ImportPreconditions.mockResolvedValue(result({ created: 1 }));
+    const onComplete = vi.fn();
+    const onCancel = vi.fn();
+    await loadFile(onComplete, onCancel);
+    await userEvent.click(screen.getByRole("button", { name: "Import" }));
+    await screen.findByText(/Imported 1 precondition/);
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });
