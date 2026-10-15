@@ -46,7 +46,7 @@ export interface CredentialOverride {
 export interface ProfileFormOptions<C extends ReuseCandidate = ReuseCandidate> {
   isDemoUrl: (url: string) => boolean;
   // The stored values when editing.
-  seed?: { name: string; url: string; key: string; scope: string; caCert: string; allowTls: boolean };
+  seed?: { name?: string; url?: string; key?: string; scope?: string; caCert?: string; allowTls?: boolean };
   isEdit?: boolean;
   // "jira" upper-cases the key and checks its shape; "free" takes it as typed.
   keyMode?: "jira" | "free";
