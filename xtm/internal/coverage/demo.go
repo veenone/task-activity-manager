@@ -181,7 +181,9 @@ func (m *Module) SeedDemoExample(profileID string) (string, error) {
 func (m *Module) testProjectPrefix(profileID string) (string, error) {
 	var key string
 	err := m.db.QueryRow(
-		`SELECT jira_key FROM test_case WHERE profile_id = ? ORDER BY jira_key LIMIT 1`,
+		// Synced tests only: a local draft carries a temporary NEW-N key and no
+		// Jira id, and NEW sorts before most project keys (#263).
+		`SELECT jira_key FROM test_case WHERE profile_id = ? AND jira_id != '' ORDER BY jira_key LIMIT 1`,
 		profileID).Scan(&key)
 	if err != nil {
 		return "", fmt.Errorf("no synced tests found — sync the demo profile first")
