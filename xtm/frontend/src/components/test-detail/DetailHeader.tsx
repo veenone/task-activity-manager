@@ -35,7 +35,7 @@ export function DetailHeader({ s, a, p }: { s: TestDetailState; a: TestDetailAct
           )}
           {test && (
             <span className="status-pill detail-head-status">
-              {test.status || "—"}
+              {test.status || "(none)"}
             </span>
           )}
         </div>

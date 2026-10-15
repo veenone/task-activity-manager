@@ -114,7 +114,7 @@ export function SyncHistoryModal({ onClose }: Props) {
                               {isOpen ? "▾ hide" : "▸ detail"}
                             </span>
                           ) : (
-                            <span className="muted">—</span>
+                            <span className="muted">(none)</span>
                           )}
                         </td>
                       </tr>
@@ -179,9 +179,9 @@ export function SyncHistoryModal({ onClose }: Props) {
 }
 
 function duration(start: string, end: string): string {
-  if (!start || !end) return "—";
+  if (!start || !end) return "(none)";
   const ms = parseJiraDate(end).getTime() - parseJiraDate(start).getTime();
-  if (isNaN(ms) || ms < 0) return "—";
+  if (isNaN(ms) || ms < 0) return "(none)";
   if (ms < 1000) return `${ms} ms`;
   return `${(ms / 1000).toFixed(1)} s`;
 }

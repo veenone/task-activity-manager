@@ -10,7 +10,8 @@ let count = 0;
 for (const file of files) {
   for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
     if (!line.includes("—")) continue;
-    if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) continue;
+    // Comments, JSX ones included, are not UI.
+    if (/^\s*(?:\/\/|\*|\/\*|\{\/\*)/.test(line)) continue;
     count += 1;
   }
 }

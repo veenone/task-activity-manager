@@ -227,7 +227,7 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
 
                 <label className="cov-field-label">Target version
                   <select className="cov-select" value={form.targetVersionId} onChange={(e) => setForm({ ...form, targetVersionId: e.target.value })}>
-                    <option value="">— none —</option>
+                    <option value="">(none)</option>
                     {versions.map((v) => (
                       <option key={v.id} value={v.id}>{v.name} [{v.status}]</option>
                     ))}
@@ -312,7 +312,7 @@ export function ChangeRequestsPanel({ canonicalId, versions, onChanged }: Props)
                         <tbody>
                           {impact.decisions.map((d) => (
                             <tr key={`${d.requirementKey}-${d.projectKey}`}>
-                              <td>{d.projectKey || "—"}</td>
+                              <td>{d.projectKey || "(none)"}</td>
                               <td>{d.requirementKey}</td>
                               <td>
                                 <select

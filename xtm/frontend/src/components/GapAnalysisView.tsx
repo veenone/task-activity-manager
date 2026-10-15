@@ -451,8 +451,8 @@ export function GapAnalysisView({ onChanged }: Props) {
                     {result.folderMismatches.map((m, i) => (
                       <tr key={i}>
                         <td>{m.summary}</td>
-                        <td className="muted">{m.referenceFolder || "—"}</td>
-                        <td className="muted">{m.targetFolder || "—"}</td>
+                        <td className="muted">{m.referenceFolder || "(none)"}</td>
+                        <td className="muted">{m.targetFolder || "(none)"}</td>
                       </tr>
                     ))}
                   </tbody>

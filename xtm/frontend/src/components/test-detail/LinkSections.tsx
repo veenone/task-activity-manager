@@ -52,7 +52,7 @@ export function PreconditionsSection({ s, a, p }: { s: TestDetailState; a: TestD
                   .filter((p) => !preconditions.some((lp) => lp.key === p.key))
                   .map((p) => ({
                     value: p.key,
-                    label: `${p.key} — ${p.summary}`,
+                    label: `${p.key}: ${p.summary}`,
                   }))}
               />
               <button
@@ -196,7 +196,7 @@ export function RequirementsSection({ s, a, p }: { s: TestDetailState; a: TestDe
                   .filter((r) => !requirements.some((lr) => lr.key === r.key))
                   .map((r) => ({
                     value: r.key,
-                    label: `${r.key} — ${r.summary}`,
+                    label: `${r.key}: ${r.summary}`,
                   }))}
               />
               <button

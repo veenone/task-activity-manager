@@ -155,7 +155,7 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                       </button>
                     </td>
                     <td>{r.summary}</td>
-                    <td>{r.status || "—"}</td>
+                    <td>{r.status || "(none)"}</td>
                     <td>
                       {kind === "testexec" ? (
                         <select

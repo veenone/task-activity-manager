@@ -22,7 +22,7 @@ export function ReuseTable({ s }: { s: CoverageState }) {
           )}
           {reuse.map((r) => (
             <tr key={r.requirementKey}>
-              <td>{r.projectKey || "—"}</td>
+              <td>{r.projectKey || "(none)"}</td>
               <td>{r.requirementKey}</td>
               <td>{r.summary}</td>
               <td>{r.status}</td>

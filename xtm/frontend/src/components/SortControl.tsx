@@ -33,7 +33,7 @@ export function SortControl({ fields, field, desc, onChange }: Props) {
         type="button"
         className="btn sort-dir"
         onClick={() => onChange(field, !desc)}
-        title={desc ? "Descending — click for ascending" : "Ascending — click for descending"}
+        title={desc ? "Descending. Click for ascending." : "Ascending. Click for descending."}
         aria-label="Toggle sort direction"
       >
         {desc ? "↓" : "↑"}

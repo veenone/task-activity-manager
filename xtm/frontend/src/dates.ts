@@ -18,7 +18,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 // formatDateTime — dd/mm/YYYY HH:mm in local time. "—" for empty, the raw
 // string only if genuinely unparseable.
 export function formatDateTime(s?: string): string {
-  if (!s) return "—";
+  if (!s) return "(none)";
   const d = parseJiraDate(s);
   if (isNaN(d.getTime())) return s;
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(
@@ -28,14 +28,14 @@ export function formatDateTime(s?: string): string {
 
 // formatDate — local date only (locale-formatted).
 export function formatDate(s?: string): string {
-  if (!s) return "—";
+  if (!s) return "(none)";
   const d = parseJiraDate(s);
   return isNaN(d.getTime()) ? s : d.toLocaleDateString();
 }
 
 // formatDateTimeLong — local date + time (locale-formatted), for logs / history.
 export function formatDateTimeLong(s?: string): string {
-  if (!s) return "—";
+  if (!s) return "(none)";
   const d = parseJiraDate(s);
   return isNaN(d.getTime()) ? s : d.toLocaleString();
 }

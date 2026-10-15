@@ -15,7 +15,7 @@ interface LabelsFieldProps {
 // chip removals, which leave nothing focused to blur.
 export function LabelsField({ profileId, value, onChange, onSave, readOnly }: LabelsFieldProps) {
   const { data: buckets = [] } = useLabels(profileId);
-  if (readOnly) return <span>{value || "—"}</span>;
+  if (readOnly) return <span>{value || "(none)"}</span>;
   return (
     <TokenPicker
       label="Labels"

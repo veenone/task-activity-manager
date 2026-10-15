@@ -70,17 +70,17 @@ export function RunHistorySection({ s }: { s: TestDetailState }) {
                     )}
                   </td>
                   <td>
-                    {r.runStatus ? <RunStatusBadge status={r.runStatus} /> : <span className="muted">—</span>}
+                    {r.runStatus ? <RunStatusBadge status={r.runStatus} /> : <span className="muted">(none)</span>}
                   </td>
-                  <td>{r.executedBy || <span className="muted">—</span>}</td>
-                  <td>{r.environment || <span className="muted">—</span>}</td>
-                  <td>{r.planKeys?.length ? r.planKeys.join(", ") : <span className="muted">—</span>}</td>
-                  <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">—</span>}</td>
+                  <td>{r.executedBy || <span className="muted">(none)</span>}</td>
+                  <td>{r.environment || <span className="muted">(none)</span>}</td>
+                  <td>{r.planKeys?.length ? r.planKeys.join(", ") : <span className="muted">(none)</span>}</td>
+                  <td>{r.fixVersions?.length ? r.fixVersions.join(", ") : <span className="muted">(none)</span>}</td>
                   <td className="muted run-history-date" style={{ whiteSpace: "nowrap" }}>
-                    {formatDateTime(r.createdAt) || "—"}
+                    {formatDateTime(r.createdAt) || "(none)"}
                   </td>
                   <td className="muted run-history-date" style={{ whiteSpace: "nowrap" }}>
-                    {formatDateTime(r.updatedAt) || "—"}
+                    {formatDateTime(r.updatedAt) || "(none)"}
                   </td>
                   <td>
                     {r.defects?.length ? (
@@ -103,7 +103,7 @@ export function RunHistorySection({ s }: { s: TestDetailState }) {
                         ))}
                       </span>
                     ) : (
-                      <span className="muted">—</span>
+                      <span className="muted">(none)</span>
                     )}
                   </td>
                 </tr>

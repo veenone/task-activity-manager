@@ -45,7 +45,7 @@ export function ComponentList({
             aria-pressed={selected === c.label}
             style={{ paddingLeft: 24 }}
             onClick={() => onSelect(c.label)}
-            title={`${c.label} — ${c.count} test(s)`}
+            title={`${c.label}: ${c.count} test(s)`}
           >
             <span className="folder-name">{c.label}</span>
             <span className="folder-count">{c.count}</span>

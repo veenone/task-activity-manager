@@ -94,7 +94,7 @@ export function PreconditionList({ s, a }: { s: PreconditionsState; a: Precondit
                       <span
                         className={`pre-type-badge pre-type-${p.type.toLowerCase()}`}
                       >
-                        {p.type || "—"}
+                        {p.type || "(none)"}
                       </span>
                     </div>
                     <div className="precond-item-summary">

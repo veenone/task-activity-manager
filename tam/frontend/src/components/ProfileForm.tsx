@@ -280,7 +280,7 @@ export function ProfileForm({
     <div className="profile-form">
       <label>
         Profile name
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Team — Project X" />
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Team: Project X" />
       </label>
       <label>
         Jira base URL

@@ -221,7 +221,7 @@ export function SprintDraftFields({ draft, suggestion, suggestionError, nameNote
               onChange={(e) => set.to(e.target.value)}
             />
           </span>
-          {dateChanged && <span className="edit-date-note">Dates changed — saving moves the sprint schedule in Jira.</span>}
+          {dateChanged && <span className="edit-date-note">Dates changed. Saving moves the sprint schedule in Jira.</span>}
           {/* Where the length came from, every time. Jira does not expose a
               board's cadence, so the only honest sources are this board's own
               closed sprints or a flat default, and a team that changed cadence

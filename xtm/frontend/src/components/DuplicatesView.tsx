@@ -404,7 +404,7 @@ export function DuplicatesView({
                               )}
                             </span>
                             <span className="dup-mstatus">
-                              {m.status || "—"}
+                              {m.status || "(none)"}
                             </span>
                             {editing?.key === m.key ? (
                               <input
@@ -428,7 +428,7 @@ export function DuplicatesView({
                               />
                             ) : (
                               <span className="dup-mfolder">
-                                {m.folderId || "—"}
+                                {m.folderId || "(none)"}
                               </span>
                             )}
                             <div className="dup-acts">
@@ -562,7 +562,7 @@ function StepCompareModal({
   return (
     <Modal onClose={onClose} className="modal dup-compare-modal" labelledBy="dup-steps-compare-title">
         <div className="pending-head">
-          <h2 id="dup-steps-compare-title">Compare steps — "{title}"</h2>
+          <h2 id="dup-steps-compare-title">Compare steps: "{title}"</h2>
           <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
@@ -599,7 +599,7 @@ function StepCompareModal({
                           {s ? (
                             <div className="dup-compare-step">
                               <div className="dup-compare-action">
-                                {s.action || <span className="muted">—</span>}
+                                {s.action || <span className="muted">(none)</span>}
                               </div>
                               {s.data && (
                                 <div className="dup-compare-sub">
@@ -666,7 +666,7 @@ function SummaryCompareModal({
   return (
     <Modal onClose={onClose} className="modal dup-compare-modal" labelledBy="dup-summaries-compare-title">
         <div className="pending-head">
-          <h2 id="dup-summaries-compare-title">Compare summaries — "{title}"</h2>
+          <h2 id="dup-summaries-compare-title">Compare summaries: "{title}"</h2>
           <button className="btn btn-ghost" onClick={onClose} title="Close" aria-label="Close">
             ✕
           </button>
@@ -703,7 +703,7 @@ function SummaryCompareModal({
                         {v && v.trim() !== "" ? (
                           <div className="dup-compare-step">{v}</div>
                         ) : (
-                          <span className="muted">—</span>
+                          <span className="muted">(none)</span>
                         )}
                       </td>
                     ))}
