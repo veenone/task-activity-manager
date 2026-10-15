@@ -79,6 +79,15 @@ describe('core design tokens', () => {
     expect(status.filter((name) => !dark.has(name))).toEqual([]);
   });
 
+  // The pending button's dot is drawn by this rule alone (#255). XTM's span
+  // held a glyph, and a background on it painted the glyph's box: a square.
+  it('draws the pending button dot as a circle', () => {
+    const dot = declarations(primitivesCss, '.btn-pending .pending-dot');
+    expect(dot.get('border-radius')).toBe('50%');
+    expect(dot.get('width')).toBe(dot.get('height'));
+    expect(dot.get('display')).toBe('inline-block');
+  });
+
   it('applies the elevation and hit-area tokens to shared primitives', () => {
     expect(declarations(primitivesCss, '.menu-panel').get('box-shadow')).toBe('var(--e-2)');
     expect(declarations(primitivesCss, '.btn').get('min-height')).toBe('var(--hit-min)');

@@ -318,7 +318,15 @@
 .btn-pending:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(244, 185, 66, 0.24);
 }
+/* The dot is an empty span this rule draws, in both apps. A glyph inside it
+   would show its box under the background, which is how XTM's became a
+   square (#255). */
 .btn-pending .pending-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0;
+  border-radius: 50%;
   background: var(--chrome-pending);
 }
 

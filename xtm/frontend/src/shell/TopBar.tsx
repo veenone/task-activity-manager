@@ -76,9 +76,7 @@ export function TopBar({ s, a }: { s: AppState; a: AppActions }) {
             onClick={() => openModal("pending")}
             title="Show uncommitted edits"
           >
-            <span className="pending-dot" aria-hidden="true">
-              ●
-            </span>
+            <span className="pending-dot" aria-hidden="true" />
             {pendingChanges.length} pending
           </button>
         )}
