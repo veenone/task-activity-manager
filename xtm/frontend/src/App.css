@@ -3685,19 +3685,6 @@ tr.row-selected td:first-child {
   padding: 32px;
   text-align: center;
 }
-.pending-table-wrap {
-  overflow: auto;
-  flex: 1;
-}
-.pending-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.pending-row-actions {
-  display: flex;
-  gap: 5px;
-  white-space: nowrap;
-}
 
 /* ===== About dialog ===== */
 /* field-hint is the explanatory line under a form control. It was used in three
@@ -3804,43 +3791,10 @@ tr.row-selected td:first-child {
   text-align: left;
 }
 
-.pending-table thead th {
-  position: sticky;
-  top: 0;
-  background: var(--row-hover);
-  padding: 6px 10px;
-  text-align: left;
-  font-weight: 600;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--fs-sm);
-}
-.pending-table tbody td {
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
-  font-size: var(--fs-sm);
-}
-.pending-before {
-  color: var(--text-muted);
-  text-decoration: line-through;
-  max-width: 240px;
-  word-break: break-word;
-}
-.pending-after {
-  color: var(--ok-fg);
-  font-weight: 500;
-  max-width: 240px;
-  word-break: break-word;
-}
 .pending-footnote {
   font-size: var(--fs-xs);
   padding: 8px 16px 12px;
   border-top: 1px solid var(--border-subtle);
-}
-.pending-footnote-inline {
-  flex: 1;
-  font-size: var(--fs-xs);
-  margin: 0;
 }
 .commit-result {
   padding: 10px 16px;

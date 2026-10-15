@@ -343,7 +343,7 @@ describe("App shell", () => {
     renderApp();
     const chip = await screen.findByRole("button", { name: "3 pending" });
     await user.click(chip);
-    expect(await screen.findByRole("dialog", { name: "Pending changes" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ })).toBeInTheDocument();
   });
 
   it("shows the last sync error in the status bar", async () => {

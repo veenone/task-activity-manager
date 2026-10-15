@@ -467,17 +467,13 @@ input, button, select { font-family: inherit; font-size: inherit; }
    hovered and carry the mark rather than the word. */
 .btn-discard-row { padding: 2px 7px; font-size: var(--fs-xs); border-color: transparent; }
 .discard-mark { font-size: var(--fs-xs); line-height: 1; }
-.pending-discard { margin-left: auto; }
-.pending-rows { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.pending-row { display: grid; grid-template-columns: 110px 1fr auto 1fr auto; gap: 8px; align-items: center; font-size: var(--fs-md); }
-/* An unpushable row explains itself under its values, with the Discard it
-   qualifies still on the first line. The note comes first in the markup, so
-   a reader meets the reason before the action; the grid puts each where it
-   belongs whatever the source order. Deliberately not .pending-held: that
-   amber always comes with a Waiting chip, and this row wears none. */
-.pending-row-unpushable { grid-template-rows: auto auto; }
-.pending-row-unpushable .btn-discard-row { grid-row: 1; grid-column: 5; }
-.pending-unpushable { grid-column: 1 / -1; grid-row: 2; margin: 2px 0 0; padding-left: 8px; border-left: 2px solid var(--warn-border); color: var(--text-muted); }
+/* A refused edit explains itself under its value, before the Discard it
+   qualifies. Deliberately not .pending-held: that amber always comes with a
+   Waiting chip, and this row wears none. */
+.pending-unpushable { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--warn-border); color: var(--text-muted); }
+/* The issue cell spans its group's rows in the Pending changes table. */
+.pending-issue { text-align: left; vertical-align: top; font-weight: normal; white-space: nowrap; }
+.pending-issue .chip { margin-left: 6px; }
 .pending-empty { padding: 24px 0; text-align: center; }
 .b { font-weight: 600; }
 
@@ -604,13 +600,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
 /* The total above the entries: the one number a reader of a work log came
    for, so it sits on its own line rather than inside the list. */
 .worklog-total { margin: 0 0 8px; font-weight: 600; }
-.pending-row-worklog { grid-template-columns: 110px 1fr auto; }
 .linked-row .pending-dot { margin-left: 4px; }
-.pending-row-link { grid-template-columns: 110px auto auto 1fr auto; }
-/* Phase 3b: a journaled board move reads as a place, so its row is label,
-   where it was, and where it is going, with the middle two collapsing for
-   a rank, which has no value it came from. */
-.pending-row-move { grid-template-columns: 110px auto auto 1fr auto; }
 /* A moved card's dot is not the plain pending dot: its position is what is
    provisional, and a card carrying a pending edit is not making that
    claim. */

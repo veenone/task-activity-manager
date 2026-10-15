@@ -445,6 +445,58 @@
   min-height: 0;
   overflow-y: auto;
 }
+/* The Pending changes table, one in each app (#257): Before struck through,
+   After marked, and the row's buttons at the end. */
+.pending-table-wrap {
+  overflow: auto;
+  flex: 1;
+}
+.pending-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pending-row-actions {
+  display: flex;
+  gap: 5px;
+  white-space: nowrap;
+}
+.pending-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--row-hover);
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+.pending-table tbody td,
+.pending-table tbody th {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+  font-size: var(--fs-sm);
+}
+.pending-before {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  max-width: 240px;
+  word-break: break-word;
+}
+.pending-after {
+  color: var(--ok-fg);
+  font-weight: 500;
+  max-width: 240px;
+  word-break: break-word;
+}
+.pending-footnote-inline {
+  flex: 1;
+  font-size: var(--fs-xs);
+  margin: 0;
+}
+.pending-table td .pending-after {
+  display: inline-block;
+}
 .bulk-row {
   display: flex;
   flex-direction: column;

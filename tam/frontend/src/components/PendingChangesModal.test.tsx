@@ -61,6 +61,15 @@ function renderModal(onClose = vi.fn()) {
   return onClose;
 }
 
+// The dialog is one table, as XTM's is (#257): each issue, sprint or board is
+// a row group labelled with its name, and each pending row is a table row.
+const pendingTable = (dialog: HTMLElement) => within(dialog).getByRole("table", { name: "Pending changes" });
+const groupsIn = (dialog: HTMLElement) =>
+  within(pendingTable(dialog)).getAllByRole("rowgroup").filter((g) => g.hasAttribute("aria-label"));
+const findGroup = async (dialog: HTMLElement, name: string) =>
+  within(await within(dialog).findByRole("table", { name: "Pending changes" })).findByRole("rowgroup", { name });
+const cells = (row: HTMLElement) => within(row).getAllByRole("cell").map((c) => c.textContent);
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.ListProfiles).mockResolvedValue([
@@ -76,18 +85,23 @@ beforeEach(() => {
 describe("PendingChangesModal", () => {
   it("groups the journal by issue, drafts first, with before and after per field", async () => {
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: "Pending changes (3)" });
     expect(await within(dialog).findByText("3 changes on 2 issues, 1 of them new")).toBeInTheDocument();
-    const cards = within(dialog).getAllByRole("group");
-    expect(cards).toHaveLength(2);
+    const head = within(pendingTable(dialog)).getAllByRole("columnheader").map((c) => c.textContent);
+    expect(head.slice(0, 4)).toEqual(["Issue", "Field", "Before", "After"]);
+    const cards = groupsIn(dialog);
+    expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["TAM-NEW-1", "PLAT-409"]);
     expect(within(cards[0]).getByText("TAM-NEW-1")).toBeInTheDocument();
     expect(within(cards[0]).getByText("Draft")).toBeInTheDocument();
     expect(within(cards[0]).getByText("Add a retry to the payment webhook consumer")).toBeInTheDocument();
     expect(within(cards[0]).getByText("New Task in PLAT, priority Medium, assignee M. Ortiz, 3 points")).toBeInTheDocument();
     expect(within(cards[1]).getByText("PLAT-409")).toBeInTheDocument();
-    const rowsOfCard = within(cards[1]).getAllByRole("listitem");
-    expect(rowsOfCard[0]).toHaveTextContent("Priority Medium to High");
-    expect(rowsOfCard[1]).toHaveTextContent("Assignee (none) to M. Ortiz");
+    const rowsOfCard = within(cards[1]).getAllByRole("row");
+    expect(cells(rowsOfCard[0])).toEqual(["Priority", "Medium", "High", "Discard"]);
+    expect(cells(rowsOfCard[1])).toEqual(["Assignee", "(none)", "M. Ortiz", "Discard"]);
+    // XTM's treatment: what goes away is struck through, what arrives is marked.
+    expect(within(rowsOfCard[0]).getByText("Medium")).toHaveClass("pending-before");
+    expect(within(rowsOfCard[0]).getByText("High")).toHaveClass("pending-after");
     expect(within(dialog).getByRole("button", { name: "Commit (2)" })).toBeEnabled();
   });
 
@@ -96,8 +110,8 @@ describe("PendingChangesModal", () => {
   it("names an edit Jira will not take and leaves the row alone", async () => {
     vi.mocked(api.ListUnpushableEdits).mockResolvedValue([{ id: 2, key: "PLAT-409", field: "priority" }]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
-    const card = (await within(dialog).findAllByRole("group"))[1];
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
+    const card = await findGroup(dialog, "PLAT-409");
     const note = await within(card).findByText(/Jira will not take Priority on PLAT-409/);
     // The explanation comes before the action it qualifies, in the order a
     // screen reader walks the row rather than only where the eye lands.
@@ -109,7 +123,9 @@ describe("PendingChangesModal", () => {
     expect(within(card).queryByText("Waiting")).not.toBeInTheDocument();
     // The row is still there, with the value the user typed, and still only
     // theirs to discard.
-    expect(within(card).getAllByRole("listitem")[0]).toHaveTextContent("Priority Medium to High");
+    const refused = within(card).getAllByRole("row")[0];
+    expect(cells(refused).slice(0, 2)).toEqual(["Priority", "Medium"]);
+    expect(within(refused).getByText("High")).toHaveClass("pending-after");
     expect(within(card).getByRole("button", { name: "Discard priority on PLAT-409" })).toBeEnabled();
     expect(api.DiscardPendingChange).not.toHaveBeenCalled();
     // The other row says nothing: Jira takes it.
@@ -119,7 +135,7 @@ describe("PendingChangesModal", () => {
   it("discards one row and all rows", async () => {
     const user = userEvent.setup();
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Discard priority on PLAT-409" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 2));
     expect(api.ListPendingChanges).toHaveBeenCalledTimes(2);
@@ -137,7 +153,7 @@ describe("PendingChangesModal", () => {
     });
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
     expect(await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501).")).toBeInTheDocument();
@@ -157,7 +173,7 @@ describe("PendingChangesModal", () => {
     });
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
     expect(
@@ -175,7 +191,7 @@ describe("PendingChangesModal", () => {
     });
     vi.mocked(api.ListPendingChanges).mockResolvedValueOnce(rows).mockResolvedValue([]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     await waitFor(() => expect(api.CommitPendingChanges).toHaveBeenCalledWith("p1"));
     expect(within(dialog).queryByText(/was created without/)).not.toBeInTheDocument();
@@ -189,12 +205,12 @@ describe("PendingChangesModal", () => {
       remaining: 3,
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     expect(await within(dialog).findByText("Last commit: nothing pushed, 2 failed.")).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-409: PUT failed: 400 priority is invalid")).toBeInTheDocument();
     expect(within(dialog).getByText("TAM-NEW-1: Severity is required")).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("group")).toHaveLength(2);
+    expect(groupsIn(dialog)).toHaveLength(2);
     expect(within(dialog).getByText("Commit again to retry the failures.")).toBeInTheDocument();
   });
 
@@ -211,7 +227,7 @@ describe("PendingChangesModal", () => {
         remaining: 1,
       });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501).");
     expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
@@ -233,11 +249,13 @@ describe("PendingChangesModal", () => {
       failures: [], remaining: 2,
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     await within(dialog).findByText("Last commit: nothing pushed, 1 held back.");
-    const cards = within(dialog).getAllByRole("group");
-    expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["PLAT-412", "TAM-NEW-1"]);
+    // The held issue is a card above the table, as XTM shows its conflicts.
+    const conflict = within(dialog).getByRole("group", { name: "PLAT-412" });
+    expect(conflict.compareDocumentPosition(pendingTable(dialog)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(groupsIn(dialog).map((c) => c.getAttribute("aria-label"))).toEqual(["TAM-NEW-1"]);
   });
 
   it("shows a held issue with base, mine, and remote and resolves it either way", async () => {
@@ -263,7 +281,7 @@ describe("PendingChangesModal", () => {
     vi.mocked(api.ResolveConflictOverride).mockResolvedValue();
     vi.mocked(api.ResolveConflictKeepRemote).mockResolvedValue();
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (3)" }));
     expect(await within(dialog).findByText("Last commit: 1 issue pushed, 1 created (TAM-NEW-1 is now PLAT-501), 1 held back.")).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-412 changed in Jira since you edited it. Resolve it below, then commit again.")).toBeInTheDocument();
@@ -297,7 +315,7 @@ describe("PendingChangesModal", () => {
     });
     vi.mocked(api.ResolveConflictKeepRemote).mockResolvedValue();
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
     const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
     vi.mocked(api.ListPendingChanges).mockResolvedValue([]);
@@ -310,7 +328,7 @@ describe("PendingChangesModal", () => {
     const user = userEvent.setup();
     vi.mocked(api.DiscardPendingChange).mockRejectedValue(new Error("row is gone"));
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Discard priority on PLAT-409" }));
     expect(await screen.findByText(/row is gone/)).toBeInTheDocument();
   });
@@ -323,9 +341,9 @@ describe("PendingChangesModal", () => {
     ]).mockResolvedValue([]);
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({ committed: [], created: [], linked: [{ key: "PLAT-412", toKey: "XT-1018", type: "Relates" }], conflicts: [], failures: [], remaining: 0 });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
-    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
-    expect(card).toHaveTextContent("Relates (outward) XT-1018 Promo code applies discount");
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
+    const card = await findGroup(dialog, "PLAT-412");
+    expect(cells(within(card).getByRole("row")).slice(0, 3)).toEqual(["Link", "", "Relates (outward) XT-1018 Promo code applies discount"]);
     expect(within(card).getByRole("button", { name: "Discard link to XT-1018" })).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Commit (1)" }));
     expect(await within(dialog).findByText("Last commit: 1 link pushed.")).toBeInTheDocument();
@@ -341,9 +359,9 @@ describe("PendingChangesModal", () => {
     ]);
     vi.mocked(api.CommitPendingChanges).mockResolvedValue({ committed: [], created: [], linked: [], logged: [{ key: "PLAT-412", timeSpent: "2h 30m" }], conflicts: [], failures: [], remaining: 0 });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
-    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
-    expect(card).toHaveTextContent(`Work log 2h 30m on ${calendarDay("2026-09-29")}, Pairing`);
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
+    const card = await findGroup(dialog, "PLAT-412");
+    expect(cells(within(card).getByRole("row")).slice(0, 3)).toEqual(["Work log", "", `2h 30m on ${calendarDay("2026-09-29")}, Pairing`]);
     await user.click(within(card).getByRole("button", { name: "Discard the 2h 30m entry on PLAT-412" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 9));
     await user.click(within(dialog).getByRole("button", { name: "Commit (1)" }));
@@ -358,9 +376,9 @@ describe("PendingChangesModal", () => {
     };
     vi.mocked(api.ListPendingChanges).mockResolvedValue([sprintRow, ...rows]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     expect(await within(dialog).findByText("4 changes on 2 issues, 1 of them new, and 1 new sprint")).toBeInTheDocument();
-    const cards = within(dialog).getAllByRole("group");
+    const cards = groupsIn(dialog);
     expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Sprint 15", "TAM-NEW-1", "PLAT-409"]);
     expect(within(cards[0]).getByText("Draft sprint")).toBeInTheDocument();
     expect(within(cards[0]).getByText("New sprint on PLAT Scrum, 2026-09-16 to 2026-09-30")).toBeInTheDocument();
@@ -386,9 +404,9 @@ describe("PendingChangesModal", () => {
       sprintsChanged: ["Sprint 12 completed, 45 unfinished cards moved to Sprint 13"],
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     expect(await within(dialog).findByText("4 changes: 1 new sprint, 2 sprint changes")).toBeInTheDocument();
-    const cards = within(dialog).getAllByRole("group");
+    const cards = groupsIn(dialog);
     expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Sprint 15", "Sprint 12", "Sprint 13"]);
     expect(cards[0]).toHaveTextContent("Start sprint Sprint 15, 2026-09-29 to 2026-10-12");
     expect(cards[2]).toHaveTextContent("Start sprint Sprint 13, 2026-09-14 to 2026-09-28");
@@ -442,14 +460,14 @@ describe("PendingChangesModal", () => {
   it("drops a refused issue out of the Commit count and says why", async () => {
     vi.mocked(api.ListUnpushableEdits).mockResolvedValue([{ id: 2, key: "PLAT-409", field: "priority" }]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     // Three rows on two issues, one of which Jira will refuse: the draft is
     // all Commit can deliver.
     await waitFor(() => expect(within(dialog).getByRole("button", { name: "Commit (1)" })).toBeInTheDocument());
     expect(await within(dialog).findByText(/1 issue is not in that count/)).toBeInTheDocument();
-    // The work itself is untouched: both cards are still there, and the
+    // The work itself is untouched: both groups are still there, and the
     // refused row is still the user's to discard.
-    expect(within(dialog).getAllByRole("group")).toHaveLength(2);
+    expect(groupsIn(dialog)).toHaveLength(2);
     expect(within(dialog).getByRole("button", { name: "Discard priority on PLAT-409" })).toBeEnabled();
   });
 
@@ -457,7 +475,7 @@ describe("PendingChangesModal", () => {
     vi.mocked(api.ListPendingChanges).mockResolvedValue(rows.filter((r) => r.entityKey === "PLAT-409"));
     vi.mocked(api.ListUnpushableEdits).mockResolvedValue([{ id: 2, key: "PLAT-409", field: "priority" }]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     const commit = await within(dialog).findByRole("button", { name: "Commit (0)" });
     expect(commit).toBeDisabled();
     // A disabled button with no account of why is the thing to avoid.
@@ -484,9 +502,9 @@ describe("PendingChangesModal", () => {
       committed: [], created: [], sprintsChanged: ["Sprint 12b edited"], linked: [], conflicts: [], failures: [], remaining: 0,
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     expect(await within(dialog).findByText("5 changes on 2 issues, 1 of them new, and 2 sprint changes")).toBeInTheDocument();
-    const cards = within(dialog).getAllByRole("group");
+    const cards = groupsIn(dialog);
     expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Sprint 13", "Sprint 12", "TAM-NEW-1", "PLAT-409"]);
     expect(cards[1]).toHaveTextContent("Edit sprint Sprint 12: name to Sprint 12b, goal removed, dates to 2026-09-01 to 2026-09-15");
     expect(cards[0]).toHaveTextContent("Delete sprint Sprint 13");
@@ -507,11 +525,12 @@ describe("PendingChangesModal", () => {
         afterVal: JSON.stringify({ name: "Checkout", type: "scrum", filterName: "Checkout filter", jql: "project = PLAT" }) },
     ]);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     expect(await within(dialog).findByText("2 changes: 1 new board, 1 new sprint")).toBeInTheDocument();
-    const cards = within(dialog).getAllByRole("group");
+    const cards = groupsIn(dialog);
     expect(cards.map((c) => c.getAttribute("aria-label"))).toEqual(["Checkout", "Sprint 1"]);
-    expect(cards[0]).toHaveTextContent("New board Checkout");
+    expect(within(cards[0]).getByText("Checkout")).toBeInTheDocument();
+    expect(cells(within(cards[0]).getByRole("row"))[0]).toBe("New board");
     expect(cards[0]).toHaveTextContent("Scrum board on the filter Checkout filter: project = PLAT");
     await user.click(within(cards[0]).getByRole("button", { name: "Discard Checkout" }));
     await waitFor(() => expect(api.DiscardPendingChange).toHaveBeenCalledWith("p1", 30));
@@ -525,11 +544,11 @@ describe("PendingChangesModal", () => {
       held: [{ key: "PLAT-409", entityType: "issue", rowId: 0, waitsFor: "TAM-NEW-1", reason: "waits for TAM-NEW-1, which Jira refused" }],
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     expect(await within(dialog).findByText("Last commit: 1 sprint created (Sprint 15 is sprint 100), 1 failed, 1 waiting.")).toBeInTheDocument();
     expect(within(dialog).getByText("PLAT-409 waits for TAM-NEW-1, which Jira refused.")).toBeInTheDocument();
-    const card = within(dialog).getByRole("group", { name: "PLAT-409" });
+    const card = within(pendingTable(dialog)).getByRole("rowgroup", { name: "PLAT-409" });
     expect(within(card).getByText("Waiting")).toBeInTheDocument();
     expect(within(card).getByText("Waits for TAM-NEW-1, which Jira refused.")).toBeInTheDocument();
     expect(within(dialog).getByText("Commit again to retry the failures.")).toBeInTheDocument();
@@ -543,7 +562,7 @@ describe("PendingChangesModal", () => {
       held: [{ key: "TAM-NEW-1", entityType: "issue_create", rowId: 3, waitsFor: "-1", reason: "waits for sprint \"Sprint 15\", which could not be read" }],
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (2)" }));
     expect(await within(dialog).findByText("Commit again once what they wait for is in Jira.")).toBeInTheDocument();
     expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
@@ -561,12 +580,12 @@ describe("PendingChangesModal board moves", () => {
     const user = userEvent.setup();
     vi.mocked(api.ListPendingChanges).mockResolvedValue(moveRows);
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
-    const card = await within(dialog).findByRole("group", { name: "PLAT-412" });
-    const rows = within(card).getAllByRole("listitem");
-    expect(rows[0]).toHaveTextContent("Status To Do to In Progress");
-    expect(rows[1]).toHaveTextContent("Sprint Sprint 12 to Sprint 13");
-    expect(rows[2]).toHaveTextContent("Rank before PLAT-409");
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
+    const card = await findGroup(dialog, "PLAT-412");
+    const rows = within(card).getAllByRole("row");
+    expect(cells(rows[0]).slice(0, 3)).toEqual(["Status", "To Do", "In Progress"]);
+    expect(cells(rows[1]).slice(0, 3)).toEqual(["Sprint", "Sprint 12", "Sprint 13"]);
+    expect(cells(rows[2]).slice(0, 3)).toEqual(["Rank", "", "before PLAT-409"]);
     expect(within(card).queryByText("statusId")).not.toBeInTheDocument();
 
     await user.click(within(card).getByRole("button", { name: "Discard the status move on PLAT-412" }));
@@ -584,7 +603,7 @@ describe("PendingChangesModal board moves", () => {
       ],
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
     expect(await within(dialog).findByText("Last commit: 2 cards moved (PLAT-412 to In Progress, PLAT-412 before PLAT-409).")).toBeInTheDocument();
   });
@@ -600,7 +619,7 @@ describe("PendingChangesModal board moves", () => {
       ],
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
     expect(
       await within(dialog).findByText("Last commit: 1 card moved (PLAT-412 to In Progress), 1 already in place."),
@@ -618,7 +637,7 @@ describe("PendingChangesModal board moves", () => {
       }],
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
     expect(await within(dialog).findByText(/cannot reach In Progress/)).toBeInTheDocument();
     expect(within(dialog).queryByText("Commit again to retry the failures.")).not.toBeInTheDocument();
@@ -638,7 +657,7 @@ describe("PendingChangesModal board moves", () => {
       }],
     });
     renderModal();
-    const dialog = await screen.findByRole("dialog", { name: "Pending changes" });
+    const dialog = await screen.findByRole("dialog", { name: /^Pending changes \(\d+\)$/ });
     await user.click(await within(dialog).findByRole("button", { name: "Commit (1)" }));
     expect(await within(dialog).findByText(/Jira said no/)).toBeInTheDocument();
 
