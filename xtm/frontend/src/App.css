@@ -69,18 +69,6 @@
   font-weight: 600;
 }
 
-/* The view tabs always take their own full-width, centered row (order: 3 pushes
-   them below the wrapped flex line), keeping Browse / Preconditions / … visually
-   separate from the New Test / More / Sync actions and the profile controls. */
-.topbar-center {
-  order: 3;
-  flex: 1 0 100%;
-  justify-content: center;
-}
-.view-tabs {
-  max-width: 100%;
-  overflow-x: auto;
-}
 .spacer {
   flex: 1;
 }
@@ -623,31 +611,6 @@
   background: #1f2937;
   color: #d1d5db;
   border-color: #374151;
-}
-
-/* View tabs (Browse / Dashboard) */
-.view-tabs {
-  display: flex;
-  gap: 2px;
-  background: var(--chrome-raised);
-  border-radius: 5px;
-  padding: 2px;
-}
-.view-tab {
-  background: transparent;
-  border: none;
-  color: var(--chrome-text-muted);
-  padding: 4px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: var(--fs-md);
-}
-.view-tab:hover {
-  color: var(--chrome-text);
-}
-.view-tab-active {
-  background: var(--accent);
-  color: var(--on-accent);
 }
 
 /* Statistics dashboard (FR-9) */

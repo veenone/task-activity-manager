@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { TOURS, TOUR_VERSION, shouldOfferTour } from "./steps";
 import { VIEWS } from "../nav";
 
-// src is where the components that carry the anchors live.
+// src is where the components that carry the anchors live, plus core's
+// components: the view tabs are core's ViewTabs (#253).
 const src = join(__dirname, "..");
+const coreComponents = join(__dirname, "../../../../frontend/core/src/components");
 
 function everySource(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -19,13 +21,14 @@ function everySource(dir: string, out: string[] = []): string[] {
 // Anchors are set two ways. Most are literal; the view tabs and the two
 // grids that serve more than one view build theirs from the view id, so a
 // template is read as the shape it can produce (`tab-${v.id}` becomes
-// "tab-" + anything). A step matches if a literal or a shape covers it.
-const sources = everySource(src).map((f) => readFileSync(f, "utf8"));
+// "tab-" + anything), including one that is a fallback (`v.tour ?? ...`).
+// A step matches if a literal or a shape covers it.
+const sources = [...everySource(src), ...everySource(coreComponents)].map((f) => readFileSync(f, "utf8"));
 const literal = new Set(
   sources.flatMap((text) => [...text.matchAll(/data-tour="([^"]+)"/g)].map((m) => m[1])),
 );
 const shapes = sources
-  .flatMap((text) => [...text.matchAll(/data-tour=\{`([^`]+)`\}/g)].map((m) => m[1]))
+  .flatMap((text) => [...text.matchAll(/data-tour=\{[^}`]*`([^`]+)`\}/g)].map((m) => m[1]))
   .map((t) => new RegExp("^" + t.replace(/\$\{[^}]+\}/g, "[A-Za-z0-9_-]+") + "$"));
 
 const anchored = (target: string) => literal.has(target) || shapes.some((re) => re.test(target));

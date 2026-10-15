@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Menu, LiveRegion, useProfile, useTour, errMsg } from "@agile-suite/core";
+import { Menu, LiveRegion, ViewTabs, useProfile, useTour, errMsg } from "@agile-suite/core";
 import { Health, EventsOn, SetNavRailVisible, SetTourSeenVersion, isDemoUrl } from "./api";
 import type { HealthInfo, Profile, Settings, SyncProgress } from "./api";
 import { VIEWS, useView } from "./nav";
@@ -251,25 +251,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* The view tabs XTM carries under its topbar. The View menu and the
-          optional rail reach the same places; this is the one that is always
-          visible, so it is the one that says where you are. */}
-      <nav className="view-tabs-bar" aria-label="Views">
-        <div className="view-tabs" data-tour="views">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              data-tour={`tab-${v.id}`}
-              className={`view-tab${v.id === view ? " view-tab-active" : ""}`}
-              aria-current={v.id === view ? "page" : undefined}
-              onClick={() => setView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <ViewTabs views={VIEWS} current={view} onSelect={setView} />
 
       <div className="app-body">
         {navRail && (
