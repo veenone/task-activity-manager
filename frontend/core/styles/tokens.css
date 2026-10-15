@@ -27,9 +27,7 @@
   /* Previously-undefined tokens: they were referenced with hardcoded light
      fallbacks that never re-pointed in dark mode. Now real tokens in both
      themes (audit S1). */
-  --warning: #b7791f;
-  --warning-bg: #fef3c7;
-  --warning-text: #92400e;
+  --warn-bg: #fef3c7;
   --card-border: var(--border);
   --accent-strong: #2b6cb0;
   --bg-subtle: var(--surface-2);
@@ -79,7 +77,7 @@
   --chrome-hover: rgba(255, 255, 255, 0.1);
   /* The chip palette. The issue type chips and the status chips draw their
      fills from one set, so a hue means the same thing wherever it appears.
-     Amber is not here: --warning-bg and --warning-text already hold it. */
+     Amber is not here: --warn-bg and --warn-text already hold it. */
   --chip-blue-bg: #dbeafe;
   --chip-blue-text: #1e40af;
   --chip-green-bg: #dcfce7;
@@ -123,8 +121,8 @@
   --state-future-soft: var(--surface-3);
   --state-closed: var(--chip-green-text);
   --state-closed-soft: var(--chip-green-bg);
-  --state-draft: var(--warning-text);
-  --state-draft-soft: var(--warning-bg);
+  --state-draft: var(--warn-text);
+  --state-draft-soft: var(--warn-bg);
   --bar-track: var(--surface-sunken);
   --bar-time: var(--accent);
   --bar-points: var(--chart-completed);
@@ -157,7 +155,7 @@
      mean elsewhere in the app. */
   --chart-remaining: var(--accent);
   --chart-ideal: var(--text-muted);
-  --chart-scope: var(--warning);
+  --chart-scope: var(--warn-fg);
   --chart-committed: #aab7ee;
   --chart-completed: #1f7a52;
   --chart-added: #0369a1;
@@ -178,7 +176,6 @@
   /* Warn: in-progress runs, pending reviews, attention without danger. */
   --warn-fg: #b45309;
   --warn-solid: #f59e0b;
-  --warn-accent: #a97400;
   /* Ok: passed runs, healthy coverage, in-sync states. */
   --ok-fg: #1f7a3d;
   --ok-solid: #22c55e;
@@ -261,9 +258,7 @@
   --warn-soft: rgba(224, 176, 98, 0.13);
   --ok-text: #5fd0a0;
   /* Dark counterparts for the tokens fixed in audit S1. */
-  --warning: #e0b062;
-  --warning-bg: #2a2109;
-  --warning-text: #f0c674;
+  --warn-bg: #2a2109;
   --card-border: var(--border);
   --accent-strong: #6ea8fe;
   --bg-subtle: var(--surface-2);
@@ -314,8 +309,8 @@
   --state-future-soft: var(--surface-3);
   --state-closed: var(--chip-green-text);
   --state-closed-soft: var(--chip-green-bg);
-  --state-draft: var(--warning-text);
-  --state-draft-soft: var(--warning-bg);
+  --state-draft: var(--warn-text);
+  --state-draft-soft: var(--warn-bg);
   --bar-track: var(--surface-sunken);
   --bar-time: var(--accent);
   --bar-points: var(--chart-completed);
@@ -333,7 +328,7 @@
      against the surface rather than sinking into it. */
   --chart-remaining: var(--accent);
   --chart-ideal: var(--text-muted);
-  --chart-scope: var(--warning);
+  --chart-scope: var(--warn-fg);
   --chart-committed: #46579a;
   --chart-completed: #4fc490;
   --chart-added: #38bdf8;
@@ -352,7 +347,6 @@
   --danger-tint: rgba(248, 113, 113, 0.16);
   --warn-fg: #fbbf24;
   --warn-solid: #f59e0b;
-  --warn-accent: #e0b062;
   --ok-fg: #4ade80;
   --ok-solid: #22c55e;
   --ok-border: #14532d;

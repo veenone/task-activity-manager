@@ -253,13 +253,13 @@
    matching the current filter (FR-3.1). Sits between the filter row and
    the table headers. */
 .select-all-banner {
-  background: var(--warning-bg);
+  background: var(--warn-bg);
   border: 1px solid var(--warn-border);
   border-radius: 4px;
   margin: 0 12px 6px;
   padding: 6px 10px;
   font-size: var(--fs-sm);
-  color: var(--warning-text);
+  color: var(--warn-text);
 }
 .link-btn {
   background: none;
@@ -442,7 +442,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--warn-fg);
-  background: var(--warning-bg);
+  background: var(--warn-bg);
   border-radius: 4px;
   padding: 1px 6px;
 }
@@ -502,7 +502,7 @@
   color: var(--indigo-fg);
 }
 .run-executing {
-  background: var(--warning-bg);
+  background: var(--warn-bg);
   color: var(--warn-fg);
 }
 .run-aborted {
@@ -583,7 +583,7 @@
   border-color: var(--indigo-border);
 }
 .run-select.run-executing {
-  background: var(--warning-bg);
+  background: var(--warn-bg);
   color: var(--warn-fg);
   border-color: var(--warn-border);
 }
@@ -679,7 +679,7 @@
 }
 .stat-tile-accent {
   border-color: var(--chrome-pending);
-  background: var(--warning-bg);
+  background: var(--warn-bg);
 }
 .stat-tile-value {
   font-size: var(--fs-2xl);
@@ -3269,7 +3269,7 @@ tr.row-selected td:first-child {
 }
 .cov-notrun,
 .cov-pill.cov-notrun {
-  background: var(--warning-bg);
+  background: var(--warn-bg);
   color: var(--warn-fg);
 }
 .cov-uncovered,
@@ -3494,8 +3494,8 @@ tr.row-selected td:first-child {
   letter-spacing: 0.04em;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--warning-bg, var(--warning-bg));
-  color: var(--warning-text, var(--warning-text));
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .precond-field {
   display: block;
@@ -3639,8 +3639,8 @@ tr.row-selected td:first-child {
   color: var(--chip-red-text);
 }
 .review-pending {
-  background: var(--warning-bg);
-  color: var(--warning-text);
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .review-meta {
   font-size: var(--fs-sm);
@@ -3888,8 +3888,8 @@ tr.row-selected td:first-child {
   margin: 2px 0;
 }
 .conflict-text {
-  color: var(--warning-text);
-  background: var(--warning-bg);
+  color: var(--warn-text);
+  background: var(--warn-bg);
   border-left: 3px solid var(--warn-solid);
   padding: 6px 8px;
   margin: 6px 0;
@@ -3932,7 +3932,7 @@ tr.row-selected td:first-child {
   font-size: var(--fs-sm);
   padding: 3px 10px;
 }
-/* Kept on purpose (#214): a quieter amber than --warning-bg in dark. */
+/* Kept on purpose (#214): a quieter amber than --warn-bg in dark. */
 :root[data-theme="dark"] .conflict-text {
   color: #e8d9a0;
   background: #2c2a1a;
@@ -3945,9 +3945,9 @@ tr.row-selected td:first-child {
   align-items: center;
   gap: 10px;
   padding: 8px 14px;
-  background: var(--warning-bg);
+  background: var(--warn-bg);
   border-bottom: 1px solid var(--warn-border);
-  color: var(--warning-text);
+  color: var(--warn-text);
   flex-shrink: 0;
   font-size: var(--fs-md);
 }
@@ -3965,13 +3965,13 @@ tr.row-selected td:first-child {
   cursor: pointer;
 }
 tr.row-checked {
-  background: var(--warning-bg);
+  background: var(--warn-bg);
 }
 tr.row-checked.row-selected {
   background: color-mix(in srgb, var(--warn-solid) 30%, var(--surface));
 }
 tr.row-checked:hover {
-  background: var(--warning-bg);
+  background: var(--warn-bg);
 }
 
 /* In-app prompt (replaces window.prompt, unsupported in WebView2) */
@@ -5535,8 +5535,8 @@ tr.row-checked:hover {
   font-weight: 600;
 }
 .testcalls-badge-broken {
-  background: var(--warning-bg);
-  color: var(--warning-text);
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .testcalls-badge-xproject {
   background: var(--chip-blue-bg);
@@ -6209,11 +6209,11 @@ tr.row-checked:hover {
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 3px;
-  background: var(--warning-bg);
-  color: var(--warning-text);
+  background: var(--warn-bg);
+  color: var(--warn-text);
   letter-spacing: 0.02em;
 }
-/* Kept on purpose (#214): a quieter amber than --warning-bg in dark. */
+/* Kept on purpose (#214): a quieter amber than --warn-bg in dark. */
 :root[data-theme="dark"] .bugs-md-no-tests {
   background: #3a2a00;
   color: #fcd34d;
@@ -6507,7 +6507,7 @@ tr.row-checked:hover {
 .gap-dir-in { background: rgba(56, 132, 222, 0.14); color: var(--accent, var(--info-solid)); }
 .gap-dir-out { background: rgba(127, 127, 127, 0.14); color: var(--text); }
 .gap-dir-proj { background: rgba(56, 132, 222, 0.14); color: var(--accent, var(--info-solid)); }
-.gap-dir-folder { background: rgba(214, 158, 46, 0.16); color: var(--warning, var(--warning)); }
+.gap-dir-folder { background: rgba(214, 158, 46, 0.16); color: var(--warn-fg); }
 .gap-count {
   margin-left: auto;
   font-weight: 700;
@@ -6680,11 +6680,11 @@ tr.row-checked:hover {
 .cov-pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: var(--fs-xs); font-weight: 600; }
 .cov-pass { background: var(--ok-tint); color: var(--ok-fg); }
 .cov-fail { background: var(--danger-tint); color: var(--danger-fg-strong); }
-.cov-notrun { background: var(--warn-soft); color: var(--warn-accent); }
+.cov-notrun { background: var(--warn-soft); color: var(--warn-text); }
 .cov-gap { background: var(--surface-sunken); color: var(--text-muted); }
-.cov-stale-dot { margin-left: 4px; color: var(--warn-accent); cursor: help; }
+.cov-stale-dot { margin-left: 4px; color: var(--warn-text); cursor: help; }
 .cov-stale {
-  background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn-accent) 27%, transparent); color: var(--text);
+  background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn-text) 27%, transparent); color: var(--text);
   padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; font-size: var(--fs-md);
 }
 /* Parameter sub-header row inside the coverage matrix table */
@@ -6718,7 +6718,7 @@ tr.row-checked:hover {
 .cov-badge-pub-notpublished { background: color-mix(in srgb, var(--text-muted) 13%, transparent); color: var(--text-muted); }
 .cov-badge-pub-insync       { background: var(--ok-tint); color: var(--ok-fg); }
 .cov-badge-pub-local        { background: var(--accent-soft); color: var(--accent); }
-.cov-badge-pub-drift        { background: var(--warn-soft); color: var(--warn-accent); }
+.cov-badge-pub-drift        { background: var(--warn-soft); color: var(--warn-text); }
 .cov-badge-pub-conflict     { background: var(--danger-tint); color: var(--danger-fg-strong); }
 .cov-publish-result-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cov-publish-fail-list { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-sm); color: var(--text-muted); }
@@ -6789,7 +6789,7 @@ tr.row-checked:hover {
   white-space: nowrap;
 }
 .cov-badge-planning  { background: var(--accent-soft); color: var(--accent); }
-.cov-badge-beta      { background: var(--warn-soft); color: var(--warn-accent); }
+.cov-badge-beta      { background: var(--warn-soft); color: var(--warn-text); }
 .cov-badge-stable    { background: var(--ok-tint); color: var(--ok-fg); }
 .cov-badge-deprecated { background: color-mix(in srgb, var(--text-muted) 13%, transparent); color: var(--text-muted); }
 
@@ -6801,7 +6801,7 @@ tr.row-checked:hover {
 
 /* Risk badges */
 .cov-badge-risk-low    { background: var(--ok-tint); color: var(--ok-fg); }
-.cov-badge-risk-medium { background: var(--warn-soft); color: var(--warn-accent); }
+.cov-badge-risk-medium { background: var(--warn-soft); color: var(--warn-text); }
 .cov-badge-risk-high   { background: var(--danger-tint); color: var(--danger-fg-strong); }
 
 /* ─── Versions & CRs tab ──────────────────────────────────────────────────── */
