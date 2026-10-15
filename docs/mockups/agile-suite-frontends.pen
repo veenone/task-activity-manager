@@ -225924,7 +225924,7 @@
                               "id": "UPS9N",
                               "name": "Label",
                               "fill": "$a2-ok",
-                              "content": "Closed 12",
+                              "content": "Closed 13",
                               "fontFamily": "Inter",
                               "fontSize": 11,
                               "fontWeight": "600"
@@ -226010,7 +226010,7 @@
                               "id": "V5ylFq",
                               "name": "Label",
                               "fill": "$a2-high",
-                              "content": "Open 1",
+                              "content": "Open 0",
                               "fontFamily": "Inter",
                               "fontSize": 11,
                               "fontWeight": "600"
@@ -226022,7 +226022,7 @@
                           "id": "xZ7uY",
                           "name": "Note",
                           "fill": "$a2-text-strong",
-                          "content": "ISS-15, waits on decision 2",
+                          "content": "none",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "normal"
@@ -228278,7 +228278,7 @@
                           "type": "frame",
                           "id": "mZoGT",
                           "name": "Pill",
-                          "fill": "$a2-high-bg",
+                          "fill": "$a2-low-bg",
                           "cornerRadius": 9,
                           "padding": [
                             2,
@@ -228289,8 +228289,8 @@
                               "type": "text",
                               "id": "eAfo9",
                               "name": "Label",
-                              "fill": "$a2-high",
-                              "content": "Open",
+                              "fill": "$a2-ok",
+                              "content": "Closed",
                               "fontFamily": "Inter",
                               "fontSize": 11,
                               "fontWeight": "600"
@@ -228304,7 +228304,7 @@
                           "fill": "$a2-text-muted",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "waits on decision 2",
+                          "content": "#252",
                           "fontFamily": "Inter",
                           "fontSize": 11,
                           "fontWeight": "normal"
@@ -230010,7 +230010,7 @@
                           "fill": "$a2-text",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "2. Whether --warn-* and --warning-* merge, and which name wins.",
+                          "content": "2. Warning tokens: decided 2026-10-15. --warning-* merged into --warn-* (#252).",
                           "lineHeight": 1.5,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -230023,7 +230023,7 @@
                           "fill": "$a2-text",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "3. Whether XTM keeps its tab bar plus rail or follows TAM's View menu.",
+                          "content": "3. Navigation: decided 2026-10-15. XTM follows TAM's View menu.",
                           "lineHeight": 1.5,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -230214,6 +230214,824 @@
                           "content": "Check both themes in demo mode.",
                           "lineHeight": 1.5,
                           "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Z6t5l",
+                  "name": "Decisions",
+                  "clip": true,
+                  "width": "fill_container",
+                  "fill": "$a2-surface",
+                  "cornerRadius": 10,
+                  "stroke": "$a2-border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "X7Wth3",
+                      "name": "Decisions head",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "padding": [
+                        18,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "OUtL3",
+                          "name": "DECISIONS",
+                          "fill": "$a2-text-subtle",
+                          "content": "DECISIONS · STATUS ON 2026-10-15",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "700",
+                          "letterSpacing": 0.9
+                        },
+                        {
+                          "type": "text",
+                          "id": "X7RDe",
+                          "name": "Decisions blurb",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The three open decisions from the audit, plus the calls made along the way. All 7 decided; navigation is still being built.",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "PqrAY",
+                      "name": "Header row",
+                      "width": "fill_container",
+                      "fill": "$a2-surface-2",
+                      "stroke": "$a2-border-subtle",
+                      "strokeWidth": {
+                        "top": 1,
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        8,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "R48GuF",
+                          "name": "Col ID",
+                          "fill": "$a2-text-subtle",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "ID",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600",
+                          "letterSpacing": 0.6
+                        },
+                        {
+                          "type": "text",
+                          "id": "O8zI6",
+                          "name": "Col DECISION",
+                          "fill": "$a2-text-subtle",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "DECISION",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600",
+                          "letterSpacing": 0.6
+                        },
+                        {
+                          "type": "text",
+                          "id": "cXoxr",
+                          "name": "Col OUTCOME",
+                          "fill": "$a2-text-subtle",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "OUTCOME",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600",
+                          "letterSpacing": 0.6
+                        },
+                        {
+                          "type": "text",
+                          "id": "lsNG5",
+                          "name": "Col STATUS",
+                          "fill": "$a2-text-subtle",
+                          "textGrowth": "fixed-width",
+                          "width": 120,
+                          "content": "STATUS",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600",
+                          "letterSpacing": 0.6
+                        },
+                        {
+                          "type": "text",
+                          "id": "bESjq",
+                          "name": "Col WHERE",
+                          "fill": "$a2-text-subtle",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "WHERE",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "600",
+                          "letterSpacing": 0.6
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "vtvfS",
+                      "name": "Row D1",
+                      "width": "fill_container",
+                      "stroke": "$a2-border-subtle",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "bCCDn",
+                          "name": "Id",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "D1",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "hgJl1",
+                          "name": "Decision",
+                          "fill": "$a2-text",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "Text floor",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "X96mx",
+                          "name": "Outcome",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "10px step, --fs-2xs, for dense tables; 11px and up elsewhere",
+                          "lineHeight": 1.45,
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "AoBSN",
+                          "name": "Status",
+                          "width": 120,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Tgov8",
+                              "name": "Pill",
+                              "fill": "$a2-low-bg",
+                              "cornerRadius": 9,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "QXAfR",
+                                  "name": "Label",
+                                  "fill": "$a2-ok",
+                                  "content": "Decided",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "C8EqG",
+                          "name": "Where",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "T1.3, #218",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "azMLg",
+                      "name": "Row D2",
+                      "width": "fill_container",
+                      "stroke": "$a2-border-subtle",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kqBvC",
+                          "name": "Id",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "D2",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "KkJM3",
+                          "name": "Decision",
+                          "fill": "$a2-text",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "Warning tokens",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ePDdZ",
+                          "name": "Outcome",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "--warning-* merges into --warn-*; --warn-accent goes too",
+                          "lineHeight": 1.45,
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Xw9LC",
+                          "name": "Status",
+                          "width": 120,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "ZDVfJ",
+                              "name": "Pill",
+                              "fill": "$a2-low-bg",
+                              "cornerRadius": 9,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "nku7u",
+                                  "name": "Label",
+                                  "fill": "$a2-ok",
+                                  "content": "Decided",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "ehKQU",
+                          "name": "Where",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "decided 2026-10-15, #252",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "dntuz",
+                      "name": "Row D3",
+                      "width": "fill_container",
+                      "stroke": "$a2-border-subtle",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "HOCX0",
+                          "name": "Id",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "D3",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "afWLX",
+                          "name": "Decision",
+                          "fill": "$a2-text",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "Navigation",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "RwJ8Z",
+                          "name": "Outcome",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "XTM drops its top tab bar plus rail and follows TAM's View menu",
+                          "lineHeight": 1.45,
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "nucn2",
+                          "name": "Status",
+                          "width": 120,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Hgi8E",
+                              "name": "Pill",
+                              "fill": "$a2-accent-soft",
+                              "cornerRadius": 9,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "JMNTl",
+                                  "name": "Label",
+                                  "fill": "$a2-accent",
+                                  "content": "In progress",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "Tp2eq",
+                          "name": "Where",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "decided 2026-10-15",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "TEADq",
+                      "name": "Row D4",
+                      "width": "fill_container",
+                      "stroke": "$a2-border-subtle",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "X5MOw1",
+                          "name": "Id",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "D4",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "cWJpk",
+                          "name": "Decision",
+                          "fill": "$a2-text",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "Pending changes dialog",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "V9ZDc",
+                          "name": "Outcome",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "PendingChangesModal stays per app; the two journals differ",
+                          "lineHeight": 1.45,
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "GjHt9",
+                          "name": "Status",
+                          "width": 120,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "L4WZv",
+                              "name": "Pill",
+                              "fill": "$a2-low-bg",
+                              "cornerRadius": 9,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "nau9I",
+                                  "name": "Label",
+                                  "fill": "$a2-ok",
+                                  "content": "Decided",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "RZjGn",
+                          "name": "Where",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "T3.1",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Q57ZB",
+                      "name": "Row D5",
+                      "width": "fill_container",
+                      "stroke": "$a2-border-subtle",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "LgWc1",
+                          "name": "Id",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "D5",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "PmNOV",
+                          "name": "Decision",
+                          "fill": "$a2-text",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "Dark overrides",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "T6vAa",
+                          "name": "Outcome",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "24 commented dark overrides stay as notes, not rules",
+                          "lineHeight": 1.45,
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "MUDy9",
+                          "name": "Status",
+                          "width": 120,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "zHR4a",
+                              "name": "Pill",
+                              "fill": "$a2-low-bg",
+                              "cornerRadius": 9,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "s8Kxc",
+                                  "name": "Label",
+                                  "fill": "$a2-ok",
+                                  "content": "Decided",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "fIaHp",
+                          "name": "Where",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "T1.2, #215, #216",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "c53Gq",
+                      "name": "Row D6",
+                      "width": "fill_container",
+                      "stroke": "$a2-border-subtle",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "gap": 16,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "c8qTjv",
+                          "name": "Id",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "D6",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ozfI6",
+                          "name": "Decision",
+                          "fill": "$a2-text",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "Mockup fonts",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "YMaxg",
+                          "name": "Outcome",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Roboto and JetBrains Mono stand in until Segoe UI is available in Pencil",
+                          "lineHeight": 1.45,
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Z4DkP",
+                          "name": "Status",
+                          "width": 120,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "XiS8n",
+                              "name": "Pill",
+                              "fill": "$a2-low-bg",
+                              "cornerRadius": 9,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "JfheJ",
+                                  "name": "Label",
+                                  "fill": "$a2-ok",
+                                  "content": "Decided",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "j7i9f",
+                          "name": "Where",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "T4.1, #248",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "e595b",
+                      "name": "Row D7",
+                      "width": "fill_container",
+                      "stroke": "$a2-border-subtle",
+                      "gap": 16,
+                      "padding": [
+                        12,
+                        24
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "U7DO8E",
+                          "name": "Id",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": 56,
+                          "content": "D7",
+                          "fontFamily": "JetBrains Mono",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Xdlqp",
+                          "name": "Decision",
+                          "fill": "$a2-text",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "Nav rail component",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "iFnSo",
+                          "name": "Outcome",
+                          "fill": "$a2-text-strong",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "TAM ViewNav serves as the NavRail component",
+                          "lineHeight": 1.45,
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "njumr",
+                          "name": "Status",
+                          "width": 120,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Iu9Va",
+                              "name": "Pill",
+                              "fill": "$a2-low-bg",
+                              "cornerRadius": 9,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "GSSJT",
+                                  "name": "Label",
+                                  "fill": "$a2-ok",
+                                  "content": "Decided",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "LAycN",
+                          "name": "Where",
+                          "fill": "$a2-text-muted",
+                          "textGrowth": "fixed-width",
+                          "width": 200,
+                          "content": "T4.1, #248",
+                          "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "normal"
                         }
@@ -238768,7 +239586,7 @@
       "type": "frame",
       "id": "uEm2U",
       "x": 1640,
-      "y": 13682,
+      "y": 14474,
       "name": "2. UI Design Language",
       "clip": true,
       "width": 1440,
