@@ -16,6 +16,8 @@ type RawWorklog struct {
 	Author struct {
 		Name        string `json:"name"`
 		DisplayName string `json:"displayName"`
+		// EmailAddress is empty when the instance hides email.
+		EmailAddress string `json:"emailAddress"`
 	} `json:"author"`
 	Started          string `json:"started"`
 	TimeSpent        string `json:"timeSpent"`
