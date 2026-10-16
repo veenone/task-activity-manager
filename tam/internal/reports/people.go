@@ -39,6 +39,29 @@ type Person struct {
 	// A card is charged to whoever holds it now: TAM keeps no assignee
 	// changes, so a card that changed hands counts for its current holder.
 	InProgressSeconds int `json:"inProgressSeconds"`
+	// SpentSeconds is the actual: every hour logged on this person's cards
+	// so far, by anyone and at any time, which is what an estimate is
+	// measured against. LoggedSeconds above is the sprint's share of work.
+	SpentSeconds int `json:"spentSeconds"`
+	// Issues is the cards behind Cards, in the order the search returned
+	// them, for the People tab's breakdown.
+	Issues []PersonCard `json:"issues"`
+}
+
+// PersonCard is one card in a person's breakdown. LoggedSeconds is the time
+// logged on this card inside the sprint by every author, since a card's own
+// row answers for the card rather than for one person.
+type PersonCard struct {
+	Key               string   `json:"key"`
+	Summary           string   `json:"summary"`
+	Status            string   `json:"status"`
+	StatusCategory    string   `json:"statusCategory"`
+	Points            *float64 `json:"points"`
+	EstimateSeconds   int      `json:"estimateSeconds"`
+	RemainingSeconds  int      `json:"remainingSeconds"`
+	SpentSeconds      int      `json:"spentSeconds"`
+	LoggedSeconds     int      `json:"loggedSeconds"`
+	InProgressSeconds int      `json:"inProgressSeconds"`
 }
 
 // StatusCategory names the Jira bucket ("new", "indeterminate", "done") of a
@@ -64,7 +87,7 @@ func People(sprint backend.Sprint, issues []backend.IssueHistory, category Statu
 		}
 		p, ok := rows[key]
 		if !ok {
-			p = &Person{Username: username, Name: name}
+			p = &Person{Username: username, Name: name, Issues: []PersonCard{}}
 			rows[key] = p
 		}
 		if p.Email == "" {
@@ -87,7 +110,9 @@ func People(sprint backend.Sprint, issues []backend.IssueHistory, category Statu
 			return nil, err
 		}
 		p.InProgressSeconds += inProgress
+		p.SpentSeconds += seconds(iss.TimeSpentSeconds)
 
+		logged := 0
 		for _, w := range append(append([]backend.Worklog{}, h.Worklogs...), h.SubtaskWorklogs...) {
 			at, err := sprintdate.Parse(w.Started)
 			if err != nil {
@@ -96,8 +121,15 @@ func People(sprint backend.Sprint, issues []backend.IssueHistory, category Statu
 			if at.Before(start) || at.After(last) {
 				continue
 			}
+			logged += w.Seconds
 			person(w.Author, w.AuthorName, w.AuthorEmail).LoggedSeconds += w.Seconds
 		}
+		p.Issues = append(p.Issues, PersonCard{
+			Key: iss.Key, Summary: iss.Summary, Status: iss.Status, StatusCategory: iss.StatusCategory,
+			Points: iss.StoryPoints, EstimateSeconds: seconds(iss.OriginalEstimateSeconds),
+			RemainingSeconds: seconds(iss.RemainingEstimateSeconds), SpentSeconds: seconds(iss.TimeSpentSeconds),
+			LoggedSeconds: logged, InProgressSeconds: inProgress,
+		})
 	}
 
 	// A row that has a display name but no username is the same person as
@@ -198,6 +230,8 @@ func (p *Person) absorb(o Person) {
 	p.RemainingSeconds += o.RemainingSeconds
 	p.LoggedSeconds += o.LoggedSeconds
 	p.InProgressSeconds += o.InProgressSeconds
+	p.SpentSeconds += o.SpentSeconds
+	p.Issues = append(p.Issues, o.Issues...)
 }
 
 func seconds(v *int) int {

@@ -154,3 +154,37 @@ func TestARowWithNoUsernameJoinsTheSameNamesRow(t *testing.T) {
 		t.Fatalf("rows = %+v, want one M. Ortiz row holding both cards", rows)
 	}
 }
+
+// TestEachPersonListsTheirCards gives the People tab its breakdown: every
+// card a person holds, with its own figures, and the time logged on it so
+// far (actual) beside the time logged inside the sprint.
+func TestEachPersonListsTheirCards(t *testing.T) {
+	c := assigned(card("PLAT-7", "In Progress", "3", "11", points(5),
+		backend.Change{At: on("2026-08-04", 9), Field: "status", From: "To Do", To: "In Progress", FromID: "1", ToID: "3"},
+	), "Rita Anand", "ranand", "")
+	c.Issue.Summary, c.Issue.StatusCategory = "Apply promo code", "indeterminate"
+	c.Issue.OriginalEstimateSeconds, c.Issue.RemainingEstimateSeconds, c.Issue.TimeSpentSeconds = secs(10), secs(4), secs(7)
+	c.Worklogs = []backend.Worklog{
+		{Author: "ranand", Started: on("2026-08-05", 10), Seconds: 2 * 3600},
+		{Author: "skim", Started: on("2026-08-06", 10), Seconds: 3600},
+		{Author: "ranand", Started: on("2026-07-20", 10), Seconds: 4 * 3600},
+	}
+	rita := row(t, people(t, c), "ranand")
+	if rita.SpentSeconds != 7*3600 {
+		t.Errorf("Rita's actual = %dh, want the 7h logged on her card so far", rita.SpentSeconds/3600)
+	}
+	if len(rita.Issues) != 1 {
+		t.Fatalf("Rita's cards = %+v, want PLAT-7", rita.Issues)
+	}
+	got := rita.Issues[0]
+	want := reports.PersonCard{
+		Key: "PLAT-7", Summary: "Apply promo code", Status: "In Progress", StatusCategory: "indeterminate",
+		Points: points(5), EstimateSeconds: 10 * 3600, RemainingSeconds: 4 * 3600, SpentSeconds: 7 * 3600,
+		LoggedSeconds: 3 * 3600, InProgressSeconds: 10 * 24 * 3600,
+	}
+	if got.Key != want.Key || got.Summary != want.Summary || got.Status != want.Status || got.StatusCategory != want.StatusCategory ||
+		got.Points == nil || *got.Points != 5 || got.EstimateSeconds != want.EstimateSeconds || got.RemainingSeconds != want.RemainingSeconds ||
+		got.SpentSeconds != want.SpentSeconds || got.LoggedSeconds != want.LoggedSeconds || got.InProgressSeconds != want.InProgressSeconds {
+		t.Errorf("card = %+v, want %+v (logged counts every author inside the sprint)", got, want)
+	}
+}

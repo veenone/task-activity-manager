@@ -1804,6 +1804,36 @@ export namespace reports {
 	        this.ideal = source["ideal"];
 	    }
 	}
+	export class PersonCard {
+	    key: string;
+	    summary: string;
+	    status: string;
+	    statusCategory: string;
+	    points?: number;
+	    estimateSeconds: number;
+	    remainingSeconds: number;
+	    spentSeconds: number;
+	    loggedSeconds: number;
+	    inProgressSeconds: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PersonCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.statusCategory = source["statusCategory"];
+	        this.points = source["points"];
+	        this.estimateSeconds = source["estimateSeconds"];
+	        this.remainingSeconds = source["remainingSeconds"];
+	        this.spentSeconds = source["spentSeconds"];
+	        this.loggedSeconds = source["loggedSeconds"];
+	        this.inProgressSeconds = source["inProgressSeconds"];
+	    }
+	}
 	export class Person {
 	    name: string;
 	    username: string;
@@ -1814,6 +1844,8 @@ export namespace reports {
 	    remainingSeconds: number;
 	    loggedSeconds: number;
 	    inProgressSeconds: number;
+	    spentSeconds: number;
+	    issues: PersonCard[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Person(source);
@@ -1830,8 +1862,29 @@ export namespace reports {
 	        this.remainingSeconds = source["remainingSeconds"];
 	        this.loggedSeconds = source["loggedSeconds"];
 	        this.inProgressSeconds = source["inProgressSeconds"];
+	        this.spentSeconds = source["spentSeconds"];
+	        this.issues = this.convertValues(source["issues"], PersonCard);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
+	
 	export class Series {
 	    sprintId: number;
 	    sprintName: string;
