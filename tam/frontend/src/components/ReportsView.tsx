@@ -10,7 +10,8 @@ import { unavailableLine } from "../lib/reportText";
 import { peopleSection } from "../lib/reportPeople";
 import { closedNewestFirst } from "../lib/sprintOrder";
 import { busyLine, isBusyRefusal } from "../lib/publishText";
-import { CapacityPanel, ReportSectionPanel } from "./CapacityPanel";
+import { CapacityPanel } from "./CapacityPanel";
+import { PeoplePanel } from "./PeoplePanel";
 import { KanbanReport } from "./KanbanReport";
 import { ReportOutputs } from "./ReportOutputs";
 import { ReportTabs, reportPanelId, reportTabId } from "./ReportTabs";
@@ -174,7 +175,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
     if (tab === "people") {
       const people = peopleSection(r)[0];
       return people ? (
-        <ReportSectionPanel section={people} headingId="report-people-heading" className="report-people" />
+        <PeoplePanel section={people} people={r.series.people ?? []} />
       ) : (
         <p className="muted" role="status">
           This report was stored before TAM counted people. Rebuild from Jira to add them.

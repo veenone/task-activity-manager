@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ReportPerson, SprintReport } from "../api";
 import { reportDocument } from "./reportDocument";
-import { peopleSection } from "./reportPeople";
+import { peopleSection, personBar } from "./reportPeople";
 
 const rita: ReportPerson = {
   name: "Rita Anand",
@@ -13,6 +13,8 @@ const rita: ReportPerson = {
   remainingSeconds: 2 * 3600 + 30 * 60,
   loggedSeconds: 9 * 3600,
   inProgressSeconds: 26 * 3600,
+  spentSeconds: 10 * 3600,
+  issues: [],
 };
 const unassigned: ReportPerson = {
   name: "",
@@ -24,6 +26,8 @@ const unassigned: ReportPerson = {
   remainingSeconds: 0,
   loggedSeconds: 0,
   inProgressSeconds: 0,
+  spentSeconds: 0,
+  issues: [],
 };
 
 function report(people?: ReportPerson[], state: Partial<SprintReport> = {}): SprintReport {
@@ -61,21 +65,24 @@ describe("the People section", () => {
       "Cards",
       "Points",
       "Estimate",
-      "Remaining",
       "Logged in sprint",
+      "Actual",
       "In progress",
+      "Remaining",
     ]);
     expect(section.table.rows).toEqual([
-      ["Rita Anand", "ranand", "r.anand@example.com", "3", "8", "12h", "2h 30m", "9h", "26h"],
-      ["Unassigned", "", "", "1", "2", "0m", "0m", "0m", "0m"],
+      ["Rita Anand", "ranand", "r.anand@example.com", "3", "8", "12h", "9h", "10h", "26h", "2h 30m"],
+      ["Unassigned", "", "", "1", "2", "0m", "0m", "0m", "0m", "0m"],
     ]);
   });
 
   it("says how logged and in-progress time are counted, and who in-progress time is charged to", () => {
     const [section] = peopleSection(report([rita]));
-    expect(section.notes.join(" ")).toMatch(/worklogs? .*author/i);
-    expect(section.notes.join(" ")).toMatch(/In Progress category/);
-    expect(section.notes.join(" ")).toMatch(/whoever holds the card now/);
+    const notes = section.notes.join(" ");
+    expect(notes).toMatch(/Logged in sprint is the time each person logged/);
+    expect(notes).toMatch(/counts as In Progress/);
+    expect(notes).toMatch(/whoever holds the card now/);
+    expect(notes).toMatch(/Actual counts all time logged on the card/);
   });
 
   it("is left out for a report stored before people were counted", () => {
@@ -86,5 +93,19 @@ describe("the People section", () => {
   it("rides in the published document, so the page, the spreadsheet and the deck carry it", () => {
     const doc = reportDocument(report([rita]));
     expect(doc?.sections.map((s) => s.heading)).toContain("People");
+  });
+});
+
+describe("personBar", () => {
+  it("is the backlog's bar: actual time against the estimate", () => {
+    expect(personBar(12 * 3600, 9 * 3600)).toMatchObject({ value: 9 * 3600, max: 12 * 3600, tone: "progress" });
+  });
+
+  it("turns over when the actual passes the estimate", () => {
+    expect(personBar(4 * 3600, 6 * 3600)).toMatchObject({ value: 4 * 3600, max: 6 * 3600, tone: "over" });
+  });
+
+  it("draws nothing with no estimate to measure against", () => {
+    expect(personBar(0, 3600)).toBeNull();
   });
 });

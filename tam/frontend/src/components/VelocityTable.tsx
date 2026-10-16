@@ -1,6 +1,7 @@
 import type { VelocityRow } from "../api";
 import { amount, emptyVelocityLine, velocityFloorLine } from "../lib/reportText";
 import { velocityTable } from "../lib/reportTables";
+import { ReportNotes } from "./ReportNotes";
 
 // VelocityTable is the board's last closed sprints as rows, oldest first,
 // which is the order VelocityChart reads them in beside it. The backend
@@ -66,7 +67,7 @@ export function VelocityTable({ rows }: { rows: VelocityRow[] }) {
         </tbody>
       </table>
       </div>
-      <p className="muted small">{velocityFloorLine()}</p>
+      <ReportNotes notes={[velocityFloorLine()]} />
     </>
   );
 }

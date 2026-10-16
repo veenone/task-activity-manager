@@ -114,6 +114,12 @@ const SENTENCE = "Sprint 11 committed 34 points, added 5, removed 2, completed 2
 const rita: ReportPerson = {
   name: "Rita Anand", username: "ranand", email: "r.anand@example.com", cards: 3, points: 8,
   estimateSeconds: 12 * 3600, remainingSeconds: 2 * 3600, loggedSeconds: 9 * 3600, inProgressSeconds: 26 * 3600,
+  spentSeconds: 10 * 3600,
+  issues: [{
+    key: "PLAT-412", summary: "Apply promo code at payment", status: "In Progress", statusCategory: "indeterminate",
+    points: 5, estimateSeconds: 8 * 3600, remainingSeconds: 2 * 3600, spentSeconds: 7 * 3600,
+    loggedSeconds: 6 * 3600, inProgressSeconds: 20 * 3600,
+  }],
 };
 
 beforeEach(() => {
@@ -150,9 +156,42 @@ describe("ReportsView people tab", () => {
     expect(within(row).getByRole("cell", { name: "r.anand@example.com" })).toBeInTheDocument();
     expect(within(row).getByRole("cell", { name: "9h" })).toBeInTheDocument();
     expect(within(row).getByRole("cell", { name: "26h" })).toBeInTheDocument();
-    expect(within(panel).getByText(/charged to whoever holds the card now/)).toBeInTheDocument();
+    // The notes sit in their own box, apart from the figures.
+    expect(within(within(panel).getByRole("note")).getByText(/charged to whoever holds the card now/)).toBeInTheDocument();
     // The sprint's charts belong to the other tab.
     expect(screen.queryByText(SENTENCE)).toBeNull();
+  });
+
+  it("draws each person's actual against their estimate as the backlog's bar", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ people: [rita] }) }));
+    renderView();
+    await screen.findByText(SENTENCE);
+    await user.click(screen.getByRole("tab", { name: "People" }));
+    const row = within(screen.getByRole("group", { name: "People" })).getByRole("row", { name: /Rita Anand/ });
+    expect(within(row).getByRole("progressbar")).toHaveAttribute("aria-valuetext", "10h of 12h");
+  });
+
+  it("opens a person's cards under their row and closes them again", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ people: [rita] }) }));
+    renderView();
+    await screen.findByText(SENTENCE);
+    await user.click(screen.getByRole("tab", { name: "People" }));
+    const toggle = screen.getByRole("button", { name: "Show Rita Anand's cards" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("row", { name: /PLAT-412/ })).toBeNull();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const card = screen.getByRole("row", { name: /PLAT-412/ });
+    expect(within(card).getByText("Apply promo code at payment")).toBeInTheDocument();
+    expect(within(card).getByText("In Progress")).toBeInTheDocument();
+    expect(within(card).getByRole("cell", { name: "20h" })).toBeInTheDocument();
+    expect(within(card).getByRole("progressbar")).toHaveAttribute("aria-valuetext", "7h of 8h");
+
+    await user.click(toggle);
+    expect(screen.queryByRole("row", { name: /PLAT-412/ })).toBeNull();
   });
 
   it("moves between the tabs with the arrow keys", async () => {

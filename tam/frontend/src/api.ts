@@ -622,6 +622,26 @@ export interface ReportPerson {
   remainingSeconds: number;
   loggedSeconds: number;
   inProgressSeconds: number;
+  // Every hour logged on the person's cards so far, by anyone: the actual
+  // an estimate is measured against.
+  spentSeconds: number;
+  // The cards behind cards, for the People tab's breakdown.
+  issues: ReportPersonCard[];
+}
+
+// ReportPersonCard is reports.PersonCard: one card in a person's breakdown.
+// loggedSeconds counts every author inside the sprint.
+export interface ReportPersonCard {
+  key: string;
+  summary: string;
+  status: string;
+  statusCategory: string;
+  points: number | null;
+  estimateSeconds: number;
+  remainingSeconds: number;
+  spentSeconds: number;
+  loggedSeconds: number;
+  inProgressSeconds: number;
 }
 
 export interface VelocityRow {
