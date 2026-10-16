@@ -893,7 +893,7 @@ input, button, select { font-family: inherit; font-size: inherit; }
    open person and their cards share a tint so the group reads as one. */
 .people-table-wrap { overflow-x: auto; }
 .people-table { font-variant-numeric: tabular-nums; }
-.people-table th, .people-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.people-table th, .people-table tbody th, .people-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .people-table thead th { background: var(--surface-2); font-size: var(--fs-sm); white-space: nowrap; }
 .people-table .people-num, .people-table th.people-num { text-align: right; white-space: nowrap; }
 .people-row > th { text-align: left; color: var(--text); font-weight: 600; white-space: nowrap; }
