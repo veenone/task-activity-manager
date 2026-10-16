@@ -283,6 +283,8 @@ export function GetTestCreateFields(arg1:string):Promise<Array<jira.FieldDef>>;
 
 export function GetTestCustomFields(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.CustomFieldValue>>;
 
+export function GetTestDataset(arg1:string,arg2:string,arg3:boolean):Promise<testrepo.Dataset>;
+
 export function GetTestMeta(arg1:string,arg2:string):Promise<jira.TestMeta>;
 
 export function GetTestPreconditions(arg1:string,arg2:string,arg3:boolean):Promise<Array<testrepo.Precondition>>;

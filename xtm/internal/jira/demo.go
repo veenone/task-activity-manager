@@ -1354,3 +1354,32 @@ func demoComponentsForIndex(i int) []string {
 	}
 	return []string{first}
 }
+
+// demoDataset gives a minority of demo tests a parameter table, so the
+// dataset panel can be seen without a live Xray instance (#267 Phase 1).
+//
+// Every twentieth test by key index gets one, which roughly matches how
+// common parameterized tests are in a real project. The parameters are
+// theme-independent: the demo step text is themed and carries no
+// ${placeholders}, so placeholder highlighting is not exercised in demo mode.
+func demoDataset(testKey string) Dataset {
+	idx := demoKeyIndex(testKey)
+	if idx < 0 || idx%20 != 0 {
+		return Dataset{}
+	}
+	params := []DatasetParameter{{Name: "USERNAME"}, {Name: "REGION"}}
+	rows := [][]string{
+		{"alice", "eu-west"},
+		{"bob", "us-east"},
+		{"carol", "ap-south"},
+	}
+	// Every third dataset also carries a combinatorial parameter, so the
+	// panel's "no iteration count when combinatorial" branch is reachable.
+	if idx%60 == 0 {
+		params = append(params, DatasetParameter{Name: "PRIORITY", Combinatorial: true})
+		for i := range rows {
+			rows[i] = append(rows[i], []string{"high", "low", "high"}[i])
+		}
+	}
+	return Dataset{Parameters: params, Rows: rows}
+}

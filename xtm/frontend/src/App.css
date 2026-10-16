@@ -7438,3 +7438,56 @@ tr.row-checked:hover {
     transition: none;
   }
 }
+
+/* Dataset: a parameterized test's parameter table in the detail panel (#267).
+   Rows are capped by DATASET_ROW_CAP, so this never draws Xray's full
+   1,000-row ceiling. */
+.dataset-section {
+  margin-top: 12px;
+}
+.dataset-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dataset-count {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: normal;
+}
+.dataset-refresh {
+  font-size: var(--fs-xs);
+  margin-left: auto;
+}
+.dataset-error {
+  color: var(--danger-fg);
+  font-size: var(--fs-sm);
+}
+/* The table scrolls sideways on its own: 20 parameters never fit the panel. */
+.dataset-scroll {
+  overflow-x: auto;
+}
+.dataset-table {
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+.dataset-table th,
+.dataset-table td {
+  border: 1px solid var(--border-subtle);
+  padding: 2px 6px;
+  text-align: left;
+  white-space: nowrap;
+}
+.dataset-table th {
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+/* Xray's own marker for a parameter it expands into extra iterations. */
+.dataset-combinatorial {
+  color: var(--warn-fg);
+  margin-left: 2px;
+}
+.dataset-capped {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}

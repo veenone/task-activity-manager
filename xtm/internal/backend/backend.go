@@ -91,6 +91,13 @@ type Capabilities struct {
 	SupportsBugRouting bool `json:"supportsBugRouting"`
 	SupportsTags       bool `json:"supportsTags"`
 
+	// SupportsDatasets: the backend models parameterized tests as a dataset
+	// (parameters and rows) that GetDataset can read. It reports that the
+	// backend HAS the concept, not that this instance permits it: Xray gained
+	// the dataset REST endpoints in 5.1 and exposes no version endpoint, so an
+	// older instance answers 404 and reads as "no dataset".
+	SupportsDatasets bool `json:"supportsDatasets"`
+
 	// SupportsComponentAdmin: the backend can create, edit and delete project
 	// components (it implements ComponentManager).
 	SupportsComponentAdmin bool `json:"supportsComponentAdmin"`
@@ -148,6 +155,12 @@ type Backend interface {
 	DeleteTestStep(ctx context.Context, key, stepID string) error
 	MoveTestStep(ctx context.Context, key, stepID string, index int, action, data, expected string) error
 	CreateCalledTestStep(ctx context.Context, key, calledTestKey, calledTestID string) (string, error)
+
+	// --- datasets ---
+	// GetDataset returns the dataset attached to a test, or an empty Dataset
+	// when it has none. contextKey names a container whose dataset overrides
+	// the test's own; empty asks for the test level.
+	GetDataset(ctx context.Context, testKey, contextKey string) (Dataset, error)
 
 	// --- custom fields ---
 	ListCustomFields(ctx context.Context, projectKey string) ([]CustomFieldDef, error)

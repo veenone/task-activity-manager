@@ -6,6 +6,7 @@ import { PreconditionsSection, MembershipsSection, RequirementsSection, BugsSect
 import { RunHistorySection } from "./test-detail/RunHistorySection";
 import { DescriptionSection, CucumberEditor, GenericEditor } from "./test-detail/DefinitionSections";
 import { StepsSection } from "./test-detail/StepsSection";
+import { DatasetSection } from "./test-detail/DatasetSection";
 import { DetailModals } from "./test-detail/DetailModals";
 import type { TestDetailProps } from "./test-detail/types";
 import { useTestDetailState } from "./test-detail/useTestDetailState";
@@ -52,6 +53,12 @@ export function TestDetail(p: TestDetailProps) {
           ) : (
             <StepsSection s={s} a={a} p={p} />
           )}
+
+          <DatasetSection
+            profileId={s.profileId}
+            testKey={p.testKey}
+            supported={s.caps.supportsDatasets}
+          />
         </div>
       )}
       <DetailModals s={s} a={a} p={p} />

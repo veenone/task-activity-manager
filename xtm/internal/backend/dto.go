@@ -279,3 +279,20 @@ type BugDetail struct {
 	Reporter          string `json:"reporter"`
 	Severity          string `json:"severity"`
 }
+
+// DatasetParameter is one column of a test's dataset: a parameter that a
+// ${placeholder} in the test's steps or definition refers to (#267).
+type DatasetParameter struct {
+	Name string `json:"name"`
+	// Combinatorial parameters are expanded by the backend into extra
+	// iterations, so a dataset carrying one runs more times than it has rows.
+	Combinatorial bool `json:"combinatorial"`
+}
+
+// Dataset is a test's parameter table: parameters as columns, one row per
+// iteration. Rows are rectangular, each the length of Parameters. An empty
+// Dataset means the test has none, which is the common case.
+type Dataset struct {
+	Parameters []DatasetParameter `json:"parameters"`
+	Rows       [][]string         `json:"rows"`
+}

@@ -538,6 +538,10 @@ export function GetTestCustomFields(arg1, arg2, arg3) {
   return window['go']['main']['App']['GetTestCustomFields'](arg1, arg2, arg3);
 }
 
+export function GetTestDataset(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetTestDataset'](arg1, arg2, arg3);
+}
+
 export function GetTestMeta(arg1, arg2) {
   return window['go']['main']['App']['GetTestMeta'](arg1, arg2);
 }

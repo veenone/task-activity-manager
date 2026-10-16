@@ -164,6 +164,7 @@ export {
   GetBulkTransitionOptions,
   BulkTransitionTests,
   GetTestSteps,
+  GetTestDataset,
   CheckJiraTestSteps,
   GetTestReview,
   SetTestReview,
@@ -584,6 +585,27 @@ export interface Capabilities {
   supportsTags: boolean;
   // Create, edit and delete project components (Jira only).
   supportsComponentAdmin: boolean;
+  // The backend models parameterized tests as a dataset GetTestDataset can
+  // read. Means the backend HAS the concept, not that this instance permits
+  // it: an Xray below 5.1 has no dataset endpoint and reads as no dataset.
+  supportsDatasets: boolean;
+}
+
+// DatasetParameter mirrors testrepo.DatasetParameter: one column of a
+// parameterized test's dataset. A combinatorial parameter is expanded by
+// Xray into extra iterations, so such a dataset runs more times than it has
+// rows, by a rule Xray does not publish.
+export interface DatasetParameter {
+  name: string;
+  combinatorial: boolean;
+}
+
+// TestDataset mirrors testrepo.Dataset: the parameters a test's
+// ${placeholder} references resolve against, and one row per iteration.
+// Empty parameters means the test is not parameterized.
+export interface TestDataset {
+  parameters: DatasetParameter[];
+  rows: string[][];
 }
 
 // ProjectComponent mirrors backend.Component: one Jira project component.

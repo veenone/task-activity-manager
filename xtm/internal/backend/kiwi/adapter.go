@@ -581,6 +581,12 @@ func (a *Adapter) CreateTestStep(ctx context.Context, key, action, data, expecte
 	return "1", nil
 }
 
+// GetDataset refuses: Kiwi TCMS has no dataset equivalent, so there is
+// nothing to read and an empty answer would be a lie rather than a fact.
+func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (backend.Dataset, error) {
+	return backend.Dataset{}, backend.ErrUnsupported
+}
+
 func (a *Adapter) UpdateTestStep(ctx context.Context, key, stepID string, fields map[string]string) error {
 	return backend.ErrUnsupported // P4.2 (write)
 }

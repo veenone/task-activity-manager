@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 52
+const schemaVersion = 53
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -144,6 +144,27 @@ CREATE TABLE IF NOT EXISTS test_step (
 	expected        TEXT NOT NULL DEFAULT '',
 	called_test_key TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (profile_id, test_key, xray_id)
+);
+
+-- test_dataset caches a test's Xray dataset: the parameters a
+-- ${placeholder} refers to, and one row per iteration (#267).
+--
+-- A row is written even when the test has NO dataset, with empty JSON
+-- arrays. That is deliberate: most tests are not parameterized, and
+-- without recording the absence the detail panel cannot tell "asked, none"
+-- from "never asked" and re-fetches from Jira on every open.
+--
+-- context_key names a Test Plan or Test Execution whose dataset overrides
+-- the test's own. It is '' at the test level, which is all Phase 1 reads;
+-- it is in the key so container-level datasets need no migration later.
+CREATE TABLE IF NOT EXISTS test_dataset (
+	profile_id      TEXT NOT NULL,
+	test_key        TEXT NOT NULL,
+	context_key     TEXT NOT NULL DEFAULT '',
+	parameters_json TEXT NOT NULL DEFAULT '[]',
+	rows_json       TEXT NOT NULL DEFAULT '[]',
+	fetched_at      TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, test_key, context_key)
 );
 
 CREATE TABLE IF NOT EXISTS test_container (
