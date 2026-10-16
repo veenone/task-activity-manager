@@ -556,6 +556,7 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsTags:                false,
 		SupportsComponentAdmin:      true,
 		SupportsDatasets:            true,
+		SupportsDatasetWrites:       true,
 	}
 }
 
@@ -571,6 +572,17 @@ func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (b
 		params[i] = backend.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
 	}
 	return backend.Dataset{Parameters: params, Rows: ds.Rows}, nil
+}
+
+// SetDataset replaces the test's own dataset (#277 W1). The client resolves
+// the key to the numeric issue id the dataset resource addresses, so nothing
+// above this layer has to carry a Jira id.
+func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Dataset) error {
+	params := make([]jira.DatasetParameter, len(d.Parameters))
+	for i, p := range d.Parameters {
+		params[i] = jira.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+	}
+	return a.c.SetDataset(ctx, testKey, jira.Dataset{Parameters: params, Rows: d.Rows})
 }
 
 func toBackendComponent(c jira.Component) backend.Component {
