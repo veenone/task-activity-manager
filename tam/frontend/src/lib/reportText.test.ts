@@ -92,7 +92,7 @@ describe("floorLine", () => {
     // the half of the old sentence that is never dead text.
     const line = floorLine();
     expect(line).toContain("Committed is a minimum estimate");
-    expect(line).not.toContain("left and later returned");
+    expect(line).not.toContain("left and came back");
   });
 });
 
@@ -105,7 +105,7 @@ describe("removedFloorLine", () => {
   });
 
   it("warns that removed sees only the cards that came back, once one did", () => {
-    expect(removedFloorLine(3)).toContain("left and later returned");
+    expect(removedFloorLine(3)).toContain("left and came back");
   });
 });
 
@@ -202,7 +202,7 @@ describe("velocityFloorLine", () => {
   it("says the Committed column is a floor in every row, not only in the sprint above it", () => {
     const line = velocityFloorLine();
     expect(line).toContain("Committed is a minimum estimate in every row");
-    expect(line).toContain("Cards removed for good are not visible");
+    expect(line).toContain("Cards removed for good don't show up");
   });
 });
 
@@ -268,17 +268,17 @@ describe("the done agreement's sentences", () => {
 describe("the kanban report's sentences", () => {
   it("puts the counts now rather than in a period that closed", () => {
     expect(kanbanScopeLine()).toContain("the board as the last sync left it");
-    expect(kanbanScopeLine()).toContain("not a period that has closed");
+    expect(kanbanScopeLine()).toContain("as the last sync left it");
     // A card Jira holds and TAM has not read is the one thing a count off the
     // cache cannot see, and the caveat capacityScopeLine carries for a sprint.
-    expect(kanbanScopeLine()).toContain("TAM has not read");
+    expect(kanbanScopeLine()).toContain("TAM hasn't read yet");
   });
 
   it("names the three metrics a kanban team will not find in it", () => {
     expect(kanbanMetricsLine()).toContain("Throughput");
     expect(kanbanMetricsLine()).toContain("cycle time");
     expect(kanbanMetricsLine()).toContain("cumulative flow diagram");
-    expect(kanbanMetricsLine()).toContain("not built yet");
+    expect(kanbanMetricsLine()).toContain("aren't built yet");
   });
 
   it("tells a board whose columns never arrived from one whose columns hold nothing", () => {

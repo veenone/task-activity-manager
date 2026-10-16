@@ -68,7 +68,7 @@ export function floorLine(): string {
 // report, most of which had nothing for it to qualify.
 export function removedFloorLine(removed: number): string {
   if (removed <= 0) return "";
-  return "Removed counts cards that left and later returned; cards removed for good are not visible.";
+  return "Removed counts cards that left and came back. Cards removed for good don't show up here.";
 }
 
 // unitLine says why a report counts cards, and is empty for one counting
@@ -96,14 +96,14 @@ export function unitLine(unit: string, unitReason: string): string {
 // travels with them onto a page, a spreadsheet and a deck as well as the
 // screen.
 export function modeLine(live: boolean): string {
-  if (live) return "In progress: these figures are provisional. They may change as work moves.";
+  if (live) return "Sprint in progress. These figures will change as work moves.";
   return "Closed sprint. These figures are final.";
 }
 
 // emptyVelocityLine is a board with no closed sprint a row could be built
 // from, which is a fact about the board and not an empty table.
 export function emptyVelocityLine(): string {
-  return "No closed sprint on this board has a start and an end date TAM can read, so there is no velocity table.";
+  return "No closed sprint on this board has start and end dates TAM can read, so there's no velocity table yet.";
 }
 
 // velocityPartialLine is the row note "Built on a partial changelog" worded
@@ -122,7 +122,7 @@ export function velocityPartialLine(sprintNames: string[]): string {
 // these rows to Confluence out of this module, where there is no paragraph
 // beside them to borrow the qualification from.
 export function velocityFloorLine(): string {
-  return "Committed is a minimum estimate in every row. Cards removed for good are not visible in the table.";
+  return "Committed is a minimum estimate in every row. Cards removed for good don't show up in the table.";
 }
 
 // The chart sentences. A chart states its numbers in text beside each mark
@@ -173,13 +173,13 @@ export function chartUndrawableLine(title: string): string {
 // mixedUnitsLine explains a velocity chart split into one panel per unit.
 // One axis over points and cards would read a card as a point.
 export function mixedUnitsLine(): string {
-  return "These sprints use different units, so each unit gets a chart of its own. A single axis would read a card as a point.";
+  return "These sprints use different units, so each unit gets its own chart. On one axis a card would read as a point.";
 }
 
 // singleSprintLine is under a velocity chart with one bar pair: it is a
 // figure, not yet a trend.
 export function singleSprintLine(): string {
-  return "Only one closed sprint has dates TAM can read, so there is no trend to compare it against yet.";
+  return "Only one closed sprint has dates TAM can read, so there's no trend to compare it with yet.";
 }
 
 // methodLine is printed with the numbers rather than kept in a document,
@@ -195,7 +195,7 @@ export function methodLine(): string {
 // work people logged, and an estimate changed mid-sprint moves the whole
 // scope rather than stepping it on the day it changed.
 export function timeBurndownLine(): string {
-  return "Hours are measured, not reconstructed: the scope is the issues' original estimates and the burn is the work logged against them, on the day it was logged for. An estimate changed during the sprint moves the whole scope line.";
+  return "The scope is the issues' original estimates and the burn is the work logged against them, on the day it was logged for. If an estimate changes during the sprint, the whole scope line moves.";
 }
 
 // MAX_NAMED_KEYS caps the keys truncationLine prints, so a sprint where
@@ -235,7 +235,7 @@ export function truncationLine(keys: string[]): string {
 // noLimitsLine is a board with no limit on any column, from Jira or set in
 // TAM, and it names both because a reader of the page can check neither.
 export function noLimitsLine(): string {
-  return "No column of this board has a limit, from Jira or set in TAM, so there is nothing for the cards to be counted against.";
+  return "No column on this board has a limit, from Jira or set in TAM, so there's nothing to count the cards against.";
 }
 
 // capacityCountLine says what the cards in the table are counted by, which
@@ -264,7 +264,7 @@ export function capacityBreachLine(columns: string[]): string {
 // about a column now, and TAM keeps no record of what a column held on a
 // past afternoon.
 export function capacityScopeLine(): string {
-  return "The counts are this sprint's cards as the last sync left them, so a card Jira holds and TAM has not read is not among them.";
+  return "The counts are this sprint's cards as the last sync left them. Cards in Jira that TAM hasn't read yet aren't included.";
 }
 
 // The kanban report's wording. A kanban board has no sprint, so nothing in
@@ -280,8 +280,8 @@ export function capacityScopeLine(): string {
 // see, which is the half of capacityScopeLine that still holds.
 export function kanbanScopeLine(): string {
   return (
-    "These counts are the board as the last sync left it, not a period that has closed. " +
-    "A card Jira holds and TAM has not read is not among them."
+    "These counts show the board as the last sync left it. " +
+    "Cards in Jira that TAM hasn't read yet aren't included."
   );
 }
 
@@ -291,7 +291,7 @@ export function kanbanScopeLine(): string {
 // yet. Saying so is cheaper than a reader concluding the sections failed to
 // load.
 export function kanbanMetricsLine(): string {
-  return "Throughput, cycle time and a cumulative flow diagram are not built yet, so column capacity is the whole of this report.";
+  return "Throughput, cycle time and a cumulative flow diagram aren't built yet, so this report only shows column capacity.";
 }
 
 // kanbanUnsyncedLine is a board whose columns have never reached the cache.
