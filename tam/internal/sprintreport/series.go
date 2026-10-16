@@ -64,6 +64,9 @@ func (s *Service) seriesFor(ctx context.Context, profileID string, boardID int, 
 	if err != nil {
 		return reports.Series{}, "", err
 	}
+	if series.People, err = reports.People(sprint, issues, s.statusCategory(ctx, issues), s.Now()); err != nil {
+		return reports.Series{}, "", err
+	}
 	if closed {
 		if err := s.store.SaveReport(ctx, profileID, boardID, series); err != nil {
 			return reports.Series{}, "", err

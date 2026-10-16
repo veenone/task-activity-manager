@@ -415,6 +415,7 @@ export namespace backend {
 	    id: string;
 	    author: string;
 	    authorName: string;
+	    authorEmail: string;
 	    started: string;
 	    timeSpent: string;
 	    seconds: number;
@@ -431,6 +432,7 @@ export namespace backend {
 	        this.id = source["id"];
 	        this.author = source["author"];
 	        this.authorName = source["authorName"];
+	        this.authorEmail = source["authorEmail"];
 	        this.started = source["started"];
 	        this.timeSpent = source["timeSpent"];
 	        this.seconds = source["seconds"];
@@ -1802,6 +1804,34 @@ export namespace reports {
 	        this.ideal = source["ideal"];
 	    }
 	}
+	export class Person {
+	    name: string;
+	    username: string;
+	    email: string;
+	    cards: number;
+	    points: number;
+	    estimateSeconds: number;
+	    remainingSeconds: number;
+	    loggedSeconds: number;
+	    inProgressSeconds: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Person(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.username = source["username"];
+	        this.email = source["email"];
+	        this.cards = source["cards"];
+	        this.points = source["points"];
+	        this.estimateSeconds = source["estimateSeconds"];
+	        this.remainingSeconds = source["remainingSeconds"];
+	        this.loggedSeconds = source["loggedSeconds"];
+	        this.inProgressSeconds = source["inProgressSeconds"];
+	    }
+	}
 	export class Series {
 	    sprintId: number;
 	    sprintName: string;
@@ -1816,6 +1846,7 @@ export namespace reports {
 	    days: Day[];
 	    truncated: string[];
 	    issues: string[];
+	    people?: Person[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Series(source);
@@ -1836,6 +1867,7 @@ export namespace reports {
 	        this.days = this.convertValues(source["days"], Day);
 	        this.truncated = source["truncated"];
 	        this.issues = source["issues"];
+	        this.people = this.convertValues(source["people"], Person);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
