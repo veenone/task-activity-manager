@@ -588,13 +588,19 @@ func (c *Client) CreatePrecondition(ctx context.Context, projectKey, summary, pt
 	if strings.TrimSpace(description) != "" {
 		fields["description"] = description
 	}
-	if strings.TrimSpace(ptype) != "" {
-		id, err := c.preconditionTypeFieldID(ctx)
-		if err != nil {
-			return "", fmt.Errorf("resolve Pre-Condition Type field: %w", err)
-		}
-		if id != "" {
-			fields[id] = map[string]string{"value": ptype}
+	if t := strings.TrimSpace(ptype); t != "" {
+		// A type that cannot be sent never fails the create. Either the
+		// instance has no Pre-Condition Type field, or its field catalogue
+		// could not be read; both only log. Returning an error here would mean
+		// an unreachable /rest/api/2/field stops a team creating preconditions
+		// at all, which is a worse failure than losing the type.
+		switch id, err := c.preconditionTypeFieldID(ctx); {
+		case err != nil:
+			log.Printf("precondition type %q not sent: reading the field catalogue failed: %v", t, err)
+		case id != "":
+			fields[id] = map[string]string{"value": t}
+		default:
+			log.Printf("precondition type %q not sent: this instance has no Pre-Condition Type field", t)
 		}
 	}
 	mergeExtraFields(fields, extraFields)

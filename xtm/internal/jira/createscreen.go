@@ -59,13 +59,18 @@ func (c *Client) GetCreateScreenFields(ctx context.Context, projectKey, issueTyp
 	for _, id := range skip {
 		skipped[id] = true
 	}
+	// A field offered on more than one issue type is answered once per type.
+	// The dialog must render it once, or the second copy overwrites what the
+	// user typed into the first.
+	seen := make(map[string]bool)
 	var out []FieldDef
 	for _, proj := range meta.Projects {
 		for _, it := range proj.IssueTypes {
 			for id, fd := range it.Fields {
-				if skipped[id] || !fd.Required {
+				if skipped[id] || !fd.Required || seen[id] {
 					continue
 				}
+				seen[id] = true
 				avs := make([]FieldOption, 0, len(fd.AllowedValues))
 				for _, av := range fd.AllowedValues {
 					v := av.Value
