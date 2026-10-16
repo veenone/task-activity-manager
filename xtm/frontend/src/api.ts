@@ -273,6 +273,20 @@ export {
   RemoveIgnoreWord,
 } from "../wailsjs/go/main/App";
 export { ChangeTestType } from "../wailsjs/go/main/App";
+import { SaveTestDataset as saveTestDatasetBinding } from "../wailsjs/go/main/App";
+import { testrepo } from "../wailsjs/go/models";
+
+// SaveTestDataset stores a test's dataset locally and queues it for commit
+// (#277 W1). The generated binding takes the model class, so the plain shape
+// the rest of this module deals in is converted here instead of being cast
+// away at the call site.
+export async function SaveTestDataset(
+  profileId: string,
+  testKey: string,
+  dataset: TestDataset,
+): Promise<void> {
+  await saveTestDatasetBinding(profileId, testKey, testrepo.Dataset.createFrom(dataset));
+}
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
 // TypeConversion is a plain-shape mirror of testrepo.TypeConversion returned
@@ -589,6 +603,10 @@ export interface Capabilities {
   // read. Means the backend HAS the concept, not that this instance permits
   // it: an Xray below 5.1 has no dataset endpoint and reads as no dataset.
   supportsDatasets: boolean;
+  // The backend can create and replace a dataset, not only read one. Separate
+  // from supportsDatasets so a read-only backend still shows the table while
+  // the editor stays away.
+  supportsDatasetWrites: boolean;
 }
 
 // DatasetParameter mirrors testrepo.DatasetParameter: one column of a

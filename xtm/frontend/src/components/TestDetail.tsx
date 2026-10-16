@@ -58,6 +58,7 @@ export function TestDetail(p: TestDetailProps) {
             profileId={s.profileId}
             testKey={p.testKey}
             supported={s.caps.supportsDatasets}
+            canEdit={s.caps.supportsDatasetWrites}
           />
         </div>
       )}

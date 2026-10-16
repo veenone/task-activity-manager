@@ -117,6 +117,7 @@ vi.mock("../features", () => ({
 const fullCaps: Capabilities = {
   name: "xray",
   supportsDatasets: true,
+  supportsDatasetWrites: true,
   idStyle: "opaque",
   supportsJqlScope: true,
   stepModel: "objects",
