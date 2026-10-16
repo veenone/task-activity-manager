@@ -459,6 +459,7 @@ func (r *Repository) RenameTest(profileID, oldKey, newKey string) error {
 		{"test_step", "test_key"},
 		{"test_precondition", "test_key"},
 		{"test_container_test", "test_key"},
+		{"test_dataset", "test_key"},
 	} {
 		if _, err := tx.Exec(
 			fmt.Sprintf(`UPDATE %s SET %s = ? WHERE profile_id = ? AND %s = ?`,
@@ -469,14 +470,15 @@ func (r *Repository) RenameTest(profileID, oldKey, newKey string) error {
 		}
 	}
 	// Rewrite still-pending changes that key off the Test so they commit against
-	// the real key — folder/field edits (test_case), precondition sets, reviews
-	// and comments key by the bare Test key; step rows key by "<testKey>:<xrayID>".
+	// the real key — folder/field edits (test_case), precondition sets, reviews,
+	// comments and datasets key by the bare Test key; step rows key by
+	// "<testKey>:<xrayID>".
 	// The test_create row is intentionally left alone: it is committed by id and
 	// then deleted, so its key is immaterial.
 	if _, err := tx.Exec(
 		`UPDATE pending_change SET entity_key = ?
 		 WHERE profile_id = ? AND entity_key = ?
-		   AND entity_type IN ('test_case','precondition_set','test_review','issue_comment')`,
+		   AND entity_type IN ('test_case','precondition_set','test_review','issue_comment','test_dataset')`,
 		newKey, profileID, oldKey,
 	); err != nil {
 		return fmt.Errorf("rewrite test pending rows: %w", err)

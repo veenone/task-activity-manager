@@ -3920,6 +3920,17 @@ func (r *Repository) DiscardPendingChange(profileID string, changeID int64) erro
 		); err != nil {
 			return fmt.Errorf("revert custom field: %w", err)
 		}
+	case entityTestDataset:
+		// The before value is the whole table as it was synced, so putting it
+		// back is one write. Leaving the cache alone would show the user an
+		// edit that is no longer queued (#277 W1).
+		var synced Dataset
+		if err := json.Unmarshal([]byte(beforeVal), &synced); err != nil {
+			return fmt.Errorf("decode dataset snapshot: %w", err)
+		}
+		if err := saveTestDataset(tx, profileID, entityKey, "", synced); err != nil {
+			return err
+		}
 	case entityIssueComment:
 		// A queued comment has no local cache state — discarding it just drops
 		// the pending row (handled after the switch).
@@ -4807,6 +4818,7 @@ const (
 	entityPreconditionAdd    = "precondition_add"
 	entityPreconditionDelete = "precondition_delete"
 	entityCustomField        = "custom_field"
+	entityTestDataset        = "test_dataset"
 	entityFolderCreate       = "folder_create"
 	entityFolderRename       = "folder_rename"
 	entityFolderDelete       = "folder_delete"
