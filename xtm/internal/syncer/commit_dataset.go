@@ -20,6 +20,13 @@ import (
 // one line per conflicting field and has only this to go on.
 const datasetConflictLabel = "Dataset"
 
+// datasetAPIAbsent replaces the raw 404 an instance below Xray 5.1 answers
+// with. The dataset endpoints arrived in 5.1, and no REST call reports the
+// plugin version, so the write is how XTM finds out. Reported as a failure
+// rather than a skip: the capability is on for this backend, and it is this
+// instance that cannot take the write. Either way the row stays pending.
+const datasetAPIAbsent = "this Jira has no Xray dataset API, which Xray 5.1 added: the dataset was not written and is still pending"
+
 // commitDatasets pushes queued dataset edits (#277 W1).
 //
 // Each write replaces the test's whole table, so a remote change that the
@@ -69,10 +76,11 @@ func (e *Engine) commitDatasets(ctx context.Context, profileID string, rows []te
 		}
 
 		if err := e.backend.SetDataset(ctx, c.EntityKey, toBackendDataset(mine)); err != nil {
-			result.Failed = append(result.Failed, FailedCommit{
-				TestKey: c.EntityKey,
-				Error:   fmt.Sprintf("write the dataset of %s: %s", c.EntityKey, sanitizeError(err.Error())),
-			})
+			reason := fmt.Sprintf("write the dataset of %s: %s", c.EntityKey, sanitizeError(err.Error()))
+			if isNotFoundErr(err) {
+				reason = datasetAPIAbsent
+			}
+			result.Failed = append(result.Failed, FailedCommit{TestKey: c.EntityKey, Error: reason})
 			continue
 		}
 		if err := e.repo.CommitPendingChanges(profileID, []int64{c.ID}); err != nil {

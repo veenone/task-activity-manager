@@ -184,6 +184,46 @@ func TestCommitDatasetOfANewTestUsesTheRealKey(t *testing.T) {
 	}
 }
 
+// Xray added the dataset API in 5.1. An older instance answers 404 to the
+// write, which on its own reads as "the test is gone".
+func TestCommitDatasetNamesAnInstanceWithNoDatasetAPI(t *testing.T) {
+	repo := datasetRepo(t)
+	if err := repo.EditTestDataset("p1", "QA-1", testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USERNAME"}},
+		Rows:       [][]string{{"alice"}},
+	}); err != nil {
+		t.Fatalf("edit dataset: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/"):
+			_, _ = w.Write([]byte(`{"id":"4242","key":"QA-1"}`))
+		default:
+			// Jersey's answer for a route the plugin does not publish.
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`<status><status-code>404</status-code></status>`))
+		}
+	}))
+	defer srv.Close()
+
+	res, err := syncer.New(xray.New(jira.NewClient(srv.URL, "tok")), repo).
+		CommitChanges(context.Background(), "p1", "QA")
+	if err != nil {
+		t.Fatalf("CommitChanges: %v", err)
+	}
+	if len(res.Failed) != 1 {
+		t.Fatalf("failed = %+v, want one failure naming the missing API", res.Failed)
+	}
+	if !strings.Contains(res.Failed[0].Error, "dataset API") {
+		t.Errorf("error = %q, want it to say the instance has no dataset API", res.Failed[0].Error)
+	}
+	if left := pendingDatasets(t, repo); len(left) != 1 {
+		t.Errorf("%d pending dataset rows, want the edit kept for a newer instance", len(left))
+	}
+}
+
 // Someone else changed the dataset between the local edit and the commit. The
 // write must not go, because it replaces the whole table and would take their
 // change with it.
