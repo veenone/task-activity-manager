@@ -140,3 +140,17 @@ func TestInProgressIsTimeInTheInProgressCategoryClippedToTheSprint(t *testing.T)
 		t.Errorf("Kim in progress = %dh, want 6h matched by status name", got/3600)
 	}
 }
+
+// TestARowWithNoUsernameJoinsTheSameNamesRow covers a card whose assignee
+// came back with a display name and no username (an older cached row, or a
+// GDPR-mode user): it is the same person as the row with that name, not a
+// second one.
+func TestARowWithNoUsernameJoinsTheSameNamesRow(t *testing.T) {
+	rows := people(t,
+		assigned(card("PLAT-1", "To Do", "1", "11", points(3)), "M. Ortiz", "mortiz", ""),
+		assigned(card("PLAT-2", "To Do", "1", "11", points(2)), "M. Ortiz", "", ""),
+	)
+	if len(rows) != 1 || rows[0].Username != "mortiz" || rows[0].Cards != 2 || rows[0].Points != 5 {
+		t.Fatalf("rows = %+v, want one M. Ortiz row holding both cards", rows)
+	}
+}

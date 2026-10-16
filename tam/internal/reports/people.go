@@ -100,6 +100,26 @@ func People(sprint backend.Sprint, issues []backend.IssueHistory, category Statu
 		}
 	}
 
+	// A row that has a display name but no username is the same person as
+	// a row with that name and a username, when there is exactly one such
+	// row: an assignee cached before schema 14 carries no username, and a
+	// second row for them would split their cards in two.
+	named := map[string][]*Person{}
+	for _, p := range rows {
+		if p.Username != "" {
+			k := strings.ToLower(p.Name)
+			named[k] = append(named[k], p)
+		}
+	}
+	for key, p := range rows {
+		if p.Username != "" || p.Name == "" {
+			continue
+		}
+		if same := named[strings.ToLower(p.Name)]; len(same) == 1 {
+			same[0].absorb(*p)
+			delete(rows, key)
+		}
+	}
 	out := make([]Person, 0, len(rows))
 	for _, p := range rows {
 		out = append(out, *p)
@@ -165,6 +185,19 @@ func timeInProgress(h backend.IssueHistory, category StatusCategory, start, last
 		}
 	}
 	return int(total / time.Second), nil
+}
+
+// absorb adds another row's figures for the same person into this one.
+func (p *Person) absorb(o Person) {
+	if p.Email == "" {
+		p.Email = o.Email
+	}
+	p.Cards += o.Cards
+	p.Points += o.Points
+	p.EstimateSeconds += o.EstimateSeconds
+	p.RemainingSeconds += o.RemainingSeconds
+	p.LoggedSeconds += o.LoggedSeconds
+	p.InProgressSeconds += o.InProgressSeconds
 }
 
 func seconds(v *int) int {
