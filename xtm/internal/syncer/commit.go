@@ -53,6 +53,7 @@ const (
 	skipReasonExecType           = "backend does not support the Test Type (exec_type) field"
 	skipReasonRunDefects         = "backend does not support run-level defect links"
 	skipReasonRunComments        = "backend does not support run-level comments"
+	skipReasonDatasetWrites      = "backend does not support dataset writes"
 )
 
 // CreatedTest records that a locally-created Test (TempKey, "NEW-N") was created
@@ -245,6 +246,9 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 	requirementCreateRows := make([]testrepo.PendingChange, 0)
 	// Requirement->Requirement link changes (entity_key = fromKey, field = linkType).
 	reqReqLinkRows := make([]testrepo.PendingChange, 0)
+	// Dataset edits, keyed by test key. Their own pass: the write replaces the
+	// whole table, so it carries a conflict check the per-field scan cannot do.
+	datasetRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -309,6 +313,10 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "test_run_comment" {
 			runCommentRows = append(runCommentRows, c)
+			continue
+		}
+		if c.EntityType == "test_dataset" {
+			datasetRows = append(datasetRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -898,6 +906,14 @@ testLoop:
 		e.skipRows(requirementDeleteRows, skipReasonRequirements, &result)
 		e.skipRows(requirementCreateRows, skipReasonRequirements, &result)
 		e.skipRows(reqReqLinkRows, skipReasonRequirements, &result)
+	}
+	// Datasets go last of the test-keyed buckets: a dataset queued against a
+	// test created in this same commit needs the rename to have happened, and
+	// that is done by the create pass far above.
+	if caps.SupportsDatasetWrites {
+		e.commitDatasets(ctx, profileID, datasetRows, &result)
+	} else {
+		e.skipRows(datasetRows, skipReasonDatasetWrites, &result)
 	}
 	// A backend that cannot create bugs itself can still have them created on
 	// its behalf: a Kiwi workspace files its defects into a Jira bug

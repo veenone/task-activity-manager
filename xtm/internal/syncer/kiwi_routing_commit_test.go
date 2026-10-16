@@ -255,6 +255,12 @@ func TestKiwiCommitSkipsUnsupportedBuckets(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create bug: %v", err)
 	}
+	if err := repo.EditTestDataset(profileID, "42", testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USERNAME"}},
+		Rows:       [][]string{{"alice"}},
+	}); err != nil {
+		t.Fatalf("edit dataset: %v", err)
+	}
 
 	before, err := repo.ListPendingChanges(profileID)
 	if err != nil {
@@ -283,6 +289,7 @@ func TestKiwiCommitSkipsUnsupportedBuckets(t *testing.T) {
 		"container_edit":   false,
 		"container_env":    false,
 		"bug_create":       false,
+		"test_dataset":     false,
 	}
 	for _, s := range result.Skipped {
 		if _, ok := wantTypes[s.EntityType]; ok {

@@ -118,11 +118,11 @@ func (r *Repository) EditTestDataset(profileID, testKey string, ds Dataset) erro
 	if err != nil {
 		return err
 	}
-	beforeJSON, err := encodeDataset(before)
+	beforeJSON, err := EncodeDataset(before)
 	if err != nil {
 		return err
 	}
-	afterJSON, err := encodeDataset(ds)
+	afterJSON, err := EncodeDataset(ds)
 	if err != nil {
 		return err
 	}
@@ -157,10 +157,14 @@ func (r *Repository) EditTestDataset(profileID, testKey string, ds Dataset) erro
 	return tx.Commit()
 }
 
-// encodeDataset serialises a table for the journal. Nil slices are written as
+// EncodeDataset serialises a table for the journal. Nil slices are written as
 // empty ones so a table that came back from the cache and one built in the UI
 // encode identically, which is what makes the revert check work.
-func encodeDataset(ds Dataset) (string, error) {
+//
+// The commit path encodes the table Jira holds with this same function before
+// comparing it against the journalled before value, so the two cannot drift
+// into disagreeing about a dataset that did not change.
+func EncodeDataset(ds Dataset) (string, error) {
 	if ds.Parameters == nil {
 		ds.Parameters = []DatasetParameter{}
 	}
