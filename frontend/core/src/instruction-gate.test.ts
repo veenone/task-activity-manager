@@ -245,6 +245,38 @@ describe('instruction gate', () => {
     expect(triggers, 'release.yml tag filters and the buildable apps have drifted').toEqual(apps.sort());
   });
 
+  // core.autocrlf rewrites every tracked text file on a Windows checkout,
+  // the gate scripts and the ratchet's own two data files among them. Git for
+  // Windows runs a CRLF script anyway, so the damage hides until the repo is
+  // reached through a shell that will not: WSL bash answers "set: -: invalid
+  // option", then a carriage return it cannot parse, and the gate never runs.
+  //
+  // The rule is asserted, not just the bytes. A Linux checkout is LF whatever
+  // .gitattributes says, so the bytes alone would pass on CI and prove
+  // nothing. The bytes are still checked, because a stale Windows worktree
+  // can hold CRLF after the rule lands, and bytes are what break the shell.
+  it('every file the gates run or read is pinned to LF', () => {
+    const files = git([
+      'ls-files',
+      '--',
+      '*.sh',
+      '.githooks/*',
+      '.ratchet-baseline',
+      '.ratchet-counters',
+    ])
+      .split(/\r?\n/)
+      .filter(Boolean);
+    expect(files.length, 'found no gate files to check').toBeGreaterThan(0);
+
+    const unpinned = files.filter(
+      (rel) => !git(['check-attr', 'eol', '--', rel]).endsWith(': lf'),
+    );
+    expect(unpinned, `not pinned to eol=lf: ${unpinned.join(', ')}`).toEqual([]);
+
+    const crlf = files.filter((rel) => read(rel).includes('\r\n'));
+    expect(crlf, `checked out with CRLF: ${crlf.join(', ')}`).toEqual([]);
+  });
+
   // Visually hidden is not the same as out of the way. `.sr-only` positions
   // absolutely, and in an app whose panes are all static that puts the box in
   // the page's own scrollable area, where it escapes every overflow: hidden

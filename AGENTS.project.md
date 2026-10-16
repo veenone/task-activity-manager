@@ -73,7 +73,7 @@ Gate: `frontend/core/src/instruction-gate.test.ts` (every class a component sets
 
 ## Project rules
 
-- Run Go commands from the module directory (`core`, `tam`, `xtm`); run npm commands from the repo root. Run `git config core.hooksPath .githooks` once per clone so the pre-commit gates exist.
+- Run Go commands from the module directory (`core`, `tam`, `xtm`); run npm commands from the repo root. Run `git config core.hooksPath .githooks` once per clone so the pre-commit gates exist. The `make` targets shell out to `sh`, which PowerShell does not provide: run them from Git Bash, or put Git's `usrin` on PATH.
 - Prose people read (docs, commit bodies, PR and issue bodies, review comments)
   is written with the humanizer skill: embedded mode for text going straight
   into a commit or PR body, file mode for a doc already on disk. Reviews of
