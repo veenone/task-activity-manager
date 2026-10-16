@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { call, errMsg, useProfile } from "@agile-suite/core";
 import { CancelSprintReport } from "../api";
-import type { Profile, Settings, Sprint, SprintReport } from "../api";
+import type { Profile, Settings, SprintReport } from "../api";
 import { useBoards, useBoardSprints } from "../queries/boards";
 import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
 import { capacitySection, reportDocument } from "../lib/reportDocument";
 import { unavailableLine } from "../lib/reportText";
 import { peopleSection } from "../lib/reportPeople";
+import { closedNewestFirst } from "../lib/sprintOrder";
 import { busyLine, isBusyRefusal } from "../lib/publishText";
 import { CapacityPanel, ReportSectionPanel } from "./CapacityPanel";
 import { KanbanReport } from "./KanbanReport";
 import { ReportOutputs } from "./ReportOutputs";
+import { ReportTabs, reportPanelId, reportTabId } from "./ReportTabs";
+import type { ReportTab } from "./ReportTabs";
 import { SprintSummary } from "./SprintSummary";
 import { VelocityTable } from "./VelocityTable";
 import { BurndownChart } from "./charts/BurndownChart";
@@ -46,6 +49,7 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   // from. When none has closed yet, the first active sprint is the default.
   const [sprintId, setSprintId] = useState(0);
   const [canceling, setCanceling] = useState(false);
+  const [tab, setTab] = useState<ReportTab>("sprint");
 
   // Both belong to the profile they were chosen for, so a switch clears
   // them in the render that first sees the new id, the way SprintsView
@@ -167,6 +171,16 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
       // keeps somebody from looking for them.
       return <p className="muted report-unavailable" role="status">{unavailableLine(r.unavailable)}</p>;
     }
+    if (tab === "people") {
+      const people = peopleSection(r)[0];
+      return people ? (
+        <ReportSectionPanel section={people} headingId="report-people-heading" className="report-people" />
+      ) : (
+        <p className="muted" role="status">
+          This report was stored before TAM counted people. Rebuild from Jira to add them.
+        </p>
+      );
+    }
     return (
       <>
         <SprintSummary series={r.series} builtAt={r.builtAt} live={inProgress} />
@@ -212,9 +226,6 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           </div>
           <CapacityPanel section={capacitySection(r)[0]} />
         </div>
-        {/* Who carried the sprint (#287), full width under the lower band:
-            nine columns do not fit a third of the frame. */}
-        <ReportSectionPanel section={peopleSection(r)[0]} headingId="report-people-heading" className="report-people" />
       </>
     );
   }
@@ -335,7 +346,17 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           <KanbanReport profileId={activeId} board={board} onOpenBoards={onOpenBoards} />
         ) : (
           <>
-            <div className="report-body">{body()}</div>
+            {/* The tabs split a report there is; the loading and refusal
+                states above one are the same on either side. */}
+            {canRebuild && <ReportTabs current={tab} onSelect={setTab} />}
+            <div
+              className="report-body"
+              role={canRebuild ? "tabpanel" : undefined}
+              id={canRebuild ? reportPanelId(tab) : undefined}
+              aria-labelledby={canRebuild ? reportTabId(tab) : undefined}
+            >
+              {body()}
+            </div>
 
             {/* The foot of the frame, outside the body. Publishing is what a
                 reader does once the figures, the charts and the trend are
@@ -359,35 +380,4 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
       </div>
     </section>
   );
-}
-
-// closedNewestFirst is the sprint picker's order, and it mirrors
-// reports.VelocitySprints in Go: closed sprints by actual completion date
-// (planned end when completion is absent), newest first,
-// with the higher id breaking a tie. That is the rule a sprint id of 0
-// resolves through, so the first row of this list is the sprint the view
-// opens on, and the control never points at one sprint while the numbers
-// below it describe another.
-//
-// A sprint whose start date will not parse is dropped, because Go drops it
-// too: it parses both dates and skips a sprint that fails either. Sorting
-// on the end date alone let a sprint with a readable end and an unreadable
-// start sit at the top of this list while a sprint id of 0 resolved past
-// it, so the picker and the numbers disagreed about which sprint was the
-// newest one. Nothing was ever mis-titled, since the heading follows the
-// response, but the two should agree without that backstop.
-//
-// A sprint whose end date will not parse sinks to the bottom instead of
-// being dropped. It cannot be the first row from there, so it costs the
-// agreement above nothing, and picking it is answered with the
-// sprintHasNoDates state, which says more than leaving it out would.
-function closedNewestFirst(sprints: Sprint[]): Sprint[] {
-  const readable = (d: string) => !Number.isNaN(new Date(d).getTime());
-  const ended = (s: Sprint) => {
-    const t = new Date(s.completeDate?.trim() ? s.completeDate : s.endDate).getTime();
-    return Number.isNaN(t) ? -Infinity : t;
-  };
-  return sprints
-    .filter((s) => s.state === "closed" && readable(s.startDate))
-    .sort((a, b) => (ended(b) === ended(a) ? b.id - a.id : ended(b) - ended(a)));
 }

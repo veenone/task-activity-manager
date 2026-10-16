@@ -886,7 +886,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
    the band is what does that now. */
 .report-capacity { min-height: 0; overflow-y: auto; }
 .report-capacity:focus-visible, .report-people:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
-.report-people { flex: 1; min-height: 0; overflow: auto; margin-top: 16px; }
+.report-people { flex: 1; min-height: 0; overflow: auto; }
+.report-tabs { flex: none; margin-top: 12px; }
 
 /* The outputs bar: the foot of the frame, a sibling of .report-body rather
    than a row inside it.

@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider, ProfileProvider, createQueryClient, useProfile } from "@agile-suite/core";
 import type { SyncProgress } from "@agile-suite/core";
@@ -117,6 +118,7 @@ const rita: ReportPerson = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(api.GetSprintReport).mockResolvedValue(report());
   sync.progress = null;
   sync.running = null;
   vi.mocked(api.ListProfiles).mockResolvedValue([
@@ -128,25 +130,47 @@ beforeEach(() => {
   vi.mocked(api.CancelSprintReport).mockResolvedValue();
 });
 
-// The People section (#287) on screen: the same section the outputs carry,
-// drawn from lib/reportPeople rather than composed again here.
-describe("ReportsView people", () => {
-  it("shows a row per person with the time they logged and spent in progress", async () => {
+// The People section (#287) on screen, in its own tab: the sprint report
+// tab keeps the one-window layout #113 built, and People is a different
+// scope of question, who carried the sprint rather than how it went.
+describe("ReportsView people tab", () => {
+  it("keeps the sprint report as the first tab and shows People only when chosen", async () => {
+    const user = userEvent.setup();
     vi.mocked(api.GetSprintReport).mockResolvedValue(report({ series: series({ people: [rita] }) }));
     renderView();
     await screen.findByText(SENTENCE);
-    const panel = await screen.findByRole("group", { name: "People" });
+    const tabs = screen.getByRole("tablist", { name: "Report views" });
+    expect(within(tabs).getByRole("tab", { name: "Sprint report" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("group", { name: "People" })).toBeNull();
+
+    await user.click(within(tabs).getByRole("tab", { name: "People" }));
+    expect(within(tabs).getByRole("tab", { name: "People" })).toHaveAttribute("aria-selected", "true");
+    const panel = screen.getByRole("group", { name: "People" });
     const row = within(panel).getByRole("row", { name: /Rita Anand/ });
     expect(within(row).getByRole("cell", { name: "r.anand@example.com" })).toBeInTheDocument();
     expect(within(row).getByRole("cell", { name: "9h" })).toBeInTheDocument();
     expect(within(row).getByRole("cell", { name: "26h" })).toBeInTheDocument();
     expect(within(panel).getByText(/charged to whoever holds the card now/)).toBeInTheDocument();
+    // The sprint's charts belong to the other tab.
+    expect(screen.queryByText(SENTENCE)).toBeNull();
   });
 
-  it("draws no People section for a report stored before people were counted", async () => {
-    vi.mocked(api.GetSprintReport).mockResolvedValue(report());
+  it("moves between the tabs with the arrow keys", async () => {
+    const user = userEvent.setup();
     renderView();
     await screen.findByText(SENTENCE);
+    screen.getByRole("tab", { name: "Sprint report" }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "People" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "People" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("says a report stored before people were counted needs a rebuild, rather than drawing nothing", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText(SENTENCE);
+    await user.click(screen.getByRole("tab", { name: "People" }));
     expect(screen.queryByRole("group", { name: "People" })).toBeNull();
+    expect(screen.getByText(/stored before TAM counted people/)).toBeInTheDocument();
   });
 });
