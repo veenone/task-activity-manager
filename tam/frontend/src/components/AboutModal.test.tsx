@@ -35,6 +35,20 @@ describe("TAM AboutModal", () => {
     expect(within(log).getByText("Log")).toBeInTheDocument();
   });
 
+  it("shows TAM's licence and opens the licences dialog", async () => {
+    const user = userEvent.setup();
+    render(<AboutModal onClose={vi.fn()} />);
+    const readout = screen.getByRole("group", { name: "Build and environment" });
+    const licence = within(readout).getByText("Licence").closest("div")!;
+    expect(within(licence).getByText("GNU GPL v3")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Licences" }));
+    const dialog = screen.getByRole("dialog", { name: "Licences" });
+    expect(within(dialog).getByRole("rowheader", { name: "github.com/wailsapp/wails/v2" })).toBeInTheDocument();
+    await user.click(within(dialog).getAllByRole("button", { name: "Close" })[1]);
+    expect(screen.queryByRole("dialog", { name: "Licences" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "About Task Activity Manager" })).toBeInTheDocument();
+  });
+
   it("opens the Jira REST documentation", async () => {
     const user = userEvent.setup();
     render(<AboutModal onClose={vi.fn()} />);
