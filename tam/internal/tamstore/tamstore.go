@@ -106,7 +106,7 @@ import (
 // It is idempotent, so nothing broke, but the stamp has to move with the
 // migrations it gates.
 var Schema = store.Schema{
-	Version: 25,
+	Version: 26,
 	Base:    baseDDL + sprintDDL + sprintReportDDL + ritualDocumentDDL + editScreenDDL + columnLimitDDL + doneTickDDL + journal.DDL,
 	Migrations: []store.Migration{{
 		Version: 5,
@@ -415,6 +415,19 @@ var Schema = store.Schema{
 			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
 			return err
 		},
+	}, {
+		Version: 26,
+		// The assignee's email, for the reports' people sections (#287).
+		// Version 14's shape: a column add, and a watermark clear so the
+		// next sync backfills every cached row, since an incremental sync
+		// only re-reads what Jira reports changed.
+		Apply: func(db *sql.DB) error {
+			if err := store.AddColumnIfMissing(db, "issue", "assignee_email TEXT NOT NULL DEFAULT ''"); err != nil {
+				return err
+			}
+			_, err := db.Exec(`UPDATE sync_state SET last_synced = ''`)
+			return err
+		},
 	}},
 	Indexes: indexDDL,
 }
@@ -502,6 +515,7 @@ CREATE TABLE IF NOT EXISTS issue (
 	status_category   TEXT NOT NULL DEFAULT '',
 	assignee          TEXT NOT NULL DEFAULT '',
 	assignee_name     TEXT NOT NULL DEFAULT '',
+	assignee_email    TEXT NOT NULL DEFAULT '',
 	reporter          TEXT NOT NULL DEFAULT '',
 	priority          TEXT NOT NULL DEFAULT '',
 	labels            TEXT NOT NULL DEFAULT '[]',

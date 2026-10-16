@@ -137,6 +137,7 @@ export namespace backend {
 	    statusCategory: string;
 	    assignee: string;
 	    assigneeName: string;
+	    assigneeEmail: string;
 	    reporter: string;
 	    priority: string;
 	    labels: string[];
@@ -173,6 +174,7 @@ export namespace backend {
 	        this.statusCategory = source["statusCategory"];
 	        this.assignee = source["assignee"];
 	        this.assigneeName = source["assigneeName"];
+	        this.assigneeEmail = source["assigneeEmail"];
 	        this.reporter = source["reporter"];
 	        this.priority = source["priority"];
 	        this.labels = source["labels"];

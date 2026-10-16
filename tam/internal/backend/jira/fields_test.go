@@ -281,3 +281,21 @@ func TestParseIssueKeepsTheStatusCategoryJiraSends(t *testing.T) {
 		})
 	}
 }
+
+// TestParseIssueAssigneeEmail reads the address Jira already sends on the
+// assignee, and leaves it blank on an instance that hides it rather than
+// treating the absence as an error.
+func TestParseIssueAssigneeEmail(t *testing.T) {
+	raw := corejira.RawIssue{ID: "1", Key: "PLAT-412", Fields: map[string]json.RawMessage{
+		"summary":  json.RawMessage(`"x"`),
+		"assignee": json.RawMessage(`{"name":"ranand","displayName":"R. Anand","emailAddress":"r.anand@example.com"}`),
+		"labels":   json.RawMessage(`null`),
+	}}
+	if iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{}); iss.AssigneeEmail != "r.anand@example.com" {
+		t.Errorf("assignee email = %q, want the address Jira sent", iss.AssigneeEmail)
+	}
+	raw.Fields["assignee"] = json.RawMessage(`{"name":"ranand","displayName":"R. Anand"}`)
+	if iss := parseIssue(raw, fieldIDs{}, "Requirement", projectTypes{}); iss.AssigneeEmail != "" {
+		t.Errorf("assignee email = %q, want blank when Jira hides it", iss.AssigneeEmail)
+	}
+}

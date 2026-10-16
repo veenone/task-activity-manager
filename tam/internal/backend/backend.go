@@ -53,6 +53,7 @@ type Issue struct {
 	StatusCategory string   `json:"statusCategory"`
 	Assignee       string   `json:"assignee"`
 	AssigneeName   string   `json:"assigneeName"`
+	AssigneeEmail  string   `json:"assigneeEmail"` // blank where Jira hides email
 	Reporter       string   `json:"reporter"`
 	Priority       string   `json:"priority"`
 	Labels         []string `json:"labels"`

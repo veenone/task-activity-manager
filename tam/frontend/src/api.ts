@@ -140,6 +140,9 @@ export interface Issue {
   // (schema 14). Optional so fixtures written before assigned-to-me still
   // type-check; a row cached before schema 14 sends "" until the next sync.
   assigneeName?: string;
+  // The assignee's email (schema 26). Blank where Jira hides email, and on a
+  // row cached before schema 26 until the next sync.
+  assigneeEmail?: string;
   reporter: string;
   priority: string;
   labels: string[];
