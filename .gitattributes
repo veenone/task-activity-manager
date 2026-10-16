@@ -1,2 +1,15 @@
 tam/internal/ritualtemplate/testdata/*.xml -text
 *.pen -text
+
+# Shell scripts and git hooks stay LF on every checkout. core.autocrlf would
+# otherwise hand a CRLF script to whichever shell runs the gates, and a shell
+# that will not parse a carriage return, WSL bash among them, refuses to run
+# it at all. Git for Windows tolerates CRLF, which is what kept this hidden.
+*.sh text eol=lf
+.githooks/* text eol=lf
+
+# The ratchet reads these two itself. A carriage return rides into awk as
+# part of the number, and the comparison dies on "98" rather than on a
+# count anyone wrote.
+.ratchet-baseline text eol=lf
+.ratchet-counters text eol=lf
