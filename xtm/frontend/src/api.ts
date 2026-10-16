@@ -616,6 +616,15 @@ export interface Capabilities {
 export interface DatasetParameter {
   name: string;
   combinatorial: boolean;
+  // Everything below is Xray's own bookkeeping, read with the dataset and
+  // handed back on save. A parameter written without it is rebuilt by the
+  // server, which gives it a new id and turns a list into free text (#283).
+  // The editor carries these through and changes none of them.
+  id?: number;
+  type?: string;
+  options?: string[];
+  listScope?: string;
+  listId?: number;
 }
 
 // TestDataset mirrors testrepo.Dataset: the parameters a test's

@@ -2036,6 +2036,11 @@ export namespace testrepo {
 	export class DatasetParameter {
 	    name: string;
 	    combinatorial: boolean;
+	    id?: number;
+	    type?: string;
+	    options?: string[];
+	    listScope?: string;
+	    listId?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new DatasetParameter(source);
@@ -2045,6 +2050,11 @@ export namespace testrepo {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
 	        this.combinatorial = source["combinatorial"];
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.options = source["options"];
+	        this.listScope = source["listScope"];
+	        this.listId = source["listId"];
 	    }
 	}
 	export class Dataset {

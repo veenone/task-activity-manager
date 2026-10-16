@@ -74,7 +74,10 @@ func (a *App) SaveTestDataset(profileID, testKey string, ds testrepo.Dataset) er
 func toRepoDataset(d backend.Dataset) testrepo.Dataset {
 	params := make([]testrepo.DatasetParameter, len(d.Parameters))
 	for i, p := range d.Parameters {
-		params[i] = testrepo.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+		params[i] = testrepo.DatasetParameter{
+			Name: p.Name, Combinatorial: p.Combinatorial, ID: p.ID,
+			Type: p.Type, Options: p.Options, ListScope: p.ListScope, ListID: p.ListID,
+		}
 	}
 	return testrepo.Dataset{Parameters: params, Rows: d.Rows}
 }

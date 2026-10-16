@@ -15,6 +15,14 @@ import (
 type DatasetParameter struct {
 	Name          string `json:"name"`
 	Combinatorial bool   `json:"combinatorial"`
+	// ID and the list fields are Xray's own bookkeeping, cached so a later
+	// write can hand them back. A parameter written without them is rebuilt
+	// by the server: a new id, and a list turned into free text (#283).
+	ID        int      `json:"id,omitempty"`
+	Type      string   `json:"type,omitempty"`
+	Options   []string `json:"options,omitempty"`
+	ListScope string   `json:"listScope,omitempty"`
+	ListID    int      `json:"listId,omitempty"`
 }
 
 // Dataset is a test's parameter table: parameters as columns, one row per
@@ -160,6 +168,25 @@ func (r *Repository) EditTestDataset(profileID, testKey string, ds Dataset) erro
 		return err
 	}
 	return tx.Commit()
+}
+
+// EncodeDatasetContent serialises only what a user can see and change: the
+// parameter names, their combinatorial flags and the rows.
+//
+// The commit compares what Jira holds against the table an edit started from,
+// and has to compare these alone. Xray gives a parameter a new id whenever it
+// is rebuilt, and rebuilds the list behind a list parameter on every edit
+// through its own UI, so comparing the stored form would report a conflict
+// over bookkeeping nobody changed (#283).
+func EncodeDatasetContent(ds Dataset) (string, error) {
+	bare := Dataset{
+		Parameters: make([]DatasetParameter, len(ds.Parameters)),
+		Rows:       ds.Rows,
+	}
+	for i, p := range ds.Parameters {
+		bare.Parameters[i] = DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+	}
+	return EncodeDataset(bare)
 }
 
 // EncodeDataset serialises a table for the journal. Nil slices are written as

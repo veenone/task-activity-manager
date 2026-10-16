@@ -254,6 +254,18 @@ write that matters is not the CSV import.
   sending `0` is refused with
   `{"error":"Parameters (0) not associated with the dataset."}`. Nothing
   documents this, and it is the first thing a client gets wrong.
+- A parameter sent with the **id it already has** is updated in place: the id
+  survives and a rename under it stays a rename rather than a removal and an
+  addition. Sent as new instead, it is rebuilt, and a `LIST` parameter whose
+  `info` was not sent back comes back as `TEXT` with its allowed values gone.
+  Sending `type` and `options` keeps it a list but rebuilds the list itself
+  with a new `listId` each write; sending the whole `info`, `listId` and
+  `paramTestListScope` included, leaves it untouched. That is #283.
+- `GET /rest/raven/1.0/dataset` answers 200 with an empty `params` array for a
+  test that simply has no dataset, so on this route nothing has to read a 404
+  as data. A nonexistent entity id answers 500 with a Java null-pointer
+  message, which is another reason to resolve the key through the ordinary
+  issue GET first.
 - An empty `params` array clears the dataset: `hasDataset` goes false
   afterwards. Neither API publishes a `DELETE`, and both answer 405 to one, so
   this is how a dataset is removed.

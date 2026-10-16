@@ -48,13 +48,15 @@ func acceptsOctetStream(accept string) bool {
 }
 
 // The bug: GetDataset asked for application/json and the export is not JSON,
-// so a real instance refused every read.
+// so a real instance refused every read. The export now serves the
+// container-level read, since #283 moved a test's own dataset to the JSON
+// model, and it is still the route that answers octet-stream.
 func TestGetDatasetReadsAnInstanceThatRefusesJSONAccept(t *testing.T) {
 	var accept string
 	srv := acceptStrictDatasetServer(t, &accept, "USERNAME,REGION\nalice,eu-west\n")
 	defer srv.Close()
 
-	d, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	d, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("GetDataset refused by a server that serves octet-stream: %v (Accept was %q)", err, accept)
 	}

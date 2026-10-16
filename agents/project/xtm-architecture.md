@@ -101,6 +101,14 @@ remote `updated`; if it moved, the Test is reported as a `Conflict` and held
 back (FR-1.4). The user syncs, then either overrides (rebase onto remote) or
 keeps remote (discard local).
 
+**A test's own dataset is read from Xray's JSON model, not the CSV export.**
+The export carries values alone, so a parameter read through it loses its id
+and, for a list parameter, its allowed values; writing that back rebuilds
+every parameter and flattens the list (#283). The model route is addressed by
+numeric issue id, so a read costs an issue GET first. A container-level read
+still uses the export, since the model addresses a Test Run rather than an
+execution (#277 W3).
+
 **A dataset is journalled whole, and its conflict check is its own.** A
 dataset edit queues one `test_dataset` row holding the entire table as JSON in
 `before_val` and `after_val`, because the write replaces the table rather than
@@ -108,7 +116,10 @@ patching cells. It has no `updated` watermark either, so the commit pass in
 `internal/syncer/commit_dataset.go` reads the table Jira holds and compares it
 with `before_val` instead of using `base_version`. Keeping "mine" on such a
 conflict rewrites `before_val` to the remote table, which is what lets the next
-commit through.
+commit through. The comparison looks at names, combinatorial flags and rows
+only: Xray reissues parameter and list ids whenever it rebuilds a parameter,
+and a conflict over bookkeeping nobody changed would be a dead end. The write
+takes its ids from the table Jira holds at commit time for the same reason.
 
 **Created entities use temporary keys.** New Preconditions/Containers/Steps get
 a placeholder key locally; the commit path creates them in Jira first, then
