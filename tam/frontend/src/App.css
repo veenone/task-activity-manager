@@ -885,7 +885,8 @@ input, button, select { font-family: inherit; font-size: inherit; }
    14em ceiling it used to carry was there to stop it eating velocity, and
    the band is what does that now. */
 .report-capacity { min-height: 0; overflow-y: auto; }
-.report-capacity:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.report-capacity:focus-visible, .report-people:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.report-people { flex: 1; min-height: 0; overflow: auto; margin-top: 16px; }
 
 /* The outputs bar: the foot of the frame, a sibling of .report-body rather
    than a row inside it.
@@ -979,11 +980,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
      for. Left growing, it is still the body's one shrinkable child and
      still collapses to nothing, which is the whole defect moved into a
      window that scrolls rather than fixed. */
-  .report-lower { flex: none; }
+  .report-lower, .report-people { flex: none; }
 }
 @media (max-width: 900px) {
   .report-charts { grid-template-columns: minmax(0, 1fr); }
   .report-lower { flex: none; grid-auto-flow: row; }
+  .report-people { flex: none; }
   /* Stacked, the charts are twice as tall and nothing fits. The chart
      heights are constants that do not shrink, so a scrollbar is the
      honest answer and crushing them is not, and the lower band's two

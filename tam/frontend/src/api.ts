@@ -604,6 +604,24 @@ export interface ReportSeries {
   // review says the same thing a month later. A card dragged out of the
   // sprint and left out is not among them, the blind spot removed carries.
   issues: string[];
+  // One row per person (#287), sorted by display name with the unassigned
+  // row last. Absent on a series stored before people were counted, and
+  // the report draws no People section for one.
+  people?: ReportPerson[];
+}
+
+// ReportPerson is reports.Person: what was assigned to somebody in the
+// sprint and the time they spent on it. name is "" on the unassigned row.
+export interface ReportPerson {
+  name: string;
+  username: string;
+  email: string;
+  cards: number;
+  points: number;
+  estimateSeconds: number;
+  remainingSeconds: number;
+  loggedSeconds: number;
+  inProgressSeconds: number;
 }
 
 export interface VelocityRow {

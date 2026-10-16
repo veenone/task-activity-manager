@@ -28,6 +28,7 @@ import {
 } from "./reportText";
 import { hasLimit, limitBreach } from "./columnLimit";
 import { agreementRows } from "./doneAgreement";
+import { peopleSection } from "./reportPeople";
 import { burndownTable, capacityTable, doneAgreementTable, outcomeTable, velocityTable } from "./reportTables";
 import type { TableSpec } from "./reportTables";
 import type { ChartImages } from "./chartImage";
@@ -133,6 +134,7 @@ export function reportDocument(
         images: velocityImages,
       },
       ...capacitySection(report),
+      ...peopleSection(report),
       ...doneAgreementSection(report, agreement),
     ],
   };

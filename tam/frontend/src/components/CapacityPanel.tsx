@@ -20,20 +20,28 @@ import type { ReportSection } from "../api";
 // and a panel reading "no limits" there would claim a fact about a board
 // nobody read.
 export function CapacityPanel({ section }: { section?: ReportSection }) {
+  return <ReportSectionPanel section={section} headingId="report-capacity-heading" className="report-capacity" />;
+}
+
+// ReportSectionPanel draws any report section the way the outputs lay one
+// out: heading, lines, table, notes. The capacity panel and the People panel
+// (#287) are both this, each with its own heading id so two on one page are
+// two named groups.
+export function ReportSectionPanel({ section, headingId, className }: { section?: ReportSection; headingId: string; className: string }) {
   if (!section) return null;
   const { columns, rows } = section.table;
   return (
     <section
-      className="report-capacity"
+      className={className}
       // A scroller has to be reachable without a mouse, and a group with no
       // name is announced as nothing in particular. This is the velocity
       // panel's rule, for the same reasons on the same page.
       role="group"
-      aria-labelledby="report-capacity-heading"
+      aria-labelledby={headingId}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
     >
-      <h3 className="report-heading" id="report-capacity-heading">{section.heading}</h3>
+      <h3 className="report-heading" id={headingId}>{section.heading}</h3>
       {section.lines.map((line) => <p className="muted small" key={line}>{line}</p>)}
       {rows.length > 0 && (
         <table className="report-table">

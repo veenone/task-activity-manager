@@ -7,8 +7,9 @@ import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
 import { capacitySection, reportDocument } from "../lib/reportDocument";
 import { unavailableLine } from "../lib/reportText";
+import { peopleSection } from "../lib/reportPeople";
 import { busyLine, isBusyRefusal } from "../lib/publishText";
-import { CapacityPanel } from "./CapacityPanel";
+import { CapacityPanel, ReportSectionPanel } from "./CapacityPanel";
 import { KanbanReport } from "./KanbanReport";
 import { ReportOutputs } from "./ReportOutputs";
 import { SprintSummary } from "./SprintSummary";
@@ -211,6 +212,9 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
           </div>
           <CapacityPanel section={capacitySection(r)[0]} />
         </div>
+        {/* Who carried the sprint (#287), full width under the lower band:
+            nine columns do not fit a third of the frame. */}
+        <ReportSectionPanel section={peopleSection(r)[0]} headingId="report-people-heading" className="report-people" />
       </>
     );
   }
