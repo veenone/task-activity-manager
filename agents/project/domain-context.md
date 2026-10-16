@@ -203,14 +203,29 @@ correct shipped in e0dbf0ce.
   `overwriteValues`, `delimiter` and `encoding`. Alongside it,
   `POST /rest/raven/1.0/dataset` takes the whole dataset as JSON and answers
   with JSON, with no flags at all.
-- `GET /rest/raven/1.0/dataset?entityId=<id>&type=TEST` returns three fields:
-  `entityDataset` (what is defined at that level), `resolvedDataset` (what will
-  actually run, after inheritance) and `resolutionMessage`, a sentence naming
-  the level, for example "This is the resolved dataset, defined in the Test."
-  Nothing has to infer which level a dataset comes from; the server says so.
+- `GET /rest/raven/1.0/dataset?entityId=<id>&type=TEST|TEST_RUN` returns three
+  fields: `entityDataset`, what this level defines; `resolvedDataset`, what it
+  would inherit from the Test; and `resolutionMessage`.
+- **`resolutionMessage` names no level.** It reads "This is the resolved
+  dataset, defined in the Test." at the test level, at a run with no override
+  and at a run that does override, which was checked one case at a time on a
+  live instance while building W3. An earlier entry here claimed the server
+  says which level a dataset comes from. It does not, and anything built on
+  that sentence would have been wrong in the one case that matters.
+- The pair is what answers the question instead. At a run, `entityDataset`
+  holds the override and is empty when there is none, while `resolvedDataset`
+  holds the Test's table either way. Nearest level wins at execution time, so
+  a non-empty `entityDataset` is what will run.
 - `type` accepts `TEST` and `TEST_RUN`, uppercase, and nothing else. A Test
   Execution is not addressable: its `entityId` is the Test Run id, which
-  `GET /rest/raven/1.0/api/testrun?testExecIssueKey=&testIssueKey=` returns.
+  `GET /rest/raven/1.0/api/testrun?testExecIssueKey=&testIssueKey=` returns,
+  answering 400 when the test is not in that execution.
+- Nothing lists the contexts that override a test's dataset.
+  `/rest/raven/1.0/dataset/analytics/override` answers 405 to a GET,
+  `/dataset/info` wants parameters this does not, and `/dataset/info/calledTest`
+  answers 403 to an ordinary user. Finding the overrides of one test means
+  asking its runs one at a time, which rules out a badge on a container's
+  member list.
   Passing an execution's issue id with `type=TEST` answers 200 with an empty
   dataset, and passing a run id with `type=TEST` answers 500.
 - `GET /rest/raven/1.0/dataset/info` reports the server's own limits:

@@ -90,6 +90,7 @@ A dataset is the table a test's `${placeholder}` references resolve against: one
 - **Create dataset** shows on a test that has none. **Edit** shows on a test that has one.
 - A column is a parameter. Type its name in the header and tick **combinatorial** if Xray should expand it into extra iterations. **Remove** above a column deletes it with its values.
 - **Add row** adds an iteration, and **Remove** at the end of a row deletes that row.
+- Opening a test from a Test Execution shows the dataset that will run there, and says whether it is the test's own or one the execution defines. An execution's own dataset is read-only in XTM.
 - A parameter whose values come from a list offers them as you type in its cells. XTM does not create or change lists, and editing a dataset leaves an existing one as it is.
 - The arrows beside a parameter name move it one column left or right, and the ones at the end of a row move that row up or down. Row order is the order the iterations run in.
 - **Export CSV** saves the table as it is on screen, in the same layout Xray's own export uses. Choosing a file from the **Import CSV** box replaces the table with what the file holds, and nothing is stored until you press Save, so a file opened by mistake costs a Cancel. A parameter the dataset already had keeps its allowed values when it comes back under the same name.
