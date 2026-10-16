@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -123,4 +124,129 @@ func fitRow(rec []string, n int) []string {
 	out := make([]string, n)
 	copy(out, rec)
 	return out
+}
+
+// datasetWritePath is Xray's JSON dataset resource. It is not the documented
+// 2.0 CSV import: that one merges and takes no flag saying otherwise, while
+// this one replaces the whole table, which is what an editor needs. The
+// #277 W0 spike confirmed every operation against a live instance; see the
+// Xray datasets section of agents/project/domain-context.md.
+const datasetWritePath = "/rest/raven/1.0/dataset"
+
+// newParameterID is the id a parameter Xray does not yet own must carry. Any
+// negative value works; omitting the id or sending zero is refused with
+// "Parameters (0) not associated with the dataset", which is the single
+// easiest thing to get wrong about this API.
+const newParameterID = -1
+
+// datasetPayload is the body the JSON resource accepts. It is the bare params
+// object: the wrapper the matching GET returns is rejected with a 500 on
+// getParams(), so this type deliberately does not mirror the read shape.
+type datasetPayload struct {
+	Params []datasetColumn `json:"params"`
+}
+
+// datasetColumn is one parameter and the values beneath it. Xray stores a
+// dataset by column, while everything above this layer holds it by row.
+type datasetColumn struct {
+	Param  datasetParamDef `json:"param"`
+	Values []datasetValue  `json:"values"`
+}
+
+type datasetParamDef struct {
+	ID            int              `json:"id"`
+	Name          string           `json:"name"`
+	Rank          int              `json:"rank"`
+	Combinatorial bool             `json:"combinatorial"`
+	Info          datasetParamInfo `json:"info"`
+}
+
+// datasetParamInfo carries the parameter's type. Only TEXT is written: a LIST
+// parameter needs allowed values, which the table this layer receives does not
+// model.
+type datasetParamInfo struct {
+	Type    string   `json:"type"`
+	Options []string `json:"options"`
+}
+
+type datasetValue struct {
+	Value string `json:"value"`
+	Rank  int    `json:"rank"`
+}
+
+// SetDataset replaces the dataset on a test with d, creating one when the test
+// has none and clearing it when d is empty (#277 W1).
+//
+// Every parameter is announced as new, which is correct while this is the
+// create path; editing an existing dataset has to send each parameter's own id
+// so a rename stays a rename, and that is W2's problem.
+//
+// A successful write answers with a plain sentence under a JSON content type,
+// so the response is deliberately not decoded.
+func (c *Client) SetDataset(ctx context.Context, testKey string, d Dataset) error {
+	if isDemoURL(c.baseURL) {
+		return fmt.Errorf("dataset writes are not available on a demo profile")
+	}
+	id, err := c.issueID(ctx, testKey)
+	if err != nil {
+		return err
+	}
+	q := url.Values{}
+	q.Set("entityId", id)
+	q.Set("type", "TEST")
+	return c.post(ctx, datasetWritePath+"?"+q.Encode(), datasetPayload{
+		Params: datasetColumns(d),
+	})
+}
+
+// issueIDFields is the field list of the issue GET that resolves a key to an
+// id. Jira answers with the id at the top level whatever is asked for, and
+// asking for nothing is not a documented option, so this asks for the one
+// field every issue has.
+const issueIDFields = "summary"
+
+// issueID resolves an issue key to the numeric id Jira assigned it. The
+// dataset write needs it because /rest/raven/1.0/dataset addresses an entity
+// by id and accepts no key; the CSV export on raven/2.0 takes the key, which
+// is why the read path never had to do this.
+func (c *Client) issueID(ctx context.Context, key string) (string, error) {
+	var resp struct {
+		ID string `json:"id"`
+	}
+	if err := c.get(ctx, "/rest/api/2/issue/"+url.PathEscape(key)+"?fields="+issueIDFields, &resp); err != nil {
+		return "", fmt.Errorf("resolve %s: %w", key, err)
+	}
+	if resp.ID == "" {
+		return "", fmt.Errorf("jira returned no issue id for %s", key)
+	}
+	return resp.ID, nil
+}
+
+// datasetColumns transposes the row-major table every caller holds into the
+// column-major one Xray stores. A row shorter than the parameter list
+// contributes an empty cell rather than shortening the column, so every
+// parameter ends up with the same number of values.
+func datasetColumns(d Dataset) []datasetColumn {
+	cols := make([]datasetColumn, 0, len(d.Parameters))
+	for i, p := range d.Parameters {
+		values := make([]datasetValue, 0, len(d.Rows))
+		for r, row := range d.Rows {
+			cell := ""
+			if i < len(row) {
+				cell = row[i]
+			}
+			values = append(values, datasetValue{Value: cell, Rank: r})
+		}
+		cols = append(cols, datasetColumn{
+			Param: datasetParamDef{
+				ID:            newParameterID,
+				Name:          p.Name,
+				Rank:          i,
+				Combinatorial: p.Combinatorial,
+				Info:          datasetParamInfo{Type: "TEXT", Options: []string{}},
+			},
+			Values: values,
+		})
+	}
+	return cols
 }
