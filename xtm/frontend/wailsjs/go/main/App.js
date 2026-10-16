@@ -346,6 +346,10 @@ export function ExportDashboard(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ExportDashboard'](arg1, arg2, arg3, arg4);
 }
 
+export function ExportDatasetCSV(arg1, arg2) {
+  return window['go']['main']['App']['ExportDatasetCSV'](arg1, arg2);
+}
+
 export function ExportDiagnostics() {
   return window['go']['main']['App']['ExportDiagnostics']();
 }
@@ -588,6 +592,10 @@ export function Health() {
 
 export function ImportCoverageTemplate(arg1, arg2) {
   return window['go']['main']['App']['ImportCoverageTemplate'](arg1, arg2);
+}
+
+export function ImportDatasetCSV(arg1, arg2) {
+  return window['go']['main']['App']['ImportDatasetCSV'](arg1, arg2);
 }
 
 export function ImportPreconditions(arg1, arg2, arg3, arg4, arg5, arg6) {

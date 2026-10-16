@@ -170,6 +170,40 @@ func (r *Repository) EditTestDataset(profileID, testKey string, ds Dataset) erro
 	return tx.Commit()
 }
 
+// MergeDatasetParameters takes a table that knows only names, flags and
+// values, and puts back what the table it replaces knew about the parameters
+// of the same name: the id Xray gave each one and, for a list parameter, the
+// list behind it.
+//
+// A CSV has nowhere to carry either. Without this, importing one over an
+// existing dataset would announce every parameter as new, and the write would
+// rebuild each of them: new ids, and a list flattened into free text. The file
+// still decides which parameters and rows exist; only their identity is
+// recovered.
+func MergeDatasetParameters(imported, current Dataset) Dataset {
+	known := make(map[string]DatasetParameter, len(current.Parameters))
+	for _, p := range current.Parameters {
+		known[p.Name] = p
+	}
+	out := Dataset{
+		Parameters: make([]DatasetParameter, len(imported.Parameters)),
+		Rows:       imported.Rows,
+	}
+	for i, p := range imported.Parameters {
+		out.Parameters[i] = p
+		was, found := known[p.Name]
+		if !found {
+			continue
+		}
+		out.Parameters[i].ID = was.ID
+		out.Parameters[i].Type = was.Type
+		out.Parameters[i].Options = was.Options
+		out.Parameters[i].ListScope = was.ListScope
+		out.Parameters[i].ListID = was.ListID
+	}
+	return out
+}
+
 // EncodeDatasetContent serialises only what a user can see and change: the
 // parameter names, their combinatorial flags and the rows.
 //

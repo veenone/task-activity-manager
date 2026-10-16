@@ -187,6 +187,8 @@ export function ExportCoverageReport(arg1:string,arg2:string):Promise<string>;
 
 export function ExportDashboard(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
+export function ExportDatasetCSV(arg1:string,arg2:testrepo.Dataset):Promise<string>;
+
 export function ExportDiagnostics():Promise<string>;
 
 export function ExportGapReport(arg1:testrepo.GapResult,arg2:string):Promise<string>;
@@ -308,6 +310,8 @@ export function GetVersionDistribution(arg1:string,arg2:string):Promise<Array<co
 export function Health():Promise<main.HealthInfo>;
 
 export function ImportCoverageTemplate(arg1:string,arg2:string):Promise<coverage.ImportSummary>;
+
+export function ImportDatasetCSV(arg1:string,arg2:testrepo.Dataset):Promise<testrepo.Dataset>;
 
 export function ImportPreconditions(arg1:string,arg2:string,arg3:boolean,arg4:testrepo.PreconditionImportMapping,arg5:boolean,arg6:Record<string, any>):Promise<testrepo.PreconditionImportResult>;
 

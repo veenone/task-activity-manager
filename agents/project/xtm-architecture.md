@@ -109,6 +109,14 @@ numeric issue id, so a read costs an issue GET first. A container-level read
 still uses the export, since the model addresses a Test Run rather than an
 execution (#277 W3).
 
+**The dataset CSV is Xray's format, so its reader and writer live in
+`internal/jira` beside the rest of it.** A CSV carries names, the
+combinatorial asterisk and values, and has nowhere to put a parameter's id or
+the list behind it, so an import matches those back by name from the table it
+replaces (`testrepo.MergeDatasetParameters`). Skipping that would rebuild
+every parameter on the next write, which is #283 again through a different
+door.
+
 **Renaming a dataset parameter is two changes, not one.** The dataset write
 carries the rename by sending the parameter's existing id, but every
 `${placeholder}` in the test's steps and definition still names the old

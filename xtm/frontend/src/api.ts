@@ -274,13 +274,33 @@ export {
   RemoveIgnoreWord,
 } from "../wailsjs/go/main/App";
 export { ChangeTestType } from "../wailsjs/go/main/App";
-import { SaveTestDataset as saveTestDatasetBinding } from "../wailsjs/go/main/App";
+import {
+  SaveTestDataset as saveTestDatasetBinding,
+  ImportDatasetCSV as importDatasetCSVBinding,
+  ExportDatasetCSV as exportDatasetCSVBinding,
+} from "../wailsjs/go/main/App";
 import { testrepo } from "../wailsjs/go/models";
 
 // SaveTestDataset stores a test's dataset locally and queues it for commit
 // (#277 W1). The generated binding takes the model class, so the plain shape
 // the rest of this module deals in is converted here instead of being cast
 // away at the call site.
+// ImportDatasetCSV reads a dataset out of a CSV and hands back the table to
+// show, carrying over what the table being replaced knows about the
+// parameters it still has (#277 W2). Nothing is stored until the user saves.
+export async function ImportDatasetCSV(
+  content: string,
+  current: TestDataset,
+): Promise<TestDataset> {
+  return importDatasetCSVBinding(content, testrepo.Dataset.createFrom(current));
+}
+
+// ExportDatasetCSV writes the table to a file the user picks and returns the
+// path, or "" if they cancelled.
+export async function ExportDatasetCSV(testKey: string, dataset: TestDataset): Promise<string> {
+  return exportDatasetCSVBinding(testKey, testrepo.Dataset.createFrom(dataset));
+}
+
 export async function SaveTestDataset(
   profileId: string,
   testKey: string,
