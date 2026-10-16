@@ -10,6 +10,12 @@ import (
 
 // datasetServer answers the dataset export with body and status, and records
 // the query it was asked.
+//
+// Every test here reads at container level, because that is what still goes
+// through the export: a test's own dataset is read from the raven/1.0 model
+// instead, which is the only place a parameter's id and list values are
+// (#283, dataset_model_test.go). The parser these tests cover is shared by
+// both, and the export is the only shape it has to read.
 func datasetServer(t *testing.T, gotQuery *string, status int, body string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +38,7 @@ func TestGetDatasetReadsParametersAndRows(t *testing.T) {
 		"USERNAME,PASSWORD\nalice,hunter2\nbob,s3cret\n")
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}
@@ -44,8 +50,8 @@ func TestGetDatasetReadsParametersAndRows(t *testing.T) {
 	if !reflect.DeepEqual(ds.Rows, wantRows) {
 		t.Fatalf("rows = %v, want %v", ds.Rows, wantRows)
 	}
-	if q != "testIssueKey=QA-1" {
-		t.Fatalf("export query %q, want testIssueKey=QA-1", q)
+	if q != "contextIssueKey=EXEC-1&testIssueKey=QA-1" {
+		t.Fatalf("export query %q, want both keys", q)
 	}
 }
 
@@ -56,7 +62,7 @@ func TestGetDatasetStripsTheCombinatorialMarker(t *testing.T) {
 	srv := datasetServer(t, &q, http.StatusOK, "BROWSER,QUALITY*\nchrome,high\n")
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}
@@ -78,7 +84,7 @@ func TestGetDatasetKeepsACommaInsideAQuotedCell(t *testing.T) {
 	srv := datasetServer(t, &q, http.StatusOK, "CITY,NOTE\n\"Paris, France\",capital\n")
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}
@@ -89,14 +95,14 @@ func TestGetDatasetKeepsACommaInsideAQuotedCell(t *testing.T) {
 }
 
 // An instance below Xray 5.1 has no dataset endpoint. The feature is not
-// version-gated, so a 404 must read as "this test has no dataset" rather than
-// surfacing an error the user cannot act on.
+// version-gated, so a 404 must read as "this level has no dataset" rather
+// than surfacing an error the user cannot act on.
 func TestGetDatasetTreatsAMissingEndpointAsNoDataset(t *testing.T) {
 	var q string
 	srv := datasetServer(t, &q, http.StatusNotFound, "")
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("a 404 must not be an error, got %v", err)
 	}
@@ -111,7 +117,7 @@ func TestGetDatasetHandlesAHeaderWithNoRows(t *testing.T) {
 	srv := datasetServer(t, &q, http.StatusOK, "USERNAME\n")
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}
@@ -126,7 +132,7 @@ func TestGetDatasetHandlesAnEmptyBody(t *testing.T) {
 	srv := datasetServer(t, &q, http.StatusOK, "")
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}
@@ -142,7 +148,7 @@ func TestGetDatasetPadsAShortRow(t *testing.T) {
 	srv := datasetServer(t, &q, http.StatusOK, "A,B,C\n1,2\n")
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}
@@ -158,13 +164,13 @@ func TestGetDatasetPropagatesAServerError(t *testing.T) {
 	srv := datasetServer(t, &q, http.StatusInternalServerError, "")
 	defer srv.Close()
 
-	if _, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", ""); err == nil {
+	if _, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1"); err == nil {
 		t.Fatal("a 500 must be an error")
 	}
 }
 
-// A Test Plan or Test Execution dataset overrides the test's own. Phase 1 only
-// reads the test level, but the context has to reach the query when it is set.
+// A Test Plan or Test Execution dataset overrides the test's own, and the
+// context reaches the query that asks for it.
 func TestGetDatasetSendsTheContextKeyWhenGiven(t *testing.T) {
 	var q string
 	srv := datasetServer(t, &q, http.StatusOK, "A\n1\n")

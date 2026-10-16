@@ -569,7 +569,10 @@ func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (b
 	}
 	params := make([]backend.DatasetParameter, len(ds.Parameters))
 	for i, p := range ds.Parameters {
-		params[i] = backend.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+		params[i] = backend.DatasetParameter{
+			Name: p.Name, Combinatorial: p.Combinatorial, ID: p.ID,
+			Type: p.Type, Options: p.Options, ListScope: p.ListScope, ListID: p.ListID,
+		}
 	}
 	return backend.Dataset{Parameters: params, Rows: ds.Rows}, nil
 }
@@ -580,7 +583,10 @@ func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (b
 func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Dataset) error {
 	params := make([]jira.DatasetParameter, len(d.Parameters))
 	for i, p := range d.Parameters {
-		params[i] = jira.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+		params[i] = jira.DatasetParameter{
+			Name: p.Name, Combinatorial: p.Combinatorial, ID: p.ID,
+			Type: p.Type, Options: p.Options, ListScope: p.ListScope, ListID: p.ListID,
+		}
 	}
 	return a.c.SetDataset(ctx, testKey, jira.Dataset{Parameters: params, Rows: d.Rows})
 }

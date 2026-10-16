@@ -287,6 +287,18 @@ type DatasetParameter struct {
 	// Combinatorial parameters are expanded by the backend into extra
 	// iterations, so a dataset carrying one runs more times than it has rows.
 	Combinatorial bool `json:"combinatorial"`
+	// ID is the parameter's id in the backend, zero for one that does not
+	// exist there yet. A write hands it back so the parameter is updated
+	// rather than replaced.
+	ID int `json:"id,omitempty"`
+	// Type, Options, ListScope and ListID describe a parameter whose values
+	// come from a list. XTM carries them untouched: writing a parameter
+	// without them rebuilds it as free text and loses the allowed values
+	// (#283). Nothing here creates or edits a list.
+	Type      string   `json:"type,omitempty"`
+	Options   []string `json:"options,omitempty"`
+	ListScope string   `json:"listScope,omitempty"`
+	ListID    int      `json:"listId,omitempty"`
 }
 
 // Dataset is a test's parameter table: parameters as columns, one row per

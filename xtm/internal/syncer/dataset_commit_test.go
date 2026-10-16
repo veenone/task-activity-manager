@@ -2,85 +2,17 @@ package syncer_test
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"agile-suite/xtm/internal/backend/xray"
 	"agile-suite/xtm/internal/jira"
-	"agile-suite/xtm/internal/store"
 	"agile-suite/xtm/internal/syncer"
 	"agile-suite/xtm/internal/testrepo"
 )
-
-// datasetInstance is a stub Xray: it resolves a key to an issue id, serves the
-// dataset export (404 when remoteCSV is empty, as a test with no dataset does)
-// and records the write.
-type datasetInstance struct {
-	remoteCSV string
-	exported  int
-	wrote     string
-	writes    int
-}
-
-func (d *datasetInstance) server(t *testing.T) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/rest/api/2/issue/"):
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"4242","key":"QA-1"}`))
-		case r.URL.Path == "/rest/raven/2.0/api/dataset/export":
-			d.exported++
-			if d.remoteCSV == "" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = w.Write([]byte(`{"error":"Dataset not found"}`))
-				return
-			}
-			w.Header().Set("Content-Type", "application/octet-stream")
-			_, _ = w.Write([]byte(d.remoteCSV))
-		case r.URL.Path == "/rest/raven/1.0/dataset":
-			d.writes++
-			b, _ := io.ReadAll(r.Body)
-			d.wrote = string(b)
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte("Dataset Updated with success."))
-		default:
-			t.Errorf("unexpected request %s %s", r.Method, r.URL)
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	}))
-}
-
-func datasetRepo(t *testing.T) *testrepo.Repository {
-	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "x.db"))
-	if err != nil {
-		t.Fatalf("open store: %v", err)
-	}
-	t.Cleanup(func() { _ = st.Close() })
-	return testrepo.NewRepository(st)
-}
-
-func pendingDatasets(t *testing.T, repo *testrepo.Repository) []testrepo.PendingChange {
-	t.Helper()
-	all, err := repo.ListPendingChanges("p1")
-	if err != nil {
-		t.Fatalf("list pending: %v", err)
-	}
-	out := []testrepo.PendingChange{}
-	for _, c := range all {
-		if c.EntityType == "test_dataset" {
-			out = append(out, c)
-		}
-	}
-	return out
-}
 
 // The queued table reaches Xray and the pending row clears. The test here had
 // no dataset, which is the case W1 exists for.
@@ -150,10 +82,11 @@ func TestCommitDatasetOfANewTestUsesTheRealKey(t *testing.T) {
 			// Serves both the conflict pre-check (fields.updated) and the id
 			// the dataset resource is addressed by.
 			_, _ = w.Write([]byte(`{"id":"4242","key":"QA-900","fields":{"updated":""}}`))
-		case r.URL.Path == "/rest/raven/2.0/api/dataset/export":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"error":"Dataset not found"}`))
+		case r.URL.Path == "/rest/raven/1.0/dataset" && r.Method == http.MethodGet:
+			// The new test has no dataset yet, which this route answers with
+			// an empty params array rather than a 404.
+			_, _ = w.Write([]byte(`{"entityDataset":{"params":[]},` +
+				`"resolvedDataset":{"params":[]},"resolutionMessage":""}`))
 		case r.URL.Path == "/rest/raven/1.0/dataset":
 			writes++
 			_, _ = w.Write([]byte("Dataset Updated with success."))
@@ -179,8 +112,8 @@ func TestCommitDatasetOfANewTestUsesTheRealKey(t *testing.T) {
 			t.Errorf("request %s still names the placeholder key %s", path, tempKey)
 		}
 	}
-	if !slices.Contains(seen, "/rest/raven/2.0/api/dataset/export?testIssueKey=QA-900") {
-		t.Errorf("the dataset was never read back under the real key: %v", seen)
+	if !slices.Contains(seen, "/rest/api/2/issue/QA-900?fields=summary") {
+		t.Errorf("the dataset was never resolved under the real key: %v", seen)
 	}
 }
 
@@ -224,6 +157,98 @@ func TestCommitDatasetNamesAnInstanceWithNoDatasetAPI(t *testing.T) {
 	}
 }
 
+// A list parameter has to reach Jira with everything the read found, or Xray
+// rebuilds it as free text and its allowed values are gone (#283).
+func TestCommitDatasetKeepsAListParameterAList(t *testing.T) {
+	repo := datasetRepo(t)
+	synced := testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{
+			Name: "TIER", ID: 2741, Type: "LIST",
+			Options: []string{"gold", "silver"}, ListScope: "PARAMETER_AD_HOC", ListID: 162,
+		}},
+		Rows: [][]string{{"gold"}},
+	}
+	if err := repo.SaveTestDataset("p1", "QA-1", "", synced); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	edited := testrepo.Dataset{Parameters: synced.Parameters, Rows: [][]string{{"gold"}, {"silver"}}}
+	if err := repo.EditTestDataset("p1", "QA-1", edited); err != nil {
+		t.Fatalf("edit dataset: %v", err)
+	}
+
+	inst := &datasetInstance{columns: []string{
+		listColumn(2741, "TIER", 162, []string{"gold", "silver"}, "gold"),
+	}}
+	srv := inst.server(t)
+	defer srv.Close()
+
+	res, err := syncer.New(xray.New(jira.NewClient(srv.URL, "tok")), repo).
+		CommitChanges(context.Background(), "p1", "QA")
+	if err != nil {
+		t.Fatalf("CommitChanges: %v", err)
+	}
+	if len(res.Failed) != 0 || len(res.Conflicted) != 0 {
+		t.Fatalf("failed=%+v conflicted=%+v, want neither", res.Failed, res.Conflicted)
+	}
+	if inst.writes != 1 {
+		t.Fatalf("%d writes, want 1", inst.writes)
+	}
+	for _, want := range []string{
+		`"id":2741`, `"type":"LIST"`, `"options":["gold","silver"]`,
+		`"paramTestListScope":"PARAMETER_AD_HOC"`, `"listId":162`,
+	} {
+		if !strings.Contains(inst.wrote, want) {
+			t.Errorf("write body %s is missing %s", inst.wrote, want)
+		}
+	}
+}
+
+// Xray gives a parameter a new id whenever it is rebuilt, and rebuilds the
+// list behind it on every edit through its own UI. None of that is a change
+// the user made, so it must neither raise a conflict nor be written back
+// stale: ids a write sends come from the table Jira holds now.
+func TestCommitDatasetTakesCurrentIdsAndIgnoresThemWhenComparing(t *testing.T) {
+	repo := datasetRepo(t)
+	synced := testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{
+			Name: "TIER", ID: 2741, Type: "LIST",
+			Options: []string{"gold", "silver"}, ListScope: "PARAMETER_AD_HOC", ListID: 162,
+		}},
+		Rows: [][]string{{"gold"}},
+	}
+	if err := repo.SaveTestDataset("p1", "QA-1", "", synced); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := repo.EditTestDataset("p1", "QA-1", testrepo.Dataset{
+		Parameters: synced.Parameters,
+		Rows:       [][]string{{"silver"}},
+	}); err != nil {
+		t.Fatalf("edit dataset: %v", err)
+	}
+
+	// Same table to look at, rebuilt underneath: new parameter id, new list.
+	inst := &datasetInstance{columns: []string{
+		listColumn(2999, "TIER", 177, []string{"gold", "silver"}, "gold"),
+	}}
+	srv := inst.server(t)
+	defer srv.Close()
+
+	res, err := syncer.New(xray.New(jira.NewClient(srv.URL, "tok")), repo).
+		CommitChanges(context.Background(), "p1", "QA")
+	if err != nil {
+		t.Fatalf("CommitChanges: %v", err)
+	}
+	if len(res.Conflicted) != 0 {
+		t.Fatalf("conflicted on bookkeeping alone: %+v", res.Conflicted)
+	}
+	if len(res.Failed) != 0 {
+		t.Fatalf("failed = %+v", res.Failed)
+	}
+	if !strings.Contains(inst.wrote, `"id":2999`) || !strings.Contains(inst.wrote, `"listId":177`) {
+		t.Errorf("write body %s does not carry the ids Jira has now", inst.wrote)
+	}
+}
+
 // Someone else changed the dataset between the local edit and the commit. The
 // write must not go, because it replaces the whole table and would take their
 // change with it.
@@ -244,7 +269,10 @@ func TestCommitDatasetHoldsBackWhenTheRemoteTableMoved(t *testing.T) {
 	}
 
 	// Jira now holds a third version: a column the local edit never saw.
-	inst := &datasetInstance{remoteCSV: "USERNAME,REGION\nalice,eu-west\n"}
+	inst := &datasetInstance{columns: []string{
+		textColumn(2726, "USERNAME", "alice"),
+		textColumn(2727, "REGION", "eu-west"),
+	}}
 	srv := inst.server(t)
 	defer srv.Close()
 
@@ -279,102 +307,5 @@ func TestCommitDatasetHoldsBackWhenTheRemoteTableMoved(t *testing.T) {
 	}
 	if left := pendingDatasets(t, repo); len(left) != 1 {
 		t.Errorf("%d pending dataset rows after a conflict, want the edit kept", len(left))
-	}
-}
-
-// Keeping mine after a conflict has to re-base what the next commit compares
-// against, or the same conflict is reported forever.
-func TestResolvingADatasetConflictWithMineLetsTheNextCommitThrough(t *testing.T) {
-	repo := datasetRepo(t)
-	mine := testrepo.Dataset{
-		Parameters: []testrepo.DatasetParameter{{Name: "USERNAME"}},
-		Rows:       [][]string{{"alice"}, {"bob"}},
-	}
-	if err := repo.EditTestDataset("p1", "QA-1", mine); err != nil {
-		t.Fatalf("edit dataset: %v", err)
-	}
-	inst := &datasetInstance{remoteCSV: "USERNAME,REGION\nalice,eu-west\n"}
-	srv := inst.server(t)
-	defer srv.Close()
-	eng := syncer.New(xray.New(jira.NewClient(srv.URL, "tok")), repo)
-
-	res, err := eng.CommitChanges(context.Background(), "p1", "QA")
-	if err != nil {
-		t.Fatalf("CommitChanges: %v", err)
-	}
-	if len(res.Conflicted) != 1 {
-		t.Fatalf("conflicted = %+v, want one conflict", res.Conflicted)
-	}
-	f := res.Conflicted[0].Fields[0]
-	if err := repo.ResolveConflictMerge("p1", "QA-1", res.Conflicted[0].RemoteVersion,
-		[]testrepo.ConflictDecision{{
-			PendingID:   f.PendingID,
-			EntityType:  f.EntityType,
-			EntityKey:   f.EntityKey,
-			Field:       f.Field,
-			Choice:      "mine",
-			RemoteValue: f.Remote,
-		}}); err != nil {
-		t.Fatalf("resolve: %v", err)
-	}
-
-	res, err = eng.CommitChanges(context.Background(), "p1", "QA")
-	if err != nil {
-		t.Fatalf("second CommitChanges: %v", err)
-	}
-	if len(res.Conflicted) != 0 {
-		t.Fatalf("still conflicted after keeping mine: %+v", res.Conflicted)
-	}
-	if inst.writes != 1 {
-		t.Fatalf("%d dataset writes after keeping mine, want 1", inst.writes)
-	}
-	if !strings.Contains(inst.wrote, `"value":"bob"`) {
-		t.Errorf("write body %s does not carry my table", inst.wrote)
-	}
-}
-
-// Taking theirs puts the remote table in the cache and drops the edit, so the
-// panel stops showing a change that is not going anywhere.
-func TestResolvingADatasetConflictWithTheirsTakesTheRemoteTable(t *testing.T) {
-	repo := datasetRepo(t)
-	if err := repo.EditTestDataset("p1", "QA-1", testrepo.Dataset{
-		Parameters: []testrepo.DatasetParameter{{Name: "USERNAME"}},
-		Rows:       [][]string{{"alice"}, {"bob"}},
-	}); err != nil {
-		t.Fatalf("edit dataset: %v", err)
-	}
-	inst := &datasetInstance{remoteCSV: "USERNAME,REGION\nalice,eu-west\n"}
-	srv := inst.server(t)
-	defer srv.Close()
-	eng := syncer.New(xray.New(jira.NewClient(srv.URL, "tok")), repo)
-
-	res, err := eng.CommitChanges(context.Background(), "p1", "QA")
-	if err != nil {
-		t.Fatalf("CommitChanges: %v", err)
-	}
-	if len(res.Conflicted) != 1 {
-		t.Fatalf("conflicted = %+v, want one conflict", res.Conflicted)
-	}
-	f := res.Conflicted[0].Fields[0]
-	if err := repo.ResolveConflictMerge("p1", "QA-1", "", []testrepo.ConflictDecision{{
-		PendingID:   f.PendingID,
-		EntityType:  f.EntityType,
-		EntityKey:   f.EntityKey,
-		Field:       f.Field,
-		Choice:      "theirs",
-		RemoteValue: f.Remote,
-	}}); err != nil {
-		t.Fatalf("resolve: %v", err)
-	}
-
-	if left := pendingDatasets(t, repo); len(left) != 0 {
-		t.Errorf("%d pending dataset rows after taking theirs, want none", len(left))
-	}
-	cached, found, err := repo.GetTestDataset("p1", "QA-1", "")
-	if err != nil || !found {
-		t.Fatalf("cache: found=%v err=%v", found, err)
-	}
-	if len(cached.Parameters) != 2 || cached.Parameters[1].Name != "REGION" {
-		t.Errorf("cached dataset = %+v, want the remote table", cached)
 	}
 }
