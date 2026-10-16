@@ -101,6 +101,15 @@ remote `updated`; if it moved, the Test is reported as a `Conflict` and held
 back (FR-1.4). The user syncs, then either overrides (rebase onto remote) or
 keeps remote (discard local).
 
+**A dataset is journalled whole, and its conflict check is its own.** A
+dataset edit queues one `test_dataset` row holding the entire table as JSON in
+`before_val` and `after_val`, because the write replaces the table rather than
+patching cells. It has no `updated` watermark either, so the commit pass in
+`internal/syncer/commit_dataset.go` reads the table Jira holds and compares it
+with `before_val` instead of using `base_version`. Keeping "mine" on such a
+conflict rewrites `before_val` to the remote table, which is what lets the next
+commit through.
+
 **Created entities use temporary keys.** New Preconditions/Containers/Steps get
 a placeholder key locally; the commit path creates them in Jira first, then
 rewrites dependent pending rows (e.g. associations) to the real key before the

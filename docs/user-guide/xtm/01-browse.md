@@ -67,6 +67,7 @@ Click **Columns** to choose which columns the grid shows and in what order. Tick
    - **Run history**: results from every execution that ran the test.
    - **Description**: click to edit. Markdown is supported.
    - **Steps**.
+   - **Dataset**: the parameters the test runs with, if it has any.
 
    ![The Description and Steps sections](images/browse-07-detail-steps.png)
 
@@ -81,6 +82,19 @@ Each step has an action, optional data, and an expected result. Type in a box to
 - **Refresh** reloads the steps from Jira.
 
 Cucumber tests show a **Cucumber scenario** box instead of steps, and Generic tests show a **Generic definition** box.
+
+### Give a test a dataset
+
+A dataset is the table a test's `${placeholder}` references resolve against: one column per parameter, one row per iteration. It sits below the steps.
+
+- **Create dataset** shows on a test that has none. **Edit** shows on a test that has one.
+- A column is a parameter. Type its name in the header and tick **combinatorial** if Xray should expand it into extra iterations. **Remove** above a column deletes it with its values.
+- **Add row** adds an iteration, and **Remove** at the end of a row deletes that row.
+- **Save** stores the table locally and counts it in **N pending**, like every other edit. Jira gets it on the next commit.
+
+Xray's own limits are checked when you save: at most 20 parameters, 100 characters in a value, no two parameters with the same name, no two identical rows, and a name that starts with a letter or underscore. A table that breaks one of them is refused with the reason, and stays on screen for you to fix.
+
+A dataset write replaces the whole table, so if someone changed it in Jira after you loaded the test, the commit stops and asks which version to keep instead of overwriting theirs.
 
 ## Create a test
 

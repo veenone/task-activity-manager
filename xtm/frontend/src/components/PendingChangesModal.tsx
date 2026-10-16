@@ -512,6 +512,12 @@ function describeChange(c: PendingChange): {
         before: "",
         after: containerSummary(c.afterVal),
       };
+    case "test_dataset":
+      return {
+        field: "dataset",
+        before: datasetSummary(c.beforeVal),
+        after: datasetSummary(c.afterVal),
+      };
     case "precondition_set":
       return {
         field: "preconditions",
@@ -646,6 +652,21 @@ function stepAction(json: string): string {
   try {
     const s = JSON.parse(json) as { action?: string };
     return s.action ?? "";
+  } catch {
+    return json;
+  }
+}
+
+// datasetSummary sizes a journalled dataset rather than printing it. The row
+// carries the whole table as JSON, which in a table cell is unreadable and
+// pushes every other column off screen (#277 W1).
+function datasetSummary(json: string): string {
+  try {
+    const ds = JSON.parse(json) as { parameters?: unknown[]; rows?: unknown[] };
+    const params = ds.parameters?.length ?? 0;
+    if (params === 0) return "none";
+    const rows = ds.rows?.length ?? 0;
+    return `${params} parameter${params === 1 ? "" : "s"}, ${rows} row${rows === 1 ? "" : "s"}`;
   } catch {
     return json;
   }
