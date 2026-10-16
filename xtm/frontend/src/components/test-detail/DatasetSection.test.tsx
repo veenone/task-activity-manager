@@ -6,9 +6,14 @@ import { DatasetSection, DATASET_ROW_CAP } from "./DatasetSection";
 import type { TestDataset } from "../../api";
 
 const getTestDataset = vi.fn();
+const saveTestDataset = vi.fn();
 vi.mock("../../api", async () => {
   const actual = await vi.importActual<typeof import("../../api")>("../../api");
-  return { ...actual, GetTestDataset: (...args: unknown[]) => getTestDataset(...args) };
+  return {
+    ...actual,
+    GetTestDataset: (...args: unknown[]) => getTestDataset(...args),
+    SaveTestDataset: (...args: unknown[]) => saveTestDataset(...args),
+  };
 });
 
 function dataset(over: Partial<TestDataset> = {}): TestDataset {
@@ -32,6 +37,8 @@ function rowsOf(n: number, cols = 1): string[][] {
 beforeEach(() => {
   getTestDataset.mockReset();
   getTestDataset.mockResolvedValue(dataset());
+  saveTestDataset.mockReset();
+  saveTestDataset.mockResolvedValue(undefined);
 });
 
 describe("DatasetSection", () => {
@@ -125,6 +132,43 @@ describe("DatasetSection", () => {
 
     await vi.waitFor(() => expect(getTestDataset).toHaveBeenCalledTimes(2));
     expect(getTestDataset).toHaveBeenLastCalledWith("p1", "QA-1", true);
+  });
+
+  it("offers to create a dataset on a test that has none, where the backend takes writes", async () => {
+    getTestDataset.mockResolvedValue({ parameters: [], rows: [] });
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
+
+    expect(await screen.findByRole("button", { name: /create dataset/i })).toBeInTheDocument();
+  });
+
+  it("offers nothing on a backend that cannot write datasets", async () => {
+    getTestDataset.mockResolvedValue({ parameters: [], rows: [] });
+    const { container } = render(<DatasetSection profileId="p1" testKey="QA-1" supported />);
+
+    await vi.waitFor(() => expect(getTestDataset).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("opens the editor on an existing dataset and shows what it saved", async () => {
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
+    await screen.findByText("USERNAME");
+
+    await userEvent.click(screen.getByRole("button", { name: /^edit$/i }));
+    await userEvent.clear(screen.getByLabelText("Row 1, parameter 1"));
+    await userEvent.type(screen.getByLabelText("Row 1, parameter 1"), "carol");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    // Back to the table, showing the edit without a re-fetch.
+    expect(await screen.findByText("carol")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Dataset editor")).not.toBeInTheDocument();
+    expect(getTestDataset).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer the editor on a backend that cannot write", async () => {
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported />);
+    await screen.findByText("USERNAME");
+
+    expect(screen.queryByRole("button", { name: /^edit$/i })).not.toBeInTheDocument();
   });
 
   it("surfaces a read failure instead of pretending the test has no dataset", async () => {

@@ -22,6 +22,7 @@ export namespace backend {
 	    supportsBugRouting: boolean;
 	    supportsTags: boolean;
 	    supportsDatasets: boolean;
+	    supportsDatasetWrites: boolean;
 	    supportsComponentAdmin: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -51,6 +52,7 @@ export namespace backend {
 	        this.supportsBugRouting = source["supportsBugRouting"];
 	        this.supportsTags = source["supportsTags"];
 	        this.supportsDatasets = source["supportsDatasets"];
+	        this.supportsDatasetWrites = source["supportsDatasetWrites"];
 	        this.supportsComponentAdmin = source["supportsComponentAdmin"];
 	    }
 	}

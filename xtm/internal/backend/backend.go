@@ -98,6 +98,13 @@ type Capabilities struct {
 	// older instance answers 404 and reads as "no dataset".
 	SupportsDatasets bool `json:"supportsDatasets"`
 
+	// SupportsDatasetWrites: the backend can create and replace a test's
+	// dataset, not only read it. Separate from SupportsDatasets so a backend
+	// that models the concept read-only keeps showing datasets while the
+	// editor stays away, and so the commit path can skip a queued dataset
+	// change rather than failing it (#277 W1).
+	SupportsDatasetWrites bool `json:"supportsDatasetWrites"`
+
 	// SupportsComponentAdmin: the backend can create, edit and delete project
 	// components (it implements ComponentManager).
 	SupportsComponentAdmin bool `json:"supportsComponentAdmin"`
@@ -161,6 +168,12 @@ type Backend interface {
 	// when it has none. contextKey names a container whose dataset overrides
 	// the test's own; empty asks for the test level.
 	GetDataset(ctx context.Context, testKey, contextKey string) (Dataset, error)
+	// SetDataset replaces a test's own dataset with d, creating one where the
+	// test had none and clearing it when d is empty. It takes no contextKey:
+	// writing an override at container level is out of scope for #277, and a
+	// parameter no caller can set would be a promise this makes good on
+	// nowhere.
+	SetDataset(ctx context.Context, testKey string, d Dataset) error
 
 	// --- custom fields ---
 	ListCustomFields(ctx context.Context, projectKey string) ([]CustomFieldDef, error)

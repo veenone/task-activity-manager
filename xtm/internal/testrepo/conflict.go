@@ -77,6 +77,19 @@ func (r *Repository) ResolveConflictMerge(profileID, testKey, remoteVersion stri
 	defer func() { _ = tx.Rollback() }()
 
 	for _, d := range decisions {
+		// Keeping mine re-bases the dataset's before value onto the table Jira
+		// holds now. The dataset commit compares those two rather than a
+		// version token, so without this the same conflict comes back on every
+		// commit and the edit can never be pushed (#277 W1).
+		if d.Choice == "mine" && d.EntityType == entityTestDataset {
+			if _, err := tx.Exec(
+				`UPDATE pending_change SET before_val = ? WHERE profile_id = ? AND id = ?`,
+				d.RemoteValue, profileID, d.PendingID,
+			); err != nil {
+				return fmt.Errorf("rebase dataset conflict: %w", err)
+			}
+			continue
+		}
 		if d.Choice != "theirs" {
 			continue
 		}
@@ -128,6 +141,15 @@ func (r *Repository) ResolveConflictMerge(profileID, testKey, remoteVersion stri
 				); err != nil {
 					return fmt.Errorf("restore deleted step to remote: %w", err)
 				}
+			}
+		case entityTestDataset:
+			// Take the table Jira holds and drop the local edit with it.
+			var remote Dataset
+			if err := json.Unmarshal([]byte(d.RemoteValue), &remote); err != nil {
+				return fmt.Errorf("decode remote dataset: %w", err)
+			}
+			if err := saveTestDataset(tx, profileID, d.EntityKey, "", remote); err != nil {
+				return err
 			}
 		case entityTestStepOrder:
 			var ids []string

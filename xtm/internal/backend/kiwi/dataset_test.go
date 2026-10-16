@@ -19,3 +19,20 @@ func TestKiwiDoesNotSupportDatasets(t *testing.T) {
 		t.Fatalf("GetDataset err = %v, want ErrUnsupported", err)
 	}
 }
+
+// Nothing to write to either, so the write capability is off and the write
+// refuses. The commit path reads the capability and skips the row rather than
+// failing it, which keeps the user's pending edit (#277 W1).
+func TestKiwiDoesNotSupportDatasetWrites(t *testing.T) {
+	a := &Adapter{}
+	if a.Capabilities().SupportsDatasetWrites {
+		t.Fatal("Kiwi must not report SupportsDatasetWrites")
+	}
+	err := a.SetDataset(context.Background(), "T-1", backend.Dataset{
+		Parameters: []backend.DatasetParameter{{Name: "A"}},
+		Rows:       [][]string{{"1"}},
+	})
+	if !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("SetDataset err = %v, want ErrUnsupported", err)
+	}
+}

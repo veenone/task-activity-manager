@@ -7491,3 +7491,34 @@ tr.row-checked:hover {
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
+
+/* Dataset editor: the same table, with every cell an input (#277 W1). The
+   inputs are sized in ch so a column is as wide as the value it holds rather
+   than as wide as the panel. */
+.dataset-editor {
+  margin-top: 4px;
+}
+.dataset-edit {
+  font-size: var(--fs-xs);
+}
+.dataset-input {
+  font-size: var(--fs-sm);
+  width: 14ch;
+}
+.dataset-combi-label {
+  align-items: center;
+  color: var(--text-muted);
+  display: flex;
+  font-size: var(--fs-xs);
+  font-weight: normal;
+  gap: 2px;
+}
+.dataset-drop {
+  font-size: var(--fs-xs);
+}
+.dataset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}

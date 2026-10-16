@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { GetTestDataset, type TestDataset } from "../../api";
+import { DatasetEditor } from "./DatasetEditor";
 
 // DATASET_ROW_CAP is how many rows the panel draws.
 //
@@ -14,19 +15,24 @@ export const DATASET_ROW_CAP = 25;
 // ${placeholder} references resolve against, and one row per iteration (#267).
 //
 // It renders nothing for a test with no dataset, which is most of them, and
-// nothing at all on a backend with no dataset concept.
+// nothing at all on a backend with no dataset concept. Where the backend
+// takes dataset writes (canEdit), a test with no dataset instead offers to
+// give it one, and a test with one can be edited (#277 W1).
 export function DatasetSection({
   profileId,
   testKey,
   supported,
+  canEdit = false,
 }: {
   profileId: string;
   testKey: string;
   supported: boolean;
+  canEdit?: boolean;
 }) {
   const [dataset, setDataset] = useState<TestDataset | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(
     async (forceRefresh: boolean) => {
@@ -57,9 +63,39 @@ export function DatasetSection({
       </div>
     );
   }
+  if (editing) {
+    return (
+      <div className="dataset-section">
+        <h4 className="dataset-head">Dataset</h4>
+        <DatasetEditor
+          profileId={profileId}
+          testKey={testKey}
+          initial={dataset ?? { parameters: [], rows: [] }}
+          onSaved={(saved) => {
+            setDataset(saved);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      </div>
+    );
+  }
   // A test with no dataset shows nothing at all, so an ordinary test's panel
-  // is unchanged.
-  if (!dataset || dataset.parameters.length === 0) return null;
+  // is unchanged, unless one can be created here.
+  if (!dataset || dataset.parameters.length === 0) {
+    if (!canEdit) return null;
+    return (
+      <div className="dataset-section">
+        <h4 className="dataset-head">
+          Dataset
+          <span className="dataset-count">none</span>
+          <button className="link-btn dataset-refresh" onClick={() => setEditing(true)}>
+            Create dataset
+          </button>
+        </h4>
+      </div>
+    );
+  }
 
   const total = dataset.rows.length;
   const shown = dataset.rows.slice(0, DATASET_ROW_CAP);
@@ -78,6 +114,15 @@ export function DatasetSection({
         >
           {loading ? "Loading…" : "Refresh"}
         </button>
+        {canEdit && (
+          <button
+            className="link-btn dataset-edit"
+            onClick={() => setEditing(true)}
+            title="Edit the parameters and rows"
+          >
+            Edit
+          </button>
+        )}
       </h4>
       <div className="dataset-scroll">
         <table className="dataset-table" aria-label="Dataset parameters and rows">

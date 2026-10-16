@@ -587,6 +587,11 @@ func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (b
 	return backend.Dataset{}, backend.ErrUnsupported
 }
 
+// SetDataset refuses for the same reason: there is nothing to write to.
+func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Dataset) error {
+	return backend.ErrUnsupported
+}
+
 func (a *Adapter) UpdateTestStep(ctx context.Context, key, stepID string, fields map[string]string) error {
 	return backend.ErrUnsupported // P4.2 (write)
 }

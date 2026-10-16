@@ -247,6 +247,9 @@ write that matters is not the CSV import.
   table. Changing a value, dropping a row, dropping a parameter, renaming one
   and toggling `combinatorial` were each confirmed by writing and reading back.
   The wrapper shape the GET returns is not accepted; send the bare `params`.
+- The JSON API addresses an entity by numeric id only. There is no key
+  parameter, unlike the 2.0 export, so a caller holding a Jira key resolves it
+  first with an ordinary issue GET.
 - A new parameter is asked for with a **negative id**. Omitting `id` or
   sending `0` is refused with
   `{"error":"Parameters (0) not associated with the dataset."}`. Nothing

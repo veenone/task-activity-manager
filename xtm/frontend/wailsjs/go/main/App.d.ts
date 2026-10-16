@@ -437,6 +437,8 @@ export function SaveBridgeMapping(arg1:string,arg2:string,arg3:string,arg4:bridg
 
 export function SaveBugConnection(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean):Promise<connection.Connection>;
 
+export function SaveTestDataset(arg1:string,arg2:string,arg3:testrepo.Dataset):Promise<void>;
+
 export function ScanAllDuplicateSteps(arg1:string):Promise<number>;
 
 export function ScanDuplicateGroupSteps(arg1:string,arg2:string):Promise<testrepo.DuplicateGroup>;
