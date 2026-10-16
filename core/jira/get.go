@@ -32,16 +32,27 @@ func (c *Client) Get(ctx context.Context, path string, out any) error {
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// getRaw performs the authenticated GET both read paths share. It judges
-// nothing: the status is the caller's to interpret, because GetBytesStatus
-// exists for callers that treat one as data.
+// acceptAny is the Accept header for a response whose media type the caller
+// does not know in advance. A server that negotiates content refuses a request
+// whose Accept it cannot satisfy, and asking for JSON when the endpoint serves
+// bytes is how #279 made every dataset read fail with a 406.
+const acceptAny = "*/*"
+
+// getRaw performs the authenticated GET both read paths share, asking for
+// JSON. It judges nothing: the status is the caller's to interpret, because
+// GetBytesStatus exists for callers that treat one as data.
 func (c *Client) getRaw(ctx context.Context, path string) (*http.Response, error) {
+	return c.getRawAccepting(ctx, path, "application/json")
+}
+
+// getRawAccepting is getRaw with the Accept header the caller needs.
+func (c *Client) getRawAccepting(ctx context.Context, path, accept string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", accept)
 	return c.Do(req)
 }
 
@@ -78,7 +89,20 @@ func (c *Client) GetBytes(ctx context.Context, path string) ([]byte, error) {
 // a particular status as data rather than failure. A failure is reported the
 // same way Get reports one, as an *HTTPError (#176).
 func (c *Client) GetBytesStatus(ctx context.Context, path string) ([]byte, int, error) {
-	resp, err := c.getRaw(ctx, path)
+	return c.getBytesStatusAccepting(ctx, path, "application/json")
+}
+
+// GetBytesAnyType is GetBytesStatus for an endpoint that does not serve JSON.
+// It accepts any media type, because the caller is taking raw bytes and will
+// sniff the shape itself. Xray's dataset export serves
+// application/octet-stream and refuses a request that asks only for JSON
+// (#279).
+func (c *Client) GetBytesAnyType(ctx context.Context, path string) ([]byte, int, error) {
+	return c.getBytesStatusAccepting(ctx, path, acceptAny)
+}
+
+func (c *Client) getBytesStatusAccepting(ctx context.Context, path, accept string) ([]byte, int, error) {
+	resp, err := c.getRawAccepting(ctx, path, accept)
 	if err != nil {
 		return nil, 0, err
 	}

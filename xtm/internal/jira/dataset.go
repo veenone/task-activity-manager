@@ -66,7 +66,7 @@ func (c *Client) GetDataset(ctx context.Context, testKey, contextKey string) (Da
 	if contextKey != "" {
 		q.Set("contextIssueKey", contextKey)
 	}
-	body, status, err := c.getBytesStatus(ctx, datasetExportPath+"?"+q.Encode())
+	body, status, err := c.getBytesAnyType(ctx, datasetExportPath+"?"+q.Encode())
 	if status == http.StatusNotFound {
 		return Dataset{}, nil
 	}
