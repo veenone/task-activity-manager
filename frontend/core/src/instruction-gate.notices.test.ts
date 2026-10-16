@@ -86,6 +86,14 @@ describe('instruction gate: third-party notices', () => {
     expect(missing, `rerun node scripts/third-party-notices.mjs: ${missing.join(', ')}`).toEqual([]);
   });
 
+  it('declares the licence the notices file and the root LICENSE carry', () => {
+    expect(read('LICENSE')).toMatch(/GNU GENERAL PUBLIC LICENSE\s+Version 3/);
+    expect(JSON.parse(read(NOTICES)).license).toBe('GPL-3.0-only');
+    expect(JSON.parse(read('tam/frontend/package.json')).license).toBe('GPL-3.0-only');
+    // wails.json's info block has no licence key, so the copyright line says it.
+    expect(JSON.parse(read('tam/wails.json')).info.copyright).toContain('GPL-3.0-only');
+  });
+
   it('lists every production npm package of tam/frontend and frontend/core', () => {
     const want = npmProduction();
     expect(want.length, 'walked no npm dependencies').toBeGreaterThan(10);
