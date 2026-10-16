@@ -122,6 +122,44 @@ describe("DatasetEditor", () => {
     expect(screen.getByLabelText("Parameter 1 name")).toHaveValue("USERNAME");
   });
 
+  // Xray's own bookkeeping comes back with the dataset and has to go back
+  // untouched: a parameter saved without its id and list binding is rebuilt
+  // by the server as free text, losing the allowed values (#283).
+  it("offers a list parameter's allowed values and saves its binding untouched", async () => {
+    const listed: TestDataset = {
+      parameters: [
+        {
+          name: "TIER",
+          combinatorial: false,
+          id: 2741,
+          type: "LIST",
+          options: ["gold", "silver"],
+          listScope: "PARAMETER_AD_HOC",
+          listId: 162,
+        },
+      ],
+      rows: [["gold"]],
+    };
+    editor(listed);
+
+    // The cell offers what the list allows, rather than leaving the user to
+    // remember it.
+    const cell = screen.getByLabelText("Row 1, parameter 1");
+    const list = document.getElementById(cell.getAttribute("list") ?? "");
+    expect(list).not.toBeNull();
+    expect(Array.from(list!.querySelectorAll("option")).map((o) => o.getAttribute("value"))).toEqual(
+      ["gold", "silver"],
+    );
+
+    await userEvent.clear(cell);
+    await userEvent.type(cell, "silver");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
+    expect(saved.parameters[0]).toEqual(listed.parameters[0]);
+    expect(saved.rows).toEqual([["silver"]]);
+  });
+
   it("leaves the dataset alone on cancel", async () => {
     const { onCancel } = editor(twoByTwo);
 

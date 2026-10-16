@@ -8,6 +8,16 @@ import { SaveTestDataset, type DatasetParameter, type TestDataset } from "../../
 // and the journal, and reaches Jira on the next Commit. The limits Xray
 // enforces are checked on the Go side, so what comes back from a refused save
 // is the reason, shown here with the table still on screen to fix.
+// optionsOf is a list parameter's allowed values, empty for a text one.
+function optionsOf(p: DatasetParameter): string[] {
+  return p.options ?? [];
+}
+
+// optionListID names the datalist a column's cells point at.
+function optionListID(column: number): string {
+  return `dataset-options-${column}`;
+}
+
 export function DatasetEditor({
   profileId,
   testKey,
@@ -111,6 +121,7 @@ export function DatasetEditor({
                       className="dataset-input"
                       value={row[c] ?? ""}
                       aria-label={`Row ${r + 1}, parameter ${c + 1}`}
+                      list={optionsOf(p).length > 0 ? optionListID(c) : undefined}
                       onChange={(e) => setCell(r, c, e.target.value)}
                     />
                   </td>
@@ -131,6 +142,18 @@ export function DatasetEditor({
           </tbody>
         </table>
       </div>
+
+      {/* The values a list parameter allows, offered to every cell under it.
+          Xray owns the list; this only saves the user remembering it. */}
+      {parameters.map((p, i) =>
+        optionsOf(p).length > 0 ? (
+          <datalist key={i} id={optionListID(i)}>
+            {optionsOf(p).map((o) => (
+              <option key={o} value={o} />
+            ))}
+          </datalist>
+        ) : null,
+      )}
 
       {error && <p className="dataset-error">{error}</p>}
 
