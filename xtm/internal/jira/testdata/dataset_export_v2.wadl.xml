@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<application xmlns="http://wadl.dev.java.net/2009/02">
+    <doc xmlns:jersey="http://jersey.java.net/" jersey:generatedBy="Jersey: 2.48 2026-03-18 06:30:56"/>
+    <grammars/>
+    <resources base="https://jira.example.com/rest/raven/2.0/">
+        <resource path="api/dataset/export">
+            <method id="a" name="GET">
+                <request>
+                    <param xmlns:xs="http://www.w3.org/2001/XMLSchema" name="testIssueKey" style="query" type="xs:string"/>
+                    <param xmlns:xs="http://www.w3.org/2001/XMLSchema" name="contextIssueKey" style="query" type="xs:string"/>
+                    <param xmlns:xs="http://www.w3.org/2001/XMLSchema" name="testIssueId" style="query" type="xs:long"/>
+                    <param xmlns:xs="http://www.w3.org/2001/XMLSchema" name="contextIssueId" style="query" type="xs:long"/>
+                    <param xmlns:xs="http://www.w3.org/2001/XMLSchema" name="resolved" style="query" type="xs:boolean" default="true"/>
+                    <param xmlns:xs="http://www.w3.org/2001/XMLSchema" name="testVersion" style="query" type="xs:string"/>
+                </request>
+                <response>
+                    <representation mediaType="application/octet-stream"/>
+                </response>
+            </method>
+        </resource>
+    </resources>
+</application>

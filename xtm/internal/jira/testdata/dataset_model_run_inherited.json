@@ -1,0 +1,1 @@
+{"entityDataset":{"params":[]},"resolvedDataset":{"params":[{"param":{"id":2725,"name":"dataset sample - 1","rank":0,"combinatorial":false,"info":{"type":"TEXT","options":[]}},"values":[{"value":"text combi - 1","rank":0},{"value":"text combi -2","rank":1}]}]},"resolutionMessage":"This is the resolved dataset, defined in the Test."}
