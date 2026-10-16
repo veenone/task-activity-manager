@@ -91,6 +91,8 @@ A dataset is the table a test's `${placeholder}` references resolve against: one
 - A column is a parameter. Type its name in the header and tick **combinatorial** if Xray should expand it into extra iterations. **Remove** above a column deletes it with its values.
 - **Add row** adds an iteration, and **Remove** at the end of a row deletes that row.
 - A parameter whose values come from a list offers them as you type in its cells. XTM does not create or change lists, and editing a dataset leaves an existing one as it is.
+- The arrows beside a parameter name move it one column left or right, and the ones at the end of a row move that row up or down. Row order is the order the iterations run in.
+- Renaming a parameter asks whether to rewrite `${OLD}` to `${NEW}` in the test's steps and definition. Say yes and each rewritten field becomes its own pending change, so you can see them before they go. Say no and the text is left exactly as it was, which is the right answer when a reference was never pointing at this parameter.
 - **Save** stores the table locally and counts it in **N pending**, like every other edit. Jira gets it on the next commit.
 
 Xray's own limits are checked when you save: at most 20 parameters, 100 characters in a value, no two parameters with the same name, no two identical rows, and a name that starts with a letter or underscore. A table that breaks one of them is refused with the reason, and stays on screen for you to fix.
