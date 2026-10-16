@@ -34,6 +34,15 @@ npm test --workspaces --if-present       # every Vitest suite
 npm run typecheck --workspaces --if-present   # every workspace's type check
 ```
 
+## Third-party notices
+
+TAM's Help > About > Licences lists every Go module and production npm package
+the binary bundles, read from `tam/frontend/src/assets/third-party.json`.
+`node scripts/third-party-notices.mjs` writes that file from `tam/go.mod` and
+the installed npm tree, so run it from the repo root after `npm install`
+whenever a dependency of TAM changes, and commit the result.
+`frontend/core/src/instruction-gate.notices.test.ts` fails until you do.
+
 ## Remotes
 
 One remote: `veenone/task-activity-manager` on GitHub. `git push` reaches it
