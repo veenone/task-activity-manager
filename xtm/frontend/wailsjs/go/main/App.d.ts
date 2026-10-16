@@ -231,6 +231,8 @@ export function GetCapabilities(arg1:string):Promise<backend.Capabilities>;
 
 export function GetContainerBoard(arg1:string,arg2:string):Promise<testrepo.TestPlanBoard>;
 
+export function GetContainerDataset(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<testrepo.Dataset>;
+
 export function GetCoverageProjectStatus(arg1:string):Promise<Array<coverage.ProjectCoverageRow>>;
 
 export function GetCoveragePublishStatus(arg1:string,arg2:string):Promise<Array<coveragepublish.GroupStatus>>;

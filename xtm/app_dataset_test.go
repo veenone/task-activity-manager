@@ -139,6 +139,55 @@ func TestImportDatasetCSVRefusesWhatItCannotUse(t *testing.T) {
 	}
 }
 
+// An execution's override is cached under its own key, so reopening a member
+// of a container costs nothing and the panel can say which level it is
+// showing without asking again (#277 W3).
+func TestGetContainerDatasetPrefersTheCache(t *testing.T) {
+	a, profileID := newTestAppWithDemoProfile(t)
+	override := testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "TIER"}},
+		Rows:       [][]string{{"run-only"}},
+	}
+	if err := a.repo.SaveTestDataset(profileID, "QA-1", "EXEC-1", override); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got, err := a.GetContainerDataset(profileID, "EXEC-1", "QA-1", false)
+	if err != nil {
+		t.Fatalf("container dataset: %v", err)
+	}
+	if len(got.Rows) != 1 || got.Rows[0][0] != "run-only" {
+		t.Errorf("dataset = %+v, want the cached override", got)
+	}
+	// The test's own dataset is a different row and is not disturbed by it.
+	own, _, err := a.repo.GetTestDataset(profileID, "QA-1", "")
+	if err != nil {
+		t.Fatalf("test level: %v", err)
+	}
+	if len(own.Parameters) != 0 {
+		t.Errorf("test-level dataset = %+v, want it untouched", own)
+	}
+}
+
+// Nothing to ask about: no container selected, or a test that exists only
+// here. Both answer empty without reaching for a backend.
+func TestGetContainerDatasetAsksNothingWithoutAContainer(t *testing.T) {
+	a, profileID := newTestAppWithDemoProfile(t)
+
+	for _, tc := range []struct{ container, test string }{
+		{"", "QA-1"},
+		{"EXEC-1", "new-test-1"},
+	} {
+		ds, err := a.GetContainerDataset(profileID, tc.container, tc.test, false)
+		if err != nil {
+			t.Fatalf("container=%q test=%q: %v", tc.container, tc.test, err)
+		}
+		if len(ds.Parameters) != 0 {
+			t.Errorf("container=%q test=%q gave %+v, want nothing", tc.container, tc.test, ds)
+		}
+	}
+}
+
 // A parameterized test's dataset reaches the caller with its parameters and
 // rows intact.
 func TestGetTestDatasetReadsAParameterizedTest(t *testing.T) {

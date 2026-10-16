@@ -434,6 +434,10 @@ export function GetContainerBoard(arg1, arg2) {
   return window['go']['main']['App']['GetContainerBoard'](arg1, arg2);
 }
 
+export function GetContainerDataset(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetContainerDataset'](arg1, arg2, arg3, arg4);
+}
+
 export function GetCoverageProjectStatus(arg1) {
   return window['go']['main']['App']['GetCoverageProjectStatus'](arg1);
 }

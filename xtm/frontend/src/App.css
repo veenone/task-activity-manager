@@ -7455,6 +7455,12 @@ tr.row-checked:hover {
   font-size: var(--fs-xs);
   font-weight: normal;
 }
+/* Which level the table on screen comes from, when a container is selected. */
+.dataset-level {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: normal;
+}
 .dataset-refresh {
   font-size: var(--fs-xs);
   margin-left: auto;

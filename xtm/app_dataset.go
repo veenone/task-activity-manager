@@ -48,7 +48,7 @@ func (a *App) GetTestDataset(profileID, testKey string, forceRefresh bool) (test
 	if err != nil {
 		return testrepo.Dataset{}, err
 	}
-	remote, err := b.GetDataset(a.ctx, testKey, "")
+	remote, err := b.GetDataset(a.ctx, testKey)
 	if err != nil {
 		return testrepo.Dataset{}, err
 	}
@@ -58,6 +58,48 @@ func (a *App) GetTestDataset(profileID, testKey string, forceRefresh bool) (test
 	// "this test has no dataset" on the strength of a server error, and the
 	// panel would keep showing nothing until someone pressed Refresh.
 	if err := a.repo.SaveTestDataset(profileID, testKey, "", ds); err != nil {
+		return testrepo.Dataset{}, err
+	}
+	return ds, nil
+}
+
+// GetContainerDataset returns the dataset a Test Execution defines for a
+// test, and an empty one when it defines none (#277 W3).
+//
+// Xray resolves a dataset nearest-first, so an execution's own table is what
+// runs there. This answers what that level defines rather than what will run,
+// because the two together are what the panel needs: an empty answer means
+// the test's own dataset is in force, and the panel says which.
+//
+// Cached per (test, container) in the same table as the test-level read, so
+// reopening a member costs nothing. forceRefresh is the panel's Refresh.
+func (a *App) GetContainerDataset(profileID, containerKey, testKey string, forceRefresh bool) (testrepo.Dataset, error) {
+	if err := a.requireStore(); err != nil {
+		return testrepo.Dataset{}, err
+	}
+	if containerKey == "" || isLocalTestKey(testKey) {
+		return testrepo.Dataset{}, nil
+	}
+	if !forceRefresh {
+		cached, found, err := a.repo.GetTestDataset(profileID, testKey, containerKey)
+		if err != nil {
+			return testrepo.Dataset{}, err
+		}
+		if found {
+			return cached, nil
+		}
+	}
+
+	b, err := a.backendFor(profileID)
+	if err != nil {
+		return testrepo.Dataset{}, err
+	}
+	remote, err := b.GetRunDataset(a.ctx, containerKey, testKey)
+	if err != nil {
+		return testrepo.Dataset{}, err
+	}
+	ds := toRepoDataset(remote)
+	if err := a.repo.SaveTestDataset(profileID, testKey, containerKey, ds); err != nil {
 		return testrepo.Dataset{}, err
 	}
 	return ds, nil

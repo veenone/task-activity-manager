@@ -6,12 +6,14 @@ import { DatasetSection, DATASET_ROW_CAP } from "./DatasetSection";
 import type { TestDataset } from "../../api";
 
 const getTestDataset = vi.fn();
+const getContainerDataset = vi.fn();
 const saveTestDataset = vi.fn();
 vi.mock("../../api", async () => {
   const actual = await vi.importActual<typeof import("../../api")>("../../api");
   return {
     ...actual,
     GetTestDataset: (...args: unknown[]) => getTestDataset(...args),
+    GetContainerDataset: (...args: unknown[]) => getContainerDataset(...args),
     SaveTestDataset: (...args: unknown[]) => saveTestDataset(...args),
   };
 });
@@ -41,6 +43,8 @@ function rowsOf(n: number, cols = 1): string[][] {
 beforeEach(() => {
   getTestDataset.mockReset();
   getTestDataset.mockResolvedValue(dataset());
+  getContainerDataset.mockReset();
+  getContainerDataset.mockResolvedValue({ parameters: [], rows: [] });
   saveTestDataset.mockReset();
   saveTestDataset.mockResolvedValue(undefined);
 });
@@ -172,6 +176,51 @@ describe("DatasetSection", () => {
     render(<DatasetSection profileId="p1" testKey="QA-1" supported />);
     await screen.findByText("USERNAME");
 
+    expect(screen.queryByRole("button", { name: /^edit$/i })).not.toBeInTheDocument();
+  });
+
+  // Xray resolves a dataset nearest-first, so an execution's own table is
+  // what runs there. Which one is on screen has to be said, not guessed
+  // (#277 W3).
+  it("shows the execution's dataset and names the level", async () => {
+    getContainerDataset.mockResolvedValue({
+      parameters: [{ name: "TIER", combinatorial: false }],
+      rows: [["run-only"]],
+    });
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported containerKey="EXEC-1" />);
+
+    expect(await screen.findByText("run-only")).toBeInTheDocument();
+    expect(screen.getByText(/defined in EXEC-1/)).toBeInTheDocument();
+    // The test's own table is not what runs here, so it is not what is shown.
+    expect(screen.queryByText("alice")).not.toBeInTheDocument();
+  });
+
+  it("shows the test's dataset, and says so, when the execution defines none", async () => {
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported containerKey="EXEC-1" />);
+
+    expect(await screen.findByText("alice")).toBeInTheDocument();
+    expect(screen.getByText(/from the test/i)).toBeInTheDocument();
+  });
+
+  it("asks for no override when no container is selected", async () => {
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported />);
+
+    await screen.findByText("alice");
+    expect(getContainerDataset).not.toHaveBeenCalled();
+    // With no container there is one level and nothing to disambiguate.
+    expect(screen.queryByText(/from the test/i)).not.toBeInTheDocument();
+  });
+
+  // Writing at execution level is out of scope on #277, and the editor saves
+  // to the test. Offering it over an override would move the wrong table.
+  it("does not offer to edit a dataset the execution defines", async () => {
+    getContainerDataset.mockResolvedValue({
+      parameters: [{ name: "TIER", combinatorial: false }],
+      rows: [["run-only"]],
+    });
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit containerKey="EXEC-1" />);
+
+    await screen.findByText("run-only");
     expect(screen.queryByRole("button", { name: /^edit$/i })).not.toBeInTheDocument();
   });
 
