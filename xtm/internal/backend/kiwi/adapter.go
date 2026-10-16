@@ -583,7 +583,12 @@ func (a *Adapter) CreateTestStep(ctx context.Context, key, action, data, expecte
 
 // GetDataset refuses: Kiwi TCMS has no dataset equivalent, so there is
 // nothing to read and an empty answer would be a lie rather than a fact.
-func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (backend.Dataset, error) {
+func (a *Adapter) GetDataset(ctx context.Context, testKey string) (backend.Dataset, error) {
+	return backend.Dataset{}, backend.ErrUnsupported
+}
+
+// GetRunDataset refuses for the same reason: no datasets, so no overrides.
+func (a *Adapter) GetRunDataset(ctx context.Context, execKey, testKey string) (backend.Dataset, error) {
 	return backend.Dataset{}, backend.ErrUnsupported
 }
 

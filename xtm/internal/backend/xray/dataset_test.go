@@ -87,14 +87,14 @@ func TestXrayDemoRefusesADatasetWrite(t *testing.T) {
 // usable dataset for the keys that carry one.
 func TestXrayDemoReturnsADatasetForEveryTwentiethTest(t *testing.T) {
 	a := New(jira.NewClient("demo", ""))
-	withData, err := a.GetDataset(context.Background(), "QA-1", "")
+	withData, err := a.GetDataset(context.Background(), "QA-1")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}
 	if len(withData.Parameters) == 0 {
 		t.Fatalf("QA-1 should carry a demo dataset, got %+v", withData)
 	}
-	none, err := a.GetDataset(context.Background(), "QA-2", "")
+	none, err := a.GetDataset(context.Background(), "QA-2")
 	if err != nil {
 		t.Fatalf("dataset: %v", err)
 	}

@@ -718,10 +718,7 @@ func (c *Client) SetTestRunStatus(ctx context.Context, execKey, testKey, status 
 // with a short backoff to give Xray a moment to materialise the run; a
 // genuinely different error fails fast.
 func (c *Client) resolveTestRunID(ctx context.Context, execKey, testKey string) (string, error) {
-	q := url.Values{}
-	q.Set("testExecIssueKey", execKey)
-	q.Set("testIssueKey", testKey)
-	path := "/rest/raven/1.0/api/testrun?" + q.Encode()
+	path := testRunPath(execKey, testKey)
 
 	backoff := []time.Duration{0, 800 * time.Millisecond, 1600 * time.Millisecond, 3200 * time.Millisecond}
 	for attempt, wait := range backoff {
@@ -732,21 +729,12 @@ func (c *Client) resolveTestRunID(ctx context.Context, execKey, testKey string) 
 			case <-time.After(wait):
 			}
 		}
-		var run struct {
-			ID json.Number `json:"id"`
+		id, missing, err := c.testRunID(ctx, path)
+		if err != nil {
+			return "", fmt.Errorf("look up test run for %s in %s: %w", testKey, execKey, err)
 		}
-		err := c.get(ctx, path, &run)
-		if err == nil {
-			if id := run.ID.String(); id != "" && id != "0" {
-				return id, nil
-			}
-			// 200 but no run id — treat like "not ready yet" and keep retrying.
-		} else {
-			var he *HTTPError
-			notReady := errors.As(err, &he) && (he.Code == http.StatusBadRequest || he.Code == http.StatusNotFound)
-			if !notReady {
-				return "", fmt.Errorf("look up test run for %s in %s: %w", testKey, execKey, err)
-			}
+		if !missing {
+			return id, nil
 		}
 		if attempt < len(backoff)-1 {
 			log.Printf("xtm: test run for %s in %s not ready yet (attempt %d) — retrying", testKey, execKey, attempt+1)
@@ -755,6 +743,37 @@ func (c *Client) resolveTestRunID(ctx context.Context, execKey, testKey string) 
 	return "", fmt.Errorf(
 		"%s has no test run in execution %s yet — Xray may still be creating it; "+
 			"sync the execution and commit again", testKey, execKey)
+}
+
+// testRunID is one attempt at the run lookup. missing is true where Xray says
+// there is no run: a 400 or 404, or a 200 carrying no id. Callers that expect
+// the run to exist retry on missing (resolveTestRunID, where Xray may still
+// be creating it); a reader takes it as the answer.
+func (c *Client) testRunID(ctx context.Context, path string) (id string, missing bool, err error) {
+	var run struct {
+		ID json.Number `json:"id"`
+	}
+	if err := c.get(ctx, path, &run); err != nil {
+		var he *HTTPError
+		if errors.As(err, &he) && (he.Code == http.StatusBadRequest || he.Code == http.StatusNotFound) {
+			return "", true, nil
+		}
+		return "", false, err
+	}
+	id = run.ID.String()
+	if id == "" || id == "0" {
+		return "", true, nil
+	}
+	return id, false, nil
+}
+
+// testRunPath is the lookup that turns an execution and a test into the id of
+// the run that pairs them.
+func testRunPath(execKey, testKey string) string {
+	q := url.Values{}
+	q.Set("testExecIssueKey", execKey)
+	q.Set("testIssueKey", testKey)
+	return "/rest/raven/1.0/api/testrun?" + q.Encode()
 }
 
 // AddTestRunDefect links a Bug to a Test's run inside a Test Execution. Demo

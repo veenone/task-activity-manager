@@ -44,60 +44,70 @@ type Dataset struct {
 	Rows       [][]string         `json:"rows"`
 }
 
-// datasetExportPath is Xray's CSV dataset export, added in Xray 5.1.0
-// (XRAY-7868). contextKey names a Test Plan or Test Execution whose dataset
-// overrides the test's own; empty asks for the test level.
-const datasetExportPath = "/rest/raven/2.0/api/dataset/export"
-
-// GetDataset returns the dataset attached to a test, or an empty Dataset when
-// it has none (#267 Phase 1, #283).
+// GetDataset returns the dataset a test defines, or an empty Dataset when it
+// has none (#267 Phase 1, #283).
 //
-// A test's own dataset is read from the raven/1.0 JSON model, because that is
-// the only route that carries each parameter's id and, for a list parameter,
-// its allowed values and the list it belongs to. The CSV export carries
-// values alone, and a write that only knows what the export said rebuilds
-// every parameter from scratch: new ids, and a list flattened into free text
-// (#283). It costs one extra request, since the model is addressed by numeric
-// issue id and publishes no key parameter.
+// It reads the raven/1.0 JSON model, the only route carrying each parameter's
+// id and, for a list parameter, its allowed values and the list behind them.
+// The CSV export carries values alone, and a write that only knew what the
+// export said rebuilt every parameter: new ids, and a list flattened into
+// free text (#283). It costs one extra request, because the model is
+// addressed by numeric issue id and publishes no key parameter.
 //
-// A container-level read still uses the export. The model addresses a Test
-// Run rather than a Test Execution, and resolving that is #277 W3's job.
-//
-// Both routes answer 404 on an instance below Xray 5.1, which has neither.
-// That reads as "no dataset", which is what the panel should show there. On
-// the model route a test that simply has no dataset answers 200 with an empty
-// params array instead, so nothing has to interpret a 404 as data. See the
-// Xray datasets section of agents/project/domain-context.md.
-func (c *Client) GetDataset(ctx context.Context, testKey, contextKey string) (Dataset, error) {
+// An instance below Xray 5.1 has no such route and answers 404, which reads
+// as no dataset: that is what the panel should show there. A test that simply
+// has no dataset answers 200 with an empty params array instead, so nothing
+// has to read a 404 as data. See the Xray datasets section of
+// agents/project/domain-context.md.
+func (c *Client) GetDataset(ctx context.Context, testKey string) (Dataset, error) {
 	if isDemoURL(c.baseURL) {
 		return demoDataset(testKey), nil
 	}
-	if contextKey == "" {
-		return c.datasetModel(ctx, testKey)
-	}
-	q := url.Values{}
-	q.Set("testIssueKey", testKey)
-	q.Set("contextIssueKey", contextKey)
-	body, status, err := c.getBytesAnyType(ctx, datasetExportPath+"?"+q.Encode())
-	if status == http.StatusNotFound {
-		return Dataset{}, nil
-	}
-	if err != nil {
-		return Dataset{}, err
-	}
-	return ParseDatasetCSV(body), nil
-}
-
-// datasetModel reads a test's own dataset from the JSON resource.
-func (c *Client) datasetModel(ctx context.Context, testKey string) (Dataset, error) {
 	id, err := c.issueID(ctx, testKey)
 	if err != nil {
 		return Dataset{}, err
 	}
+	return c.datasetModel(ctx, id, datasetEntityTest)
+}
+
+// GetRunDataset returns the dataset a Test Execution defines for a test, and
+// an empty Dataset when it defines none (#277 W3).
+//
+// Xray resolves a dataset nearest-first: a run's own table wins over the
+// test's. The model reports the two separately, `entityDataset` for what this
+// level defines and `resolvedDataset` for what it would otherwise inherit,
+// and this returns the first. Reading the resolved one instead would hand
+// back the test's table while the caller believed the execution had
+// overridden it.
+//
+// The resolutionMessage the same response carries is not used: it reads "This
+// is the resolved dataset, defined in the Test." whatever the level and
+// whether or not an override exists.
+//
+// A test with no run in that execution has nothing to override with, and says
+// so by answering empty rather than failing.
+func (c *Client) GetRunDataset(ctx context.Context, execKey, testKey string) (Dataset, error) {
+	if isDemoURL(c.baseURL) {
+		return Dataset{}, nil
+	}
+	runID, missing, err := c.testRunID(ctx, testRunPath(execKey, testKey))
+	if err != nil {
+		return Dataset{}, fmt.Errorf("look up the run of %s in %s: %w", testKey, execKey, err)
+	}
+	if missing {
+		return Dataset{}, nil
+	}
+	return c.datasetModel(ctx, runID, datasetEntityRun)
+}
+
+// datasetModel reads what one entity defines, a test or a test run, from the
+// JSON resource. It returns entityDataset: what this level defines, not what
+// it inherits.
+func (c *Client) datasetModel(ctx context.Context, entityID, entityType string) (Dataset, error) {
 	q := url.Values{}
-	q.Set("entityId", id)
-	q.Set("type", datasetEntityTest)
-	body, status, err := c.getBytesAnyType(ctx, datasetWritePath+"?"+q.Encode())
+	q.Set("entityId", entityID)
+	q.Set("type", entityType)
+	body, status, err := c.getBytesStatus(ctx, datasetWritePath+"?"+q.Encode())
 	if status == http.StatusNotFound {
 		return Dataset{}, nil
 	}
@@ -110,7 +120,7 @@ func (c *Client) datasetModel(ctx context.Context, testKey string) (Dataset, err
 		} `json:"entityDataset"`
 	}
 	if err := json.Unmarshal(body, &model); err != nil {
-		return Dataset{}, fmt.Errorf("decode dataset of %s: %w", testKey, err)
+		return Dataset{}, fmt.Errorf("decode dataset of %s %s: %w", entityType, entityID, err)
 	}
 	return datasetRows(model.EntityDataset.Params), nil
 }
@@ -225,10 +235,14 @@ func (c *Client) SetDataset(ctx context.Context, testKey string, d Dataset) erro
 	})
 }
 
-// datasetEntityTest is the only entity type a test's own dataset is read or
-// written under. Xray also accepts TEST_RUN, addressed by run id, which #277
-// leaves to W3; everything else answers "Entity Type is not valid."
-const datasetEntityTest = "TEST"
+// The entity types the dataset resource accepts, uppercase. A Test Execution
+// is not one of them: a dataset defined for a test within an execution hangs
+// off the run that pairs them. Everything else answers "Entity Type is not
+// valid."
+const (
+	datasetEntityTest = "TEST"
+	datasetEntityRun  = "TEST_RUN"
+)
 
 // issueIDFields is the field list of the issue GET that resolves a key to an
 // id. Jira answers with the id at the top level whatever is asked for, and

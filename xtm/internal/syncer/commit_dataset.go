@@ -45,7 +45,7 @@ func (e *Engine) commitDatasets(ctx context.Context, profileID string, rows []te
 			continue
 		}
 
-		remote, err := e.backend.GetDataset(ctx, c.EntityKey, "")
+		remote, err := e.backend.GetDataset(ctx, c.EntityKey)
 		if err != nil {
 			result.Failed = append(result.Failed, FailedCommit{
 				TestKey: c.EntityKey,

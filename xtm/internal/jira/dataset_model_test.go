@@ -34,7 +34,7 @@ func TestGetDatasetReadsTheJSONModel(t *testing.T) {
 	srv := modelServer(t, &asked, http.StatusOK, string(readFixture(t, "dataset_model_test_level.json")))
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1")
 	if err != nil {
 		t.Fatalf("GetDataset: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestGetDatasetReadsAnEmptyModelAsNoDataset(t *testing.T) {
 			`"resolutionMessage":"This is the resolved dataset, defined in the Test."}`)
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-2", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-2")
 	if err != nil {
 		t.Fatalf("GetDataset: %v", err)
 	}
@@ -102,35 +102,12 @@ func TestGetDatasetTreatsAMissingRouteAsNoDataset(t *testing.T) {
 		`<status><status-code>404</status-code></status>`)
 	defer srv.Close()
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "")
+	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1")
 	if err != nil {
 		t.Fatalf("a missing dataset route must read as no dataset: %v", err)
 	}
 	if len(ds.Parameters) != 0 {
 		t.Errorf("dataset = %+v, want an empty one", ds)
-	}
-}
-
-// A container-level read still goes through the 2.0 export: the JSON model
-// addresses a run by its run id, which nothing above resolves yet (#277 W3).
-func TestGetDatasetStillExportsForAContextKey(t *testing.T) {
-	var asked []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		asked = append(asked, r.URL.Path)
-		w.Header().Set("Content-Type", "application/octet-stream")
-		_, _ = w.Write([]byte("USERNAME\nalice\n"))
-	}))
-	defer srv.Close()
-
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("GetDataset: %v", err)
-	}
-	if len(asked) != 1 || asked[0] != "/rest/raven/2.0/api/dataset/export" {
-		t.Errorf("requests = %v, want the export alone", asked)
-	}
-	if len(ds.Parameters) != 1 || ds.Parameters[0].Name != "USERNAME" {
-		t.Errorf("dataset = %+v, want the exported table", ds)
 	}
 }
 
