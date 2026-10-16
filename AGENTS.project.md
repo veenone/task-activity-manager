@@ -16,9 +16,9 @@ Gate: `frontend/core/src/instruction-gate.test.ts` (no token literal written to 
 
 ### Store schema and purge
 Owns: SQLite schema, migration order, and everything a profile owns locally.
-Path: migrations in `core/store`; per-profile deletion in the two `PurgeProfile` implementations (`tam/internal/issuerepo/state.go` sweeps issue data, `tam/internal/boardrepo/boardrepo.go` sweeps board data); per-board deletion in `RemoveBoards`.
-Never: a profile-keyed table named in neither purge list; a board-keyed table absent from `RemoveBoards`, `ritual_document` excepted for the reason recorded on it; a column added to an existing table without a migration entry.
-Gate: `frontend/core/src/instruction-gate.test.ts` (every profile-keyed table is named in one of the two purge lists, which partition the tables between them, and every board-keyed table is also named in `RemoveBoards`).
+Path: migrations in `core/store`. TAM deletes a profile through two `PurgeProfile` implementations that partition its tables (`tam/internal/issuerepo/state.go` sweeps issue data, `tam/internal/boardrepo/boardrepo.go` sweeps board data), and a board through `RemoveBoards`. XTM has one list, `profileScopedTables` in `xtm/internal/testrepo/purge.go`, and no board.
+Never: a profile-keyed table named in no purge list of its own app; a board-keyed table absent from `RemoveBoards`, `ritual_document` excepted for the reason recorded on it; a column added to an existing table without a migration entry.
+Gate: `frontend/core/src/instruction-gate.test.ts`, which reads both apps' schemas. It checks the list, not the deleting: XTM also has `TestPurgeProfileLeavesNoProfileRowBehind`, which seeds every profile-keyed table from the live schema and proves the rows go. The gate covered TAM alone until #272, by which time 25 of XTM's 40 profile-keyed tables had never been swept.
 
 ### Generated bindings
 Owns: the Wails binding layer, `tam/frontend/wailsjs` and `xtm/frontend/wailsjs`.
