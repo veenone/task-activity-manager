@@ -1,12 +1,13 @@
 import { normalizeJiraUrl } from "@agile-suite/core";
-import type { ProfileFormState } from "./useProfileFormState";
+import type { BugTracker } from "./useBugTracker";
 
 // BugTrackerFieldset is the Jira connection a Kiwi profile files bugs into.
-export function BugTrackerFieldset({ s }: { s: ProfileFormState }) {
-  const { bugConnId, bugTrackerUrl, setBugTrackerUrl, bugTrackerProjectKey, setBugTrackerProjectKey, bugTrackerIssueType, setBugTrackerIssueType, bugTrackerToken, setBugTrackerToken, bugTrackerCaCert, setBugTrackerCaCert, bugTrackerAllowUntrustedTLS, setBugTrackerAllowUntrustedTLS, bugTrackerLoadError, isConnection, backendIsKiwi, bugTrackerUrlError, bugTrackerPartial } = s;
+// active is false on an Xray profile and on a workspace connection.
+export function BugTrackerFieldset({ b, active }: { b: BugTracker; active: boolean }) {
+  const { hasStored, url: bugTrackerUrl, setUrl: setBugTrackerUrl, projectKey: bugTrackerProjectKey, setProjectKey: setBugTrackerProjectKey, issueType: bugTrackerIssueType, setIssueType: setBugTrackerIssueType, token: bugTrackerToken, setToken: setBugTrackerToken, caCert: bugTrackerCaCert, setCaCert: setBugTrackerCaCert, allowTls: bugTrackerAllowUntrustedTLS, setAllowTls: setBugTrackerAllowUntrustedTLS, loadError: bugTrackerLoadError, urlError: bugTrackerUrlError, partial: bugTrackerPartial } = b;
   return (
     <>
-      {backendIsKiwi && !isConnection && (
+      {active && (
         <fieldset className="profile-bug-tracker">
           <legend>Bug tracker</legend>
           <p className="field-hint">
@@ -67,7 +68,7 @@ export function BugTrackerFieldset({ s }: { s: ProfileFormState }) {
               value={bugTrackerToken}
               onChange={(e) => setBugTrackerToken(e.target.value)}
               placeholder={
-                bugConnId
+                hasStored
                   ? "Leave blank to keep the current token"
                   : "Personal access token"
               }
