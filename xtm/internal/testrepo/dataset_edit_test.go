@@ -3,6 +3,8 @@ package testrepo
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -130,6 +132,96 @@ func TestEditTestDatasetBackToTheSyncedTableDropsTheRow(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cached, twoByTwo) {
 		t.Errorf("cached dataset = %+v, want the synced table back", cached)
+	}
+}
+
+// Xray enforces its own limits, and finding out at commit time means the user
+// loses the edit they already made. Nothing invalid is journalled.
+func TestEditTestDatasetRefusesATableXrayWouldReject(t *testing.T) {
+	wide := make([]DatasetParameter, 21)
+	for i := range wide {
+		wide[i] = DatasetParameter{Name: "P" + strconv.Itoa(i)}
+	}
+
+	for _, tc := range []struct {
+		name string
+		ds   Dataset
+		want string
+	}{
+		{"too many parameters", Dataset{Parameters: wide}, "20 parameters"},
+		{
+			"value too long",
+			Dataset{
+				Parameters: []DatasetParameter{{Name: "USERNAME"}},
+				Rows:       [][]string{{strings.Repeat("a", 101)}},
+			},
+			"100 characters",
+		},
+		{
+			"duplicate parameter name",
+			Dataset{Parameters: []DatasetParameter{{Name: "USERNAME"}, {Name: "USERNAME"}}},
+			"more than once",
+		},
+		{
+			"name starting with a digit",
+			Dataset{Parameters: []DatasetParameter{{Name: "1ST_USER"}}},
+			"1ST_USER",
+		},
+		{"empty name", Dataset{Parameters: []DatasetParameter{{Name: ""}}}, "needs a name"},
+		{
+			"duplicate rows",
+			Dataset{
+				Parameters: []DatasetParameter{{Name: "USERNAME"}},
+				Rows:       [][]string{{"alice"}, {"alice"}},
+			},
+			"rows 1 and 2",
+		},
+		{
+			"row wider than the parameters",
+			Dataset{
+				Parameters: []DatasetParameter{{Name: "USERNAME"}},
+				Rows:       [][]string{{"alice", "eu-west"}},
+			},
+			"more cells",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newTestRepo(t)
+			err := r.EditTestDataset("p1", "QA-1", tc.ds)
+			if err == nil {
+				t.Fatalf("%s was accepted", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error = %q, want it to mention %q", err, tc.want)
+			}
+			if rows := pendingDatasetRows(t, r, "p1"); len(rows) != 0 {
+				t.Errorf("a rejected table was journalled anyway: %+v", rows)
+			}
+			if _, found, _ := r.GetTestDataset("p1", "QA-1", ""); found {
+				t.Error("a rejected table reached the cache")
+			}
+		})
+	}
+}
+
+// The limits are limits, not margins: a table sitting exactly on them is fine.
+func TestEditTestDatasetAcceptsTheLimits(t *testing.T) {
+	r := newTestRepo(t)
+	params := make([]DatasetParameter, 20)
+	row := make([]string, 20)
+	for i := range params {
+		params[i] = DatasetParameter{Name: "P" + strconv.Itoa(i)}
+		row[i] = strings.Repeat("a", 100)
+	}
+	// A name with the punctuation Xray allows, at its full length.
+	params[0] = DatasetParameter{Name: "_" + strings.Repeat("a", 63)}
+	params[1] = DatasetParameter{Name: "user name - 2"}
+
+	if err := r.EditTestDataset("p1", "QA-1", Dataset{
+		Parameters: params,
+		Rows:       [][]string{row},
+	}); err != nil {
+		t.Fatalf("a table on the limits was refused: %v", err)
 	}
 }
 

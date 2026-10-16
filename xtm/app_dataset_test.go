@@ -18,6 +18,57 @@ func newTestAppWithDemoProfile(t *testing.T) (*App, string) {
 	return a, p.ID
 }
 
+// Saving a dataset is local: the table shows immediately, one pending change
+// is queued, and nothing is sent until Commit (#277 W1).
+func TestSaveTestDatasetQueuesTheTableLocally(t *testing.T) {
+	a, profileID := newTestAppWithDemoProfile(t)
+	want := testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USERNAME"}},
+		Rows:       [][]string{{"alice"}, {"bob"}},
+	}
+
+	if err := a.SaveTestDataset(profileID, "QA-2", want); err != nil {
+		t.Fatalf("save dataset: %v", err)
+	}
+
+	got, err := a.GetTestDataset(profileID, "QA-2", false)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if len(got.Parameters) != 1 || got.Parameters[0].Name != "USERNAME" || len(got.Rows) != 2 {
+		t.Errorf("dataset = %+v, want the table just saved", got)
+	}
+	pending, err := a.repo.ListPendingChanges(profileID)
+	if err != nil {
+		t.Fatalf("list pending: %v", err)
+	}
+	queued := 0
+	for _, c := range pending {
+		if c.EntityType == "test_dataset" && c.EntityKey == "QA-2" {
+			queued++
+		}
+	}
+	if queued != 1 {
+		t.Errorf("%d queued dataset changes, want 1 (pending=%+v)", queued, pending)
+	}
+}
+
+// The limits are enforced before anything is stored, so the editor can show
+// the reason and the user still has their table in front of them.
+func TestSaveTestDatasetRefusesAnInvalidTable(t *testing.T) {
+	a, profileID := newTestAppWithDemoProfile(t)
+
+	err := a.SaveTestDataset(profileID, "QA-2", testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USERNAME"}, {Name: "USERNAME"}},
+	})
+	if err == nil {
+		t.Fatal("a dataset with two parameters of the same name was accepted")
+	}
+	if _, found, _ := a.repo.GetTestDataset(profileID, "QA-2", ""); found {
+		t.Error("the rejected table was cached anyway")
+	}
+}
+
 // A parameterized test's dataset reaches the caller with its parameters and
 // rows intact.
 func TestGetTestDatasetReadsAParameterizedTest(t *testing.T) {

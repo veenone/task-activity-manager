@@ -114,6 +114,11 @@ const datasetField = "dataset"
 // one pending row still holding the table as it was synced, and editing back
 // to that table drops the row, both from the journal's own coalescing.
 func (r *Repository) EditTestDataset(profileID, testKey string, ds Dataset) error {
+	// Checked here rather than at the binding so no caller can queue a table
+	// Xray will refuse, which would only be discovered at commit.
+	if err := ValidateDataset(ds); err != nil {
+		return err
+	}
 	before, _, err := r.GetTestDataset(profileID, testKey, "")
 	if err != nil {
 		return err

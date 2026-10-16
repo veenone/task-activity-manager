@@ -57,6 +57,19 @@ func (a *App) GetTestDataset(profileID, testKey string, forceRefresh bool) (test
 	return ds, nil
 }
 
+// SaveTestDataset replaces a test's dataset locally and queues it for commit
+// (#277 W1). The editor calls it; Jira hears nothing until Commit, like every
+// other edit in XTM.
+//
+// A table Xray would refuse is refused here, with the reason, and neither
+// cached nor queued. The check lives in the repository so no path can skip it.
+func (a *App) SaveTestDataset(profileID, testKey string, ds testrepo.Dataset) error {
+	if err := a.requireStore(); err != nil {
+		return err
+	}
+	return a.repo.EditTestDataset(profileID, testKey, ds)
+}
+
 // toRepoDataset maps the neutral backend DTO onto the stored shape.
 func toRepoDataset(d backend.Dataset) testrepo.Dataset {
 	params := make([]testrepo.DatasetParameter, len(d.Parameters))

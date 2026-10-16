@@ -846,6 +846,10 @@ export function SaveBugConnection(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['SaveBugConnection'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
+export function SaveTestDataset(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveTestDataset'](arg1, arg2, arg3);
+}
+
 export function ScanAllDuplicateSteps(arg1) {
   return window['go']['main']['App']['ScanAllDuplicateSteps'](arg1);
 }
