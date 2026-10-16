@@ -1,6 +1,8 @@
 import { useState } from "react";
 
 import {
+  ExportDatasetCSV,
+  ImportDatasetCSV,
   RenameDatasetPlaceholder,
   SaveTestDataset,
   type DatasetParameter,
@@ -125,6 +127,32 @@ export function DatasetEditor({
       if (ok) {
         await RenameDatasetPlaceholder(profileId, testKey, r.from, r.to);
       }
+    }
+  };
+
+  // A dataset is a table, and a spreadsheet is where people edit tables. The
+  // file replaces what is on screen; nothing is stored until Save, so a file
+  // opened by mistake costs a Cancel.
+  const importFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError("");
+    try {
+      const table = await ImportDatasetCSV(await file.text(), { parameters, rows });
+      setParameters(table.parameters);
+      setRows(table.rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const exportFile = async () => {
+    setError("");
+    try {
+      await ExportDatasetCSV(testKey, { parameters, rows });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -279,6 +307,19 @@ export function DatasetEditor({
         </button>
         <button className="btn" onClick={onCancel} disabled={saving}>
           Cancel
+        </button>
+      </div>
+
+      <div className="dataset-actions">
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          aria-label="Import CSV"
+          className="dataset-file"
+          onChange={(e) => void importFile(e)}
+        />
+        <button className="btn" onClick={() => void exportFile()}>
+          Export CSV
         </button>
       </div>
     </div>

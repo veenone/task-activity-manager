@@ -7,12 +7,16 @@ import type { TestDataset } from "../../api";
 
 const saveTestDataset = vi.fn();
 const renamePlaceholder = vi.fn();
+const importDatasetCSV = vi.fn();
+const exportDatasetCSV = vi.fn();
 vi.mock("../../api", async () => {
   const actual = await vi.importActual<typeof import("../../api")>("../../api");
   return {
     ...actual,
     SaveTestDataset: (...args: unknown[]) => saveTestDataset(...args),
     RenameDatasetPlaceholder: (...args: unknown[]) => renamePlaceholder(...args),
+    ImportDatasetCSV: (...args: unknown[]) => importDatasetCSV(...args),
+    ExportDatasetCSV: (...args: unknown[]) => exportDatasetCSV(...args),
   };
 });
 
@@ -53,6 +57,9 @@ beforeEach(() => {
   renamePlaceholder.mockResolvedValue(0);
   confirm.mockReset();
   confirm.mockResolvedValue(true);
+  importDatasetCSV.mockReset();
+  exportDatasetCSV.mockReset();
+  exportDatasetCSV.mockResolvedValue("C:/tmp/QA-1-dataset.csv");
 });
 
 describe("DatasetEditor", () => {
@@ -247,6 +254,58 @@ describe("DatasetEditor", () => {
 
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
     expect(confirm).not.toHaveBeenCalled();
+  });
+
+  // A dataset is a table, and a spreadsheet is where people edit tables.
+  it("shows the table an imported file describes", async () => {
+    const imported: TestDataset = {
+      parameters: [
+        { name: "TIER", combinatorial: false, id: 2741 },
+        { name: "ROUND", combinatorial: true },
+      ],
+      rows: [["gold", "1"]],
+    };
+    importDatasetCSV.mockResolvedValue(imported);
+    editor(twoByTwo);
+
+    await userEvent.upload(
+      screen.getByLabelText("Import CSV"),
+      new File(["TIER,ROUND*\ngold,1\n"], "dataset.csv", { type: "text/csv" }),
+    );
+
+    expect(await screen.findByDisplayValue("TIER")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("ROUND")).toBeInTheDocument();
+    // The file replaces the table, so what was there is gone.
+    expect(screen.queryByDisplayValue("USERNAME")).not.toBeInTheDocument();
+    // The table the file replaced goes with it, so the parameters it still
+    // has keep their identity.
+    expect(importDatasetCSV).toHaveBeenCalledWith(expect.any(String), twoByTwo);
+  });
+
+  it("says why a file was refused and keeps the table on screen", async () => {
+    importDatasetCSV.mockRejectedValue(new Error("that file has no parameter row"));
+    editor(twoByTwo);
+
+    await userEvent.upload(
+      screen.getByLabelText("Import CSV"),
+      new File([""], "empty.csv", { type: "text/csv" }),
+    );
+
+    expect(await screen.findByText(/no parameter row/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("USERNAME")).toBeInTheDocument();
+  });
+
+  it("exports the table on screen, not the one it started with", async () => {
+    editor(twoByTwo);
+
+    await userEvent.clear(screen.getByLabelText("Row 1, parameter 1"));
+    await userEvent.type(screen.getByLabelText("Row 1, parameter 1"), "carol");
+    await userEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+
+    await vi.waitFor(() => expect(exportDatasetCSV).toHaveBeenCalled());
+    const [key, table] = exportDatasetCSV.mock.calls[0] as [string, TestDataset];
+    expect(key).toBe("QA-1");
+    expect(table.rows[0][0]).toBe("carol");
   });
 
   it("leaves the dataset alone on cancel", async () => {

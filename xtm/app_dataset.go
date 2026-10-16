@@ -1,7 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"agile-suite/xtm/internal/backend"
+	"agile-suite/xtm/internal/jira"
 	"agile-suite/xtm/internal/testrepo"
 )
 
@@ -83,6 +89,69 @@ func (a *App) RenameDatasetPlaceholder(profileID, testKey, oldName, newName stri
 		return 0, err
 	}
 	return a.repo.RenameDatasetPlaceholder(profileID, testKey, oldName, newName)
+}
+
+// ImportDatasetCSV reads a dataset out of a CSV the user picked and hands it
+// back for the editor to show (#277 W2). Nothing is stored: the user sees the
+// table first and saves it like any other edit.
+//
+// current is the table being replaced. A CSV carries names, the combinatorial
+// asterisk and values, and has nowhere to put a parameter's id or the list
+// behind it, so those are matched back by name. Without that an import would
+// rebuild every parameter on the next write.
+func (a *App) ImportDatasetCSV(content string, current testrepo.Dataset) (testrepo.Dataset, error) {
+	parsed := fromJiraDataset(jira.ParseDatasetCSV([]byte(content)))
+	if len(parsed.Parameters) == 0 {
+		return testrepo.Dataset{}, fmt.Errorf("that file has no parameter row; the first row names the parameters")
+	}
+	merged := testrepo.MergeDatasetParameters(parsed, current)
+	if err := testrepo.ValidateDataset(merged); err != nil {
+		return testrepo.Dataset{}, err
+	}
+	return merged, nil
+}
+
+// ExportDatasetCSV writes the table the editor is showing to a file the user
+// picks, in the layout Xray's own export uses, and returns the path (empty if
+// they cancelled).
+//
+// It exports what is on screen rather than what is cached, so an export taken
+// mid-edit is the table the user is looking at.
+func (a *App) ExportDatasetCSV(testKey string, ds testrepo.Dataset) (string, error) {
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export dataset",
+		DefaultFilename: exportFilename(testKey + "-dataset.csv"),
+		Filters:         []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv"}},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog: %w", err)
+	}
+	if path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, jira.DatasetCSV(toJiraDataset(ds)), 0o644); err != nil {
+		return "", fmt.Errorf("write dataset: %w", err)
+	}
+	return path, nil
+}
+
+// fromJiraDataset / toJiraDataset map the client's table onto the stored one.
+// The CSV layout is Xray's, so its reader and writer live in the jira package
+// with the rest of that format.
+func fromJiraDataset(d jira.Dataset) testrepo.Dataset {
+	params := make([]testrepo.DatasetParameter, len(d.Parameters))
+	for i, p := range d.Parameters {
+		params[i] = testrepo.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+	}
+	return testrepo.Dataset{Parameters: params, Rows: d.Rows}
+}
+
+func toJiraDataset(ds testrepo.Dataset) jira.Dataset {
+	params := make([]jira.DatasetParameter, len(ds.Parameters))
+	for i, p := range ds.Parameters {
+		params[i] = jira.DatasetParameter{Name: p.Name, Combinatorial: p.Combinatorial}
+	}
+	return jira.Dataset{Parameters: params, Rows: ds.Rows}
 }
 
 // toRepoDataset maps the neutral backend DTO onto the stored shape.

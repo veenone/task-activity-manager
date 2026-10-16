@@ -96,6 +96,49 @@ func TestRenameDatasetPlaceholderQueuesTheRewrite(t *testing.T) {
 	}
 }
 
+// A spreadsheet round trip is the point of the CSV: out, edited, back in.
+// What comes back is the file's table, with the identity of the parameters it
+// still has recovered from the table it replaces (#277 W2).
+func TestImportDatasetCSVReadsTheFileAndKeepsWhatIsKnown(t *testing.T) {
+	a, _ := newTestAppWithDemoProfile(t)
+	current := testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{
+			{Name: "TIER", ID: 2741, Type: "LIST", Options: []string{"gold", "silver"}, ListID: 162},
+		},
+		Rows: [][]string{{"gold"}},
+	}
+
+	got, err := a.ImportDatasetCSV("TIER,ROUND*\nsilver,1\ngold,2\n", current)
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if len(got.Parameters) != 2 || got.Parameters[1].Name != "ROUND" {
+		t.Fatalf("parameters = %+v, want TIER and ROUND", got.Parameters)
+	}
+	if !got.Parameters[1].Combinatorial {
+		t.Error("the asterisk on ROUND did not come through as combinatorial")
+	}
+	if got.Parameters[0].ID != 2741 || got.Parameters[0].ListID != 162 {
+		t.Errorf("TIER = %+v, want the id and list it already had", got.Parameters[0])
+	}
+	if len(got.Rows) != 2 || got.Rows[1][1] != "2" {
+		t.Errorf("rows = %q, want both rows of the file", got.Rows)
+	}
+}
+
+// A file that is not a dataset should say so rather than quietly emptying the
+// editor, and one Xray would refuse should be refused here too.
+func TestImportDatasetCSVRefusesWhatItCannotUse(t *testing.T) {
+	a, _ := newTestAppWithDemoProfile(t)
+
+	if _, err := a.ImportDatasetCSV("", testrepo.Dataset{}); err == nil {
+		t.Error("an empty file was accepted")
+	}
+	if _, err := a.ImportDatasetCSV("A,A\n1,2\n", testrepo.Dataset{}); err == nil {
+		t.Error("a file with two columns of the same name was accepted")
+	}
+}
+
 // A parameterized test's dataset reaches the caller with its parameters and
 // rows intact.
 func TestGetTestDatasetReadsAParameterizedTest(t *testing.T) {
