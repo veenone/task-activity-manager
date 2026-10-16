@@ -16,6 +16,10 @@ vi.mock("../../api", async () => {
   };
 });
 
+// The editor asks for confirmation when a parameter is renamed, and
+// DialogContext is not mounted here.
+vi.mock("../useConfirm", () => ({ useConfirm: () => ({ confirm: vi.fn(async () => false) }) }));
+
 function dataset(over: Partial<TestDataset> = {}): TestDataset {
   return {
     parameters: [

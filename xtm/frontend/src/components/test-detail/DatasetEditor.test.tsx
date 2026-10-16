@@ -6,10 +6,19 @@ import { DatasetEditor } from "./DatasetEditor";
 import type { TestDataset } from "../../api";
 
 const saveTestDataset = vi.fn();
+const renamePlaceholder = vi.fn();
 vi.mock("../../api", async () => {
   const actual = await vi.importActual<typeof import("../../api")>("../../api");
-  return { ...actual, SaveTestDataset: (...args: unknown[]) => saveTestDataset(...args) };
+  return {
+    ...actual,
+    SaveTestDataset: (...args: unknown[]) => saveTestDataset(...args),
+    RenameDatasetPlaceholder: (...args: unknown[]) => renamePlaceholder(...args),
+  };
 });
+
+// useConfirm wraps DialogContext, which is not mounted in these tests.
+const confirm = vi.fn();
+vi.mock("../useConfirm", () => ({ useConfirm: () => ({ confirm }) }));
 
 const empty: TestDataset = { parameters: [], rows: [] };
 
@@ -40,6 +49,10 @@ function editor(initial: TestDataset, onSaved = vi.fn(), onCancel = vi.fn()) {
 beforeEach(() => {
   saveTestDataset.mockReset();
   saveTestDataset.mockResolvedValue(undefined);
+  renamePlaceholder.mockReset();
+  renamePlaceholder.mockResolvedValue(0);
+  confirm.mockReset();
+  confirm.mockResolvedValue(true);
 });
 
 describe("DatasetEditor", () => {
@@ -158,6 +171,82 @@ describe("DatasetEditor", () => {
     const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
     expect(saved.parameters[0]).toEqual(listed.parameters[0]);
     expect(saved.rows).toEqual([["silver"]]);
+  });
+
+  it("moves a parameter and the values under it", async () => {
+    editor(twoByTwo);
+
+    await userEvent.click(screen.getByRole("button", { name: "Move parameter 1 right" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
+    expect(saved.parameters.map((p) => p.name)).toEqual(["REGION", "USERNAME"]);
+    expect(saved.rows).toEqual([
+      ["eu-west", "alice"],
+      ["us-east", "bob"],
+    ]);
+  });
+
+  it("moves a row, because the order is the order the iterations run in", async () => {
+    editor(twoByTwo);
+
+    await userEvent.click(screen.getByRole("button", { name: "Move row 2 up" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const saved = saveTestDataset.mock.calls[0][2] as TestDataset;
+    expect(saved.rows).toEqual([
+      ["bob", "us-east"],
+      ["alice", "eu-west"],
+    ]);
+  });
+
+  // A ${placeholder} refers to a parameter by name. Rename the parameter and
+  // the reference resolves to nothing, and the test runs with the literal
+  // text in place of a value (#277 W2).
+  it("offers to rewrite the references after a rename, and does it when accepted", async () => {
+    const existing: TestDataset = {
+      parameters: [{ name: "USER", combinatorial: false, id: 2741 }],
+      rows: [["alice"]],
+    };
+    editor(existing);
+
+    const name = screen.getByLabelText("Parameter 1 name");
+    await userEvent.clear(name);
+    await userEvent.type(name, "ACCOUNT");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await vi.waitFor(() => expect(renamePlaceholder).toHaveBeenCalled());
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(renamePlaceholder).toHaveBeenCalledWith("p1", "QA-1", "USER", "ACCOUNT");
+  });
+
+  it("leaves the references alone when the rewrite is declined", async () => {
+    confirm.mockResolvedValue(false);
+    const existing: TestDataset = {
+      parameters: [{ name: "USER", combinatorial: false, id: 2741 }],
+      rows: [["alice"]],
+    };
+    const { onSaved } = editor(existing);
+
+    const name = screen.getByLabelText("Parameter 1 name");
+    await userEvent.clear(name);
+    await userEvent.type(name, "ACCOUNT");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(renamePlaceholder).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing when a parameter is added rather than renamed", async () => {
+    const { onSaved } = editor(twoByTwo);
+
+    await userEvent.click(screen.getByRole("button", { name: "Add parameter" }));
+    await userEvent.type(screen.getByLabelText("Parameter 3 name"), "TIER");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(confirm).not.toHaveBeenCalled();
   });
 
   it("leaves the dataset alone on cancel", async () => {

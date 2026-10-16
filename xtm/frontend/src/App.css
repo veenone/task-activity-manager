@@ -7516,6 +7516,13 @@ tr.row-checked:hover {
 .dataset-drop {
   font-size: var(--fs-xs);
 }
+/* The reorder pair sits with the parameter name, not with Remove: moving a
+   column and deleting it are different intents. */
+.dataset-move {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 6px;
+}
 .dataset-actions {
   display: flex;
   flex-wrap: wrap;

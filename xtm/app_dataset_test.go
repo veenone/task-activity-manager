@@ -69,6 +69,33 @@ func TestSaveTestDatasetRefusesAnInvalidTable(t *testing.T) {
 	}
 }
 
+// Renaming a parameter is offered with the rewrite its references need, and
+// the rewrite is journalled like any other edit (#277 W2).
+func TestRenameDatasetPlaceholderQueuesTheRewrite(t *testing.T) {
+	a, profileID := newTestAppWithDemoProfile(t)
+	if err := a.repo.UpsertTests(profileID, []testrepo.TestCase{{
+		Key: "QA-7", ID: "7", Summary: "s", Status: "Open",
+		Description: "Sign in as ${USER}", Updated: "2026-01-01T00:00:00Z",
+	}}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	changed, err := a.RenameDatasetPlaceholder(profileID, "QA-7", "USER", "ACCOUNT")
+	if err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	if changed != 1 {
+		t.Fatalf("rewrote %d fields, want 1", changed)
+	}
+	tc, err := a.repo.GetTest(profileID, "QA-7")
+	if err != nil {
+		t.Fatalf("read test: %v", err)
+	}
+	if tc.Description != "Sign in as ${ACCOUNT}" {
+		t.Errorf("description = %q, want the rewritten one", tc.Description)
+	}
+}
+
 // A parameterized test's dataset reaches the caller with its parameters and
 // rows intact.
 func TestGetTestDatasetReadsAParameterizedTest(t *testing.T) {

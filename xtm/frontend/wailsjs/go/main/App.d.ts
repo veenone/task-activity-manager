@@ -417,6 +417,8 @@ export function RemoveRequirementSource(arg1:string,arg2:string):Promise<void>;
 
 export function RenameCanonicalRequirement(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
+export function RenameDatasetPlaceholder(arg1:string,arg2:string,arg3:string,arg4:string):Promise<number>;
+
 export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function RenameLabel(arg1:string,arg2:string,arg3:string):Promise<testrepo.BulkEditResult>;

@@ -109,6 +109,14 @@ numeric issue id, so a read costs an issue GET first. A container-level read
 still uses the export, since the model addresses a Test Run rather than an
 execution (#277 W3).
 
+**Renaming a dataset parameter is two changes, not one.** The dataset write
+carries the rename by sending the parameter's existing id, but every
+`${placeholder}` in the test's steps and definition still names the old
+parameter and would resolve to nothing. `RenameDatasetPlaceholder` rewrites
+those through the ordinary step and field edits, so each rewritten field is
+its own pending change. The editor offers it after a rename and does nothing
+unless the user agrees: a reference may be deliberate.
+
 **A dataset is journalled whole, and its conflict check is its own.** A
 dataset edit queues one `test_dataset` row holding the entire table as JSON in
 `before_val` and `after_val`, because the write replaces the table rather than

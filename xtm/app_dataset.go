@@ -70,6 +70,21 @@ func (a *App) SaveTestDataset(profileID, testKey string, ds testrepo.Dataset) er
 	return a.repo.EditTestDataset(profileID, testKey, ds)
 }
 
+// RenameDatasetPlaceholder rewrites ${oldName} to ${newName} in the test's
+// steps and definition, and reports how many fields changed (#277 W2).
+//
+// The editor calls it after a parameter rename, once the user has agreed:
+// renaming a parameter leaves every reference to the old name resolving to
+// nothing, and a test then runs with the literal ${OLD} in place of a value.
+// It is a separate call rather than part of the save because the rewrite is a
+// choice, and because each rewritten field is its own pending change.
+func (a *App) RenameDatasetPlaceholder(profileID, testKey, oldName, newName string) (int, error) {
+	if err := a.requireStore(); err != nil {
+		return 0, err
+	}
+	return a.repo.RenameDatasetPlaceholder(profileID, testKey, oldName, newName)
+}
+
 // toRepoDataset maps the neutral backend DTO onto the stored shape.
 func toRepoDataset(d backend.Dataset) testrepo.Dataset {
 	params := make([]testrepo.DatasetParameter, len(d.Parameters))
