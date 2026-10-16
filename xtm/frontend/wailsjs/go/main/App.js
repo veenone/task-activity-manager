@@ -806,6 +806,10 @@ export function RenameCanonicalRequirement(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['RenameCanonicalRequirement'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function RenameDatasetPlaceholder(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RenameDatasetPlaceholder'](arg1, arg2, arg3, arg4);
+}
+
 export function RenameFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['RenameFolder'](arg1, arg2, arg3);
 }
