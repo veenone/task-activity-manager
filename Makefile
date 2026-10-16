@@ -19,8 +19,10 @@ typecheck:
 	npm run typecheck --workspaces --if-present
 
 # The instruction gate runs inside `npm test --workspaces` (frontend/core).
+# Match the prefix: the store schema and purge contract lives in its own
+# file beside the main one.
 instruction:
-	cd frontend/core && npx vitest run src/instruction-gate.test.ts
+	cd frontend/core && npx vitest run src/instruction-gate
 
 lint:
 	sh scripts/lint-report.sh
