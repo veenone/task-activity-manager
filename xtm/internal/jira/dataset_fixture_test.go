@@ -23,7 +23,7 @@ func readFixture(t *testing.T, name string) []byte {
 }
 
 func TestParseDatasetCSVReadsALiveTextExport(t *testing.T) {
-	d := parseDatasetCSV(readFixture(t, "dataset_export_text.csv"))
+	d := ParseDatasetCSV(readFixture(t, "dataset_export_text.csv"))
 
 	if len(d.Parameters) != 1 || d.Parameters[0].Name != "dataset sample - 1" {
 		t.Fatalf("parameters = %+v, want one named %q", d.Parameters, "dataset sample - 1")
@@ -43,7 +43,7 @@ func TestParseDatasetCSVReadsALiveTextExport(t *testing.T) {
 }
 
 func TestParseDatasetCSVMarksTheCombinatorialColumnAndPadsAShortRow(t *testing.T) {
-	d := parseDatasetCSV(readFixture(t, "dataset_export_list_combinatorial.csv"))
+	d := ParseDatasetCSV(readFixture(t, "dataset_export_list_combinatorial.csv"))
 
 	names := make([]string, len(d.Parameters))
 	combi := make([]bool, len(d.Parameters))

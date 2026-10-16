@@ -1,15 +1,11 @@
 package jira
 
 import (
-	"bytes"
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 // DatasetParameter is one column of a test's dataset: a parameter a
@@ -89,7 +85,7 @@ func (c *Client) GetDataset(ctx context.Context, testKey, contextKey string) (Da
 	if err != nil {
 		return Dataset{}, err
 	}
-	return parseDatasetCSV(body), nil
+	return ParseDatasetCSV(body), nil
 }
 
 // datasetModel reads a test's own dataset from the JSON resource.
@@ -149,55 +145,6 @@ func datasetRows(cols []datasetColumn) Dataset {
 		ds.Rows = append(ds.Rows, row)
 	}
 	return ds
-}
-
-// parseDatasetCSV reads Xray's dataset export. The header row names the
-// parameters, each later row is one iteration, and a name ending in an
-// asterisk is combinatorial.
-//
-// A malformed body yields an empty dataset rather than an error: the panel
-// showing nothing is a better answer than a test that cannot be opened.
-func parseDatasetCSV(body []byte) Dataset {
-	r := csv.NewReader(bytes.NewReader(bytes.TrimPrefix(body, []byte("\xef\xbb\xbf"))))
-	// Xray's own export is comma-delimited. Ragged rows are tolerated and
-	// padded below, so the parser must not reject them on field count.
-	r.FieldsPerRecord = -1
-
-	header, err := r.Read()
-	if err != nil {
-		return Dataset{}
-	}
-	params := make([]DatasetParameter, 0, len(header))
-	for _, name := range header {
-		trimmed := strings.TrimSpace(name)
-		params = append(params, DatasetParameter{
-			Name:          strings.TrimSuffix(trimmed, "*"),
-			Combinatorial: strings.HasSuffix(trimmed, "*"),
-		})
-	}
-
-	var rows [][]string
-	for {
-		rec, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			// Stop at the first unreadable row and keep what parsed. A
-			// truncated table is more useful than none.
-			break
-		}
-		rows = append(rows, fitRow(rec, len(params)))
-	}
-	return Dataset{Parameters: params, Rows: rows}
-}
-
-// fitRow makes a record exactly n cells long, padding a short row and
-// truncating a long one, so every row lines up under its parameters.
-func fitRow(rec []string, n int) []string {
-	out := make([]string, n)
-	copy(out, rec)
-	return out
 }
 
 // datasetWritePath is Xray's JSON dataset resource. It is not the documented

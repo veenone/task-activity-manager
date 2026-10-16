@@ -225,6 +225,52 @@ func TestEditTestDatasetAcceptsTheLimits(t *testing.T) {
 	}
 }
 
+// A CSV carries names and values and nothing else. Importing one over an
+// existing dataset must not throw away what the table already knows about
+// its parameters, or the write that follows rebuilds every one of them and a
+// list parameter comes back as free text (#283, through a different door).
+func TestMergeDatasetParametersKeepsWhatTheTableKnows(t *testing.T) {
+	current := Dataset{
+		Parameters: []DatasetParameter{
+			{Name: "TIER", ID: 2741, Type: "LIST", Options: []string{"gold", "silver"},
+				ListScope: "PARAMETER_AD_HOC", ListID: 162},
+			{Name: "REGION", ID: 2742, Type: "TEXT"},
+		},
+		Rows: [][]string{{"gold", "eu-west"}},
+	}
+	// The spreadsheet came back with REGION gone, TIER renamed by nobody, and
+	// a column that was not there before.
+	imported := Dataset{
+		Parameters: []DatasetParameter{{Name: "TIER"}, {Name: "ROUND", Combinatorial: true}},
+		Rows:       [][]string{{"silver", "1"}},
+	}
+
+	merged := MergeDatasetParameters(imported, current)
+
+	if len(merged.Parameters) != 2 {
+		t.Fatalf("merged %d parameters, want the two the file had", len(merged.Parameters))
+	}
+	tier := merged.Parameters[0]
+	if tier.ID != 2741 || tier.Type != "LIST" || tier.ListID != 162 {
+		t.Errorf("TIER = %+v, want the id and list binding it already had", tier)
+	}
+	if len(tier.Options) != 2 {
+		t.Errorf("TIER kept %d allowed values, want 2", len(tier.Options))
+	}
+	// A column the table has never seen is new, and carries nothing.
+	round := merged.Parameters[1]
+	if round.ID != 0 || round.Type != "" || round.ListID != 0 {
+		t.Errorf("ROUND = %+v, want a parameter with no server identity", round)
+	}
+	if !round.Combinatorial {
+		t.Error("the imported combinatorial flag was dropped")
+	}
+	// The file decides which parameters and rows there are.
+	if !reflect.DeepEqual(merged.Rows, imported.Rows) {
+		t.Errorf("rows = %q, want the imported ones", merged.Rows)
+	}
+}
+
 // Discarding the pending change puts the synced table back. Dropping the row
 // alone would leave the editor showing an edit that will never be sent.
 func TestDiscardingADatasetEditRestoresTheSyncedTable(t *testing.T) {
