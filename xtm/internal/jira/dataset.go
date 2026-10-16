@@ -13,9 +13,11 @@ import (
 // DatasetParameter is one column of a test's dataset: a parameter a
 // ${placeholder} in the test's steps or definition refers to.
 //
-// Xray also distinguishes text from list parameters, but the CSV export
-// carries values rather than list definitions, so a list parameter is
+// Xray distinguishes text from list parameters, but the CSV export carries
+// values rather than list definitions, so a list parameter is
 // indistinguishable from a text one here. The type is therefore not modelled.
+// The raven/1.0 JSON API does carry it, with the allowed values and the list's
+// scope and id, if a caller ever needs more than the table.
 type DatasetParameter struct {
 	Name string `json:"name"`
 	// Combinatorial parameters are marked with an asterisk suffix on the CSV
@@ -41,18 +43,20 @@ const datasetExportPath = "/rest/raven/2.0/api/dataset/export"
 // GetDataset returns the dataset attached to a test, or an empty Dataset when
 // it has none (FR, issue #267 Phase 1).
 //
-// An instance below Xray 5.1 has no export endpoint and answers 404. XTM does
-// not version-gate the feature, because nothing in the Xray REST API reports
-// its version: Settings exposes only teststatuses and teststepstatuses. A 404
-// is therefore read as "no dataset", which renders identically to a test that
-// genuinely has none. That equivalence holds only while this path is
-// read-only; a write phase has to tell the two apart before it sends anything.
+// An instance below Xray 5.1 has no export endpoint and answers 404, the same
+// status a test with no dataset gets. Reading both as "no dataset" is right
+// for a read-only path, and a write path must not: the #277 W0 spike found the
+// two are distinguishable by body, so no version check is needed. A missing
+// dataset answers application/json {"error":"Dataset not found"}; a missing
+// route answers Jersey's application/xml <status-code>404</status-code>. The
+// fixtures in testdata hold one of each.
 //
-// NOTE(xtm): #267 Phase 0 left these unverified against a live instance,
-// because the public docs do not state them: whether the export answers with
-// raw text/csv or a JSON wrapper, and whether a list parameter's allowed
-// values survive the round trip. The parser reads the body as CSV either way
-// and would return an empty dataset from a JSON wrapper rather than fail.
+// The spike settled what #267 Phase 0 could only guess: the response is raw
+// CSV with Content-Type application/octet-stream, not text/csv and not a JSON
+// wrapper, and a list parameter's allowed values do not survive the export.
+// They are not lost, only absent here: /rest/raven/1.0/dataset returns them,
+// along with the level a dataset resolves from. See the Xray datasets section
+// of agents/project/domain-context.md.
 func (c *Client) GetDataset(ctx context.Context, testKey, contextKey string) (Dataset, error) {
 	if isDemoURL(c.baseURL) {
 		return demoDataset(testKey), nil

@@ -75,3 +75,17 @@ pending `sprint_edit` rows after `boardrepo.writeSprints`, the way issue
 syncs keep pending field edits.
 
 **Raised by:** bundle 04 Task 7, 2026-09-17.
+
+## Split xtm/internal/syncer/commit.go
+
+**What:** break `commit.go` into per-entity commit files, the way `commit_dataset.go` will be added beside it rather than inside it.
+
+**Why:** the file is 2,325 lines against the 400-line cap C2 sets, and it holds the entity dispatch that every new feature has to touch. It has twice needed gofmt-only commits of its own (`900620d0`, `1676a4ef`), which is what a file nobody wants to open looks like.
+
+**Pros:** every future feature stops growing the largest file in the module, and the dispatch in `commitChanges` becomes readable. **Cons:** a large mechanical diff across the most commit-critical code in XTM, carrying real regression risk for no user-visible gain.
+
+**Context:** the dataset work (#277) establishes the pattern by putting `commitDatasets` in its own file without paying for the migration. The dispatch switch at `commit.go:139` still grows by a few lines per entity either way, so splitting the handlers out does not remove that. Start by moving the `commitRun*` family, which is self-contained.
+
+**Depends on:** nothing. Best done between features, not during one.
+
+**Raised by:** /plan-eng-review of #277, 2026-10-16.

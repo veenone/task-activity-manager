@@ -182,3 +182,89 @@ commit hash behind it; the instruction gate checks the hash exists.
   bundled container filters, a docked detail panel, collapsible panels, a
   pager and copy changes into a single commit (5020d4f). Land UI changes
   narrow enough to revert one at a time.
+
+## Xray datasets over REST
+
+Verified against a live Xray Server/DC instance (Jersey 2.48) in October 2026,
+while planning the dataset write feature (#277). The read path these entries
+correct shipped in e0dbf0ce.
+
+- There are two dataset APIs, not one. `/rest/raven/2.0/api/dataset/export` is
+  the documented CSV export. `/rest/raven/1.0/dataset` is the JSON API the Xray
+  UI itself drives, and it is the one a write needs. Both answered on the same
+  instance.
+- `/rest/raven/2.0/api/dataset/import` exists and accepts POST. A widely cited
+  community thread reports it answering 404; that does not reproduce. Confirm
+  with `OPTIONS`, which returns a WADL naming every query parameter: the import
+  takes `testIssueId`, `testIssueKey`, `contextIssueId`, `contextIssueKey` and
+  `testVersion`, and **no** overwrite or create-parameters flag.
+- The two flags the import dialog shows live on a different route:
+  `POST /rest/raven/1.0/dataset/parseDataset` takes `createNewParameters`,
+  `overwriteValues`, `delimiter` and `encoding`. Alongside it,
+  `POST /rest/raven/1.0/dataset` takes the whole dataset as JSON and answers
+  with JSON, with no flags at all.
+- `GET /rest/raven/1.0/dataset?entityId=<id>&type=TEST` returns three fields:
+  `entityDataset` (what is defined at that level), `resolvedDataset` (what will
+  actually run, after inheritance) and `resolutionMessage`, a sentence naming
+  the level, for example "This is the resolved dataset, defined in the Test."
+  Nothing has to infer which level a dataset comes from; the server says so.
+- `type` accepts `TEST` and `TEST_RUN`, uppercase, and nothing else. A Test
+  Execution is not addressable: its `entityId` is the Test Run id, which
+  `GET /rest/raven/1.0/api/testrun?testExecIssueKey=&testIssueKey=` returns.
+  Passing an execution's issue id with `type=TEST` answers 200 with an empty
+  dataset, and passing a run id with `type=TEST` answers 500.
+- `GET /rest/raven/1.0/dataset/info` reports the server's own limits:
+  `maxParametersSize` (20) and `maxParametersValueSize` (100 characters per
+  value). Read them rather than hardcoding them. The per-value cap is easy to
+  miss and the server enforces it.
+- `GET /rest/raven/1.0/dataset/hasDataset` answers `{"hasDataset":bool}` without
+  transferring the table, which is the cheap way to ask whether a level
+  overrides.
+- A test with no dataset and an instance with no endpoint both answer 404, but
+  they are distinguishable: a missing dataset is
+  `application/json` `{"error":"Dataset not found"}`, while a missing route is
+  Jersey's `application/xml` `<status><status-code>404</status-code>`. No
+  version detection is needed to tell them apart.
+- The CSV export answers `application/octet-stream`, not `text/csv`, and the
+  body is raw CSV with no JSON wrapper. A combinatorial parameter carries an
+  asterisk suffix on its column name. A short row is padded with empty cells.
+- List parameters keep their allowed values in the JSON API
+  (`info.type` is `LIST`, with `options`, `paramTestListScope` and `listId`) and
+  lose them in the CSV export, which carries values only. A reader that only
+  speaks CSV cannot tell a list parameter from a text one.
+- The Universal Plugin Manager route that would report the Xray version
+  (`/rest/plugins/1.0/...`) answers 403 to a non-administrator, so an ordinary
+  user's client cannot read the plugin version.
+
+### Writing a dataset
+
+The same spike, continued against a throwaway Test. Every operation the
+planning issue called impossible under merge semantics works, because the
+write that matters is not the CSV import.
+
+- `POST /rest/raven/1.0/dataset?entityId=<id>&type=TEST` takes
+  `{"params":[{"param":{...},"values":[...]}]}` and **replaces** the whole
+  table. Changing a value, dropping a row, dropping a parameter, renaming one
+  and toggling `combinatorial` were each confirmed by writing and reading back.
+  The wrapper shape the GET returns is not accepted; send the bare `params`.
+- A new parameter is asked for with a **negative id**. Omitting `id` or
+  sending `0` is refused with
+  `{"error":"Parameters (0) not associated with the dataset."}`. Nothing
+  documents this, and it is the first thing a client gets wrong.
+- An empty `params` array clears the dataset: `hasDataset` goes false
+  afterwards. Neither API publishes a `DELETE`, and both answer 405 to one, so
+  this is how a dataset is removed.
+- A successful write answers `Content-Type: application/json` with a body that
+  is **not** JSON: the sentence `Dataset Updated with success.` A failure
+  answers JSON. Branch on the status, not the body.
+- Multipart writes to `raven/1.0` are refused with a plain-text 403
+  `XSRF check failed` unless the request carries
+  `X-Atlassian-Token: no-check`. The JSON write on the same prefix does not
+  need it, so the check follows the content type rather than the API.
+- `POST /rest/raven/1.0/dataset/parseDataset` requires `delimiter` and
+  `encoding` in the query despite the WADL marking nothing required; without
+  `encoding` it answers 500 `{"error":"Null charset name"}`.
+- `POST /rest/raven/2.0/api/dataset/import` does create a dataset where none
+  existed. It takes `multipart/form-data` with a `.csv` filename, and answers
+  200 with an empty body. A non-CSV filename is refused with
+  `{"error":"The file extension is not valid. Please use a CSV file."}`.
