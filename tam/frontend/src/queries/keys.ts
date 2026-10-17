@@ -47,6 +47,9 @@ export const keys = {
   // Every open sprint across every board the profile has synced, the list a
   // caller with no board of its own offers the Sprint field.
   openSprints: (profileId: string) => [profileId, "openSprints"] as const,
+  // The board's open work per assignee (#288). It sits under the board's
+  // prefix so whatever refreshes the board refreshes it too.
+  boardAllocation: (profileId: string, boardId: number) => [profileId, "board", boardId, "allocation"] as const,
   board: (profileId: string, boardId: number, sprintId: string, swimlane: string) =>
     [profileId, "board", boardId, sprintId, swimlane] as const,
   // What the start dialog opens with: the next sprint's name and the dates

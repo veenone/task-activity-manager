@@ -2,7 +2,8 @@ import { Fragment, useState } from "react";
 import { ProgressBar } from "@agile-suite/core";
 import type { ReportPerson, ReportPersonCard, ReportSection } from "../api";
 import { points, workDuration } from "../lib/format";
-import { BAR_HEADING, PEOPLE_COLUMNS, personBar, personKey, timeCells } from "../lib/reportPeople";
+import { BAR_HEADING, PEOPLE_TIME, personBar, personKey, timeCells } from "../lib/reportPeople";
+import type { TimeColumn } from "../lib/reportPeople";
 import { statusClass } from "../lib/statusClass";
 import { ReportNotes } from "./ReportNotes";
 
@@ -11,7 +12,17 @@ import { ReportNotes } from "./ReportNotes";
 // time bar against their estimate, and each row opens to the cards behind
 // it. The figures in the cells are the outputs' own, from lib/reportPeople,
 // so the tab and the published page read the same.
-export function PeoplePanel({ section, people }: { section: ReportSection; people: ReportPerson[] }) {
+export function PeoplePanel({
+  section,
+  people,
+  headingId = "report-people-heading",
+  time = PEOPLE_TIME,
+}: {
+  section: ReportSection;
+  people: ReportPerson[];
+  headingId?: string;
+  time?: TimeColumn[];
+}) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
     setOpen((was) => {
@@ -21,8 +32,8 @@ export function PeoplePanel({ section, people }: { section: ReportSection; peopl
     });
 
   return (
-    <section className="report-people" role="group" aria-labelledby="report-people-heading">
-      <h3 className="report-heading" id="report-people-heading">{section.heading}</h3>
+    <section className="report-people" role="group" aria-labelledby={headingId}>
+      <h3 className="report-heading" id={headingId}>{section.heading}</h3>
       <div className="people-table-wrap">
         <table className="report-table people-table">
           <caption className="sr-only">{section.heading}</caption>
@@ -33,7 +44,7 @@ export function PeoplePanel({ section, people }: { section: ReportSection; peopl
               <th scope="col">Email</th>
               <th scope="col" className="people-num">Cards</th>
               <th scope="col" className="people-num">Points</th>
-              {PEOPLE_COLUMNS.map((c) => <th scope="col" className="people-num" key={c}>{c}</th>)}
+              {time.map((c) => <th scope="col" className="people-num" key={c.label}>{c.label}</th>)}
               <th scope="col">{BAR_HEADING}</th>
             </tr>
           </thead>
@@ -42,7 +53,7 @@ export function PeoplePanel({ section, people }: { section: ReportSection; peopl
               const key = personKey(p);
               const name = p.name || "Unassigned";
               const isOpen = open.has(key);
-              const listId = `people-cards-${key}`;
+              const listId = `${headingId}-cards-${key}`;
               return (
                 <Fragment key={key}>
                   <tr className={`people-row${isOpen ? " people-row-open" : ""}`}>
@@ -64,11 +75,11 @@ export function PeoplePanel({ section, people }: { section: ReportSection; peopl
                     <td className="muted">{p.email}</td>
                     <td className="people-num">{p.cards}</td>
                     <td className="people-num">{points(p.points)}</td>
-                    {timeCells(p).map((v, i) => <td className="people-num" key={PEOPLE_COLUMNS[i]}>{v}</td>)}
+                    {timeCells(p, time).map((v, i) => <td className="people-num" key={time[i].label}>{v}</td>)}
                     <td><TimeBarCell estimate={p.estimateSeconds} spent={p.spentSeconds} /></td>
                   </tr>
                   {isOpen && p.issues.map((c, i) => (
-                    <CardRow key={c.key} card={c} id={i === 0 ? listId : undefined} />
+                    <CardRow key={c.key} card={c} id={i === 0 ? listId : undefined} time={time} />
                   ))}
                 </Fragment>
               );
@@ -83,7 +94,7 @@ export function PeoplePanel({ section, people }: { section: ReportSection; peopl
 
 // CardRow is one card under its person: the key and summary across the three
 // identity columns, then the card's own figures in the person's columns.
-function CardRow({ card: c, id }: { card: ReportPersonCard; id?: string }) {
+function CardRow({ card: c, id, time }: { card: ReportPersonCard; id?: string; time: TimeColumn[] }) {
   return (
     <tr className="people-card" id={id}>
       <td colSpan={3}>
@@ -95,7 +106,7 @@ function CardRow({ card: c, id }: { card: ReportPersonCard; id?: string }) {
         </span>
       </td>
       <td className="people-num">{c.points === null ? "" : points(c.points)}</td>
-      {timeCells(c).map((v, i) => <td className="people-num" key={PEOPLE_COLUMNS[i]}>{v}</td>)}
+      {timeCells(c, time).map((v, i) => <td className="people-num" key={time[i].label}>{v}</td>)}
       <td><TimeBarCell estimate={c.estimateSeconds} spent={c.spentSeconds} /></td>
     </tr>
   );

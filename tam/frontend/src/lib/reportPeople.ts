@@ -12,32 +12,50 @@ import type { TableSpec } from "./reportTables";
 // (C2). The rule those two exist for still holds: the People tab and the
 // three outputs all read the section from here, so it is worded once.
 
-// The time columns, in the order a reader follows them: what was planned,
-// what the sprint spent, what was spent in all, how long the cards were
-// being worked, and what is left.
-export const PEOPLE_COLUMNS = ["Estimate", "Logged in sprint", "Actual", "In progress", "Remaining"];
-
-// timeCells is a person's or a card's time columns, in PEOPLE_COLUMNS order.
-export function timeCells(t: {
+// TimeFigures is what a person row and a card row both carry.
+export interface TimeFigures {
   estimateSeconds: number;
   loggedSeconds: number;
   spentSeconds: number;
   inProgressSeconds: number;
   remainingSeconds: number;
-}): string[] {
-  return [t.estimateSeconds, t.loggedSeconds, t.spentSeconds, t.inProgressSeconds, t.remainingSeconds].map(workDuration);
+}
+
+// TimeColumn is one time column of a people table: its heading and the
+// figure it shows.
+export interface TimeColumn {
+  label: string;
+  seconds: (t: TimeFigures) => number;
+}
+
+const ESTIMATE: TimeColumn = { label: "Estimate", seconds: (t) => t.estimateSeconds };
+const LOGGED: TimeColumn = { label: "Logged in sprint", seconds: (t) => t.loggedSeconds };
+const ACTUAL: TimeColumn = { label: "Actual", seconds: (t) => t.spentSeconds };
+const IN_PROGRESS: TimeColumn = { label: "In progress", seconds: (t) => t.inProgressSeconds };
+const REMAINING: TimeColumn = { label: "Remaining", seconds: (t) => t.remainingSeconds };
+
+// The People section's time columns, in the order a reader follows them:
+// what was planned, what the sprint spent, what was spent in all, how long
+// the cards were worked, and what is left. The board allocation has no
+// changelog behind it, so it shows only the three the cache can answer.
+export const PEOPLE_TIME = [ESTIMATE, LOGGED, ACTUAL, IN_PROGRESS, REMAINING];
+export const ALLOCATION_TIME = [ESTIMATE, ACTUAL, REMAINING];
+
+// timeCells is a person's or a card's time columns, worded.
+export function timeCells(t: TimeFigures, columns: TimeColumn[] = PEOPLE_TIME): string[] {
+  return columns.map((c) => workDuration(c.seconds(t)));
 }
 
 // peopleTable is one row per person, in the order the backend sorted them.
 // A blank username or email stays blank: Jira hides email on some instances,
 // and the unassigned row has neither.
-export function peopleTable(people: ReportPerson[]): TableSpec {
+export function peopleTable(people: ReportPerson[], caption = "People", time: TimeColumn[] = PEOPLE_TIME): TableSpec {
   return {
-    caption: "People",
-    columns: ["Person", "Username", "Email", "Cards", "Points", ...PEOPLE_COLUMNS],
+    caption,
+    columns: ["Person", "Username", "Email", "Cards", "Points", ...time.map((c) => c.label)],
     rows: people.map((p) => ({
       key: personKey(p),
-      cells: [p.name || "Unassigned", p.username, p.email, String(p.cards), points(p.points), ...timeCells(p)],
+      cells: [p.name || "Unassigned", p.username, p.email, String(p.cards), points(p.points), ...timeCells(p, time)],
     })),
   };
 }
@@ -101,6 +119,44 @@ export function peopleSection(report: SprintReport): ReportSection[] {
       bars: people.map(outputBar),
     },
     notes: [peopleLoggedLine(), peopleInProgressLine(), peopleEstimateLine()],
+    images: [],
+  }];
+}
+
+// The board allocation's notes, short for the same reason the People notes
+// are.
+export function allocationScopeLine(): string {
+  return "Covers every open card on the board, in any sprint or the backlog.";
+}
+
+export function allocationSyncLine(): string {
+  return "Figures are from the last sync.";
+}
+
+export function allocationEmptyLine(): string {
+  return "No card on this board is open.";
+}
+
+// allocationSection is the board's open work per assignee (#288). Unlike
+// peopleSection it is always one section once the rows were read: a board
+// with nothing open says so, since an absent section would read as one TAM
+// never looked at.
+export function allocationSection(people: ReportPerson[]): ReportSection[] {
+  const heading = "Board allocation";
+  if (people.length === 0) {
+    return [{ heading, lines: [allocationEmptyLine()], table: { columns: [], rows: [] }, notes: [], images: [] }];
+  }
+  const table = peopleTable(people, heading, ALLOCATION_TIME);
+  return [{
+    heading,
+    lines: [],
+    table: {
+      columns: table.columns,
+      rows: table.rows.map((r) => r.cells),
+      barHeading: BAR_HEADING,
+      bars: people.map(outputBar),
+    },
+    notes: [allocationScopeLine(), allocationSyncLine()],
     images: [],
   }];
 }

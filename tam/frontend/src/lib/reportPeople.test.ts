@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { ReportPerson, SprintReport } from "../api";
-import { reportDocument } from "./reportDocument";
-import { peopleSection, personBar } from "./reportPeople";
+import { kanbanDocument, reportDocument } from "./reportDocument";
+import { allocationSection, peopleSection, personBar } from "./reportPeople";
 
 const rita: ReportPerson = {
   name: "Rita Anand",
@@ -113,5 +113,31 @@ describe("personBar", () => {
 
   it("draws nothing with no estimate to measure against", () => {
     expect(personBar(0, 3600)).toBeNull();
+  });
+});
+
+describe("the Board allocation section", () => {
+  it("is a row per assignee with estimate, actual and remaining, and the bar", () => {
+    const [section] = allocationSection([rita, unassigned]);
+    expect(section.heading).toBe("Board allocation");
+    expect(section.table.columns).toEqual(["Person", "Username", "Email", "Cards", "Points", "Estimate", "Actual", "Remaining"]);
+    expect(section.table.rows[0]).toEqual(["Rita Anand", "ranand", "r.anand@example.com", "3", "8", "12h", "10h", "2h 30m"]);
+    expect(section.table.bars).toEqual([{ done: 10 * 3600, target: 12 * 3600 }, null]);
+    expect(section.notes.join(" ")).toMatch(/every open card on the board/);
+    expect(section.notes.join(" ")).toMatch(/last sync/);
+    expect(section.notes.length).toBeLessThanOrEqual(3);
+  });
+
+  it("says a board with no open cards has none rather than printing an empty table", () => {
+    const [section] = allocationSection([]);
+    expect(section.table.columns).toEqual([]);
+    expect(section.lines).toEqual(["No card on this board is open."]);
+  });
+
+  it("rides in the sprint report and the kanban report when given", () => {
+    expect(reportDocument(report([rita]), false, {}, undefined, [rita])?.sections.map((s) => s.heading)).toContain("Board allocation");
+    expect(reportDocument(report([rita]))?.sections.map((s) => s.heading)).not.toContain("Board allocation");
+    const columns = [{ name: "To Do", statusIds: ["1"], total: 1, points: 0, counted: 1, min: null, max: null, constraint: "issueCount" }];
+    expect(kanbanDocument("Ops", columns, [rita])?.sections.map((s) => s.heading)).toEqual(["Column capacity", "Board allocation"]);
   });
 });

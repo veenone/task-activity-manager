@@ -1,7 +1,8 @@
 import type { Board } from "../api";
-import { useBoard } from "../queries/boards";
+import { useBoard, useBoardAllocation } from "../queries/boards";
 import { kanbanDocument } from "../lib/reportDocument";
 import { kanbanEmptyLine, kanbanUnsyncedLine } from "../lib/reportText";
+import { AllocationPanel } from "./AllocationPanel";
 import { CapacityPanel } from "./CapacityPanel";
 import { ReportOutputs } from "./ReportOutputs";
 
@@ -41,7 +42,8 @@ export function KanbanReport({
   // Null for a board with no columns cached, which is what leaves the three
   // publishers disabled with their own reason beside them. Cheap enough to
   // word on every render: it is a table of a handful of rows.
-  const doc = kanbanDocument(board.name, columns);
+  const allocation = useBoardAllocation(profileId, board.id);
+  const doc = kanbanDocument(board.name, columns, allocation.data);
   const publishable = !!doc && !nothingSynced;
 
   function body() {
@@ -65,7 +67,16 @@ export function KanbanReport({
     if (nothingSynced) return <p className="muted" role="status">{kanbanEmptyLine()}</p>;
     // The section the three publishers lay out, drawn by the component that
     // draws a sprint report's. One set of rows, worded once.
-    return <CapacityPanel section={doc?.sections[0]} />;
+    return (
+      <>
+        <CapacityPanel section={doc?.sections[0]} />
+        <AllocationPanel
+          rows={allocation.data}
+          error={allocation.isError ? allocation.error.message : undefined}
+          onRetry={() => void allocation.refetch()}
+        />
+      </>
+    );
   }
 
   return (

@@ -1278,6 +1278,11 @@ export const ListBoardSprints: (profileId: string, boardId: number) => Promise<S
 // their Sprint field offer a choice instead of only printing a fact.
 export const ListOpenSprints: (profileId: string) => Promise<SprintChoice[]> =
   App.ListOpenSprints;
+// BoardAllocation is the board's open work per assignee (#288), read from the
+// cache with no Jira call. The rows are the People section's shape.
+export const BoardAllocation = (profileId: string, boardId: number): Promise<ReportPerson[]> =>
+  App.BoardAllocation(profileId, boardId) as unknown as Promise<ReportPerson[]>;
+
 export const GetBoard = (
   profileId: string,
   boardId: number,

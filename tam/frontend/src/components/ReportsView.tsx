@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { call, errMsg, useProfile } from "@agile-suite/core";
 import { CancelSprintReport } from "../api";
 import type { Profile, Settings, SprintReport } from "../api";
-import { useBoards, useBoardSprints } from "../queries/boards";
+import { useBoardAllocation, useBoards, useBoardSprints } from "../queries/boards";
 import { useSprintReport } from "../queries/reports";
 import { useSync } from "../contexts/SyncContext";
 import { capacitySection, reportDocument } from "../lib/reportDocument";
@@ -12,6 +12,7 @@ import { closedNewestFirst } from "../lib/sprintOrder";
 import { busyLine, isBusyRefusal } from "../lib/publishText";
 import { CapacityPanel } from "./CapacityPanel";
 import { PeoplePanel } from "./PeoplePanel";
+import { AllocationPanel } from "./AllocationPanel";
 import { KanbanReport } from "./KanbanReport";
 import { ReportOutputs } from "./ReportOutputs";
 import { ReportTabs, reportPanelId, reportTabId } from "./ReportTabs";
@@ -81,6 +82,9 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
   const requestedSprintId = sprintId || (closed.length ? 0 : active[0]?.id ?? 0);
   const live = active.some((s) => s.id === requestedSprintId);
   const reportBoardId = sprints.isSuccess ? board?.id ?? 0 : 0;
+  // The board's open work per assignee (#288), from the cache: no lock, so it
+  // reads beside the report rather than after it.
+  const allocation = useBoardAllocation(activeId, kanban ? 0 : board?.id ?? 0);
 
   // Wait for the list so a board running its first sprint never asks for
   // a nonexistent closed report before resolving its active default.
@@ -174,12 +178,21 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
     }
     if (tab === "people") {
       const people = peopleSection(r)[0];
-      return people ? (
-        <PeoplePanel section={people} people={r.series.people ?? []} />
-      ) : (
-        <p className="muted" role="status">
-          This report was stored before TAM counted people. Rebuild from Jira to add them.
-        </p>
+      return (
+        <>
+          {people ? (
+            <PeoplePanel section={people} people={r.series.people ?? []} />
+          ) : (
+            <p className="muted" role="status">
+              This report was stored before TAM counted people. Rebuild from Jira to add them.
+            </p>
+          )}
+          <AllocationPanel
+            rows={allocation.data}
+            error={allocation.isError ? errMsg(allocation.error) : undefined}
+            onRetry={() => void allocation.refetch()}
+          />
+        </>
       );
     }
     return (
@@ -371,8 +384,8 @@ export function ReportsView({ onOpenBoards }: { onOpenBoards?: () => void } = {}
                 <ReportOutputs
                   profileId={activeId}
                   boardId={reportBoardId}
-                  doc={reportDocument(shown, inProgress)}
-                  sprint={{ report: shown, live: inProgress, charts: reportFrame }}
+                  doc={reportDocument(shown, inProgress, {}, undefined, allocation.data)}
+                  sprint={{ report: shown, live: inProgress, charts: reportFrame, allocation: allocation.data }}
                 />
               </div>
             )}
