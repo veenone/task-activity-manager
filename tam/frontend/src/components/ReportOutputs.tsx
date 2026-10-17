@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { RefObject } from "react";
 import { call, errMsg } from "@agile-suite/core";
 import { ExportSprintReportPPTX, ExportSprintReportXLSX, PublishSprintReport } from "../api";
-import type { ReportDocument, SprintReport } from "../api";
+import type { ReportDocument, ReportPerson, SprintReport } from "../api";
 import { chartImages } from "../lib/chartImage";
 import { reportDocument } from "../lib/reportDocument";
 import { sprintDoneAgreement } from "../queries/doneAgreement";
@@ -58,6 +58,8 @@ interface Props {
   sprint?: {
     report: SprintReport;
     live: boolean;
+    // The board allocation (#288), when the view has read it.
+    allocation?: ReportPerson[];
     // charts is the report frame the view drew, and the only place a picture
     // is looked for. The charts are in the DOM rather than in the report, so
     // they are collected on the click: rasterising three of them on every
@@ -137,7 +139,7 @@ export function ReportOutputs({ profileId, boardId, doc, sprint }: Props) {
     const { report, live, charts } = sprint;
     const images = await chartImages(charts.current);
     const agreement = await sprintDoneAgreement(profileId, boardId, report.series.sprintId, report.series.issues ?? []);
-    return reportDocument(report, live, images, agreement) ?? built;
+    return reportDocument(report, live, images, agreement, sprint.allocation) ?? built;
   }
 
   function onRun(id: PublisherID, label: string) {

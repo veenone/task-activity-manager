@@ -1,4 +1,4 @@
-import type { ColumnView, ReportDocument, ReportSection, ReportSeries, ReportTable, SprintReport } from "../api";
+import type { ColumnView, ReportDocument, ReportPerson, ReportSection, ReportSeries, ReportTable, SprintReport } from "../api";
 import {
   agreementCountLine,
   agreementSourceLine,
@@ -28,7 +28,7 @@ import {
 } from "./reportText";
 import { hasLimit, limitBreach } from "./columnLimit";
 import { agreementRows } from "./doneAgreement";
-import { peopleSection } from "./reportPeople";
+import { allocationSection, peopleSection } from "./reportPeople";
 import { burndownTable, capacityTable, doneAgreementTable, outcomeTable, velocityTable } from "./reportTables";
 import type { TableSpec } from "./reportTables";
 import type { ChartImages } from "./chartImage";
@@ -82,6 +82,8 @@ export function reportDocument(
   live = false,
   images: ChartImages = {},
   agreement?: AgreementFigures,
+  // The board's open work per assignee (#288), when the caller read it.
+  allocation?: ReportPerson[],
 ): ReportDocument | null {
   if (report.unavailable) return null;
   const s = report.series;
@@ -135,6 +137,7 @@ export function reportDocument(
       },
       ...capacitySection(report),
       ...peopleSection(report),
+      ...(allocation ? allocationSection(allocation) : []),
       ...doneAgreementSection(report, agreement),
     ],
   };
@@ -216,7 +219,7 @@ export function capacitySection(report: SprintReport): ReportSection[] {
 // that table because its other three sections are the report, while here the
 // counts are the report and a reader would be left working out which of the
 // board's columns the sentence was about.
-export function kanbanDocument(boardName: string, columns: ColumnView[]): ReportDocument | null {
+export function kanbanDocument(boardName: string, columns: ColumnView[], allocation?: ReportPerson[]): ReportDocument | null {
   if (columns.length === 0) return null;
   const capacity = capacityTable(columns);
   const over = columns.filter((c) => limitBreach(c) === "over").map((c) => c.name);
@@ -228,7 +231,7 @@ export function kanbanDocument(boardName: string, columns: ColumnView[]): Report
       table: cells(capacity),
       notes: kept([columns.some(hasLimit) ? "" : noLimitsLine(), kanbanScopeLine(), kanbanMetricsLine()]),
       images: [],
-    }],
+    }, ...(allocation ? allocationSection(allocation) : [])],
   };
 }
 

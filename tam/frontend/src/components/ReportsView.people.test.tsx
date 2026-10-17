@@ -27,6 +27,7 @@ vi.mock("../api", async () => {
     // cache and publishes them, so it touches neither of the two above.
     GetBoard: vi.fn(),
     PublishSprintReport: vi.fn(),
+    BoardAllocation: vi.fn(),
   };
 });
 
@@ -134,6 +135,7 @@ beforeEach(() => {
   vi.mocked(api.ListBoards).mockResolvedValue([{ id: 1, name: "Acme Platform Scrum", type: "scrum" }]);
   vi.mocked(api.ListBoardSprints).mockResolvedValue(SPRINTS);
   vi.mocked(api.CancelSprintReport).mockResolvedValue();
+  vi.mocked(api.BoardAllocation).mockResolvedValue([]);
 });
 
 // The People section (#287) on screen, in its own tab: the sprint report
@@ -211,5 +213,51 @@ describe("ReportsView people tab", () => {
     await user.click(screen.getByRole("tab", { name: "People" }));
     expect(screen.queryByRole("group", { name: "People" })).toBeNull();
     expect(screen.getByText(/stored before TAM counted people/)).toBeInTheDocument();
+  });
+});
+
+// The board allocation (#288) sits on the People tab under the sprint's own
+// People section: the board's open work per assignee, from the cache.
+describe("ReportsView board allocation", () => {
+  it("shows each assignee's open work on the board with the bar and the cards behind it", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.BoardAllocation).mockResolvedValue([{ ...rita, loggedSeconds: 0, inProgressSeconds: 0 }]);
+    renderView();
+    await screen.findByText(SENTENCE);
+    await user.click(screen.getByRole("tab", { name: "People" }));
+    const panel = await screen.findByRole("group", { name: "Board allocation" });
+    const headers = within(panel).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headers).toEqual(["Person", "Username", "Email", "Cards", "Points", "Estimate", "Actual", "Remaining", "Actual against estimate"]);
+    const row = within(panel).getByRole("row", { name: /Rita Anand/ });
+    expect(within(row).getByRole("progressbar")).toHaveAttribute("aria-valuetext", "10h of 12h");
+    await user.click(within(panel).getByRole("button", { name: "Show Rita Anand's cards" }));
+    expect(within(panel).getByRole("row", { name: /PLAT-412/ })).toBeInTheDocument();
+    expect(within(within(panel).getByRole("note")).getByText(/every open card on the board/)).toBeInTheDocument();
+    expect(api.BoardAllocation).toHaveBeenCalledWith("p1", 1);
+  });
+
+  it("says a board with no open cards has none", async () => {
+    const user = userEvent.setup();
+    renderView();
+    await screen.findByText(SENTENCE);
+    await user.click(screen.getByRole("tab", { name: "People" }));
+    expect(await screen.findByText("No card on this board is open.")).toBeInTheDocument();
+  });
+});
+
+describe("ReportsView board allocation on a kanban board", () => {
+  it("draws the allocation under the column capacity", async () => {
+    vi.mocked(api.ListBoards).mockResolvedValue([{ id: 2, name: "Ops Kanban", type: "kanban" }]);
+    vi.mocked(api.GetBoard).mockResolvedValue({
+      boardId: 2, sprintId: "", swimlane: "none", lanes: [],
+      columns: [{ name: "To Do", statusIds: ["1"], total: 2, points: 0, counted: 2, min: null, max: null, constraint: "issueCount" }],
+      donePoints: 0, unmapped: 0, unmappedStatuses: [], notSynced: 0, capped: false, needsStatusSync: false,
+    });
+    vi.mocked(api.BoardAllocation).mockResolvedValue([{ ...rita, loggedSeconds: 0, inProgressSeconds: 0 }]);
+    renderView();
+    expect(await screen.findByRole("group", { name: /column capacity/i })).toBeInTheDocument();
+    const panel = await screen.findByRole("group", { name: "Board allocation" });
+    expect(within(panel).getByRole("row", { name: /Rita Anand/ })).toBeInTheDocument();
+    expect(api.BoardAllocation).toHaveBeenCalledWith("p1", 2);
   });
 });
