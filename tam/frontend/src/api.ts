@@ -140,6 +140,9 @@ export interface Issue {
   // (schema 14). Optional so fixtures written before assigned-to-me still
   // type-check; a row cached before schema 14 sends "" until the next sync.
   assigneeName?: string;
+  // The assignee's email (schema 26). Blank where Jira hides email, and on a
+  // row cached before schema 26 until the next sync.
+  assigneeEmail?: string;
   reporter: string;
   priority: string;
   labels: string[];
@@ -601,6 +604,44 @@ export interface ReportSeries {
   // review says the same thing a month later. A card dragged out of the
   // sprint and left out is not among them, the blind spot removed carries.
   issues: string[];
+  // One row per person (#287), sorted by display name with the unassigned
+  // row last. Absent on a series stored before people were counted, and
+  // the report draws no People section for one.
+  people?: ReportPerson[];
+}
+
+// ReportPerson is reports.Person: what was assigned to somebody in the
+// sprint and the time they spent on it. name is "" on the unassigned row.
+export interface ReportPerson {
+  name: string;
+  username: string;
+  email: string;
+  cards: number;
+  points: number;
+  estimateSeconds: number;
+  remainingSeconds: number;
+  loggedSeconds: number;
+  inProgressSeconds: number;
+  // Every hour logged on the person's cards so far, by anyone: the actual
+  // an estimate is measured against.
+  spentSeconds: number;
+  // The cards behind cards, for the People tab's breakdown.
+  issues: ReportPersonCard[];
+}
+
+// ReportPersonCard is reports.PersonCard: one card in a person's breakdown.
+// loggedSeconds counts every author inside the sprint.
+export interface ReportPersonCard {
+  key: string;
+  summary: string;
+  status: string;
+  statusCategory: string;
+  points: number | null;
+  estimateSeconds: number;
+  remainingSeconds: number;
+  spentSeconds: number;
+  loggedSeconds: number;
+  inProgressSeconds: number;
 }
 
 export interface VelocityRow {
@@ -1341,6 +1382,16 @@ export const CancelSprintReport: (profileId: string) => Promise<void> = App.Canc
 export interface ReportTable {
   columns: string[];
   rows: string[][];
+  // An optional last column of progress bars, one per row (null for a row
+  // with none): the spreadsheet draws Excel data bars, the page and the deck
+  // draw them as text. reportout.Bar on the Go side.
+  barHeading?: string;
+  bars?: (ReportBar | null)[];
+}
+
+export interface ReportBar {
+  done: number;
+  target: number;
 }
 
 // A section's chart as a picture: the file name it travels under inside the

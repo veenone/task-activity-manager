@@ -43,6 +43,9 @@ const (
 	styleTableCell
 	styleNote
 	styleKeyRows = styleNote
+	// stylePercent is not in the template: percentStyle derives it from
+	// styleTableCell the first time a bar column needs it.
+	stylePercent = styleKeyRows + 1
 )
 
 // XLSX is a report as a spreadsheet: one sheet, read top to bottom, with
@@ -82,10 +85,7 @@ func XLSX(d Document) ([]byte, error) {
 			w.line(line, styleLine)
 		}
 		if len(s.Table.Columns) > 0 {
-			w.cells(s.Table.Columns, styleTableHead)
-			for _, row := range s.Table.Rows {
-				w.cells(row, styleTableCell)
-			}
+			w.table(s.Table)
 		}
 		for _, note := range s.Notes {
 			w.line(note, styleNote)

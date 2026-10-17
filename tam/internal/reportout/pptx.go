@@ -288,7 +288,8 @@ func sectionSlides(s Section, pics map[string]string) []page {
 	if perSlide < 1 {
 		perSlide = 1
 	}
-	rows := s.Table.Rows
+	table := withBars(s.Table)
+	rows := table.Rows
 	var out []page
 	for first := true; first || len(rows) > 0; first = false {
 		take := rows
@@ -296,7 +297,7 @@ func sectionSlides(s Section, pics map[string]string) []page {
 			take = take[:perSlide]
 		}
 		rows = rows[len(take):]
-		out = append(out, page{body: sectionSlide(s, Table{Columns: s.Table.Columns, Rows: take}, "")})
+		out = append(out, page{body: sectionSlide(s, Table{Columns: table.Columns, Rows: take}, "")})
 		if len(rows) == 0 {
 			break
 		}

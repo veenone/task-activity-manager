@@ -197,6 +197,8 @@ type userRef struct {
 	Name        string `json:"name"`
 	Key         string `json:"key"`
 	DisplayName string `json:"displayName"`
+	// EmailAddress is empty when the instance hides email from this caller.
+	EmailAddress string `json:"emailAddress"`
 }
 
 type keyed struct {
@@ -259,6 +261,7 @@ func parseIssue(raw corejira.RawIssue, ids fieldIDs, requirementType string, pt 
 	if err := json.Unmarshal(f["assignee"], &assignee); err == nil && assignee != nil {
 		iss.Assignee = displayName(*assignee)
 		iss.AssigneeName = assigneeName(*assignee)
+		iss.AssigneeEmail = assignee.EmailAddress
 	}
 	if err := json.Unmarshal(f["reporter"], &reporter); err == nil && reporter != nil {
 		iss.Reporter = displayName(*reporter)

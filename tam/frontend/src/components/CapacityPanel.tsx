@@ -1,4 +1,5 @@
 import type { ReportSection } from "../api";
+import { ReportNotes } from "./ReportNotes";
 
 // CapacityPanel is the report's capacity section on screen: the board's columns
 // against their WIP limits, with each limit attributed to Jira or to this team.
@@ -53,7 +54,7 @@ export function CapacityPanel({ section }: { section?: ReportSection }) {
           </tbody>
         </table>
       )}
-      {section.notes.map((note) => <p className="muted small" key={note}>{note}</p>)}
+      <ReportNotes notes={section.notes} />
     </section>
   );
 }

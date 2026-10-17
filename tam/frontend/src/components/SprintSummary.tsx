@@ -11,6 +11,7 @@ import {
   unitLine,
 } from "../lib/reportText";
 import { ReportMetrics } from "./ReportMetrics";
+import { ReportNotes } from "./ReportNotes";
 
 // SprintSummary is the sentence a sprint review starts with, and everything
 // that sentence is not allowed to be read without.
@@ -59,9 +60,7 @@ export function SprintSummary({ series, builtAt, live = false }: { series: Repor
           at .small, so its 78ch and the container's 78ch resolved against
           different font sizes and drew right edges about 78px apart. The
           container already caps the measure. */}
-      {unit && <p className="muted small">{unit}</p>}
-      <p className="muted small">{floorLine()}</p>
-      {removed && <p className="muted small">{removed}</p>}
+      <ReportNotes notes={[unit, floorLine(), removed].filter((n): n is string => !!n)} />
       {truncation && <p className="warn-text small">{truncation}</p>}
       <details className="report-details">
         <summary>How this report is calculated</summary>

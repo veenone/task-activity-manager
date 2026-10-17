@@ -137,6 +137,7 @@ export namespace backend {
 	    statusCategory: string;
 	    assignee: string;
 	    assigneeName: string;
+	    assigneeEmail: string;
 	    reporter: string;
 	    priority: string;
 	    labels: string[];
@@ -173,6 +174,7 @@ export namespace backend {
 	        this.statusCategory = source["statusCategory"];
 	        this.assignee = source["assignee"];
 	        this.assigneeName = source["assigneeName"];
+	        this.assigneeEmail = source["assigneeEmail"];
 	        this.reporter = source["reporter"];
 	        this.priority = source["priority"];
 	        this.labels = source["labels"];
@@ -413,6 +415,7 @@ export namespace backend {
 	    id: string;
 	    author: string;
 	    authorName: string;
+	    authorEmail: string;
 	    started: string;
 	    timeSpent: string;
 	    seconds: number;
@@ -429,6 +432,7 @@ export namespace backend {
 	        this.id = source["id"];
 	        this.author = source["author"];
 	        this.authorName = source["authorName"];
+	        this.authorEmail = source["authorEmail"];
 	        this.started = source["started"];
 	        this.timeSpent = source["timeSpent"];
 	        this.seconds = source["seconds"];
@@ -1657,6 +1661,20 @@ export namespace profile {
 
 export namespace reportout {
 	
+	export class Bar {
+	    done: number;
+	    target: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Bar(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.done = source["done"];
+	        this.target = source["target"];
+	    }
+	}
 	export class Image {
 	    name: string;
 	    alt: string;
@@ -1676,6 +1694,8 @@ export namespace reportout {
 	export class Table {
 	    columns: string[];
 	    rows: string[][];
+	    barHeading?: string;
+	    bars?: Bar[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Table(source);
@@ -1685,7 +1705,27 @@ export namespace reportout {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.columns = source["columns"];
 	        this.rows = source["rows"];
+	        this.barHeading = source["barHeading"];
+	        this.bars = this.convertValues(source["bars"], Bar);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Section {
 	    heading: string;
@@ -1800,6 +1840,87 @@ export namespace reports {
 	        this.ideal = source["ideal"];
 	    }
 	}
+	export class PersonCard {
+	    key: string;
+	    summary: string;
+	    status: string;
+	    statusCategory: string;
+	    points?: number;
+	    estimateSeconds: number;
+	    remainingSeconds: number;
+	    spentSeconds: number;
+	    loggedSeconds: number;
+	    inProgressSeconds: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PersonCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.summary = source["summary"];
+	        this.status = source["status"];
+	        this.statusCategory = source["statusCategory"];
+	        this.points = source["points"];
+	        this.estimateSeconds = source["estimateSeconds"];
+	        this.remainingSeconds = source["remainingSeconds"];
+	        this.spentSeconds = source["spentSeconds"];
+	        this.loggedSeconds = source["loggedSeconds"];
+	        this.inProgressSeconds = source["inProgressSeconds"];
+	    }
+	}
+	export class Person {
+	    name: string;
+	    username: string;
+	    email: string;
+	    cards: number;
+	    points: number;
+	    estimateSeconds: number;
+	    remainingSeconds: number;
+	    loggedSeconds: number;
+	    inProgressSeconds: number;
+	    spentSeconds: number;
+	    issues: PersonCard[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Person(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.username = source["username"];
+	        this.email = source["email"];
+	        this.cards = source["cards"];
+	        this.points = source["points"];
+	        this.estimateSeconds = source["estimateSeconds"];
+	        this.remainingSeconds = source["remainingSeconds"];
+	        this.loggedSeconds = source["loggedSeconds"];
+	        this.inProgressSeconds = source["inProgressSeconds"];
+	        this.spentSeconds = source["spentSeconds"];
+	        this.issues = this.convertValues(source["issues"], PersonCard);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class Series {
 	    sprintId: number;
 	    sprintName: string;
@@ -1814,6 +1935,7 @@ export namespace reports {
 	    days: Day[];
 	    truncated: string[];
 	    issues: string[];
+	    people?: Person[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Series(source);
@@ -1834,6 +1956,7 @@ export namespace reports {
 	        this.days = this.convertValues(source["days"], Day);
 	        this.truncated = source["truncated"];
 	        this.issues = source["issues"];
+	        this.people = this.convertValues(source["people"], Person);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

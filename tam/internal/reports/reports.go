@@ -33,11 +33,9 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"agile-suite/tam/internal/backend"
-	"agile-suite/tam/internal/sprintdate"
 )
 
 // The units a series can be counted in.
@@ -168,6 +166,11 @@ type Series struct {
 	// sprint and left out is never returned by the search, so it is not
 	// here either.
 	Issues []string `json:"issues"`
+	// People is the sprint's People section, one row per person (#287). It
+	// is absent on a series stored before it existed, and the view draws no
+	// section for one, the way it draws no capacity section for an older
+	// report.
+	People []Person `json:"people,omitempty"`
 }
 
 // Build reconstructs one sprint from its issues' changelogs.
@@ -190,33 +193,16 @@ func Build(sprint backend.Sprint, done func(string) bool, issues []backend.Issue
 	if done == nil {
 		return Series{}, fmt.Errorf("sprint %d has no rule for what counts as finished, so nothing can be burned down", sprint.ID)
 	}
-	start, err := sprintdate.Parse(sprint.StartDate)
+	// The planned end still anchors an active sprint's ideal line, which
+	// is drawn elsewhere; the walk itself runs over window's stretch.
+	start, end, last, err := window(sprint, now)
 	if err != nil {
-		return Series{}, fmt.Errorf("sprint %d has no start date TAM can read, so there is nothing to reconstruct: %w: %w", sprint.ID, ErrNoDates, err)
-	}
-	end, err := sprintEnd(sprint)
-	if err != nil {
-		return Series{}, fmt.Errorf("sprint %d has no end date TAM can read, so there is nothing to reconstruct: %w: %w", sprint.ID, ErrNoDates, err)
-	}
-	if end.Before(start) {
-		return Series{}, fmt.Errorf("sprint %d ends before it starts, so it has no days to walk: %w", sprint.ID, ErrNoDates)
+		return Series{}, err
 	}
 
 	cards, err := rewound(sprint, issues, start)
 	if err != nil {
 		return Series{}, err
-	}
-
-	// Active sprints include work through now, even past their planned end.
-	// Closed sprints stop at their close, capped at now for inconsistent
-	// future timestamps. The planned end still anchors an active sprint's
-	// ideal line. A future start yields its single day rather than no series.
-	last := end
-	if strings.EqualFold(strings.TrimSpace(sprint.State), "active") || now.Before(last) {
-		last = now
-	}
-	if last.Before(start) {
-		last = start
 	}
 
 	w := &walker{

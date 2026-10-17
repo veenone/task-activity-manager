@@ -58,13 +58,14 @@ func mapWorklogs(raw []corejira.RawWorklog) []backend.Worklog {
 	out := make([]backend.Worklog, 0, len(raw))
 	for _, w := range raw {
 		out = append(out, backend.Worklog{
-			ID:         w.ID,
-			Author:     w.Author.Name,
-			AuthorName: w.Author.DisplayName,
-			Started:    w.Started,
-			TimeSpent:  w.TimeSpent,
-			Seconds:    w.TimeSpentSeconds,
-			Comment:    w.Comment,
+			ID:          w.ID,
+			Author:      w.Author.Name,
+			AuthorName:  w.Author.DisplayName,
+			AuthorEmail: w.Author.EmailAddress,
+			Started:     w.Started,
+			TimeSpent:   w.TimeSpent,
+			Seconds:     w.TimeSpentSeconds,
+			Comment:     w.Comment,
 		})
 	}
 	return out

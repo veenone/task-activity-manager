@@ -22,12 +22,14 @@ type Worklog struct {
 	ID         string `json:"id"`
 	Author     string `json:"author"`
 	AuthorName string `json:"authorName"`
-	Started    string `json:"started"`
-	TimeSpent  string `json:"timeSpent"`
-	Seconds    int    `json:"seconds"`
-	Comment    string `json:"comment"`
-	Pending    bool   `json:"pending"`
-	PendingID  int64  `json:"pendingId"`
+	// AuthorEmail is blank where the instance hides email.
+	AuthorEmail string `json:"authorEmail"`
+	Started     string `json:"started"`
+	TimeSpent   string `json:"timeSpent"`
+	Seconds     int    `json:"seconds"`
+	Comment     string `json:"comment"`
+	Pending     bool   `json:"pending"`
+	PendingID   int64  `json:"pendingId"`
 }
 
 // WorklogDraft is an entry TAM holds in the journal until Commit sends it.

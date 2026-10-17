@@ -885,7 +885,35 @@ input, button, select { font-family: inherit; font-size: inherit; }
    14em ceiling it used to carry was there to stop it eating velocity, and
    the band is what does that now. */
 .report-capacity { min-height: 0; overflow-y: auto; }
-.report-capacity:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.report-capacity:focus-visible, .report-people:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.report-people { flex: 1; min-height: 0; overflow: auto; }
+/* The People tab's table (#287): a row per person that opens to the cards
+   behind it. Rules between rows and a tinted head make a wide table of
+   hours readable, the figures sit right so their digits line up, and an
+   open person and their cards share a tint so the group reads as one. */
+.people-table-wrap { overflow-x: auto; }
+.people-table { font-variant-numeric: tabular-nums; }
+.people-table th, .people-table tbody th, .people-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.people-table thead th { background: var(--surface-2); font-size: var(--fs-sm); white-space: nowrap; }
+.people-table .people-num, .people-table th.people-num { text-align: right; white-space: nowrap; }
+.people-row > th { text-align: left; color: var(--text); font-weight: 600; white-space: nowrap; }
+.people-row:hover, .people-card:hover { background: var(--row-hover); }
+.people-row-open, .people-row-open:hover { background: var(--accent-soft); }
+.people-card td { background: var(--surface-2); font-size: var(--fs-sm); }
+.people-card td:first-child { padding-left: 36px; }
+.people-card-key { font-weight: 600; color: var(--info-fg); }
+.people-card-summary { color: var(--text-muted); }
+.people-name { vertical-align: middle; }
+.people-toggle { width: 20px; margin-right: 6px; padding: 0; border: 0; background: transparent; color: var(--text-muted); font: inherit; cursor: pointer; }
+.people-toggle:hover { color: var(--text); }
+.people-toggle:focus-visible { outline: var(--focus-ring); }
+.people-toggle:disabled { visibility: hidden; }
+.people-time { min-width: 170px; }
+/* A section's notes, in a box of their own so the caveats read apart from
+   the figures they qualify. */
+.report-notes { margin-top: 12px; padding: 8px 12px; background: var(--accent-soft); border-left: 3px solid var(--info-border); color: var(--text); font-size: var(--fs-sm); }
+.report-notes p { margin: 2px 0; }
+.report-tabs { flex: none; margin-top: 12px; }
 
 /* The outputs bar: the foot of the frame, a sibling of .report-body rather
    than a row inside it.
@@ -979,11 +1007,12 @@ input, button, select { font-family: inherit; font-size: inherit; }
      for. Left growing, it is still the body's one shrinkable child and
      still collapses to nothing, which is the whole defect moved into a
      window that scrolls rather than fixed. */
-  .report-lower { flex: none; }
+  .report-lower, .report-people { flex: none; }
 }
 @media (max-width: 900px) {
   .report-charts { grid-template-columns: minmax(0, 1fr); }
   .report-lower { flex: none; grid-auto-flow: row; }
+  .report-people { flex: none; }
   /* Stacked, the charts are twice as tall and nothing fits. The chart
      heights are constants that do not shrink, so a scrollbar is the
      honest answer and crushing them is not, and the lower band's two

@@ -55,6 +55,7 @@ func storageImage(b *strings.Builder, im Image) {
 }
 
 func storageTable(b *strings.Builder, t Table) {
+	t = withBars(t)
 	if len(t.Columns) == 0 {
 		return
 	}

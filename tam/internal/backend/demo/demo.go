@@ -31,10 +31,9 @@ type Backend struct {
 	nextKey  int
 	conflict map[string]bool
 	links    map[string][]backend.Link
-	// worklogs holds the entries a Commit pushed this run, keyed by issue.
-	// The dataset seeds none: a worklog only exists because somebody logged
-	// it, and inventing entries would make the section read as a record of
-	// work nobody did.
+	// worklogs holds the entries keyed by issue: the closed sprint's sample
+	// (demo.SampleWorklogs), which the reports' time figures are drawn from,
+	// plus whatever a Commit pushed this run. Only Sprint 11 is seeded.
 	worklogs    map[string][]backend.Worklog
 	sprintState map[int]string
 	// sprintDraft holds the name and dates a start was given, beside
@@ -84,7 +83,7 @@ func New(projectKey string) *Backend {
 		nextKey:       500,
 		conflict:      map[string]bool{},
 		links:         map[string][]backend.Link{},
-		worklogs:      map[string][]backend.Worklog{},
+		worklogs:      demo.SampleWorklogs(demo.Issues(projectKey)),
 		sprintState:   map[int]string{},
 		sprintDraft:   map[int]backend.SprintDraft{},
 		sprintCreated: map[int]backend.Sprint{},
