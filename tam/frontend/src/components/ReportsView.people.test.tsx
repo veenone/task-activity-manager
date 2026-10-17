@@ -157,7 +157,7 @@ describe("ReportsView people tab", () => {
     expect(within(row).getByRole("cell", { name: "9h" })).toBeInTheDocument();
     expect(within(row).getByRole("cell", { name: "26h" })).toBeInTheDocument();
     // The notes sit in their own box, apart from the figures.
-    expect(within(within(panel).getByRole("note")).getByText(/charged to whoever holds the card now/)).toBeInTheDocument();
+    expect(within(within(panel).getByRole("note")).getByText(/credited to its current assignee/)).toBeInTheDocument();
     // The sprint's charts belong to the other tab.
     expect(screen.queryByText(SENTENCE)).toBeNull();
   });

@@ -79,10 +79,16 @@ describe("the People section", () => {
   it("says how logged and in-progress time are counted, and who in-progress time is charged to", () => {
     const [section] = peopleSection(report([rita]));
     const notes = section.notes.join(" ");
-    expect(notes).toMatch(/Logged in sprint is the time each person logged/);
-    expect(notes).toMatch(/counts as In Progress/);
-    expect(notes).toMatch(/whoever holds the card now/);
-    expect(notes).toMatch(/Actual counts all time logged on the card/);
+    expect(section.notes).toHaveLength(3);
+    expect(notes).toMatch(/each person's own worklogs/);
+    expect(notes).toMatch(/credited to its current assignee/);
+    expect(notes).toMatch(/Actual is all time logged on a card/);
+  });
+
+  it("carries each person's actual against their estimate as a bar column for the outputs", () => {
+    const [section] = peopleSection(report([rita, unassigned]));
+    expect(section.table.barHeading).toBe("Actual against estimate");
+    expect(section.table.bars).toEqual([{ done: 10 * 3600, target: 12 * 3600 }, null]);
   });
 
   it("is left out for a report stored before people were counted", () => {

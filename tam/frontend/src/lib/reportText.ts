@@ -68,7 +68,7 @@ export function floorLine(): string {
 // report, most of which had nothing for it to qualify.
 export function removedFloorLine(removed: number): string {
   if (removed <= 0) return "";
-  return "Removed counts cards that left and came back. Cards removed for good don't show up here.";
+  return "Removed only counts cards that came back.";
 }
 
 // unitLine says why a report counts cards, and is empty for one counting
@@ -80,15 +80,15 @@ export function unitLine(unit: string, unitReason: string): string {
   if (unit !== "cards") return "";
   if (unitReason === "nothingEstimated") {
     return (
-      "This report counts cards because points appear in the sprint or its history, but none were set during the sprint. Estimate the cards to report points."
+      "Counted in cards: points appear in the sprint or its history but none were set, so estimate the cards to report points."
     );
   }
   if (unitReason === "noPointsFieldSeen") {
     return (
-      "This report counts cards because no story points appear in the sprint or its history. TAM cannot tell whether the field is missing or unused."
+      "Counted in cards: no story points appear in the sprint or its history, so the field is missing or unused."
     );
   }
-  return "These figures count cards rather than points.";
+  return "Counted in cards, not points.";
 }
 
 // modeLine says whether the figures beside it are final. A running sprint's
@@ -122,7 +122,7 @@ export function velocityPartialLine(sprintNames: string[]): string {
 // these rows to Confluence out of this module, where there is no paragraph
 // beside them to borrow the qualification from.
 export function velocityFloorLine(): string {
-  return "Committed is a minimum estimate in every row. Cards removed for good don't show up in the table.";
+  return "Committed is a minimum in every row. Cards removed for good aren't shown.";
 }
 
 // The chart sentences. A chart states its numbers in text beside each mark
@@ -235,7 +235,7 @@ export function truncationLine(keys: string[]): string {
 // noLimitsLine is a board with no limit on any column, from Jira or set in
 // TAM, and it names both because a reader of the page can check neither.
 export function noLimitsLine(): string {
-  return "No column on this board has a limit, from Jira or set in TAM, so there's nothing to count the cards against.";
+  return "No column on this board has a limit, from Jira or set in TAM.";
 }
 
 // capacityCountLine says what the cards in the table are counted by, which
@@ -264,7 +264,7 @@ export function capacityBreachLine(columns: string[]): string {
 // about a column now, and TAM keeps no record of what a column held on a
 // past afternoon.
 export function capacityScopeLine(): string {
-  return "The counts are this sprint's cards as the last sync left them. Cards in Jira that TAM hasn't read yet aren't included.";
+  return "Counts come from the last sync, so cards TAM hasn't read yet aren't included.";
 }
 
 // The kanban report's wording. A kanban board has no sprint, so nothing in
@@ -280,8 +280,7 @@ export function capacityScopeLine(): string {
 // see, which is the half of capacityScopeLine that still holds.
 export function kanbanScopeLine(): string {
   return (
-    "These counts show the board as the last sync left it. " +
-    "Cards in Jira that TAM hasn't read yet aren't included."
+    "Counts come from the last sync, so cards TAM hasn't read yet aren't included."
   );
 }
 
@@ -291,7 +290,7 @@ export function kanbanScopeLine(): string {
 // yet. Saying so is cheaper than a reader concluding the sections failed to
 // load.
 export function kanbanMetricsLine(): string {
-  return "Throughput, cycle time and a cumulative flow diagram aren't built yet, so this report only shows column capacity.";
+  return "Throughput, cycle time and a cumulative flow diagram aren't built yet.";
 }
 
 // kanbanUnsyncedLine is a board whose columns have never reached the cache.

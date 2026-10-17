@@ -1382,6 +1382,16 @@ export const CancelSprintReport: (profileId: string) => Promise<void> = App.Canc
 export interface ReportTable {
   columns: string[];
   rows: string[][];
+  // An optional last column of progress bars, one per row (null for a row
+  // with none): the spreadsheet draws Excel data bars, the page and the deck
+  // draw them as text. reportout.Bar on the Go side.
+  barHeading?: string;
+  bars?: (ReportBar | null)[];
+}
+
+export interface ReportBar {
+  done: number;
+  target: number;
 }
 
 // A section's chart as a picture: the file name it travels under inside the

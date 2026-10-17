@@ -105,7 +105,7 @@ describe("removedFloorLine", () => {
   });
 
   it("warns that removed sees only the cards that came back, once one did", () => {
-    expect(removedFloorLine(3)).toContain("left and came back");
+    expect(removedFloorLine(3)).toContain("only counts cards that came back");
   });
 });
 
@@ -114,7 +114,7 @@ describe("unitLine", () => {
     expect(unitLine("points", "")).toBe("");
   });
   it("tells the team it can fix this one by estimating", () => {
-    expect(unitLine("cards", "nothingEstimated")).toContain("Estimate the cards");
+    expect(unitLine("cards", "nothingEstimated")).toContain("estimate the cards");
   });
   it("claims story points only where the backend looked, which is this sprint and its history", () => {
     const line = unitLine("cards", "nothingEstimated");
@@ -201,8 +201,8 @@ describe("velocityFloorLine", () => {
   // qualification cannot live in a paragraph beside it.
   it("says the Committed column is a floor in every row, not only in the sprint above it", () => {
     const line = velocityFloorLine();
-    expect(line).toContain("Committed is a minimum estimate in every row");
-    expect(line).toContain("Cards removed for good don't show up");
+    expect(line).toContain("Committed is a minimum in every row");
+    expect(line).toContain("Cards removed for good aren't shown");
   });
 });
 
@@ -267,8 +267,7 @@ describe("the done agreement's sentences", () => {
 // makes one, and two empty boards that mean two different things.
 describe("the kanban report's sentences", () => {
   it("puts the counts now rather than in a period that closed", () => {
-    expect(kanbanScopeLine()).toContain("the board as the last sync left it");
-    expect(kanbanScopeLine()).toContain("as the last sync left it");
+    expect(kanbanScopeLine()).toContain("from the last sync");
     // A card Jira holds and TAM has not read is the one thing a count off the
     // cache cannot see, and the caveat capacityScopeLine carries for a sprint.
     expect(kanbanScopeLine()).toContain("TAM hasn't read yet");

@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { ProgressBar } from "@agile-suite/core";
 import type { ReportPerson, ReportPersonCard, ReportSection } from "../api";
 import { points, workDuration } from "../lib/format";
-import { PEOPLE_COLUMNS, peopleCardLine, personBar, personKey, timeCells } from "../lib/reportPeople";
+import { BAR_HEADING, PEOPLE_COLUMNS, personBar, personKey, timeCells } from "../lib/reportPeople";
 import { statusClass } from "../lib/statusClass";
 import { ReportNotes } from "./ReportNotes";
 
@@ -34,7 +34,7 @@ export function PeoplePanel({ section, people }: { section: ReportSection; peopl
               <th scope="col" className="people-num">Cards</th>
               <th scope="col" className="people-num">Points</th>
               {PEOPLE_COLUMNS.map((c) => <th scope="col" className="people-num" key={c}>{c}</th>)}
-              <th scope="col">Actual against estimate</th>
+              <th scope="col">{BAR_HEADING}</th>
             </tr>
           </thead>
           <tbody>
@@ -76,7 +76,7 @@ export function PeoplePanel({ section, people }: { section: ReportSection; peopl
           </tbody>
         </table>
       </div>
-      <ReportNotes notes={[...section.notes, peopleCardLine()]} />
+      <ReportNotes notes={section.notes} />
     </section>
   );
 }

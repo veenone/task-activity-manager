@@ -1,4 +1,4 @@
-import type { ReportPerson, ReportSection, SprintReport } from "../api";
+import type { ReportBar, ReportPerson, ReportSection, SprintReport } from "../api";
 import { points, workDuration } from "./format";
 import { timeBar } from "./issueTime";
 import type { TimeBar } from "./issueTime";
@@ -60,23 +60,28 @@ export function personBar(estimateSeconds: number, spentSeconds: number): TimeBa
   });
 }
 
-// The section's notes. Each answers a question a reader of the table asks.
+// The section's notes: three short sentences, one per figure a reader might
+// misread.
 export function peopleLoggedLine(): string {
-  return "Logged in sprint is the time each person logged between the sprint's start and end, sub-tasks included. If you logged time on someone else's card, you get a row of your own.";
+  return "Logged counts each person's own worklogs in the sprint; a card row counts everyone's.";
 }
 
 export function peopleInProgressLine(): string {
-  return "In progress is how long each card sat in a status Jira counts as In Progress during the sprint. It's charged to whoever holds the card now, because TAM doesn't track earlier assignees.";
+  return "In progress is time a card sat In Progress, credited to its current assignee.";
 }
 
 export function peopleEstimateLine(): string {
-  return "Estimate, Actual and Remaining are each card's own figures as they stand today. Actual counts all time logged on the card, including before the sprint.";
+  return "Actual is all time logged on a card, before the sprint too.";
 }
 
-// peopleCardLine is the breakdown's own note: a card's row answers for the
-// card, so its logged time counts everyone who logged on it.
-export function peopleCardLine(): string {
-  return "In each person's card list, Logged in sprint counts everyone who logged time on that card.";
+// BAR_HEADING names the actual-against-estimate column, on screen and in the
+// outputs.
+export const BAR_HEADING = "Actual against estimate";
+
+// outputBar is a person's bar as the outputs take it, or null with no
+// estimate to measure against.
+function outputBar(p: ReportPerson): ReportBar | null {
+  return p.estimateSeconds > 0 ? { done: p.spentSeconds, target: p.estimateSeconds } : null;
 }
 
 // peopleSection is a list of nothing or one, the way capacitySection is: a
@@ -89,7 +94,12 @@ export function peopleSection(report: SprintReport): ReportSection[] {
   return [{
     heading: table.caption,
     lines: [],
-    table: { columns: table.columns, rows: table.rows.map((r) => r.cells) },
+    table: {
+      columns: table.columns,
+      rows: table.rows.map((r) => r.cells),
+      barHeading: BAR_HEADING,
+      bars: people.map(outputBar),
+    },
     notes: [peopleLoggedLine(), peopleInProgressLine(), peopleEstimateLine()],
     images: [],
   }];

@@ -181,8 +181,8 @@ describe("ReportsView", () => {
     expect(screen.getByText("Committed is a minimum estimate.")).toBeInTheDocument();
     // The removed half only appears when something was removed, and the
     // fixture removed two cards.
-    expect(screen.getByText(/left and came back/)).toBeInTheDocument();
-    expect(screen.getByText(/left and came back/)).toBeInTheDocument();
+    expect(screen.getByText(/only counts cards that came back/)).toBeInTheDocument();
+    expect(screen.getByText(/only counts cards that came back/)).toBeInTheDocument();
   });
 
   it("shows five labeled figures for quick sprint-review scanning", async () => {
@@ -226,7 +226,7 @@ describe("ReportsView", () => {
     );
     renderView();
     expect(await screen.findByText(/Sprint 11 committed 12 cards/)).toBeInTheDocument();
-    expect(screen.getByText(/Estimate the cards to report points/)).toBeInTheDocument();
+    expect(screen.getByText(/estimate the cards to report points/)).toBeInTheDocument();
   });
 
   it("counts cards and does not claim the instance has no story points field", async () => {
@@ -372,7 +372,7 @@ describe("ReportsView", () => {
   it("qualifies the velocity table's Committed column beside the table itself", async () => {
     renderView();
     await screen.findByText(SENTENCE);
-    expect(screen.getByText(/Committed is a minimum estimate in every row/)).toBeInTheDocument();
+    expect(screen.getByText(/Committed is a minimum in every row/)).toBeInTheDocument();
   });
 
   it("reads the sprint the user picks", async () => {
@@ -683,7 +683,7 @@ describe("ReportsView, fixed height", () => {
       report({ series: series({ unit: "cards", unitReason: "nothingEstimated" }) }),
     );
     renderView();
-    const line = await screen.findByText(/counts cards because points appear/);
+    const line = await screen.findByText(/Counted in cards: points appear/);
     expect(line.closest("details")).toBeNull();
   });
 
@@ -841,7 +841,7 @@ describe("ReportsView on a kanban board", () => {
     vi.mocked(api.GetBoard).mockResolvedValue(boardView(COLUMNS));
     renderView();
     const p = await panel();
-    expect(within(p).getByText(/as the last sync left it/)).toBeInTheDocument();
+    expect(within(p).getByText(/from the last sync/)).toBeInTheDocument();
     expect(within(p).getByText(/Throughput, cycle time and a cumulative flow diagram aren.t built yet/))
       .toBeInTheDocument();
     // Nothing claims a build time the way a sprint report's stamp does.
