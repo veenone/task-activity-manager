@@ -169,6 +169,27 @@ func TestGetContainerDatasetPrefersTheCache(t *testing.T) {
 	}
 }
 
+// Iterations belong to a run, so there is nothing to ask for without an
+// execution, and nothing for a test that exists only here (#267 Phase 4).
+func TestGetRunIterationsAsksNothingWithoutARun(t *testing.T) {
+	a, profileID := newTestAppWithDemoProfile(t)
+
+	for _, tc := range []struct{ container, test string }{
+		{"", "QA-1"},
+		{"EXEC-1", "new-test-1"},
+		// A demo profile has runs but no parameterized ones.
+		{"EXEC-1", "QA-1"},
+	} {
+		iters, err := a.GetRunIterations(profileID, tc.container, tc.test)
+		if err != nil {
+			t.Fatalf("container=%q test=%q: %v", tc.container, tc.test, err)
+		}
+		if len(iters) != 0 {
+			t.Errorf("container=%q test=%q gave %+v, want none", tc.container, tc.test, iters)
+		}
+	}
+}
+
 // Nothing to ask about: no container selected, or a test that exists only
 // here. Both answer empty without reaching for a backend.
 func TestGetContainerDatasetAsksNothingWithoutAContainer(t *testing.T) {

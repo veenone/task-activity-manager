@@ -502,6 +502,10 @@ export function GetRequirementTraceability(arg1, arg2) {
   return window['go']['main']['App']['GetRequirementTraceability'](arg1, arg2);
 }
 
+export function GetRunIterations(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetRunIterations'](arg1, arg2, arg3);
+}
+
 export function GetRunRollup(arg1, arg2) {
   return window['go']['main']['App']['GetRunRollup'](arg1, arg2);
 }

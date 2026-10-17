@@ -265,6 +265,8 @@ export function GetRequirementLinks(arg1:string,arg2:string):Promise<Array<testr
 
 export function GetRequirementTraceability(arg1:string,arg2:Array<string>):Promise<testrepo.Sankey>;
 
+export function GetRunIterations(arg1:string,arg2:string,arg3:string):Promise<Array<backend.RunIteration>>;
+
 export function GetRunRollup(arg1:string,arg2:string):Promise<testrepo.RunRollup>;
 
 export function GetRunRollupBreakdown(arg1:string,arg2:string):Promise<Array<testrepo.RollupMember>>;

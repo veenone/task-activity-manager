@@ -7,6 +7,7 @@ import { RunHistorySection } from "./test-detail/RunHistorySection";
 import { DescriptionSection, CucumberEditor, GenericEditor } from "./test-detail/DefinitionSections";
 import { StepsSection } from "./test-detail/StepsSection";
 import { DatasetSection } from "./test-detail/DatasetSection";
+import { IterationsSection } from "./test-detail/IterationsSection";
 import { DetailModals } from "./test-detail/DetailModals";
 import type { TestDetailProps } from "./test-detail/types";
 import { useTestDetailState } from "./test-detail/useTestDetailState";
@@ -60,6 +61,12 @@ export function TestDetail(p: TestDetailProps) {
             supported={s.caps.supportsDatasets}
             canEdit={s.caps.supportsDatasetWrites}
             containerKey={p.containerKey ?? ""}
+          />
+
+          <IterationsSection
+            profileId={s.profileId}
+            testKey={p.testKey}
+            containerKey={s.caps.supportsDatasets ? (p.containerKey ?? "") : ""}
           />
         </div>
       )}
