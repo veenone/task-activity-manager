@@ -117,6 +117,45 @@ func TestCommitDatasetOfANewTestUsesTheRealKey(t *testing.T) {
 	}
 }
 
+// Demo mode is how XTM is seen without a Jira to point it at, so a dataset
+// edited there has to commit like any other change. Every other write already
+// treats a demo commit as a no-op success (#295).
+func TestCommitDatasetOnADemoProfileClearsThePendingRow(t *testing.T) {
+	repo := datasetRepo(t)
+	edited := testrepo.Dataset{
+		Parameters: []testrepo.DatasetParameter{{Name: "USERNAME"}},
+		Rows:       [][]string{{"alice"}, {"bob"}},
+	}
+	// QA-2 carries no demo dataset, so this is the create case: the table
+	// the user builds is the whole change.
+	if err := repo.EditTestDataset("p1", "QA-2", edited); err != nil {
+		t.Fatalf("edit dataset: %v", err)
+	}
+
+	res, err := syncer.New(xray.New(jira.NewClient("demo", "tok")), repo).
+		CommitChanges(context.Background(), "p1", "QA")
+	if err != nil {
+		t.Fatalf("CommitChanges: %v", err)
+	}
+	if len(res.Failed) != 0 || len(res.Conflicted) != 0 {
+		t.Fatalf("failed=%+v conflicted=%+v, want neither", res.Failed, res.Conflicted)
+	}
+	if len(res.Succeeded) != 1 || res.Succeeded[0] != "QA-2" {
+		t.Errorf("succeeded = %v, want [QA-2]", res.Succeeded)
+	}
+	if left := pendingDatasets(t, repo); len(left) != 0 {
+		t.Errorf("%d pending dataset rows after a demo commit, want none", len(left))
+	}
+	// What the user saved is what they keep looking at.
+	cached, found, err := repo.GetTestDataset("p1", "QA-2", "")
+	if err != nil || !found {
+		t.Fatalf("cache: found=%v err=%v", found, err)
+	}
+	if len(cached.Rows) != 2 {
+		t.Errorf("cached dataset = %+v, want the table that was saved", cached)
+	}
+}
+
 // Xray added the dataset API in 5.1. An older instance answers 404 to the
 // write, which on its own reads as "the test is gone".
 func TestCommitDatasetNamesAnInstanceWithNoDatasetAPI(t *testing.T) {

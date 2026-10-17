@@ -68,18 +68,16 @@ func TestXraySetDatasetWritesTheTable(t *testing.T) {
 	}
 }
 
-// A demo profile has no instance to write to. Saying so beats a connection
-// error naming a host that does not exist (#277 T7 will make demo persist).
-func TestXrayDemoRefusesADatasetWrite(t *testing.T) {
+// A demo profile has no instance to write to, and takes the write as done so
+// the pending change clears on a demo commit, like every other write (#295).
+// Refusing it left a dataset edited in demo mode stuck in the journal.
+func TestXrayDemoTakesADatasetWriteAsDone(t *testing.T) {
 	err := New(jira.NewClient("demo", "")).SetDataset(context.Background(), "QA-1", backend.Dataset{
 		Parameters: []backend.DatasetParameter{{Name: "A"}},
 		Rows:       [][]string{{"1"}},
 	})
-	if err == nil {
-		t.Fatal("a demo profile reported a dataset write as done")
-	}
-	if !strings.Contains(err.Error(), "demo profile") {
-		t.Errorf("error = %q, want it to name the demo profile", err)
+	if err != nil {
+		t.Fatalf("a demo dataset write failed: %v", err)
 	}
 }
 

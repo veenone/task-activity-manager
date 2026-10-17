@@ -162,6 +162,13 @@ serving ~5,000 tests plus sample Test Sets/Plans/Executions, folders, and
 preconditions, so the whole UI works end to end offline. The header shows a
 yellow `DEMO` chip. This is the default way to exercise the app today.
 
+A write in demo mode answers success without sending anything, so the pending
+change clears on a demo commit and the feature can be walked through end to
+end. A write that refuses instead leaves the change stuck in the journal with
+no way to clear it but a discard, which is what the dataset write did until
+#295. What the store holds is what the user keeps seeing; a refresh reads the
+generator again, the same way a refresh on a real profile reads the server.
+
 ## Conventions
 
 - Go: standard `gofmt`; package names lowercase; document exported identifiers.
