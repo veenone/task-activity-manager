@@ -59,6 +59,7 @@ export function TestDetail(p: TestDetailProps) {
             testKey={p.testKey}
             supported={s.caps.supportsDatasets}
             canEdit={s.caps.supportsDatasetWrites}
+            containerKey={p.containerKey ?? ""}
           />
         </div>
       )}

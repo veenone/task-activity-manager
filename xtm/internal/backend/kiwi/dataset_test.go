@@ -15,7 +15,7 @@ func TestKiwiDoesNotSupportDatasets(t *testing.T) {
 	if a.Capabilities().SupportsDatasets {
 		t.Fatal("Kiwi must not report SupportsDatasets")
 	}
-	if _, err := a.GetDataset(context.Background(), "T-1", ""); !errors.Is(err, backend.ErrUnsupported) {
+	if _, err := a.GetDataset(context.Background(), "T-1"); !errors.Is(err, backend.ErrUnsupported) {
 		t.Fatalf("GetDataset err = %v, want ErrUnsupported", err)
 	}
 }
@@ -27,6 +27,9 @@ func TestKiwiDoesNotSupportDatasetWrites(t *testing.T) {
 	a := &Adapter{}
 	if a.Capabilities().SupportsDatasetWrites {
 		t.Fatal("Kiwi must not report SupportsDatasetWrites")
+	}
+	if _, err := a.GetRunDataset(context.Background(), "EXEC-1", "T-1"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("GetRunDataset err = %v, want ErrUnsupported", err)
 	}
 	err := a.SetDataset(context.Background(), "T-1", backend.Dataset{
 		Parameters: []backend.DatasetParameter{{Name: "A"}},

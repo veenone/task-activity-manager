@@ -101,13 +101,15 @@ remote `updated`; if it moved, the Test is reported as a `Conflict` and held
 back (FR-1.4). The user syncs, then either overrides (rebase onto remote) or
 keeps remote (discard local).
 
-**A test's own dataset is read from Xray's JSON model, not the CSV export.**
-The export carries values alone, so a parameter read through it loses its id
-and, for a list parameter, its allowed values; writing that back rebuilds
-every parameter and flattens the list (#283). The model route is addressed by
-numeric issue id, so a read costs an issue GET first. A container-level read
-still uses the export, since the model addresses a Test Run rather than an
-execution (#277 W3).
+**A dataset is read from Xray's JSON model, never the CSV export.** The export
+carries values alone, so a parameter read through it loses its id and, for a
+list parameter, its allowed values; writing that back rebuilds every parameter
+and flattens the list (#283). The model is addressed by numeric id, so a
+test-level read costs an issue GET first and an execution-level read costs a
+run lookup. Both ask for `entityDataset`, what that level defines: an empty
+answer at an execution means the test's own dataset is what runs there, and
+the panel says which it is showing. The CSV parser stays for the files users
+bring back from a spreadsheet, and the export route is gone.
 
 **The dataset CSV is Xray's format, so its reader and writer live in
 `internal/jira` beside the rest of it.** A CSV carries names, the

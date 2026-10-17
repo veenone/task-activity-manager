@@ -181,6 +181,9 @@ export function ContainersView(p: ContainerViewProps) {
           folders={[]}
           jiraUrl={jiraUrl ?? ""}
           readOnly
+          // Only an execution can hold a dataset of its own; a set or a plan
+          // has no run to hang one off.
+          containerKey={kind === "testexec" ? selected : ""}
           onClose={() => setDetailKey(null)}
           onEdited={() => {}}
         />

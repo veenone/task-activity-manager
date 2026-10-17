@@ -562,11 +562,26 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 
 // GetDataset reads the test's Xray dataset (#267). Xray answers 404 below
 // 5.1, which the client turns into an empty dataset.
-func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (backend.Dataset, error) {
-	ds, err := a.c.GetDataset(ctx, testKey, contextKey)
+func (a *Adapter) GetDataset(ctx context.Context, testKey string) (backend.Dataset, error) {
+	ds, err := a.c.GetDataset(ctx, testKey)
 	if err != nil {
 		return backend.Dataset{}, err
 	}
+	return toBackendDataset(ds), nil
+}
+
+// GetRunDataset reads what a Test Execution defines for this test, which is
+// what will actually run there (#277 W3).
+func (a *Adapter) GetRunDataset(ctx context.Context, execKey, testKey string) (backend.Dataset, error) {
+	ds, err := a.c.GetRunDataset(ctx, execKey, testKey)
+	if err != nil {
+		return backend.Dataset{}, err
+	}
+	return toBackendDataset(ds), nil
+}
+
+// toBackendDataset maps the client's table onto the neutral one.
+func toBackendDataset(ds jira.Dataset) backend.Dataset {
 	params := make([]backend.DatasetParameter, len(ds.Parameters))
 	for i, p := range ds.Parameters {
 		params[i] = backend.DatasetParameter{
@@ -574,7 +589,7 @@ func (a *Adapter) GetDataset(ctx context.Context, testKey, contextKey string) (b
 			Type: p.Type, Options: p.Options, ListScope: p.ListScope, ListID: p.ListID,
 		}
 	}
-	return backend.Dataset{Parameters: params, Rows: ds.Rows}, nil
+	return backend.Dataset{Parameters: params, Rows: ds.Rows}
 }
 
 // SetDataset replaces the test's own dataset (#277 W1). The client resolves

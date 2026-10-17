@@ -153,11 +153,6 @@ func (c *Client) getBytesStatus(ctx context.Context, path string) ([]byte, int, 
 	return c.Client.GetBytesStatus(ctx, path)
 }
 
-// getBytesAnyType is getBytesStatus for an endpoint that does not serve JSON.
-func (c *Client) getBytesAnyType(ctx context.Context, path string) ([]byte, int, error) {
-	return c.Client.GetBytesAnyType(ctx, path)
-}
-
 func (c *Client) put(ctx context.Context, path string, body any) error {
 	return c.Client.Put(ctx, path, body)
 }

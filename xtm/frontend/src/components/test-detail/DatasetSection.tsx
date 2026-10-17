@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { GetTestDataset, type TestDataset } from "../../api";
+import { GetContainerDataset, GetTestDataset, type TestDataset } from "../../api";
 import { DatasetEditor } from "./DatasetEditor";
 
 // DATASET_ROW_CAP is how many rows the panel draws.
@@ -23,13 +23,19 @@ export function DatasetSection({
   testKey,
   supported,
   canEdit = false,
+  containerKey = "",
 }: {
   profileId: string;
   testKey: string;
   supported: boolean;
   canEdit?: boolean;
+  // The Test Execution the test is being looked at inside, if any. An
+  // execution can define its own dataset for a test, and that is what runs
+  // there (#277 W3).
+  containerKey?: string;
 }) {
   const [dataset, setDataset] = useState<TestDataset | null>(null);
+  const [override, setOverride] = useState<TestDataset | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -41,13 +47,18 @@ export function DatasetSection({
       setError("");
       try {
         setDataset(await GetTestDataset(profileId, testKey, forceRefresh));
+        setOverride(
+          containerKey
+            ? await GetContainerDataset(profileId, containerKey, testKey, forceRefresh)
+            : null,
+        );
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         setLoading(false);
       }
     },
-    [profileId, testKey, supported],
+    [profileId, testKey, supported, containerKey],
   );
 
   useEffect(() => {
@@ -63,6 +74,11 @@ export function DatasetSection({
       </div>
     );
   }
+  // Nearest level wins, which is what Xray does when the test runs.
+  const overridden = (override?.parameters.length ?? 0) > 0;
+  const shown = overridden ? override : dataset;
+  const level = !containerKey ? "" : overridden ? `defined in ${containerKey}` : "from the test";
+
   if (editing) {
     return (
       <div className="dataset-section">
@@ -82,7 +98,7 @@ export function DatasetSection({
   }
   // A test with no dataset shows nothing at all, so an ordinary test's panel
   // is unchanged, unless one can be created here.
-  if (!dataset || dataset.parameters.length === 0) {
+  if (!shown || shown.parameters.length === 0) {
     if (!canEdit) return null;
     return (
       <div className="dataset-section">
@@ -97,15 +113,16 @@ export function DatasetSection({
     );
   }
 
-  const total = dataset.rows.length;
-  const shown = dataset.rows.slice(0, DATASET_ROW_CAP);
-  const combinatorial = dataset.parameters.some((p) => p.combinatorial);
+  const total = shown.rows.length;
+  const drawn = shown.rows.slice(0, DATASET_ROW_CAP);
+  const combinatorial = shown.parameters.some((p) => p.combinatorial);
 
   return (
     <div className="dataset-section">
       <h4 className="dataset-head">
         Dataset
         <span className="dataset-count">{iterationLabel(total, combinatorial)}</span>
+        {level && <span className="dataset-level">{level}</span>}
         <button
           className="link-btn dataset-refresh"
           onClick={() => void load(true)}
@@ -114,7 +131,7 @@ export function DatasetSection({
         >
           {loading ? "Loading…" : "Refresh"}
         </button>
-        {canEdit && (
+        {canEdit && !overridden && (
           <button
             className="link-btn dataset-edit"
             onClick={() => setEditing(true)}
@@ -128,7 +145,7 @@ export function DatasetSection({
         <table className="dataset-table" aria-label="Dataset parameters and rows">
           <thead>
             <tr>
-              {dataset.parameters.map((p) => (
+              {shown.parameters.map((p) => (
                 <th key={p.name} scope="col">
                   {p.name}
                   {p.combinatorial && (
@@ -144,9 +161,9 @@ export function DatasetSection({
             </tr>
           </thead>
           <tbody>
-            {shown.map((row, i) => (
+            {drawn.map((row, i) => (
               <tr key={i}>
-                {dataset.parameters.map((p, c) => (
+                {shown.parameters.map((p, c) => (
                   <td key={p.name}>{row[c] ?? ""}</td>
                 ))}
               </tr>

@@ -165,6 +165,7 @@ export {
   BulkTransitionTests,
   GetTestSteps,
   GetTestDataset,
+  GetContainerDataset,
   RenameDatasetPlaceholder,
   CheckJiraTestSteps,
   GetTestReview,

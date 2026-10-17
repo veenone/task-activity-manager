@@ -21,6 +21,10 @@ export interface TestDetailProps {
   // short-circuits. Read display (fields, steps, preconditions, requirements,
   // custom fields, bugs, run history) remains fully functional.
   readOnly?: boolean;
+  // The Test Execution this test is being looked at inside, when the panel
+  // was opened from one. An execution can define its own dataset for a test,
+  // and that is what runs there (#277 W3).
+  containerKey?: string;
 }
 
 export type EditableField =

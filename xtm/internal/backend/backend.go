@@ -164,10 +164,13 @@ type Backend interface {
 	CreateCalledTestStep(ctx context.Context, key, calledTestKey, calledTestID string) (string, error)
 
 	// --- datasets ---
-	// GetDataset returns the dataset attached to a test, or an empty Dataset
-	// when it has none. contextKey names a container whose dataset overrides
-	// the test's own; empty asks for the test level.
-	GetDataset(ctx context.Context, testKey, contextKey string) (Dataset, error)
+	// GetDataset returns the dataset a test defines, or an empty Dataset when
+	// it has none.
+	GetDataset(ctx context.Context, testKey string) (Dataset, error)
+	// GetRunDataset returns the dataset a Test Execution defines for a test,
+	// which overrides the test's own, and an empty Dataset when it defines
+	// none. A test that is not in that execution also reads as none (#277 W3).
+	GetRunDataset(ctx context.Context, execKey, testKey string) (Dataset, error)
 	// SetDataset replaces a test's own dataset with d, creating one where the
 	// test had none and clearing it when d is empty. It takes no contextKey:
 	// writing an override at container level is out of scope for #277, and a

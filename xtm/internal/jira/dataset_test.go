@@ -1,47 +1,22 @@
 package jira
 
 import (
-	"context"
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 )
 
-// datasetServer answers the dataset export with body and status, and records
-// the query it was asked.
+// The CSV parser, exercised directly.
 //
-// Every test here reads at container level, because that is what still goes
-// through the export: a test's own dataset is read from the raven/1.0 model
-// instead, which is the only place a parameter's id and list values are
-// (#283, dataset_model_test.go). The parser these tests cover is shared by
-// both, and the export is the only shape it has to read.
-func datasetServer(t *testing.T, gotQuery *string, status int, body string) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/rest/raven/2.0/api/dataset/export" {
-			t.Errorf("unexpected request %s", r.URL.Path)
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		*gotQuery = r.URL.RawQuery
-		w.Header().Set("Content-Type", "text/csv")
-		w.WriteHeader(status)
-		_, _ = w.Write([]byte(body))
-	}))
-}
+// It used to be reached through GetDataset, because a test's dataset was read
+// from the 2.0 export. That read goes to the JSON model now (#283) and the
+// export is gone, but the parser stays: it reads the files a user brings back
+// from a spreadsheet (#277 W2). These are the cases about the format itself;
+// dataset_fixture_test.go reads what a live instance actually sent.
 
 // The header row names the parameters and each later row is one iteration.
-func TestGetDatasetReadsParametersAndRows(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusOK,
-		"USERNAME,PASSWORD\nalice,hunter2\nbob,s3cret\n")
-	defer srv.Close()
+func TestParseDatasetCSVReadsParametersAndRows(t *testing.T) {
+	ds := ParseDatasetCSV([]byte("USERNAME,PASSWORD\nalice,hunter2\nbob,s3cret\n"))
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("dataset: %v", err)
-	}
 	wantNames := []string{"USERNAME", "PASSWORD"}
 	if got := parameterNames(ds.Parameters); !reflect.DeepEqual(got, wantNames) {
 		t.Fatalf("parameters = %v, want %v", got, wantNames)
@@ -50,22 +25,13 @@ func TestGetDatasetReadsParametersAndRows(t *testing.T) {
 	if !reflect.DeepEqual(ds.Rows, wantRows) {
 		t.Fatalf("rows = %v, want %v", ds.Rows, wantRows)
 	}
-	if q != "contextIssueKey=EXEC-1&testIssueKey=QA-1" {
-		t.Fatalf("export query %q, want both keys", q)
-	}
 }
 
 // Xray marks a combinatorial parameter with an asterisk suffix on the column
 // name. The flag is ours to keep; the asterisk is not part of the name.
-func TestGetDatasetStripsTheCombinatorialMarker(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusOK, "BROWSER,QUALITY*\nchrome,high\n")
-	defer srv.Close()
+func TestParseDatasetCSVStripsTheCombinatorialMarker(t *testing.T) {
+	ds := ParseDatasetCSV([]byte("BROWSER,QUALITY*\nchrome,high\n"))
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("dataset: %v", err)
-	}
 	if len(ds.Parameters) != 2 {
 		t.Fatalf("parameters = %v, want 2", ds.Parameters)
 	}
@@ -79,108 +45,39 @@ func TestGetDatasetStripsTheCombinatorialMarker(t *testing.T) {
 
 // A quoted cell may hold the delimiter. encoding/csv handles this; the test
 // pins it so a hand-rolled splitter can never replace the parser.
-func TestGetDatasetKeepsACommaInsideAQuotedCell(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusOK, "CITY,NOTE\n\"Paris, France\",capital\n")
-	defer srv.Close()
+func TestParseDatasetCSVKeepsACommaInsideAQuotedCell(t *testing.T) {
+	ds := ParseDatasetCSV([]byte("CITY,NOTE\n\"Paris, France\",capital\n"))
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("dataset: %v", err)
-	}
-	want := [][]string{{"Paris, France", "capital"}}
-	if !reflect.DeepEqual(ds.Rows, want) {
-		t.Fatalf("rows = %v, want %v", ds.Rows, want)
+	if len(ds.Rows) != 1 || ds.Rows[0][0] != "Paris, France" {
+		t.Fatalf("rows = %q, want the comma kept inside the cell", ds.Rows)
 	}
 }
 
-// An instance below Xray 5.1 has no dataset endpoint. The feature is not
-// version-gated, so a 404 must read as "this level has no dataset" rather
-// than surfacing an error the user cannot act on.
-func TestGetDatasetTreatsAMissingEndpointAsNoDataset(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusNotFound, "")
-	defer srv.Close()
+// A dataset with no rows is a header and nothing else.
+func TestParseDatasetCSVHandlesAHeaderWithNoRows(t *testing.T) {
+	ds := ParseDatasetCSV([]byte("USERNAME\n"))
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("a 404 must not be an error, got %v", err)
-	}
-	if len(ds.Parameters) != 0 || len(ds.Rows) != 0 {
-		t.Fatalf("dataset = %+v, want empty", ds)
-	}
-}
-
-// A test with no dataset exports a header and nothing else.
-func TestGetDatasetHandlesAHeaderWithNoRows(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusOK, "USERNAME\n")
-	defer srv.Close()
-
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("dataset: %v", err)
-	}
 	if len(ds.Parameters) != 1 || len(ds.Rows) != 0 {
 		t.Fatalf("dataset = %+v, want one parameter and no rows", ds)
 	}
 }
 
-// An empty body is not a parse failure. Nothing to show is a valid answer.
-func TestGetDatasetHandlesAnEmptyBody(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusOK, "")
-	defer srv.Close()
-
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("dataset: %v", err)
-	}
-	if len(ds.Parameters) != 0 {
+// An empty body is not a parse failure. Nothing to show is a valid answer,
+// and an import refuses it in its own words rather than crashing here.
+func TestParseDatasetCSVHandlesAnEmptyBody(t *testing.T) {
+	if ds := ParseDatasetCSV(nil); len(ds.Parameters) != 0 {
 		t.Fatalf("parameters = %v, want none", ds.Parameters)
 	}
 }
 
 // A row with fewer cells than the header is padded rather than dropped, so a
 // short row still lines up under its parameters.
-func TestGetDatasetPadsAShortRow(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusOK, "A,B,C\n1,2\n")
-	defer srv.Close()
+func TestParseDatasetCSVPadsAShortRow(t *testing.T) {
+	ds := ParseDatasetCSV([]byte("A,B,C\n1,2\n"))
 
-	ds, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1")
-	if err != nil {
-		t.Fatalf("dataset: %v", err)
-	}
 	want := [][]string{{"1", "2", ""}}
 	if !reflect.DeepEqual(ds.Rows, want) {
 		t.Fatalf("rows = %v, want %v", ds.Rows, want)
-	}
-}
-
-// A server error is a real failure and must reach the caller, unlike a 404.
-func TestGetDatasetPropagatesAServerError(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusInternalServerError, "")
-	defer srv.Close()
-
-	if _, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "EXEC-1"); err == nil {
-		t.Fatal("a 500 must be an error")
-	}
-}
-
-// A Test Plan or Test Execution dataset overrides the test's own, and the
-// context reaches the query that asks for it.
-func TestGetDatasetSendsTheContextKeyWhenGiven(t *testing.T) {
-	var q string
-	srv := datasetServer(t, &q, http.StatusOK, "A\n1\n")
-	defer srv.Close()
-
-	if _, err := newTestClient(srv).GetDataset(context.Background(), "QA-1", "QA-99"); err != nil {
-		t.Fatalf("dataset: %v", err)
-	}
-	if q != "contextIssueKey=QA-99&testIssueKey=QA-1" {
-		t.Fatalf("export query %q", q)
 	}
 }
 
