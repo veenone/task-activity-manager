@@ -220,8 +220,13 @@ type datasetValue struct {
 // A successful write answers with a plain sentence under a JSON content type,
 // so the response is deliberately not decoded.
 func (c *Client) SetDataset(ctx context.Context, testKey string, d Dataset) error {
+	// A demo profile has no instance to write to, and reports success so the
+	// pending change clears on a demo commit, as every other write here does
+	// (#295). The edit stays visible because the store keeps it; a refresh
+	// reads the demo fixture again, exactly as a refresh on a real profile
+	// reads the server again.
 	if isDemoURL(c.baseURL) {
-		return fmt.Errorf("dataset writes are not available on a demo profile")
+		return nil
 	}
 	id, err := c.issueID(ctx, testKey)
 	if err != nil {
