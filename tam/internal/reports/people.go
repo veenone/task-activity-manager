@@ -2,8 +2,6 @@ package reports
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	"agile-suite/tam/internal/backend"
@@ -79,38 +77,15 @@ func People(sprint backend.Sprint, issues []backend.IssueHistory, category Statu
 	if err != nil {
 		return nil, err
 	}
-	rows := map[string]*Person{}
-	person := func(username, name, email string) *Person {
-		key := username
-		if key == "" {
-			key = name
-		}
-		p, ok := rows[key]
-		if !ok {
-			p = &Person{Username: username, Name: name, Issues: []PersonCard{}}
-			rows[key] = p
-		}
-		if p.Email == "" {
-			p.Email = email
-		}
-		return p
-	}
-
+	r := roster{}
 	for _, h := range issues {
 		iss := h.Issue
-		p := person(iss.AssigneeName, iss.Assignee, iss.AssigneeEmail)
-		p.Cards++
-		if iss.StoryPoints != nil {
-			p.Points += *iss.StoryPoints
-		}
-		p.EstimateSeconds += seconds(iss.OriginalEstimateSeconds)
-		p.RemainingSeconds += seconds(iss.RemainingEstimateSeconds)
+		p, card := r.assign(iss)
 		inProgress, err := timeInProgress(h, category, start, last)
 		if err != nil {
 			return nil, err
 		}
 		p.InProgressSeconds += inProgress
-		p.SpentSeconds += seconds(iss.TimeSpentSeconds)
 
 		logged := 0
 		for _, w := range append(append([]backend.Worklog{}, h.Worklogs...), h.SubtaskWorklogs...) {
@@ -122,51 +97,12 @@ func People(sprint backend.Sprint, issues []backend.IssueHistory, category Statu
 				continue
 			}
 			logged += w.Seconds
-			person(w.Author, w.AuthorName, w.AuthorEmail).LoggedSeconds += w.Seconds
+			r.person(w.Author, w.AuthorName, w.AuthorEmail).LoggedSeconds += w.Seconds
 		}
-		p.Issues = append(p.Issues, PersonCard{
-			Key: iss.Key, Summary: iss.Summary, Status: iss.Status, StatusCategory: iss.StatusCategory,
-			Points: iss.StoryPoints, EstimateSeconds: seconds(iss.OriginalEstimateSeconds),
-			RemainingSeconds: seconds(iss.RemainingEstimateSeconds), SpentSeconds: seconds(iss.TimeSpentSeconds),
-			LoggedSeconds: logged, InProgressSeconds: inProgress,
-		})
+		card.LoggedSeconds, card.InProgressSeconds = logged, inProgress
+		p.Issues = append(p.Issues, card)
 	}
-
-	// A row that has a display name but no username is the same person as
-	// a row with that name and a username, when there is exactly one such
-	// row: an assignee cached before schema 14 carries no username, and a
-	// second row for them would split their cards in two.
-	named := map[string][]*Person{}
-	for _, p := range rows {
-		if p.Username != "" {
-			k := strings.ToLower(p.Name)
-			named[k] = append(named[k], p)
-		}
-	}
-	for key, p := range rows {
-		if p.Username != "" || p.Name == "" {
-			continue
-		}
-		if same := named[strings.ToLower(p.Name)]; len(same) == 1 {
-			same[0].absorb(*p)
-			delete(rows, key)
-		}
-	}
-	out := make([]Person, 0, len(rows))
-	for _, p := range rows {
-		out = append(out, *p)
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if (a.Name == "") != (b.Name == "") {
-			return b.Name == ""
-		}
-		if la, lb := strings.ToLower(a.Name), strings.ToLower(b.Name); la != lb {
-			return la < lb
-		}
-		return a.Username < b.Username
-	})
-	return out, nil
+	return r.list(), nil
 }
 
 // timeInProgress replays one card's status changes and adds up the time it

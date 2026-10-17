@@ -14,6 +14,10 @@ export function AutoMapImport(arg1) {
   return window['go']['main']['App']['AutoMapImport'](arg1);
 }
 
+export function BoardAllocation(arg1, arg2) {
+  return window['go']['main']['App']['BoardAllocation'](arg1, arg2);
+}
+
 export function CanTransition(arg1, arg2, arg3) {
   return window['go']['main']['App']['CanTransition'](arg1, arg2, arg3);
 }
