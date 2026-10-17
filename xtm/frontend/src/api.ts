@@ -166,6 +166,7 @@ export {
   GetTestSteps,
   GetTestDataset,
   GetContainerDataset,
+  GetRunIterations,
   RenameDatasetPlaceholder,
   CheckJiraTestSteps,
   GetTestReview,
@@ -655,6 +656,18 @@ export interface DatasetParameter {
 export interface TestDataset {
   parameters: DatasetParameter[];
   rows: string[][];
+}
+
+// RunIteration mirrors backend.RunIteration: one run of a parameterized test
+// inside an execution, with the values it ran with and how it went. A test
+// with a dataset runs once per row, and the run's own status is derived from
+// these.
+export interface RunIteration {
+  // The iteration's id in Xray, 0 where it has none: a dataset of one row is
+  // reported by Xray as a run without iterations of its own.
+  id: number;
+  status: string;
+  parameters: { name: string; value: string }[];
 }
 
 // ProjectComponent mirrors backend.Component: one Jira project component.
