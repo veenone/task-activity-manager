@@ -592,6 +592,24 @@ func toBackendDataset(ds jira.Dataset) backend.Dataset {
 	return backend.Dataset{Parameters: params, Rows: ds.Rows}
 }
 
+// GetRunIterations reads what each row of the dataset did in this execution
+// (#267 Phase 4).
+func (a *Adapter) GetRunIterations(ctx context.Context, execKey, testKey string) ([]backend.RunIteration, error) {
+	iters, err := a.c.GetRunIterations(ctx, execKey, testKey)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.RunIteration, len(iters))
+	for i, it := range iters {
+		params := make([]backend.RunIterationParam, len(it.Parameters))
+		for j, p := range it.Parameters {
+			params[j] = backend.RunIterationParam{Name: p.Name, Value: p.Value}
+		}
+		out[i] = backend.RunIteration{ID: it.ID, Status: it.Status, Parameters: params}
+	}
+	return out, nil
+}
+
 // SetDataset replaces the test's own dataset (#277 W1). The client resolves
 // the key to the numeric issue id the dataset resource addresses, so nothing
 // above this layer has to carry a Jira id.

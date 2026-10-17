@@ -171,6 +171,10 @@ type Backend interface {
 	// which overrides the test's own, and an empty Dataset when it defines
 	// none. A test that is not in that execution also reads as none (#277 W3).
 	GetRunDataset(ctx context.Context, execKey, testKey string) (Dataset, error)
+	// GetRunIterations returns the iterations of a test's run inside an
+	// execution, in the order they run, and none for a run that is not
+	// parameterized or has no run at all (#267 Phase 4).
+	GetRunIterations(ctx context.Context, execKey, testKey string) ([]RunIteration, error)
 	// SetDataset replaces a test's own dataset with d, creating one where the
 	// test had none and clearing it when d is empty. It takes no contextKey:
 	// writing an override at container level is out of scope for #277, and a

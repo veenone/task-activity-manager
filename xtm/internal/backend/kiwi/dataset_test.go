@@ -31,6 +31,9 @@ func TestKiwiDoesNotSupportDatasetWrites(t *testing.T) {
 	if _, err := a.GetRunDataset(context.Background(), "EXEC-1", "T-1"); !errors.Is(err, backend.ErrUnsupported) {
 		t.Fatalf("GetRunDataset err = %v, want ErrUnsupported", err)
 	}
+	if _, err := a.GetRunIterations(context.Background(), "EXEC-1", "T-1"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("GetRunIterations err = %v, want ErrUnsupported", err)
+	}
 	err := a.SetDataset(context.Background(), "T-1", backend.Dataset{
 		Parameters: []backend.DatasetParameter{{Name: "A"}},
 		Rows:       [][]string{{"1"}},
