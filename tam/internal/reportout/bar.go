@@ -21,8 +21,9 @@ type Bar struct {
 const barSegments = 10
 
 // textBar is a bar drawn in text, for the outputs that cannot draw a shape
-// in a table cell: the Confluence page and the deck. A full bar past the
-// target keeps its real percentage, so an overrun still reads as one.
+// in a table cell: the Confluence page and the deck. A no-break space joins
+// it to its percentage so a narrow cell keeps them on one line, and a full
+// bar past the target keeps its real percentage, so an overrun reads as one.
 func textBar(b *Bar) string {
 	if b == nil || b.Target <= 0 {
 		return ""
@@ -30,7 +31,7 @@ func textBar(b *Bar) string {
 	ratio := b.Done / b.Target
 	filled := int(math.Round(math.Min(ratio, 1) * barSegments))
 	return strings.Repeat("▰", filled) + strings.Repeat("▱", barSegments-filled) +
-		fmt.Sprintf(" %d%%", int(math.Round(ratio*100)))
+		fmt.Sprintf(" %d%%", int(math.Round(ratio*100)))
 }
 
 // ratio is a bar's done over its target, and false for a row with no bar.

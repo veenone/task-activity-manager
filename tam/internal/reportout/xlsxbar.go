@@ -70,6 +70,13 @@ func (w *sheet) percentStyle() int {
 	if base.Fill.Pattern < 0 || base.Fill.Pattern > 18 {
 		base.Fill = excelize.Fill{}
 	}
+	// Borders read back as ARGB ("00C9D6DF"), which NewStyle takes for a
+	// different colour; the template's grey is the last six digits.
+	for i, b := range base.Border {
+		if len(b.Color) == 8 {
+			base.Border[i].Color = b.Color[2:]
+		}
+	}
 	id, err := w.f.NewStyle(base)
 	if err != nil {
 		w.keep(err)

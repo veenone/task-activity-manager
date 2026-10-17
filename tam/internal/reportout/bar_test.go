@@ -30,9 +30,9 @@ func TestTextBarIsTenSegmentsAndThePercentage(t *testing.T) {
 		bar  *Bar
 		want string
 	}{
-		{&Bar{Done: 7, Target: 10}, "▰▰▰▰▰▰▰▱▱▱ 70%"},
-		{&Bar{Done: 10, Target: 8}, "▰▰▰▰▰▰▰▰▰▰ 125%"},
-		{&Bar{Done: 0, Target: 4}, "▱▱▱▱▱▱▱▱▱▱ 0%"},
+		{&Bar{Done: 7, Target: 10}, "▰▰▰▰▰▰▰▱▱▱ 70%"},
+		{&Bar{Done: 10, Target: 8}, "▰▰▰▰▰▰▰▰▰▰ 125%"},
+		{&Bar{Done: 0, Target: 4}, "▱▱▱▱▱▱▱▱▱▱ 0%"},
 		{&Bar{Done: 3, Target: 0}, ""},
 		{nil, ""},
 	} {
@@ -46,8 +46,8 @@ func TestStorageDrawsTheBarColumnAsText(t *testing.T) {
 	body := Storage(barred())
 	for _, want := range []string{
 		"<th>Person</th><th>Actual</th><th>Actual against estimate</th>",
-		"<td>Rita Anand</td><td>7h</td><td>▰▰▰▰▰▰▰▱▱▱ 70%</td>",
-		"<td>M. Ortiz</td><td>10h</td><td>▰▰▰▰▰▰▰▰▰▰ 125%</td>",
+		"<td>Rita Anand</td><td>7h</td><td>▰▰▰▰▰▰▰▱▱▱ 70%</td>",
+		"<td>M. Ortiz</td><td>10h</td><td>▰▰▰▰▰▰▰▰▰▰ 125%</td>",
 		"<td>J. Park</td><td>0m</td><td></td>",
 	} {
 		if !strings.Contains(body, want) {
@@ -58,7 +58,7 @@ func TestStorageDrawsTheBarColumnAsText(t *testing.T) {
 
 func TestPPTXDrawsTheBarColumnAsText(t *testing.T) {
 	slide := deck(t, barred())["ppt/slides/slide3.xml"]
-	for _, want := range []string{"Actual against estimate", "▰▰▰▰▰▰▰▱▱▱ 70%"} {
+	for _, want := range []string{"Actual against estimate", "▰▰▰▰▰▰▰▱▱▱ 70%"} {
 		if !strings.Contains(slide, want) {
 			t.Errorf("the People slide is missing %q", want)
 		}
