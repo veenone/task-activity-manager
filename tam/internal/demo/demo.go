@@ -152,6 +152,7 @@ func Issues(projectKey string) []backend.Issue {
 	out := make([]backend.Issue, 0, 60)
 	for i, c := range curated {
 		iss := c
+		withSampleTime(&iss, iss.Key)
 		iss.Key = rekey(iss.Key, projectKey)
 		iss.ParentKey = rekey(iss.ParentKey, projectKey)
 		// backend.NonNil is not enough here: curated is package state and
@@ -198,6 +199,7 @@ func Issues(projectKey string) []backend.Issue {
 		if e := fillerEpics[rng.Intn(len(fillerEpics))]; e != "" {
 			iss.ParentKey = rekey(e, projectKey)
 		}
+		withSampleTime(&iss, "")
 		out = append(out, iss)
 	}
 	return out

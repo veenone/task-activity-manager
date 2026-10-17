@@ -131,9 +131,8 @@ func (b *Backend) SearchIssuesWithHistory(_ context.Context, jql string, startAt
 	}
 	out := make([]backend.IssueHistory, 0, end-startAt)
 	for _, iss := range all[startAt:end] {
-		// The worklogs are whatever this run pushed, for the reason
-		// worklog.go gives: the dataset seeds none, so a demo burndown in
-		// hours only moves once somebody logs work in the demo.
+		// The worklogs are Sprint 11's sample plus whatever this run
+		// pushed, the same entries worklog.go answers with.
 		out = append(out, backend.IssueHistory{
 			Issue:    iss,
 			Changes:  changesFor(iss.Key, b.project),

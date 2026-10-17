@@ -8,9 +8,9 @@ import (
 	"agile-suite/tam/internal/backend"
 )
 
-// Worklogs answers with the entries this run pushed and nothing else. The
-// dataset seeds none, because a worklog is only ever the record of work
-// somebody did and a seeded one would be state no operation produced.
+// Worklogs answers with the closed sprint's sample entries and whatever this
+// run pushed. Only Sprint 11 is seeded, so the demo's reports have time to
+// draw (#287); every other card starts with none.
 func (b *Backend) Worklogs(_ context.Context, key string) ([]backend.Worklog, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
