@@ -1661,6 +1661,20 @@ export namespace profile {
 
 export namespace reportout {
 	
+	export class Bar {
+	    done: number;
+	    target: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Bar(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.done = source["done"];
+	        this.target = source["target"];
+	    }
+	}
 	export class Image {
 	    name: string;
 	    alt: string;
@@ -1680,6 +1694,8 @@ export namespace reportout {
 	export class Table {
 	    columns: string[];
 	    rows: string[][];
+	    barHeading?: string;
+	    bars?: Bar[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Table(source);
@@ -1689,7 +1705,27 @@ export namespace reportout {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.columns = source["columns"];
 	        this.rows = source["rows"];
+	        this.barHeading = source["barHeading"];
+	        this.bars = this.convertValues(source["bars"], Bar);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Section {
 	    heading: string;

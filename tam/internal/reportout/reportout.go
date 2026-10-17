@@ -31,6 +31,11 @@ import (
 type Table struct {
 	Columns []string   `json:"columns"`
 	Rows    [][]string `json:"rows"`
+	// BarHeading and Bars are an optional last column of progress bars, one
+	// per row (nil for a row with none). The spreadsheet draws them as Excel
+	// data bars, the page and the deck as text; see bar.go.
+	BarHeading string `json:"barHeading,omitempty"`
+	Bars       []*Bar `json:"bars,omitempty"`
 }
 
 // Image is a section's chart as a picture: the file name it travels under
@@ -115,6 +120,9 @@ func (d Document) Check() error {
 		return errors.New("this report has no sections, so there is nothing to publish or export")
 	}
 	for _, s := range d.Sections {
+		if err := checkBars(s.Heading, s.Table); err != nil {
+			return err
+		}
 		for _, im := range s.Images {
 			if _, _, err := im.PNG(); err != nil {
 				return err
