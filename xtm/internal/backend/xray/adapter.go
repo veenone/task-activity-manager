@@ -22,6 +22,7 @@ func New(c *jira.Client) *Adapter { return &Adapter{c: c} }
 // Compile-time assertion that the adapter satisfies the interface.
 var _ backend.Backend = (*Adapter)(nil)
 var _ backend.ComponentManager = (*Adapter)(nil)
+var _ backend.PlanDatasetReader = (*Adapter)(nil)
 
 // --- connection / auth ---
 
@@ -574,6 +575,16 @@ func (a *Adapter) GetDataset(ctx context.Context, testKey string) (backend.Datas
 // what will actually run there (#277 W3).
 func (a *Adapter) GetRunDataset(ctx context.Context, execKey, testKey string) (backend.Dataset, error) {
 	ds, err := a.c.GetRunDataset(ctx, execKey, testKey)
+	if err != nil {
+		return backend.Dataset{}, err
+	}
+	return toBackendDataset(ds), nil
+}
+
+// GetPlanDataset reads only the Plan-level definition. The CSV transport does
+// not carry list metadata, so the neutral DTO keeps those fields empty.
+func (a *Adapter) GetPlanDataset(ctx context.Context, planKey, testKey string) (backend.Dataset, error) {
+	ds, err := a.c.GetPlanDataset(ctx, planKey, testKey)
 	if err != nil {
 		return backend.Dataset{}, err
 	}

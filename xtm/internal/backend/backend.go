@@ -20,6 +20,13 @@ const (
 // runtime backstop.
 var ErrUnsupported = errors.New("backend: operation not supported")
 
+// PlanDatasetReader is the optional capability for reading what a Test Plan
+// itself defines for one Test. It stays outside Backend because not every
+// test-management system models Plan-level dataset overrides.
+type PlanDatasetReader interface {
+	GetPlanDataset(ctx context.Context, planKey, testKey string) (Dataset, error)
+}
+
 // VersionToken is an opaque per-entity version marker used for optimistic
 // concurrency. Each backend owns both how it produces a token
 // (RemoteVersion) and how it orders two tokens (RemoteAhead) — for Xray this

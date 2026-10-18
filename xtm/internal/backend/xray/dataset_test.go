@@ -100,3 +100,30 @@ func TestXrayDemoReturnsADatasetForEveryTwentiethTest(t *testing.T) {
 		t.Fatalf("QA-2 should carry no dataset, got %+v", none)
 	}
 }
+
+func TestAdapterGetPlanDatasetMapsCSVMetadataAsIncomplete(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = w.Write([]byte("USER,REGION*\nalice,eu\n"))
+	}))
+	defer srv.Close()
+
+	dataset, err := New(jira.NewClient(srv.URL, "tok")).GetPlanDataset(context.Background(), "QA-PLAN-1", "QA-1")
+	if err != nil {
+		t.Fatalf("GetPlanDataset: %v", err)
+	}
+	if len(dataset.Parameters) != 2 || dataset.Parameters[0].Name != "USER" {
+		t.Fatalf("parameters = %+v, want the CSV names", dataset.Parameters)
+	}
+	if !dataset.Parameters[1].Combinatorial {
+		t.Errorf("second parameter = %+v, want combinatorial", dataset.Parameters[1])
+	}
+	for _, parameter := range dataset.Parameters {
+		if parameter.Type != "" || parameter.ID != 0 || parameter.ListID != 0 || parameter.ListScope != "" || len(parameter.Options) != 0 {
+			t.Errorf("parameter = %+v, want CSV-only metadata with unknown type", parameter)
+		}
+	}
+	if len(dataset.Rows) != 1 || dataset.Rows[0][0] != "alice" || dataset.Rows[0][1] != "eu" {
+		t.Fatalf("rows = %+v, want mapped CSV values", dataset.Rows)
+	}
+}
