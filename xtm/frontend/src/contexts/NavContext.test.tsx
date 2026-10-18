@@ -50,4 +50,17 @@ describe("NavProvider", () => {
     expect(result.current.showNewTest).toBe(true);
     expect(result.current.newTestFolder).toBe("Regression/Login");
   });
+
+  it("holds a container navigation target until the destination consumes it", () => {
+    const { result } = renderHook(() => useNav(), { wrapper });
+
+    act(() => result.current.openContainer({ kind: "testexec", key: "EXEC-42" }));
+    expect(result.current.containerTarget).toEqual({
+      kind: "testexec",
+      key: "EXEC-42",
+    });
+
+    act(() => result.current.consumeContainerTarget());
+    expect(result.current.containerTarget).toBeNull();
+  });
 });

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
 // NavContext owns App.tsx's view-routing and browse-grouping state (spec §5.4):
@@ -31,6 +31,11 @@ export type View =
 
 export type GroupBy = "folder" | "testset" | "testplan" | "component";
 
+export interface ContainerNavigationTarget {
+  kind: "testplan" | "testexec";
+  key: string;
+}
+
 interface NavApi {
   view: View;
   setView: Dispatch<SetStateAction<View>>;
@@ -48,6 +53,9 @@ interface NavApi {
   setShowNewTest: Dispatch<SetStateAction<boolean>>;
   newTestFolder: string;
   setNewTestFolder: Dispatch<SetStateAction<string>>;
+  containerTarget: ContainerNavigationTarget | null;
+  openContainer: (target: ContainerNavigationTarget) => void;
+  consumeContainerTarget: () => void;
 }
 
 const NavContext = createContext<NavApi | null>(null);
@@ -68,6 +76,16 @@ export function NavProvider({ children }: { children: ReactNode }) {
   const [selectedComponent, setSelectedComponent] = useState<string>("");
   const [showNewTest, setShowNewTest] = useState(false);
   const [newTestFolder, setNewTestFolder] = useState<string>("");
+  const [containerTarget, setContainerTarget] =
+    useState<ContainerNavigationTarget | null>(null);
+  const openContainer = useCallback(
+    (target: ContainerNavigationTarget) => setContainerTarget(target),
+    [],
+  );
+  const consumeContainerTarget = useCallback(
+    () => setContainerTarget(null),
+    [],
+  );
 
   const api = useMemo<NavApi>(
     () => ({
@@ -85,6 +103,9 @@ export function NavProvider({ children }: { children: ReactNode }) {
       setShowNewTest,
       newTestFolder,
       setNewTestFolder,
+      containerTarget,
+      openContainer,
+      consumeContainerTarget,
     }),
     [
       view,
@@ -94,6 +115,9 @@ export function NavProvider({ children }: { children: ReactNode }) {
       selectedComponent,
       showNewTest,
       newTestFolder,
+      containerTarget,
+      openContainer,
+      consumeContainerTarget,
     ],
   );
 

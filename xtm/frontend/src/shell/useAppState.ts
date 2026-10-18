@@ -100,6 +100,7 @@ export function useAppState() {
     setShowNewTest,
     newTestFolder,
     setNewTestFolder,
+    openContainer,
   } = useNav();
 
   // Browse selection lives in SelectionContext (spec §5.3); TestTable now reads
@@ -326,7 +327,7 @@ export function useAppState() {
   // tail, and during a spellcheck scan; a commit does not lock it).
   const syncActive = !canSwitchProfile;
 
-  return { profiles, setProfiles, activeId, setActiveId, defaultProfileId, setDefaultProfileId, theme, showCoverage, setShowCoverage, navRail, setNavRail, loadingProfiles, activeProfile, chooseTheme, setDefaultFor, reloadProfiles, prompt, confirm, notice, isOpen, openModal, closeModal, syncStatus, pulling, progress, syncError, canSync, canCommit, canSwitchProfile, beginSync, failSync, endSync, beginCommit, endCommit, view, setView, groupBy, setGroupBy, selectedFolder, setSelectedFolder, selectedContainer, setSelectedContainer, selectedComponent, setSelectedComponent, showNewTest, setShowNewTest, newTestFolder, setNewTestFolder, selectedKey, setSelectedKey, selectedSet, setSelectedSet, startTour, health, setHealth, tourSeenVersion, setTourSeenVersion, editingProfile, setEditingProfile, detailVersion, setDetailVersion, lastCommitResult, setLastCommitResult, sidebarWidth, setSidebarWidth, prevProfileRef, queryClient, pendingQuery, pendingChanges, syncState, folders, groupContainers, components, pendingByTestKey, reloadPending, refreshProfileData, isDemo, demoVar, caps, shownViews, syncActive, startSidebarResize };
+  return { profiles, setProfiles, activeId, setActiveId, defaultProfileId, setDefaultProfileId, theme, showCoverage, setShowCoverage, navRail, setNavRail, loadingProfiles, activeProfile, chooseTheme, setDefaultFor, reloadProfiles, prompt, confirm, notice, isOpen, openModal, closeModal, syncStatus, pulling, progress, syncError, canSync, canCommit, canSwitchProfile, beginSync, failSync, endSync, beginCommit, endCommit, view, setView, groupBy, setGroupBy, selectedFolder, setSelectedFolder, selectedContainer, setSelectedContainer, selectedComponent, setSelectedComponent, showNewTest, setShowNewTest, newTestFolder, setNewTestFolder, openContainer, selectedKey, setSelectedKey, selectedSet, setSelectedSet, startTour, health, setHealth, tourSeenVersion, setTourSeenVersion, editingProfile, setEditingProfile, detailVersion, setDetailVersion, lastCommitResult, setLastCommitResult, sidebarWidth, setSidebarWidth, prevProfileRef, queryClient, pendingQuery, pendingChanges, syncState, folders, groupContainers, components, pendingByTestKey, reloadPending, refreshProfileData, isDemo, demoVar, caps, shownViews, syncActive, startSidebarResize };
 }
 
 export type AppState = ReturnType<typeof useAppState>;

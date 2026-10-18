@@ -1,6 +1,6 @@
 import { errMsg } from "../../api";
 import { DatasetCatalogTable } from "./DatasetCatalogTable";
-import type { ContainerTarget } from "./DatasetCatalogDetail";
+import type { ContainerNavigationTarget } from "../../contexts/NavContext";
 import { DatasetCatalogToolbar } from "./DatasetCatalogToolbar";
 import { useDatasetCatalogState } from "./useDatasetCatalogState";
 import "./datasets.css";
@@ -8,7 +8,7 @@ import "./datasets.css";
 interface Props {
   jiraUrl: string;
   onOpenTest: (key: string) => void;
-  onOpenContainer: (target: ContainerTarget) => void;
+  onOpenContainer: (target: ContainerNavigationTarget) => void;
 }
 
 export function DatasetsView(props: Props) {

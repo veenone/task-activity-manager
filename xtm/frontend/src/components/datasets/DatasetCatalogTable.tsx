@@ -2,14 +2,14 @@ import { Fragment } from "react";
 import type { DatasetCatalogTestSummary } from "../../api";
 import { Pager } from "../Pager";
 import { DatasetCatalogDetail } from "./DatasetCatalogDetail";
-import type { ContainerTarget } from "./DatasetCatalogDetail";
+import type { ContainerNavigationTarget } from "../../contexts/NavContext";
 import type { DatasetCatalogState } from "./useDatasetCatalogState";
 
 interface Props {
   state: DatasetCatalogState;
   jiraUrl: string;
   onOpenTest: (key: string) => void;
-  onOpenContainer: (target: ContainerTarget) => void;
+  onOpenContainer: (target: ContainerNavigationTarget) => void;
 }
 
 function Count({ value, singular }: { value: number; singular: string }) {

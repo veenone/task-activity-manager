@@ -288,4 +288,33 @@ describe("DatasetsView", () => {
       "https://jira.example.com/browse/QA-1",
     );
   });
+
+  it("offers Jira, but not an unsafe local action, for an external Test", async () => {
+    vi.mocked(useDatasetCatalog).mockReturnValue(
+      queryResult(
+        page({
+          tests: [{ ...testRow, external: true, internalOpenable: false }],
+        }),
+      ),
+    );
+    vi.mocked(useDatasetCatalogDetail).mockReturnValue({
+      data: {
+        ...detail,
+        test: { ...testRow, external: true, internalOpenable: false },
+      },
+      error: null,
+      isLoading: false,
+    } as ReturnType<typeof useDatasetCatalogDetail>);
+    const user = userEvent.setup();
+    renderView();
+
+    await user.click(screen.getByRole("button", { name: /expand QA-1/i }));
+
+    expect(
+      screen.queryByRole("button", { name: "Open Test QA-1" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open QA-1 in Jira" }),
+    ).toBeVisible();
+  });
 });

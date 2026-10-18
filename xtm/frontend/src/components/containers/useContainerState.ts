@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFocusWhen } from "@agile-suite/core";
 import { useProfile } from "../../contexts/ProfileContext";
+import { useNav } from "../../contexts/NavContext";
 import { useViewState } from "../../lib/viewState";
 import { errMsg } from "../../api";
 import type { ExecMemberRun, RollupMember } from "../../api";
@@ -15,6 +16,7 @@ import { KINDS } from "./constants";
 // state when the kind or the container changes.
 export function useContainerState() {
   const { activeId: profileId } = useProfile();
+  const { containerTarget, consumeContainerTarget } = useNav();
   // Gates the Test Execution environment controls to what the active
   // profile's backend actually supports (P6.2a).
   const caps = useCapabilities(profileId);
@@ -183,12 +185,38 @@ export function useContainerState() {
   }, [containers]);
 
   useEffect(() => {
+    if (containerTarget) return;
     if (viewContainers.length === 0) return;
     setSelected((cur) => {
       if (viewContainers.some((c) => c.key === cur)) return cur;
       return viewContainers[0].key;
     });
-  }, [viewContainers]);
+  }, [containerTarget, viewContainers]);
+
+  useEffect(() => {
+    if (!containerTarget) return;
+    setMode("containers");
+    if (kind !== containerTarget.kind) {
+      setKind(containerTarget.kind);
+      return;
+    }
+    if (containersQuery.isPlaceholderData) return;
+    const rows = containersQuery.data;
+    if (!rows) return;
+    if (rows.some((container) => container.key === containerTarget.key)) {
+      setSelected(containerTarget.key);
+    }
+    consumeContainerTarget();
+  }, [
+    containerTarget,
+    consumeContainerTarget,
+    containersQuery.data,
+    containersQuery.isPlaceholderData,
+    kind,
+    setKind,
+    setMode,
+    setSelected,
+  ]);
 
   useEffect(() => {
     setBugFor(null);
@@ -218,12 +246,13 @@ export function useContainerState() {
   }, [selected]);
 
   useEffect(() => {
+    if (containerTarget) return;
     const rows = containersQuery.data;
     if (!rows) return;
     setSelected((cur) =>
       cur && rows.some((c) => c.key === cur) ? cur : rows.length > 0 ? rows[0].key : "",
     );
-  }, [containersQuery.data]);
+  }, [containerTarget, containersQuery.data]);
 
   useEffect(() => {
     setBoardPage(0);

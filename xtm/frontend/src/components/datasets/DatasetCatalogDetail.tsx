@@ -4,11 +4,7 @@ import type {
   DatasetCatalogUsage,
 } from "../../api";
 import { useDatasetCatalogDetail } from "../../queries/datasets";
-
-export interface ContainerTarget {
-  kind: "testplan" | "testexec";
-  key: string;
-}
+import type { ContainerNavigationTarget } from "../../contexts/NavContext";
 
 interface Props {
   profileId: string;
@@ -16,7 +12,7 @@ interface Props {
   open: boolean;
   jiraUrl: string;
   onOpenTest: (key: string) => void;
-  onOpenContainer: (target: ContainerTarget) => void;
+  onOpenContainer: (target: ContainerNavigationTarget) => void;
 }
 
 function Definition({ definition }: { definition: DatasetCatalogDefinition }) {
@@ -52,7 +48,7 @@ function UsageLink({
 }: {
   usage: DatasetCatalogUsage;
   overridden: boolean;
-  onOpen: (target: ContainerTarget) => void;
+  onOpen: (target: ContainerNavigationTarget) => void;
 }) {
   const kind = usage.containerKind === "testplan" ? "testplan" : "testexec";
   const label = kind === "testplan" ? "Plan" : "Execution";
