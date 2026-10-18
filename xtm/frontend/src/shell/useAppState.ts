@@ -311,6 +311,7 @@ export function useAppState() {
         supportsPreconditionObjects: caps.supportsPreconditionObjects,
         supportsRequirementObjects: caps.supportsRequirementObjects,
         supportsComponentAdmin: caps.supportsComponentAdmin,
+        supportsDatasets: caps.supportsDatasets,
         showCoverage,
       }),
     [caps, showCoverage],

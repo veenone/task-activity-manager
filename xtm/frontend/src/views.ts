@@ -27,6 +27,7 @@ export interface ViewContext {
   supportsPreconditionObjects: boolean;
   supportsRequirementObjects: boolean;
   supportsComponentAdmin: boolean;
+  supportsDatasets: boolean;
   showCoverage: boolean;
 }
 
@@ -50,6 +51,12 @@ export const VIEWS: ViewDef[] = [
   { id: "dashboard", label: "Dashboard", tour: "tab-dashboard" },
   { id: "traceability", label: "Traceability", tour: "tab-traceability" },
   { id: "plans", label: "Containers", tour: "tab-plans" },
+  {
+    id: "datasets",
+    label: "Datasets",
+    tour: "tab-datasets",
+    shown: (c) => c.supportsDatasets,
+  },
   {
     id: "components",
     label: "Components",

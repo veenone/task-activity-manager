@@ -89,6 +89,7 @@ var menuViews = []struct{ id, label, accelerator string }{
 	{"dashboard", "Dashboard", "7"},
 	{"traceability", "Traceability", "8"},
 	{"plans", "Containers", "9"},
+	{"datasets", "Datasets", ""},
 	{"components", "Components", ""},
 	{"coverage", "Coverage", ""},
 	{"misspellings", "Spellcheck", ""},

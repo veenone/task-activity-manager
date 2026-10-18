@@ -7,6 +7,7 @@ import { ComponentList } from "../components/ComponentList";
 import { Dashboard } from "../components/Dashboard";
 import { TraceabilityTabs } from "../components/TraceabilityTabs";
 import { ContainersView } from "../components/ContainersView";
+import { DatasetsView } from "../components/datasets/DatasetsView";
 import { ComponentsView } from "../components/components-admin/ComponentsView";
 import { PreconditionsView } from "../components/PreconditionsView";
 import { RequirementsView } from "../components/RequirementsView";
@@ -94,6 +95,17 @@ export function MainView({ s, a }: { s: AppState; a: AppActions }) {
               refreshProfileData();
               reloadPending();
             }}
+          />
+        </main>
+      ) : view === "datasets" && caps.supportsDatasets ? (
+        <main className="content content-datasets">
+          <DatasetsView
+            jiraUrl={activeProfile?.jiraUrl ?? ""}
+            onOpenTest={(key) => {
+              setSelectedKey(key);
+              setView("browse");
+            }}
+            onOpenContainer={() => setView("plans")}
           />
         </main>
       ) : view === "components" && caps.supportsComponentAdmin ? (

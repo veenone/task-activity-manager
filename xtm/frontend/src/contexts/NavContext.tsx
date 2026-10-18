@@ -24,6 +24,7 @@ export type View =
   | "dashboard"
   | "traceability"
   | "plans"
+  | "datasets"
   | "components"
   | "coverage"
   | "misspellings";
