@@ -109,6 +109,7 @@ columns: date / tester / environment), **44** (Plan / Set run roll-up), **45**
 | 53 | `53-requirement-test-detail.png` | **Requirements** → pick a requirement with covering tests → click a covering test | The covering test's read-only detail open as a right-side panel |
 | 54 | `54-profile-locked-sync.png` | Any view → click **Sync**, capture mid-sync | Tight crop of the **top bar** with the profile selector greyed out and the Sync button reading "Syncing…" |
 | 55 | `55-exec-defects-remarks.png` | **Containers** → kind **Test Execution**, select one | The member table with the **Defects** column (linked bug chips, ＋ picker) and the editable **Remarks** column |
+| 56 | `56-datasets.png` | **Datasets** → **Scan datasets**, expand a Test with linked containers | The catalog, filters, default dataset, an override, and the Plan and Execution links visible |
 
 **Refresh for 1.7.0a (post-alpha).** Re-shoot these because their UI changed:
 **26** (Requirement Sankey now has the **Test** column — 5 layers), **38**

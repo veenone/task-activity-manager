@@ -348,6 +348,82 @@ Update the developer call-flow documentation for discovery, generation
 publication and navigation intent. Record only newly verified Xray behavior in
 the domain playbook.
 
+## Implementation map
+
+The shipped implementation keeps the App binding thin and puts discovery and
+publication in their domain packages, following the application boundary in
+`AGENTS.project.md` and trust-boundary rule I1.
+
+### Scan and publication
+
+```text
+DatasetsView
+  -> useDatasetCatalogState.scan
+  -> SyncDatasetCatalog
+  -> App.SyncDatasetCatalog
+  -> datasetcatalog.Service.Sync
+  -> testrepo.Repository.PublishDatasetCatalog
+  -> active catalog generation changes in one SQLite transaction
+```
+
+`DatasetsView` starts the scan only after the user clicks **Scan datasets**.
+`App.SyncDatasetCatalog` resolves the selected profile and backend, forwards
+progress through `emitDatasetCatalogProgress`, and delegates discovery to
+`datasetcatalog.Service.Sync`. The service enumerates Test and container
+relationships, runs the Test, Plan and Execution probes, and calls
+`Repository.PublishDatasetCatalog` only after all probes succeed. Publication
+writes a new generation and switches `dataset_catalog_state.active_generation`
+in the same transaction. An error or cancellation leaves the previous
+generation active, satisfying I2's recovery requirement without touching the
+dataset editor cache or pending journal.
+
+### Catalog reads
+
+```text
+DatasetsView
+  -> useDatasetCatalog
+  -> ListDatasetCatalog
+  -> App.ListDatasetCatalog
+  -> testrepo.Repository.ListDatasetCatalog
+
+DatasetCatalogDetail
+  -> useDatasetCatalogDetail
+  -> GetDatasetCatalogDetail
+  -> App.GetDatasetCatalogDetail
+  -> testrepo.Repository.GetDatasetCatalogDetail
+```
+
+The query keys include the profile and complete filter or Test identity. List
+queries retain the previous page while a new page or scan is loading. Detail
+queries remain disabled until a row is expanded. Both App methods validate
+binding input before the repository reads the active generation.
+
+### Exact navigation
+
+```text
+DatasetCatalogDetail
+  -> DatasetsView callbacks
+  -> MainView
+  -> NavContext.openContainer({ kind, key })
+  -> ContainersView / useContainerState
+  -> consumeContainerTarget()
+```
+
+Opening a Test sets the exact Browse selection. Opening a Plan or Execution
+stores a one-shot `ContainerNavigationTarget` and switches to Containers.
+`useContainerState` leaves Bugs mode, applies the target kind, waits until the
+matching list has replaced any retained placeholder data, selects the exact
+key, and consumes the target. External Tests whose local destination is not
+safe expose the Jira action only.
+
+### Plan transport evidence
+
+The Plan reader is based on Xray's checked-in WADL contract and fixture-backed
+tests for `resolved=false`. No connected Xray instance was available during
+this implementation, so the live override and inheritance response check
+remains a pre-merge validation item. This change therefore adds no new live
+platform claim to `agents/project/domain-context.md`.
+
 ## Delivery sequence
 
 1. Verify and pin the Plan override transport.
