@@ -241,6 +241,8 @@ export function GetCoverageRelationSankey(arg1:string):Promise<testrepo.Sankey>;
 
 export function GetCoverageReport(arg1:string,arg2:string):Promise<coverage.CoverageReport>;
 
+export function GetDatasetCatalogDetail(arg1:string,arg2:string):Promise<testrepo.DatasetCatalogDetail>;
+
 export function GetDiagnostics():Promise<main.Diagnostics>;
 
 export function GetExecutionMembersWithRuns(arg1:string,arg2:string):Promise<Array<testrepo.ExecMemberRun>>;
@@ -350,6 +352,8 @@ export function ListCoverageCandidateTests(arg1:string,arg2:string):Promise<Arra
 export function ListCoverageGaps(arg1:string,arg2:string):Promise<Array<coverage.Gap>>;
 
 export function ListCoverageProjects(arg1:string):Promise<Array<coverage.ProjectConfig>>;
+
+export function ListDatasetCatalog(arg1:string,arg2:testrepo.DatasetCatalogQuery):Promise<testrepo.DatasetCatalogPage>;
 
 export function ListFolders(arg1:string):Promise<Array<testrepo.Folder>>;
 
@@ -516,6 +520,8 @@ export function SetVersionStatus(arg1:string,arg2:string,arg3:string):Promise<vo
 export function SyncBugs(arg1:string):Promise<void>;
 
 export function SyncContainers(arg1:string):Promise<void>;
+
+export function SyncDatasetCatalog(arg1:string):Promise<void>;
 
 export function SyncPreconditions(arg1:string):Promise<void>;
 

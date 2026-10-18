@@ -2089,6 +2089,228 @@ export namespace testrepo {
 		    return a;
 		}
 	}
+	export class DatasetCatalogDefinition {
+	    testKey: string;
+	    scopeKind: string;
+	    contextKey: string;
+	    contextSummary: string;
+	    parameters: DatasetParameter[];
+	    rows: string[][];
+	    metadataComplete: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogDefinition(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.scopeKind = source["scopeKind"];
+	        this.contextKey = source["contextKey"];
+	        this.contextSummary = source["contextSummary"];
+	        this.parameters = this.convertValues(source["parameters"], DatasetParameter);
+	        this.rows = source["rows"];
+	        this.metadataComplete = source["metadataComplete"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DatasetCatalogExecPlan {
+	    execKey: string;
+	    planKey: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogExecPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.execKey = source["execKey"];
+	        this.planKey = source["planKey"];
+	    }
+	}
+	export class DatasetCatalogUsage {
+	    testKey: string;
+	    containerKind: string;
+	    containerKey: string;
+	    containerSummary: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.containerKind = source["containerKind"];
+	        this.containerKey = source["containerKey"];
+	        this.containerSummary = source["containerSummary"];
+	    }
+	}
+	export class DatasetCatalogTestSummary {
+	    testKey: string;
+	    summary: string;
+	    projectKey: string;
+	    external: boolean;
+	    internalOpenable: boolean;
+	    defaultParameterCount: number;
+	    defaultRowCount: number;
+	    planCount: number;
+	    executionCount: number;
+	    overrideCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogTestSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.testKey = source["testKey"];
+	        this.summary = source["summary"];
+	        this.projectKey = source["projectKey"];
+	        this.external = source["external"];
+	        this.internalOpenable = source["internalOpenable"];
+	        this.defaultParameterCount = source["defaultParameterCount"];
+	        this.defaultRowCount = source["defaultRowCount"];
+	        this.planCount = source["planCount"];
+	        this.executionCount = source["executionCount"];
+	        this.overrideCount = source["overrideCount"];
+	    }
+	}
+	export class DatasetCatalogDetail {
+	    test: DatasetCatalogTestSummary;
+	    definitions: DatasetCatalogDefinition[];
+	    usages: DatasetCatalogUsage[];
+	    execPlans: DatasetCatalogExecPlan[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.test = this.convertValues(source["test"], DatasetCatalogTestSummary);
+	        this.definitions = this.convertValues(source["definitions"], DatasetCatalogDefinition);
+	        this.usages = this.convertValues(source["usages"], DatasetCatalogUsage);
+	        this.execPlans = this.convertValues(source["execPlans"], DatasetCatalogExecPlan);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class DatasetCatalogState {
+	    activeGeneration: number;
+	    lastSyncedAt: string;
+	    ownedTestCount: number;
+	    externalTestCount: number;
+	    relationshipCount: number;
+	    testGroupCount: number;
+	    definitionCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.activeGeneration = source["activeGeneration"];
+	        this.lastSyncedAt = source["lastSyncedAt"];
+	        this.ownedTestCount = source["ownedTestCount"];
+	        this.externalTestCount = source["externalTestCount"];
+	        this.relationshipCount = source["relationshipCount"];
+	        this.testGroupCount = source["testGroupCount"];
+	        this.definitionCount = source["definitionCount"];
+	    }
+	}
+	export class DatasetCatalogPage {
+	    state?: DatasetCatalogState;
+	    tests: DatasetCatalogTestSummary[];
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = this.convertValues(source["state"], DatasetCatalogState);
+	        this.tests = this.convertValues(source["tests"], DatasetCatalogTestSummary);
+	        this.total = source["total"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DatasetCatalogQuery {
+	    search: string;
+	    scope: string;
+	    ownership: string;
+	    limit: number;
+	    offset: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DatasetCatalogQuery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.search = source["search"];
+	        this.scope = source["scope"];
+	        this.ownership = source["ownership"];
+	        this.limit = source["limit"];
+	        this.offset = source["offset"];
+	    }
+	}
+	
+	
+	
 	
 	export class DeallocateResult {
 	    removed: string[];

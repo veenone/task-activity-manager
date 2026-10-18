@@ -279,6 +279,9 @@ import {
   SaveTestDataset as saveTestDatasetBinding,
   ImportDatasetCSV as importDatasetCSVBinding,
   ExportDatasetCSV as exportDatasetCSVBinding,
+  SyncDatasetCatalog as syncDatasetCatalogBinding,
+  ListDatasetCatalog as listDatasetCatalogBinding,
+  GetDatasetCatalogDetail as getDatasetCatalogDetailBinding,
 } from "../wailsjs/go/main/App";
 import { testrepo } from "../wailsjs/go/models";
 
@@ -308,6 +311,30 @@ export async function SaveTestDataset(
   dataset: TestDataset,
 ): Promise<void> {
   await saveTestDatasetBinding(profileId, testKey, testrepo.Dataset.createFrom(dataset));
+}
+
+export async function SyncDatasetCatalog(profileId: string): Promise<void> {
+  await syncDatasetCatalogBinding(profileId);
+}
+
+export async function ListDatasetCatalog(
+  profileId: string,
+  query: DatasetCatalogQuery,
+): Promise<DatasetCatalogPage> {
+  return listDatasetCatalogBinding(
+    profileId,
+    testrepo.DatasetCatalogQuery.createFrom(query),
+  ) as Promise<DatasetCatalogPage>;
+}
+
+export async function GetDatasetCatalogDetail(
+  profileId: string,
+  testKey: string,
+): Promise<DatasetCatalogDetail> {
+  return getDatasetCatalogDetailBinding(
+    profileId,
+    testKey,
+  ) as Promise<DatasetCatalogDetail>;
 }
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
@@ -655,6 +682,72 @@ export interface DatasetParameter {
 export interface TestDataset {
   parameters: DatasetParameter[];
   rows: string[][];
+}
+
+export interface DatasetCatalogQuery {
+  search: string;
+  scope: string;
+  ownership: string;
+  limit: number;
+  offset: number;
+}
+
+export interface DatasetCatalogState {
+  activeGeneration: number;
+  lastSyncedAt: string;
+  ownedTestCount: number;
+  externalTestCount: number;
+  relationshipCount: number;
+  testGroupCount: number;
+  definitionCount: number;
+}
+
+export interface DatasetCatalogTestSummary {
+  testKey: string;
+  summary: string;
+  projectKey: string;
+  external: boolean;
+  internalOpenable: boolean;
+  defaultParameterCount: number;
+  defaultRowCount: number;
+  planCount: number;
+  executionCount: number;
+  overrideCount: number;
+}
+
+export interface DatasetCatalogDefinition {
+  testKey: string;
+  scopeKind: string;
+  contextKey: string;
+  contextSummary: string;
+  parameters: DatasetParameter[];
+  rows: string[][];
+  metadataComplete: boolean;
+}
+
+export interface DatasetCatalogUsage {
+  testKey: string;
+  containerKind: string;
+  containerKey: string;
+  containerSummary: string;
+}
+
+export interface DatasetCatalogExecPlan {
+  execKey: string;
+  planKey: string;
+}
+
+export interface DatasetCatalogPage {
+  state: DatasetCatalogState | null;
+  tests: DatasetCatalogTestSummary[];
+  total: number;
+}
+
+export interface DatasetCatalogDetail {
+  test: DatasetCatalogTestSummary;
+  definitions: DatasetCatalogDefinition[];
+  usages: DatasetCatalogUsage[];
+  execPlans: DatasetCatalogExecPlan[];
 }
 
 // ProjectComponent mirrors backend.Component: one Jira project component.

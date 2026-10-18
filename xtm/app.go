@@ -54,6 +54,7 @@ func recoverToError(method string, errp *error) {
 // callable from the React frontend.
 type App struct {
 	ctx            context.Context
+	emitEvent      func(context.Context, string, ...interface{})
 	store          *store.Store
 	shared         *coreStore.DB
 	sharedPath     string
@@ -89,7 +90,11 @@ type HealthInfo struct {
 
 // NewApp creates a new App application struct.
 func NewApp() *App {
-	return &App{statusCache: map[string][]string{}, priorityCache: map[string][]string{}}
+	return &App{
+		emitEvent:     runtime.EventsEmit,
+		statusCache:   map[string][]string{},
+		priorityCache: map[string][]string{},
+	}
 }
 
 // startup wires the service layer. Failures are captured into startupErr

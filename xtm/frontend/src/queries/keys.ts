@@ -118,6 +118,11 @@ export const keys = {
   coverageMap: (profileId: string) =>
     [profileId, "canonicalRequirements", "map"] as const,
   containers: (profileId: string) => [profileId, "containers"] as const,
+  datasets: (profileId: string) => [profileId, "datasets"] as const,
+  datasetCatalog: <T extends object>(profileId: string, query: T) =>
+    [profileId, "datasets", "catalog", query] as const,
+  datasetDetail: (profileId: string, testKey: string) =>
+    [profileId, "datasets", "detail", testKey] as const,
   // Per-container detail reads for ContainersView, nested under the
   // "containers" prefix so invalidateProfileData refreshes them with the list.
   containerBoard: (profileId: string, key: string) =>

@@ -454,6 +454,10 @@ export function GetCoverageReport(arg1, arg2) {
   return window['go']['main']['App']['GetCoverageReport'](arg1, arg2);
 }
 
+export function GetDatasetCatalogDetail(arg1, arg2) {
+  return window['go']['main']['App']['GetDatasetCatalogDetail'](arg1, arg2);
+}
+
 export function GetDiagnostics() {
   return window['go']['main']['App']['GetDiagnostics']();
 }
@@ -672,6 +676,10 @@ export function ListCoverageGaps(arg1, arg2) {
 
 export function ListCoverageProjects(arg1) {
   return window['go']['main']['App']['ListCoverageProjects'](arg1);
+}
+
+export function ListDatasetCatalog(arg1, arg2) {
+  return window['go']['main']['App']['ListDatasetCatalog'](arg1, arg2);
 }
 
 export function ListFolders(arg1) {
@@ -1004,6 +1012,10 @@ export function SyncBugs(arg1) {
 
 export function SyncContainers(arg1) {
   return window['go']['main']['App']['SyncContainers'](arg1);
+}
+
+export function SyncDatasetCatalog(arg1) {
+  return window['go']['main']['App']['SyncDatasetCatalog'](arg1);
 }
 
 export function SyncPreconditions(arg1) {
