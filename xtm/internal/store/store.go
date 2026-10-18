@@ -18,7 +18,7 @@ import (
 )
 
 // schemaVersion is bumped whenever the schema changes.
-const schemaVersion = 53
+const schemaVersion = 54
 
 // SchemaVersion returns the schema version this build writes — surfaced in the
 // diagnostics view (FR-12.4).
@@ -619,6 +619,61 @@ CREATE TABLE IF NOT EXISTS coverage_group_publication (
 	published_at    TEXT NOT NULL,
 	PRIMARY KEY (profile_id, group_id)
 );
+` + datasetCatalogSchema
+
+const datasetCatalogSchema = `
+CREATE TABLE IF NOT EXISTS dataset_catalog_state (
+	profile_id          TEXT PRIMARY KEY,
+	active_generation   INTEGER NOT NULL DEFAULT 0,
+	last_synced_at      TEXT NOT NULL DEFAULT '',
+	owned_test_count    INTEGER NOT NULL DEFAULT 0,
+	external_test_count INTEGER NOT NULL DEFAULT 0,
+	relationship_count  INTEGER NOT NULL DEFAULT 0,
+	test_group_count    INTEGER NOT NULL DEFAULT 0,
+	definition_count    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS dataset_catalog_test (
+	profile_id       TEXT NOT NULL,
+	generation       INTEGER NOT NULL,
+	test_key         TEXT NOT NULL,
+	summary          TEXT NOT NULL DEFAULT '',
+	project_key      TEXT NOT NULL DEFAULT '',
+	is_external      INTEGER NOT NULL DEFAULT 0,
+	internal_openable INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (profile_id, generation, test_key)
+);
+
+CREATE TABLE IF NOT EXISTS dataset_catalog_definition (
+	profile_id       TEXT NOT NULL,
+	generation       INTEGER NOT NULL,
+	test_key         TEXT NOT NULL,
+	scope_kind       TEXT NOT NULL,
+	context_key      TEXT NOT NULL DEFAULT '',
+	context_summary  TEXT NOT NULL DEFAULT '',
+	parameters_json  TEXT NOT NULL DEFAULT '[]',
+	rows_json        TEXT NOT NULL DEFAULT '[]',
+	metadata_complete INTEGER NOT NULL DEFAULT 1,
+	PRIMARY KEY (profile_id, generation, test_key, scope_kind, context_key)
+);
+
+CREATE TABLE IF NOT EXISTS dataset_catalog_usage (
+	profile_id       TEXT NOT NULL,
+	generation       INTEGER NOT NULL,
+	test_key         TEXT NOT NULL,
+	container_kind   TEXT NOT NULL,
+	container_key    TEXT NOT NULL,
+	container_summary TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (profile_id, generation, test_key, container_kind, container_key)
+);
+
+CREATE TABLE IF NOT EXISTS dataset_catalog_exec_plan (
+	profile_id TEXT NOT NULL,
+	generation INTEGER NOT NULL,
+	exec_key   TEXT NOT NULL,
+	plan_key   TEXT NOT NULL,
+	PRIMARY KEY (profile_id, generation, exec_key, plan_key)
+);
 `
 
 // indexSchema is applied *after* applyMigrations so every column referenced
@@ -665,6 +720,9 @@ CREATE INDEX IF NOT EXISTS idx_coverage_project ON coverage_project(profile_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_external_ref_extkey ON external_ref(profile_id, connection, entity_type, external_key);
 CREATE INDEX IF NOT EXISTS idx_connection_workspace ON connection(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_cov_group_pub_container ON coverage_group_publication(profile_id, container_key);
+CREATE INDEX IF NOT EXISTS idx_dataset_catalog_definition_context ON dataset_catalog_definition(profile_id, generation, scope_kind, context_key);
+CREATE INDEX IF NOT EXISTS idx_dataset_catalog_usage_context ON dataset_catalog_usage(profile_id, generation, container_kind, container_key);
+CREATE INDEX IF NOT EXISTS idx_dataset_catalog_exec_plan_plan ON dataset_catalog_exec_plan(profile_id, generation, plan_key);
 `
 
 // Store wraps the SQLite connection for one local database file.
@@ -1388,6 +1446,14 @@ func applyMigrations(db *sql.DB) error {
 		`ALTER TABLE pending_change ADD COLUMN transition_fields TEXT`,
 	); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 		return fmt.Errorf("v52 add pending_change.transition_fields: %w", err)
+	}
+
+	// v54: complete, generation-scoped dataset catalog snapshots. The editor's
+	// lazy test_dataset cache remains separate from this read model.
+	if current < 54 {
+		if _, err := db.Exec(datasetCatalogSchema); err != nil {
+			return fmt.Errorf("v54 create dataset catalog: %w", err)
+		}
 	}
 	return nil
 }
