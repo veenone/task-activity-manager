@@ -2,6 +2,7 @@ package xray
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +27,23 @@ func TestXrayReportsDatasetSupport(t *testing.T) {
 func TestXrayReportsDatasetWrites(t *testing.T) {
 	if !(&Adapter{}).Capabilities().SupportsDatasetWrites {
 		t.Fatal("Xray must report SupportsDatasetWrites")
+	}
+}
+
+func TestXrayKeepsLiveParameterizedRunsUnsupportedWithoutTransportEvidence(t *testing.T) {
+	a := &Adapter{}
+	capabilities := a.Capabilities()
+	if capabilities.SupportsParameterizedRunDetail || capabilities.SupportsParameterizedRunWrites {
+		t.Fatalf("parameterized run capabilities = (%v, %v), want both false", capabilities.SupportsParameterizedRunDetail, capabilities.SupportsParameterizedRunWrites)
+	}
+	if _, err := a.GetParameterizedRun(context.Background(), "QA-EXEC-1", "QA-1"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("GetParameterizedRun err = %v, want ErrUnsupported", err)
+	}
+	if err := a.SetIterationStatus(context.Background(), "QA-EXEC-1", "QA-1", "iteration-1", "PASS"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("SetIterationStatus err = %v, want ErrUnsupported", err)
+	}
+	if err := a.SetIterationStepStatus(context.Background(), "QA-EXEC-1", "QA-1", "iteration-1", "step-1", "PASS"); !errors.Is(err, backend.ErrUnsupported) {
+		t.Fatalf("SetIterationStepStatus err = %v, want ErrUnsupported", err)
 	}
 }
 

@@ -617,6 +617,18 @@ func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Data
 	return a.c.SetDataset(ctx, testKey, jira.Dataset{Parameters: params, Rows: d.Rows})
 }
 
+func (a *Adapter) GetParameterizedRun(ctx context.Context, execKey, testKey string) (backend.ParameterizedRun, error) {
+	return backend.ParameterizedRun{}, backend.ErrUnsupported
+}
+
+func (a *Adapter) SetIterationStatus(ctx context.Context, execKey, testKey, iterationID, status string) error {
+	return backend.ErrUnsupported
+}
+
+func (a *Adapter) SetIterationStepStatus(ctx context.Context, execKey, testKey, iterationID, stepResultID, status string) error {
+	return backend.ErrUnsupported
+}
+
 func toBackendComponent(c jira.Component) backend.Component {
 	return backend.Component{ID: c.ID, Name: c.Name, Description: c.Description,
 		LeadName: c.LeadName, LeadDisplayName: c.LeadDisplayName, AssigneeType: c.AssigneeType}
