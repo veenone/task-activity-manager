@@ -4,11 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../api";
 import { keys } from "./keys";
-import { useDatasetCatalog, useDatasetCatalogDetail } from "./datasets";
+import { useDatasetCatalog, useDatasetCatalogDetail, useTestDataset } from "./datasets";
 
 vi.mock("../api", () => ({
   ListDatasetCatalog: vi.fn(),
   GetDatasetCatalogDetail: vi.fn(),
+  GetTestDataset: vi.fn(),
   errMsg: (error: unknown) =>
     error instanceof Error ? error.message : String(error),
 }));
@@ -38,11 +39,59 @@ describe("dataset catalog queries", () => {
       () => useDatasetCatalogDetail("p1", "QA-1", false),
       { wrapper: Wrapper },
     );
+    const dataset = renderHook(() => useTestDataset("p1", "QA-1", false), {
+      wrapper: Wrapper,
+    });
 
     expect(list.result.current.fetchStatus).toBe("idle");
     expect(detail.result.current.fetchStatus).toBe("idle");
+    expect(dataset.result.current.fetchStatus).toBe("idle");
     expect(api.ListDatasetCatalog).not.toHaveBeenCalled();
     expect(api.GetDatasetCatalogDetail).not.toHaveBeenCalled();
+    expect(api.GetTestDataset).not.toHaveBeenCalled();
+  });
+
+  it("keys a Test dataset by profile and Test identity", async () => {
+    (api.GetTestDataset as ReturnType<typeof vi.fn>).mockResolvedValue({
+      parameters: [{ name: "USER", combinatorial: false }],
+      rows: [["alice"]],
+    });
+    const { client, Wrapper } = makeHarness();
+    const { result } = renderHook(() => useTestDataset("p1", "QA-1", true), {
+      wrapper: Wrapper,
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(client.getQueryData(["test-dataset", "p1", "QA-1"])).toEqual(result.current.data);
+    expect(api.GetTestDataset).toHaveBeenCalledWith("p1", "QA-1", false);
+  });
+
+  it("does not let a late response from the previous Test seed the current Test", async () => {
+    let resolveQA1!: (value: unknown) => void;
+    const qa1 = new Promise((resolve) => { resolveQA1 = resolve; });
+    (api.GetTestDataset as ReturnType<typeof vi.fn>).mockImplementation(
+      (_profile: string, key: string) => key === "QA-1"
+        ? qa1
+        : Promise.resolve({ parameters: [{ name: "QA2" }], rows: [["two"]] }),
+    );
+    const { client, Wrapper } = makeHarness();
+    const { result, rerender } = renderHook(
+      ({ testKey }) => useTestDataset("p1", testKey, true),
+      { wrapper: Wrapper, initialProps: { testKey: "QA-1" } },
+    );
+
+    rerender({ testKey: "QA-2" });
+    await waitFor(() => expect(result.current.data?.parameters[0]?.name).toBe("QA2"));
+    resolveQA1({ parameters: [{ name: "QA1" }], rows: [["one"]] });
+    await act(async () => {});
+
+    expect(result.current.data?.parameters[0]?.name).toBe("QA2");
+    expect(client.getQueryData(["test-dataset", "p1", "QA-1"])).toEqual({
+      parameters: [{ name: "QA1" }], rows: [["one"]],
+    });
+    expect(client.getQueryData(["test-dataset", "p1", "QA-2"])).toEqual({
+      parameters: [{ name: "QA2" }], rows: [["two"]],
+    });
   });
 
   it("puts the complete query object in the catalog cache key", async () => {

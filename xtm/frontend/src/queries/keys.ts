@@ -119,6 +119,8 @@ export const keys = {
     [profileId, "canonicalRequirements", "map"] as const,
   containers: (profileId: string) => [profileId, "containers"] as const,
   datasets: (profileId: string) => [profileId, "datasets"] as const,
+  testDataset: (profileId: string, testKey: string) =>
+    ["test-dataset", profileId, testKey] as const,
   datasetCatalog: <T extends object>(profileId: string, query: T) =>
     [profileId, "datasets", "catalog", query] as const,
   datasetDetail: (profileId: string, testKey: string) =>

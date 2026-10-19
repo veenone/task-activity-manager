@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   ExportDatasetCSV,
@@ -11,6 +12,7 @@ import {
 import { Menu } from "../Menu";
 import { useConfirm } from "../useConfirm";
 import { DatasetParameterDialog } from "./DatasetParameterDialog";
+import { keys } from "../../queries/keys";
 
 interface Rename {
   from: string;
@@ -67,6 +69,7 @@ export function DatasetEditor({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const { confirm } = useConfirm();
+  const queryClient = useQueryClient();
 
   const removeParameter = (index: number) => {
     setParameters((current) => current.filter((_, itemIndex) => itemIndex !== index));
@@ -161,6 +164,7 @@ export function DatasetEditor({
     };
     try {
       await SaveTestDataset(profileId, testKey, table);
+      queryClient.setQueryData(keys.testDataset(profileId, testKey), table);
       await offerRewrites(renamesIn(initial, parameters));
       onSaved(table);
     } catch (caught) {

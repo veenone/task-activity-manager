@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   GetDatasetCatalogDetail,
+  GetTestDataset,
   ListDatasetCatalog,
   type DatasetCatalogQuery,
 } from "../api";
@@ -27,6 +28,18 @@ export function useDatasetCatalogDetail(
   return useQuery({
     queryKey: keys.datasetDetail(profileId, testKey),
     queryFn: () => call(() => GetDatasetCatalogDetail(profileId, testKey)),
+    enabled: !!profileId && !!testKey && enabled,
+  });
+}
+
+export function useTestDataset(
+  profileId: string,
+  testKey: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: keys.testDataset(profileId, testKey),
+    queryFn: () => call(() => GetTestDataset(profileId, testKey, false)),
     enabled: !!profileId && !!testKey && enabled,
   });
 }

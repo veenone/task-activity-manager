@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,16 +39,19 @@ const twoByTwo: TestDataset = {
 };
 
 function editor(initial: TestDataset, onSaved = vi.fn(), onCancel = vi.fn()) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <DatasetEditor
-      profileId="p1"
-      testKey="QA-1"
-      initial={initial}
-      onSaved={onSaved}
-      onCancel={onCancel}
-    />,
+    <QueryClientProvider client={client}>
+      <DatasetEditor
+        profileId="p1"
+        testKey="QA-1"
+        initial={initial}
+        onSaved={onSaved}
+        onCancel={onCancel}
+      />
+    </QueryClientProvider>,
   );
-  return { onSaved, onCancel };
+  return { onSaved, onCancel, client };
 }
 
 async function addParameter(name: string) {

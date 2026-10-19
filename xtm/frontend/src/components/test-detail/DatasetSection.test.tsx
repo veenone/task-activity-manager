@@ -1,9 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import React from "react";
+import { render as testingRender, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DatasetSection, DATASET_ROW_CAP } from "./DatasetSection";
 import type { TestDataset } from "../../api";
+import { keys } from "../../queries/keys";
 
 const getTestDataset = vi.fn();
 const getContainerDataset = vi.fn();
@@ -38,6 +41,14 @@ function dataset(over: Partial<TestDataset> = {}): TestDataset {
 
 function rowsOf(n: number, cols = 1): string[][] {
   return Array.from({ length: n }, (_, i) => Array.from({ length: cols }, () => `v${i}`));
+}
+
+function render(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const result = testingRender(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
+  return { ...result, client };
 }
 
 beforeEach(() => {
@@ -158,7 +169,7 @@ describe("DatasetSection", () => {
   });
 
   it("opens the editor on an existing dataset and shows what it saved", async () => {
-    render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
+    const { client } = render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
     await screen.findByText("USERNAME");
 
     await userEvent.click(screen.getByRole("button", { name: /^edit$/i }));
@@ -170,6 +181,7 @@ describe("DatasetSection", () => {
     expect(await screen.findByText("carol")).toBeInTheDocument();
     expect(screen.queryByLabelText("Dataset editor")).not.toBeInTheDocument();
     expect(getTestDataset).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData<TestDataset>(keys.testDataset("p1", "QA-1"))?.rows[0][0]).toBe("carol");
   });
 
   it("does not offer the editor on a backend that cannot write", async () => {

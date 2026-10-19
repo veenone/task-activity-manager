@@ -7,6 +7,7 @@ import type { TestDetailProps } from "./types";
 // field for Kiwi.
 export function StepsSection({ s, a, p }: { s: TestDetailState; a: TestDetailActions; p: TestDetailProps }) {
   const { profileId, confirm, steps, setSteps, stepsLoading, stepsError, setShowCloneSteps, setShowCallPicker, setShowCrossCall, setShowCrossClone, jiraStepInfo, caps, crossProjectEnabled } = s;
+  const parameters = s.dataset.parameters;
   const { refreshSteps, addStep, duplicateStep, moveStep } = a;
   const { testKey, pendingForTest, onEdited, readOnly } = p;
   return (
@@ -86,6 +87,7 @@ export function StepsSection({ s, a, p }: { s: TestDetailState; a: TestDetailAct
                   key={s.xrayId}
                   testKey={testKey}
                   step={s}
+                  parameters={parameters}
                   pendingForTest={pendingForTest}
                   isFirst={i === 0}
                   isLast={i === steps.length - 1}
