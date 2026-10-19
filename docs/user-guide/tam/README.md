@@ -37,6 +37,10 @@ TAM writes nothing to Jira until you press Commit. Editing a field, dragging a c
 
 Everything else in these guides assumes that loop. [Getting started](00-getting-started.md) walks through it.
 
+## One document instead of nine
+
+[USER_GUIDE.md](USER_GUIDE.md) is the same material as one numbered document, which is what the PDF is built from. The pages here are the ones to read on screen and the ones to edit; the single file carries the same content for distribution.
+
 ## About the figures
 
 These pages have no screenshots yet. Where a guide names a button or a column, the name is the one on screen.
