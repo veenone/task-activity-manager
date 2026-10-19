@@ -7,16 +7,34 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"agile-suite/xtm/internal/backend"
 )
+
+type JUnitTargetKind string
+
+const (
+	JUnitTargetRun       JUnitTargetKind = "run"
+	JUnitTargetIteration JUnitTargetKind = "iteration"
+)
+
+// JUnitProperty is one testcase-level property from a JUnit report.
+type JUnitProperty struct {
+	Name  string `xml:"name,attr" json:"name"`
+	Value string `xml:"value,attr" json:"value"`
+}
 
 // JUnitMatch is one testcase matched to a single member test of the execution,
 // with the run result it will set.
 type JUnitMatch struct {
-	Testcase   string `json:"testcase"`
-	TestKey    string `json:"testKey"`
-	Summary    string `json:"summary"`
-	Result     string `json:"result"`     // "PASS" or "FAIL"
-	CurrentRun string `json:"currentRun"` // the test's current run status in this execution
+	Testcase    string                       `json:"testcase"`
+	TestKey     string                       `json:"testKey"`
+	Summary     string                       `json:"summary"`
+	Result      string                       `json:"result"`     // "PASS" or "FAIL"
+	CurrentRun  string                       `json:"currentRun"` // the test's current run status in this execution
+	TargetKind  JUnitTargetKind              `json:"targetKind"`
+	IterationID string                       `json:"iterationId"`
+	Parameters  []backend.IterationParameter `json:"parameters"`
 }
 
 // JUnitSkip is a testcase that will not be applied, with the reason.
@@ -50,10 +68,11 @@ type junitTestSuite struct {
 
 // junitTestCase holds the fields we care about from a <testcase> element.
 type junitTestCase struct {
-	Name    string         `xml:"name,attr"`
-	Failure *junitPresence `xml:"failure"`
-	Error   *junitPresence `xml:"error"`
-	Skipped *junitPresence `xml:"skipped"`
+	Name       string          `xml:"name,attr"`
+	Properties []JUnitProperty `xml:"properties>property"`
+	Failure    *junitPresence  `xml:"failure"`
+	Error      *junitPresence  `xml:"error"`
+	Skipped    *junitPresence  `xml:"skipped"`
 }
 
 // junitPresence is used for child elements whose mere presence is meaningful
@@ -70,7 +89,7 @@ func parseJUnitXML(data []byte) ([]junitTestCase, error) {
 		for _, s := range suites.TestSuites {
 			all = append(all, s.TestCases...)
 		}
-		return all, nil
+		return normalizeJUnitProperties(all), nil
 	}
 
 	// Fall back to bare <testsuite>.
@@ -78,7 +97,73 @@ func parseJUnitXML(data []byte) ([]junitTestCase, error) {
 	if err := xml.Unmarshal(data, &suite); err != nil {
 		return nil, fmt.Errorf("parse JUnit XML: %w", err)
 	}
-	return suite.TestCases, nil
+	return normalizeJUnitProperties(suite.TestCases), nil
+}
+
+func normalizeJUnitProperties(cases []junitTestCase) []junitTestCase {
+	for caseIndex := range cases {
+		for propertyIndex := range cases[caseIndex].Properties {
+			property := &cases[caseIndex].Properties[propertyIndex]
+			property.Name = strings.TrimSpace(property.Name)
+			property.Value = strings.TrimSpace(property.Value)
+		}
+		if cases[caseIndex].Properties == nil {
+			cases[caseIndex].Properties = []JUnitProperty{}
+		}
+	}
+	return cases
+}
+
+// matchIteration resolves a testcase only when its properties contain one
+// complete dataset signature and that signature identifies exactly one row.
+func matchIteration(properties []JUnitProperty, run backend.ParameterizedRun) (string, []backend.IterationParameter, string) {
+	if len(run.Iterations) == 0 {
+		return "", nil, "no dataset iterations are available"
+	}
+	required := make(map[string]struct{}, len(run.Iterations[0].Parameters))
+	for _, parameter := range run.Iterations[0].Parameters {
+		required[parameter.Name] = struct{}{}
+	}
+	values := make(map[string]string, len(required))
+	for _, property := range properties {
+		if _, relevant := required[property.Name]; !relevant {
+			continue
+		}
+		if _, duplicate := values[property.Name]; duplicate {
+			return "", nil, fmt.Sprintf("duplicate property %q", property.Name)
+		}
+		values[property.Name] = property.Value
+	}
+	for _, parameter := range run.Iterations[0].Parameters {
+		if _, present := values[parameter.Name]; !present {
+			return "", nil, fmt.Sprintf("missing dataset property %q", parameter.Name)
+		}
+	}
+
+	matches := make([]backend.RunIteration, 0, 1)
+	for _, iteration := range run.Iterations {
+		if len(iteration.Parameters) != len(required) {
+			continue
+		}
+		exact := true
+		for _, parameter := range iteration.Parameters {
+			if values[parameter.Name] != parameter.Value {
+				exact = false
+				break
+			}
+		}
+		if exact {
+			matches = append(matches, iteration)
+		}
+	}
+	if len(matches) == 0 {
+		return "", nil, "no iteration matches the complete dataset signature"
+	}
+	if len(matches) > 1 {
+		return "", nil, "multiple iterations share the dataset signature"
+	}
+	signature := append([]backend.IterationParameter(nil), matches[0].Parameters...)
+	return matches[0].ID, signature, ""
 }
 
 // execMember holds the summary and current run status for one execution member.
@@ -214,6 +299,8 @@ func (r *Repository) AnalyzeJUnitImport(profileID, execKey, xmlBase64 string) (J
 				Summary:    hits[0].summary,
 				Result:     result,
 				CurrentRun: hits[0].runStatus,
+				TargetKind: JUnitTargetRun,
+				Parameters: []backend.IterationParameter{},
 			})
 		default:
 			preview.Skipped = append(preview.Skipped, JUnitSkip{
