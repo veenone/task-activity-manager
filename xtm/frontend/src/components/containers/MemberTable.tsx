@@ -1,6 +1,8 @@
 
+import { Fragment } from "react";
 import { RUN_STATUSES, PAGE_SIZE_OPTIONS } from "./constants";
 import { ExecRunCells, DefectsCell, RemarksCell } from "./RunCells";
+import { ParameterizedRunRows } from "./ParameterizedRunRows";
 import type { ContainerState } from "./useContainerState";
 import type { ContainerActions, ContainerViewProps } from "./useContainerActions";
 
@@ -10,6 +12,7 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
   const {
     kind, setBugFor, setLinkBugFor, selectedRuns, setSelectedRuns, bulkStatus, setBulkStatus,
     setBoardPage, memberFvFilter, setDetailKey, setDetailVersion, pageSize, setPageSize, caps,
+    profileId, selected, expandedRuns, setExpandedRuns, parameterizedTests, setParameterizedTests,
     containers, board, memberRuns, kindLabel, allRows, boardTotalPages, safePage, pageRows,
   } = s;
   const {
@@ -118,9 +121,12 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                   </td>
                 </tr>
               ) : (
-                pageRows.map((r) => (
+                pageRows.map((r) => {
+                  const resultKey = `${selected}:${r.testKey}`;
+                  const expanded = expandedRuns.has(resultKey);
+                  const parameterized = parameterizedTests.has(resultKey);
+                  return <Fragment key={r.testKey}>
                   <tr
-                    key={r.testKey}
                     className={selectedRuns.has(r.testKey) ? "board-row-sel" : ""}
                   >
                     {kind === "testexec" && (
@@ -133,6 +139,21 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                       </td>
                     )}
                     <td className="mono">
+                      {kind === "testexec" && caps.supportsParameterizedRunDetail && (
+                        <button
+                          type="button"
+                          className="parameterized-run-toggle"
+                          aria-expanded={expanded}
+                          aria-label={`${expanded ? "Hide" : "Show"} dataset iterations for ${r.testKey}`}
+                          onClick={() => setExpandedRuns((current) => {
+                            const next = new Set(current);
+                            if (next.has(resultKey)) next.delete(resultKey); else next.add(resultKey);
+                            return next;
+                          })}
+                        >
+                          <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+                        </button>
+                      )}
                       {r.testKey}
                       {r.isExternal && (
                         <span
@@ -162,7 +183,9 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                           className={`run-select run-${(r.runStatus || "todo").toLowerCase()}`}
                           value={r.runStatus || ""}
                           onChange={(e) => setRunStatus(r.testKey, e.target.value)}
-                          title="Set this test's result in this execution"
+                          disabled={parameterized}
+                          aria-label={`Overall result for ${r.testKey}`}
+                          title={parameterized ? "Calculated from dataset iterations" : "Set this test's result in this execution"}
                         >
                           {!r.runStatus && <option value="">Set result…</option>}
                           {RUN_STATUSES.map((s) => (
@@ -180,6 +203,7 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                       ) : (
                         <span className="muted">not run</span>
                       )}
+                      {parameterized && <span className="parameterized-aggregate-note">Calculated from iterations</span>}
                     </td>
                     {kind === "testexec" && (
                       <ExecRunCells
@@ -227,7 +251,27 @@ export function MemberTable({ s, a, p }: { s: ContainerState; a: ContainerAction
                       </button>
                     </td>
                   </tr>
-                ))
+                  {kind === "testexec" && caps.supportsParameterizedRunDetail && expanded && (
+                    <tr className="parameterized-detail-row">
+                      <td colSpan={12}>
+                        <ParameterizedRunRows
+                          profileId={profileId}
+                          execKey={selected}
+                          testKey={r.testKey}
+                          expanded={expanded}
+                          canWrite={caps.supportsParameterizedRunWrites}
+                          onLoaded={() => setParameterizedTests((current) => {
+                            if (current.has(resultKey)) return current;
+                            const next = new Set(current);
+                            next.add(resultKey);
+                            return next;
+                          })}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>;
+                })
               )}
             </tbody>
           </table>

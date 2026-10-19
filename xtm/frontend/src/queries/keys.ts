@@ -135,6 +135,8 @@ export const keys = {
     [profileId, "containers", "members", key] as const,
   containerRollup: (profileId: string, key: string) =>
     [profileId, "containers", "rollup", key] as const,
+  parameterizedRun: (profileId: string, execKey: string, testKey: string) =>
+    ["parameterized-run", profileId, execKey, testKey] as const,
   // TraceabilityTabs' reads, all under one prefix so invalidateProfileData
   // refreshes the whole view.
   traceabilityStats: (profileId: string) =>

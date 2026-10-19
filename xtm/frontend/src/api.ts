@@ -166,7 +166,6 @@ export {
   GetTestSteps,
   GetTestDataset,
   GetContainerDataset,
-  GetParameterizedRun,
   SetIterationStatus,
   SetIterationStepStatus,
   RenameDatasetPlaceholder,
@@ -285,6 +284,7 @@ import {
   SyncDatasetCatalog as syncDatasetCatalogBinding,
   ListDatasetCatalog as listDatasetCatalogBinding,
   GetDatasetCatalogDetail as getDatasetCatalogDetailBinding,
+  GetParameterizedRun as getParameterizedRunBinding,
 } from "../wailsjs/go/main/App";
 import { testrepo } from "../wailsjs/go/models";
 
@@ -338,6 +338,20 @@ export async function GetDatasetCatalogDetail(
     profileId,
     testKey,
   ) as Promise<DatasetCatalogDetail>;
+}
+
+export async function GetParameterizedRun(
+  profileId: string,
+  execKey: string,
+  testKey: string,
+  forceRefresh: boolean,
+): Promise<ParameterizedRun> {
+  return getParameterizedRunBinding(
+    profileId,
+    execKey,
+    testKey,
+    forceRefresh,
+  ) as Promise<ParameterizedRun>;
 }
 export { EventsOn, BrowserOpenURL } from "../wailsjs/runtime/runtime";
 
