@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -237,6 +237,60 @@ describe("DatasetsView", () => {
     expect(screen.getByText(/parameter metadata unknown/i)).toBeVisible();
     expect(screen.getByRole("heading", { name: "Used by" })).toBeVisible();
     expect(screen.getByText("Inherited default")).toBeVisible();
+  });
+
+  it("renders_scope_cards_and_a_compact_usage_table", async () => {
+    vi.mocked(useDatasetCatalog).mockReturnValue(queryResult(page()));
+    const user = userEvent.setup();
+    renderView();
+
+    const expand = screen.getByRole("button", { name: /expand QA-1/i });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    await user.click(expand);
+    expect(expand).toHaveAttribute("aria-expanded", "true");
+
+    expect(screen.getByRole("region", { name: "Default dataset" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Plan PLAN-1 dataset" })).toBeVisible();
+    const usageTable = screen.getByRole("table", {
+      name: "Containers using this dataset",
+    });
+    for (const heading of ["Type", "Container", "Summary", "Dataset"]) {
+      expect(
+        within(usageTable).getByRole("columnheader", { name: heading }),
+      ).toBeVisible();
+    }
+    expect(within(usageTable).getByRole("button", { name: "Open Plan PLAN-1" })).toBeVisible();
+    expect(
+      within(usageTable).getByRole("button", { name: "Open Execution EXEC-1" }),
+    ).toBeVisible();
+    expect(within(usageTable).getByText("Override")).toBeVisible();
+    expect(within(usageTable).getByText("Inherited default")).toBeVisible();
+  });
+
+  it("keeps_long_usage_content_reachable_at_narrow_width", async () => {
+    const longSummary = "October release execution with an intentionally long container summary";
+    vi.mocked(useDatasetCatalog).mockReturnValue(queryResult(page()));
+    vi.mocked(useDatasetCatalogDetail).mockReturnValue({
+      data: {
+        ...detail,
+        usages: detail.usages.map((usage) =>
+          usage.containerKey === "EXEC-1"
+            ? { ...usage, containerSummary: longSummary }
+            : usage,
+        ),
+      },
+      error: null,
+      isLoading: false,
+    } as ReturnType<typeof useDatasetCatalogDetail>);
+    const user = userEvent.setup();
+    renderView();
+
+    await user.click(screen.getByRole("button", { name: /expand QA-1/i }));
+    const usageTable = screen.getByRole("table", {
+      name: "Containers using this dataset",
+    });
+    expect(screen.getByText(longSummary)).toBeVisible();
+    expect(usageTable.parentElement).toHaveClass("dataset-usages-scroll");
   });
 
   it("persists complete filters, resets paging, and pages by Test group", async () => {

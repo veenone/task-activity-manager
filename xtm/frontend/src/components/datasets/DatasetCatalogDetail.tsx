@@ -15,9 +15,15 @@ interface Props {
   onOpenContainer: (target: ContainerNavigationTarget) => void;
 }
 
-function Definition({ definition }: { definition: DatasetCatalogDefinition }) {
+function Definition({
+  definition,
+  label,
+}: {
+  definition: DatasetCatalogDefinition;
+  label: string;
+}) {
   return (
-    <div className="dataset-definition">
+    <section className="dataset-definition" aria-label={label}>
       {definition.contextKey && (
         <div className="dataset-definition-title">
           <strong>{definition.contextKey}</strong>
@@ -37,11 +43,11 @@ function Definition({ definition }: { definition: DatasetCatalogDefinition }) {
           {definition.rows.length} row{definition.rows.length === 1 ? "" : "s"}
         </span>
       </div>
-    </div>
+    </section>
   );
 }
 
-function UsageLink({
+function UsageRow({
   usage,
   overridden,
   onOpen,
@@ -53,19 +59,24 @@ function UsageLink({
   const kind = usage.containerKind === "testplan" ? "testplan" : "testexec";
   const label = kind === "testplan" ? "Plan" : "Execution";
   return (
-    <li>
-      <button
-        className="link-btn"
-        aria-label={`Open ${label} ${usage.containerKey}`}
-        onClick={() => onOpen({ kind, key: usage.containerKey })}
-      >
-        {usage.containerKey}
-      </button>
-      <span>{usage.containerSummary}</span>
-      <span className={overridden ? "dataset-override" : "muted"}>
-        {overridden ? "Override" : "Inherited default"}
-      </span>
-    </li>
+    <tr>
+      <td>{label}</td>
+      <td>
+        <button
+          className="link-btn"
+          aria-label={`Open ${label} ${usage.containerKey}`}
+          onClick={() => onOpen({ kind, key: usage.containerKey })}
+        >
+          {usage.containerKey}
+        </button>
+      </td>
+      <td className="dataset-usage-summary">{usage.containerSummary}</td>
+      <td>
+        <span className={overridden ? "dataset-override" : "muted"}>
+          {overridden ? "Override" : "Inherited default"}
+        </span>
+      </td>
+    </tr>
   );
 }
 
@@ -106,50 +117,77 @@ export function DatasetCatalogDetail({
 
   return (
     <div className="dataset-detail-grid">
-      <section>
+      <div className="dataset-scope-group">
         <h3>Default dataset</h3>
         {defaults.length > 0 ? (
           defaults.map((definition) => (
-            <Definition key="default" definition={definition} />
+            <Definition
+              key="default"
+              definition={definition}
+              label="Default dataset"
+            />
           ))
         ) : (
           <p className="muted">No Test-level default.</p>
         )}
-      </section>
+      </div>
       {plans.length > 0 && (
-        <section>
+        <div className="dataset-scope-group">
           <h3>Plan overrides</h3>
           {plans.map((definition) => (
-            <Definition key={definition.contextKey} definition={definition} />
+            <Definition
+              key={definition.contextKey}
+              definition={definition}
+              label={`Plan ${definition.contextKey} dataset`}
+            />
           ))}
-        </section>
+        </div>
       )}
       {executions.length > 0 && (
-        <section>
+        <div className="dataset-scope-group">
           <h3>Execution overrides</h3>
           {executions.map((definition) => (
-            <Definition key={definition.contextKey} definition={definition} />
+            <Definition
+              key={definition.contextKey}
+              definition={definition}
+              label={`Execution ${definition.contextKey} dataset`}
+            />
           ))}
-        </section>
+        </div>
       )}
       <section className="dataset-usages">
         <h3>Used by</h3>
         {usages.length === 0 ? (
           <p className="muted">No synced Plan or Execution uses this Test.</p>
         ) : (
-          <ul>
-            {usages.map((usage) => {
-              const scope = usage.containerKind === "testplan" ? "plan" : "execution";
-              return (
-                <UsageLink
-                  key={`${usage.containerKind}:${usage.containerKey}`}
-                  usage={usage}
-                  overridden={overrideKeys.has(`${scope}:${usage.containerKey}`)}
-                  onOpen={onOpenContainer}
-                />
-              );
-            })}
-          </ul>
+          <div className="dataset-usages-scroll">
+            <table
+              className="dataset-usage-table"
+              aria-label="Containers using this dataset"
+            >
+              <thead>
+                <tr>
+                  <th scope="col">Type</th>
+                  <th scope="col">Container</th>
+                  <th scope="col">Summary</th>
+                  <th scope="col">Dataset</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usages.map((usage) => {
+                  const scope = usage.containerKind === "testplan" ? "plan" : "execution";
+                  return (
+                    <UsageRow
+                      key={`${usage.containerKind}:${usage.containerKey}`}
+                      usage={usage}
+                      overridden={overrideKeys.has(`${scope}:${usage.containerKey}`)}
+                      onOpen={onOpenContainer}
+                    />
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
       <div className="dataset-detail-actions">
