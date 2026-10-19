@@ -117,7 +117,16 @@ combinatorial asterisk and values, and has nowhere to put a parameter's id or
 the list behind it, so an import matches those back by name from the table it
 replaces (`testrepo.MergeDatasetParameters`). Skipping that would rebuild
 every parameter on the next write, which is #283 again through a different
-door.
+door. A column with no match is normalized to `TEXT`.
+
+**Dataset parameter configuration is separate from cell editing.**
+`DatasetParameterDialog` returns one complete parameter to `DatasetEditor`.
+Text parameters accept free-form cells. An ad-hoc List carries `type=LIST`,
+ordered unique `options` and `paramTestListScope=PARAMETER_AD_HOC`; a new List
+has no positive `listId`. Existing predefined bindings stay read-only and are
+sent back with their ids and scope unless the user confirms conversion. XTM
+does not administer project lists. `testrepo.ValidateDataset` checks this
+contract before the whole table can enter the journal.
 
 **Renaming a dataset parameter is two changes, not one.** The dataset write
 carries the rename by sending the parameter's existing id, but every
@@ -138,6 +147,10 @@ commit through. The comparison looks at names, combinatorial flags and rows
 only: Xray reissues parameter and list ids whenever it rebuilds a parameter,
 and a conflict over bookkeeping nobody changed would be a dead end. The write
 takes its ids from the table Jira holds at commit time for the same reason.
+The frontend call flow remains `DatasetEditor` to `SaveTestDataset`, then
+`testrepo.EditTestDataset` validates, caches and journals the full table in one
+transaction. Commit later maps the stored parameter metadata to Xray's
+column-major JSON payload.
 
 **Created entities use temporary keys.** New Preconditions/Containers/Steps get
 a placeholder key locally; the commit path creates them in Jira first, then

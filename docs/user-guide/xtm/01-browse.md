@@ -88,16 +88,17 @@ Cucumber tests show a **Cucumber scenario** box instead of steps, and Generic te
 A dataset is the table a test's `${placeholder}` references resolve against: one column per parameter, one row per iteration. It sits below the steps.
 
 - **Create dataset** shows on a test that has none. **Edit** shows on a test that has one.
-- A column is a parameter. Type its name in the header and tick **combinatorial** if Xray should expand it into extra iterations. **Remove** above a column deletes it with its values.
+- A column is a parameter. Click **Add parameter**, or open **Actions** in an existing column header, to configure its name, type and combinatorial behavior. The same menu moves or removes the column with its values.
+- Choose **Text** for free-form values. Choose **List** to enter an ordered set of options, one per line. List cells become dropdowns, and XTM refuses to remove an option while a row still uses it.
 - **Add row** adds an iteration, and **Remove** at the end of a row deletes that row.
 - Opening a test from a Test Execution shows the dataset that will run there, and says whether it is the test's own or one the execution defines. An execution's own dataset is read-only in XTM.
-- A parameter whose values come from a list offers them as you type in its cells. XTM does not create or change lists, and editing a dataset leaves an existing one as it is.
-- The arrows beside a parameter name move it one column left or right, and the ones at the end of a row move that row up or down. Row order is the order the iterations run in.
-- **Export CSV** saves the table as it is on screen, in the same layout Xray's own export uses. Choosing a file from the **Import CSV** box replaces the table with what the file holds, and nothing is stored until you press Save, so a file opened by mistake costs a Cancel. A parameter the dataset already had keeps its allowed values when it comes back under the same name.
+- XTM preserves a parameter that uses a predefined Jira list. Its binding and options are read-only until you explicitly convert it to an ad-hoc list. XTM does not administer project lists.
+- The arrows at the end of a row move that row up or down. Row order is the order the iterations run in.
+- **Export CSV** saves names and values in Xray's CSV layout. **Import CSV** replaces the table on screen, but stores nothing until **Save**. CSV has no field for parameter type, options or Jira ids: a column matched by name keeps its existing List metadata, while a new column becomes Text.
 - Renaming a parameter asks whether to rewrite `${OLD}` to `${NEW}` in the test's steps and definition. Say yes and each rewritten field becomes its own pending change, so you can see them before they go. Say no and the text is left exactly as it was, which is the right answer when a reference was never pointing at this parameter.
 - **Save** stores the table locally and counts it in **N pending**, like every other edit. Jira gets it on the next commit.
 
-Xray's own limits are checked when you save: at most 20 parameters, 100 characters in a value, no two parameters with the same name, no two identical rows, and a name that starts with a letter or underscore. A table that breaks one of them is refused with the reason, and stays on screen for you to fix.
+Xray's own limits are checked when you save: at most 20 parameters, 100 characters in a value, no two parameters with the same name, no two identical rows, and a name that starts with a letter or underscore. A List also needs unique options and every cell must use one of them. A table that breaks a rule is refused with the reason and stays on screen for you to fix.
 
 A dataset write replaces the whole table, so if someone changed it in Jira after you loaded the test, the commit stops and asks which version to keep instead of overwriting theirs.
 

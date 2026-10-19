@@ -25,14 +25,16 @@ snapshot exists for that profile yet.
 ## Read a Test group
 
 Each row represents one Test, not a reusable project-level dataset. Expand a
-row to see:
+row to see definition cards for each available scope:
 
 - **Default dataset**: parameters and rows defined on the Test.
 - **Plan overrides**: a different dataset defined for that Test in a Test
   Plan.
 - **Execution overrides**: a different dataset defined for that Test in a
   Test Execution.
-- **Used by**: every synced Plan and Execution that contains the Test.
+- **Used by**: a compact table of every synced Plan and Execution that
+  contains the Test. Its container keys open the corresponding Plan or
+  Execution.
 
 A usage marked **Inherited default** uses the Test's default dataset. A usage
 marked **Override** has its own context-specific definition. **Override only**
@@ -40,6 +42,10 @@ means the Test has no default but does have a Plan or Execution definition.
 
 Plan exports do not include all parameter type metadata. XTM labels that
 metadata as unknown instead of guessing a type.
+
+Long summaries wrap inside the definition cards. The **Used by** table scrolls
+horizontally when the view is narrow, so its Type, Container, Summary and
+Dataset columns remain reachable.
 
 ## Profile and project boundaries
 
@@ -69,6 +75,12 @@ From an expanded row:
 
 The catalog is read-only. Edit a default dataset from the Test detail panel;
 Plan and Execution overrides are not editable from this view.
+
+The editor supports Text parameters and ad-hoc List parameters. List options
+are stored with the Test dataset. Existing predefined Jira list bindings are
+preserved unless you confirm conversion to an ad-hoc list; XTM does not create,
+edit or delete project lists. CSV import matches existing columns by name to
+retain their list metadata, and treats unmatched columns as Text.
 
 ## Troubleshooting
 
