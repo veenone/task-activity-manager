@@ -128,6 +128,15 @@ sent back with their ids and scope unless the user confirms conversion. XTM
 does not administer project lists. `testrepo.ValidateDataset` checks this
 contract before the whole table can enter the journal.
 
+**Iterations are read fresh, never cached.** How each dataset row went in an
+execution comes from the 2.0 run resource when the panel opens, and goes
+nowhere near the store. A dataset changes rarely and is cached; results change
+every time someone runs the test, and the only reader is a panel open in front
+of the person who changed them. They are also a property of the run rather
+than of the dataset: a run keeps the parameters it was created with, so
+rendering them from the cached dataset would show rows that run never had
+(#267 Phase 4).
+
 **Renaming a dataset parameter is two changes, not one.** The dataset write
 carries the rename by sending the parameter's existing id, but every
 `${placeholder}` in the test's steps and definition still names the old

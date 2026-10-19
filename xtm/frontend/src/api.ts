@@ -168,6 +168,7 @@ export {
   GetContainerDataset,
   SetIterationStatus,
   SetIterationStepStatus,
+  GetRunIterations,
   RenameDatasetPlaceholder,
   CheckJiraTestSteps,
   GetTestReview,

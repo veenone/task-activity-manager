@@ -99,6 +99,37 @@ func TestXrayDemoTakesADatasetWriteAsDone(t *testing.T) {
 	}
 }
 
+// An execution's run of a parameterized test is one run per dataset row, and
+// the adapter hands each one up with the values it ran with (#267 Phase 4).
+func TestXrayGetRunIterationsReadsThemFromTheRun(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/rest/raven/1.0/api/testrun" {
+			_, _ = w.Write([]byte(`{"id":42,"testKey":"QA-1"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":42,"status":"EXECUTING","iterations":[` +
+			`{"id":7,"status":"PASS","parameters":[{"name":"TIER","value":"gold"}]},` +
+			`{"id":8,"status":"FAIL","parameters":[{"name":"TIER","value":"silver"}]}]}`))
+	}))
+	defer srv.Close()
+
+	iters, err := New(jira.NewClient(srv.URL, "tok")).
+		GetRunIterations(context.Background(), "EXEC-1", "QA-1")
+	if err != nil {
+		t.Fatalf("iterations: %v", err)
+	}
+	if len(iters) != 2 {
+		t.Fatalf("read %d iterations, want 2", len(iters))
+	}
+	if iters[1].ID != "8" || iters[1].Status != "FAIL" {
+		t.Errorf("second iteration = %+v, want id 8 with FAIL", iters[1])
+	}
+	if len(iters[0].Parameters) != 1 || iters[0].Parameters[0].Value != "gold" {
+		t.Errorf("first iteration parameters = %+v, want TIER gold", iters[0].Parameters)
+	}
+}
+
 // Demo mode answers without a network call, so a demo adapter still returns a
 // usable dataset for the keys that carry one.
 func TestXrayDemoReturnsADatasetForEveryTwentiethTest(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"agile-suite/xtm/internal/backend"
@@ -609,6 +610,28 @@ func toBackendDataset(ds jira.Dataset) backend.Dataset {
 		}
 	}
 	return backend.Dataset{Parameters: params, Rows: ds.Rows}
+}
+
+// GetRunIterations reads what each row of the dataset did in this execution
+// (#267 Phase 4).
+func (a *Adapter) GetRunIterations(ctx context.Context, execKey, testKey string) ([]backend.RunIteration, error) {
+	iters, err := a.c.GetRunIterations(ctx, execKey, testKey)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.RunIteration, len(iters))
+	for i, it := range iters {
+		params := make([]backend.IterationParameter, len(it.Parameters))
+		for j, p := range it.Parameters {
+			params[j] = backend.IterationParameter{Name: p.Name, Value: p.Value}
+		}
+		id := ""
+		if it.ID != 0 {
+			id = strconv.Itoa(it.ID)
+		}
+		out[i] = backend.RunIteration{ID: id, Rank: i, Status: it.Status, Parameters: params, Steps: []backend.IterationStep{}}
+	}
+	return out, nil
 }
 
 // SetDataset replaces the test's own dataset (#277 W1). The client resolves

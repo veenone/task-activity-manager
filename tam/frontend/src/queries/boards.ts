@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { call } from "@agile-suite/core";
 import {
+  BoardAllocation,
   AddIssuesToBoard,
   CanTransition,
   CompleteSprint,
@@ -65,6 +66,16 @@ export function useOpenSprints(profileId: string) {
 // settles, sprintId is not the real one yet, and firing the query anyway is
 // a wasted round trip with a real risk of the whole board flashing before
 // the sprint-scoped one replaces it.
+// useBoardAllocation is the board's open work per assignee (#288), from the
+// cache alone, so it needs no lock and no report to be running.
+export function useBoardAllocation(profileId: string, boardId: number) {
+  return useQuery({
+    queryKey: keys.boardAllocation(profileId, boardId),
+    queryFn: () => call(() => BoardAllocation(profileId, boardId)),
+    enabled: !!profileId && boardId > 0,
+  });
+}
+
 export function useBoard(profileId: string, boardId: number, sprintId: string, swimlane: string, ready: boolean) {
   return useQuery({
     queryKey: keys.board(profileId, boardId, sprintId, swimlane),

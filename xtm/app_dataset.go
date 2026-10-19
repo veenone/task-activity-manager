@@ -105,6 +105,27 @@ func (a *App) GetContainerDataset(profileID, containerKey, testKey string, force
 	return ds, nil
 }
 
+// GetRunIterations returns how each row of a test's dataset went in one
+// execution (#267 Phase 4).
+//
+// Deliberately not cached. A dataset changes rarely and is cached; results
+// change every time someone runs the test, and the panel that asks for these
+// is open in front of the person who just changed them. Nothing else reads
+// them, so there is no table to keep in step either.
+func (a *App) GetRunIterations(profileID, containerKey, testKey string) ([]backend.RunIteration, error) {
+	if err := a.requireStore(); err != nil {
+		return nil, err
+	}
+	if containerKey == "" || isLocalTestKey(testKey) {
+		return nil, nil
+	}
+	b, err := a.backendFor(profileID)
+	if err != nil {
+		return nil, err
+	}
+	return b.GetRunIterations(a.ctx, containerKey, testKey)
+}
+
 // SaveTestDataset replaces a test's dataset locally and queues it for commit
 // (#277 W1). The editor calls it; Jira hears nothing until Commit, like every
 // other edit in XTM.

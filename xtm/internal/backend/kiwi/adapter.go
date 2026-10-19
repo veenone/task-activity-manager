@@ -592,6 +592,11 @@ func (a *Adapter) GetRunDataset(ctx context.Context, execKey, testKey string) (b
 	return backend.Dataset{}, backend.ErrUnsupported
 }
 
+// GetRunIterations refuses too: with no datasets there are no iterations.
+func (a *Adapter) GetRunIterations(ctx context.Context, execKey, testKey string) ([]backend.RunIteration, error) {
+	return nil, backend.ErrUnsupported
+}
+
 // SetDataset refuses for the same reason: there is nothing to write to.
 func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Dataset) error {
 	return backend.ErrUnsupported

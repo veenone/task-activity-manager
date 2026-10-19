@@ -251,6 +251,35 @@ correct shipped in e0dbf0ce.
   (`/rest/plugins/1.0/...`) answers 403 to a non-administrator, so an ordinary
   user's client cannot read the plugin version.
 
+### Iterations of a parameterized run
+
+Answered against the same instance while planning #267 Phase 4, which the
+issue's Phase 0 had left open. Fixtures in `xtm/internal/jira/testdata/`.
+
+- `GET /rest/raven/2.0/api/testrun/{runId}` carries `iterations`: one entry
+  per dataset row, each with its own `id`, `status`, `color` and the
+  `parameters` it runs with. The 1.0 resource carries none of it, nor does
+  `testexec/{key}/test?detailed=true`, which is what XTM syncs today.
+- **A single-row dataset produces no iterations.** The run carries a flat
+  `parameters` array instead. A reader that only looks for `iterations` shows
+  such a run as if it were not parameterized.
+- **A run freezes its dataset when it is created.** Replacing the test's
+  dataset afterwards leaves the existing run reporting the parameters it was
+  created with, under their old names. Only a run created after the change
+  sees it.
+- `GET /rest/raven/2.0/api/testrun/{runId}/iteration/{id}` reads one on its
+  own, with its `steps`. There is no `/iteration` collection: asking for one
+  answers 404 in both API versions, which is what makes the run GET the only
+  way in.
+- **A per-iteration write exists**, which #267 wrote as an open question
+  against the JSON results import. `PUT` that same iteration resource with
+  `{"status":"PASS"}` and it answers `{"id":<id>,"stepResults":[]}`: the id
+  alone, not the updated iteration. The run's own status then moves to
+  `EXECUTING` on its own, because Xray derives it from the iterations.
+- `.../iteration/{id}/status?status=PASS` is not a route, despite the run
+  having one of that shape. The iteration's status is written through the
+  body.
+
 ### Writing a dataset
 
 The same spike, continued against a throwaway Test. Every operation the
