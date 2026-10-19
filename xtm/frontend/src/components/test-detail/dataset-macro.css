@@ -20,6 +20,7 @@
 .dataset-macro-trigger {
   flex: 0 0 auto;
   font-family: var(--font-mono);
+  font-weight: 700;
 }
 
 .dataset-macro-menu {
@@ -28,8 +29,9 @@
   top: 100%;
   right: 0;
   display: grid;
-  min-width: 220px;
-  max-height: 220px;
+  min-width: 260px;
+  max-width: min(360px, calc(100vw - 32px));
+  max-height: 260px;
   overflow-y: auto;
   border: 1px solid var(--border-strong);
   border-radius: var(--r-2);
@@ -37,13 +39,37 @@
   box-shadow: var(--modal-shadow);
 }
 
+.dataset-macro-menu-head {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
 .dataset-macro-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 8px 10px;
   border: 0;
   background: transparent;
   color: var(--text);
   text-align: left;
   cursor: pointer;
+}
+
+.dataset-macro-option code {
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataset-macro-option > span {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
 }
 
 .dataset-macro-option:hover,

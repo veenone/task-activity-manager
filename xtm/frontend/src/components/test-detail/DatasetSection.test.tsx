@@ -160,6 +160,20 @@ describe("DatasetSection", () => {
     expect(await screen.findByRole("button", { name: /create dataset/i })).toBeInTheDocument();
   });
 
+  it("opens dataset creation in the shared modal and closes without changing the test", async () => {
+    getTestDataset.mockResolvedValue({ parameters: [], rows: [] });
+    render(<DatasetSection profileId="p1" testKey="QA-1" supported canEdit />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /create dataset/i }));
+    expect(screen.getByRole("dialog", { name: "Create dataset" })).toBeVisible();
+    expect(screen.getByText(/parameters become reusable macros/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add parameter" })).toHaveFocus();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Create dataset" })).not.toBeInTheDocument();
+    expect(saveTestDataset).not.toHaveBeenCalled();
+  });
+
   it("offers nothing on a backend that cannot write datasets", async () => {
     getTestDataset.mockResolvedValue({ parameters: [], rows: [] });
     const { container } = render(<DatasetSection profileId="p1" testKey="QA-1" supported />);

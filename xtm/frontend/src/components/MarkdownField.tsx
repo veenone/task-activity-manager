@@ -12,7 +12,7 @@ import { Markdown } from "./Markdown";
 
 interface Props {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, selection?: { start: number; end: number }) => void;
   // onCommit fires on blur — the same place the previous bare textarea saved.
   onCommit: () => void;
   placeholder?: string;
@@ -99,8 +99,12 @@ export const MarkdownField = forwardRef<MarkdownFieldHandle, Props>(function Mar
       value,
       className,
       placeholder,
-      onChange: (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) =>
-        onChange(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+        const editor = e.currentTarget;
+        const start = editor.selectionStart ?? editor.value.length;
+        const end = editor.selectionEnd ?? start;
+        onChange(editor.value, { start, end });
+      },
       onBlur: finishEditing,
       onKeyDown,
     };

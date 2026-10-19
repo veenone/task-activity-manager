@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -10,6 +10,7 @@ import {
   type TestDataset,
 } from "../../api";
 import { Menu } from "../Menu";
+import { Modal } from "../Modal";
 import { useConfirm } from "../useConfirm";
 import { DatasetParameterDialog } from "./DatasetParameterDialog";
 import { keys } from "../../queries/keys";
@@ -68,6 +69,8 @@ export function DatasetEditor({
   const [parameterEdit, setParameterEdit] = useState<ParameterEdit | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const titleId = useId();
+  const addParameterRef = useRef<HTMLButtonElement>(null);
   const { confirm } = useConfirm();
   const queryClient = useQueryClient();
 
@@ -174,34 +177,81 @@ export function DatasetEditor({
     }
   };
 
+  const creating = initial.parameters.length === 0;
+
   return (
-    <div className="dataset-editor">
-      <div className="dataset-editor-toolbar" role="group" aria-label="Dataset toolbar">
-        <button
-          className="btn"
-          onClick={() =>
-            setParameterEdit({
-              index: null,
-              parameter: { name: "", combinatorial: false, type: "TEXT" },
-            })
-          }
-        >
-          Add parameter
-        </button>
-        <label className="btn dataset-import">
-          Import CSV
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            aria-label="Import CSV"
-            onChange={(event) => void importFile(event)}
-          />
-        </label>
-        <button className="btn" onClick={() => void exportFile()}>Export CSV</button>
+    <Modal
+      initialFocus={addParameterRef}
+      onClose={onCancel}
+      className="modal dataset-editor-modal"
+      labelledBy={titleId}
+    >
+      <div className="pending-head dataset-editor-head">
+        <div>
+          <h2 id={titleId}>{creating ? "Create dataset" : "Edit dataset"}</h2>
+          <p>Parameters become reusable macros in the test steps.</p>
+        </div>
+        <button className="btn btn-ghost" onClick={onCancel} aria-label="Close">×</button>
       </div>
 
-      <div className="dataset-scroll dataset-editor-scroll">
-        <table className="dataset-table dataset-editor-table" aria-label="Dataset editor">
+      <div className="bulk-body dataset-editor-body">
+        {parameters.length === 0 ? (
+          <div className="dataset-editor-empty">
+            <div>
+              <strong>Start with a parameter</strong>
+              <p>Add a text or list parameter, then enter one row for each test iteration.</p>
+            </div>
+            <button
+              ref={addParameterRef}
+              className="btn btn-primary"
+              onClick={() =>
+                setParameterEdit({
+                  index: null,
+                  parameter: { name: "", combinatorial: false, type: "TEXT" },
+                })
+              }
+            >
+              Add parameter
+            </button>
+            <label className="btn dataset-import">
+              Import CSV
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                aria-label="Import CSV"
+                onChange={(event) => void importFile(event)}
+              />
+            </label>
+          </div>
+        ) : (
+          <>
+            <div className="dataset-editor-toolbar" role="group" aria-label="Dataset toolbar">
+              <button
+                ref={addParameterRef}
+                className="btn"
+                onClick={() =>
+                  setParameterEdit({
+                    index: null,
+                    parameter: { name: "", combinatorial: false, type: "TEXT" },
+                  })
+                }
+              >
+                Add parameter
+              </button>
+              <label className="btn dataset-import">
+                Import CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  aria-label="Import CSV"
+                  onChange={(event) => void importFile(event)}
+                />
+              </label>
+              <button className="btn" onClick={() => void exportFile()}>Export CSV</button>
+            </div>
+
+            <div className="dataset-scroll dataset-editor-scroll">
+              <table className="dataset-table dataset-editor-table" aria-label="Dataset editor">
           <thead>
             <tr>
               <th scope="col" className="dataset-row-heading">Row</th>
@@ -272,18 +322,36 @@ export function DatasetEditor({
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+              </table>
+            </div>
+          </>
+        )}
 
       {error && <p className="dataset-error" role="alert">{error}</p>}
+      </div>
 
-      <div className="dataset-editor-actions" role="group" aria-label="Dataset actions">
-        <button className="btn" onClick={addRow}>Add row</button>
-        <span className="dataset-action-spacer" />
-        <button className="btn" onClick={onCancel} disabled={saving}>Cancel</button>
-        <button className="btn btn-primary" onClick={() => void save()} disabled={saving}>
-          {saving ? "Saving…" : "Save"}
+      <div
+        className="pending-actions dataset-editor-actions"
+        role="group"
+        aria-label="Dataset actions"
+      >
+        <button
+          className="btn"
+          onClick={addRow}
+          disabled={parameters.length === 0 || saving}
+        >
+          Add row
         </button>
+        <div className="dataset-primary-actions">
+          <button className="btn" onClick={onCancel} disabled={saving}>Cancel</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => void save()}
+            disabled={saving || parameters.length === 0}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
       </div>
 
       {parameterEdit && (
@@ -298,6 +366,6 @@ export function DatasetEditor({
           onCancel={() => setParameterEdit(null)}
         />
       )}
-    </div>
+    </Modal>
   );
 }

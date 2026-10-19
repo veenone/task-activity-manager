@@ -15,10 +15,11 @@ type Props = Omit<ComponentProps<typeof MarkdownField>, "ref"> & {
   parameters: DatasetParameter[];
 };
 
-function activeTrigger(value: string): TriggerRange | null {
-  const start = value.lastIndexOf("${");
-  if (start < 0 || value.indexOf("}", start) >= 0) return null;
-  return { start, end: value.length, prefix: value.slice(start + 2) };
+function activeTrigger(value: string, caret: number): TriggerRange | null {
+  const beforeCaret = value.slice(0, caret);
+  const start = beforeCaret.lastIndexOf("${");
+  if (start < 0 || beforeCaret.indexOf("}", start) >= 0) return null;
+  return { start, end: caret, prefix: value.slice(start + 2, caret) };
 }
 
 function undefinedReferences(value: string, parameterNames: Set<string>): string[] {
@@ -60,9 +61,9 @@ export function DatasetMacroField({
     return names.filter((name) => name.toLocaleLowerCase().startsWith(prefix));
   }, [names, trigger]);
 
-  function change(next: string) {
+  function change(next: string, selection?: { start: number; end: number }) {
     onChange(next);
-    const nextTrigger = activeTrigger(next);
+    const nextTrigger = activeTrigger(next, selection?.start ?? next.length);
     setTrigger(nextTrigger);
     setActiveIndex(0);
     setOpen(Boolean(nextTrigger));
@@ -107,7 +108,11 @@ export function DatasetMacroField({
           ref={fieldRef}
           value={value}
           onChange={change}
-          onCommit={onCommit}
+          onCommit={() => {
+            setOpen(false);
+            setTrigger(null);
+            onCommit();
+          }}
           onKeyDown={onKeyDown}
           className={className}
         />
@@ -125,11 +130,14 @@ export function DatasetMacroField({
             setOpen((current) => !current);
           }}
         >
-          {"${"}
+          <span aria-hidden="true">{"${"}</span>
         </button>
       </div>
       {open && (
         <div className="dataset-macro-menu" role="listbox" aria-label="Dataset parameters">
+          <div className="dataset-macro-menu-head" aria-hidden="true">
+            Insert parameter
+          </div>
           {filtered.length > 0 ? filtered.map((name, index) => (
             <button
               type="button"
@@ -137,10 +145,12 @@ export function DatasetMacroField({
               role="option"
               aria-selected={index === activeIndex}
               className={`dataset-macro-option${index === activeIndex ? " dataset-macro-option-active" : ""}`}
+              aria-label={name}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => insert(name)}
             >
-              {name}
+              <code>{`\${${name}}`}</code>
+              <span>{parameters.find((parameter) => parameter.name === name)?.type === "LIST" ? "List" : "Text"}</span>
             </button>
           )) : <p className="dataset-macro-empty">No matching parameters</p>}
         </div>

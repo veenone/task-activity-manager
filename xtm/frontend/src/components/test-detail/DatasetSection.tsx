@@ -107,8 +107,7 @@ export function DatasetSection({
 
   if (editing) {
     return (
-      <div className="dataset-section">
-        <h4 className="dataset-head">Dataset</h4>
+      <>
         <DatasetEditor
           profileId={profileId}
           testKey={testKey}
@@ -116,7 +115,10 @@ export function DatasetSection({
           onSaved={() => setEditing(false)}
           onCancel={() => setEditing(false)}
         />
-      </div>
+        <div className="dataset-section">
+          <h4 className="dataset-head">Dataset</h4>
+        </div>
+      </>
     );
   }
   // A test with no dataset shows nothing at all, so an ordinary test's panel

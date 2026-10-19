@@ -81,13 +81,19 @@ Each step has an action, optional data, and an expected result. Type in a box to
 - **Clone from…** copies the steps of another test.
 - **Refresh** reloads the steps from Jira.
 
+When the test has a dataset, its Action, Data and Expected fields include a
+**${** button. Click it, or type `${` in the field, then choose a parameter
+with the mouse or the arrow keys and Enter. XTM inserts the complete
+`${PARAMETER}` macro at the caret. A reference with no matching dataset
+parameter stays visible and shows an error below the field.
+
 Cucumber tests show a **Cucumber scenario** box instead of steps, and Generic tests show a **Generic definition** box.
 
 ### Give a test a dataset
 
 A dataset is the table a test's `${placeholder}` references resolve against: one column per parameter, one row per iteration. It sits below the steps.
 
-- **Create dataset** shows on a test that has none. **Edit** shows on a test that has one.
+- **Create dataset** shows on a test that has none. **Edit** shows on a test that has one. Both open the dataset dialog, with parameters and file actions above the table and Save and Cancel in the footer.
 - A column is a parameter. Click **Add parameter**, or open **Actions** in an existing column header, to configure its name, type and combinatorial behavior. The same menu moves or removes the column with its values.
 - Choose **Text** for free-form values. Choose **List** to enter an ordered set of options, one per line. List cells become dropdowns, and XTM refuses to remove an option while a row still uses it.
 - **Add row** adds an iteration, and **Remove** at the end of a row deletes that row.

@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import type { DatasetParameter } from "../../api";
 import { Modal } from "../Modal";
 import { useConfirm } from "../useConfirm";
 
-const TITLE_ID = "dataset-parameter-title";
 const AD_HOC_SCOPE = "PARAMETER_AD_HOC";
 
 function uniqueOptions(value: string): string[] {
@@ -50,6 +49,9 @@ export function DatasetParameterDialog({
   const [converted, setConverted] = useState(false);
   const [error, setError] = useState("");
   const { confirm } = useConfirm();
+  const titleId = useId();
+  const descriptionId = useId();
+  const nameRef = useRef<HTMLInputElement>(null);
 
   const predefined =
     type === "LIST" &&
@@ -114,21 +116,21 @@ export function DatasetParameterDialog({
   const bindingLabel = `${parameter.listScope === "PROJECT" ? "Project" : "Predefined"} list ${parameter.listId ?? ""}`.trim();
 
   return (
-    <Modal onClose={onCancel} className="modal dataset-parameter-dialog" labelledBy={TITLE_ID}>
-      <div className="dataset-dialog-head">
+    <Modal initialFocus={nameRef} onClose={onCancel} className="modal dataset-parameter-dialog" labelledBy={titleId}>
+      <div className="pending-head dataset-dialog-head">
         <div>
-          <h2 id={TITLE_ID}>{title}</h2>
-          <p>Configure the column used by test step dataset macros.</p>
+          <h2 id={titleId}>{title}</h2>
+          <p id={descriptionId}>Configure the column used by test step dataset macros.</p>
         </div>
         <button className="btn btn-ghost" onClick={onCancel} aria-label="Close">×</button>
       </div>
 
-      <div className="dataset-dialog-body">
-        <label className="dataset-field">
+      <div className="bulk-body dataset-dialog-body" aria-describedby={descriptionId}>
+        <label className="bulk-row dataset-field">
           <span>Parameter name</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} />
+          <input ref={nameRef} value={name} onChange={(event) => setName(event.target.value)} />
         </label>
-        <label className="dataset-field">
+        <label className="bulk-row dataset-field">
           <span>Type</span>
           <select
             aria-label="Parameter type"
@@ -165,7 +167,7 @@ export function DatasetParameterDialog({
                 </button>
               </div>
             )}
-            <label className="dataset-field">
+            <label className="bulk-row dataset-field">
               <span>List options</span>
               <textarea
                 aria-label="List options"
@@ -185,7 +187,7 @@ export function DatasetParameterDialog({
         {error && <p className="dataset-error" role="alert">{error}</p>}
       </div>
 
-      <div className="dataset-dialog-actions">
+      <div className="pending-actions dataset-dialog-actions">
         <button className="btn" onClick={onCancel}>Cancel</button>
         <button className="btn btn-primary" onClick={save}>Save parameter</button>
       </div>

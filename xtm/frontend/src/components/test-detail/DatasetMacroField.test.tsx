@@ -64,6 +64,19 @@ describe("DatasetMacroField", () => {
     expect(screen.queryByRole("listbox", { name: "Dataset parameters" })).not.toBeInTheDocument();
   });
 
+  it("replaces a typed trigger at the caret without removing the text after it", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="Use  value" />);
+    await user.click(screen.getByRole("textbox"));
+    const editor = screen.getByRole("textbox") as HTMLTextAreaElement;
+    editor.setSelectionRange(4, 4);
+
+    await user.type(editor, "$" + "{{ACC", { skipClick: true });
+    await user.click(screen.getByRole("option", { name: /ACCOUNT REGION/ }));
+
+    expect(editor).toHaveValue("Use ${ACCOUNT REGION} value");
+  });
+
   it("keeps an undefined macro visible and explains it without relying on color", () => {
     render(<Harness initial="Use ${MISSING}" />);
 
