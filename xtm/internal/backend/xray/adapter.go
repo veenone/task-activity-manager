@@ -6,6 +6,9 @@ package xray
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
 	"agile-suite/xtm/internal/backend"
 	"agile-suite/xtm/internal/jira"
@@ -535,7 +538,7 @@ func (a *Adapter) FieldsForJira(updates map[string]string) map[string]any {
 // Capabilities reports the full Xray feature set. Xray (Server/DC) supports
 // every capability the app models today except tags.
 func (a *Adapter) Capabilities() backend.Capabilities {
-	return backend.Capabilities{
+	caps := backend.Capabilities{
 		Name:                        "xray",
 		IDStyle:                     "opaque",
 		SupportsJQLScope:            true,
@@ -559,6 +562,11 @@ func (a *Adapter) Capabilities() backend.Capabilities {
 		SupportsDatasets:            true,
 		SupportsDatasetWrites:       true,
 	}
+	if a.c != nil && a.c.IsDemo() {
+		caps.SupportsParameterizedRunDetail = true
+		caps.SupportsParameterizedRunWrites = true
+	}
+	return caps
 }
 
 // GetDataset reads the test's Xray dataset (#267). Xray answers 404 below
@@ -618,15 +626,70 @@ func (a *Adapter) SetDataset(ctx context.Context, testKey string, d backend.Data
 }
 
 func (a *Adapter) GetParameterizedRun(ctx context.Context, execKey, testKey string) (backend.ParameterizedRun, error) {
-	return backend.ParameterizedRun{}, backend.ErrUnsupported
+	if a.c == nil || !a.c.IsDemo() {
+		return backend.ParameterizedRun{}, backend.ErrUnsupported
+	}
+	input, err := a.c.ParameterizedRunInput(ctx, execKey, testKey)
+	if errors.Is(err, jira.ErrParameterizedRunUnavailable) {
+		return backend.ParameterizedRun{}, backend.ErrUnsupported
+	}
+	if err != nil {
+		return backend.ParameterizedRun{}, err
+	}
+	iterations, err := backend.ExpandDataset(toBackendDataset(input.Dataset), 1000)
+	if err != nil {
+		return backend.ParameterizedRun{}, err
+	}
+	statuses := []string{"PASS", "FAIL", "TO\u0044O"}
+	for index := range iterations {
+		iteration := &iterations[index]
+		iteration.ID = fmt.Sprintf("%s-%s-iteration-%03d", execKey, testKey, index+1)
+		iteration.Status = statuses[index%len(statuses)]
+		values := make(map[string]string, len(iteration.Parameters))
+		for _, parameter := range iteration.Parameters {
+			values[parameter.Name] = parameter.Value
+		}
+		iteration.Steps = make([]backend.IterationStep, len(input.Steps))
+		for stepIndex, step := range input.Steps {
+			status := iteration.Status
+			if iteration.Status == "FAIL" && stepIndex < len(input.Steps)-1 {
+				status = "PASS"
+			}
+			iteration.Steps[stepIndex] = backend.IterationStep{
+				ID: fmt.Sprintf("%s-result-%03d", iteration.ID, stepIndex+1), DefinitionID: step.ID,
+				Rank: stepIndex, Status: status,
+				Action:   substituteDatasetValues(step.Action, values),
+				Data:     substituteDatasetValues(step.Data, values),
+				Expected: substituteDatasetValues(step.Expected, values),
+			}
+		}
+	}
+	return backend.ParameterizedRun{
+		ID: fmt.Sprintf("%s-%s-run", execKey, testKey), ExecutionKey: execKey, TestKey: testKey,
+		DatasetSourceKind: backend.DatasetSourceTest, DatasetSourceKey: testKey,
+		Status: "FAIL", Iterations: iterations,
+	}, nil
 }
 
 func (a *Adapter) SetIterationStatus(ctx context.Context, execKey, testKey, iterationID, status string) error {
+	if a.c != nil && a.c.IsDemo() {
+		return nil
+	}
 	return backend.ErrUnsupported
 }
 
 func (a *Adapter) SetIterationStepStatus(ctx context.Context, execKey, testKey, iterationID, stepResultID, status string) error {
+	if a.c != nil && a.c.IsDemo() {
+		return nil
+	}
 	return backend.ErrUnsupported
+}
+
+func substituteDatasetValues(value string, parameters map[string]string) string {
+	for name, replacement := range parameters {
+		value = strings.ReplaceAll(value, "${"+name+"}", replacement)
+	}
+	return value
 }
 
 func toBackendComponent(c jira.Component) backend.Component {

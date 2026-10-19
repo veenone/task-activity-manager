@@ -482,6 +482,10 @@ export function GetParamModel(arg1, arg2) {
   return window['go']['main']['App']['GetParamModel'](arg1, arg2);
 }
 
+export function GetParameterizedRun(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetParameterizedRun'](arg1, arg2, arg3, arg4);
+}
+
 export function GetPreconditionCreateFields(arg1) {
   return window['go']['main']['App']['GetPreconditionCreateFields'](arg1);
 }
@@ -936,6 +940,14 @@ export function SetCoverageProjects(arg1, arg2) {
 
 export function SetDefaultProfile(arg1) {
   return window['go']['main']['App']['SetDefaultProfile'](arg1);
+}
+
+export function SetIterationStatus(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SetIterationStatus'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function SetIterationStepStatus(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['SetIterationStepStatus'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function SetMemberVersion(arg1, arg2, arg3, arg4) {

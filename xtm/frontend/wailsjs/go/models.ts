@@ -23,6 +23,8 @@ export namespace backend {
 	    supportsTags: boolean;
 	    supportsDatasets: boolean;
 	    supportsDatasetWrites: boolean;
+	    supportsParameterizedRunDetail: boolean;
+	    supportsParameterizedRunWrites: boolean;
 	    supportsComponentAdmin: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -53,6 +55,8 @@ export namespace backend {
 	        this.supportsTags = source["supportsTags"];
 	        this.supportsDatasets = source["supportsDatasets"];
 	        this.supportsDatasetWrites = source["supportsDatasetWrites"];
+	        this.supportsParameterizedRunDetail = source["supportsParameterizedRunDetail"];
+	        this.supportsParameterizedRunWrites = source["supportsParameterizedRunWrites"];
 	        this.supportsComponentAdmin = source["supportsComponentAdmin"];
 	    }
 	}
@@ -112,6 +116,125 @@ export namespace backend {
 	        this.outward = source["outward"];
 	    }
 	}
+	export class IterationParameter {
+	    name: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new IterationParameter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.value = source["value"];
+	    }
+	}
+	export class IterationStep {
+	    id: string;
+	    definitionId: string;
+	    rank: number;
+	    status: string;
+	    action: string;
+	    data: string;
+	    expected: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new IterationStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.definitionId = source["definitionId"];
+	        this.rank = source["rank"];
+	        this.status = source["status"];
+	        this.action = source["action"];
+	        this.data = source["data"];
+	        this.expected = source["expected"];
+	    }
+	}
+	export class RunIteration {
+	    id: string;
+	    rank: number;
+	    status: string;
+	    parameters: IterationParameter[];
+	    steps: IterationStep[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RunIteration(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.rank = source["rank"];
+	        this.status = source["status"];
+	        this.parameters = this.convertValues(source["parameters"], IterationParameter);
+	        this.steps = this.convertValues(source["steps"], IterationStep);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ParameterizedRun {
+	    id: string;
+	    executionKey: string;
+	    testKey: string;
+	    datasetSourceKind: string;
+	    datasetSourceKey: string;
+	    status: string;
+	    iterations: RunIteration[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ParameterizedRun(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.executionKey = source["executionKey"];
+	        this.testKey = source["testKey"];
+	        this.datasetSourceKind = source["datasetSourceKind"];
+	        this.datasetSourceKey = source["datasetSourceKey"];
+	        this.status = source["status"];
+	        this.iterations = this.convertValues(source["iterations"], RunIteration);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class User {
 	    name: string;
 	    displayName: string;

@@ -137,6 +137,7 @@ const fullCaps: Capabilities = {
   name: "xray",
   supportsDatasets: true,
   supportsDatasetWrites: true,
+  supportsParameterizedRunDetail: false, supportsParameterizedRunWrites: false,
   idStyle: "opaque",
   supportsJqlScope: true,
   stepModel: "objects",

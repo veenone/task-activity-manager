@@ -255,6 +255,8 @@ export function GetIgnoreWords():Promise<Array<string>>;
 
 export function GetParamModel(arg1:string,arg2:string):Promise<coverage.ParamModel>;
 
+export function GetParameterizedRun(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<backend.ParameterizedRun>;
+
 export function GetPreconditionCreateFields(arg1:string):Promise<Array<jira.FieldDef>>;
 
 export function GetProfileCrossProjectSources(arg1:string):Promise<string>;
@@ -482,6 +484,10 @@ export function SetContainerEnvironments(arg1:string,arg2:string,arg3:Array<stri
 export function SetCoverageProjects(arg1:string,arg2:Array<coverage.ProjectConfig>):Promise<void>;
 
 export function SetDefaultProfile(arg1:string):Promise<void>;
+
+export function SetIterationStatus(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
+
+export function SetIterationStepStatus(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
 
 export function SetMemberVersion(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 

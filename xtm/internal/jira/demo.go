@@ -351,6 +351,23 @@ func demoCalledKey(testKey string) string {
 // generic theme it returns the original three-step skeleton (plus
 // duplicate-cluster and call-graph overrides).
 func demoStepsForKey(theme demoTheme, testKey string) []Step {
+	if testKey == "DEMO2-1" {
+		return []Step{
+			{
+				ID:       testKey + "-dataset-1",
+				Index:    1,
+				Action:   "Sign in as ${USERNAME}",
+				Data:     "Use the ${REGION} region",
+				Expected: "The ${PRIORITY} priority workspace opens",
+			},
+			{
+				ID:       testKey + "-dataset-2",
+				Index:    2,
+				Action:   "Confirm ${USERNAME} can access ${REGION}",
+				Expected: "Access is recorded at ${PRIORITY} priority",
+			},
+		}
+	}
 	if theme.Variant == "pkcs" {
 		// Derive the feature from the test key index so the steps are fully
 		// deterministic (same input → same output).
@@ -1360,8 +1377,8 @@ func demoComponentsForIndex(i int) []string {
 //
 // Every twentieth test by key index gets one, which roughly matches how
 // common parameterized tests are in a real project. The parameters are
-// theme-independent: the demo step text is themed and carries no
-// ${placeholders}, so placeholder highlighting is not exercised in demo mode.
+// theme-independent. DEMO2-1 has matching placeholders in its manual steps so
+// macro authoring and resolved execution results are both visible offline.
 func demoDataset(testKey string) Dataset {
 	idx := demoKeyIndex(testKey)
 	if idx < 0 || idx%20 != 0 {

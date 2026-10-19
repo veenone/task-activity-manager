@@ -166,6 +166,9 @@ export {
   GetTestSteps,
   GetTestDataset,
   GetContainerDataset,
+  GetParameterizedRun,
+  SetIterationStatus,
+  SetIterationStepStatus,
   RenameDatasetPlaceholder,
   CheckJiraTestSteps,
   GetTestReview,
@@ -656,6 +659,8 @@ export interface Capabilities {
   // from supportsDatasets so a read-only backend still shows the table while
   // the editor stays away.
   supportsDatasetWrites: boolean;
+  supportsParameterizedRunDetail: boolean;
+  supportsParameterizedRunWrites: boolean;
 }
 
 // DatasetParameter mirrors testrepo.DatasetParameter: one column of a
@@ -682,6 +687,39 @@ export interface DatasetParameter {
 export interface TestDataset {
   parameters: DatasetParameter[];
   rows: string[][];
+}
+
+export interface IterationParameter {
+  name: string;
+  value: string;
+}
+
+export interface IterationStep {
+  id: string;
+  definitionId: string;
+  rank: number;
+  status: string;
+  action: string;
+  data: string;
+  expected: string;
+}
+
+export interface RunIteration {
+  id: string;
+  rank: number;
+  status: string;
+  parameters: IterationParameter[];
+  steps: IterationStep[];
+}
+
+export interface ParameterizedRun {
+  id: string;
+  executionKey: string;
+  testKey: string;
+  datasetSourceKind: "test" | "plan" | "execution";
+  datasetSourceKey: string;
+  status: string;
+  iterations: RunIteration[];
 }
 
 export interface DatasetCatalogQuery {
