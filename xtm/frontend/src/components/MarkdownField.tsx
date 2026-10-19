@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { KeyboardEventHandler } from "react";
 
 import { Markdown } from "./Markdown";
 
@@ -22,6 +23,7 @@ interface Props {
   // className is applied to BOTH the editor and the rendered view so the
   // field keeps the same footprint as it toggles between them.
   className?: string;
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement | HTMLTextAreaElement>;
 }
 
 export interface MarkdownFieldHandle {
@@ -42,6 +44,7 @@ export const MarkdownField = forwardRef<MarkdownFieldHandle, Props>(function Mar
     rows = 4,
     multiline = true,
     className,
+    onKeyDown,
   },
   handleRef,
 ) {
@@ -99,6 +102,7 @@ export const MarkdownField = forwardRef<MarkdownFieldHandle, Props>(function Mar
       onChange: (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) =>
         onChange(e.target.value),
       onBlur: finishEditing,
+      onKeyDown,
     };
     // Native browser spell-check (WebView2 is Chromium) flags typos in step
     // (Action / Data / Expected) and description prose as you edit

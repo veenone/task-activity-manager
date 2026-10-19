@@ -39,6 +39,14 @@ In the same row you can:
 - On a FAIL row, click the bug button to create a bug for the failed test.
 - Click **✕** to remove the test from the execution.
 
+When a test uses a dataset, expand its row to see one result for each resolved
+parameter combination. Each iteration shows the values used and its resolved
+steps. On the Demo2 profile, you can change an iteration or step result and
+commit it from the Pending list. Live Xray connections currently show these
+controls only when the connected backend advertises verified parameterized-run
+write support. Unsupported connections keep the results read-only and do not
+discard local pending data.
+
 ### Many tests at once
 
 1. Tick the tests to update.
@@ -104,7 +112,10 @@ On a demo profile, **Regenerate sample data** and **Clean sample data…** reset
 
 6. Click **Create execution & apply**.
 
-XTM matches each testcase to a test by its summary. Both imports end as pending changes, so commit them from the Pending list.
+XTM matches each testcase to a test by its summary. Dataset-aware reports can
+also identify a specific iteration; check the preview before applying so you
+can confirm each testcase maps to the intended parameter combination. Both
+imports end as pending changes, so commit them from the Pending list.
 
 ## Work with bugs
 

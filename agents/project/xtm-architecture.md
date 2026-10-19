@@ -152,6 +152,18 @@ The frontend call flow remains `DatasetEditor` to `SaveTestDataset`, then
 transaction. Commit later maps the stored parameter metadata to Xray's
 column-major JSON payload.
 
+**Parameterized Test Runs are cached and committed by stable result ids.** A
+Test remains one execution member; `test_run_iteration` and
+`test_run_iteration_step` hold its nested result tree. The frontend loads that
+tree lazily with the full profile, execution and test identity in its query
+key. Status edits journal `test_run_iteration` or
+`test_run_iteration_step` rows. Before a write, `commit_iteration.go` reads the
+remote tree and compares the targeted stable id with `before_val`: a different
+remote status becomes a conflict, an already-applied value clears locally, and
+a backend refusal keeps only that row pending. Detail and write capabilities
+are separate. Demo2 advertises both for its deterministic fixture; live Xray
+and Kiwi keep both false until fixture-backed endpoints prove their contracts.
+
 **Created entities use temporary keys.** New Preconditions/Containers/Steps get
 a placeholder key locally; the commit path creates them in Jira first, then
 rewrites dependent pending rows (e.g. associations) to the real key before the

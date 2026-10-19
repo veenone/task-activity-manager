@@ -54,6 +54,7 @@ const (
 	skipReasonRunDefects         = "backend does not support run-level defect links"
 	skipReasonRunComments        = "backend does not support run-level comments"
 	skipReasonDatasetWrites      = "backend does not support dataset writes"
+	skipReasonIterationWrites    = "backend does not support parameterized run writes"
 )
 
 // CreatedTest records that a locally-created Test (TempKey, "NEW-N") was created
@@ -249,6 +250,8 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 	// Dataset edits, keyed by test key. Their own pass: the write replaces the
 	// whole table, so it carries a conflict check the per-field scan cannot do.
 	datasetRows := make([]testrepo.PendingChange, 0)
+	// Parameterized results use stable run, iteration and step-result ids.
+	iterationRows := make([]testrepo.PendingChange, 0)
 	for _, c := range changes {
 		if c.EntityType == "test_membership_add" ||
 			c.EntityType == "test_membership_remove" ||
@@ -317,6 +320,10 @@ func (e *Engine) commitChanges(ctx context.Context, profileID, projectKey string
 		}
 		if c.EntityType == "test_dataset" {
 			datasetRows = append(datasetRows, c)
+			continue
+		}
+		if c.EntityType == "test_run_iteration" || c.EntityType == "test_run_iteration_step" {
+			iterationRows = append(iterationRows, c)
 			continue
 		}
 		testKey, ok := parentTestKey(c)
@@ -884,6 +891,11 @@ testLoop:
 		e.skipRows(commentRows, skipReasonComments, &result)
 	}
 	e.commitRuns(ctx, profileID, runRows, &result)
+	if caps.SupportsParameterizedRunWrites {
+		e.commitIterations(ctx, profileID, iterationRows, &result)
+	} else {
+		e.skipRows(iterationRows, skipReasonIterationWrites, &result)
+	}
 	// Run-level defect links + remarks are Xray raven-specific (RND_P_4TFINT_05-296),
 	// gated behind issueBackedWrites like reviews/comments: Xray runs them, a
 	// settable-status backend (Kiwi) skips them.

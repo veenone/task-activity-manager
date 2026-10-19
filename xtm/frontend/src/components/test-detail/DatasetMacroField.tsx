@@ -79,7 +79,7 @@ export function DatasetMacroField({
     setTrigger(null);
   }
 
-  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+  function onKeyDown(event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
     if (!open) return;
     if (event.key === "Escape") {
       event.preventDefault();
@@ -100,7 +100,7 @@ export function DatasetMacroField({
   }
 
   return (
-    <div className={`dataset-macro-field ${className ?? ""}`} onKeyDown={onKeyDown}>
+    <div className={`dataset-macro-field ${className ?? ""}`}>
       <div className="dataset-macro-editor">
         <MarkdownField
           {...fieldProps}
@@ -108,6 +108,7 @@ export function DatasetMacroField({
           value={value}
           onChange={change}
           onCommit={onCommit}
+          onKeyDown={onKeyDown}
           className={className}
         />
         <button
