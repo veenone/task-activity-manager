@@ -193,6 +193,7 @@ func MergeDatasetParameters(imported, current Dataset) Dataset {
 		out.Parameters[i] = p
 		was, found := known[p.Name]
 		if !found {
+			out.Parameters[i].Type = datasetParameterText
 			continue
 		}
 		out.Parameters[i].ID = was.ID

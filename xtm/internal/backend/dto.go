@@ -301,6 +301,12 @@ type DatasetParameter struct {
 	ListID    int      `json:"listId,omitempty"`
 }
 
+const (
+	DatasetParameterText  = "TEXT"
+	DatasetParameterList  = "LIST"
+	DatasetListScopeAdHoc = "PARAMETER_AD_HOC"
+)
+
 // Dataset is a test's parameter table: parameters as columns, one row per
 // iteration. Rows are rectangular, each the length of Parameters. An empty
 // Dataset means the test has none, which is the common case.

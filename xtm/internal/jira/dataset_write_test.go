@@ -52,7 +52,10 @@ type wroteParam struct {
 		Rank          int    `json:"rank"`
 		Combinatorial bool   `json:"combinatorial"`
 		Info          struct {
-			Type string `json:"type"`
+			Type      string   `json:"type"`
+			Options   []string `json:"options"`
+			ListScope string   `json:"paramTestListScope"`
+			ListID    int      `json:"listId"`
 		} `json:"info"`
 	} `json:"param"`
 	Values []struct {
@@ -124,6 +127,62 @@ func TestSetDatasetMarksEveryNewParameterWithANegativeID(t *testing.T) {
 			t.Errorf("parameter %q has id %d, want a negative id to mean new",
 				p.Param.Name, *p.Param.ID)
 		}
+	}
+}
+
+func TestSetDatasetWritesNewAdHocListInfo(t *testing.T) {
+	var got datasetWrite
+	srv := datasetWriteServer(t, &got, http.StatusOK, "Dataset Updated with success.")
+	defer srv.Close()
+
+	err := newTestClient(srv).SetDataset(context.Background(), "QA-1", Dataset{
+		Parameters: []DatasetParameter{{
+			Name: "TIER", Type: "LIST", Options: []string{"gold", "silver"},
+			ListScope: "PARAMETER_AD_HOC",
+		}},
+		Rows: [][]string{{"gold"}},
+	})
+	if err != nil {
+		t.Fatalf("set dataset: %v", err)
+	}
+
+	param := decodeParams(t, got.body)[0].Param
+	if param.ID == nil || *param.ID >= 0 {
+		t.Fatalf("id = %v, want a negative new-parameter marker", param.ID)
+	}
+	if param.Info.Type != "LIST" || param.Info.ListScope != "PARAMETER_AD_HOC" {
+		t.Errorf("info = %+v, want a new ad-hoc LIST", param.Info)
+	}
+	if !reflect.DeepEqual(param.Info.Options, []string{"gold", "silver"}) {
+		t.Errorf("options = %q, want ordered list options", param.Info.Options)
+	}
+	if param.Info.ListID != 0 {
+		t.Errorf("listId = %d, want no positive id for a new ad-hoc list", param.Info.ListID)
+	}
+}
+
+func TestSetDatasetPreservesPredefinedListBinding(t *testing.T) {
+	var got datasetWrite
+	srv := datasetWriteServer(t, &got, http.StatusOK, "Dataset Updated with success.")
+	defer srv.Close()
+
+	err := newTestClient(srv).SetDataset(context.Background(), "QA-1", Dataset{
+		Parameters: []DatasetParameter{{
+			Name: "ENVIRONMENT", ID: 2741, Type: "LIST",
+			Options: []string{"staging", "production"}, ListScope: "PROJECT", ListID: 42,
+		}},
+		Rows: [][]string{{"staging"}},
+	})
+	if err != nil {
+		t.Fatalf("set dataset: %v", err)
+	}
+
+	param := decodeParams(t, got.body)[0].Param
+	if param.ID == nil || *param.ID != 2741 || param.Info.ListID != 42 || param.Info.ListScope != "PROJECT" {
+		t.Errorf("parameter = %+v, want the predefined binding byte-for-byte", param)
+	}
+	if !reflect.DeepEqual(param.Info.Options, []string{"staging", "production"}) {
+		t.Errorf("options = %q, want the predefined options preserved", param.Info.Options)
 	}
 }
 

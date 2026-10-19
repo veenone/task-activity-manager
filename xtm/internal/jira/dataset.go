@@ -201,7 +201,7 @@ func datasetRows(cols []datasetColumn) Dataset {
 			Name:          col.Param.Name,
 			Combinatorial: col.Param.Combinatorial,
 			ID:            col.Param.ID,
-			Type:          col.Param.Info.Type,
+			Type:          normalizedDatasetParameterType(col.Param.Info.Type),
 			Options:       col.Param.Info.Options,
 			ListScope:     col.Param.Info.ListScope,
 			ListID:        col.Param.Info.ListID,
@@ -377,8 +377,9 @@ func parameterID(p DatasetParameter) int {
 	return newParameterID
 }
 
-// parameterInfo hands back what the read found. A parameter the editor just
-// added has none, and is written as text; nothing in XTM creates a list.
+// parameterInfo hands back what the read found. A parameter with no type is a
+// legacy text parameter. A new ad-hoc list carries its options and scope but
+// no server-owned list id; existing list bindings keep every positive id.
 func parameterInfo(p DatasetParameter) datasetParamInfo {
 	info := datasetParamInfo{
 		Type:      p.Type,
@@ -389,12 +390,11 @@ func parameterInfo(p DatasetParameter) datasetParamInfo {
 	if info.Type == "" {
 		info.Type = datasetParamText
 	}
+	if p.ID <= 0 && info.Type == datasetParamList && info.ListScope == datasetListScopeAdHoc {
+		info.ListID = 0
+	}
 	if info.Options == nil {
 		info.Options = []string{}
 	}
 	return info
 }
-
-// datasetParamText is the type of an ordinary parameter, and the only type
-// XTM writes for one it has just been given.
-const datasetParamText = "TEXT"
