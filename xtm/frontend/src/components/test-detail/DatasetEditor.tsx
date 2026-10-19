@@ -8,54 +8,44 @@ import {
   type DatasetParameter,
   type TestDataset,
 } from "../../api";
+import { Menu } from "../Menu";
 import { useConfirm } from "../useConfirm";
+import { DatasetParameterDialog } from "./DatasetParameterDialog";
 
-// DatasetEditor edits a test's parameter table in place (#277 W1).
-//
-// Saving is local, like every other edit in XTM: the table goes to the store
-// and the journal, and reaches Jira on the next Commit. The limits Xray
-// enforces are checked on the Go side, so what comes back from a refused save
-// is the reason, shown here with the table still on screen to fix.
-// Rename is one parameter that kept its id and changed its name.
 interface Rename {
   from: string;
   to: string;
 }
 
-// renamesIn pairs parameters by the id Xray gave them, so a rename is told
-// from a removal and an addition. A parameter with no id is new here and
-// cannot have been renamed.
+interface ParameterEdit {
+  index: number | null;
+  parameter: DatasetParameter;
+}
+
 function renamesIn(before: TestDataset, after: DatasetParameter[]): Rename[] {
   const out: Rename[] = [];
-  for (const p of after) {
-    if (!p.id) continue;
-    const was = before.parameters.find((q) => q.id === p.id);
-    if (was && was.name !== p.name) out.push({ from: was.name, to: p.name });
+  for (const parameter of after) {
+    if (!parameter.id) continue;
+    const previous = before.parameters.find((candidate) => candidate.id === parameter.id);
+    if (previous && previous.name !== parameter.name) {
+      out.push({ from: previous.name, to: parameter.name });
+    }
   }
   return out;
 }
 
-// swap returns the list with two entries exchanged.
-function swap<T>(xs: T[], i: number, j: number): T[] {
-  const out = [...xs];
-  [out[i], out[j]] = [out[j], out[i]];
-  return out;
+function swap<T>(items: T[], left: number, right: number): T[] {
+  const result = [...items];
+  [result[left], result[right]] = [result[right], result[left]];
+  return result;
 }
 
-// fit pads a row to the parameter count, so moving a column does not leave a
-// hole in a row that was short.
 function fit(row: string[], width: number): string[] {
-  return Array.from({ length: width }, (_, i) => row[i] ?? "");
+  return Array.from({ length: width }, (_, index) => row[index] ?? "");
 }
 
-// optionsOf is a list parameter's allowed values, empty for a text one.
-function optionsOf(p: DatasetParameter): string[] {
-  return p.options ?? [];
-}
-
-// optionListID names the datalist a column's cells point at.
-function optionListID(column: number): string {
-  return `dataset-options-${column}`;
+function isList(parameter: DatasetParameter): boolean {
+  return parameter.type === "LIST";
 }
 
 export function DatasetEditor({
@@ -71,79 +61,85 @@ export function DatasetEditor({
   onSaved: (saved: TestDataset) => void;
   onCancel: () => void;
 }) {
-  const [parameters, setParameters] = useState<DatasetParameter[]>(
-    initial.parameters.length > 0 ? initial.parameters : [{ name: "", combinatorial: false }],
-  );
-  const [rows, setRows] = useState<string[][]>(initial.rows.length > 0 ? initial.rows : [[""]]);
+  const [parameters, setParameters] = useState<DatasetParameter[]>(initial.parameters);
+  const [rows, setRows] = useState<string[][]>(initial.rows.length > 0 ? initial.rows : [[]]);
+  const [parameterEdit, setParameterEdit] = useState<ParameterEdit | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const { confirm } = useConfirm();
 
-  const setParameter = (i: number, over: Partial<DatasetParameter>) =>
-    setParameters((ps) => ps.map((p, j) => (i === j ? { ...p, ...over } : p)));
-
-  const addParameter = () => {
-    setParameters((ps) => [...ps, { name: "", combinatorial: false }]);
-    setRows((rs) => rs.map((r) => [...r, ""]));
+  const removeParameter = (index: number) => {
+    setParameters((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setRows((current) =>
+      current.map((row) => row.filter((_, itemIndex) => itemIndex !== index)),
+    );
   };
 
-  const removeParameter = (i: number) => {
-    setParameters((ps) => ps.filter((_, j) => j !== i));
-    setRows((rs) => rs.map((r) => r.filter((_, j) => j !== i)));
+  const setCell = (rowIndex: number, columnIndex: number, value: string) =>
+    setRows((current) =>
+      current.map((row, index) =>
+        index === rowIndex
+          ? row.map((cell, cellIndex) => (cellIndex === columnIndex ? value : cell))
+          : row,
+      ),
+    );
+
+  const addRow = () => setRows((current) => [...current, parameters.map(() => "")]);
+  const removeRow = (rowIndex: number) =>
+    setRows((current) => current.filter((_, index) => index !== rowIndex));
+
+  const moveParameter = (index: number, direction: number) => {
+    const target = index + direction;
+    if (target < 0 || target >= parameters.length) return;
+    setParameters((current) => swap(current, index, target));
+    setRows((current) =>
+      current.map((row) => swap(fit(row, parameters.length), index, target)),
+    );
   };
 
-  const setCell = (r: number, c: number, value: string) =>
-    setRows((rs) => rs.map((row, i) => (i === r ? row.map((v, j) => (j === c ? value : v)) : row)));
-
-  const addRow = () => setRows((rs) => [...rs, parameters.map(() => "")]);
-  const removeRow = (r: number) => setRows((rs) => rs.filter((_, i) => i !== r));
-
-  // Moving a parameter moves its column of values with it. Moving a row
-  // changes the order the iterations run in, which is the point of it.
-  const moveParameter = (i: number, by: number) => {
-    const j = i + by;
-    if (j < 0 || j >= parameters.length) return;
-    setParameters((ps) => swap(ps, i, j));
-    setRows((rs) => rs.map((row) => swap(fit(row, parameters.length), i, j)));
-  };
-  const moveRow = (r: number, by: number) => {
-    const j = r + by;
-    if (j < 0 || j >= rows.length) return;
-    setRows((rs) => swap(rs, r, j));
+  const moveRow = (index: number, direction: number) => {
+    const target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    setRows((current) => swap(current, index, target));
   };
 
-  // A ${placeholder} refers to a parameter by name, so a rename leaves every
-  // reference to the old name resolving to nothing and the test runs with the
-  // literal text. The rewrite is offered rather than done, because only the
-  // author knows whether a reference was deliberate.
+  const applyParameter = (parameter: DatasetParameter) => {
+    if (parameterEdit?.index === null) {
+      setParameters((current) => [...current, parameter]);
+      setRows((current) => current.map((row) => [...row, ""]));
+    } else if (parameterEdit) {
+      setParameters((current) =>
+        current.map((item, index) => (index === parameterEdit.index ? parameter : item)),
+      );
+    }
+    setParameterEdit(null);
+  };
+
   const offerRewrites = async (renames: Rename[]) => {
-    for (const r of renames) {
-      const ok = await confirm({
+    for (const rename of renames) {
+      const accepted = await confirm({
         title: "Rewrite the references too?",
-        message: `This test's steps and definition may refer to \${${r.from}}. Rewrite those to \${${r.to}}?`,
+        message: `This test's steps and definition may refer to \${${rename.from}}. Rewrite those to \${${rename.to}}?`,
         confirmLabel: "Rewrite",
         cancelLabel: "Leave them",
       });
-      if (ok) {
-        await RenameDatasetPlaceholder(profileId, testKey, r.from, r.to);
+      if (accepted) {
+        await RenameDatasetPlaceholder(profileId, testKey, rename.from, rename.to);
       }
     }
   };
 
-  // A dataset is a table, and a spreadsheet is where people edit tables. The
-  // file replaces what is on screen; nothing is stored until Save, so a file
-  // opened by mistake costs a Cancel.
-  const importFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+  const importFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
     setError("");
     try {
       const table = await ImportDatasetCSV(await file.text(), { parameters, rows });
       setParameters(table.parameters);
       setRows(table.rows);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
     }
   };
 
@@ -151,26 +147,24 @@ export function DatasetEditor({
     setError("");
     try {
       await ExportDatasetCSV(testKey, { parameters, rows });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
     }
   };
 
   const save = async () => {
     setSaving(true);
     setError("");
-    // A row shorter than the parameter list is padded here rather than in the
-    // store, so what is saved is what the grid shows.
     const table: TestDataset = {
       parameters,
-      rows: rows.map((r) => parameters.map((_, c) => r[c] ?? "")),
+      rows: rows.map((row) => parameters.map((_, column) => row[column] ?? "")),
     };
     try {
       await SaveTestDataset(profileId, testKey, table);
       await offerRewrites(renamesIn(initial, parameters));
       onSaved(table);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSaving(false);
     }
@@ -178,102 +172,98 @@ export function DatasetEditor({
 
   return (
     <div className="dataset-editor">
-      <div className="dataset-scroll">
-        <table className="dataset-table" aria-label="Dataset editor">
+      <div className="dataset-editor-toolbar" role="group" aria-label="Dataset toolbar">
+        <button
+          className="btn"
+          onClick={() =>
+            setParameterEdit({
+              index: null,
+              parameter: { name: "", combinatorial: false, type: "TEXT" },
+            })
+          }
+        >
+          Add parameter
+        </button>
+        <label className="btn dataset-import">
+          Import CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            aria-label="Import CSV"
+            onChange={(event) => void importFile(event)}
+          />
+        </label>
+        <button className="btn" onClick={() => void exportFile()}>Export CSV</button>
+      </div>
+
+      <div className="dataset-scroll dataset-editor-scroll">
+        <table className="dataset-table dataset-editor-table" aria-label="Dataset editor">
           <thead>
             <tr>
-              {parameters.map((p, i) => (
-                <th key={i} scope="col">
-                  <input
-                    className="dataset-input"
-                    value={p.name}
-                    aria-label={`Parameter ${i + 1} name`}
-                    onChange={(e) => setParameter(i, { name: e.target.value })}
-                  />
-                  <label className="dataset-combi-label">
-                    <input
-                      type="checkbox"
-                      checked={p.combinatorial}
-                      aria-label={`Parameter ${i + 1} is combinatorial`}
-                      onChange={(e) => setParameter(i, { combinatorial: e.target.checked })}
+              <th scope="col" className="dataset-row-heading">Row</th>
+              {parameters.map((parameter, index) => (
+                <th key={parameter.id ?? `${parameter.name}:${index}`} scope="col">
+                  <div className="dataset-parameter-heading">
+                    <span>
+                      <strong>{parameter.name}</strong>
+                      <small>{isList(parameter) ? "List" : "Text"}</small>
+                    </span>
+                    {parameter.combinatorial && (
+                      <span className="dataset-combinatorial" title="Combinatorial parameter">*</span>
+                    )}
+                    <Menu
+                      label="Actions"
+                      triggerClassName="btn btn-ghost dataset-parameter-menu"
+                      triggerLabel={`Actions for parameter ${index + 1}`}
+                      align="right"
+                      items={[
+                        { key: "edit", label: "Edit parameter", onClick: () => setParameterEdit({ index, parameter }) },
+                        { key: "left", label: "Move left", onClick: () => moveParameter(index, -1), disabled: index === 0 },
+                        { key: "right", label: "Move right", onClick: () => moveParameter(index, 1), disabled: index === parameters.length - 1 },
+                        { key: "divider", divider: true },
+                        { key: "remove", label: "Remove parameter", onClick: () => removeParameter(index), disabled: parameters.length === 1, danger: true },
+                      ]}
                     />
-                    combinatorial
-                  </label>
-                  <span className="dataset-move">
-                    <button
-                      className="link-btn"
-                      aria-label={`Move parameter ${i + 1} left`}
-                      onClick={() => moveParameter(i, -1)}
-                      disabled={i === 0}
-                      title="Move this parameter one column left"
-                    >
-                      {"<"}
-                    </button>
-                    <button
-                      className="link-btn"
-                      aria-label={`Move parameter ${i + 1} right`}
-                      onClick={() => moveParameter(i, 1)}
-                      disabled={i === parameters.length - 1}
-                      title="Move this parameter one column right"
-                    >
-                      {">"}
-                    </button>
-                  </span>
-                  <button
-                    className="link-btn dataset-drop"
-                    aria-label={`Remove parameter ${i + 1}`}
-                    onClick={() => removeParameter(i)}
-                    disabled={parameters.length === 1}
-                    title="Remove this parameter and its values"
-                  >
-                    Remove
-                  </button>
+                  </div>
                 </th>
               ))}
+              <th scope="col" className="dataset-row-actions-heading">Row actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, r) => (
-              <tr key={r}>
-                {parameters.map((p, c) => (
-                  <td key={c}>
-                    <input
-                      className="dataset-input"
-                      value={row[c] ?? ""}
-                      aria-label={`Row ${r + 1}, parameter ${c + 1}`}
-                      list={optionsOf(p).length > 0 ? optionListID(c) : undefined}
-                      onChange={(e) => setCell(r, c, e.target.value)}
-                    />
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                <th scope="row" className="dataset-row-number">{rowIndex + 1}</th>
+                {parameters.map((parameter, columnIndex) => (
+                  <td key={parameter.id ?? `${parameter.name}:${columnIndex}`}>
+                    {isList(parameter) ? (
+                      <select
+                        className="dataset-cell-control"
+                        value={row[columnIndex] ?? ""}
+                        aria-label={`Row ${rowIndex + 1}, ${parameter.name}`}
+                        onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)}
+                      >
+                        <option value="">Select an option</option>
+                        {(parameter.options ?? []).map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="dataset-cell-control"
+                        value={row[columnIndex] ?? ""}
+                        aria-label={`Row ${rowIndex + 1}, ${parameter.name}`}
+                        onChange={(event) => setCell(rowIndex, columnIndex, event.target.value)}
+                      />
+                    )}
                   </td>
                 ))}
                 <td>
-                  <button
-                    className="link-btn"
-                    aria-label={`Move row ${r + 1} up`}
-                    onClick={() => moveRow(r, -1)}
-                    disabled={r === 0}
-                    title="Run this iteration earlier"
-                  >
-                    {"^"}
-                  </button>
-                  <button
-                    className="link-btn"
-                    aria-label={`Move row ${r + 1} down`}
-                    onClick={() => moveRow(r, 1)}
-                    disabled={r === rows.length - 1}
-                    title="Run this iteration later"
-                  >
-                    {"v"}
-                  </button>
-                  <button
-                    className="link-btn dataset-drop"
-                    aria-label={`Remove row ${r + 1}`}
-                    onClick={() => removeRow(r)}
-                    disabled={rows.length === 1}
-                    title="Remove this row"
-                  >
-                    Remove
-                  </button>
+                  <div className="dataset-row-actions">
+                    <button className="btn btn-ghost" aria-label={`Move row ${rowIndex + 1} up`} onClick={() => moveRow(rowIndex, -1)} disabled={rowIndex === 0}>↑</button>
+                    <button className="btn btn-ghost" aria-label={`Move row ${rowIndex + 1} down`} onClick={() => moveRow(rowIndex, 1)} disabled={rowIndex === rows.length - 1}>↓</button>
+                    <button className="btn btn-ghost" aria-label={`Remove row ${rowIndex + 1}`} onClick={() => removeRow(rowIndex)} disabled={rows.length === 1}>Remove</button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -281,47 +271,29 @@ export function DatasetEditor({
         </table>
       </div>
 
-      {/* The values a list parameter allows, offered to every cell under it.
-          Xray owns the list; this only saves the user remembering it. */}
-      {parameters.map((p, i) =>
-        optionsOf(p).length > 0 ? (
-          <datalist key={i} id={optionListID(i)}>
-            {optionsOf(p).map((o) => (
-              <option key={o} value={o} />
-            ))}
-          </datalist>
-        ) : null,
-      )}
+      {error && <p className="dataset-error" role="alert">{error}</p>}
 
-      {error && <p className="dataset-error">{error}</p>}
-
-      <div className="dataset-actions">
-        <button className="btn" onClick={addParameter}>
-          Add parameter
-        </button>
-        <button className="btn" onClick={addRow}>
-          Add row
-        </button>
+      <div className="dataset-editor-actions" role="group" aria-label="Dataset actions">
+        <button className="btn" onClick={addRow}>Add row</button>
+        <span className="dataset-action-spacer" />
+        <button className="btn" onClick={onCancel} disabled={saving}>Cancel</button>
         <button className="btn btn-primary" onClick={() => void save()} disabled={saving}>
           {saving ? "Saving…" : "Save"}
         </button>
-        <button className="btn" onClick={onCancel} disabled={saving}>
-          Cancel
-        </button>
       </div>
 
-      <div className="dataset-actions">
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          aria-label="Import CSV"
-          className="dataset-file"
-          onChange={(e) => void importFile(e)}
+      {parameterEdit && (
+        <DatasetParameterDialog
+          parameter={parameterEdit.parameter}
+          usedValues={
+            parameterEdit.index === null
+              ? []
+              : rows.map((row) => row[parameterEdit.index ?? 0] ?? "")
+          }
+          onSave={applyParameter}
+          onCancel={() => setParameterEdit(null)}
         />
-        <button className="btn" onClick={() => void exportFile()}>
-          Export CSV
-        </button>
-      </div>
+      )}
     </div>
   );
 }
